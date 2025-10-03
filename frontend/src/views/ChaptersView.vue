@@ -61,6 +61,10 @@ function goBack() {
   router.push('/')
 }
 
+function goToCharacters() {
+  router.push(`/characters/${props.novelId}`)
+}
+
 function formatDate(timestamp: number) {
   return new Date(timestamp).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -92,6 +96,9 @@ function getWordCount(content: string): number {
       </div>
 
       <div class="header-actions">
+        <button @click="goToCharacters" class="characters-button">
+          👤 人物
+        </button>
         <button @click="createNewChapter" class="new-chapter-button">
           <span class="plus-icon">+</span>
           新章节
@@ -154,11 +161,11 @@ function getWordCount(content: string): number {
   min-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .chapters-header {
-  background: white;
+  background: var(--color-surface);
   border-bottom: 1px solid #e9ecef;
   padding: 12px 16px;
   display: flex;
@@ -179,7 +186,7 @@ function getWordCount(content: string): number {
   gap: 6px;
   background: none;
   border: none;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -189,7 +196,7 @@ function getWordCount(content: string): number {
 }
 
 .back-button:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   color: #333;
 }
 
@@ -212,12 +219,31 @@ function getWordCount(content: string): number {
 
 .chapters-count {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+.characters-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-info);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.characters-button:hover {
+  opacity: 0.9;
 }
 
 .new-chapter-button {
@@ -253,8 +279,8 @@ function getWordCount(content: string): number {
 .empty-chapters {
   text-align: center;
   padding: 60px 20px;
-  color: #6c757d;
-  background: white;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -298,7 +324,7 @@ function getWordCount(content: string): number {
 }
 
 .chapter-card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -334,8 +360,8 @@ function getWordCount(content: string): number {
 
 .chapter-order {
   font-size: 12px;
-  color: #6c757d;
-  background: #f8f9fa;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -343,7 +369,7 @@ function getWordCount(content: string): number {
 .chapter-preview {
   margin-bottom: 8px;
   font-size: 14px;
-  color: #495057;
+  color: var(--color-text-medium);
   line-height: 1.5;
 }
 
@@ -354,7 +380,7 @@ function getWordCount(content: string): number {
 
 .empty-text {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -362,7 +388,7 @@ function getWordCount(content: string): number {
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .chapter-actions {

@@ -28,6 +28,10 @@ const editingNextChapterOverview = ref('')
 const selectedBackgroundTemplate = ref<string>('')
 const selectedAiWriterTemplate = ref<string>('')
 
+// 人物选择相关状态
+const selectedCharacters = ref<string[]>([]) // 选中的人物ID列表
+const showCharacterSelector = ref(false)
+
 const novel = computed(() => appStore.currentNovel)
 const session = computed(() => appStore.writingSession)
 const currentChapter = computed(() => appStore.getCurrentChapter())
@@ -69,7 +73,6 @@ async function sendToAI() {
   }
 
   appStore.setGenerating(true)
-  appStore.setLoading(true)
 
   try {
     difyApi.updateConfig(appStore.difyConfig)
@@ -82,7 +85,9 @@ async function sendToAI() {
       next_chapter_overview: appStore.getCurrentChapterNextOverview(),
       // 使用当前最新内容：包括未保存的生成内容
       current_chapter_content: appStore.getCurrentChapterLatestContent(),
-      history_chapters_content: appStore.getHistoryChapters().map(c => `Chapter ${c.order} ${c.title}: ${c.content}`).join('\n\n')
+      history_chapters_content: appStore.getHistoryChaptersContent(),
+      // 添加选中的人物信息
+      characters_info: getSelectedCharactersInfo()
     }
 
     // 清空之前的内容，准备接收流式数据
@@ -119,7 +124,6 @@ async function sendToAI() {
     appStore.setError(error instanceof Error ? error.message : '生成失败')
   } finally {
     appStore.setGenerating(false)
-    appStore.setLoading(false)
   }
 }
 
@@ -201,21 +205,22 @@ function toggleCloseupMode() {
 
   isCloseupMode.value = !isCloseupMode.value
 
-  if (isCloseupMode.value) {
-    // 开启特写模式，自动生成特写内容
-    generateCloseup()
-  } else {
+  if (!isCloseupMode.value) {
     // 关闭特写模式，关闭对话框
     showCloseupDialog.value = false
     closeupContent.value = ''
   }
+  // 注意：开启特写模式时不自动生成内容，等用户点击发送按钮
 }
 
 async function generateCloseup() {
   if (!appStore.canSendToAI || !novel.value || !currentChapter.value || !canUseCloseup.value) return
 
   isGeneratingCloseup.value = true
-  appStore.setLoading(true)
+
+  // 立即打开弹窗并清空之前的特写内容
+  closeupContent.value = ''
+  showCloseupDialog.value = true
 
   try {
     difyApi.updateConfig(appStore.difyConfig)
@@ -228,35 +233,80 @@ async function generateCloseup() {
       next_chapter_overview: appStore.getCurrentChapterNextOverview(),
       // 使用当前最新内容：包括未保存的生成内容
       current_chapter_content: appStore.getCurrentChapterLatestContent(),
-      history_chapters_content: appStore.getHistoryChapters().map(c => `Chapter ${c.order} ${c.title}: ${c.content}`).join('\n\n'),
+      history_chapters_content: appStore.getHistoryChaptersContent(),
+      // 添加选中的人物信息
+      characters_info: getSelectedCharactersInfo(),
       cmd: '特写'
     }
 
-    const response = await difyApi.runWorkflow({
-      inputs,
-      response_mode: 'blocking',
-      user: `novel_${novel.value.id}_chapter_${currentChapter.value.id}_closeup`
-    })
-
-    if (response.data.outputs?.content) {
-      closeupContent.value = response.data.outputs.content
-      showCloseupDialog.value = true
-    }
+    await difyApi.runWorkflowStreaming(
+      {
+        inputs,
+        user: `novel_${novel.value.id}_chapter_${currentChapter.value.id}_closeup`
+      },
+      // onMessage - 处理流式数据
+      (data: any) => {
+        if (data.event === 'text_chunk' && data.data?.text) {
+          // 逐步追加特写文本内容
+          closeupContent.value += data.data.text
+        } else if (data.event === 'workflow_finished' && data.data?.outputs?.content) {
+          // 工作流完成，设置最终内容
+          closeupContent.value = data.data.outputs.content
+        }
+      },
+      // onError
+      (error: Error) => {
+        appStore.setError(error.message)
+        // 生成失败时关闭特写弹窗和模式
+        showCloseupDialog.value = false
+        isCloseupMode.value = false
+      },
+      // onComplete
+      () => {
+        // 流式传输完成
+        console.log('Closeup streaming completed')
+      }
+    )
 
   } catch (error) {
     appStore.setError(error instanceof Error ? error.message : '特写生成失败')
-    // 生成失败时关闭特写模式
+    // 生成失败时关闭特写弹窗和模式
+    showCloseupDialog.value = false
     isCloseupMode.value = false
   } finally {
     isGeneratingCloseup.value = false
-    appStore.setLoading(false)
   }
 }
 
 function closeCloseupDialog() {
   showCloseupDialog.value = false
-  isCloseupMode.value = false
-  closeupContent.value = ''
+  // 关闭弹窗后保持特写模式开启状态，不清理特写内容，这样用户可以重新查看
+  // 用户需要手动关闭特写开关来退出特写模式
+}
+
+function toggleCharacterSelection(characterId: string) {
+  const index = selectedCharacters.value.indexOf(characterId)
+  if (index > -1) {
+    selectedCharacters.value.splice(index, 1)
+  } else {
+    selectedCharacters.value.push(characterId)
+  }
+}
+
+function clearCharacterSelection() {
+  selectedCharacters.value = []
+}
+
+function getSelectedCharactersInfo(): string {
+  if (selectedCharacters.value.length === 0) return ''
+
+  const charactersInfo = selectedCharacters.value
+    .map(id => appStore.getCharacter(id))
+    .filter(char => char !== null)
+    .map(char => `${char!.name}: ${char!.description}`)
+    .join('\n')
+
+  return charactersInfo
 }
 
 function goBack() {
@@ -360,6 +410,15 @@ function formatDate(timestamp: number) {
 
           <div class="action-buttons">
             <button
+              @click="showCharacterSelector = !showCharacterSelector"
+              :class="['character-selector-toggle', { active: showCharacterSelector || selectedCharacters.length > 0 }]"
+              :title="selectedCharacters.length > 0 ? `已选择 ${selectedCharacters.length} 个人物` : '选择人物参与创作'"
+            >
+              <span class="character-icon">👤</span>
+              <span class="character-count" v-if="selectedCharacters.length > 0">{{ selectedCharacters.length }}</span>
+              <span class="character-text">{{ selectedCharacters.length > 0 ? '已选人物' : '选择人物' }}</span>
+            </button>
+            <button
               @click="toggleCloseupMode"
               :disabled="!canUseCloseup || isGeneratingCloseup"
               :class="['closeup-toggle', {
@@ -386,6 +445,46 @@ function formatDate(timestamp: number) {
       </div>
     </div>
 
+    <!-- 人物选择对话框 -->
+    <div v-if="showCharacterSelector" class="dialog-overlay" @click="showCharacterSelector = false">
+      <div class="dialog character-selector-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>选择参与创作的人物</h3>
+          <button @click="showCharacterSelector = false" class="close-button">×</button>
+        </div>
+        <div class="dialog-body">
+          <div v-if="appStore.currentNovelCharacters.length === 0" class="empty-characters">
+            <div class="empty-icon">👤</div>
+            <p>还没有人物，<router-link :to="`/characters/${novel.id}`" class="create-character-link">去创建人物</router-link></p>
+          </div>
+          <div v-else class="character-selection-list">
+            <div
+              v-for="character in appStore.currentNovelCharacters"
+              :key="character.id"
+              @click="toggleCharacterSelection(character.id)"
+              :class="['character-selection-item', { selected: selectedCharacters.includes(character.id) }]"
+            >
+              <div class="character-checkbox">
+                <span v-if="selectedCharacters.includes(character.id)" class="check-icon">✓</span>
+              </div>
+              <div class="character-info">
+                <h4 class="character-name">{{ character.name }}</h4>
+                <p class="character-description">{{ character.description }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button @click="clearCharacterSelection" class="clear-selection-button" :disabled="selectedCharacters.length === 0">
+            清空选择
+          </button>
+          <button @click="showCharacterSelector = false" class="confirm-selection-button">
+            确认选择 {{ selectedCharacters.length > 0 ? `(${selectedCharacters.length})` : '' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 特写内容展示对话框 -->
     <div v-if="showCloseupDialog" class="dialog-overlay" @click="closeCloseupDialog">
       <div class="dialog large-dialog closeup-dialog" @click.stop>
@@ -407,7 +506,7 @@ function formatDate(timestamp: number) {
             {{ isGeneratingCloseup ? '重新生成中...' : '🔄 重新生成' }}
           </button>
           <button @click="closeCloseupDialog" class="close-closeup-button">
-            关闭特写模式
+            关闭弹窗
           </button>
         </div>
       </div>
@@ -545,11 +644,11 @@ function formatDate(timestamp: number) {
   min-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .writing-header {
-  background: white;
+  background: var(--color-surface);
   border-bottom: 1px solid #e9ecef;
   padding: 12px 16px;
   display: flex;
@@ -570,7 +669,7 @@ function formatDate(timestamp: number) {
   gap: 6px;
   background: none;
   border: none;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -580,8 +679,8 @@ function formatDate(timestamp: number) {
 }
 
 .back-button:hover {
-  background: #f8f9fa;
-  color: #333;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
 }
 
 .back-icon {
@@ -598,7 +697,7 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .chapter-status {
@@ -609,12 +708,12 @@ function formatDate(timestamp: number) {
 
 .chapter-info {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .unsaved-indicator {
   font-size: 12px;
-  color: #dc3545;
+  color: var(--color-danger);
   font-weight: 500;
 }
 
@@ -676,7 +775,7 @@ function formatDate(timestamp: number) {
 
 .content-display {
   flex: 1;
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   min-height: 300px;
@@ -702,7 +801,7 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .save-button {
@@ -723,7 +822,7 @@ function formatDate(timestamp: number) {
 
 .save-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -732,7 +831,7 @@ function formatDate(timestamp: number) {
   padding: 20px;
   font-size: 16px;
   line-height: 1.8;
-  color: #333;
+  color: var(--color-text-primary);
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
@@ -746,7 +845,7 @@ function formatDate(timestamp: number) {
   justify-content: center;
   padding: 40px;
   text-align: center;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .empty-icon {
@@ -767,7 +866,7 @@ function formatDate(timestamp: number) {
 
 .input-section {
   flex-shrink: 0;
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -791,13 +890,13 @@ function formatDate(timestamp: number) {
 
 .input-container textarea:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 .input-container textarea:disabled {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -819,8 +918,8 @@ function formatDate(timestamp: number) {
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;
-  background: #f8f9fa;
-  color: #dc3545;
+  background: var(--color-surface-secondary);
+  color: var(--color-danger);
   border: 1px solid #f5c6cb;
 }
 
@@ -836,9 +935,79 @@ function formatDate(timestamp: number) {
   flex-shrink: 0;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.character-selector-toggle {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.character-selector-toggle:hover:not(:disabled) {
+  border-color: var(--color-info);
+  color: var(--color-info);
+  transform: translateY(-1px);
+}
+
+.character-selector-toggle.active {
+  background: linear-gradient(135deg, var(--color-info), #138496);
+  color: white;
+  border-color: var(--color-info);
+  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
+}
+
+.character-selector-toggle.active:hover:not(:disabled) {
+  background: linear-gradient(135deg, #138496, #117a8b);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(23, 162, 184, 0.4);
+}
+
+.character-icon {
+  font-size: 16px;
+}
+
+.character-count {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-info);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+
+.character-selector-toggle.active .character-count {
+  background: white;
+  color: var(--color-info);
+}
+
+.character-text {
+  font-weight: 500;
+}
+
 .closeup-toggle {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   border: 2px solid #dee2e6;
   border-radius: 8px;
   padding: 12px 20px;
@@ -887,8 +1056,8 @@ function formatDate(timestamp: number) {
 
 .closeup-toggle:disabled,
 .closeup-toggle.disabled {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   border-color: #dee2e6;
   cursor: not-allowed;
   transform: none;
@@ -932,7 +1101,7 @@ function formatDate(timestamp: number) {
 
 .refresh-closeup-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -965,7 +1134,7 @@ function formatDate(timestamp: number) {
 
 .send-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -985,7 +1154,7 @@ function formatDate(timestamp: number) {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 400px;
@@ -1021,14 +1190,14 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .close-button {
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -1040,8 +1209,8 @@ function formatDate(timestamp: number) {
 }
 
 .close-button:hover {
-  background: #f8f9fa;
-  color: #333;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -1063,7 +1232,7 @@ function formatDate(timestamp: number) {
   margin-bottom: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .form-group textarea {
@@ -1080,14 +1249,14 @@ function formatDate(timestamp: number) {
 
 .form-group textarea:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 .help-text {
   margin-top: 6px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -1095,7 +1264,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
 }
 
@@ -1112,13 +1281,13 @@ function formatDate(timestamp: number) {
 }
 
 .cancel-button {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
-  color: #333;
+  background: var(--color-hover-background);
+  color: var(--color-text-primary);
 }
 
 .save-settings-button {
@@ -1141,7 +1310,7 @@ function formatDate(timestamp: number) {
 
 .create-chapter-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -1162,14 +1331,14 @@ function formatDate(timestamp: number) {
   padding: 4px 8px;
   border: 1px solid #dee2e6;
   border-radius: 4px;
-  background: white;
+  background: var(--color-surface);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .template-btn:hover:not(:disabled) {
-  background: #e9ecef;
+  background: var(--color-hover-background);
   border-color: #adb5bd;
 }
 
@@ -1190,7 +1359,7 @@ function formatDate(timestamp: number) {
 .empty-templates {
   text-align: center;
   padding: 40px 20px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .empty-icon {
@@ -1213,8 +1382,8 @@ function formatDate(timestamp: number) {
 }
 
 .template-item:hover {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: var(--color-surface-secondary);
+  border-color: var(--color-primary);
 }
 
 .template-item:last-child {
@@ -1232,25 +1401,163 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .template-date {
   font-size: 11px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .template-description {
   margin: 0 0 8px 0;
   font-size: 12px;
-  color: #495057;
+  color: var(--color-text-medium);
   font-style: italic;
 }
 
 .template-preview {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
+}
+
+/* 人物选择对话框样式 */
+.character-selector-dialog {
+  max-width: 600px;
+}
+
+.character-selection-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.character-selection-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.character-selection-item:hover {
+  background: var(--color-surface-secondary);
+  border-color: var(--color-info);
+}
+
+.character-selection-item.selected {
+  background: #e7f3ff;
+  border-color: var(--color-info);
+  box-shadow: 0 2px 4px rgba(23, 162, 184, 0.2);
+}
+
+.character-selection-item:last-child {
+  margin-bottom: 0;
+}
+
+.character-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #dee2e6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.2s;
+}
+
+.character-selection-item.selected .character-checkbox {
+  background: var(--color-info);
+  border-color: var(--color-info);
+}
+
+.check-icon {
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.character-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.character-name {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.character-description {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-medium);
+  line-height: 1.4;
+}
+
+.empty-characters {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-secondary);
+}
+
+.empty-characters .empty-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.create-character-link {
+  color: var(--color-info);
+  text-decoration: underline;
+}
+
+.create-character-link:hover {
+  text-decoration: none;
+}
+
+.clear-selection-button {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-selection-button:hover:not(:disabled) {
+  background: var(--color-hover-background);
+  color: var(--color-text-primary);
+}
+
+.clear-selection-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirm-selection-button {
+  background: var(--color-info);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-selection-button:hover {
+  opacity: 0.9;
 }
 
 /* 特写对话框样式 */
@@ -1326,6 +1633,7 @@ function formatDate(timestamp: number) {
   }
 
   .closeup-toggle,
+  .character-selector-toggle,
   .send-button {
     width: 100%;
   }

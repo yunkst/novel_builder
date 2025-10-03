@@ -304,11 +304,11 @@ function formatDate(timestamp: number) {
   min-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .chapter-header {
-  background: white;
+  background: var(--color-surface);
   border-bottom: 1px solid #e9ecef;
   padding: 16px;
   flex-shrink: 0;
@@ -322,7 +322,7 @@ function formatDate(timestamp: number) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -368,7 +368,7 @@ function formatDate(timestamp: number) {
 
 .chapter-meta {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .chapter-actions {
@@ -391,8 +391,8 @@ function formatDate(timestamp: number) {
 }
 
 .edit-button {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--color-hover-background);
+  color: var(--color-text-medium);
 }
 
 .edit-button:hover {
@@ -410,7 +410,7 @@ function formatDate(timestamp: number) {
 
 .generate-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -425,17 +425,17 @@ function formatDate(timestamp: number) {
 
 .save-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
 .cancel-button {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
+  background: var(--color-hover-background);
   color: #333;
 }
 
@@ -463,7 +463,7 @@ function formatDate(timestamp: number) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--color-surface);
   margin: 16px;
   border-radius: 12px;
   overflow: hidden;
@@ -476,12 +476,12 @@ function formatDate(timestamp: number) {
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid #e9ecef;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .toolbar-left {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .toolbar-right {
@@ -493,14 +493,14 @@ function formatDate(timestamp: number) {
   padding: 4px 8px;
   border: 1px solid #dee2e6;
   border-radius: 4px;
-  background: white;
+  background: var(--color-surface);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .toolbar-button:hover {
-  background: #e9ecef;
+  background: var(--color-hover-background);
 }
 
 .content-editor {
@@ -518,7 +518,7 @@ function formatDate(timestamp: number) {
 
 .content-viewer {
   flex: 1;
-  background: white;
+  background: var(--color-surface);
   margin: 16px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -533,7 +533,7 @@ function formatDate(timestamp: number) {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   text-align: center;
 }
 
@@ -579,7 +579,7 @@ function formatDate(timestamp: number) {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 400px;
@@ -622,7 +622,7 @@ function formatDate(timestamp: number) {
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -634,7 +634,7 @@ function formatDate(timestamp: number) {
 }
 
 .close-button:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   color: #333;
 }
 
@@ -681,7 +681,7 @@ function formatDate(timestamp: number) {
 .help-text {
   margin-top: 6px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -689,7 +689,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
 }
 
@@ -711,7 +711,7 @@ function formatDate(timestamp: number) {
 
 .generate-submit-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 

@@ -285,11 +285,11 @@ function formatDate(timestamp: number) {
   min-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .templates-header {
-  background: white;
+  background: var(--color-surface);
   border-bottom: 1px solid #e9ecef;
   padding: 12px 16px;
   display: flex;
@@ -310,7 +310,7 @@ function formatDate(timestamp: number) {
   gap: 6px;
   background: none;
   border: none;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -320,7 +320,7 @@ function formatDate(timestamp: number) {
 }
 
 .back-button:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   color: #333;
 }
 
@@ -343,7 +343,7 @@ function formatDate(timestamp: number) {
 
 .templates-count {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .header-actions {
@@ -376,7 +376,7 @@ function formatDate(timestamp: number) {
 }
 
 .tabs-container {
-  background: white;
+  background: var(--color-surface);
   border-bottom: 1px solid #e9ecef;
   flex-shrink: 0;
 }
@@ -392,7 +392,7 @@ function formatDate(timestamp: number) {
   padding: 12px 16px;
   font-size: 14px;
   font-weight: 500;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
@@ -416,8 +416,8 @@ function formatDate(timestamp: number) {
 .empty-templates {
   text-align: center;
   padding: 60px 20px;
-  color: #6c757d;
-  background: white;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -461,7 +461,7 @@ function formatDate(timestamp: number) {
 }
 
 .template-card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -496,8 +496,8 @@ function formatDate(timestamp: number) {
 
 .template-type {
   font-size: 12px;
-  color: #6c757d;
-  background: #f8f9fa;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -505,14 +505,14 @@ function formatDate(timestamp: number) {
 .template-description {
   margin-bottom: 8px;
   font-size: 14px;
-  color: #495057;
+  color: var(--color-text-medium);
   font-style: italic;
 }
 
 .template-preview {
   margin-bottom: 8px;
   font-size: 14px;
-  color: #495057;
+  color: var(--color-text-medium);
   line-height: 1.5;
 }
 
@@ -520,7 +520,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .template-actions {
@@ -574,7 +574,7 @@ function formatDate(timestamp: number) {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 500px;
@@ -617,7 +617,7 @@ function formatDate(timestamp: number) {
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -629,7 +629,7 @@ function formatDate(timestamp: number) {
 }
 
 .close-button:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   color: #333;
 }
 
@@ -682,7 +682,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
 }
 
@@ -699,12 +699,12 @@ function formatDate(timestamp: number) {
 }
 
 .cancel-button {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
+  background: var(--color-hover-background);
   color: #333;
 }
 
@@ -722,7 +722,7 @@ function formatDate(timestamp: number) {
 .create-button:disabled,
 .save-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 

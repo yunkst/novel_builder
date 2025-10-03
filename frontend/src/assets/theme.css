@@ -39,6 +39,16 @@
   --color-validation-valid: #d4edda;
   --color-validation-valid-text: #155724;
   --color-validation-valid-border: #c3e6cb;
+
+  /* Warning colors */
+  --color-warning-background: #fff3cd;
+  --color-warning-border: #ffeaa7;
+  --color-warning-text: #856404;
+
+  /* Border and divider colors */
+  --color-divider: #e9ecef;
+  --color-hover-background: #e9ecef;
+  --color-text-medium: #495057;
 }
 
 [data-theme="dark"] {
@@ -81,6 +91,16 @@
   --color-validation-valid: #283a28;
   --color-validation-valid-text: #51cf66;
   --color-validation-valid-border: #334a33;
+
+  /* Warning colors */
+  --color-warning-background: #3a3428;
+  --color-warning-border: #4a4233;
+  --color-warning-text: #ffd43b;
+
+  /* Border and divider colors */
+  --color-divider: #555555;
+  --color-hover-background: #4a4a4a;
+  --color-text-medium: #bbbbbb;
 }
 
 /* Smooth transition for theme switching */

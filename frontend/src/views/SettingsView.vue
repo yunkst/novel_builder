@@ -8,12 +8,14 @@ const appStore = useAppStore()
 
 const apiBaseUrl = ref('')
 const apiKey = ref('')
+const historyCharsLimit = ref(20000)
 const isSaving = ref(false)
 const testResult = ref<string | null>(null)
 
 onMounted(() => {
   apiBaseUrl.value = appStore.difyConfig.apiBaseUrl
   apiKey.value = appStore.difyConfig.apiKey
+  historyCharsLimit.value = appStore.settings.historyChaptersMaxChars
 })
 
 async function saveSettings() {
@@ -77,6 +79,7 @@ function clearData() {
   appStore.novels.splice(0)
   appStore.chapters.splice(0)
   appStore.templates.splice(0)
+  appStore.characters.splice(0)
   appStore.setCurrentNovel(null)
   appStore.resetWritingSession()
 
@@ -84,6 +87,21 @@ function clearData() {
   setTimeout(() => {
     testResult.value = null
   }, 2000)
+}
+
+function updateHistoryCharsLimit() {
+  if (historyCharsLimit.value >= 1000 && historyCharsLimit.value <= 100000) {
+    appStore.setHistoryChaptersMaxChars(historyCharsLimit.value)
+    testResult.value = '历史章节字数限制已更新'
+    setTimeout(() => {
+      testResult.value = null
+    }, 2000)
+  } else {
+    testResult.value = '字数限制必须在1000-100000之间'
+    setTimeout(() => {
+      testResult.value = null
+    }, 3000)
+  }
 }
 </script>
 
@@ -98,6 +116,26 @@ function clearData() {
       <div class="settings-section">
         <h2>外观设置</h2>
         <ThemeToggle />
+      </div>
+
+      <!-- 创作设置 -->
+      <div class="settings-section">
+        <h2>创作设置</h2>
+        <div class="form-group">
+          <label>历史章节字数限制</label>
+          <input
+            v-model.number="historyCharsLimit"
+            type="number"
+            min="1000"
+            max="100000"
+            step="1000"
+            class="form-input"
+            @change="updateHistoryCharsLimit"
+          />
+          <div class="help-text">
+            发送给AI的历史章节最大字符数，默认20000字。较大的值会提供更多上下文但增加API成本。
+          </div>
+        </div>
       </div>
 
       <!-- Dify API 配置 -->
@@ -174,6 +212,7 @@ function clearData() {
             <li>小说数量: {{ appStore.novels.length }}</li>
             <li>章节数量: {{ appStore.chapters.length }}</li>
             <li>模板数量: {{ appStore.templates.length }}</li>
+            <li>人物数量: {{ appStore.characters.length }}</li>
           </ul>
         </div>
 

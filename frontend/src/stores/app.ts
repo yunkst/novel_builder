@@ -12,6 +12,15 @@ export interface Template {
   updatedAt: number
 }
 
+export interface Character {
+  id: string
+  novelId: string
+  name: string
+  description: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Novel {
   id: string
   title: string
@@ -46,6 +55,7 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 
 export interface AppSettings {
   themeMode: ThemeMode
+  historyChaptersMaxChars: number  // 历史章节最大字符数
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -58,6 +68,7 @@ export const useAppStore = defineStore('app', () => {
   // 小说数据
   const novels = ref<Novel[]>([])
   const chapters = ref<Chapter[]>([])
+  const characters = ref<Character[]>([])
   const currentNovel = ref<Novel | null>(null)
 
   // 模板数据
@@ -65,7 +76,8 @@ export const useAppStore = defineStore('app', () => {
 
   // 应用设置
   const settings = ref<AppSettings>({
-    themeMode: 'system'
+    themeMode: 'system',
+    historyChaptersMaxChars: 20000  // 默认2万字
   })
 
   // 创作会话状态
@@ -115,6 +127,14 @@ export const useAppStore = defineStore('app', () => {
 
   const aiWriterTemplates = computed(() => {
     return templates.value.filter(t => t.type === 'ai_writer').sort((a, b) => b.updatedAt - a.updatedAt)
+  })
+
+  // 当前小说的人物列表
+  const currentNovelCharacters = computed(() => {
+    if (!currentNovel.value) return []
+    return characters.value
+      .filter(character => character.novelId === currentNovel.value!.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
   })
 
   // 当前生效的主题
@@ -172,12 +192,14 @@ export const useAppStore = defineStore('app', () => {
   function deleteNovel(id: string) {
     novels.value = novels.value.filter(n => n.id !== id)
     chapters.value = chapters.value.filter(c => c.novelId !== id)
+    characters.value = characters.value.filter(c => c.novelId !== id) // 删除相关人物
     if (currentNovel.value?.id === id) {
       currentNovel.value = null
       resetWritingSession()
     }
     saveNovels()
     saveChapters()
+    saveCharacters() // 保存人物数据
   }
 
   function setCurrentNovel(novel: Novel | null) {
@@ -256,6 +278,38 @@ export const useAppStore = defineStore('app', () => {
     return templates.value.find(t => t.id === id) || null
   }
 
+  // 人物管理方法
+  function createCharacter(novelId: string, name: string, description: string): Character {
+    const character: Character = {
+      id: Date.now().toString(),
+      novelId,
+      name,
+      description,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    characters.value.push(character)
+    saveCharacters()
+    return character
+  }
+
+  function updateCharacter(id: string, updates: Partial<Omit<Character, 'id' | 'novelId' | 'createdAt'>>) {
+    const character = characters.value.find(c => c.id === id)
+    if (character) {
+      Object.assign(character, updates, { updatedAt: Date.now() })
+      saveCharacters()
+    }
+  }
+
+  function deleteCharacter(id: string) {
+    characters.value = characters.value.filter(c => c.id !== id)
+    saveCharacters()
+  }
+
+  function getCharacter(id: string): Character | null {
+    return characters.value.find(c => c.id === id) || null
+  }
+
   // 创作会话方法
   function setUserInput(input: string) {
     writingSession.value.userInput = input
@@ -282,16 +336,18 @@ export const useAppStore = defineStore('app', () => {
   function startEditingChapter(chapterId: string) {
     const chapter = chapters.value.find(c => c.id === chapterId)
     if (chapter) {
+      // 检查是否切换到了不同的章节
+      const isDifferentChapter = writingSession.value.currentChapterId !== chapterId
+
       writingSession.value.currentChapterId = chapterId
       writingSession.value.originalContent = chapter.content
 
-      // 只有在没有未保存的生成内容时，才用章节内容初始化generatedContent
-      // 这样可以保留从localStorage恢复的未保存内容
-      if (!writingSession.value.generatedContent) {
+      // 如果是切换到不同章节，或者没有生成内容，则重置为章节内容
+      if (isDifferentChapter || !writingSession.value.generatedContent) {
         writingSession.value.generatedContent = chapter.content
         writingSession.value.hasUnsavedChanges = false
       }
-      // 如果有生成内容，检查是否有未保存的更改
+      // 如果是同一章节且有生成内容，检查是否有未保存的更改
       else {
         writingSession.value.hasUnsavedChanges = writingSession.value.generatedContent !== chapter.content
       }
@@ -339,6 +395,37 @@ export const useAppStore = defineStore('app', () => {
     if (!currentNovel.value) return []
     const currentOrder = getCurrentChapter()?.order || 0
     return currentNovelChapters.value.filter(c => c.order < currentOrder)
+  }
+
+  function getHistoryChaptersContent(maxChars?: number): string {
+    const historyChapters = getHistoryChapters()
+    if (historyChapters.length === 0) return ''
+
+    // 使用设置中的字数限制，如果没有提供参数的话
+    const charLimit = maxChars ?? settings.value.historyChaptersMaxChars
+
+    // 从最近的章节开始，逐步添加完整章节，直到接近字数限制
+    let selectedChapters: Chapter[] = []
+    let totalChars = 0
+
+    // 倒序遍历（从最近的章节开始）
+    for (let i = historyChapters.length - 1; i >= 0; i--) {
+      const chapter = historyChapters[i]
+      const chapterText = `Chapter ${chapter.order} ${chapter.title}: ${chapter.content}`
+
+      // 如果添加这个完整章节会超过字数限制，就停止添加
+      if (totalChars + chapterText.length > charLimit) {
+        break
+      }
+
+      selectedChapters.unshift(chapter) // 添加到开头，保持章节顺序
+      totalChars += chapterText.length + (selectedChapters.length > 1 ? 2 : 0) // 加上换行符的长度
+    }
+
+    // 构建最终内容
+    return selectedChapters
+      .map(c => `Chapter ${c.order} ${c.title}: ${c.content}`)
+      .join('\n\n')
   }
 
   function saveWritingSession() {
@@ -430,11 +517,27 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function saveCharacters() {
+    localStorage.setItem('characters', JSON.stringify(characters.value))
+  }
+
+  function loadCharacters() {
+    const saved = localStorage.getItem('characters')
+    if (saved) {
+      try {
+        characters.value = JSON.parse(saved)
+      } catch (e) {
+        console.warn('Failed to load characters from localStorage')
+      }
+    }
+  }
+
   function loadAllData() {
     loadDifyConfig()
     loadNovels()
     loadChapters()
     loadTemplates()
+    loadCharacters()
     loadSettings()
     loadWritingSession()
     // 应用主题设置
@@ -499,6 +602,11 @@ export const useAppStore = defineStore('app', () => {
     applyTheme()
   }
 
+  function setHistoryChaptersMaxChars(maxChars: number) {
+    settings.value.historyChaptersMaxChars = maxChars
+    saveSettings()
+  }
+
   function applyTheme() {
     const theme = currentTheme.value
     document.documentElement.setAttribute('data-theme', theme)
@@ -525,6 +633,7 @@ export const useAppStore = defineStore('app', () => {
     novels,
     chapters,
     templates,
+    characters,
     currentNovel,
     writingSession,
     settings,
@@ -533,6 +642,7 @@ export const useAppStore = defineStore('app', () => {
 
     // 计算属性
     currentNovelChapters,
+    currentNovelCharacters,
     canSendToAI,
     isConfigured,
     backgroundTemplates,
@@ -552,6 +662,10 @@ export const useAppStore = defineStore('app', () => {
     updateTemplate,
     deleteTemplate,
     getTemplate,
+    createCharacter,
+    updateCharacter,
+    deleteCharacter,
+    getCharacter,
     setUserInput,
     setGeneratedContent,
     setGenerating,
@@ -563,12 +677,14 @@ export const useAppStore = defineStore('app', () => {
     getCurrentChapterContent,
     getCurrentChapterLatestContent,
     getHistoryChapters,
+    getHistoryChaptersContent,
     saveCurrentChapter,
     loadAllData,
     setLoading,
     setError,
     clearError,
     setThemeMode,
+    setHistoryChaptersMaxChars,
     applyTheme
   }
 })

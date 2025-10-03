@@ -311,11 +311,11 @@ function formatDate(timestamp: number) {
 .novel-view {
   min-height: calc(100vh - 56px);
   padding: 16px;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .novel-header {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
@@ -330,7 +330,7 @@ function formatDate(timestamp: number) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -360,13 +360,13 @@ function formatDate(timestamp: number) {
 .novel-summary {
   margin: 0 0 12px 0;
   font-size: 16px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
 .novel-meta {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .novel-actions {
@@ -389,8 +389,8 @@ function formatDate(timestamp: number) {
 }
 
 .edit-button {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--color-hover-background);
+  color: var(--color-text-medium);
 }
 
 .edit-button:hover {
@@ -408,7 +408,7 @@ function formatDate(timestamp: number) {
 
 .generate-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -426,7 +426,7 @@ function formatDate(timestamp: number) {
 }
 
 .chapters-section {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -474,7 +474,7 @@ function formatDate(timestamp: number) {
 .empty-chapters {
   text-align: center;
   padding: 60px 20px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .empty-icon {
@@ -507,7 +507,7 @@ function formatDate(timestamp: number) {
 }
 
 .chapter-card:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .chapter-card:last-child {
@@ -529,7 +529,7 @@ function formatDate(timestamp: number) {
 
 .chapter-meta {
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .chapter-arrow {
@@ -554,7 +554,7 @@ function formatDate(timestamp: number) {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 400px;
@@ -597,7 +597,7 @@ function formatDate(timestamp: number) {
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -609,7 +609,7 @@ function formatDate(timestamp: number) {
 }
 
 .close-button:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   color: #333;
 }
 
@@ -680,7 +680,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
 }
 
@@ -698,12 +698,12 @@ function formatDate(timestamp: number) {
 }
 
 .cancel-button {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
+  background: var(--color-hover-background);
   color: #333;
 }
 
@@ -731,7 +731,7 @@ function formatDate(timestamp: number) {
 .save-button:disabled,
 .generate-submit-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 

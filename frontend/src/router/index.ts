@@ -15,6 +15,12 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/characters/:novelId',
+      name: 'characters',
+      component: () => import('@/views/CharactersView.vue'),
+      props: true
+    },
+    {
       path: '/writing/:novelId',
       name: 'writing',
       component: () => import('@/views/WritingView.vue'),

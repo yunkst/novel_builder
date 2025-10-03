@@ -354,7 +354,7 @@ function formatDate(timestamp: number) {
 .home-view {
   min-height: calc(100vh - 56px);
   padding: 16px;
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .config-warning {
@@ -362,8 +362,8 @@ function formatDate(timestamp: number) {
 }
 
 .warning-card {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background: var(--color-warning-background);
+  border: 1px solid var(--color-warning-border);
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -377,14 +377,14 @@ function formatDate(timestamp: number) {
 
 .warning-card h3 {
   margin: 0 0 4px 0;
-  color: #856404;
+  color: var(--color-warning-text);
   font-size: 16px;
   font-weight: 600;
 }
 
 .warning-card p {
   margin: 0 0 8px 0;
-  color: #856404;
+  color: var(--color-warning-text);
   font-size: 14px;
 }
 
@@ -399,7 +399,7 @@ function formatDate(timestamp: number) {
 }
 
 .novels-section {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -417,7 +417,7 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .header-actions {
@@ -470,7 +470,7 @@ function formatDate(timestamp: number) {
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .empty-icon {
@@ -502,7 +502,7 @@ function formatDate(timestamp: number) {
 }
 
 .novel-card:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
 }
 
 .novel-card:last-child {
@@ -519,14 +519,14 @@ function formatDate(timestamp: number) {
   margin: 0 0 6px 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   line-height: 1.4;
 }
 
 .novel-background {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -534,7 +534,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .novel-actions {
@@ -587,7 +587,7 @@ function formatDate(timestamp: number) {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 500px;
@@ -619,14 +619,14 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .close-button {
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -638,8 +638,8 @@ function formatDate(timestamp: number) {
 }
 
 .close-button:hover {
-  background: #f8f9fa;
-  color: #333;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -661,7 +661,7 @@ function formatDate(timestamp: number) {
   margin-bottom: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .form-group input,
@@ -690,7 +690,7 @@ function formatDate(timestamp: number) {
 .help-text {
   margin-top: 6px;
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -710,20 +710,20 @@ function formatDate(timestamp: number) {
   padding: 4px 8px;
   border: 1px solid #dee2e6;
   border-radius: 4px;
-  background: white;
+  background: var(--color-surface);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .template-btn:hover:not(:disabled) {
-  background: #e9ecef;
+  background: var(--color-hover-background);
   border-color: #adb5bd;
 }
 
 .template-btn:disabled {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -755,7 +755,7 @@ function formatDate(timestamp: number) {
 .empty-templates {
   text-align: center;
   padding: 40px 20px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .empty-icon {
@@ -778,7 +778,7 @@ function formatDate(timestamp: number) {
 }
 
 .template-item:hover {
-  background: #f8f9fa;
+  background: var(--color-surface-secondary);
   border-color: #007bff;
 }
 
@@ -797,30 +797,30 @@ function formatDate(timestamp: number) {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .template-date {
   font-size: 11px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .template-description {
   margin: 0 0 8px 0;
   font-size: 12px;
-  color: #495057;
+  color: var(--color-text-medium);
   font-style: italic;
 }
 
 .template-preview {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
 .readonly-textarea {
-  background: #f8f9fa !important;
-  color: #6c757d !important;
+  background: var(--color-surface-secondary) !important;
+  color: var(--color-text-secondary) !important;
   cursor: not-allowed;
 }
 
@@ -835,7 +835,7 @@ function formatDate(timestamp: number) {
 
 .save-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -843,7 +843,7 @@ function formatDate(timestamp: number) {
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
 }
 
@@ -859,13 +859,13 @@ function formatDate(timestamp: number) {
 }
 
 .cancel-button {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
-  color: #333;
+  background: var(--color-hover-background);
+  color: var(--color-text-primary);
 }
 
 .create-button {
@@ -879,7 +879,7 @@ function formatDate(timestamp: number) {
 
 .create-button:disabled {
   background: #dee2e6;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
