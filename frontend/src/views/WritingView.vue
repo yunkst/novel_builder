@@ -21,6 +21,12 @@ const showCloseupDialog = ref(false)
 const closeupContent = ref('')
 const isGeneratingCloseup = ref(false)
 const isCloseupMode = ref(false) // 特写模式开关状态
+const selectedText = ref('') // 用户选择的文本片段
+const selectedParagraphs = ref<number[]>([]) // 选中的段落索引数组
+const showRewriteRequirementDialog = ref(false) // 改写要求输入弹窗
+const rewriteRequirement = ref('') // 改写要求
+const showRewriteResultDialog = ref(false) // 改写结果弹窗
+const rewriteResult = ref('') // 改写结果
 
 const editingBackgroundSetting = ref('')
 const editingAiWriterSetting = ref('')
@@ -36,9 +42,36 @@ const novel = computed(() => appStore.currentNovel)
 const session = computed(() => appStore.writingSession)
 const currentChapter = computed(() => appStore.getCurrentChapter())
 
+// 获取所有章节并按顺序排序
+const allChapters = computed(() => {
+  if (!novel.value) return []
+  return appStore.currentNovelChapters.sort((a, b) => a.order - b.order)
+})
+
+// 当前章节的索引
+const currentChapterIndex = computed(() => {
+  if (!currentChapter.value) return -1
+  return allChapters.value.findIndex(c => c.id === currentChapter.value!.id)
+})
+
+// 是否有上一章
+const hasPreviousChapter = computed(() => currentChapterIndex.value > 0)
+
+// 是否有下一章
+const hasNextChapter = computed(() => {
+  return currentChapterIndex.value >= 0 && currentChapterIndex.value < allChapters.value.length - 1
+})
+
 // 特写功能是否可用（当前章节有内容时）
 const canUseCloseup = computed(() => {
   return currentChapter.value && (currentChapter.value.content.trim().length > 0 || session.value.generatedContent.trim().length > 0)
+})
+
+// 将生成内容分割成段落
+const contentParagraphs = computed(() => {
+  if (!session.value.generatedContent) return []
+  // 按换行符分割，过滤空段落
+  return session.value.generatedContent.split('\n').filter(p => p.trim().length > 0)
 })
 
 onMounted(() => {
@@ -65,12 +98,6 @@ onMounted(() => {
 
 async function sendToAI() {
   if (!appStore.canSendToAI || !novel.value || !currentChapter.value) return
-
-  // 如果特写模式开启，调用特写生成而不是正常的内容生成
-  if (isCloseupMode.value) {
-    generateCloseup()
-    return
-  }
 
   appStore.setGenerating(true)
 
@@ -206,11 +233,99 @@ function toggleCloseupMode() {
   isCloseupMode.value = !isCloseupMode.value
 
   if (!isCloseupMode.value) {
-    // 关闭特写模式，关闭对话框
-    showCloseupDialog.value = false
-    closeupContent.value = ''
+    // 关闭特写模式，清空选择
+    selectedParagraphs.value = []
+    selectedText.value = ''
+    rewriteRequirement.value = ''
   }
-  // 注意：开启特写模式时不自动生成内容，等用户点击发送按钮
+}
+
+// 打开改写要求输入弹窗
+function openRewriteRequirementDialog() {
+  if (selectedParagraphs.value.length === 0) return
+  showRewriteRequirementDialog.value = true
+}
+
+// 开始改写
+async function startRewrite() {
+  if (!rewriteRequirement.value.trim()) return
+
+  showRewriteRequirementDialog.value = false
+  showRewriteResultDialog.value = true
+  rewriteResult.value = ''
+  isGeneratingCloseup.value = true
+
+  try {
+    difyApi.updateConfig(appStore.difyConfig)
+
+    const inputs: any = {
+      user_input: rewriteRequirement.value,
+      background_setting: novel.value!.backgroundSetting,
+      ai_writer_setting: novel.value!.aiWriterSetting,
+      next_chapter_overview: appStore.getCurrentChapterNextOverview(),
+      current_chapter_content: appStore.getCurrentChapterLatestContent(),
+      history_chapters_content: appStore.getHistoryChaptersContent(),
+      characters_info: getSelectedCharactersInfo(),
+      cmd: '特写'
+    }
+
+    if (selectedText.value) {
+      inputs.choice_content = selectedText.value
+    }
+
+    await difyApi.runWorkflowStreaming(
+      {
+        inputs,
+        user: `novel_${novel.value!.id}_chapter_${currentChapter.value!.id}_rewrite`
+      },
+      (data: any) => {
+        if (data.event === 'text_chunk' && data.data?.text) {
+          rewriteResult.value += data.data.text
+        } else if (data.event === 'workflow_finished' && data.data?.outputs?.content) {
+          rewriteResult.value = data.data.outputs.content
+        }
+      },
+      (error: Error) => {
+        appStore.setError(error.message)
+        showRewriteResultDialog.value = false
+      },
+      () => {
+        console.log('Rewrite streaming completed')
+      }
+    )
+  } catch (error) {
+    appStore.setError(error instanceof Error ? error.message : '改写失败')
+    showRewriteResultDialog.value = false
+  } finally {
+    isGeneratingCloseup.value = false
+  }
+}
+
+// 替换段落
+function replaceSelectedParagraphs() {
+  if (!selectedText.value || !rewriteResult.value) return
+
+  const replacedContent = session.value.generatedContent.replace(selectedText.value, rewriteResult.value)
+  appStore.setGeneratedContent(replacedContent)
+
+  // 清空状态并关闭弹窗
+  selectedText.value = ''
+  selectedParagraphs.value = []
+  rewriteResult.value = ''
+  rewriteRequirement.value = ''
+  showRewriteResultDialog.value = false
+  isCloseupMode.value = false
+}
+
+// 重新生成
+function regenerateRewrite() {
+  showRewriteResultDialog.value = false
+  showRewriteRequirementDialog.value = true
+}
+
+// 关闭结果弹窗
+function closeRewriteResultDialog() {
+  showRewriteResultDialog.value = false
 }
 
 async function generateCloseup() {
@@ -226,7 +341,7 @@ async function generateCloseup() {
     difyApi.updateConfig(appStore.difyConfig)
 
     // 构建发送给 Dify 的数据，包含特写指令
-    const inputs = {
+    const inputs: any = {
       user_input: session.value.userInput,
       background_setting: novel.value.backgroundSetting,
       ai_writer_setting: novel.value.aiWriterSetting,
@@ -237,6 +352,11 @@ async function generateCloseup() {
       // 添加选中的人物信息
       characters_info: getSelectedCharactersInfo(),
       cmd: '特写'
+    }
+
+    // 如果用户选择了文本片段，添加到参数中
+    if (selectedText.value) {
+      inputs.choice_content = selectedText.value
     }
 
     await difyApi.runWorkflowStreaming(
@@ -280,8 +400,80 @@ async function generateCloseup() {
 
 function closeCloseupDialog() {
   showCloseupDialog.value = false
-  // 关闭弹窗后保持特写模式开启状态，不清理特写内容，这样用户可以重新查看
+  // 关闭弹窗后保持特写模式开启状态，不清理特写内容和选择状态
   // 用户需要手动关闭特写开关来退出特写模式
+}
+
+function replaceSelectedText() {
+  if (!selectedText.value || !closeupContent.value) return
+
+  // 替换生成内容中的文本
+  if (session.value.generatedContent) {
+    const replacedContent = session.value.generatedContent.replace(selectedText.value, closeupContent.value)
+    appStore.setGeneratedContent(replacedContent)
+  }
+
+  // 清空选择的文本和特写内容
+  selectedText.value = ''
+  selectedParagraphs.value = []
+  closeupContent.value = ''
+  showCloseupDialog.value = false
+  isCloseupMode.value = false
+}
+
+function handleParagraphClick(index: number) {
+  if (!isCloseupMode.value) return
+
+  const selectedIndex = selectedParagraphs.value.indexOf(index)
+
+  if (selectedIndex > -1) {
+    // 已选中，取消选择
+    selectedParagraphs.value.splice(selectedIndex, 1)
+  } else {
+    // 未选中，添加选择
+    selectedParagraphs.value.push(index)
+  }
+
+  // 排序并检查是否连续
+  selectedParagraphs.value.sort((a, b) => a - b)
+
+  // 检查是否连续
+  if (!isConsecutive(selectedParagraphs.value)) {
+    // 如果不连续，只保留当前点击的段落
+    selectedParagraphs.value = [index]
+  }
+
+  // 更新选中的文本
+  updateSelectedText()
+}
+
+function isConsecutive(arr: number[]): boolean {
+  if (arr.length <= 1) return true
+
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] !== arr[i - 1] + 1) {
+      return false
+    }
+  }
+  return true
+}
+
+function updateSelectedText() {
+  if (selectedParagraphs.value.length === 0) {
+    selectedText.value = ''
+    return
+  }
+
+  const selectedContent = selectedParagraphs.value
+    .map(index => contentParagraphs.value[index])
+    .join('\n')
+
+  selectedText.value = selectedContent
+}
+
+function handleTextSelection() {
+  // 移动端不再使用这个函数
+  return
 }
 
 function toggleCharacterSelection(characterId: string) {
@@ -307,6 +499,42 @@ function getSelectedCharactersInfo(): string {
     .join('\n')
 
   return charactersInfo
+}
+
+function goToPreviousChapter() {
+  if (!hasPreviousChapter.value) return
+
+  // 检查是否有未保存的更改
+  if (session.value.hasUnsavedChanges) {
+    if (!confirm('你有未保存的更改，确定要切换章节吗？更改将会丢失。')) {
+      return
+    }
+    appStore.discardChanges()
+  }
+
+  const previousChapter = allChapters.value[currentChapterIndex.value - 1]
+  if (previousChapter) {
+    appStore.startEditingChapter(previousChapter.id)
+  }
+}
+
+function goToNextChapter() {
+  if (!hasNextChapter.value) return
+
+  // 检查是否有未保存的更改
+  if (session.value.hasUnsavedChanges) {
+    if (!confirm('你有未保存的更改，确定要切换章节吗？更改将会丢失。')) {
+      return
+    }
+    appStore.discardChanges()
+  }
+
+  const nextChapter = allChapters.value[currentChapterIndex.value + 1]
+  if (nextChapter) {
+    appStore.startEditingChapter(nextChapter.id)
+    // 滚动到页面顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
 function goBack() {
@@ -339,6 +567,11 @@ function formatDate(timestamp: number) {
           <span class="back-icon">←</span>
           返回
         </button>
+        <div class="chapter-navigation">
+          <button @click="goToPreviousChapter" :disabled="!hasPreviousChapter" class="nav-button prev-button" title="上一章">
+            ◀ 上一章
+          </button>
+        </div>
         <div class="novel-info">
           <h2 class="novel-title">{{ novel.title }}</h2>
           <div class="chapter-status">
@@ -370,7 +603,19 @@ function formatDate(timestamp: number) {
               保存章节
             </button>
           </div>
-          <div class="content-text">{{ session.generatedContent }}</div>
+          <div class="content-text">
+            <div
+              v-for="(paragraph, index) in contentParagraphs"
+              :key="index"
+              :class="['paragraph', {
+                'selectable': isCloseupMode,
+                'selected': selectedParagraphs.includes(index)
+              }]"
+              @click="handleParagraphClick(index)"
+            >
+              {{ paragraph }}
+            </div>
+          </div>
         </div>
 
         <div v-else class="empty-content">
@@ -379,6 +624,27 @@ function formatDate(timestamp: number) {
           <p>在下方输入框中描述你想要的内容，然后发送给 AI</p>
         </div>
       </div>
+
+      <!-- 浮动特写开关 -->
+      <button
+        v-if="canUseCloseup"
+        @click="toggleCloseupMode"
+        :class="['floating-closeup-toggle', { active: isCloseupMode }]"
+        :title="isCloseupMode ? '关闭特写模式' : '开启特写模式'"
+      >
+        <span class="toggle-icon">{{ isCloseupMode ? '✨' : '👁️' }}</span>
+      </button>
+
+      <!-- 浮动改写按钮 -->
+      <button
+        v-if="isCloseupMode && selectedParagraphs.length > 0"
+        @click="openRewriteRequirementDialog"
+        class="floating-rewrite-button"
+        title="改写选中段落"
+      >
+        <span class="rewrite-icon">✍️</span>
+        <span class="rewrite-text">改写</span>
+      </button>
 
       <!-- 用户输入区域 -->
       <div class="input-section">
@@ -419,26 +685,11 @@ function formatDate(timestamp: number) {
               <span class="character-text">{{ selectedCharacters.length > 0 ? '已选人物' : '选择人物' }}</span>
             </button>
             <button
-              @click="toggleCloseupMode"
-              :disabled="!canUseCloseup || isGeneratingCloseup"
-              :class="['closeup-toggle', {
-                disabled: !canUseCloseup,
-                active: isCloseupMode,
-                generating: isGeneratingCloseup
-              }]"
-              :title="canUseCloseup ? (isCloseupMode ? '关闭特写模式' : '开启特写模式') : '需要当前章节有内容才能使用特写功能'"
-            >
-              <span class="toggle-icon">{{ isCloseupMode ? '✨' : '👁️' }}</span>
-              <span class="toggle-text">
-                {{ isGeneratingCloseup ? '生成特写中...' : (isCloseupMode ? '特写已开启' : '特写模式') }}
-              </span>
-            </button>
-            <button
               @click="sendToAI"
-              :disabled="(!appStore.canSendToAI && !isCloseupMode) || session.isGenerating || (isCloseupMode && !canUseCloseup)"
-              :class="['send-button', { 'closeup-mode': isCloseupMode }]"
+              :disabled="!appStore.canSendToAI || session.isGenerating"
+              class="send-button"
             >
-              {{ session.isGenerating ? '生成中...' : (isCloseupMode ? '✨ 生成特写' : '发送给 AI') }}
+              {{ session.isGenerating ? '生成中...' : '发送给 AI' }}
             </button>
           </div>
         </div>
@@ -485,6 +736,64 @@ function formatDate(timestamp: number) {
       </div>
     </div>
 
+    <!-- 改写要求输入对话框 -->
+    <div v-if="showRewriteRequirementDialog" class="dialog-overlay" @click="showRewriteRequirementDialog = false">
+      <div class="dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>输入改写要求</h3>
+          <button @click="showRewriteRequirementDialog = false" class="close-button">×</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>请描述你的改写要求</label>
+            <textarea
+              v-model="rewriteRequirement"
+              placeholder="例如：增加细节描述、改变语气、加强情感表达等..."
+              rows="4"
+              maxlength="500"
+              autofocus
+            ></textarea>
+            <div class="help-text">已选择 {{ selectedParagraphs.length }} 个段落</div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button @click="showRewriteRequirementDialog = false" class="cancel-button">取消</button>
+          <button @click="startRewrite" :disabled="!rewriteRequirement.trim()" class="confirm-button">
+            确认改写
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 改写结果展示对话框 -->
+    <div v-if="showRewriteResultDialog" class="dialog-overlay" @click.stop>
+      <div class="dialog large-dialog rewrite-result-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>✨ 改写结果</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="rewrite-result-content">
+            {{ rewriteResult || '正在生成中...' }}
+          </div>
+          <div class="rewrite-note">
+            <span class="note-icon">📝</span>
+            <span>你可以选择替换原文、重新改写或关闭</span>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button @click="regenerateRewrite" :disabled="isGeneratingCloseup" class="rewrite-button">
+            {{ isGeneratingCloseup ? '生成中...' : '🔄 重写' }}
+          </button>
+          <button @click="replaceSelectedParagraphs" :disabled="isGeneratingCloseup || !rewriteResult" class="replace-button">
+            替换
+          </button>
+          <button @click="closeRewriteResultDialog" class="close-result-button">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 特写内容展示对话框 -->
     <div v-if="showCloseupDialog" class="dialog-overlay" @click="closeCloseupDialog">
       <div class="dialog large-dialog closeup-dialog" @click.stop>
@@ -496,14 +805,21 @@ function formatDate(timestamp: number) {
           <div class="closeup-content">
             {{ closeupContent }}
           </div>
-          <div class="closeup-note">
+          <div v-if="selectedText" class="closeup-note selection-info">
+            <span class="note-icon">📝</span>
+            <span>你选择了 {{ selectedParagraphs.length }} 个段落，可以使用下方的"替换原文"按钮将其替换为特写内容</span>
+          </div>
+          <div v-else class="closeup-note">
             <span class="note-icon">💡</span>
-            <span>这是基于当前章节内容生成的特写片段，不会影响原文内容</span>
+            <span>这是基于当前章节内容生成的特写片段。开启特写模式后，点击段落可选择连续的内容进行特写</span>
           </div>
         </div>
         <div class="dialog-footer">
           <button @click="generateCloseup" :disabled="isGeneratingCloseup" class="refresh-closeup-button">
             {{ isGeneratingCloseup ? '重新生成中...' : '🔄 重新生成' }}
+          </button>
+          <button v-if="selectedText" @click="replaceSelectedText" class="replace-button">
+            替换原文
           </button>
           <button @click="closeCloseupDialog" class="close-closeup-button">
             关闭弹窗
@@ -603,6 +919,13 @@ function formatDate(timestamp: number) {
       </div>
     </div>
 
+    <!-- 底部导航 -->
+    <div class="bottom-navigation">
+      <button @click="goToNextChapter" :disabled="!hasNextChapter" class="nav-button next-button" title="下一章">
+        下一章 ▶
+      </button>
+    </div>
+
     <!-- 模板选择对话框 -->
     <div v-if="showTemplateSelector" class="dialog-overlay" @click="showTemplateSelector = null">
       <div class="dialog template-dialog" @click.stop>
@@ -687,6 +1010,33 @@ function formatDate(timestamp: number) {
   font-size: 16px;
 }
 
+.chapter-navigation {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-button {
+  background: none;
+  border: 1px solid #dee2e6;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--color-surface-secondary);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.nav-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .novel-info {
   display: flex;
   flex-direction: column;
@@ -764,6 +1114,37 @@ function formatDate(timestamp: number) {
   font-size: 14px;
 }
 
+.bottom-navigation {
+  background: var(--color-surface);
+  border-top: 1px solid #e9ecef;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bottom-navigation .nav-button {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  font-weight: 500;
+  padding: 12px 20px;
+  font-size: 16px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.bottom-navigation .nav-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.bottom-navigation .nav-button:disabled {
+  background: #dee2e6;
+  color: var(--color-text-secondary);
+}
+
 .writing-content {
   flex: 1;
   display: flex;
@@ -771,6 +1152,100 @@ function formatDate(timestamp: number) {
   gap: 16px;
   padding: 16px;
   min-height: 0;
+  position: relative;
+}
+
+/* 浮动特写开关按钮 */
+.floating-closeup-toggle {
+  position: fixed;
+  bottom: 120px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid #dee2e6;
+  color: var(--color-text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.floating-closeup-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  border-color: #17a2b8;
+}
+
+.floating-closeup-toggle.active {
+  background: linear-gradient(135deg, #17a2b8, #138496);
+  border-color: #17a2b8;
+  color: white;
+}
+
+.floating-closeup-toggle.active:hover {
+  background: linear-gradient(135deg, #138496, #117a8b);
+}
+
+.floating-closeup-toggle .toggle-icon {
+  animation: none;
+}
+
+.floating-closeup-toggle.active .toggle-icon {
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+/* 浮动改写按钮 */
+.floating-rewrite-button {
+  position: fixed;
+  bottom: 120px;
+  right: 92px;
+  height: 56px;
+  padding: 0 20px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #28a745, #218838);
+  border: none;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  transition: all 0.3s ease;
+  z-index: 100;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.floating-rewrite-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+  background: linear-gradient(135deg, #218838, #1e7e34);
+}
+
+.floating-rewrite-button .rewrite-icon {
+  font-size: 20px;
+}
+
+.floating-rewrite-button .rewrite-text {
+  font-weight: 600;
 }
 
 .content-display {
@@ -832,9 +1307,36 @@ function formatDate(timestamp: number) {
   font-size: 16px;
   line-height: 1.8;
   color: var(--color-text-primary);
+  overflow-y: auto;
+}
+
+.paragraph {
   white-space: pre-wrap;
   word-wrap: break-word;
-  overflow-y: auto;
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.paragraph.selectable {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.paragraph.selectable:hover {
+  background: rgba(23, 162, 184, 0.1);
+  border-color: rgba(23, 162, 184, 0.3);
+}
+
+.paragraph.selected {
+  background: rgba(23, 162, 184, 0.2);
+  border-color: #17a2b8;
+  box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
 }
 
 .empty-content {
@@ -1005,106 +1507,6 @@ function formatDate(timestamp: number) {
   font-weight: 500;
 }
 
-.closeup-toggle {
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-  border: 2px solid #dee2e6;
-  border-radius: 8px;
-  padding: 12px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-}
-
-.closeup-toggle:hover:not(:disabled) {
-  border-color: #17a2b8;
-  color: #17a2b8;
-  transform: translateY(-1px);
-}
-
-.closeup-toggle.active {
-  background: linear-gradient(135deg, #17a2b8, #138496);
-  color: white;
-  border-color: #17a2b8;
-  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
-}
-
-.closeup-toggle.active:hover:not(:disabled) {
-  background: linear-gradient(135deg, #138496, #117a8b);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(23, 162, 184, 0.4);
-}
-
-.closeup-toggle.generating {
-  animation: pulse 2s ease-in-out infinite alternate;
-}
-
-@keyframes pulse {
-  from {
-    box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
-  }
-  to {
-    box-shadow: 0 0 0 10px rgba(23, 162, 184, 0);
-  }
-}
-
-.closeup-toggle:disabled,
-.closeup-toggle.disabled {
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-  border-color: #dee2e6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.toggle-icon {
-  font-size: 18px;
-  transition: all 0.3s ease;
-}
-
-.closeup-toggle.active .toggle-icon {
-  animation: sparkle 1.5s ease-in-out infinite;
-}
-
-@keyframes sparkle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-}
-
-.toggle-text {
-  font-weight: 500;
-}
-
-.refresh-closeup-button {
-  background: #17a2b8;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-right: 8px;
-}
-
-.refresh-closeup-button:hover:not(:disabled) {
-  background: #138496;
-}
-
-.refresh-closeup-button:disabled {
-  background: #dee2e6;
-  color: var(--color-text-secondary);
-  cursor: not-allowed;
-}
-
 .send-button {
   background: #007bff;
   color: white;
@@ -1118,18 +1520,8 @@ function formatDate(timestamp: number) {
   flex-shrink: 0;
 }
 
-.send-button.closeup-mode {
-  background: linear-gradient(135deg, #17a2b8, #138496);
-  box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
-}
-
 .send-button:hover:not(:disabled) {
   background: #0056b3;
-}
-
-.send-button.closeup-mode:hover:not(:disabled) {
-  background: linear-gradient(135deg, #138496, #117a8b);
-  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.4);
 }
 
 .send-button:disabled {
@@ -1612,6 +2004,120 @@ function formatDate(timestamp: number) {
   background: var(--color-primary-hover);
 }
 
+/* 改写相关弹窗样式 */
+.rewrite-result-dialog {
+  max-width: 800px;
+}
+
+.rewrite-result-content {
+  background: var(--color-surface-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rewrite-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e7f3ff;
+  border: 1px solid #b3d7ff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #0066cc;
+}
+
+.rewrite-button {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rewrite-button:hover:not(:disabled) {
+  background: #138496;
+}
+
+.rewrite-button:disabled {
+  background: #dee2e6;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.replace-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.replace-button:hover:not(:disabled) {
+  background: #218838;
+}
+
+.replace-button:disabled {
+  background: #dee2e6;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.close-result-button {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-result-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.confirm-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-button:hover:not(:disabled) {
+  background: #218838;
+}
+
+.confirm-button:disabled {
+  background: #dee2e6;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .writing-content {
     padding: 12px;
@@ -1645,6 +2151,37 @@ function formatDate(timestamp: number) {
   .closeup-content {
     font-size: 14px;
     padding: 16px;
+  }
+
+  /* 移动端浮动按钮适配 */
+  .floating-closeup-toggle {
+    bottom: 80px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  .floating-rewrite-button {
+    bottom: 80px;
+    right: 72px;
+    height: 48px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .floating-rewrite-button .rewrite-icon {
+    font-size: 18px;
+  }
+
+  .rewrite-result-dialog {
+    max-width: 90vw;
+  }
+
+  .rewrite-result-content {
+    font-size: 14px;
+    padding: 16px;
+    min-height: 150px;
   }
 }
 </style>

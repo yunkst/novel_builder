@@ -23,6 +23,14 @@ const saveTemplateName = ref('')
 const saveTemplateDescription = ref('')
 const saveTemplateContent = ref('')
 
+// 上传小说相关
+const showImportDialog = ref(false)
+const importedFile = ref<File | null>(null)
+const isImporting = ref(false)
+const importNovelTitle = ref('')
+const importProgress = ref(0)
+const importStatus = ref('')
+
 const sortedNovels = computed(() => {
   return [...appStore.novels].sort((a, b) => b.updatedAt - a.updatedAt)
 })
@@ -125,6 +133,115 @@ function formatDate(timestamp: number) {
     day: 'numeric'
   })
 }
+
+// 上传功能相关函数
+function openImportDialog() {
+  importNovelTitle.value = ''
+  importedFile.value = null
+  showImportDialog.value = true
+}
+
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    importedFile.value = target.files[0]
+    // 如果没有输入标题，使用文件名作为默认标题
+    if (!importNovelTitle.value.trim()) {
+      const fileName = target.files[0].name
+      importNovelTitle.value = fileName.replace(/\.[^/.]+$/, '') // 去掉文件扩展名
+    }
+  }
+}
+
+async function importNovelFromTxt() {
+  if (!importedFile.value || !importNovelTitle.value.trim()) return
+
+  isImporting.value = true
+  importProgress.value = 0
+  importStatus.value = '正在读取文件...'
+
+  try {
+    let fileContent = await importedFile.value.text()
+    importProgress.value = 10
+    importStatus.value = '正在解析文本...'
+
+    importProgress.value = 20
+    importStatus.value = '正在识别章节...'
+
+    // 创建新小说
+    const novel = appStore.createNovel(
+      importNovelTitle.value,
+      '从TXT文件导入的小说',
+      '通用AI作家设定，擅长各种类型的小说创作'
+    )
+
+    // 使用 ------------ 作为章节分隔符（允许前后有任意空白符）
+    const chapters = fileContent.split(/\s*-{3,}\s*/)
+
+    // 过滤掉空章节
+    const validChapters = chapters.filter(chapter => chapter.trim().length > 0)
+
+    if (validChapters.length === 0) {
+      // 如果没有找到章节，将整个文件作为一章
+      const chapter = appStore.createChapter(novel.id, '第1章')
+      appStore.updateChapter(chapter.id, { content: fileContent.trim() })
+      importProgress.value = 100
+      importStatus.value = '导入完成！'
+    } else {
+      importStatus.value = `找到 ${validChapters.length} 个章节，正在导入...`
+      importProgress.value = 30
+
+      // 划分章节
+      const progressStep = 70 / validChapters.length // 剩余70%进度分配给章节导入
+      for (let i = 0; i < validChapters.length; i++) {
+        const chapterContent = validChapters[i].trim()
+
+        if (chapterContent.length === 0) continue
+
+        // 提取章节标题（第一行非空行）
+        const lines = chapterContent.split('\n').filter(line => line.trim().length > 0)
+        const chapterTitle = lines[0]?.trim() || `第 ${i + 1} 章`
+
+        // 剩余内容作为章节正文
+        const content = lines.slice(1).join('\n').trim()
+
+        // 创建章节
+        const chapter = appStore.createChapter(novel.id, chapterTitle)
+        if (content.length > 0) {
+          appStore.updateChapter(chapter.id, { content })
+        }
+
+        // 更新进度
+        importProgress.value = 30 + Math.round((i + 1) * progressStep)
+        importStatus.value = `正在导入 ${i + 1}/${validChapters.length} 章节...`
+
+        // 让UI有机会更新
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }
+
+      importProgress.value = 100
+      importStatus.value = '导入完成！'
+    }
+
+    // 延迟关闭对话框，让用户看到完成状态
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    showImportDialog.value = false
+    importedFile.value = null
+    importNovelTitle.value = ''
+    importProgress.value = 0
+    importStatus.value = ''
+
+    // 导入成功后跳转到小说章节页面
+    router.push(`/chapters/${novel.id}`)
+  } catch (error) {
+    appStore.setError(error instanceof Error ? error.message : '导入失败')
+    importProgress.value = 0
+    importStatus.value = ''
+  } finally {
+    isImporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -149,6 +266,10 @@ function formatDate(timestamp: number) {
           <router-link to="/templates" class="templates-button">
             📄 模板管理
           </router-link>
+          <button @click="openImportDialog" class="import-button">
+            <span class="import-icon">📁</span>
+            上传小说
+          </button>
           <button @click="openCreateDialog" class="new-button">
             <span class="plus-icon">+</span>
             新建小说
@@ -347,6 +468,68 @@ function formatDate(timestamp: number) {
         </div>
       </div>
     </div>
+
+    <!-- 上传小说对话框 -->
+    <div v-if="showImportDialog" class="dialog-overlay" @click="showImportDialog = false">
+      <div class="dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>上传TXT小说</h3>
+          <button @click="showImportDialog = false" class="close-button">×</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>小说标题 *</label>
+            <input
+              v-model="importNovelTitle"
+              type="text"
+              placeholder="输入小说标题（可自动从文件名获取）"
+              maxlength="50"
+              :disabled="isImporting"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>选择TXT文件 *</label>
+            <input
+              type="file"
+              accept=".txt"
+              @change="handleFileSelect"
+              class="file-input"
+              :disabled="isImporting"
+            />
+            <div class="help-text">
+              系统将自动识别 "------------" 作为章节分隔符并进行划分。如果没有章节标记，将作为单章节导入。
+            </div>
+          </div>
+
+          <div v-if="importedFile && !isImporting" class="file-info">
+            <span class="file-icon">📄</span>
+            <span class="file-name">{{ importedFile.name }}</span>
+            <span class="file-size">({{ Math.round(importedFile.size / 1024) }} KB)</span>
+          </div>
+
+          <div v-if="isImporting" class="import-progress">
+            <div class="progress-info">
+              <span class="progress-status">{{ importStatus }}</span>
+              <span class="progress-percent">{{ importProgress }}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: importProgress + '%' }"></div>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button @click="showImportDialog = false" class="cancel-button" :disabled="isImporting">取消</button>
+          <button
+            @click="importNovelFromTxt"
+            :disabled="!importedFile || !importNovelTitle.trim() || isImporting"
+            class="import-submit-button"
+          >
+            {{ isImporting ? '导入中...' : '开始导入' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -441,6 +624,29 @@ function formatDate(timestamp: number) {
 
 .templates-button:hover {
   background: #5a6268;
+}
+
+.import-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.import-button:hover {
+  background: #138496;
+}
+
+.import-icon {
+  font-size: 14px;
 }
 
 .new-button {
@@ -694,6 +900,43 @@ function formatDate(timestamp: number) {
   line-height: 1.4;
 }
 
+.file-input {
+  padding: 8px !important;
+  border: 2px dashed #dee2e6 !important;
+  background: var(--color-surface-secondary);
+  cursor: pointer;
+}
+
+.file-input:hover {
+  border-color: #007bff !important;
+  background: rgba(0, 123, 255, 0.05);
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-surface-secondary);
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.file-icon {
+  font-size: 16px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+.file-size {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .form-label-with-action {
   display: flex;
   justify-content: space-between;
@@ -881,6 +1124,66 @@ function formatDate(timestamp: number) {
   background: #dee2e6;
   color: var(--color-text-secondary);
   cursor: not-allowed;
+}
+
+.import-submit-button {
+  background: #17a2b8;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.import-submit-button:hover:not(:disabled) {
+  background: #138496;
+}
+
+.import-submit-button:disabled {
+  background: #dee2e6;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.import-progress {
+  margin-top: 16px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-status {
+  font-size: 14px;
+  color: var(--color-text-medium);
+  font-weight: 500;
+}
+
+.progress-percent {
+  font-size: 14px;
+  color: #17a2b8;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #17a2b8, #138496);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 @media (max-width: 768px) {

@@ -35,6 +35,12 @@ const router = createRouter({
       path: '/templates',
       name: 'templates',
       component: () => import('@/views/TemplatesView.vue')
+    },
+    {
+      path: '/novel/:id',
+      name: 'novel',
+      component: () => import('@/views/NovelView.vue'),
+      props: true
     }
   ]
 })
