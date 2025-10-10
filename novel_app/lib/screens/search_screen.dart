@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/novel_crawler_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/crawlers/crawler_factory.dart';
+import '../services/crawlers/base_crawler.dart';
 import 'chapter_list_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -16,6 +19,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Novel> _searchResults = [];
   bool _isLoading = false;
   String _errorMessage = '';
+  final CrawlerFactory _factory = CrawlerFactory();
 
   @override
   void dispose() {
@@ -40,11 +44,42 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final results = await _crawlerService.searchNovels(keyword);
+      // 读取启用的源站点
+      final prefs = await SharedPreferences.getInstance();
+      final enabledHosts = prefs.getStringList('enabled_sources');
+      final crawlers = _factory.registered;
+      final List<BaseCrawler> activeCrawlers = enabledHosts == null || enabledHosts.isEmpty
+          ? crawlers
+          : crawlers.where((c) => enabledHosts.contains(Uri.parse(c.baseUrl).host)).toList();
+
+      if (activeCrawlers.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '未启用任何源站点，请到设置中启用';
+        });
+        return;
+      }
+
+      // 并行搜索，流式追加结果
+      final List<Novel> aggregated = [];
+      final futures = activeCrawlers.map((crawler) async {
+        try {
+          final res = await crawler.searchNovels(keyword);
+          if (res.isNotEmpty) {
+            setState(() {
+              aggregated.addAll(res);
+              _searchResults = List.of(aggregated);
+            });
+          }
+        } catch (_) {
+          // 忽略单站点错误，继续其他站点
+        }
+      }).toList();
+
+      await Future.wait(futures);
       setState(() {
-        _searchResults = results;
         _isLoading = false;
-        if (results.isEmpty) {
+        if (aggregated.isEmpty) {
           _errorMessage = '未找到相关小说，请尝试其他关键词';
         }
       });
@@ -109,6 +144,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 itemCount: _searchResults.length,
                 itemBuilder: (context, index) {
                   final novel = _searchResults[index];
+                  final host = Uri.tryParse(novel.url)?.host ?? '未知站点';
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -119,7 +155,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         novel.title,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('作者: ${novel.author}'),
+                      subtitle: Text('作者: ${novel.author} · 来源: $host'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         Navigator.push(

@@ -4,6 +4,7 @@ class Chapter {
   final String? content;
   final bool isCached;
   final int? chapterIndex;
+  final bool isUserInserted;
 
   Chapter({
     required this.title,
@@ -11,6 +12,7 @@ class Chapter {
     this.content,
     this.isCached = false,
     this.chapterIndex,
+    this.isUserInserted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class Chapter {
       'content': content,
       'isCached': isCached ? 1 : 0,
       'chapterIndex': chapterIndex,
+      'isUserInserted': isUserInserted ? 1 : 0,
     };
   }
 
@@ -30,6 +33,7 @@ class Chapter {
       content: map['content'] as String?,
       isCached: (map['isCached'] as int) == 1,
       chapterIndex: map['chapterIndex'] as int?,
+      isUserInserted: (map['isUserInserted'] as int?) == 1,
     );
   }
 
@@ -39,6 +43,7 @@ class Chapter {
     String? content,
     bool? isCached,
     int? chapterIndex,
+    bool? isUserInserted,
   }) {
     return Chapter(
       title: title ?? this.title,
@@ -46,6 +51,7 @@ class Chapter {
       content: content ?? this.content,
       isCached: isCached ?? this.isCached,
       chapterIndex: chapterIndex ?? this.chapterIndex,
+      isUserInserted: isUserInserted ?? this.isUserInserted,
     );
   }
 }

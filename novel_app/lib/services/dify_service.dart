@@ -180,4 +180,130 @@ class DifyService {
       }
     }
   }
+
+  // 通用的流式工作流执行方法
+  Future<void> runWorkflowStreaming({
+    required Map<String, dynamic> inputs,
+    required Function(String data) onData,
+    Function(String error)? onError,
+    Function()? onDone,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final difyUrl = prefs.getString('dify_url');
+    final difyToken = prefs.getString('dify_token');
+
+    if (difyUrl == null || difyUrl.isEmpty || difyToken == null || difyToken.isEmpty) {
+      throw Exception('请先在设置中配置 Dify URL 和 Token');
+    }
+
+    final url = Uri.parse('$difyUrl/workflows/run');
+
+    final requestBody = {
+      'inputs': inputs,
+      'response_mode': 'streaming',
+      'user': 'novel-builder-app',
+    };
+
+    print('=== Dify API 请求信息 ===');
+    print('URL: $url');
+    print('Request Body: ${jsonEncode(requestBody)}');
+    print('======================');
+
+    final body = jsonEncode(requestBody);
+
+    final request = http.Request('POST', url);
+    request.headers.addAll({
+      'Authorization': 'Bearer $difyToken',
+      'Content-Type': 'application/json',
+    });
+    request.body = body;
+
+    try {
+      final streamedResponse = await request.send();
+
+      print('Response Status Code: ${streamedResponse.statusCode}');
+
+      if (streamedResponse.statusCode == 200) {
+        bool doneCalled = false;
+
+        await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
+          print('收到流式数据块: $chunk');
+
+          // 解析 SSE 格式的数据
+          final lines = chunk.split('\n');
+          for (var line in lines) {
+            print('处理行: $line');
+
+            if (line.startsWith('data: ')) {
+              final dataStr = line.substring(6);
+              if (dataStr.trim().isEmpty) continue;
+
+              try {
+                final data = jsonDecode(dataStr);
+                print('解析的数据: $data');
+
+                // 处理文本块事件
+                if (data['event'] == 'text_chunk' && data['data'] != null) {
+                  final text = data['data']['text'];
+                  print('提取的文本: $text');
+                  if (text != null && text.isNotEmpty) {
+                    onData(text);
+                  }
+                }
+                // 处理工作流完成事件
+                else if (data['event'] == 'workflow_finished') {
+                  print('工作流完成事件: ${data['data']}');
+                  // 调用完成回调
+                  if (onDone != null && !doneCalled) {
+                    doneCalled = true;
+                    onDone();
+                  }
+                }
+              } catch (e) {
+                print('解析错误: $e, 数据: $dataStr');
+                // 忽略解析错误，继续处理下一行
+                continue;
+              }
+            }
+          }
+        }
+
+        // 流结束，如果还没有调用过 onDone，这里调用一次作为后备
+        print('流式传输结束');
+        if (onDone != null && !doneCalled) {
+          print('流结束后调用 onDone（后备方案）');
+          onDone();
+        }
+      } else {
+        // 读取错误响应内容
+        final errorBody = await streamedResponse.stream.bytesToString();
+        print('Error Response Body: $errorBody');
+
+        try {
+          final errorData = jsonDecode(errorBody);
+          final errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
+          final errorCode = errorData['code'] ?? '';
+          final fullError = 'Dify API 请求失败 (${streamedResponse.statusCode})\n错误码: $errorCode\n错误信息: $errorMessage';
+          if (onError != null) {
+            onError(fullError);
+          } else {
+            throw Exception(fullError);
+          }
+        } catch (e) {
+          final fullError = 'Dify API 流式请求失败 (${streamedResponse.statusCode}): $errorBody';
+          if (onError != null) {
+            onError(fullError);
+          } else {
+            throw Exception(fullError);
+          }
+        }
+      }
+    } catch (e) {
+      if (onError != null) {
+        onError(e.toString());
+      } else {
+        rethrow;
+      }
+    }
+  }
 }

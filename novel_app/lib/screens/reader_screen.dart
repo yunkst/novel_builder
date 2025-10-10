@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
@@ -42,6 +43,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final Set<String> _preloadedChapterUrls = {};
   bool _isPreloading = false;
 
+  // 自动滚动相关状态
+  bool _isAutoScrolling = false;
+  Timer? _autoScrollTimer;
+  double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
+  static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +58,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
     _scrollController.dispose();
     _crawlerService.dispose();
     _rewriteResultNotifier.dispose();
@@ -68,16 +76,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
     try {
       final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
       String content;
+      
       if (cachedContent != null) {
         content = cachedContent;
-      } else {
-        content = await _crawlerService.getChapterContent(_currentChapter.url);
-        if (content.isNotEmpty) {
-          await _databaseService.cacheChapter(widget.novel.url, _currentChapter, content);
-        }
-      }
-
-      if (content.isNotEmpty) {
         setState(() {
           _content = content;
           _isLoading = false;
@@ -86,16 +87,60 @@ class _ReaderScreenState extends State<ReaderScreen> {
         // 开始预加载其他章节
         _startPreloadingChapters();
       } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = '未能获取章节内容';
-        });
+        // 从网络获取内容
+        try {
+          content = await _crawlerService.getChapterContent(_currentChapter.url);
+          
+          // 验证内容有效性
+          if (content.isNotEmpty && content.length > 50) {
+            // 缓存有效内容
+            await _databaseService.cacheChapter(widget.novel.url, _currentChapter, content);
+            
+            setState(() {
+              _content = content;
+              _isLoading = false;
+            });
+            _updateReadingProgress();
+            // 开始预加载其他章节
+            _startPreloadingChapters();
+          } else {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = '章节内容为空或过短，请稍后重试';
+            });
+          }
+        } catch (e) {
+          // 网络获取失败，显示错误信息而不是将错误作为内容
+          setState(() {
+            _isLoading = false;
+            _errorMessage = _getErrorMessage(e);
+          });
+        }
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '加载失败: $e';
+        _errorMessage = '加载章节时发生错误: ${e.toString()}';
       });
+    }
+  }
+
+  /// 根据异常类型返回用户友好的错误信息
+  String _getErrorMessage(dynamic error) {
+    final errorStr = error.toString();
+    
+    if (errorStr.contains('请求过于频繁')) {
+      return '请求过于频繁，请稍后重试';
+    } else if (errorStr.contains('超时') || errorStr.contains('timeout')) {
+      return '网络连接超时，请检查网络后重试';
+    } else if (errorStr.contains('网络错误') || errorStr.contains('SocketException')) {
+      return '网络连接失败，请检查网络设置';
+    } else if (errorStr.contains('状态码')) {
+      return '服务器响应异常，请稍后重试';
+    } else if (errorStr.contains('未能提取到有效的章节内容')) {
+      return '无法解析章节内容，可能是网站结构变化';
+    } else {
+      return '获取章节内容失败，请稍后重试';
     }
   }
 
@@ -148,14 +193,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
           continue;
         }
 
-        // 延迟加载，避免过快
-        await Future.delayed(const Duration(milliseconds: 800));
+        // 延迟加载，避免请求过于频繁 (3-5秒随机延迟)
+        final delaySeconds = 3 + (chapter.url.hashCode % 3);
+        await Future.delayed(Duration(seconds: delaySeconds));
 
         // 爬取并缓存
         final content = await _crawlerService.getChapterContent(chapter.url);
         if (content.isNotEmpty) {
           await _databaseService.cacheChapter(widget.novel.url, chapter, content);
           _preloadedChapterUrls.add(chapter.url);
+          print('预加载成功: ${chapter.title}');
         }
       } catch (e) {
         // 静默处理预加载错误，不影响用户阅读
@@ -220,6 +267,117 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     });
                     this.setState(() {});
                   },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 开始自动滚动
+  void _startAutoScroll() {
+    if (_isAutoScrolling) return;
+    
+    setState(() {
+      _isAutoScrolling = true;
+    });
+
+    const duration = Duration(milliseconds: 50); // 每50毫秒滚动一次
+    final scrollStep = (_baseScrollSpeed * _scrollSpeed * 50) / 1000; // 每次滚动的像素数
+
+    _autoScrollTimer = Timer.periodic(duration, (timer) {
+      if (!_isAutoScrolling) {
+        timer.cancel();
+        return;
+      }
+
+      final currentPosition = _scrollController.offset;
+      final maxPosition = _scrollController.position.maxScrollExtent;
+
+      if (currentPosition >= maxPosition) {
+        // 已滚动到底部，停止自动滚动
+        _stopAutoScroll();
+        return;
+      }
+
+      final newPosition = currentPosition + scrollStep;
+      _scrollController.animateTo(
+        newPosition.clamp(0.0, maxPosition),
+        duration: duration,
+        curve: Curves.linear,
+      );
+    });
+  }
+
+  // 停止自动滚动
+  void _stopAutoScroll() {
+    setState(() {
+      _isAutoScrolling = false;
+    });
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
+  // 切换自动滚动状态
+  void _toggleAutoScroll() {
+    if (_isAutoScrolling) {
+      _stopAutoScroll();
+    } else {
+      _startAutoScroll();
+    }
+  }
+
+  // 调整滚动速度
+  void _adjustScrollSpeed(double speed) {
+    setState(() {
+      _scrollSpeed = speed.clamp(0.1, 5.0); // 限制速度范围在0.1x到5.0x之间
+    });
+  }
+
+  // 显示滚动速度调整对话框
+  void _showScrollSpeedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('调整滚动速度'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '当前速度: ${_scrollSpeed.toStringAsFixed(1)}x',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Slider(
+                  value: _scrollSpeed,
+                  min: 0.1,
+                  max: 5.0,
+                  divisions: 49,
+                  label: '${_scrollSpeed.toStringAsFixed(1)}x',
+                  onChanged: (value) {
+                    setState(() {
+                      _scrollSpeed = value;
+                    });
+                    this.setState(() {});
+                  },
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('慢 (0.1x)', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    Text('快 (5.0x)', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  ],
                 ),
               ],
             );
@@ -540,7 +698,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   // 替换选中的段落
-  void _replaceSelectedParagraphs() {
+  void _replaceSelectedParagraphs() async {
     if (_selectedParagraphIndices.isEmpty || _rewriteResultNotifier.value.isEmpty) return;
 
     final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
@@ -551,12 +709,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
     paragraphs.insert(_selectedParagraphIndices.first, _rewriteResultNotifier.value);
 
+    final newContent = paragraphs.join('\n');
+
     setState(() {
-      _content = paragraphs.join('\n');
+      _content = newContent;
       _selectedParagraphIndices.clear();
       _rewriteResultNotifier.value = '';
       _isCloseupMode = false;
     });
+
+    // 保存修改后的内容到数据库
+    try {
+      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
+    } catch (e) {
+      print('保存章节内容失败: $e');
+    }
   }
 
   Future<void> _generateCloseUp(String selectedText, String userInput) async {
@@ -636,9 +803,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
         title: Text(_currentChapter.title),
         actions: [
           IconButton(
+            icon: Icon(_isAutoScrolling ? Icons.pause : Icons.play_arrow),
+            onPressed: _toggleAutoScroll,
+            tooltip: _isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
+            color: _isAutoScrolling ? Colors.red : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.speed),
+            onPressed: _showScrollSpeedDialog,
+            tooltip: '调整滚动速度',
+          ),
+          IconButton(
             icon: const Icon(Icons.text_fields),
             onPressed: _showFontSizeDialog,
             tooltip: '调整字体',
+          ),
+          IconButton(
+            icon: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
+            onPressed: _toggleCloseupMode,
+            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
+            color: _isCloseupMode ? Colors.blue : null,
           ),
         ],
       ),
@@ -745,37 +929,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ],
                 ),
       // 浮动按钮
-      floatingActionButton: _content.isNotEmpty
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // 改写按钮（选中段落时显示）
-                if (_isCloseupMode && _selectedParagraphIndices.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: FloatingActionButton.extended(
-                      onPressed: () {
-                        final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-                        _showRewriteRequirementDialog(paragraphs);
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('改写'),
-                      backgroundColor: Colors.green,
-                      heroTag: 'rewrite',
-                    ),
-                  ),
-                // 特写模式开关按钮
-                FloatingActionButton(
-                  onPressed: _toggleCloseupMode,
-                  backgroundColor: _isCloseupMode ? Colors.blue : Colors.grey[400],
-                  heroTag: 'closeup_toggle',
-                  child: Icon(
-                    _isCloseupMode ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
+      floatingActionButton: _content.isNotEmpty && _isCloseupMode && _selectedParagraphIndices.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+                _showRewriteRequirementDialog(paragraphs);
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('改写'),
+              backgroundColor: Colors.green,
+              heroTag: 'rewrite',
             )
           : null,
     );

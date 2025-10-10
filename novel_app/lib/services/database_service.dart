@@ -25,8 +25,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -67,9 +68,23 @@ class DatabaseService {
         chapterUrl TEXT NOT NULL,
         title TEXT NOT NULL,
         chapterIndex INTEGER,
+        isUserInserted INTEGER DEFAULT 0,
+        insertedAt INTEGER,
         UNIQUE(novelUrl, chapterUrl)
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // 添加用户插入章节的标记字段
+      await db.execute('''
+        ALTER TABLE novel_chapters ADD COLUMN isUserInserted INTEGER DEFAULT 0
+      ''');
+      await db.execute('''
+        ALTER TABLE novel_chapters ADD COLUMN insertedAt INTEGER
+      ''');
+    }
   }
 
   // ========== 书架操作 ==========
@@ -146,6 +161,22 @@ class DatabaseService {
     );
   }
 
+  /// 获取上次阅读的章节索引
+  Future<int> getLastReadChapter(String novelUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      columns: ['lastReadChapter'],
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+    
+    if (maps.isNotEmpty) {
+      return maps.first['lastReadChapter'] as int? ?? 0;
+    }
+    return 0;
+  }
+
   // ========== 章节缓存操作 ==========
 
   /// 缓存章节内容
@@ -162,6 +193,20 @@ class DatabaseService {
         'cachedAt': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// 更新章节内容
+  Future<int> updateChapterContent(String chapterUrl, String content) async {
+    final db = await database;
+    return await db.update(
+      'chapter_cache',
+      {
+        'content': content,
+        'cachedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
     );
   }
 
@@ -222,6 +267,52 @@ class DatabaseService {
     );
   }
 
+  /// 清除特定小说的所有缓存（包括章节内容和章节列表）
+  Future<void> clearNovelCache(String novelUrl) async {
+    final db = await database;
+    final batch = db.batch();
+    
+    // 删除章节内容缓存
+    batch.delete(
+      'chapter_cache',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+    );
+    
+    // 删除章节列表缓存
+    batch.delete(
+      'novel_chapters',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+    );
+    
+    await batch.commit(noResult: true);
+  }
+
+  /// 获取小说缓存统计信息
+  Future<Map<String, int>> getNovelCacheStats(String novelUrl) async {
+    final db = await database;
+    
+    // 获取缓存的章节内容数量
+    final contentResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM chapter_cache WHERE novelUrl = ?',
+      [novelUrl],
+    );
+    final contentCount = contentResult.first['count'] as int;
+    
+    // 获取章节列表数量
+    final chaptersResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM novel_chapters WHERE novelUrl = ?',
+      [novelUrl],
+    );
+    final chaptersCount = chaptersResult.first['count'] as int;
+    
+    return {
+      'cachedChapters': contentCount,
+      'totalChapters': chaptersCount,
+    };
+  }
+
   /// 缓存整本小说
   Future<void> cacheWholeNovel(String novelUrl, List<Chapter> chapters, Future<String> Function(String) getContent) async {
     for (var chapter in chapters) {
@@ -237,10 +328,17 @@ class DatabaseService {
     final db = await database;
     final batch = db.batch();
 
-    // 先删除旧的章节列表
+    // 获取用户插入的章节
+    final userInsertedChapters = await db.query(
+      'novel_chapters',
+      where: 'novelUrl = ? AND isUserInserted = 1',
+      whereArgs: [novelUrl],
+    );
+
+    // 只删除非用户插入的章节
     batch.delete(
       'novel_chapters',
-      where: 'novelUrl = ?',
+      where: 'novelUrl = ? AND isUserInserted = 0',
       whereArgs: [novelUrl],
     );
 
@@ -253,12 +351,16 @@ class DatabaseService {
           'chapterUrl': chapters[i].url,
           'title': chapters[i].title,
           'chapterIndex': i,
+          'isUserInserted': 0,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
 
     await batch.commit(noResult: true);
+
+    // 重新排序章节索引，将用户插入的章节保持在原位置
+    await _reorderChapters(novelUrl);
   }
 
   /// 获取缓存的章节列表
@@ -276,8 +378,75 @@ class DatabaseService {
         title: maps[i]['title'],
         url: maps[i]['chapterUrl'],
         chapterIndex: maps[i]['chapterIndex'],
+        isUserInserted: maps[i]['isUserInserted'] == 1,
       );
     });
+  }
+
+  /// 重新排序章节索引
+  Future<void> _reorderChapters(String novelUrl) async {
+    final db = await database;
+    final chapters = await db.query(
+      'novel_chapters',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+      orderBy: 'chapterIndex ASC',
+    );
+
+    final batch = db.batch();
+    for (var i = 0; i < chapters.length; i++) {
+      batch.update(
+        'novel_chapters',
+        {'chapterIndex': i},
+        where: 'id = ?',
+        whereArgs: [chapters[i]['id']],
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 插入用户章节
+  Future<void> insertUserChapter(String novelUrl, String title, String content, int insertIndex) async {
+    final db = await database;
+    final batch = db.batch();
+
+    // 生成唯一的章节URL
+    final chapterUrl = 'user_chapter_${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // 将插入位置之后的章节索引都加1
+    batch.rawUpdate(
+      'UPDATE novel_chapters SET chapterIndex = chapterIndex + 1 WHERE novelUrl = ? AND chapterIndex >= ?',
+      [novelUrl, insertIndex],
+    );
+
+    // 插入新的用户章节
+    batch.insert(
+      'novel_chapters',
+      {
+        'novelUrl': novelUrl,
+        'chapterUrl': chapterUrl,
+        'title': title,
+        'chapterIndex': insertIndex,
+        'isUserInserted': 1,
+        'insertedAt': now,
+      },
+    );
+
+    // 同时在章节缓存表中添加内容
+    batch.insert(
+      'chapter_cache',
+      {
+        'novelUrl': novelUrl,
+        'chapterUrl': chapterUrl,
+        'title': title,
+        'content': content,
+        'chapterIndex': insertIndex,
+        'cachedAt': now,
+      },
+    );
+
+    await batch.commit(noResult: true);
   }
 
   /// 清空所有缓存
