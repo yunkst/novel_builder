@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 class DifyService {
   Future<String> generateCloseUp({
@@ -69,6 +70,7 @@ class DifyService {
     required String userInput,
     required String currentChapterContent,
     required List<String> historyChaptersContent,
+    String backgroundSetting = '',
     required Function(String chunk) onChunk,
     Function()? onComplete,  // 新增完成回调
   }) async {
@@ -91,15 +93,16 @@ class DifyService {
         'history_chapters_content': historyChaptersContent.join('\n\n'),
         'current_chapter_content': currentChapterContent,
         'choice_content': selectedParagraph,
+        'background_setting': backgroundSetting,
       },
       'response_mode': 'streaming',
       'user': 'novel-builder-app',
     };
 
-    print('=== Dify API 请求信息 ===');
-    print('URL: $url');
-    print('Request Body: ${jsonEncode(requestBody)}');
-    print('======================');
+    debugPrint('=== Dify API 请求信息 ===');
+    debugPrint('URL: $url');
+    debugPrint('Request Body: ${jsonEncode(requestBody)}');
+    debugPrint('======================');
 
     final body = jsonEncode(requestBody);
 
@@ -112,18 +115,18 @@ class DifyService {
 
     final streamedResponse = await request.send();
 
-    print('Response Status Code: ${streamedResponse.statusCode}');
+    debugPrint('Response Status Code: ${streamedResponse.statusCode}');
 
     if (streamedResponse.statusCode == 200) {
       bool completeCalled = false;
 
       await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
-        print('收到流式数据块: $chunk');
+        debugPrint('收到流式数据块: $chunk');
 
         // 解析 SSE 格式的数据
         final lines = chunk.split('\n');
         for (var line in lines) {
-          print('处理行: $line');
+          debugPrint('处理行: $line');
 
           if (line.startsWith('data: ')) {
             final dataStr = line.substring(6);
@@ -131,19 +134,19 @@ class DifyService {
 
             try {
               final data = jsonDecode(dataStr);
-              print('解析的数据: $data');
+              debugPrint('解析的数据: $data');
 
               // 处理文本块事件
               if (data['event'] == 'text_chunk' && data['data'] != null) {
                 final text = data['data']['text'];
-                print('提取的文本: $text');
+                debugPrint('提取的文本: $text');
                 if (text != null && text.isNotEmpty) {
                   onChunk(text);
                 }
               }
               // 处理工作流完成事件
               else if (data['event'] == 'workflow_finished') {
-                print('工作流完成事件: ${data['data']}');
+                debugPrint('工作流完成事件: ${data['data']}');
                 // 调用完成回调
                 if (onComplete != null && !completeCalled) {
                   completeCalled = true;
@@ -151,7 +154,7 @@ class DifyService {
                 }
               }
             } catch (e) {
-              print('解析错误: $e, 数据: $dataStr');
+              debugPrint('解析错误: $e, 数据: $dataStr');
               // 忽略解析错误，继续处理下一行
               continue;
             }
@@ -160,15 +163,15 @@ class DifyService {
       }
 
       // 流结束，如果还没有调用过 onComplete，这里调用一次作为后备
-      print('流式传输结束');
+      debugPrint('流式传输结束');
       if (onComplete != null && !completeCalled) {
-        print('流结束后调用 onComplete（后备方案）');
+        debugPrint('流结束后调用 onComplete（后备方案）');
         onComplete();
       }
     } else {
       // 读取错误响应内容
       final errorBody = await streamedResponse.stream.bytesToString();
-      print('Error Response Body: $errorBody');
+      debugPrint('Error Response Body: $errorBody');
 
       try {
         final errorData = jsonDecode(errorBody);
@@ -204,10 +207,10 @@ class DifyService {
       'user': 'novel-builder-app',
     };
 
-    print('=== Dify API 请求信息 ===');
-    print('URL: $url');
-    print('Request Body: ${jsonEncode(requestBody)}');
-    print('======================');
+    debugPrint('=== Dify API 请求信息 ===');
+    debugPrint('URL: $url');
+    debugPrint('Request Body: ${jsonEncode(requestBody)}');
+    debugPrint('======================');
 
     final body = jsonEncode(requestBody);
 
@@ -221,18 +224,18 @@ class DifyService {
     try {
       final streamedResponse = await request.send();
 
-      print('Response Status Code: ${streamedResponse.statusCode}');
+      debugPrint('Response Status Code: ${streamedResponse.statusCode}');
 
       if (streamedResponse.statusCode == 200) {
         bool doneCalled = false;
 
         await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
-          print('收到流式数据块: $chunk');
+          debugPrint('收到流式数据块: $chunk');
 
           // 解析 SSE 格式的数据
           final lines = chunk.split('\n');
           for (var line in lines) {
-            print('处理行: $line');
+            debugPrint('处理行: $line');
 
             if (line.startsWith('data: ')) {
               final dataStr = line.substring(6);
@@ -240,19 +243,19 @@ class DifyService {
 
               try {
                 final data = jsonDecode(dataStr);
-                print('解析的数据: $data');
+                debugPrint('解析的数据: $data');
 
                 // 处理文本块事件
                 if (data['event'] == 'text_chunk' && data['data'] != null) {
                   final text = data['data']['text'];
-                  print('提取的文本: $text');
+                  debugPrint('提取的文本: $text');
                   if (text != null && text.isNotEmpty) {
                     onData(text);
                   }
                 }
                 // 处理工作流完成事件
                 else if (data['event'] == 'workflow_finished') {
-                  print('工作流完成事件: ${data['data']}');
+                  debugPrint('工作流完成事件: ${data['data']}');
                   // 调用完成回调
                   if (onDone != null && !doneCalled) {
                     doneCalled = true;
@@ -260,7 +263,7 @@ class DifyService {
                   }
                 }
               } catch (e) {
-                print('解析错误: $e, 数据: $dataStr');
+                debugPrint('解析错误: $e, 数据: $dataStr');
                 // 忽略解析错误，继续处理下一行
                 continue;
               }
@@ -269,15 +272,15 @@ class DifyService {
         }
 
         // 流结束，如果还没有调用过 onDone，这里调用一次作为后备
-        print('流式传输结束');
+        debugPrint('流式传输结束');
         if (onDone != null && !doneCalled) {
-          print('流结束后调用 onDone（后备方案）');
+          debugPrint('流结束后调用 onDone（后备方案）');
           onDone();
         }
       } else {
         // 读取错误响应内容
         final errorBody = await streamedResponse.stream.bytesToString();
-        print('Error Response Body: $errorBody');
+        debugPrint('Error Response Body: $errorBody');
 
         try {
           final errorData = jsonDecode(errorBody);

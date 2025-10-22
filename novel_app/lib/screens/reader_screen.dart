@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
-import '../services/novel_crawler_service.dart';
+import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 
@@ -23,7 +23,7 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen> {
-  final NovelCrawlerService _crawlerService = NovelCrawlerService();
+  final ApiServiceWrapper _apiService = ApiServiceWrapper();
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
 
@@ -39,6 +39,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final ValueNotifier<String> _rewriteResultNotifier = ValueNotifier<String>('');
   final ValueNotifier<bool> _isGeneratingRewriteNotifier = ValueNotifier<bool>(false);
 
+  // 全文重写相关状态
+  final ValueNotifier<String> _fullRewriteResultNotifier = ValueNotifier<String>('');
+  final ValueNotifier<bool> _isGeneratingFullRewriteNotifier = ValueNotifier<bool>(false);
+
+  // 全文重写要求的用户输入缓存
+  String _lastFullRewriteInput = '';
+
   // 预加载相关状态
   final Set<String> _preloadedChapterUrls = {};
   bool _isPreloading = false;
@@ -53,16 +60,30 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void initState() {
     super.initState();
     _currentChapter = widget.chapter;
-    _loadChapterContent();
+    _initApi();
+  }
+
+  Future<void> _initApi() async {
+    try {
+      await _apiService.init();
+      _loadChapterContent();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '初始化API失败: $e';
+      });
+    }
   }
 
   @override
   void dispose() {
     _autoScrollTimer?.cancel();
     _scrollController.dispose();
-    _crawlerService.dispose();
+    _apiService.dispose();
     _rewriteResultNotifier.dispose();
     _isGeneratingRewriteNotifier.dispose();
+    _fullRewriteResultNotifier.dispose();
+    _isGeneratingFullRewriteNotifier.dispose();
     super.dispose();
   }
 
@@ -89,7 +110,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       } else {
         // 从网络获取内容
         try {
-          content = await _crawlerService.getChapterContent(_currentChapter.url);
+          content = await _apiService.getChapterContent(_currentChapter.url);
           
           // 验证内容有效性
           if (content.isNotEmpty && content.length > 50) {
@@ -197,16 +218,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final delaySeconds = 3 + (chapter.url.hashCode % 3);
         await Future.delayed(Duration(seconds: delaySeconds));
 
-        // 爬取并缓存
-        final content = await _crawlerService.getChapterContent(chapter.url);
+        // 从后端获取并缓存
+        final content = await _apiService.getChapterContent(chapter.url);
         if (content.isNotEmpty) {
           await _databaseService.cacheChapter(widget.novel.url, chapter, content);
           _preloadedChapterUrls.add(chapter.url);
-          print('预加载成功: ${chapter.title}');
+    debugPrint('预加载成功: ${chapter.title}');
         }
       } catch (e) {
         // 静默处理预加载错误，不影响用户阅读
-        print('预加载章节失败: ${chapter.title}, 错误: $e');
+    debugPrint('预加载章节失败: ${chapter.title}, 错误: $e');
       }
     }
   }
@@ -336,11 +357,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   // 调整滚动速度
-  void _adjustScrollSpeed(double speed) {
-    setState(() {
-      _scrollSpeed = speed.clamp(0.1, 5.0); // 限制速度范围在0.1x到5.0x之间
-    });
-  }
+  // 已弃用：直接通过滑块 onChanged 修改 _scrollSpeed
 
   // 显示滚动速度调整对话框
   void _showScrollSpeedDialog() {
@@ -393,39 +410,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Future<void> _showCloseUpDialog(String selectedText) async {
-    final userInputController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('特写输入'),
-        content: TextField(
-          controller: userInputController,
-          decoration: const InputDecoration(
-            hintText: '请输入你的要求...',
-          ),
-          autofocus: true,
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, userInputController.text);
-            },
-            child: const Text('生成'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
-      _generateCloseUp(selectedText, result);
-    }
-  }
+  // 已弃用：特写输入逻辑已迁移到改写弹窗流程
 
   // 切换特写模式
   void _toggleCloseupMode() {
@@ -478,12 +463,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
         .join('\n');
   }
 
+  // 改写要求的用户输入缓存
+  String _lastRewriteInput = '';
+
   // 打开改写要求输入弹窗
   Future<void> _showRewriteRequirementDialog(List<String> paragraphs) async {
     final selectedText = _getSelectedText(paragraphs);
     if (selectedText.isEmpty) return;
 
-    final userInputController = TextEditingController();
+    final userInputController = TextEditingController(text: _lastRewriteInput);
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -527,6 +515,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
 
     if (result != null && result.isNotEmpty) {
+      _lastRewriteInput = result; // 保存用户输入
       _generateRewrite(selectedText, result);
     }
   }
@@ -545,12 +534,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
       if (currentIndex > 1) {
         final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _crawlerService.getChapterContent(prevChapter2.url);
+        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
         historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
       }
       if (currentIndex > 0) {
         final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _crawlerService.getChapterContent(prevChapter1.url);
+        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
@@ -562,12 +551,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
         userInput: userInput,
         currentChapterContent: _content,
         historyChaptersContent: historyChaptersContent,
+        backgroundSetting: widget.novel.backgroundSetting ?? '',
         onChunk: (chunk) {
-          print('onChunk 回调收到: $chunk');
+    debugPrint('onChunk 回调收到: $chunk');
           _rewriteResultNotifier.value += chunk;
         },
         onComplete: () {
-          print('onComplete 回调被调用');
+    debugPrint('onComplete 回调被调用');
           _isGeneratingRewriteNotifier.value = false;
         },
       );
@@ -659,7 +649,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       : () {
                           Navigator.pop(dialogContext);
                           final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-                          final selectedText = _getSelectedText(paragraphs);
                           _showRewriteRequirementDialog(paragraphs);
                         },
                   icon: const Icon(Icons.refresh),
@@ -722,73 +711,308 @@ class _ReaderScreenState extends State<ReaderScreen> {
     try {
       await _databaseService.updateChapterContent(_currentChapter.url, newContent);
     } catch (e) {
-      print('保存章节内容失败: $e');
+    debugPrint('保存章节内容失败: $e');
     }
   }
 
-  Future<void> _generateCloseUp(String selectedText, String userInput) async {
-    showDialog(
+  // 显示全文重写要求输入弹窗
+  Future<void> _showFullRewriteRequirementDialog() async {
+    final userInputController = TextEditingController(text: _lastFullRewriteInput);
+    final result = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
+      builder: (context) => AlertDialog(
+        title: const Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('正在生成中...'),
+            Icon(Icons.auto_stories, color: Colors.green),
+            SizedBox(width: 8),
+            Text('全文重写'),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '将对整章内容进行重写',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: userInputController,
+              decoration: const InputDecoration(
+                labelText: '重写要求',
+                hintText: '例如：改变写作风格、增加细节描写、调整情节节奏等...',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              maxLines: 4,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '提示：AI将根据你的要求重新创作整章内容',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, userInputController.text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('开始重写'),
+          ),
+        ],
       ),
     );
+
+    if (result != null && result.isNotEmpty) {
+      _lastFullRewriteInput = result; // 保存用户输入
+      _generateFullRewrite(result);
+    }
+  }
+
+  // 生成全文重写内容（流式）
+  Future<void> _generateFullRewrite(String userInput) async {
+    _isGeneratingFullRewriteNotifier.value = true;
+    _fullRewriteResultNotifier.value = '';
+
+    // 显示流式结果弹窗
+    _showFullRewriteResultDialog();
 
     try {
       final List<String> historyChaptersContent = [];
       final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
-      
+
+      // 获取历史章节内容（最多前2章）
       if (currentIndex > 1) {
         final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _crawlerService.getChapterContent(prevChapter2.url);
+        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
         historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
       }
       if (currentIndex > 0) {
         final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _crawlerService.getChapterContent(prevChapter1.url);
+        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
       final difyService = DifyService();
-      final generatedText = await difyService.generateCloseUp(
-        selectedParagraph: selectedText,
-        userInput: userInput,
-        currentChapterContent: _content,
-        historyChaptersContent: historyChaptersContent,
-      );
 
-      if (mounted) Navigator.pop(context);
+      // 构建全文重写的参数
+      final inputs = {
+        'user_input': userInput,
+        'cmd': '', // 空的cmd参数
+        'history_chapters_content': historyChaptersContent.join('\n\n'),
+        'current_chapter_content': _content,
+        'choice_content': '', // 空的choice_content参数
+        'ai_writer_setting': '',
+        'background_setting': widget.novel.backgroundSetting ?? widget.novel.description ?? '',
+        'next_chapter_overview': '',
+        'characters_info': '',
+      };
 
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('生成结果'),
-          content: SingleChildScrollView(child: SelectableText(generatedText)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('关闭'),
-            ),
-          ],
-        ),
+      // 使用通用的流式 API
+      await difyService.runWorkflowStreaming(
+        inputs: inputs,
+        onData: (data) {
+          debugPrint('全文重写收到数据: $data');
+          _fullRewriteResultNotifier.value += data;
+        },
+        onError: (error) {
+          debugPrint('全文重写错误: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('全文重写失败: $error'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        },
+        onDone: () {
+          debugPrint('全文重写完成');
+          _isGeneratingFullRewriteNotifier.value = false;
+        },
       );
 
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      _isGeneratingFullRewriteNotifier.value = false;
+      _fullRewriteResultNotifier.value = '生成失败: $e';
+
+      // 同时显示 SnackBar 提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成失败: $e', style: const TextStyle(color: Colors.red))),
+          SnackBar(
+            content: Text('全文重写失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }
   }
+
+  // 显示全文重写结果弹窗
+  void _showFullRewriteResultDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.auto_stories, color: Colors.green),
+              SizedBox(width: 8),
+              Text('全文重写结果'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 400),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    border: Border.all(color: Colors.grey[700]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: SingleChildScrollView(
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: _fullRewriteResultNotifier,
+                      builder: (context, value, child) {
+                        return Text(
+                          value.isEmpty ? '正在生成中...' : value,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '你可以选择替换全文、重新生成或关闭',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ValueListenableBuilder<bool>(
+              valueListenable: _isGeneratingFullRewriteNotifier,
+              builder: (context, isGenerating, child) {
+                return TextButton.icon(
+                  onPressed: isGenerating
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext);
+                          _showFullRewriteRequirementDialog();
+                        },
+                  icon: const Icon(Icons.refresh),
+                  label: Text(isGenerating ? '生成中...' : '重新生成'),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: _isGeneratingFullRewriteNotifier,
+              builder: (context, isGenerating, child) {
+                return ValueListenableBuilder<String>(
+                  valueListenable: _fullRewriteResultNotifier,
+                  builder: (context, value, child) {
+                    return ElevatedButton.icon(
+                      onPressed: (isGenerating || value.isEmpty)
+                          ? null
+                          : () {
+                              _replaceFullContent();
+                              Navigator.pop(dialogContext);
+                            },
+                      icon: const Icon(Icons.check),
+                      label: const Text('替换全文'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 替换全文内容
+  void _replaceFullContent() async {
+    if (_fullRewriteResultNotifier.value.isEmpty) return;
+
+    final newContent = _fullRewriteResultNotifier.value;
+
+    setState(() {
+      _content = newContent;
+      _fullRewriteResultNotifier.value = '';
+    });
+
+    // 保存修改后的内容到数据库
+    try {
+      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('全文重写完成并已保存'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('保存章节内容失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -817,6 +1041,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
             icon: const Icon(Icons.text_fields),
             onPressed: _showFontSizeDialog,
             tooltip: '调整字体',
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_stories),
+            onPressed: _showFullRewriteRequirementDialog,
+            tooltip: '全文重写',
+            color: Colors.green,
           ),
           IconButton(
             icon: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
@@ -863,11 +1093,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.blue.withOpacity(0.2) : null,
+                                color: isSelected ? Colors.blue.withValues(alpha: 0.2) : null,
                                 border: isSelected
                                     ? Border.all(color: Colors.blue, width: 2)
                                     : _isCloseupMode
-                                        ? Border.all(color: Colors.blue.withOpacity(0.3), width: 1)
+                                        ? Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1)
                                         : null,
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -889,7 +1119,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         color: Theme.of(context).colorScheme.surface,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, -2),
                           ),

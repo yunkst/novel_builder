@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
-import '../services/novel_crawler_service.dart';
+import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
+import '../services/cache_manager.dart';
 import 'reader_screen.dart';
 
 class ChapterListScreen extends StatefulWidget {
@@ -16,9 +17,10 @@ class ChapterListScreen extends StatefulWidget {
 }
 
 class _ChapterListScreenState extends State<ChapterListScreen> {
-  final NovelCrawlerService _crawlerService = NovelCrawlerService();
+  final ApiServiceWrapper _api = ApiServiceWrapper();
   final DatabaseService _databaseService = DatabaseService();
   final DifyService _difyService = DifyService();
+  final CacheManager _cacheManager = CacheManager();
   final ScrollController _scrollController = ScrollController();
   List<Chapter> _chapters = [];
   bool _isLoading = true;
@@ -36,15 +38,27 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadChapters();
+    _initApi();
     _checkBookshelfStatus();
     _loadLastReadChapter();
+  }
+
+  Future<void> _initApi() async {
+    try {
+      await _api.init();
+      _loadChapters();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '初始化API失败: $e';
+      });
+    }
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    _crawlerService.dispose();
+    _api.dispose();
     _insertResultNotifier.dispose();
     _isGeneratingInsertNotifier.dispose();
     _isGeneratingNotifier.dispose();
@@ -52,7 +66,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadChapters() async {
+  Future<void> _loadChapters({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -62,16 +76,43 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       // 先尝试从缓存加载
       final cachedChapters = await _databaseService.getCachedNovelChapters(widget.novel.url);
 
-      if (cachedChapters.isNotEmpty) {
+      if (cachedChapters.isNotEmpty && !forceRefresh) {
+        // 有缓存且不强制刷新时，直接显示缓存
         setState(() {
           _chapters = cachedChapters;
           _isLoading = false;
         });
         _scrollToLastReadChapter();
+        return;
       }
 
-      // 从网络获取最新章节列表
-      final chapters = await _crawlerService.getChapterList(widget.novel.url);
+      if (cachedChapters.isNotEmpty && forceRefresh) {
+        // 有缓存但需要刷新时，先显示缓存，然后在后台更新
+        setState(() {
+          _chapters = cachedChapters;
+          _isLoading = false;
+        });
+        _scrollToLastReadChapter();
+
+        // 在后台更新章节列表
+        await _refreshChaptersFromBackend();
+      } else {
+        // 没有缓存时，从后端获取
+        await _refreshChaptersFromBackend();
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '加载章节列表失败: $e';
+      });
+    }
+  }
+
+  // 从后端刷新章节列表的独立方法
+  Future<void> _refreshChaptersFromBackend() async {
+    try {
+      // 从后端获取最新章节列表
+      final chapters = await _api.getChapters(widget.novel.url);
 
       if (chapters.isNotEmpty) {
         // 缓存章节列表
@@ -85,17 +126,33 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _isLoading = false;
         });
         _scrollToLastReadChapter();
-      } else if (cachedChapters.isEmpty) {
+
+        // 显示更新成功提示
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('章节列表已更新')),
+          );
+        }
+      } else {
         setState(() {
           _isLoading = false;
           _errorMessage = '未能获取章节列表';
         });
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '加载章节列表失败: $e';
-      });
+      // 如果已经有缓存数据，不显示错误，只显示提示
+      if (_chapters.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('更新章节列表失败: $e')),
+          );
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '加载章节列表失败: $e';
+        });
+      }
     }
   }
 
@@ -106,7 +163,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         _lastReadChapterIndex = lastReadIndex;
       });
     } catch (e) {
-      print('获取上次阅读章节失败: $e');
+      debugPrint('获取上次阅读章节失败: $e');
     }
   }
 
@@ -165,51 +222,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     await _checkBookshelfStatus();
   }
 
-  Future<void> _cacheAllChapters() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('缓存小说'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text('正在缓存 ${_chapters.length} 章节...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      for (var i = 0; i < _chapters.length; i++) {
-        final chapter = _chapters[i];
-        final content = await _crawlerService.getChapterContent(chapter.url);
-        await _databaseService.cacheChapter(widget.novel.url, chapter, content);
-
-        // 每10章更新一次进度
-        if (i % 10 == 0) {
-          // 可以在这里更新进度提示
-        }
-      }
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('全书缓存完成')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('缓存失败: $e')),
-        );
-      }
-    }
-  }
-
+  
   Future<void> _showClearCacheDialog() async {
     showDialog(
       context: context,
@@ -531,7 +544,113 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
+  // 显示创建第一个章节的对话框
+  Future<void> _showCreateFirstChapterDialog() async {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
 
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.add_circle, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('创建第一章'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('为你的小说创建第一个章节'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: '章节标题',
+                hintText: '例如：第一章 开始',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: contentController,
+              decoration: const InputDecoration(
+                labelText: '章节内容',
+                hintText: '请输入章节内容...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 8,
+              minLines: 4,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final title = titleController.text.trim();
+              final content = contentController.text.trim();
+              if (title.isEmpty || content.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('请填写章节标题和内容'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context, {
+                'title': title,
+                'content': content,
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      try {
+        await _databaseService.createCustomChapter(
+          widget.novel.url,
+          result['title']!,
+          result['content']!,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('章节创建成功！'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // 重新加载章节列表
+        await _loadChapters();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('创建失败: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -547,13 +666,13 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                   _toggleBookshelf();
                   break;
                 case 'cache_all':
-                  _cacheAllChapters();
+                  _enqueueCacheWholeNovel();
                   break;
                 case 'clear_cache':
                   _showClearCacheDialog();
                   break;
                 case 'refresh':
-                  _loadChapters();
+                  _loadChapters(forceRefresh: true);
                   break;
               }
             },
@@ -615,7 +734,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _loadChapters,
+                        onPressed: () => _loadChapters(forceRefresh: true),
                         child: const Text('重试'),
                       ),
                     ],
@@ -644,14 +763,67 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                     ),
                     const Divider(),
                     Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _chapters.length,
-                        itemBuilder: (context, index) {
-                          final chapter = _chapters[index];
-                          final isLastRead = index == _lastReadChapterIndex;
-                          
-                          return ListTile(
+                      child: _chapters.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.menu_book,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '还没有章节',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    widget.novel.url.startsWith('custom://')
+                                        ? '点击下方按钮创建第一个章节'
+                                        : '你可以从源网站获取章节，或创建自己的章节',
+                                    style: TextStyle(
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showCreateFirstChapterDialog(),
+                                    icon: const Icon(Icons.add_circle_outline),
+                                    label: const Text('创建章节'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  if (!widget.novel.url.startsWith('custom://')) ...[
+                                    const SizedBox(height: 16),
+                                    TextButton.icon(
+                                      onPressed: () => _loadChapters(forceRefresh: true),
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('从源网站获取章节'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              itemCount: _chapters.length,
+                              itemBuilder: (context, index) {
+                                final chapter = _chapters[index];
+                                final isLastRead = index == _lastReadChapterIndex;
+
+                                return ListTile(
                             title: Text(
                               chapter.title,
                               style: TextStyle(
@@ -705,5 +877,15 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                   ],
                 ),
     );
+  }
+
+  void _enqueueCacheWholeNovel() {
+    // 将小说加入后台缓存队列
+    _cacheManager.enqueueNovel(widget.novel.url);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已开始后台缓存全书')),
+      );
+    }
   }
 }

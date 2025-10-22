@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/cache_manager.dart';
 
 void main() {
   runApp(const NovelReaderApp());
@@ -37,6 +38,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
+  final CacheManager _cacheManager = CacheManager();
 
   static const List<Widget> _pages = <Widget>[
     BookshelfScreen(),
@@ -48,6 +50,19 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 简单认为进入主页即活跃
+    _cacheManager.setAppActive(true);
+  }
+
+  @override
+  void dispose() {
+    _cacheManager.setAppActive(false);
+    super.dispose();
   }
 
   @override

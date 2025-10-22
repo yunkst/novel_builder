@@ -5,6 +5,7 @@ class Novel {
   final bool isInBookshelf;
   final String? coverUrl;
   final String? description;
+  final String? backgroundSetting;
 
   Novel({
     required this.title,
@@ -13,6 +14,7 @@ class Novel {
     this.isInBookshelf = false,
     this.coverUrl,
     this.description,
+    this.backgroundSetting,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class Novel {
       'isInBookshelf': isInBookshelf ? 1 : 0,
       'coverUrl': coverUrl,
       'description': description,
+      'backgroundSetting': backgroundSetting,
     };
   }
 
@@ -34,6 +37,7 @@ class Novel {
       isInBookshelf: (map['isInBookshelf'] as int) == 1,
       coverUrl: map['coverUrl'] as String?,
       description: map['description'] as String?,
+      backgroundSetting: map['backgroundSetting'] as String?,
     );
   }
 
@@ -44,6 +48,7 @@ class Novel {
     bool? isInBookshelf,
     String? coverUrl,
     String? description,
+    String? backgroundSetting,
   }) {
     return Novel(
       title: title ?? this.title,
@@ -52,6 +57,7 @@ class Novel {
       isInBookshelf: isInBookshelf ?? this.isInBookshelf,
       coverUrl: coverUrl ?? this.coverUrl,
       description: description ?? this.description,
+      backgroundSetting: backgroundSetting ?? this.backgroundSetting,
     );
   }
 }

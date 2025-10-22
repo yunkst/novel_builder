@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.2
+  sdk: ">=3.0.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -37,9 +37,15 @@ dependencies:
 
   # HTTP请求
   http: ^1.1.0
+  dio: ^5.4.0
+  built_value: ^8.9.0
+  built_collection: ^5.1.1
 
   # HTML解析
   html: ^0.15.4
+
+  # JSON序列化
+  json_annotation: ^4.8.0
 
   # 本地数据库
   sqflite: ^2.3.0
@@ -52,6 +58,10 @@ dependencies:
   # 共享偏好设置
   shared_preferences: ^2.2.2
 
+  # OpenAPI生成的代码包
+  novel_api:
+    path: generated/api
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -62,6 +72,11 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+  # JSON序列化代码生成
+  build_runner: ^2.4.0
+  json_serializable: ^6.7.0
+  built_value_generator: ^8.9.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

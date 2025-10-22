@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dify_settings_screen.dart';
-import 'source_settings_screen.dart';
+import 'backend_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,15 +15,15 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('源站点配置'),
-            subtitle: const Text('选择启用的小说搜索源站点'),
+            leading: const Icon(Icons.settings_ethernet),
+            title: const Text('后端服务配置'),
+            subtitle: const Text('设置后端 HOST 与 TOKEN'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const SourceSettingsScreen(),
+                  builder: (context) => const BackendSettingsScreen(),
                 ),
               );
             },

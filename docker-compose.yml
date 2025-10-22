@@ -11,3 +11,13 @@ services:
     volumes:
       - ./frontend:/app:rw  # 挂载源代码，支持热重载
       - /app/node_modules  # 防止本地node_modules覆盖容器中的
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3800:8000"
+    environment:
+      - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
+      - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}

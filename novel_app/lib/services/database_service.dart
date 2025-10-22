@@ -25,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -41,6 +41,7 @@ class DatabaseService {
         url TEXT NOT NULL UNIQUE,
         coverUrl TEXT,
         description TEXT,
+        backgroundSetting TEXT,
         addedAt INTEGER NOT NULL,
         lastReadChapter INTEGER DEFAULT 0,
         lastReadTime INTEGER
@@ -85,6 +86,12 @@ class DatabaseService {
         ALTER TABLE novel_chapters ADD COLUMN insertedAt INTEGER
       ''');
     }
+    if (oldVersion < 3) {
+      // 添加背景设定字段
+      await db.execute('''
+        ALTER TABLE bookshelf ADD COLUMN backgroundSetting TEXT
+      ''');
+    }
   }
 
   // ========== 书架操作 ==========
@@ -100,6 +107,7 @@ class DatabaseService {
         'url': novel.url,
         'coverUrl': novel.coverUrl,
         'description': novel.description,
+        'backgroundSetting': novel.backgroundSetting,
         'addedAt': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -131,6 +139,7 @@ class DatabaseService {
         url: maps[i]['url'],
         coverUrl: maps[i]['coverUrl'],
         description: maps[i]['description'],
+        backgroundSetting: maps[i]['backgroundSetting'],
         isInBookshelf: true,
       );
     });
@@ -159,6 +168,35 @@ class DatabaseService {
       where: 'url = ?',
       whereArgs: [novelUrl],
     );
+  }
+
+  /// 更新小说背景设定
+  Future<int> updateBackgroundSetting(String novelUrl, String? backgroundSetting) async {
+    final db = await database;
+    return await db.update(
+      'bookshelf',
+      {
+        'backgroundSetting': backgroundSetting,
+      },
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+  }
+
+  /// 获取小说背景设定
+  Future<String?> getBackgroundSetting(String novelUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      columns: ['backgroundSetting'],
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first['backgroundSetting'] as String?;
+    }
+    return null;
   }
 
   /// 获取上次阅读的章节索引
@@ -316,6 +354,12 @@ class DatabaseService {
   /// 缓存整本小说
   Future<void> cacheWholeNovel(String novelUrl, List<Chapter> chapters, Future<String> Function(String) getContent) async {
     for (var chapter in chapters) {
+      // 已缓存则跳过，避免重复网络请求与写入
+      final already = await isChapterCached(chapter.url);
+      if (already) {
+        continue;
+      }
+
       final content = await getContent(chapter.url);
       await cacheChapter(novelUrl, chapter, content);
     }
@@ -327,13 +371,6 @@ class DatabaseService {
   Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters) async {
     final db = await database;
     final batch = db.batch();
-
-    // 获取用户插入的章节
-    final userInsertedChapters = await db.query(
-      'novel_chapters',
-      where: 'novelUrl = ? AND isUserInserted = 1',
-      whereArgs: [novelUrl],
-    );
 
     // 只删除非用户插入的章节
     batch.delete(
@@ -454,6 +491,123 @@ class DatabaseService {
     final db = await database;
     await db.delete('chapter_cache');
     await db.delete('novel_chapters');
+  }
+
+  /// 创建用户自定义空小说
+  Future<int> createCustomNovel(String title, String author, {String? description}) async {
+    final db = await database;
+    final customUrl = 'custom://${DateTime.now().millisecondsSinceEpoch}';
+    return await db.insert(
+      'bookshelf',
+      {
+        'title': title,
+        'author': author,
+        'url': customUrl,
+        'coverUrl': null,
+        'description': description,
+        'backgroundSetting': null,
+        'addedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// 创建用户自定义章节
+  Future<int> createCustomChapter(String novelUrl, String title, String content) async {
+    final db = await database;
+
+    // 获取当前最大章节索引
+    final result = await db.rawQuery(
+      'SELECT MAX(chapterIndex) as maxIndex FROM novel_chapters WHERE novelUrl = ?',
+      [novelUrl],
+    );
+    final maxIndex = result.first['maxIndex'] as int? ?? 0;
+
+    // 生成章节URL
+    final chapterUrl = 'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
+
+    // 插入章节元数据
+    await db.insert(
+      'novel_chapters',
+      {
+        'novelUrl': novelUrl,
+        'chapterUrl': chapterUrl,
+        'title': title,
+        'chapterIndex': maxIndex + 1,
+        'isUserInserted': 1,
+        'insertedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    // 缓存章节内容
+    await db.insert(
+      'chapter_cache',
+      {
+        'novelUrl': novelUrl,
+        'chapterUrl': chapterUrl,
+        'content': content,
+        'cachedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    return maxIndex + 1;
+  }
+
+  /// 获取用户创建的章节内容
+  Future<String?> getCustomChapterContent(String chapterUrl) async {
+    final db = await database;
+    final result = await db.query(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+    if (result.isNotEmpty) {
+      return result.first['content'] as String?;
+    }
+    return null;
+  }
+
+  /// 更新用户创建的章节内容
+  Future<void> updateCustomChapter(String chapterUrl, String title, String content) async {
+    final db = await database;
+
+    // 更新章节标题
+    await db.update(
+      'novel_chapters',
+      {'title': title},
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    // 更新章节内容
+    await db.update(
+      'chapter_cache',
+      {
+        'content': content,
+        'cachedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+  }
+
+  /// 删除用户创建的章节
+  Future<void> deleteCustomChapter(String chapterUrl) async {
+    final db = await database;
+
+    await db.delete(
+      'novel_chapters',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    await db.delete(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
   }
 
   /// 关闭数据库

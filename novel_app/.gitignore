@@ -33,6 +33,12 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# OpenAPI 生成的代码
+/lib/generated/
+openapi.json
+.openapi-generator/
+.openapi-generator-ignore
+
 # Symbolication related
 app.*.symbols
 

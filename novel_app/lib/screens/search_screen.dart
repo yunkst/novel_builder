@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
-import '../services/novel_crawler_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/crawlers/crawler_factory.dart';
-import '../services/crawlers/base_crawler.dart';
+import '../services/api_service_wrapper.dart';
 import 'chapter_list_screen.dart';
+import '../utils/toast_utils.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,25 +13,48 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final NovelCrawlerService _crawlerService = NovelCrawlerService();
+  final ApiServiceWrapper _api = ApiServiceWrapper();
   List<Novel> _searchResults = [];
   bool _isLoading = false;
   String _errorMessage = '';
-  final CrawlerFactory _factory = CrawlerFactory();
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initApi();
+  }
+
+  Future<void> _initApi() async {
+    try {
+      await _api.init();
+      setState(() {
+        _isInitialized = true;
+      });
+    } catch (e) {
+      // API初始化失败，可能是未配置后端地址
+      setState(() {
+        _isInitialized = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _crawlerService.dispose();
+    _api.dispose();
     super.dispose();
   }
 
   Future<void> _searchNovels() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) {
-      setState(() {
-        _errorMessage = '请输入搜索关键词';
-      });
+      ToastUtils.showWarning(context, '请输入搜索关键词');
+      return;
+    }
+
+    if (!_isInitialized) {
+      ToastUtils.showError(context, '请先配置后端服务地址');
       return;
     }
 
@@ -44,50 +65,38 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      // 读取启用的源站点
-      final prefs = await SharedPreferences.getInstance();
-      final enabledHosts = prefs.getStringList('enabled_sources');
-      final crawlers = _factory.registered;
-      final List<BaseCrawler> activeCrawlers = enabledHosts == null || enabledHosts.isEmpty
-          ? crawlers
-          : crawlers.where((c) => enabledHosts.contains(Uri.parse(c.baseUrl).host)).toList();
+      // 显示开始搜索的提示
+      ToastUtils.showLoading(context, '正在搜索 "$keyword"...');
 
-      if (activeCrawlers.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = '未启用任何源站点，请到设置中启用';
-        });
-        return;
-      }
+      // 通过后端服务进行搜索
+      final results = await _api.searchNovels(keyword);
 
-      // 并行搜索，流式追加结果
-      final List<Novel> aggregated = [];
-      final futures = activeCrawlers.map((crawler) async {
-        try {
-          final res = await crawler.searchNovels(keyword);
-          if (res.isNotEmpty) {
-            setState(() {
-              aggregated.addAll(res);
-              _searchResults = List.of(aggregated);
-            });
-          }
-        } catch (_) {
-          // 忽略单站点错误，继续其他站点
-        }
-      }).toList();
-
-      await Future.wait(futures);
       setState(() {
         _isLoading = false;
-        if (aggregated.isEmpty) {
+        _searchResults = results;
+        if (results.isEmpty) {
           _errorMessage = '未找到相关小说，请尝试其他关键词';
         }
       });
+
+      // 显示搜索结果提示
+      if (mounted) {
+        if (results.isNotEmpty) {
+          ToastUtils.showSuccess(context, '找到 ${results.length} 个相关小说');
+        } else {
+          ToastUtils.showInfo(context, '未找到相关小说，请尝试其他关键词');
+        }
+      }
+
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '搜索失败: $e';
+        _errorMessage = e.toString();
       });
+      
+      if (mounted) {
+        ToastUtils.showError(context, e.toString());
+      }
     }
   }
 
