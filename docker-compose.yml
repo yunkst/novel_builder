@@ -21,3 +21,26 @@ services:
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
+      - DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    ports: 
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=novel_user
+      - POSTGRES_PASSWORD=novel_pass
+      - POSTGRES_DB=novel_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novel_user -d novel_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

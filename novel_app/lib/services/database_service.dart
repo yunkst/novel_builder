@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/novel.dart';
 import '../models/chapter.dart';
 
@@ -13,6 +14,8 @@ class DatabaseService {
 
   DatabaseService._internal();
 
+  bool get isWebPlatform => kIsWeb;
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -20,6 +23,10 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
+    if (kIsWeb) {
+      throw Exception('Database is not supported on web platform');
+    }
+
     final databasePath = await getDatabasesPath();
     final path = join(databasePath, 'novel_reader.db');
 
@@ -126,6 +133,10 @@ class DatabaseService {
 
   /// 获取书架列表
   Future<List<Novel>> getBookshelf() async {
+    if (isWebPlatform) {
+      return []; // Web平台不支持数据库，返回空列表
+    }
+
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'bookshelf',
@@ -172,6 +183,10 @@ class DatabaseService {
 
   /// 更新小说背景设定
   Future<int> updateBackgroundSetting(String novelUrl, String? backgroundSetting) async {
+    if (isWebPlatform) {
+      return 0; // Web平台什么都不做，返回0
+    }
+
     final db = await database;
     return await db.update(
       'bookshelf',
@@ -329,6 +344,10 @@ class DatabaseService {
 
   /// 获取小说缓存统计信息
   Future<Map<String, int>> getNovelCacheStats(String novelUrl) async {
+    if (isWebPlatform) {
+      return {'cachedChapters': 0, 'totalChapters': 0}; // Web平台返回默认值
+    }
+
     final db = await database;
     
     // 获取缓存的章节内容数量
@@ -495,6 +514,10 @@ class DatabaseService {
 
   /// 创建用户自定义空小说
   Future<int> createCustomNovel(String title, String author, {String? description}) async {
+    if (isWebPlatform) {
+      throw Exception('Creating custom novels is not supported on web platform');
+    }
+
     final db = await database;
     final customUrl = 'custom://${DateTime.now().millisecondsSinceEpoch}';
     return await db.insert(

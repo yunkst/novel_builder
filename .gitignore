@@ -1,0 +1,214 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+.env
+.env.local
+.env.*.local
+env.bak/
+venv.bak/
+
+# Flask/FastAPI
+instance/
+.webassets-cache
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Ruff
+.ruff_cache/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+pubspec.lock
+
+# Flutter web
+*.dart.js
+*.dart.js.map
+*.info.json
+*.part.js
+*.part.js.map
+
+# Flutter coverage
+coverage/
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Node package lock (optional, uncomment if needed)
+# package-lock.json
+# yarn.lock
+
+# Playwright
+.playwright-mcp/
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Docker
+.dockerignore
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# IDE - IntelliJ / WebStorm / PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# IDE - Eclipse
+.settings/
+.project
+.classpath
+
+# Operating System Files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.tmp/
+temp/
+
+# Logs and databases
+*.log
+logs/
+*.sql
+*.sqlite
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Sensitive data
+secrets/
+credentials/
+*.pem
+*.key
+*.cert
+*.crt
+
+# Test coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Claude Code
+.claude/settings.local.json
+
+# Project specific
+backend;D/
+ch1.txt

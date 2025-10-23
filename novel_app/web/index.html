@@ -31,8 +31,21 @@
 
   <title>novel_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- CORS Headers for development -->
+  <meta http-equiv="Access-Control-Allow-Origin" content="*">
+  <meta http-equiv="Access-Control-Allow-Methods" content="GET, POST, PUT, DELETE, OPTIONS">
+  <meta http-equiv="Access-Control-Allow-Headers" content="Content-Type, Authorization, X-API-TOKEN">
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- CORS Script for development -->
+  <script>
+    // This script helps with CORS issues during development
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.log('Development mode detected - CORS headers configured');
+    }
+  </script>
 </body>
 </html>

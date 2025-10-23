@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import asyncio
 import re
 import time
 import urllib.parse
@@ -19,6 +20,14 @@ class ShukugeCrawler(BaseCrawler):
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
+
+    async def search(self, keyword: str) -> List[Dict]:
+        """
+        异步搜索方法，用于SearchService
+        """
+        # 在线程池中执行同步的search_novels方法
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.search_novels, keyword)
 
     def search_novels(self, keyword: str) -> List[Dict]:
         # 尝试不同的搜索入口

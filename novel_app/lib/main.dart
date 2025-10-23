@@ -14,7 +14,7 @@ class NovelReaderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '小说阅读器',
+      title: 'Novel App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
         useMaterial3: true,
@@ -25,6 +25,7 @@ class NovelReaderApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.dark,
       home: const HomePage(),
+      debugShowCheckedModeBanner: true,
     );
   }
 }

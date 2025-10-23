@@ -43,6 +43,11 @@ class ApiServiceWrapper {
       receiveTimeout: Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        // CORS headers for web requests
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-TOKEN',
       },
     ));
 
