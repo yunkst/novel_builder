@@ -3,6 +3,7 @@ import '../models/novel.dart';
 import '../services/database_service.dart';
 import '../services/cache_manager.dart';
 import 'chapter_list_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class BookshelfScreen extends StatefulWidget {
   const BookshelfScreen({super.key});
@@ -37,18 +38,51 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
       _isLoading = true;
     });
 
-    final novels = await _databaseService.getBookshelf();
-    final Map<String, Map<String, int>> statsMap = {};
-    for (final n in novels) {
-      final stats = await _databaseService.getNovelCacheStats(n.url);
-      statsMap[n.url] = stats;
-    }
+    try {
+      if (kIsWeb) {
+        // 在Web环境中，模拟一些测试数据
+        final mockNovels = [
+          Novel(
+            title: '测试小说1',
+            author: '测试作者1',
+            url: 'https://example.com/novel1',
+            coverUrl: '',
+            description: '这是一个测试小说描述',
+          ),
+          Novel(
+            title: '测试小说2',
+            author: '测试作者2',
+            url: 'https://example.com/novel2',
+            coverUrl: '',
+            description: '这是另一个测试小说描述',
+          ),
+        ];
 
-    setState(() {
-      _bookshelf = novels;
-      _isLoading = false;
-      _progress.addAll(statsMap);
-    });
+        setState(() {
+          _bookshelf = mockNovels;
+          _isLoading = false;
+        });
+      } else {
+        final novels = await _databaseService.getBookshelf();
+        final Map<String, Map<String, int>> statsMap = {};
+        for (final n in novels) {
+          final stats = await _databaseService.getNovelCacheStats(n.url);
+          statsMap[n.url] = stats;
+        }
+
+        setState(() {
+          _bookshelf = novels;
+          _isLoading = false;
+          _progress.addAll(statsMap);
+        });
+      }
+    } catch (e) {
+      print('加载书架失败: $e');
+      setState(() {
+        _bookshelf = [];
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _removeFromBookshelf(Novel novel) async {

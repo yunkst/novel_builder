@@ -1,0 +1,62 @@
+# Ruff configuration file (alternative to pyproject.toml section)
+
+# Line length
+line-length = 88
+
+# Exclude files and directories
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    "__pycache__",
+    "venv",
+    "env",
+    ".venv",
+    ".env",
+    "build",
+    "dist",
+    "migrations",
+]
+
+# Target Python version
+target-version = "py311"
+
+# Enable rules
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "PTH", # flake8-use-pathlib
+    "PERF", # flake8-perf
+    "RUF", # Ruff-specific rules
+]
+
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "W191",  # indentation contains tabs
+    "B904",  # raise inside except without from
+    "RUF012", # mutable class default
+]
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Fix unsafe behavior
+fix = true
+fixable = ["ALL"]
+unfixable = []
+
+# Per-file ignores
+[per-file-ignores]
+"__init__.py" = ["F401"]
+"test_*.py" = ["ARG001", "ARG002"]
+"conftest.py" = ["F401", "ARG001"]

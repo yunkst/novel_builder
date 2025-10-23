@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  novel-backend-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: novel-backend-test
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - NOVEL_API_TOKEN=test-token
+      - NOVEL_ENABLED_SITES=test_site
+      - SECRET_KEY=test-secret-key
+      - PYTEST_CURRENT_TEST=${PYTEST_CURRENT_TEST}
+    volumes:
+      # Mount source code and tests
+      - ./app:/app/app
+      - ./tests:/app/tests
+      # Mount test results
+      - ./test-results:/app/test-results
+    command: pytest tests/ -v --cov=app --cov-report=html --cov-report=xml --cov-report=term --junitxml=test-results/junit.xml
+    networks:
+      - novel-test-network
+
+  # Service for running linting and type checking
+  code-quality:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: novel-backend-quality
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./.ruff.toml:/app/.ruff.toml
+    command: |
+      sh -c "
+        echo 'Running Ruff...' &&
+        ruff check . &&
+        echo 'Running MyPy...' &&
+        mypy app/ &&
+        echo 'Running Pylint...' &&
+        pylint app/ --disable=C0114,C0115,C0116 &&
+        echo 'Running Bandit...' &&
+        bandit -r app/ -f custom &&
+        echo 'All quality checks passed!'
+      "
+    networks:
+      - novel-test-network
+
+volumes:
+  test-results:
+    driver: local
+
+networks:
+  novel-test-network:
+    driver: bridge

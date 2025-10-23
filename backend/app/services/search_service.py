@@ -1,35 +1,71 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import List, Dict
+import asyncio
+from typing import List, Dict, Any, Optional
 
 from .base_crawler import BaseCrawler
 
 
 class SearchService:
-    def __init__(self, crawlers: List[BaseCrawler]):
-        self.crawlers = crawlers
+    def __init__(self, crawlers: Optional[List[BaseCrawler]] = None):
+        self.crawlers = crawlers or []
 
-    def search(self, keyword: str) -> List[Dict]:
-        results: List[Dict] = []
-        for crawler in self.crawlers:
+    async def search(self, keyword: str, crawlers: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Search for novels using provided crawlers.
+
+        Args:
+            keyword: Search keyword
+            crawlers: Dictionary of crawlers to use (overrides instance crawlers)
+
+        Returns:
+            List of search results
+        """
+        if not keyword or len(keyword.strip()) < 2:
+            return []
+
+        # Use provided crawlers or instance crawlers
+        target_crawlers = crawlers or {}
+        results: List[Dict[str, Any]] = []
+
+        for site_name, crawler in target_crawlers.items():
             try:
-                items = crawler.search_novels(keyword)
-                if items:
-                    results.extend(items)
-            except Exception:
-                # 某个站点异常不影响整体搜索
+                # Check if crawler has search method
+                if hasattr(crawler, 'search') and callable(getattr(crawler, 'search')):
+                    items = await crawler.search(keyword)
+                    if items:
+                        results.extend(items)
+            except Exception as e:
+                # Log error but continue with other crawlers
+                print(f"Error searching with {site_name}: {e}")
                 continue
 
-        # 去重并标准化输出
+        # Normalize and deduplicate results
         seen = set()
-        unique: List[Dict] = []
-        for n in results:
-            title = n.get("title")
-            url = n.get("url")
-            author = n.get("author") or "未知"
-            key = (title, url)
-            if title and url and key not in seen:
-                unique.append({"title": title, "author": author, "url": url})
-                seen.add(key)
-        return unique
+        unique_results: List[Dict[str, Any]] = []
+
+        for result in results:
+            if isinstance(result, dict):
+                # Ensure required fields exist
+                title = result.get("title", "")
+                url = result.get("url", "")
+                author = result.get("author", "未知作者")
+
+                # Create unique key
+                key = (title.strip(), url.strip())
+
+                # Add if valid and not seen
+                if title and url and key not in seen:
+                    unique_results.append({
+                        "title": title.strip(),
+                        "author": author.strip(),
+                        "url": url.strip(),
+                        "cover_url": result.get("cover_url", ""),
+                        "description": result.get("description", ""),
+                        "status": result.get("status", "unknown"),
+                        "last_updated": result.get("last_updated", "")
+                    })
+                    seen.add(key)
+
+        return unique_results

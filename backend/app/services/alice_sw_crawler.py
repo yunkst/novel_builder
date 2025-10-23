@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import asyncio
 import re
 import time
 import urllib.parse
@@ -19,6 +20,14 @@ class AliceSWCrawler(BaseCrawler):
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
+
+    async def search(self, keyword: str) -> List[Dict]:
+        """
+        异步搜索方法，用于SearchService
+        """
+        # 在线程池中执行同步的search_novels方法
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.search_novels, keyword)
 
     def search_novels(self, keyword: str) -> List[Dict]:
         search_url = f"{self.base_url}/search.html"
@@ -39,6 +48,8 @@ class AliceSWCrawler(BaseCrawler):
                 if not title_link:
                     continue
                 title = title_link.get_text().strip()
+                # 去掉搜索结果中的序号（如 "1. "��"2. " 等）
+                title = re.sub(r'^\d+\.\s+', '', title)
                 href = title_link.get('href', '')
                 author = "未知"
                 text = item.get_text()
@@ -153,7 +164,18 @@ class AliceSWCrawler(BaseCrawler):
                 paragraphs = soup.find_all('p')
                 content = ''
                 if len(paragraphs) > 5:
-                    content = '\n'.join([p.get_text().strip() for p in paragraphs])
+                    # 过滤掉非正文段落（如导航元素、页面信息等）
+                    filter_keywords = ['分类:', '最新章节:', '继续阅读', '上一章', '下一章', '目录', '返回', '书签']
+                    filtered_paragraphs = []
+                    for p in paragraphs:
+                        text = p.get_text().strip()
+                        # 跳过太短的段落和包含过滤关键词的段落
+                        if len(text) < 10:
+                            continue
+                        if any(keyword in text for keyword in filter_keywords):
+                            continue
+                        filtered_paragraphs.append(text)
+                    content = '\n'.join(filtered_paragraphs)
                 else:
                     # 兜底：尝试常见内容容器
                     selectors = ['div#content','div.content','div.readcontent','div#chaptercontent','div.chapter-content','div.book_con','div.showtxt']

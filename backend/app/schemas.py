@@ -18,3 +18,4 @@ class Chapter(BaseModel):
 class ChapterContent(BaseModel):
     title: str
     content: str
+    from_cache: bool = False

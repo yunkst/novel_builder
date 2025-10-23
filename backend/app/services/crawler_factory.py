@@ -9,17 +9,20 @@ from .alice_sw_crawler import AliceSWCrawler
 from .shukuge_crawler import ShukugeCrawler
 
 
-def get_enabled_crawlers() -> List[BaseCrawler]:
+def get_enabled_crawlers() -> dict:
     """
     根据环境变量 NOVEL_ENABLED_SITES 启用站点；未设置时默认全部启用。
     示例：NOVEL_ENABLED_SITES="alice,shukuge"
+
+    Returns:
+        Dict mapping site names to crawler instances
     """
     enabled = os.getenv("NOVEL_ENABLED_SITES", "").lower()
-    crawlers: List[BaseCrawler] = []
+    crawlers = {}
     if not enabled or "alice" in enabled:
-        crawlers.append(AliceSWCrawler())
+        crawlers["alice_sw"] = AliceSWCrawler()
     if not enabled or "shukuge" in enabled or "shukuge" in enabled:
-        crawlers.append(ShukugeCrawler())
+        crawlers["shukuge"] = ShukugeCrawler()
     return crawlers
 
 

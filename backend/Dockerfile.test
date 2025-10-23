@@ -1,0 +1,43 @@
+# Dockerfile for running tests and code quality checks
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Configure PyPI to use Aliyun mirror
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+# Copy configuration files
+COPY pyproject.toml ./
+COPY .ruff.toml ./
+
+# Install Python dependencies (including dev dependencies)
+RUN pip install --no-cache-dir -e ".[dev]"
+
+# Copy source code
+COPY ./app ./app
+COPY ./tests ./tests
+
+# Create test results directory
+RUN mkdir -p test-results
+
+# Change to non-root user for security
+RUN useradd --create-home --shell /bin/bash testuser \
+    && chown -R testuser:testuser /app
+USER testuser
+
+# Default command runs tests
+CMD ["pytest", "tests/", "-v", "--cov=app", "--cov-report=html", "--cov-report=xml", "--cov-report=term"]
