@@ -50,6 +50,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // 全文重写要求的用户输入缓存
   String _lastFullRewriteInput = '';
 
+  // 总结相关状态
+  final ValueNotifier<String> _summarizeResultNotifier = ValueNotifier<String>('');
+  final ValueNotifier<bool> _isGeneratingSummarizeNotifier = ValueNotifier<bool>(false);
+
   // 预加载相关状态
   final Set<String> _preloadedChapterUrls = {};
   bool _isPreloading = false;
@@ -88,6 +92,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _isGeneratingRewriteNotifier.dispose();
     _fullRewriteResultNotifier.dispose();
     _isGeneratingFullRewriteNotifier.dispose();
+    _summarizeResultNotifier.dispose();
+    _isGeneratingSummarizeNotifier.dispose();
     super.dispose();
   }
 
@@ -465,6 +471,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
+  // 处理菜单动作
+  void _handleMenuAction(String action) {
+    switch (action) {
+      case 'scroll_speed':
+        _showScrollSpeedDialog();
+        break;
+      case 'font_size':
+        _showFontSizeDialog();
+        break;
+      case 'summarize':
+        _showSummarizeDialog();
+        break;
+      case 'full_rewrite':
+        _showFullRewriteRequirementDialog();
+        break;
+      case 'closeup_mode':
+        _toggleCloseupMode();
+        break;
+    }
+  }
+
   // 调整滚动速度
   // 已弃用：直接通过滑块 onChanged 修改 _scrollSpeed
 
@@ -717,18 +744,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   padding: const EdgeInsets.all(12),
                   child: SingleChildScrollView(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _rewriteResultNotifier,
-                      builder: (context, value, child) {
-                        return Text(
-                          value.isEmpty ? '正在生成中...' : value,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.6,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
+                    child: SelectableText(
+                      _rewriteResultNotifier.value.isEmpty
+                          ? '正在生成中...'
+                          : _rewriteResultNotifier.value,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -822,6 +846,224 @@ class _ReaderScreenState extends State<ReaderScreen> {
     } catch (e) {
     debugPrint('保存章节内容失败: $e');
     }
+  }
+
+  // 显示总结功能弹窗
+  Future<void> _showSummarizeDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.summarize, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('章节总结'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '将对当前章节内容进行总结',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '提示：AI将提取章节的核心内容和关键情节',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _generateSummarize();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('开始总结'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 生成章节总结（流式）
+  Future<void> _generateSummarize() async {
+    _isGeneratingSummarizeNotifier.value = true;
+    _summarizeResultNotifier.value = '';
+
+    // 显示流式结果弹窗
+    _showSummarizeResultDialog();
+
+    try {
+      final List<String> historyChaptersContent = [];
+      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+
+      // 获取历史章节内容（最多前2章）
+      if (currentIndex > 1) {
+        final prevChapter2 = widget.chapters[currentIndex - 2];
+        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
+        historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
+      }
+      if (currentIndex > 0) {
+        final prevChapter1 = widget.chapters[currentIndex - 1];
+        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
+        historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
+      }
+
+      final difyService = DifyService();
+
+      // 构建总结的参数
+      final inputs = {
+        'user_input': '总结',
+        'cmd': '总结',
+        'history_chapters_content': historyChaptersContent.join('\n\n'),
+        'current_chapter_content': _content,
+        'choice_content': '',
+        'ai_writer_setting': '',
+        'background_setting': widget.novel.backgroundSetting ?? widget.novel.description ?? '',
+        'next_chapter_overview': '',
+        'characters_info': '',
+      };
+
+      // 使用通用的流式 API
+      await difyService.runWorkflowStreaming(
+        inputs: inputs,
+        onData: (data) {
+          debugPrint('总结收到数据: $data');
+          _summarizeResultNotifier.value += data;
+        },
+        onError: (error) {
+          debugPrint('总结错误: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('章节总结失败: $error'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        },
+        onDone: () {
+          debugPrint('总结完成');
+          _isGeneratingSummarizeNotifier.value = false;
+        },
+      );
+
+    } catch (e) {
+      _isGeneratingSummarizeNotifier.value = false;
+      _summarizeResultNotifier.value = '生成失败: $e';
+
+      // 同时显示 SnackBar 提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('章节总结失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // 显示总结结果弹窗
+  void _showSummarizeResultDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.summarize, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('章节总结'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 400),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    border: Border.all(color: Colors.grey[700]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      _summarizeResultNotifier.value.isEmpty
+                          ? '正在生成中...'
+                          : _summarizeResultNotifier.value,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '您可以查看总结内容或关闭',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ValueListenableBuilder<bool>(
+              valueListenable: _isGeneratingSummarizeNotifier,
+              builder: (context, isGenerating, child) {
+                return TextButton.icon(
+                  onPressed: isGenerating
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext);
+                          _showSummarizeDialog();
+                        },
+                  icon: const Icon(Icons.refresh),
+                  label: Text(isGenerating ? '生成中...' : '重新总结'),
+                );
+              },
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // 显示全文重写要求输入弹窗
@@ -1004,18 +1246,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   padding: const EdgeInsets.all(12),
                   child: SingleChildScrollView(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _fullRewriteResultNotifier,
-                      builder: (context, value, child) {
-                        return Text(
-                          value.isEmpty ? '正在生成中...' : value,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.6,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
+                    child: SelectableText(
+                      _fullRewriteResultNotifier.value.isEmpty
+                          ? '正在生成中...'
+                          : _fullRewriteResultNotifier.value,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -1133,35 +1372,81 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentChapter.title),
+        title: Text(
+          _currentChapter.title,
+          style: const TextStyle(fontSize: 18),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
+        ),
         actions: [
+          // 主要功能：自动滚动
           IconButton(
             icon: Icon(_isAutoScrolling ? Icons.pause : Icons.play_arrow),
             onPressed: _toggleAutoScroll,
             tooltip: _isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
             color: _isAutoScrolling ? Colors.red : null,
           ),
-          IconButton(
-            icon: const Icon(Icons.speed),
-            onPressed: _showScrollSpeedDialog,
-            tooltip: '调整滚动速度',
-          ),
-          IconButton(
-            icon: const Icon(Icons.text_fields),
-            onPressed: _showFontSizeDialog,
-            tooltip: '调整字体',
-          ),
-          IconButton(
-            icon: const Icon(Icons.auto_stories),
-            onPressed: _showFullRewriteRequirementDialog,
-            tooltip: '全文重写',
-            color: Colors.green,
-          ),
-          IconButton(
-            icon: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
-            onPressed: _toggleCloseupMode,
-            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
-            color: _isCloseupMode ? Colors.blue : null,
+          // 更多功能菜单
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: '更多功能',
+            onSelected: _handleMenuAction,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'scroll_speed',
+                child: Row(
+                  children: [
+                    Icon(Icons.speed, size: 18),
+                    SizedBox(width: 12),
+                    Text('滚动速度'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'font_size',
+                child: Row(
+                  children: [
+                    Icon(Icons.text_fields, size: 18),
+                    SizedBox(width: 12),
+                    Text('字体大小'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'summarize',
+                child: Row(
+                  children: [
+                    Icon(Icons.summarize, size: 18, color: Colors.orange),
+                    SizedBox(width: 12),
+                    Text('总结'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'full_rewrite',
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_stories, size: 18, color: Colors.green),
+                    SizedBox(width: 12),
+                    Text('全文重写'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'closeup_mode',
+                child: Row(
+                  children: [
+                    Icon(
+                      _isCloseupMode ? Icons.visibility : Icons.visibility_off,
+                      size: 18,
+                      color: _isCloseupMode ? Colors.blue : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(_isCloseupMode ? '关闭特写模式' : '开启特写模式'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1267,19 +1552,62 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ],
                 ),
-      // 浮动按钮
-      floatingActionButton: _content.isNotEmpty && _isCloseupMode && _selectedParagraphIndices.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-                _showRewriteRequirementDialog(paragraphs);
-              },
-              icon: const Icon(Icons.edit),
-              label: const Text('改写'),
-              backgroundColor: Colors.green,
-              heroTag: 'rewrite',
-            )
-          : null,
+      // 悬浮工具栏
+      floatingActionButton: _buildFloatingActions(),
+    );
+  }
+
+  // 构建悬浮动作组件
+  Widget? _buildFloatingActions() {
+    if (_content.isEmpty) return null;
+
+    // 如果在特写模式下且有选中段落，显示改写按钮
+    if (_isCloseupMode && _selectedParagraphIndices.isNotEmpty) {
+      return FloatingActionButton.extended(
+        onPressed: () {
+          final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+          _showRewriteRequirementDialog(paragraphs);
+        },
+        icon: const Icon(Icons.edit),
+        label: const Text('改写'),
+        backgroundColor: Colors.green,
+        heroTag: 'rewrite',
+      );
+    }
+
+    // 正常阅读模式下，显示快速访问工具栏
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 80.0), // 避免与底部导航重叠
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // 字体大小调整
+          FloatingActionButton.small(
+            onPressed: _showFontSizeDialog,
+            tooltip: '字体大小',
+            heroTag: 'font_size',
+            child: const Icon(Icons.text_fields),
+          ),
+          const SizedBox(height: 8),
+          // 滚动速度调整
+          FloatingActionButton.small(
+            onPressed: _showScrollSpeedDialog,
+            tooltip: '滚动速度',
+            heroTag: 'scroll_speed',
+            child: const Icon(Icons.speed),
+          ),
+          const SizedBox(height: 8),
+          // 特写模式切换
+          FloatingActionButton.small(
+            onPressed: _toggleCloseupMode,
+            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
+            heroTag: 'closeup_mode',
+            backgroundColor: _isCloseupMode ? Colors.blue : null,
+            child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
+          ),
+        ],
+      ),
     );
   }
 }
