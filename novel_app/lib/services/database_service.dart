@@ -653,43 +653,52 @@ class DatabaseService {
       orderBy: 'novelUrl, chapterIndex',
     );
 
-    return List.generate(maps.length, (i) {
-      return ChapterSearchResult(
-        novelUrl: maps[i]['novelUrl'],
-        chapterUrl: maps[i]['chapterUrl'],
-        chapterTitle: maps[i]['title'],
-        chapterIndex: maps[i]['chapterIndex'],
-        content: maps[i]['content'],
-        cachedAt: maps[i]['cachedAt'],
-        matchedText: _extractMatchedText(maps[i]['content'], keyword),
-      );
-    });
-  }
+    final List<ChapterSearchResult> results = [];
 
-  /// 提取匹配的文本片段
-  String _extractMatchedText(String content, String keyword) {
-    if (content.length <= 200) {
-      return content;
+    for (int i = 0; i < maps.length; i++) {
+      final content = maps[i]['content'] ?? '';
+      final title = maps[i]['title'] ?? '';
+
+      // 查找所有匹配位置
+      final List<MatchPosition> matchPositions = _findMatchPositions(content, keyword);
+
+      results.add(ChapterSearchResult(
+        novelUrl: maps[i]['novelUrl'] ?? '',
+        novelTitle: title, // 使用章节标题作为小说标题（临时解决方案）
+        novelAuthor: '未知作者', // 数据库中没有作者信息，需要从书架表获取
+        chapterUrl: maps[i]['chapterUrl'] ?? '',
+        chapterTitle: title,
+        chapterIndex: maps[i]['chapterIndex'] ?? 0,
+        content: content,
+        searchKeywords: [keyword],
+        matchPositions: matchPositions,
+        cachedAt: DateTime.tryParse(maps[i]['cachedAt'] ?? '') ?? DateTime.now(),
+      ));
     }
 
-    final int keywordLength = keyword.length;
-    final int contextLength = 100;
-
-    final int index = content.toLowerCase().indexOf(keyword.toLowerCase());
-    if (index == -1) {
-      return '${content.substring(0, 200)}...';
-    }
-
-    int start = (index - contextLength).clamp(0, content.length);
-    int end = (index + keywordLength + contextLength).clamp(0, content.length);
-
-    String result = content.substring(start, end);
-    if (start > 0) result = '...$result';
-    if (end < content.length) result = '$result...';
-
-    return result;
+    return results;
   }
 
+  /// 查找文本中所有匹配的位置
+  List<MatchPosition> _findMatchPositions(String text, String keyword) {
+    final List<MatchPosition> positions = [];
+    final String lowerText = text.toLowerCase();
+    final String lowerKeyword = keyword.toLowerCase();
+
+    int index = lowerText.indexOf(lowerKeyword);
+    while (index != -1) {
+      positions.add(MatchPosition(
+        start: index,
+        end: index + keyword.length,
+        matchedText: text.substring(index, index + keyword.length),
+      ));
+      index = lowerText.indexOf(lowerKeyword, index + 1);
+    }
+
+    return positions;
+  }
+
+  
   /// 获取所有已缓存小说的列表（用于搜索筛选）
   Future<List<CachedNovelInfo>> getCachedNovels() async {
     final db = await database;
@@ -699,19 +708,25 @@ class DatabaseService {
         cc.novelUrl,
         b.title as novelTitle,
         b.author as novelAuthor,
-        COUNT(cc.id) as cachedChapterCount
+        b.coverUrl,
+        b.description,
+        COUNT(cc.id) as cachedChapterCount,
+        MAX(cc.cachedAt) as lastUpdated
       FROM chapter_cache cc
       LEFT JOIN bookshelf b ON cc.novelUrl = b.url
-      GROUP BY cc.novelUrl, b.title, b.author
+      GROUP BY cc.novelUrl, b.title, b.author, b.coverUrl, b.description
       ORDER BY b.title
     ''');
 
     return List.generate(maps.length, (i) {
       return CachedNovelInfo(
-        novelUrl: maps[i]['novelUrl'],
+        novelUrl: maps[i]['novelUrl'] ?? '',
         novelTitle: maps[i]['novelTitle'] ?? '未知小说',
         novelAuthor: maps[i]['novelAuthor'] ?? '未知作者',
-        cachedChapterCount: maps[i]['cachedChapterCount'],
+        coverUrl: maps[i]['coverUrl'],
+        description: maps[i]['description'],
+        chapterCount: maps[i]['cachedChapterCount'] ?? 0,
+        lastUpdated: DateTime.tryParse(maps[i]['lastUpdated'] ?? '') ?? DateTime.now(),
       );
     });
   }

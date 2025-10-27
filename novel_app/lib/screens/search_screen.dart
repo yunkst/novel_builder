@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/api_service_wrapper.dart';
-import '../services/cache_search_service.dart';
+import '../services/database_service.dart';
 import 'chapter_list_screen.dart';
 import 'cache_search_screen.dart';
 import '../utils/toast_utils.dart';
@@ -16,6 +16,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ApiServiceWrapper _api = ApiServiceWrapper();
+  final DatabaseService _databaseService = DatabaseService();
   List<Novel> _searchResults = [];
   bool _isLoading = false;
   String _errorMessage = '';
@@ -195,7 +196,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 itemCount: _searchResults.length,
                 itemBuilder: (context, index) {
                   final novel = _searchResults[index];
-                  final host = Uri.tryParse(novel.url)?.host ?? '未知站点';
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -203,10 +203,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     child: ListTile(
                       title: Text(
-                        result.novelTitle,
+                        novel.title,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('作者: ${result.novelAuthor} · 来源: ${_api.getBaseUrl()}'),
+                      subtitle: Text('作者: ${novel.author} · 来源: ${Uri.tryParse(novel.url)?.host ?? '未知站点'}'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         Navigator.push(
