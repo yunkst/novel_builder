@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Novel Builder Backend - 使用示例
@@ -8,9 +7,9 @@ Novel Builder Backend - 使用示例
 """
 
 import asyncio
+from typing import Any
+
 import httpx
-import json
-from typing import List, Dict, Any
 
 
 class NovelClient:
@@ -34,7 +33,7 @@ class NovelClient:
             print(f"健康检查失败: {e}")
             return False
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             async with httpx.AsyncClient(headers=self.headers) as client:
@@ -51,7 +50,7 @@ class NovelClient:
             print(f"搜索失败: {e}")
             return []
 
-    async def get_chapters(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapters(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             async with httpx.AsyncClient(headers=self.headers) as client:
@@ -68,7 +67,7 @@ class NovelClient:
             print(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             async with httpx.AsyncClient(headers=self.headers) as client:
@@ -85,7 +84,7 @@ class NovelClient:
             print(f"获取章节内容失败: {e}")
             return {}
 
-    def print_novel(self, novel: Dict[str, Any]) -> None:
+    def print_novel(self, novel: dict[str, Any]) -> None:
         """打印小说信息"""
         print(f"📚 {novel.get('title', '未知标题')}")
         print(f"✍️  作者: {novel.get('author', '未知')}")
@@ -96,7 +95,7 @@ class NovelClient:
             print(f"🖼️  封面: {novel['cover_url']}")
         print("-" * 50)
 
-    def print_chapter(self, chapter: Dict[str, Any]) -> None:
+    def print_chapter(self, chapter: dict[str, Any]) -> None:
         """打印章节信息"""
         print(f"📄 {chapter.get('title', '未知标题')}")
         print(f"🔗 链接: {chapter.get('url', '未知')}")
@@ -179,7 +178,7 @@ async def demo_basic_usage():
                 preview += "..."
 
             print(f"📖 内容预览:\n{preview}")
-            print(f"\n📊 章节统计:")
+            print("\n📊 章节统计:")
             print(f"   - 总字数: {len(chapter_text)}")
             print(f"   - 段落数: {len([p for p in chapter_text.split('\n') if p.strip()])}")
 

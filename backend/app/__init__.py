@@ -1,2 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""
+Novel Builder Backend Application
+
+A FastAPI-based web service for novel content crawling and caching.
+"""
+
+__version__ = "1.0.0"

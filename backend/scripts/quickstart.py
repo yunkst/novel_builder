@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 快速启动脚本 - 一键设置开发环境
 """
 
 import os
-import sys
 import subprocess
-import json
+import sys
 from pathlib import Path
 
 

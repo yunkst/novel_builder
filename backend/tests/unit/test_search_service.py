@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Unit tests for SearchService - focus on business logic without external dependencies.
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import patch, AsyncMock
-from typing import List, Dict, Any
 
 from app.services.search_service import SearchService
 
@@ -42,7 +41,7 @@ class TestSearchService:
                 "cover_url": "https://example.com/cover.jpg",
                 "description": "测试描述",
                 "status": "ongoing",
-                "last_updated": "2024-01-01T00:00:00Z"
+                "last_updated": "2024-01-01T00:00:00Z",
             }
         ]
 
@@ -62,12 +61,28 @@ class TestSearchService:
         # Create multiple crawlers with different results
         crawler1 = AsyncMock()
         crawler1.search.return_value = [
-            {"title": "小说1", "author": "作者1", "url": "https://example.com/1", "cover_url": "", "description": "", "status": "ongoing", "last_updated": "2024-01-01T00:00:00Z"}
+            {
+                "title": "小说1",
+                "author": "作者1",
+                "url": "https://example.com/1",
+                "cover_url": "",
+                "description": "",
+                "status": "ongoing",
+                "last_updated": "2024-01-01T00:00:00Z",
+            }
         ]
 
         crawler2 = AsyncMock()
         crawler2.search.return_value = [
-            {"title": "小说2", "author": "作者2", "url": "https://example.com/2", "cover_url": "", "description": "", "status": "ongoing", "last_updated": "2024-01-01T00:00:00Z"}
+            {
+                "title": "小说2",
+                "author": "作者2",
+                "url": "https://example.com/2",
+                "cover_url": "",
+                "description": "",
+                "status": "ongoing",
+                "last_updated": "2024-01-01T00:00:00Z",
+            }
         ]
 
         crawlers = {"site1": crawler1, "site2": crawler2}
@@ -89,7 +104,15 @@ class TestSearchService:
 
         working_crawler = AsyncMock()
         working_crawler.search.return_value = [
-            {"title": "正常小说", "author": "正常作者", "url": "https://example.com/normal", "cover_url": "", "description": "", "status": "ongoing", "last_updated": "2024-01-01T00:00:00Z"}
+            {
+                "title": "正常小说",
+                "author": "正常作者",
+                "url": "https://example.com/normal",
+                "cover_url": "",
+                "description": "",
+                "status": "ongoing",
+                "last_updated": "2024-01-01T00:00:00Z",
+            }
         ]
 
         crawlers = {"failing": failing_crawler, "working": working_crawler}
@@ -102,17 +125,24 @@ class TestSearchService:
     @pytest.mark.asyncio
     async def test_search_crawler_timeout_handling(self):
         """Test search handles crawler timeouts."""
-        import asyncio
 
         service = SearchService()
 
         # Create a crawler that times out
         slow_crawler = AsyncMock()
-        slow_crawler.search.side_effect = asyncio.TimeoutError("Timeout")
+        slow_crawler.search.side_effect = TimeoutError("Timeout")
 
         fast_crawler = AsyncMock()
         fast_crawler.search.return_value = [
-            {"title": "快速结果", "author": "快速作者", "url": "https://example.com/fast", "cover_url": "", "description": "", "status": "ongoing", "last_updated": "2024-01-01T00:00:00Z"}
+            {
+                "title": "快速结果",
+                "author": "快速作者",
+                "url": "https://example.com/fast",
+                "cover_url": "",
+                "description": "",
+                "status": "ongoing",
+                "last_updated": "2024-01-01T00:00:00Z",
+            }
         ]
 
         crawlers = {"slow": slow_crawler, "fast": fast_crawler}
@@ -124,26 +154,6 @@ class TestSearchService:
 
     def test_result_validation(self):
         """Test that search results are properly validated."""
-        service = SearchService()
-
-        # Test valid result format
-        valid_result = {
-            "title": "测试小说",
-            "author": "测试作者",
-            "url": "https://example.com/novel/1",
-            "cover_url": "https://example.com/cover.jpg",
-            "description": "测试描述",
-            "status": "ongoing",
-            "last_updated": "2024-01-01T00:00:00Z"
-        }
-
-        # This would be implemented in SearchService
-        # assert service._validate_result(valid_result) == True
-
-        # Test missing required fields
-        invalid_result = {
-            "title": "测试小说",
-            # Missing author, url, etc.
-        }
-
-        # assert service._validate_result(invalid_result) == False
+        # Placeholder for future validation implementation
+        # This would test result format validation in SearchService
+        assert True  # Temporary placeholder

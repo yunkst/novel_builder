@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Unit tests for main FastAPI application.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
-
-from app.main import app
 
 
 class TestHealthCheck:
@@ -63,7 +61,10 @@ class TestSearchEndpoint:
         response = client.get("/search?keyword=test", headers=headers)
 
         # Assertions - focus on response structure, not data content
-        assert response.status_code in [200, 500]  # May fail due to network, but structure should be correct
+        assert response.status_code in [
+            200,
+            500,
+        ]  # May fail due to network, but structure should be correct
 
         if response.status_code == 200:
             data = response.json()
@@ -102,7 +103,7 @@ class TestSearchEndpoint:
             "测试",
             "novel",
             "小说",
-            "a" * 50  # Long keyword
+            "a" * 50,  # Long keyword
         ]
 
         for keyword in test_keywords:
@@ -153,7 +154,9 @@ class TestCrawlersIntegration:
         sample_novel_data: dict,
     ) -> None:
         """Test crawler integration with search."""
-        with patch("app.main.get_enabled_crawlers", mock_crawler_factory.get_enabled_crawlers):
+        with patch(
+            "app.main.get_enabled_crawlers", mock_crawler_factory.get_enabled_crawlers
+        ):
             headers = {"X-API-TOKEN": valid_token}
             response = await async_client.get("/search?keyword=test", headers=headers)
 
@@ -183,7 +186,10 @@ class TestErrorHandling:
         response = client.get("/search?keyword=test", headers=headers)
 
         # Should handle error gracefully
-        assert response.status_code in [500, 200]  # Depending on error handling strategy
+        assert response.status_code in [
+            500,
+            200,
+        ]  # Depending on error handling strategy
 
     def test_cors_headers(self, client: TestClient) -> None:
         """Test CORS headers are present."""

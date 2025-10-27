@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-import asyncio
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 from .base_crawler import BaseCrawler
 
 
 class SearchService:
-    def __init__(self, crawlers: Optional[List[BaseCrawler]] = None):
+    def __init__(self, crawlers: list[BaseCrawler] | None = None):
         self.crawlers = crawlers or []
 
-    async def search(self, keyword: str, crawlers: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    async def search(
+        self, keyword: str, crawlers: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Search for novels using provided crawlers.
 
@@ -27,12 +27,12 @@ class SearchService:
 
         # Use provided crawlers or instance crawlers
         target_crawlers = crawlers or {}
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for site_name, crawler in target_crawlers.items():
             try:
                 # Check if crawler has search method
-                if hasattr(crawler, 'search') and callable(getattr(crawler, 'search')):
+                if hasattr(crawler, "search") and callable(crawler.search):
                     items = await crawler.search(keyword)
                     if items:
                         results.extend(items)
@@ -43,7 +43,7 @@ class SearchService:
 
         # Normalize and deduplicate results
         seen = set()
-        unique_results: List[Dict[str, Any]] = []
+        unique_results: list[dict[str, Any]] = []
 
         for result in results:
             if isinstance(result, dict):
@@ -57,15 +57,17 @@ class SearchService:
 
                 # Add if valid and not seen
                 if title and url and key not in seen:
-                    unique_results.append({
-                        "title": title.strip(),
-                        "author": author.strip(),
-                        "url": url.strip(),
-                        "cover_url": result.get("cover_url", ""),
-                        "description": result.get("description", ""),
-                        "status": result.get("status", "unknown"),
-                        "last_updated": result.get("last_updated", "")
-                    })
+                    unique_results.append(
+                        {
+                            "title": title.strip(),
+                            "author": author.strip(),
+                            "url": url.strip(),
+                            "cover_url": result.get("cover_url", ""),
+                            "description": result.get("description", ""),
+                            "status": result.get("status", "unknown"),
+                            "last_updated": result.get("last_updated", ""),
+                        }
+                    )
                     seen.add(key)
 
         return unique_results

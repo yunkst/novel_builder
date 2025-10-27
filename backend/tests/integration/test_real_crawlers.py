@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Integration tests using real crawler instances.
@@ -7,9 +6,7 @@ Tests actual component interaction without heavy mocking.
 """
 
 import pytest
-import asyncio
 from httpx import AsyncClient
-from unittest.mock import patch
 
 from app.services.crawler_factory import get_enabled_crawlers
 from app.services.search_service import SearchService
@@ -32,10 +29,10 @@ class TestRealCrawlerIntegration:
 
         # Each crawler should have required methods
         for site_name, crawler in crawlers.items():
-            assert hasattr(crawler, 'search')
-            assert hasattr(crawler, 'get_chapters')
-            assert hasattr(crawler, 'get_chapter_content')
-            assert callable(getattr(crawler, 'search'))
+            assert hasattr(crawler, "search")
+            assert hasattr(crawler, "get_chapters")
+            assert hasattr(crawler, "get_chapter_content")
+            assert callable(crawler.search)
 
     @pytest.mark.asyncio
     async def test_search_service_with_real_crawlers(self):
@@ -91,7 +88,9 @@ class TestAPIWithRealComponents:
         assert response.json() == {"status": "ok"}
 
     @pytest.mark.asyncio
-    async def test_search_endpoint_real_integration(self, async_client: AsyncClient, valid_token: str):
+    async def test_search_endpoint_real_integration(
+        self, async_client: AsyncClient, valid_token: str
+    ):
         """Test search endpoint with real integration."""
         headers = {"X-API-TOKEN": valid_token}
 
@@ -106,7 +105,9 @@ class TestAPIWithRealComponents:
             assert isinstance(data, list)
 
     @pytest.mark.asyncio
-    async def test_search_validation_real(self, async_client: AsyncClient, valid_token: str):
+    async def test_search_validation_real(
+        self, async_client: AsyncClient, valid_token: str
+    ):
         """Test search validation with real API."""
         headers = {"X-API-TOKEN": valid_token}
 
@@ -139,6 +140,7 @@ class TestDataValidation:
     async def test_novel_data_schema_validation(self):
         """Test that novel data conforms to expected schema."""
         from pydantic import ValidationError
+
         from app.schemas import Novel
 
         # Test valid data
@@ -149,7 +151,7 @@ class TestDataValidation:
             "cover_url": "https://example.com/cover.jpg",
             "description": "测试描述",
             "status": "ongoing",
-            "last_updated": "2024-01-01T00:00:00Z"
+            "last_updated": "2024-01-01T00:00:00Z",
         }
 
         novel = Novel(**valid_data)

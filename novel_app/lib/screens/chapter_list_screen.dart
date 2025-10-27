@@ -5,7 +5,9 @@ import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
+import '../services/cache_sync_service.dart';
 import 'reader_screen.dart';
+import 'chapter_search_screen.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -659,6 +661,19 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         title: Text(widget.novel.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 搜索按钮
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChapterSearchScreen(novel: widget.novel),
+                ),
+              );
+            },
+            tooltip: '搜索章节内容',
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
@@ -667,6 +682,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                   break;
                 case 'cache_all':
                   _enqueueCacheWholeNovel();
+                  break;
+                case 'cache_server':
+                  _enqueueServerCache();
+                  break;
+                case 'cache_sync':
+                  _syncServerCache();
                   break;
                 case 'clear_cache':
                   _showClearCacheDialog();
@@ -694,6 +715,26 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                     Icon(Icons.download),
                     SizedBox(width: 8),
                     Text('缓存全书'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'cache_server',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_download),
+                    SizedBox(width: 8),
+                    Text('服务端缓存'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'cache_sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.sync),
+                    SizedBox(width: 8),
+                    Text('同步缓存'),
                   ],
                 ),
               ),
@@ -886,6 +927,59 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已开始后台缓存全书')),
       );
+    }
+  }
+
+  /// 使用服务端缓存
+  Future<void> _enqueueServerCache() async {
+    try {
+      final taskId = await _cacheManager.createServerCacheTask(widget.novel.url);
+      if (taskId != null && taskId > 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已开始服务端缓存')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('创建服务端缓存任务失败')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('服务端缓存失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 同步服务端缓存
+  Future<void> _syncServerCache() async {
+    try {
+      final cacheSyncService = CacheSyncService();
+      final success = await cacheSyncService.syncNovel(widget.novel.url);
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('正在同步服务端缓存...')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('服务端未找到该小说的缓存任务')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步缓存失败: $e')),
+        );
+      }
     }
   }
 }

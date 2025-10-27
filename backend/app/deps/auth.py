@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from fastapi import Header, HTTPException
+
 from ..config import settings
 
 
-def verify_token(x_api_token: str | None = Header(default=None, alias=settings.token_header)):
+def verify_token(
+    x_api_token: str | None = Header(default=None, alias=settings.token_header),
+):
     # 如果未设置环境变量，则不进行校验（便于本地开发）；生产请务必设置
     if not settings.api_token:
         return True

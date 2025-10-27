@@ -56,8 +56,13 @@ class _HomePageState extends State<HomePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 简单认为进入主页即活跃
+    // 标记应用活跃
     _cacheManager.setAppActive(true);
+
+    // 应用启动时同步服务端缓存（异步执行，不阻塞UI）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cacheManager.syncOnAppStart();
+    });
   }
 
   @override

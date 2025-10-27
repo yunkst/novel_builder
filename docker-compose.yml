@@ -1,23 +1,15 @@
 version: '3.8'
 
 services:
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3154:5173"
-    volumes:
-      - ./frontend:/app:rw  # 挂载源代码，支持热重载
-      - /app/node_modules  # 防止本地node_modules覆盖容器中的
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "3800:8000"
+    volumes:
+      # 添加这行，把本地 backend 目录挂载到容器中
+      - ./backend:/app
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
@@ -28,8 +20,6 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    ports: 
-      - "5432:5432"
     environment:
       - POSTGRES_USER=novel_user
       - POSTGRES_PASSWORD=novel_pass

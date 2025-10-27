@@ -3,8 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
+import '../models/cache_task.dart';
 
 /// API 服务封装层
 ///
@@ -187,5 +189,140 @@ class ApiServiceWrapper {
   /// 释放资源
   void dispose() {
     _dio.close();
+  }
+
+  // ========== 缓存相关方法 ==========
+
+  /// 创建缓存任务
+  Future<CacheTask> createCacheTask(String novelUrl) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      final response = await _api.createCacheTaskApiCacheCreatePost(
+        novelUrl: novelUrl,
+        X_API_TOKEN: token,
+      );
+
+      // 从响应中提取任务数据
+      final data = response.data;
+      if (data != null) {
+        // 将 JsonObject 转换为 Map
+        final dataMap = _jsonObjectToMap(data);
+        if (dataMap.containsKey('task_id')) {
+          return CacheTask.fromJson(dataMap);
+        }
+      }
+      throw Exception('创建缓存任务失败：响应格式错误');
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取缓存任务列表
+  Future<List<CacheTask>> getCacheTasks() async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      final response = await _api.getCacheTasksApiCacheTasksGet(
+        X_API_TOKEN: token,
+      );
+
+      final data = response.data;
+      if (data != null) {
+        final dataMap = _jsonObjectToMap(data);
+        if (dataMap.containsKey('tasks')) {
+          final tasksList = dataMap['tasks'] as List<dynamic>? ?? [];
+          return tasksList
+              .map((taskData) => CacheTask.fromJson(Map<String, dynamic>.from(taskData)))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取缓存任务状态
+  Future<CacheTaskUpdate> getCacheTaskStatus(int taskId) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      final response = await _api.getCacheStatusApiCacheStatusTaskIdGet(
+        taskId: taskId,
+        X_API_TOKEN: token,
+      );
+
+      final data = response.data;
+      if (data != null) {
+        final dataMap = _jsonObjectToMap(data);
+        return CacheTaskUpdate.fromJson(dataMap);
+      } else {
+        throw Exception('获取缓存状态失败：响应格式错误');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 取消缓存任务
+  Future<bool> cancelCacheTask(int taskId) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      final response = await _api.cancelCacheTaskApiCacheCancelTaskIdPost(
+        taskId: taskId,
+        X_API_TOKEN: token,
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 下载已缓存小说
+  Future<String> downloadCachedNovel(int taskId, {String format = 'json'}) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      final response = await _api.downloadCachedNovelApiCacheDownloadTaskIdGet(
+        taskId: taskId,
+        format: format,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.toString();
+      } else {
+        throw Exception('下载缓存失败：${response.statusCode}');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 将 JsonObject 转换为 Map<String, dynamic>
+  Map<String, dynamic> _jsonObjectToMap(dynamic jsonObject) {
+    if (jsonObject is Map<String, dynamic>) {
+      return jsonObject;
+    }
+
+    // 如果是 JsonObject，尝试转换为字符串再解析
+    if (jsonObject != null) {
+      try {
+        final jsonString = jsonObject.toString();
+        final parsed = jsonDecode(jsonString);
+        return Map<String, dynamic>.from(parsed);
+      } catch (e) {
+        // 如果转换失败，返回空 Map
+        if (kDebugMode) {
+          print('JSON解析失败: $e');
+        }
+        return {};
+      }
+    }
+
+    return {};
   }
 }

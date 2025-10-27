@@ -39,6 +39,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY ./app ./app
 
+# Copy test scripts and alembic config
+COPY ./test_backend.py ./
+COPY ./BACKEND_TESTING.md ./
+COPY ./alembic.ini ./
+COPY ./alembic ./alembic
+
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app

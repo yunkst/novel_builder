@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-from typing import Optional, Dict, Any
+from typing import Any
+from urllib.parse import urlparse
+
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-from urllib.parse import urlparse
+
 from ..models import ChapterCache
 
 
@@ -18,14 +19,14 @@ class CacheService:
             parsed = urlparse(url)
             domain = parsed.netloc
             # 提取主域名
-            if domain.startswith('www.'):
+            if domain.startswith("www."):
                 domain = domain[4:]
             return domain
         except Exception:
             return "unknown"
 
     @staticmethod
-    def get_chapter_content(db: Session, chapter_url: str) -> Optional[Dict[str, Any]]:
+    def get_chapter_content(db: Session, chapter_url: str) -> dict[str, Any] | None:
         """
         获取缓存的章节内容
 
@@ -37,7 +38,9 @@ class CacheService:
             章节内容字典，如果缓存不存在则返回 None
         """
         try:
-            cache = db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            cache = (
+                db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            )
             if cache:
                 # 更新访问统计
                 cache.access_count += 1
@@ -52,10 +55,7 @@ class CacheService:
 
     @staticmethod
     def set_chapter_content(
-        db: Session,
-        chapter_url: str,
-        title: str,
-        content: str
+        db: Session, chapter_url: str, title: str, content: str
     ) -> bool:
         """
         设置章节内容缓存（如果已存在则更新）
@@ -73,7 +73,9 @@ class CacheService:
             source = CacheService._extract_source(chapter_url)
 
             # 查找是否已存在
-            cache = db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            cache = (
+                db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            )
 
             if cache:
                 # 更新现有缓存
@@ -89,7 +91,7 @@ class CacheService:
                     title=title,
                     content=content,
                     source=source,
-                    access_count=1
+                    access_count=1,
                 )
                 db.add(cache)
 
@@ -113,7 +115,9 @@ class CacheService:
             是否删除成功
         """
         try:
-            cache = db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            cache = (
+                db.query(ChapterCache).filter(ChapterCache.url == chapter_url).first()
+            )
             if cache:
                 db.delete(cache)
                 db.commit()
@@ -125,7 +129,7 @@ class CacheService:
             return False
 
     @staticmethod
-    def get_cache_stats(db: Session) -> Dict[str, Any]:
+    def get_cache_stats(db: Session) -> dict[str, Any]:
         """
         获取缓存统计信息
 
@@ -139,15 +143,21 @@ class CacheService:
             total_count = db.query(ChapterCache).count()
 
             # 按来源统计
-            source_stats = db.query(
-                ChapterCache.source,
-                func.count(ChapterCache.id).label('count')
-            ).group_by(ChapterCache.source).all()
+            source_stats = (
+                db.query(
+                    ChapterCache.source, func.count(ChapterCache.id).label("count")
+                )
+                .group_by(ChapterCache.source)
+                .all()
+            )
 
             # 最热门的章节
-            hot_chapters = db.query(ChapterCache).order_by(
-                ChapterCache.access_count.desc()
-            ).limit(10).all()
+            hot_chapters = (
+                db.query(ChapterCache)
+                .order_by(ChapterCache.access_count.desc())
+                .limit(10)
+                .all()
+            )
 
             return {
                 "total_chapters": total_count,
@@ -157,15 +167,15 @@ class CacheService:
                         "url": ch.url,
                         "title": ch.title,
                         "access_count": ch.access_count,
-                        "last_accessed": ch.last_accessed_at.isoformat() if ch.last_accessed_at else None
+                        "last_accessed": ch.last_accessed_at.isoformat()
+                        if ch.last_accessed_at
+                        else None,
                     }
                     for ch in hot_chapters
-                ]
+                ],
             }
         except Exception as e:
-            return {
-                "error": f"获取统计信息失败: {e}"
-            }
+            return {"error": f"获取统计信息失败: {e}"}
 
     @staticmethod
     def clear_old_cache(db: Session, days: int = 30) -> int:
@@ -181,11 +191,14 @@ class CacheService:
         """
         try:
             from datetime import datetime, timedelta
+
             threshold = datetime.now() - timedelta(days=days)
 
-            result = db.query(ChapterCache).filter(
-                ChapterCache.last_accessed_at < threshold
-            ).delete()
+            result = (
+                db.query(ChapterCache)
+                .filter(ChapterCache.last_accessed_at < threshold)
+                .delete()
+            )
 
             db.commit()
             return result

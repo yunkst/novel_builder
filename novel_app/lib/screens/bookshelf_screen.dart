@@ -3,7 +3,7 @@ import '../models/novel.dart';
 import '../services/database_service.dart';
 import '../services/cache_manager.dart';
 import 'chapter_list_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 class BookshelfScreen extends StatefulWidget {
   const BookshelfScreen({super.key});
@@ -77,7 +77,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         });
       }
     } catch (e) {
-      print('加载书架失败: $e');
+      debugPrint('加载书架失败: $e');
       setState(() {
         _bookshelf = [];
         _isLoading = false;

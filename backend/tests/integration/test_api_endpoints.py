@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Integration tests for API endpoints.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
-from unittest.mock import patch, AsyncMock
 
 
 @pytest.mark.integration
@@ -41,7 +41,9 @@ class TestAPIIntegration:
             headers = {"X-API-TOKEN": valid_token}
 
             # Step 1: Search for novels
-            search_response = await async_client.get("/search?keyword=test", headers=headers)
+            search_response = await async_client.get(
+                "/search?keyword=test", headers=headers
+            )
             assert search_response.status_code == 200
             novels = search_response.json()
             assert len(novels) == 1
@@ -180,7 +182,7 @@ class TestAPIIntegration:
                 "cover_url": f"https://example.com/cover/{i}.jpg",
                 "description": f"这是第{i}本测试小说的描述",
                 "status": "ongoing",
-                "last_updated": "2024-01-01T00:00:00Z"
+                "last_updated": "2024-01-01T00:00:00Z",
             }
             for i in range(100)  # 100 novels
         ]
@@ -215,9 +217,7 @@ class TestHealthChecks:
         import asyncio
 
         # Make many concurrent health check requests
-        tasks = [
-            async_client.get("/health") for _ in range(50)
-        ]
+        tasks = [async_client.get("/health") for _ in range(50)]
 
         responses = await asyncio.gather(*tasks)
 

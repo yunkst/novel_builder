@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/cache_search_service.dart';
 import 'chapter_list_screen.dart';
+import 'cache_search_screen.dart';
 import '../utils/toast_utils.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -44,6 +46,21 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.dispose();
     _api.dispose();
     super.dispose();
+  }
+
+  /// 检查是否有缓存内容
+  Future<bool> _checkHasCachedContent() async {
+    try {
+      // 简单查询数据库是否有相关章节缓存
+      final results = await _databaseService.searchInCachedContent(
+        _searchController.text.trim(),
+        novelUrl: null, // 查询所有缓存内容，不限制小说URL
+      );
+
+      return results.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<void> _searchNovels() async {
@@ -106,6 +123,31 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         title: const Text('搜索小说'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          FutureBuilder<bool>(
+            future: _checkHasCachedContent(),
+            builder: (context, snapshot) {
+              final hasCachedContent = snapshot.data ?? false;
+              if (!hasCachedContent) {
+                return const SizedBox.shrink();
+              }
+
+              return IconButton(
+                icon: const Icon(Icons.storage),
+                tooltip: '搜索缓存内容',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CacheSearchScreen(),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -161,10 +203,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     child: ListTile(
                       title: Text(
-                        novel.title,
+                        result.novelTitle,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('作者: ${novel.author} · 来源: $host'),
+                      subtitle: Text('作者: ${result.novelAuthor} · 来源: ${_api.getBaseUrl()}'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         Navigator.push(

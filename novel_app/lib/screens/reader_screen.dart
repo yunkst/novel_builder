@@ -2,20 +2,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
+import '../widgets/highlighted_text.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Novel novel;
   final Chapter chapter;
   final List<Chapter> chapters;
+  final ChapterSearchResult? searchResult;
 
   const ReaderScreen({
     super.key,
     required this.novel,
     required this.chapter,
     required this.chapters,
+    this.searchResult,
   });
 
   @override
@@ -97,7 +101,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     try {
       final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
       String content;
-      
+
       if (cachedContent != null) {
         content = cachedContent;
         setState(() {
@@ -105,6 +109,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
           _isLoading = false;
         });
         _updateReadingProgress();
+
+        // 如果有搜索结果，跳转到匹配位置
+        if (widget.searchResult != null && widget.searchResult!.chapterUrl == _currentChapter.url) {
+          _scrollToSearchMatch();
+        }
+
         // 开始预加载其他章节
         _startPreloadingChapters();
       } else {
@@ -168,6 +178,105 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _updateReadingProgress() async {
     final chapterIndex = _currentChapter.chapterIndex ?? widget.chapters.indexOf(_currentChapter);
     await _databaseService.updateLastReadChapter(widget.novel.url, chapterIndex);
+  }
+
+  /// 滚动到搜索匹配位置
+  void _scrollToSearchMatch() {
+    if (widget.searchResult == null || widget.searchResult!.matchPositions.isEmpty) {
+      return;
+    }
+
+    // 延迟执行滚动，确保内容已经渲染
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        final firstMatch = widget.searchResult!.firstMatch;
+        if (firstMatch != null) {
+          // 估算滚动位置（基于字符位置的粗略估算）
+          // 这里假设平均每个字符占用一定的高度
+          final estimatedScrollOffset = (firstMatch.start * 0.3).toDouble();
+
+          final maxScrollExtent = _scrollController.position.maxScrollExtent;
+          final targetOffset = estimatedScrollOffset.clamp(0.0, maxScrollExtent);
+
+          _scrollController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutCubic,
+          );
+
+          // 显示跳转提示
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('已跳转到匹配位置 (${widget.searchResult!.matchCount} 处匹配)'),
+              duration: const Duration(seconds: 2),
+              action: SnackBarAction(
+                label: '查看全部',
+                onPressed: () {
+                  _showSearchMatchDialog();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  /// 显示搜索匹配详情对话框
+  void _showSearchMatchDialog() {
+    if (widget.searchResult == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('搜索匹配详情'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('章节: ${widget.searchResult!.chapterTitle}'),
+              const SizedBox(height: 8),
+              Text('匹配数量: ${widget.searchResult!.matchCount} 处'),
+              const SizedBox(height: 16),
+              const Text('搜索关键词:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Wrap(
+                children: widget.searchResult!.searchKeywords.map((keyword) {
+                  return Chip(
+                    label: Text(keyword),
+                    backgroundColor: Theme.of(context).colorScheme.primary..withValues(alpha:0.1),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              const Text('匹配预览:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.maxFinite,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                child: SearchResultHighlight(
+                  originalText: widget.searchResult!.content,
+                  keywords: widget.searchResult!.searchKeywords,
+                  maxLines: 5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 开始预加载章节

@@ -31,10 +31,10 @@ dependencies = [
     "pydantic>=2.4.0",
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.6",
-    # Future database dependencies (commented out for phase 1)
-    # "sqlalchemy>=2.0.0",
-    # "psycopg2-binary>=2.9.0",
-    # "alembic>=1.12.0",
+    # Database dependencies for caching functionality
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.12.0",
 ]
 
 [project.optional-dependencies]

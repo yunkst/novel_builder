@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/search_result.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -631,6 +632,88 @@ class DatabaseService {
       where: 'chapterUrl = ?',
       whereArgs: [chapterUrl],
     );
+  }
+
+  /// 在缓存内容中搜索关键字
+  Future<List<ChapterSearchResult>> searchInCachedContent(String keyword, {String? novelUrl}) async {
+    final db = await database;
+
+    String whereClause = "content LIKE ? OR title LIKE ?";
+    List<dynamic> whereArgs = ['%$keyword%', '%$keyword%'];
+
+    if (novelUrl != null && novelUrl.isNotEmpty) {
+      whereClause += " AND novelUrl = ?";
+      whereArgs.add(novelUrl);
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chapter_cache',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'novelUrl, chapterIndex',
+    );
+
+    return List.generate(maps.length, (i) {
+      return ChapterSearchResult(
+        novelUrl: maps[i]['novelUrl'],
+        chapterUrl: maps[i]['chapterUrl'],
+        chapterTitle: maps[i]['title'],
+        chapterIndex: maps[i]['chapterIndex'],
+        content: maps[i]['content'],
+        cachedAt: maps[i]['cachedAt'],
+        matchedText: _extractMatchedText(maps[i]['content'], keyword),
+      );
+    });
+  }
+
+  /// 提取匹配的文本片段
+  String _extractMatchedText(String content, String keyword) {
+    if (content.length <= 200) {
+      return content;
+    }
+
+    final int keywordLength = keyword.length;
+    final int contextLength = 100;
+
+    final int index = content.toLowerCase().indexOf(keyword.toLowerCase());
+    if (index == -1) {
+      return '${content.substring(0, 200)}...';
+    }
+
+    int start = (index - contextLength).clamp(0, content.length);
+    int end = (index + keywordLength + contextLength).clamp(0, content.length);
+
+    String result = content.substring(start, end);
+    if (start > 0) result = '...$result';
+    if (end < content.length) result = '$result...';
+
+    return result;
+  }
+
+  /// 获取所有已缓存小说的列表（用于搜索筛选）
+  Future<List<CachedNovelInfo>> getCachedNovels() async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT DISTINCT
+        cc.novelUrl,
+        b.title as novelTitle,
+        b.author as novelAuthor,
+        COUNT(cc.id) as cachedChapterCount
+      FROM chapter_cache cc
+      LEFT JOIN bookshelf b ON cc.novelUrl = b.url
+      GROUP BY cc.novelUrl, b.title, b.author
+      ORDER BY b.title
+    ''');
+
+    return List.generate(maps.length, (i) {
+      return CachedNovelInfo(
+        novelUrl: maps[i]['novelUrl'],
+        novelTitle: maps[i]['novelTitle'] ?? '未知小说',
+        novelAuthor: maps[i]['novelAuthor'] ?? '未知作者',
+        cachedChapterCount: maps[i]['cachedChapterCount'],
+      );
+    });
   }
 
   /// 关闭数据库

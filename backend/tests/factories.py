@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Test data factories for creating realistic test data.
 """
 
+from datetime import UTC, datetime
+from typing import Any
+
 import factory
-from datetime import datetime, timezone
-from typing import Dict, Any, List
 
 
 class NovelFactory(factory.Factory):
@@ -21,13 +21,11 @@ class NovelFactory(factory.Factory):
     url = factory.Faker("url")
     cover_url = factory.Faker("image_url")
     description = factory.Faker("paragraph", nb_sentences=2)
-    status = factory.fuzzy.FuzzyChoice(["ongoing", "completed", "hiatus"])
-    last_updated = factory.LazyFunction(
-        lambda: datetime.now(timezone.utc).isoformat()
-    )
+    status = factory.Iterator(["ongoing", "completed", "hiatus"])
+    last_updated = factory.LazyFunction(lambda: datetime.now(UTC).isoformat())
 
     @classmethod
-    def create_batch(cls, size, **kwargs) -> List[Dict[str, Any]]:
+    def create_batch(cls, size, **kwargs) -> list[dict[str, Any]]:
         """Create a batch of novel data."""
         return [cls.create(**kwargs) for _ in range(size)]
 
@@ -60,29 +58,33 @@ class SearchResultsFactory:
     """Factory for creating realistic search results."""
 
     @staticmethod
-    def create_empty_results() -> List[Dict[str, Any]]:
+    def create_empty_results() -> list[dict[str, Any]]:
         """Create empty search results."""
         return []
 
     @staticmethod
-    def create_single_result(**overrides) -> Dict[str, Any]:
+    def create_single_result(**overrides) -> dict[str, Any]:
         """Create a single search result with optional overrides."""
         result = NovelFactory.create()
         result.update(overrides)
         return result
 
     @staticmethod
-    def create_multiple_results(count: int, **overrides) -> List[Dict[str, Any]]:
+    def create_multiple_results(count: int, **overrides) -> list[dict[str, Any]]:
         """Create multiple search results."""
         return NovelFactory.create_batch(count, **overrides)
 
     @staticmethod
-    def create_mixed_quality_results() -> List[Dict[str, Any]]:
+    def create_mixed_quality_results() -> list[dict[str, Any]]:
         """Create results with varying quality for testing filtering."""
         results = [
             NovelFactory.create(title="高质量小说", author="知名作者"),
-            NovelFactory.create(title="低质量小说", author="", description=""),  # Missing author/description
-            NovelFactory.create(title="正常小说", author="普通作者", status="completed"),
+            NovelFactory.create(
+                title="低质量小说", author="", description=""
+            ),  # Missing author/description
+            NovelFactory.create(
+                title="正常小说", author="普通作者", status="completed"
+            ),
             NovelFactory.create(title="连载小说", author="新人作者", status="ongoing"),
         ]
         return results
@@ -102,21 +104,11 @@ class APITestDataFactory:
         return "invalid-token"
 
     @staticmethod
-    def create_search_request_data(keyword: str = None) -> Dict[str, Any]:
+    def create_search_request_data(keyword: str = None) -> dict[str, Any]:
         """Create search request data."""
-        return {
-            "keyword": keyword or "测试关键词",
-            "site": "test_site",
-            "limit": 20
-        }
+        return {"keyword": keyword or "测试关键词", "site": "test_site", "limit": 20}
 
     @staticmethod
-    def create_expected_response_structure() -> Dict[str, Any]:
+    def create_expected_response_structure() -> dict[str, Any]:
         """Create expected API response structure."""
-        return {
-            "status": "success",
-            "data": [],
-            "total": 0,
-            "page": 1,
-            "limit": 20
-        }
+        return {"status": "success", "data": [], "total": 0, "page": 1, "limit": 20}
