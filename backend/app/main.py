@@ -6,6 +6,8 @@ This module contains the main FastAPI application with all API endpoints
 for novel searching, chapter management, and caching functionality.
 """
 
+from typing import Any
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -44,7 +46,7 @@ app.add_middleware(
 
 # 应用启动事件
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     # 初始化数据库
     init_db()
     print("✓ Novel Builder Backend 启动完成")
@@ -54,12 +56,12 @@ async def startup_event():
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.get("/search", response_model=list[Novel], dependencies=[Depends(verify_token)])
-async def search(keyword: str = Query(..., min_length=1, description="小说名称或作者")):
+async def search(keyword: str = Query(..., min_length=1, description="小说名称或作者")) -> list[dict[str, Any]]:
     crawlers = get_enabled_crawlers()
     service = SearchService(list(crawlers.values()))
     results = await service.search(keyword, crawlers)
@@ -84,7 +86,7 @@ def chapters(url: str = Query(..., description="小说详情页或阅读页URL")
 )
 def chapter_content(
     url: str = Query(..., description="章节URL"),
-    force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
+    _force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
 ):
     """
     获取章节内容

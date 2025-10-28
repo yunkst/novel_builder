@@ -1,23 +1,19 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 单元测试：缓存数据库操作
 测试缓存任务的数据库CRUD操作和数据一致性
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone
-from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
-from typing import List, Dict, Any
 
-from app.database import get_db, Base
-from app.models import CacheTask, CachedChapter
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.database import Base
+from app.models import CacheTask
 from app.services.novel_cache_service import novel_cache_service
-from tests.factories import APITestDataFactory
 
 
 class TestCacheDatabase:
@@ -30,7 +26,7 @@ class TestCacheDatabase:
             "sqlite:///:memory:",
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
-            echo=False
+            echo=False,
         )
 
         # 创建所有表
@@ -80,17 +76,15 @@ class TestCacheDatabase:
         # Given
         with self.SessionLocal() as db:
             # 先创建任务
-            task = self.cache_service.create_cache_task("https://example.com/novel/progress-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/progress-test", db
+            )
             db.commit()
             task_id = task.id
 
             # When
             success = self.cache_service.update_task_progress(
-                db,
-                task_id,
-                cached_chapters=50,
-                failed_chapters=2,
-                status="running"
+                db, task_id, cached_chapters=50, failed_chapters=2, status="running"
             )
 
         db.commit()
@@ -109,17 +103,15 @@ class TestCacheDatabase:
         """测试完成缓存任务"""
         # Given
         with self.SessionLocal() as db:
-            task = self.cache_service.create_cache_task("https://example.com/novel/completion-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/completion-test", db
+            )
             db.commit()
             task_id = task.id
 
             # When
             success = self.cache_service.update_task_progress(
-                db,
-                task_id,
-                cached_chapters=100,
-                failed_chapters=0,
-                status="completed"
+                db, task_id, cached_chapters=100, failed_chapters=0, status="completed"
             )
             db.commit()
 
@@ -135,7 +127,9 @@ class TestCacheDatabase:
         """测试更新缓存任务错误状态"""
         # Given
         with self.SessionLocal() as db:
-            task = self.cache_service.create_cache_task("https://example.com/novel/error-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/error-test", db
+            )
             db.commit()
             task_id = task.id
 
@@ -146,7 +140,7 @@ class TestCacheDatabase:
                 cached_chapters=30,
                 failed_chapters=5,
                 status="failed",
-                error_message="网络连接失败"
+                error_message="网络连接失败",
             )
             db.commit()
 
@@ -163,7 +157,9 @@ class TestCacheDatabase:
         # Given
         with self.SessionLocal() as db:
             # 先创建任务
-            task = self.cache_service.create_cache_task("https://example.com/novel/chapters-crud-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/chapters-crud-test", db
+            )
             db.commit()
             task_id = task.id
 
@@ -174,15 +170,15 @@ class TestCacheDatabase:
                     "chapter_url": f"{task.novel_url}/chapter/1",
                     "chapter_content": "第一章内容...",
                     "word_count": 1000,
-                    "chapter_index": 1
+                    "chapter_index": 1,
                 },
                 {
                     "chapter_title": "第二章",
                     "chapter_url": f"{task.novel_url}/chapter/2",
                     "chapter_content": "第二章内容...",
                     "word_count": 1500,
-                    "chapter_index": 2
-                }
+                    "chapter_index": 2,
+                },
             ]
 
             success = self.cache_service.cache_chapters(task_id, chapters_data, db)
@@ -203,7 +199,9 @@ class TestCacheDatabase:
         """测试获取空的缓存章节"""
         # Given
         with self.SessionLocal() as db:
-            task = self.cache_service.create_cache_task("https://example.com/novel/empty-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/empty-test", db
+            )
             db.commit()
             task_id = task.id
 
@@ -218,9 +216,15 @@ class TestCacheDatabase:
         # Given
         with self.SessionLocal() as db:
             # 创建不同状态的任务
-            task1 = self.cache_service.create_cache_task("https://example.com/novel/status-test1", db)
-            task2 = self.cache_service.create_cache_task("https://example.com/novel/status-test2", db)
-            task3 = self.cache_service.create_cache_task("https://example.com/novel/status-test3", db)
+            task1 = self.cache_service.create_cache_task(
+                "https://example.com/novel/status-test1", db
+            )
+            task2 = self.cache_service.create_cache_task(
+                "https://example.com/novel/status-test2", db
+            )
+            task3 = self.cache_service.create_cache_task(
+                "https://example.com/novel/status-test3", db
+            )
             db.commit()
 
             # 更新任务状态
@@ -230,9 +234,15 @@ class TestCacheDatabase:
             db.commit()
 
             # When - 按状态筛选
-            pending_tasks = self.cache_service.get_cache_tasks(status="pending", limit=10, offset=0, db)
-            running_tasks = self.cache_service.get_cache_tasks(status="running", limit=10, offset=0, db)
-            completed_tasks = self.cache_service.get_cache_tasks(status="completed", limit=10, offset=0, db)
+            pending_tasks = self.cache_service.get_cache_tasks(
+                db, status="pending", limit=10, offset=0
+            )
+            running_tasks = self.cache_service.get_cache_tasks(
+                db, status="running", limit=10, offset=0
+            )
+            completed_tasks = self.cache_service.get_cache_tasks(
+                db, status="completed", limit=10, offset=0
+            )
 
             # Then
             assert len(pending_tasks) == 1
@@ -249,16 +259,18 @@ class TestCacheDatabase:
             # 创建多个任务
             tasks = []
             for i in range(15):  # 创建15个任务用于测试分页
-                task = self.cache_service.create_cache_task(f"https://example.com/novel/pagination-test-{i}", db)
+                task = self.cache_service.create_cache_task(
+                    f"https://example.com/novel/pagination-test-{i}", db
+                )
                 tasks.append(task)
             db.commit()
 
             # When - 第一页
-            page1 = self.cache_service.get_cache_tasks(limit=5, offset=0, db)
+            page1 = self.cache_service.get_cache_tasks(db, limit=5, offset=0)
             # 第二页
-            page2 = self.cache_service.get_cache_tasks(limit=5, offset=5, db)
+            page2 = self.cache_service.get_cache_tasks(db, limit=5, offset=5)
             # 第三页
-            page3 = self.cache_service.get_cache_tasks(limit=5, offset=10, db)
+            page3 = self.cache_service.get_cache_tasks(db, limit=5, offset=10)
 
             # Then
             assert len(page1) == 5
@@ -274,7 +286,9 @@ class TestCacheDatabase:
         """测试取消缓存任务的数据库操作"""
         # Given
         with self.SessionLocal() as db:
-            task = self.cache_service.create_cache_task("https://example.com/novel/cancel-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/cancel-test", db
+            )
             db.commit()
             task_id = task.id
 
@@ -314,23 +328,30 @@ class TestCacheDatabase:
         # When & Then
         with self.SessionLocal() as db:
             for case in test_cases:
-                task = self.cache_service.create_cache_task("https://example.com/novel/progress-test", db)
+                task = self.cache_service.create_cache_task(
+                    "https://example.com/novel/progress-test", db
+                )
                 self.cache_service.update_task_progress(
                     task.id,
+                    db,
                     cached_chapters=case["cached"],
                     total_chapters=case["total"],
                     status="running",
-                    db
                 )
                 db.commit()
 
                 # 重新获取任务验证进度
-                updated_task = db.query(CacheTask).filter(CacheTask.id == task.id).first()
-                calculated_progress = (updated_task.cached_chapters / updated_task.total_chapters * 100)
+                updated_task = (
+                    db.query(CacheTask).filter(CacheTask.id == task.id).first()
+                )
+                calculated_progress = (
+                    updated_task.cached_chapters / updated_task.total_chapters * 100
+                )
 
                 # 使用四舍五入比较
-                assert abs(calculated_progress - case["expected"]) < 0.5, \
+                assert abs(calculated_progress - case["expected"]) < 0.5, (
                     f"进度计算错误: expected={case['expected']}, got={calculated_progress}"
+                )
 
     def test_database_transaction_rollback(self):
         """测试数据库事务回滚"""
@@ -341,7 +362,9 @@ class TestCacheDatabase:
             # When - 模拟事务中的错误
             try:
                 # 开始事务
-                task = self.cache_service.create_cache_task("https://example.com/novel/transaction-test", db)
+                task = self.cache_service.create_cache_task(
+                    "https://example.com/novel/transaction-test", db
+                )
                 db.add(task)
                 db.flush()  # 持久化到会话但不提交
 
@@ -359,7 +382,6 @@ class TestCacheDatabase:
     def test_concurrent_database_operations(self):
         """测试并发数据库操作"""
         import threading
-        import time
 
         results = []
         errors = []
@@ -370,8 +392,7 @@ class TestCacheDatabase:
                     # 每个工作线程创建10个任务
                     for i in range(10):
                         task = self.cache_service.create_cache_task(
-                            f"https://example.com/novel/concurrent-{worker_id}-{i}",
-                            db
+                            f"https://example.com/novel/concurrent-{worker_id}-{i}", db
                         )
                         db.add(task)
                         db.commit()
@@ -406,7 +427,7 @@ class TestCacheDatabase:
             "sqlite:///:memory:",
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
-            echo=False
+            echo=False,
         )
 
         # 模拟连接错误（通过关闭连接）
@@ -416,7 +437,9 @@ class TestCacheDatabase:
         try:
             with self.SessionLocal() as db:
                 # 这应该失败，因为引擎已关闭
-                task = self.cache_service.create_cache_task("https://example.com/novel/connection-error", db)
+                task = self.cache_service.create_cache_task(
+                    "https://example.com/novel/connection-error", db
+                )
                 db.commit()
             # 如果没有抛出异常，说明错误处理可能有问题
             assert False, "应该抛出数据库连接异常"
@@ -428,7 +451,9 @@ class TestCacheDatabase:
         """测试大数据处理"""
         # Given
         with self.SessionLocal() as db:
-            task = self.cache_service.create_cache_task("https://example.com/novel/large-data-test", db)
+            task = self.cache_service.create_cache_task(
+                "https://example.com/novel/large-data-test", db
+            )
             db.commit()
             task_id = task.id
 
@@ -436,11 +461,11 @@ class TestCacheDatabase:
             large_chapters = []
             for i in range(1000):  # 1000章
                 chapter_data = {
-                    "chapter_title": f"第{i+1}章",
-                    "chapter_url": f"{task.novel_url}/chapter/{i+1}",
+                    "chapter_title": f"第{i + 1}章",
+                    "chapter_url": f"{task.novel_url}/chapter/{i + 1}",
                     "chapter_content": "章节内容" * 100,  # 较长的内容
                     "word_count": 100 * 100,  # 10000字
-                    "chapter_index": i + 1
+                    "chapter_index": i + 1,
                 }
                 large_chapters.append(chapter_data)
 
@@ -465,14 +490,16 @@ class TestCacheDatabase:
             # When - 尝试创建无效任务
             invalid_cases = [
                 {"novel_url": None},  # 空URL
-                {"novel_url": ""},    # 空字符串URL
+                {"novel_url": ""},  # 空字符串URL
                 {"novel_url": "invalid-url"},  # 无效URL格式
             ]
 
             for case in invalid_cases:
                 # Then
                 try:
-                    task = self.cache_service.create_cache_task(case.get("novel_url"), db)
+                    task = self.cache_service.create_cache_task(
+                        case.get("novel_url"), db
+                    )
                     # 如果没有抛出异常，验证数据是否正确处理
                     if task:
                         assert task.novel_url is not None
@@ -497,7 +524,9 @@ class TestCacheDatabase:
             tasks = []
             batch_size = 100
             for i in range(batch_size):
-                task = self.cache_service.create_cache_task(f"https://example.com/novel/perf-test-{i}", db)
+                task = self.cache_service.create_cache_task(
+                    f"https://example.com/novel/perf-test-{i}", db
+                )
                 tasks.append(task)
 
             # 批量提交
@@ -506,13 +535,19 @@ class TestCacheDatabase:
             creation_time = time.time() - start_time
 
             # Then - 性能断言
-            assert creation_time < 10.0, f"创建{batch_size}个任务耗时过长: {creation_time:.2f}秒"
-            assert creation_time < batch_size * 0.01, f"平均每个任务创建时间过长: {creation_time/batch_size:.3f}秒"
+            assert creation_time < 10.0, (
+                f"创建{batch_size}个任务耗时过长: {creation_time:.2f}秒"
+            )
+            assert creation_time < batch_size * 0.01, (
+                f"平均每个任务创建时间过长: {creation_time / batch_size:.3f}秒"
+            )
 
             # 验证查询性能
             query_start = time.time()
             all_tasks = db.query(CacheTask).all()
             query_time = time.time() - query_start
 
-            assert query_time < 1.0, f"查询{batch_size}个任务耗时过长: {query_time:.2f}秒"
+            assert query_time < 1.0, (
+                f"查询{batch_size}个任务耗时过长: {query_time:.2f}秒"
+            )
             assert len(all_tasks) == batch_size

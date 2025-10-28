@@ -90,20 +90,19 @@ class AliceSWCrawler(BaseCrawler):
                 for a in any_soup.find_all("a", href=True):
                     title = a.get_text().strip()
                     href = a.get("href", "")
-                    if re.search(r"^/book/\d+/[^/]+\.html$", href):
-                        if len(title) > 1 and not any(
+                    if (re.search(r"^/book/\d+/[^/]+\.html$", href) and
+                        len(title) > 1 and not any(
                             x in title for x in ["首页", "分类", "排行", "小说", "文章"]
-                        ):
-                            if re.search(
-                                r"第\s*\d+|第[一二三四五六七八九十百千万]+|章|节|卷|楔子|序章|终章|大结局",
-                                title,
-                            ):
-                                results.append(
-                                    {
-                                        "title": title,
-                                        "url": urllib.parse.urljoin(base, href),
-                                    }
-                                )
+                        ) and re.search(
+                            r"第\s*\d+|第[一二三四五六七八九十百千万]+|章|节|卷|楔子|序章|终章|大结局",
+                            title,
+                        )):
+                        results.append(
+                            {
+                                "title": title,
+                                "url": urllib.parse.urljoin(base, href),
+                            }
+                        )
                 return results
 
             chapters: list[dict] = []

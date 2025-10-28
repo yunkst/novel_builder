@@ -21,9 +21,7 @@ class TestCacheE2E:
     @pytest.fixture
     async def api_client(self):
         """创建API客户端"""
-        return aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30)
-        )
+        return aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
 
     @pytest.fixture
     def valid_headers(self):
@@ -36,7 +34,9 @@ class TestCacheE2E:
         return "http://localhost:8000"
 
     @pytest.mark.asyncio
-    async def test_complete_caching_workflow_e2e(self, api_client, valid_headers, base_url):
+    async def test_complete_caching_workflow_e2e(
+        self, api_client, valid_headers, base_url
+    ):
         """测试完整的缓存工作流程"""
         # Given - 测试小说URL
         novel_url = "https://example.com/novel/e2e-test"
@@ -45,9 +45,7 @@ class TestCacheE2E:
         create_data = {"novel_url": novel_url}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as response:
             assert response.status == 200
             create_result = await response.json()
@@ -59,10 +57,9 @@ class TestCacheE2E:
         max_polls = 30  # 最多等待30次，每次1秒
         current_status = "pending"
 
-        for poll_count in range(max_polls):
+        for _poll_count in range(max_polls):
             async with api_client.get(
-                f"{base_url}/api/cache/status/{task_id}",
-                headers=valid_headers
+                f"{base_url}/api/cache/status/{task_id}", headers=valid_headers
             ) as status_response:
                 assert status_response.status == 200
                 status_result = await status_response.json()
@@ -79,7 +76,7 @@ class TestCacheE2E:
             # Step 4: 下载缓存的小说
             async with api_client.get(
                 f"{base_url}/api/cache/download/{task_id}?format=json",
-                headers=valid_headers
+                headers=valid_headers,
             ) as download_response:
                 assert download_response.status == 200
                 download_result = await download_response.json()
@@ -104,25 +101,21 @@ class TestCacheE2E:
         novel_urls = [
             "https://example.com/novel/concurrent-1",
             "https://example.com/novel/concurrent-2",
-            "https://example.com/novel/concurrent-3"
+            "https://example.com/novel/concurrent-3",
         ]
 
         # When - 并发创建多个缓存任务
         async def create_task(novel_url):
             create_data = {"novel_url": novel_url}
             async with api_client.post(
-                f"{base_url}/api/cache/create",
-                json=create_data,
-                headers=valid_headers
+                f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
             ) as response:
                 assert response.status == 200
                 result = await response.json()
                 return result["task_id"]
 
         # 并发执行创建任务
-        task_ids = await asyncio.gather(*[
-            create_task(url) for url in novel_urls
-        ])
+        task_ids = await asyncio.gather(*[create_task(url) for url in novel_urls])
 
         # Then - 验证所有任务都创建成功
         assert len(task_ids) == len(novel_urls)
@@ -143,9 +136,7 @@ class TestCacheE2E:
         create_data = {"novel_url": novel_url}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as response:
             assert response.status == 200
             create_result = await response.json()
@@ -158,8 +149,7 @@ class TestCacheE2E:
         start_time = time.time()
         while time.time() - start_time < max_duration:
             async with api_client.get(
-                f"{base_url}/api/cache/status/{task_id}",
-                headers=valid_headers
+                f"{base_url}/api/cache/status/{task_id}", headers=valid_headers
             ) as status_response:
                 assert status_response.status == 200
                 status_result = await status_response.json()
@@ -171,13 +161,14 @@ class TestCacheE2E:
             await asyncio.sleep(0.5)  # 每0.5秒检查一次
 
         # Then - 验证状态变化符合预期
-        valid_status_progression = ["pending", "running", "completed"]
         assert len(status_history) >= 2
         assert status_history[0] == "pending"  # 应该从pending开始
         assert status_history[-1] == "completed"  # 应该以completed结束
 
     @pytest.mark.asyncio
-    async def test_cache_task_cancellation_e2e(self, api_client, valid_headers, base_url):
+    async def test_cache_task_cancellation_e2e(
+        self, api_client, valid_headers, base_url
+    ):
         """测试缓存任务取消功能"""
         # Given
         novel_url = "https://example.com/novel/cancel-test"
@@ -186,9 +177,7 @@ class TestCacheE2E:
         create_data = {"novel_url": novel_url}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as response:
             assert response.status == 200
             create_result = await response.json()
@@ -196,8 +185,7 @@ class TestCacheE2E:
 
         # Step 2: 立即取消任务
         async with api_client.post(
-            f"{base_url}/api/cache/cancel/{task_id}",
-            headers=valid_headers
+            f"{base_url}/api/cache/cancel/{task_id}", headers=valid_headers
         ) as cancel_response:
             # 取消可能成功也可能失败（如果任务已经完成）
             assert cancel_response.status in [200, 404]
@@ -208,15 +196,17 @@ class TestCacheE2E:
 
         # Step 3: 验证任务状态
         async with api_client.get(
-            f"{base_url}/api/cache/status/{task_id}",
-            headers=valid_headers
+            f"{base_url}/api/cache/status/{task_id}", headers=valid_headers
         ) as status_response:
             assert status_response.status == 200
             status_result = await status_response.json()
 
             # 任务状态应该是 pending, running, cancelled, 或 completed
             assert status_result["status"] in [
-                "pending", "running", "cancelled", "completed"
+                "pending",
+                "running",
+                "cancelled",
+                "completed",
             ]
 
     @pytest.mark.asyncio
@@ -228,9 +218,7 @@ class TestCacheE2E:
             create_data = {"novel_url": f"https://example.com/novel/pagination-{i}"}
 
             async with api_client.post(
-                f"{base_url}/api/cache/create",
-                json=create_data,
-                headers=valid_headers
+                f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
             ) as response:
                 assert response.status == 200
                 result = await response.json()
@@ -241,8 +229,7 @@ class TestCacheE2E:
 
         # Step 1: 测试第一页（默认limit=20, offset=0）
         async with api_client.get(
-            f"{base_url}/api/cache/tasks",
-            headers=valid_headers
+            f"{base_url}/api/cache/tasks", headers=valid_headers
         ) as response:
             assert response.status == 200
             result = await response.json()
@@ -252,8 +239,7 @@ class TestCacheE2E:
 
         # Step 2: 测试分页（limit=5, offset=0）
         async with api_client.get(
-            f"{base_url}/api/cache/tasks?limit=5&offset=0",
-            headers=valid_headers
+            f"{base_url}/api/cache/tasks?limit=5&offset=0", headers=valid_headers
         ) as response:
             assert response.status == 200
             result = await response.json()
@@ -262,8 +248,7 @@ class TestCacheE2E:
 
         # Step 3: 测试第二页（limit=5, offset=5）
         async with api_client.get(
-            f"{base_url}/api/cache/tasks?limit=5&offset=5",
-            headers=valid_headers
+            f"{base_url}/api/cache/tasks?limit=5&offset=5", headers=valid_headers
         ) as response:
             assert response.status == 200
             result = await response.json()
@@ -271,8 +256,7 @@ class TestCacheE2E:
 
         # Step 4: 测试状态过滤
         async with api_client.get(
-            f"{base_url}/api/cache/tasks?status=pending&limit=10",
-            headers=valid_headers
+            f"{base_url}/api/cache/tasks?status=pending&limit=10", headers=valid_headers
         ) as response:
             assert response.status == 200
             result = await response.json()
@@ -281,7 +265,9 @@ class TestCacheE2E:
                 assert task["status"] in ["pending", "running"]
 
     @pytest.mark.asyncio
-    async def test_cache_download_formats_e2e(self, api_client, valid_headers, base_url):
+    async def test_cache_download_formats_e2e(
+        self, api_client, valid_headers, base_url
+    ):
         """测试缓存下载的不同格式"""
         # Given - 创建一个已完成的任务
         novel_url = "https://example.com/novel/download-formats-test"
@@ -290,9 +276,7 @@ class TestCacheE2E:
         create_data = {"novel_url": novel_url}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as create_response:
             assert create_response.status == 200
             create_result = await create_response.json()
@@ -303,7 +287,7 @@ class TestCacheE2E:
         # Step 1: 测试JSON格式下载
         async with api_client.get(
             f"{base_url}/api/cache/download/{task_id}?format=json",
-            headers=valid_headers
+            headers=valid_headers,
         ) as json_response:
             # 这个可能返回404如果任务未完成，这是正常的
             if json_response.status == 200:
@@ -318,8 +302,7 @@ class TestCacheE2E:
 
         # Step 2: 测试TXT格式下载
         async with api_client.get(
-            f"{base_url}/api/cache/download/{task_id}?format=txt",
-            headers=valid_headers
+            f"{base_url}/api/cache/download/{task_id}?format=txt", headers=valid_headers
         ) as txt_response:
             if txt_response.status == 200:
                 # TXT下载应该返回文件内容
@@ -327,7 +310,9 @@ class TestCacheE2E:
                 assert "text/plain" in content_type
 
                 # 检查是否有attachment header
-                content_disposition = txt_response.headers.get("content-disposition", "")
+                content_disposition = txt_response.headers.get(
+                    "content-disposition", ""
+                )
                 assert "attachment" in content_disposition
             elif txt_response.status == 404:
                 pass  # 任务未完成，这是预期的
@@ -336,8 +321,7 @@ class TestCacheE2E:
 
         # Step 3: 测试无效格式
         async with api_client.get(
-            f"{base_url}/api/cache/download/{task_id}?format=xml",
-            headers=valid_headers
+            f"{base_url}/api/cache/download/{task_id}?format=xml", headers=valid_headers
         ) as invalid_response:
             assert invalid_response.status == 400
 
@@ -351,9 +335,7 @@ class TestCacheE2E:
         create_data = {"novel_url": "https://example.com/novel/test"}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=invalid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=invalid_headers
         ) as response:
             assert response.status == 401
 
@@ -361,7 +343,7 @@ class TestCacheE2E:
         async with api_client.post(
             f"{base_url}/api/cache/create",
             json={},  # 缺少novel_url
-            headers=valid_headers
+            headers=valid_headers,
         ) as response:
             assert response.status == 422  # Validation error
 
@@ -376,7 +358,7 @@ class TestCacheE2E:
             async with api_client.post(
                 f"{base_url}/api/cache/create",
                 json={"novel_url": invalid_url},
-                headers=valid_headers
+                headers=valid_headers,
             ) as response:
                 # 可能返回400或422，取决于验证逻辑
                 assert response.status in [400, 422]
@@ -386,21 +368,19 @@ class TestCacheE2E:
 
         for task_id in non_existent_ids:
             async with api_client.get(
-                f"{base_url}/api/cache/status/{task_id}",
-                headers=valid_headers
+                f"{base_url}/api/cache/status/{task_id}", headers=valid_headers
             ) as response:
                 assert response.status == 404
 
             async with api_client.post(
-                f"{base_url}/api/cache/cancel/{task_id}",
-                headers=valid_headers
+                f"{base_url}/api/cache/cancel/{task_id}", headers=valid_headers
             ) as cancel_response:
                 assert cancel_response.status == 404
 
         # Test 5: 无效的查询参数
         async with api_client.get(
             f"{base_url}/api/cache/tasks?limit=1000",  # 超出限制
-            headers=valid_headers
+            headers=valid_headers,
         ) as response:
             # 应该被限制到100
             assert response.status == 200
@@ -409,12 +389,14 @@ class TestCacheE2E:
 
         async with api_client.get(
             f"{base_url}/api/cache/tasks?limit=-1",  # 负数limit
-            headers=valid_headers
+            headers=valid_headers,
         ) as response:
             assert response.status == 422  # Validation error
 
     @pytest.mark.asyncio
-    async def test_websocket_progress_updates(self, api_client, valid_headers, base_url):
+    async def test_websocket_progress_updates(
+        self, api_client, valid_headers, base_url
+    ):
         """测试WebSocket进度更新功能"""
         # Given
         novel_url = "https://example.com/novel/websocket-test"
@@ -423,9 +405,7 @@ class TestCacheE2E:
         create_data = {"novel_url": novel_url}
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as response:
             assert response.status == 200
             create_result = await response.json()
@@ -459,7 +439,10 @@ class TestCacheE2E:
                         # 最多等待10个消息
                         if len(progress_updates) >= 10:
                             break
-                    elif msg.type == aiohttp.WSMsgType.ERROR or msg.type == aiohttp.WSMsgType.CLOSED:
+                    elif (
+                        msg.type == aiohttp.WSMsgType.ERROR
+                        or msg.type == aiohttp.WSMsgType.CLOSED
+                    ):
                         break
 
         except Exception as e:
@@ -473,11 +456,11 @@ class TestCacheE2E:
 
             # 验证进度是递增的（对于正常完成的情况）
             for i in range(1, len(progress_updates)):
-                prev_progress = progress_updates[i-1]["progress"]
+                prev_progress = progress_updates[i - 1]["progress"]
                 curr_progress = progress_updates[i]["progress"]
 
                 # 进度应该是非递减的
-                if progress_updates[i]["status"] == progress_updates[i-1]["status"]:
+                if progress_updates[i]["status"] == progress_updates[i - 1]["status"]:
                     assert curr_progress >= prev_progress
 
     @pytest.mark.asyncio
@@ -490,9 +473,7 @@ class TestCacheE2E:
         start_time = time.time()
 
         async with api_client.post(
-            f"{base_url}/api/cache/create",
-            json=create_data,
-            headers=valid_headers
+            f"{base_url}/api/cache/create", json=create_data, headers=valid_headers
         ) as response:
             assert response.status == 200
             create_result = await response.json()
@@ -506,8 +487,7 @@ class TestCacheE2E:
             start_time = time.time()
 
             async with api_client.get(
-                f"{base_url}/api/cache/status/{task_id}",
-                headers=valid_headers
+                f"{base_url}/api/cache/status/{task_id}", headers=valid_headers
             ) as response:
                 assert response.status == 200
                 await response.json()
@@ -519,8 +499,7 @@ class TestCacheE2E:
         start_time = time.time()
 
         async with api_client.get(
-            f"{base_url}/api/cache/tasks",
-            headers=valid_headers
+            f"{base_url}/api/cache/tasks", headers=valid_headers
         ) as response:
             assert response.status == 200
             await response.json()
@@ -540,9 +519,14 @@ class TestCacheE2E:
             async with api_client.post(
                 f"{base_url}/api/cache/create",
                 json={**create_data, "novel_url": f"{create_data['novel_url']}-{i}"},
-                headers=valid_headers
+                headers=valid_headers,
             ) as response:
-                responses.append((response.status, await response.text() if response.status != 200 else ""))
+                responses.append(
+                    (
+                        response.status,
+                        await response.text() if response.status != 200 else "",
+                    )
+                )
 
         # Then - 分析响应
         success_count = sum(1 for status, _ in responses if status == 200)

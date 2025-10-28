@@ -85,8 +85,8 @@ class NovelCacheService:
             f"缓存任务创建成功: task_id={task.id}, total_chapters={len(chapters)}"
         )
 
-        # 4. 启动后台缓存任务
-        asyncio.create_task(self._cache_chapters(int(task.id), chapters, novel_url))
+        # 4. 启动后台缓存任务 (fire-and-forget 任务，无需等待完成)
+        asyncio.create_task(self._cache_chapters(int(task.id), chapters, novel_url))  # noqa: RUF006
 
         return task
 

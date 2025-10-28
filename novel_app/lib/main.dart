@@ -3,8 +3,20 @@ import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/cache_manager.dart';
+import 'services/api_service_wrapper.dart';
 
-void main() {
+void main() async {
+  // 确保 Flutter 初始化完成
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化 API 服务
+  try {
+    await ApiServiceWrapper().init();
+  } catch (e) {
+    debugPrint('API 服务初始化失败: $e');
+    // 继续运行，用户可以在设置中配置
+  }
+
   runApp(const NovelReaderApp());
 }
 

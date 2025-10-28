@@ -33,14 +33,14 @@ class ChapterCache(Base):
 
     # 创建时间
     created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False  # pylint: disable=not-callable
     )
 
     # 更新时间
     updated_at = Column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        server_default=func.now(),  # pylint: disable=not-callable
+        onupdate=func.now(),        # pylint: disable=not-callable
         nullable=False,
     )
 

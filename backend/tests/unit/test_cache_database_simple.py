@@ -18,18 +18,22 @@ class TestCacheDatabaseSimple:
         """每个测试方法前的设置"""
         self.test_session = get_test_db_session()
         # 简化的缓存服务，只包含基本功能
-        self.cache_service = type('SimpleCacheService', (), {
-            'create_cache_task': lambda self, novel_url, db: type('MockTask', (), {
-                'id': 1,
-                'novel_url': novel_url,
-                'status': 'pending'
-            })(),
-            'get_cache_tasks': lambda self, **kwargs: []
-        })()
+        self.cache_service = type(
+            "SimpleCacheService",
+            (),
+            {
+                "create_cache_task": lambda self, novel_url, db: type(
+                    "MockTask",
+                    (),
+                    {"id": 1, "novel_url": novel_url, "status": "pending"},
+                )(),
+                "get_cache_tasks": lambda self, **kwargs: [],
+            },
+        )()
 
     def teardown_method(self):
         """每个测试方法后的清理"""
-        if hasattr(self, 'test_session'):
+        if hasattr(self, "test_session"):
             self.test_session.close()
 
     def test_basic_database_connection(self):
@@ -57,9 +61,9 @@ class TestCacheDatabaseSimple:
 
         # Then
         assert task is not None
-        assert hasattr(task, 'id')
-        assert hasattr(task, 'novel_url')
-        assert hasattr(task, 'status')
+        assert hasattr(task, "id")
+        assert hasattr(task, "novel_url")
+        assert hasattr(task, "status")
         assert task.novel_url == novel_url
         assert task.status == "pending"
 
@@ -89,7 +93,7 @@ class TestCacheDatabaseSimple:
                 session.execute("CREATE TABLE test_table (id INTEGER)")
                 session.rollback()
                 # 在回滚后执行查询
-                result = session.execute("SELECT COUNT(*) FROM test_table")
+                session.execute("SELECT COUNT(*) FROM test_table")
         except Exception:
             # Then - 表不存在，查询会失败，这是预期的
             pass
@@ -101,41 +105,40 @@ class TestCacheDatabaseSimple:
         """测试缓存数据验证"""
         # Given
         test_data = {
-            'novel_url': 'https://example.com/novel/valid',
-            'novel_title': 'Test Novel',
-            'status': 'pending',
-            'total_chapters': 100,
-            'cached_chapters': 0,
-            'failed_chapters': 0
+            "novel_url": "https://example.com/novel/valid",
+            "novel_title": "Test Novel",
+            "status": "pending",
+            "total_chapters": 100,
+            "cached_chapters": 0,
+            "failed_chapters": 0,
         }
 
         # When & Then - 数据验证
-        assert test_data['novel_url'] is not None
-        assert test_data['status'] in ['pending', 'running', 'completed', 'failed']
-        assert test_data['total_chapters'] >= 0
-        assert test_data['cached_chapters'] >= 0
-        assert test_data['failed_chapters'] >= 0
-        assert test_data['cached_chapters'] <= test_data['total_chapters']
+        assert test_data["novel_url"] is not None
+        assert test_data["status"] in ["pending", "running", "completed", "failed"]
+        assert test_data["total_chapters"] >= 0
+        assert test_data["cached_chapters"] >= 0
+        assert test_data["failed_chapters"] >= 0
+        assert test_data["cached_chapters"] <= test_data["total_chapters"]
 
     def test_progress_calculation(self):
         """测试进度计算逻辑"""
         # Given
         test_cases = [
-            {'cached': 0, 'total': 100, 'expected': 0.0},
-            {'cached': 50, 'total': 100, 'expected': 0.5},
-            {'cached': 100, 'total': 100, 'expected': 1.0},
-            {'cached': 0, 'total': 0, 'expected': 0.0},
+            {"cached": 0, "total": 100, "expected": 0.0},
+            {"cached": 50, "total": 100, "expected": 0.5},
+            {"cached": 100, "total": 100, "expected": 1.0},
+            {"cached": 0, "total": 0, "expected": 0.0},
         ]
 
         # When & Then
         for case in test_cases:
-            cached = case['cached']
-            total = case['total']
-            expected = case['expected']
+            cached = case["cached"]
+            total = case["total"]
+            expected = case["expected"]
 
-            if total > 0:
-                progress = cached / total
-            else:
-                progress = 0.0
+            progress = cached / total if total > 0 else 0.0
 
-            assert abs(progress - expected) < 0.001, f"Progress calculation failed: {cached}/{total} = {progress}, expected {expected}"
+            assert abs(progress - expected) < 0.001, (
+                f"Progress calculation failed: {cached}/{total} = {progress}, expected {expected}"
+            )

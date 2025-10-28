@@ -104,7 +104,7 @@ class APITestDataFactory:
         return "invalid-token"
 
     @staticmethod
-    def create_search_request_data(keyword: str = None) -> dict[str, Any]:
+    def create_search_request_data(keyword: str | None = None) -> dict[str, Any]:
         """Create search request data."""
         return {"keyword": keyword or "测试关键词", "site": "test_site", "limit": 20}
 

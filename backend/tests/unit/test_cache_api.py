@@ -22,8 +22,12 @@ class TestCacheAPI:
     def setup_method(self):
         """每个测试方法执行前的设置"""
         self.client = TestClient(app)
-        self.valid_headers = {"X-API-TOKEN": APITestDataFactory.create_valid_auth_token()}
-        self.invalid_headers = {"X-API-TOKEN": APITestDataFactory.create_invalid_auth_token()}
+        self.valid_headers = {
+            "X-API-TOKEN": APITestDataFactory.create_valid_auth_token()
+        }
+        self.invalid_headers = {
+            "X-API-TOKEN": APITestDataFactory.create_invalid_auth_token()
+        }
 
     def test_create_cache_task_success(self):
         """测试成功创建缓存任务"""
@@ -32,7 +36,9 @@ class TestCacheAPI:
         request_data = {"novel_url": novel_url}
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.create_cache_task') as mock_create:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.create_cache_task"
+        ) as mock_create:
             mock_task = CacheTask(
                 id=1,
                 novel_url=novel_url,
@@ -44,14 +50,12 @@ class TestCacheAPI:
                 failed_chapters=0,
                 error_message=None,
                 created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                updated_at=datetime.now(UTC),
             )
             mock_create.return_value = mock_task
 
             response = self.client.post(
-                "/api/cache/create",
-                json=request_data,
-                headers=self.valid_headers
+                "/api/cache/create", json=request_data, headers=self.valid_headers
             )
 
         # Then
@@ -68,9 +72,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.post(
-            "/api/cache/create",
-            json=request_data,
-            headers=self.valid_headers
+            "/api/cache/create", json=request_data, headers=self.valid_headers
         )
 
         # Then
@@ -82,13 +84,13 @@ class TestCacheAPI:
         request_data = {"novel_url": "invalid-url"}
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.create_cache_task') as mock_create:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.create_cache_task"
+        ) as mock_create:
             mock_create.side_effect = ValueError("无效的小说URL")
 
             response = self.client.post(
-                "/api/cache/create",
-                json=request_data,
-                headers=self.valid_headers
+                "/api/cache/create", json=request_data, headers=self.valid_headers
             )
 
         # Then
@@ -102,9 +104,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.post(
-            "/api/cache/create",
-            json=request_data,
-            headers=self.invalid_headers
+            "/api/cache/create", json=request_data, headers=self.invalid_headers
         )
 
         # Then
@@ -116,13 +116,13 @@ class TestCacheAPI:
         request_data = {"novel_url": "https://example.com/novel/test"}
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.create_cache_task') as mock_create:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.create_cache_task"
+        ) as mock_create:
             mock_create.side_effect = Exception("数据库错误")
 
             response = self.client.post(
-                "/api/cache/create",
-                json=request_data,
-                headers=self.valid_headers
+                "/api/cache/create", json=request_data, headers=self.valid_headers
             )
 
         # Then
@@ -135,7 +135,9 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status:
             mock_task = CacheTask(
                 id=task_id,
                 novel_url="https://example.com/novel/test",
@@ -147,13 +149,12 @@ class TestCacheAPI:
                 failed_chapters=2,
                 error_message=None,
                 created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                updated_at=datetime.now(UTC),
             )
             mock_status.return_value = mock_task
 
             response = self.client.get(
-                f"/api/cache/status/{task_id}",
-                headers=self.valid_headers
+                f"/api/cache/status/{task_id}", headers=self.valid_headers
             )
 
         # Then
@@ -172,12 +173,13 @@ class TestCacheAPI:
         task_id = 999
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status:
             mock_status.return_value = None
 
             response = self.client.get(
-                f"/api/cache/status/{task_id}",
-                headers=self.valid_headers
+                f"/api/cache/status/{task_id}", headers=self.valid_headers
             )
 
         # Then
@@ -190,8 +192,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.get(
-            f"/api/cache/status/{task_id}",
-            headers=self.invalid_headers
+            f"/api/cache/status/{task_id}", headers=self.invalid_headers
         )
 
         # Then
@@ -202,7 +203,9 @@ class TestCacheAPI:
         # Given
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_cache_tasks') as mock_tasks:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_cache_tasks"
+        ) as mock_tasks:
             mock_tasks_list = [
                 CacheTask(
                     id=1,
@@ -215,7 +218,7 @@ class TestCacheAPI:
                     failed_chapters=0,
                     error_message=None,
                     created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
+                    updated_at=datetime.now(UTC),
                 ),
                 CacheTask(
                     id=2,
@@ -228,15 +231,12 @@ class TestCacheAPI:
                     failed_chapters=3,
                     error_message=None,
                     created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
-                )
+                    updated_at=datetime.now(UTC),
+                ),
             ]
             mock_tasks.return_value = mock_tasks_list
 
-            response = self.client.get(
-                "/api/cache/tasks",
-                headers=self.valid_headers
-            )
+            response = self.client.get("/api/cache/tasks", headers=self.valid_headers)
 
         # Then
         assert response.status_code == 200
@@ -264,7 +264,9 @@ class TestCacheAPI:
         status_filter = "running"
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_cache_tasks') as mock_tasks:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_cache_tasks"
+        ) as mock_tasks:
             mock_tasks.return_value = [
                 CacheTask(
                     id=2,
@@ -277,13 +279,12 @@ class TestCacheAPI:
                     failed_chapters=3,
                     error_message=None,
                     created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
+                    updated_at=datetime.now(UTC),
                 )
             ]
 
             response = self.client.get(
-                f"/api/cache/tasks?status={status_filter}",
-                headers=self.valid_headers
+                f"/api/cache/tasks?status={status_filter}", headers=self.valid_headers
             )
 
         # Then
@@ -299,12 +300,16 @@ class TestCacheAPI:
         offset = 20
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_cache_tasks') as mock_tasks:
-            mock_tasks.return_value = [CacheTask(id=i, status="completed") for i in range(limit)]
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_cache_tasks"
+        ) as mock_tasks:
+            mock_tasks.return_value = [
+                CacheTask(id=i, status="completed") for i in range(limit)
+            ]
 
             response = self.client.get(
                 f"/api/cache/tasks?limit={limit}&offset={offset}",
-                headers=self.valid_headers
+                headers=self.valid_headers,
             )
 
         # Then
@@ -315,10 +320,7 @@ class TestCacheAPI:
     def test_get_cache_tasks_unauthorized(self):
         """测试未授权时获取缓存任务列表"""
         # When
-        response = self.client.get(
-            "/api/cache/tasks",
-            headers=self.invalid_headers
-        )
+        response = self.client.get("/api/cache/tasks", headers=self.invalid_headers)
 
         # Then
         assert response.status_code == 401
@@ -329,12 +331,13 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.cancel_task') as mock_cancel:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.cancel_task"
+        ) as mock_cancel:
             mock_cancel.return_value = True
 
             response = self.client.post(
-                f"/api/cache/cancel/{task_id}",
-                headers=self.valid_headers
+                f"/api/cache/cancel/{task_id}", headers=self.valid_headers
             )
 
         # Then
@@ -349,12 +352,13 @@ class TestCacheAPI:
         task_id = 999
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.cancel_task') as mock_cancel:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.cancel_task"
+        ) as mock_cancel:
             mock_cancel.return_value = False
 
             response = self.client.post(
-                f"/api/cache/cancel/{task_id}",
-                headers=self.valid_headers
+                f"/api/cache/cancel/{task_id}", headers=self.valid_headers
             )
 
         # Then
@@ -367,8 +371,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.post(
-            f"/api/cache/cancel/{task_id}",
-            headers=self.invalid_headers
+            f"/api/cache/cancel/{task_id}", headers=self.invalid_headers
         )
 
         # Then
@@ -380,12 +383,13 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.cancel_task') as mock_cancel:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.cancel_task"
+        ) as mock_cancel:
             mock_cancel.side_effect = Exception("数据库错误")
 
             response = self.client.post(
-                f"/api/cache/cancel/{task_id}",
-                headers=self.valid_headers
+                f"/api/cache/cancel/{task_id}", headers=self.valid_headers
             )
 
         # Then
@@ -397,47 +401,50 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
-            with patch('app.services.novel_cache_service.novel_cache_service.get_cached_chapters') as mock_chapters:
-                mock_task = CacheTask(
-                    id=task_id,
-                    novel_url="https://example.com/novel/test",
-                    novel_title="测试小说",
-                    novel_author="测试作者",
-                    status="completed",
-                    total_chapters=2,
-                    cached_chapters=2,
-                    failed_chapters=0,
-                    error_message=None,
-                    created_at=datetime.now(UTC),
-                    completed_at=datetime.now(UTC)
-                )
-                mock_status.return_value = mock_task
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status, patch(
+            "app.services.novel_cache_service.novel_cache_service.get_cached_chapters"
+        ) as mock_chapters:
+            mock_task = CacheTask(
+                id=task_id,
+                novel_url="https://example.com/novel/test",
+                novel_title="测试小说",
+                novel_author="测试作者",
+                status="completed",
+                total_chapters=2,
+                cached_chapters=2,
+                failed_chapters=0,
+                error_message=None,
+                created_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+            )
+            mock_status.return_value = mock_task
 
-                mock_chapters_list = [
-                    {
-                        "chapter_title": "第一章",
-                        "chapter_url": "https://example.com/chapter/1",
-                        "chapter_content": "第一章内容...",
-                        "word_count": 1000,
-                        "chapter_index": 1,
-                        "cached_at": datetime.now(UTC)
-                    },
-                    {
-                        "chapter_title": "第二章",
-                        "chapter_url": "https://example.com/chapter/2",
-                        "chapter_content": "第二章内容...",
-                        "word_count": 1500,
-                        "chapter_index": 2,
-                        "cached_at": datetime.now(UTC)
-                    }
-                ]
-                mock_chapters.return_value = mock_chapters_list
+            mock_chapters_list = [
+                {
+                    "chapter_title": "第一章",
+                    "chapter_url": "https://example.com/chapter/1",
+                    "chapter_content": "第一章内容...",
+                    "word_count": 1000,
+                    "chapter_index": 1,
+                    "cached_at": datetime.now(UTC),
+                },
+                {
+                    "chapter_title": "第二章",
+                    "chapter_url": "https://example.com/chapter/2",
+                    "chapter_content": "第二章内容...",
+                    "word_count": 1500,
+                    "chapter_index": 2,
+                    "cached_at": datetime.now(UTC),
+                },
+            ]
+            mock_chapters.return_value = mock_chapters_list
 
-                response = self.client.get(
-                    f"/api/cache/download/{task_id}?format=json",
-                    headers=self.valid_headers
-                )
+            response = self.client.get(
+                f"/api/cache/download/{task_id}?format=json",
+                headers=self.valid_headers,
+            )
 
         # Then
         assert response.status_code == 200
@@ -458,39 +465,42 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
-            with patch('app.services.novel_cache_service.novel_cache_service.get_cached_chapters') as mock_chapters:
-                mock_task = CacheTask(
-                    id=task_id,
-                    novel_url="https://example.com/novel/test",
-                    novel_title="测试小说",
-                    novel_author="测试作者",
-                    status="completed",
-                    total_chapters=2,
-                    cached_chapters=2,
-                    failed_chapters=0,
-                    error_message=None,
-                    created_at=datetime.now(UTC),
-                    completed_at=datetime.now(UTC)
-                )
-                mock_status.return_value = mock_task
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status, patch(
+            "app.services.novel_cache_service.novel_cache_service.get_cached_chapters"
+        ) as mock_chapters:
+            mock_task = CacheTask(
+                id=task_id,
+                novel_url="https://example.com/novel/test",
+                novel_title="测试小说",
+                novel_author="测试作者",
+                status="completed",
+                total_chapters=2,
+                cached_chapters=2,
+                failed_chapters=0,
+                error_message=None,
+                created_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+            )
+            mock_status.return_value = mock_task
 
-                mock_chapters_list = [
-                    {
-                        "chapter_title": "第一章",
-                        "chapter_url": "https://example.com/chapter/1",
-                        "chapter_content": "第一章内容",
-                        "word_count": 1000,
-                        "chapter_index": 1,
-                        "cached_at": datetime.now(UTC)
-                    }
-                ]
-                mock_chapters.return_value = mock_chapters_list
+            mock_chapters_list = [
+                {
+                    "chapter_title": "第一章",
+                    "chapter_url": "https://example.com/chapter/1",
+                    "chapter_content": "第一章内容",
+                    "word_count": 1000,
+                    "chapter_index": 1,
+                    "cached_at": datetime.now(UTC),
+                }
+            ]
+            mock_chapters.return_value = mock_chapters_list
 
-                response = self.client.get(
-                    f"/api/cache/download/{task_id}?format=txt",
-                    headers=self.valid_headers
-                )
+            response = self.client.get(
+                f"/api/cache/download/{task_id}?format=txt",
+                headers=self.valid_headers,
+            )
 
         # Then
         assert response.status_code == 200
@@ -508,7 +518,9 @@ class TestCacheAPI:
         task_id = 1
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status:
             mock_task = CacheTask(
                 id=task_id,
                 novel_url="https://example.com/novel/test",
@@ -519,13 +531,12 @@ class TestCacheAPI:
                 cached_chapters=50,
                 failed_chapters=2,
                 error_message=None,
-                created_at=datetime.now(UTC)
+                created_at=datetime.now(UTC),
             )
             mock_status.return_value = mock_task
 
             response = self.client.get(
-                f"/api/cache/download/{task_id}?format=json",
-                headers=self.valid_headers
+                f"/api/cache/download/{task_id}?format=json", headers=self.valid_headers
             )
 
         # Then
@@ -537,12 +548,13 @@ class TestCacheAPI:
         task_id = 999
 
         # When
-        with patch('app.services.novel_cache_service.novel_cache_service.get_task_status') as mock_status:
+        with patch(
+            "app.services.novel_cache_service.novel_cache_service.get_task_status"
+        ) as mock_status:
             mock_status.return_value = None
 
             response = self.client.get(
-                f"/api/cache/download/{task_id}?format=json",
-                headers=self.valid_headers
+                f"/api/cache/download/{task_id}?format=json", headers=self.valid_headers
             )
 
         # Then
@@ -555,8 +567,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.get(
-            f"/api/cache/download/{task_id}?format=json",
-            headers=self.invalid_headers
+            f"/api/cache/download/{task_id}?format=json", headers=self.invalid_headers
         )
 
         # Then
@@ -569,8 +580,7 @@ class TestCacheAPI:
 
         # When
         response = self.client.get(
-            f"/api/cache/download/{task_id}?format=xml",
-            headers=self.valid_headers
+            f"/api/cache/download/{task_id}?format=xml", headers=self.valid_headers
         )
 
         # Then
@@ -591,7 +601,7 @@ class TestCacheAPI:
             expected = case["expected"]
 
             if total > 0:
-                actual = int(round((cached / total) * 100))
+                actual = round((cached / total) * 100)
                 assert actual == expected, f"Failed for total={total}, cached={cached}"
             else:
                 assert expected == 0, f"Failed for total={total}, cached={cached}"
@@ -600,8 +610,14 @@ class TestCacheAPI:
         """测试API响应结构的一致性"""
         # 验证所有成功响应都包含预期字段
         required_task_fields = [
-            "task_id", "status", "novel_title", "novel_author",
-            "total_chapters", "cached_chapters", "failed_chapters", "progress"
+            "task_id",
+            "status",
+            "novel_title",
+            "novel_author",
+            "total_chapters",
+            "cached_chapters",
+            "failed_chapters",
+            "progress",
         ]
 
         # This test validates the expected response structure
@@ -615,7 +631,9 @@ class TestCacheAPI:
         import asyncio
 
         async def make_concurrent_requests():
-            with patch('app.services.novel_cache_service.novel_cache_service.create_cache_task') as mock_create:
+            with patch(
+                "app.services.novel_cache_service.novel_cache_service.create_cache_task"
+            ) as mock_create:
                 mock_task = CacheTask(
                     id=1,
                     novel_url="https://example.com/novel/test",
@@ -626,7 +644,7 @@ class TestCacheAPI:
                     cached_chapters=0,
                     failed_chapters=0,
                     error_message=None,
-                    created_at=datetime.now(UTC)
+                    created_at=datetime.now(UTC),
                 )
                 mock_create.return_value = mock_task
 
@@ -635,13 +653,11 @@ class TestCacheAPI:
                     return self.client.post(
                         "/api/cache/create",
                         json={"novel_url": "https://example.com/novel/test"},
-                        headers=self.valid_headers
+                        headers=self.valid_headers,
                     )
 
                 # 并发执行5个请求
-                responses = await asyncio.gather(*[
-                    make_request() for _ in range(5)
-                ])
+                responses = await asyncio.gather(*[make_request() for _ in range(5)])
 
                 # 验证所有请求都成功
                 for response in responses:

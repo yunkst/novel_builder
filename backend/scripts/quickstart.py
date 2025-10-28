@@ -14,11 +14,7 @@ def run_command(command: str, check: bool = True) -> subprocess.CompletedProcess
     """运行shell命令"""
     print(f"🔧 执行命令: {command}")
     result = subprocess.run(
-        command,
-        shell=True,
-        capture_output=True,
-        text=True,
-        check=check
+        command, shell=True, capture_output=True, text=True, check=check
     )
     if result.stdout:
         print(result.stdout)
@@ -46,7 +42,7 @@ def setup_virtual_environment():
         run_command(f"{sys.executable} -m venv venv")
 
     # 激活虚拟环境
-    if os.name == 'nt':  # Windows
+    if os.name == "nt":  # Windows
         pip_path = "venv/Scripts/pip"
         python_path = "venv/Scripts/python"
     else:  # Unix-like
@@ -194,8 +190,9 @@ def start_server(python_path: str):
 
     # 检查端口是否被占用
     import socket
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(('localhost', 8000))
+    result = sock.connect_ex(("localhost", 8000))
     sock.close()
 
     if result == 0:
@@ -210,7 +207,9 @@ def start_server(python_path: str):
 
     try:
         # 使用uvicorn启动服务器
-        os.system(f"{python_path} -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000")
+        os.system(
+            f"{python_path} -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+        )
     except KeyboardInterrupt:
         print("\n👋 服务器已停止")
 
@@ -225,6 +224,7 @@ def check_requirements():
     # 检查pip
     try:
         import pip
+
         print("✅ pip可用")
     except ImportError:
         print("❌ pip不可用")
@@ -270,21 +270,21 @@ def main():
 
     # 询问是否运行代码检查
     choice = input("是否运行代码检查? (y/n): ").strip().lower()
-    if choice in ['y', 'yes', '是']:
+    if choice in ["y", "yes", "是"]:
         if not run_code_checks(python_path):
             print("⚠️ 代码检查未完全通过，但可以继续开发")
         print()
 
     # 询问是否运行测试
     choice = input("是否运行测试? (y/n): ").strip().lower()
-    if choice in ['y', 'yes', '是']:
+    if choice in ["y", "yes", "是"]:
         if not run_tests(python_path):
             print("⚠️ 部分测试失败，但可以继续开发")
         print()
 
     # 询问是否启动服务器
     choice = input("是否启动开发服务器? (y/n): ").strip().lower()
-    if choice in ['y', 'yes', '是']:
+    if choice in ["y", "yes", "是"]:
         start_server(python_path)
     else:
         print("\n✅ 开发环境设置完成!")

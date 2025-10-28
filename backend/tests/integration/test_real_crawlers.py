@@ -28,7 +28,7 @@ class TestRealCrawlerIntegration:
         assert len(crawlers) > 0
 
         # Each crawler should have required methods
-        for site_name, crawler in crawlers.items():
+        for crawler in crawlers.values():
             assert hasattr(crawler, "search")
             assert hasattr(crawler, "get_chapters")
             assert hasattr(crawler, "get_chapter_content")

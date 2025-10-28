@@ -18,10 +18,7 @@ class NovelClient:
     def __init__(self, base_url: str = "http://localhost:8000", api_token: str = ""):
         self.base_url = base_url.rstrip("/")
         self.api_token = api_token
-        self.headers = {
-            "X-API-TOKEN": api_token,
-            "Content-Type": "application/json"
-        }
+        self.headers = {"X-API-TOKEN": api_token, "Content-Type": "application/json"}
 
     async def health_check(self) -> bool:
         """检查API健康状态"""
@@ -38,8 +35,7 @@ class NovelClient:
         try:
             async with httpx.AsyncClient(headers=self.headers) as client:
                 response = await client.get(
-                    f"{self.base_url}/search",
-                    params={"keyword": keyword}
+                    f"{self.base_url}/search", params={"keyword": keyword}
                 )
                 response.raise_for_status()
                 return response.json()
@@ -55,13 +51,14 @@ class NovelClient:
         try:
             async with httpx.AsyncClient(headers=self.headers) as client:
                 response = await client.get(
-                    f"{self.base_url}/chapters",
-                    params={"novel_url": novel_url}
+                    f"{self.base_url}/chapters", params={"novel_url": novel_url}
                 )
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as e:
-            print(f"获取章节列表失败 (HTTP {e.response.status_code}): {e.response.text}")
+            print(
+                f"获取章节列表失败 (HTTP {e.response.status_code}): {e.response.text}"
+            )
             return []
         except Exception as e:
             print(f"获取章节列表失败: {e}")
@@ -73,12 +70,14 @@ class NovelClient:
             async with httpx.AsyncClient(headers=self.headers) as client:
                 response = await client.get(
                     f"{self.base_url}/chapter-content",
-                    params={"chapter_url": chapter_url}
+                    params={"chapter_url": chapter_url},
                 )
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as e:
-            print(f"获取章节内容失败 (HTTP {e.response.status_code}): {e.response.text}")
+            print(
+                f"获取章节内容失败 (HTTP {e.response.status_code}): {e.response.text}"
+            )
             return {}
         except Exception as e:
             print(f"获取章节内容失败: {e}")
@@ -89,9 +88,9 @@ class NovelClient:
         print(f"📚 {novel.get('title', '未知标题')}")
         print(f"✍️  作者: {novel.get('author', '未知')}")
         print(f"🔗 链接: {novel.get('url', '未知')}")
-        if novel.get('description'):
+        if novel.get("description"):
             print(f"📖 简介: {novel['description']}")
-        if novel.get('cover_url'):
+        if novel.get("cover_url"):
             print(f"🖼️  封面: {novel['cover_url']}")
         print("-" * 50)
 
@@ -99,7 +98,7 @@ class NovelClient:
         """打印章节信息"""
         print(f"📄 {chapter.get('title', '未知标题')}")
         print(f"🔗 链接: {chapter.get('url', '未知')}")
-        if chapter.get('index'):
+        if chapter.get("index"):
             print(f"📍 索引: {chapter['index']}")
         print("-" * 30)
 
@@ -111,6 +110,7 @@ async def demo_basic_usage():
 
     # 从环境变量获取配置
     import os
+
     api_token = os.getenv("NOVEL_API_TOKEN", "your-api-token-here")
     base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
 
@@ -144,7 +144,7 @@ async def demo_basic_usage():
     if novels:
         print("\n3️⃣ 获取第一本小说的章节列表...")
         first_novel = novels[0]
-        novel_url = first_novel['url']
+        novel_url = first_novel["url"]
 
         chapters = await client.get_chapters(novel_url)
 
@@ -161,7 +161,7 @@ async def demo_basic_usage():
         if chapters:
             print("\n4️⃣ 获取第一章内容...")
             first_chapter = chapters[0]
-            chapter_url = first_chapter['url']
+            chapter_url = first_chapter["url"]
 
             content = await client.get_chapter_content(chapter_url)
 
@@ -170,7 +170,7 @@ async def demo_basic_usage():
                 return
 
             print(f"✅ 章节标题: {content.get('title', '未知')}")
-            chapter_text = content.get('content', '')
+            chapter_text = content.get("content", "")
 
             # 只显示前500个字符
             preview = chapter_text[:500]
@@ -180,11 +180,12 @@ async def demo_basic_usage():
             print(f"📖 内容预览:\n{preview}")
             print("\n📊 章节统计:")
             print(f"   - 总字数: {len(chapter_text)}")
-            print(f"   - 段落数: {len([p for p in chapter_text.split('\n') if p.strip()])}")
+            paragraphs = [p for p in chapter_text.split('\n') if p.strip()]
+            print(f"   - 段落数: {len(paragraphs)}")
 
-            if content.get('next_chapter_url'):
+            if content.get("next_chapter_url"):
                 print(f"   - 下一章: {content['next_chapter_url']}")
-            if content.get('prev_chapter_url'):
+            if content.get("prev_chapter_url"):
                 print(f"   - 上一章: {content['prev_chapter_url']}")
 
 
@@ -212,6 +213,7 @@ async def interactive_mode():
     print("=" * 20)
 
     import os
+
     api_token = os.getenv("NOVEL_API_TOKEN", "your-api-token-here")
     base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
 
@@ -233,7 +235,9 @@ async def interactive_mode():
                 if novels:
                     print(f"\n找到 {len(novels)} 本小说:")
                     for i, novel in enumerate(novels, 1):
-                        print(f"{i}. {novel.get('title', '未知')} - {novel.get('author', '未知')}")
+                        print(
+                            f"{i}. {novel.get('title', '未知')} - {novel.get('author', '未知')}"
+                        )
                 else:
                     print("没有找到相关小说")
 
@@ -277,7 +281,7 @@ async def main():
 
         # 询问是否进入交互模式
         choice = input("\n是否进入交互模式? (y/n): ").strip().lower()
-        if choice in ['y', 'yes', '是']:
+        if choice in ["y", "yes", "是"]:
             await interactive_mode()
 
     except KeyboardInterrupt:

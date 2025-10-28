@@ -17,11 +17,16 @@ exclude = [
     "build",
     "dist",
     "migrations",
+    "alembic",  # Auto-generated database migrations
+    "scripts",  # Build and utility scripts
+    "examples", # Example usage code
 ]
 
 # Target Python version
 target-version = "py311"
 
+# Lint configuration
+[lint]
 # Enable rules
 select = [
     "E",   # pycodestyle errors
@@ -45,18 +50,20 @@ ignore = [
     "W191",  # indentation contains tabs
     "B904",  # raise inside except without from
     "RUF012", # mutable class default
+    # Chinese punctuation is acceptable in Chinese comments/docstrings
+    "RUF001", # ambiguous characters in strings (Chinese punctuation)
+    "RUF002", # ambiguous characters in docstrings (Chinese punctuation)
+    "RUF003", # ambiguous characters in comments (Chinese punctuation)
 ]
 
 # Allow unused variables when underscore-prefixed
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Fix unsafe behavior
-fix = true
+# Per-file ignores
+per-file-ignores."__init__.py" = ["F401"]
+per-file-ignores."test_*.py" = ["ARG001", "ARG002"]
+per-file-ignores."conftest.py" = ["F401", "ARG001"]
+
+# Fix settings
 fixable = ["ALL"]
 unfixable = []
-
-# Per-file ignores
-[per-file-ignores]
-"__init__.py" = ["F401"]
-"test_*.py" = ["ARG001", "ARG002"]
-"conftest.py" = ["F401", "ARG001"]

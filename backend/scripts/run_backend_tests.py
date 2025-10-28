@@ -176,7 +176,7 @@ class BackendTestRunner:
                     if match:
                         test_results["total"] = int(match.split()[0])
 
-                elif "passed in " line or ("passed in" in line and "failed in" in line):
+                elif "passed in " in line or ("passed in" in line and "failed in" in line):
                     # pytest 5.x+ 的详细格式
                     parts = line.split(",")
                     for part in parts:
@@ -184,7 +184,7 @@ class BackendTestRunner:
                         if "passed in" in part:
                             count = part.split("=")[1] if "=" in part else 1
                             test_results["passed"] += int(count)
-                        elif "failed in" part:
+                        elif "failed in" in part:
                             count = part.split("=")[1] if "=" in part else 1
                             test_results["failed"] += int(count)
                         elif "skipped" in part:
@@ -205,10 +205,10 @@ class BackendTestRunner:
                                     minutes = int(time_parts[1])
                                     seconds = int(time_parts[2])
                                     test_results["duration"] = hours * 3600 + minutes * 60 + seconds
-                            elif len(time_parts) == 2:
-                                minutes = int(time_parts[0])
-                                seconds = int(time_parts[1])
-                                test_results["duration"] = minutes * 60 + seconds
+                                elif len(time_parts) == 2:
+                                    minutes = int(time_parts[0])
+                                    seconds = int(time_parts[1])
+                                    test_results["duration"] = minutes * 60 + seconds
 
                 # 提取失败的测试信息
                 if "FAILED " in line or "ERROR " in line:
@@ -530,7 +530,7 @@ class BackendTestRunner:
             <div class="performance-metrics">
                 <div class="metric">
                     <div class="label">测试通过率</div>
-                    <div class="value">{sum(r['results']['passed'] / sum(r['results']['total']) * 100:.1f}%</div>
+                    <div class="value">{sum(r['results']['passed']) / sum(r['results']['total']) * 100:.1f}%</div>
                 </div>
             </div>
         </div>
@@ -608,8 +608,7 @@ class BackendTestRunner:
                 "max_duration": max(r.get('duration', 0.0) for r in results),
                 "min_duration": min(r.get('duration', 0.0) for r in results),
             },
-            "pass_rate": sum(r.get('results', {}).get('passed', 0) / sum(r.get('results', {}).get('total', 0)) * 100 if sum(r.get('results', {}).get('total', 0)) > 0 else 0,
-            },
+            "pass_rate": sum(r.get('results', {}).get('passed', 0) for r in results) / sum(r.get('results', {}).get('total', 0) for r in results) * 100 if sum(r.get('results', {}).get('total', 0) for r in results) > 0 else 0,
             "categories": {
                 category: {
                     "config": self.test_categories[category],
@@ -617,25 +616,22 @@ class BackendTestRunner:
                     "success": r['success'],
                     "duration": r['duration'],
                     "total": r['results']['total'],
-                    "passed': r['results']['passed'],
-                    "failed': r['results']['failed'],
+                    "passed": r['results']['passed'],
+                    "failed": r['results']['failed'],
                     "errors": r['results']['errors'],
                     "skipped": r['results']['skipped'],
                     "pass_rate": (r['results']['passed'] / r['results']['total']) * 100 if r['results']['total'] > 0 else 0,
                 }
                 for r in results
             },
-            },
         },
-            "performance_metrics": {
+        "performance_metrics": {
                 "total_tests_run": sum(r.get('results', {}).get('total', 0) for r in results),
                 "average_response_time": sum(r.get('results', {}).get('duration', 0.0) for r in results) / len(results),
                 "max_response_time": max(r.get('results', {}).get('duration', 0.0) for r in results),
                 "min_response_time": min(r.get('results', {}).get('duration', 0.0) for r in results),
                 "total_coverage": sum(r.get('results', {}).get('total', 0) for r in results),
-            },
         },
-        }
 
         # 保存JSON报告
         report_filename = f"backend_test_report_{int(time.time())}.json"

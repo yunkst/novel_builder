@@ -161,7 +161,7 @@ class CacheService:
 
             return {
                 "total_chapters": total_count,
-                "by_source": {source: count for source, count in source_stats},
+                "by_source": dict(source_stats),
                 "hot_chapters": [
                     {
                         "url": ch.url,

@@ -6,7 +6,6 @@
 """
 
 
-
 class TestBasicPerformance:
     """基本性能测试类"""
 
@@ -20,7 +19,9 @@ class TestBasicPerformance:
 
         # Then - 验证所有响应时间都低于阈值
         for response_time in simulated_response_times:
-            assert response_time < max_response_time, f"Response time {response_time}s exceeds threshold {max_response_time}s"
+            assert response_time < max_response_time, (
+                f"Response time {response_time}s exceeds threshold {max_response_time}s"
+            )
 
     def test_database_query_performance(self):
         """测试数据库查询性能"""
@@ -32,7 +33,9 @@ class TestBasicPerformance:
 
         # Then - 验证所有查询时间都低于阈值
         for query_time in simulated_query_times:
-            assert query_time < max_query_time, f"Query time {query_time}s exceeds threshold {max_query_time}s"
+            assert query_time < max_query_time, (
+                f"Query time {query_time}s exceeds threshold {max_query_time}s"
+            )
 
     def test_concurrent_request_handling(self):
         """测试并发请求处理"""
@@ -56,7 +59,9 @@ class TestBasicPerformance:
         simulated_throughput = operation_count / duration
 
         # Then - 验证吞吐量满足要求
-        assert simulated_throughput >= min_throughput, f"Throughput {simulated_throughput} ops/s below minimum {min_throughput} ops/s"
+        assert simulated_throughput >= min_throughput, (
+            f"Throughput {simulated_throughput} ops/s below minimum {min_throughput} ops/s"
+        )
 
     def test_memory_usage_limits(self):
         """测试内存使用限制"""
@@ -68,7 +73,9 @@ class TestBasicPerformance:
 
         # Then - 验证内存使用在限制内
         for memory_usage in simulated_memory_usage:
-            assert memory_usage < max_memory_usage, f"Memory usage {memory_usage}MB exceeds limit {max_memory_usage}MB"
+            assert memory_usage < max_memory_usage, (
+                f"Memory usage {memory_usage}MB exceeds limit {max_memory_usage}MB"
+            )
 
     def test_websocket_connection_performance(self):
         """测试WebSocket连接性能"""
@@ -82,10 +89,14 @@ class TestBasicPerformance:
 
         # Then - 验证连接时间和消息延迟
         for conn_time in connection_times:
-            assert conn_time < max_connection_time, f"Connection time {conn_time}s exceeds limit {max_connection_time}s"
+            assert conn_time < max_connection_time, (
+                f"Connection time {conn_time}s exceeds limit {max_connection_time}s"
+            )
 
         for latency in message_latencies:
-            assert latency < max_message_latency, f"Message latency {latency}s exceeds limit {max_message_latency}s"
+            assert latency < max_message_latency, (
+                f"Message latency {latency}s exceeds limit {max_message_latency}s"
+            )
 
     def test_cache_file_size_management(self):
         """测试缓存文件大小管理"""
@@ -98,30 +109,35 @@ class TestBasicPerformance:
         # Then - 验证单个文件大小合理
         for file_size in cache_file_sizes:
             assert file_size > 0
-            assert file_size < max_cache_size, f"File size {file_size} bytes exceeds cache limit"
+            assert file_size < max_cache_size, (
+                f"File size {file_size} bytes exceeds cache limit"
+            )
 
     def test_performance_monitoring_metrics(self):
         """测试性能监控指标"""
         # Given - 性能监控指标
         performance_metrics = {
-            'response_times': [0.1, 0.2, 0.15, 0.3],
-            'error_rates': [0.01, 0.02, 0.015, 0.008],
-            'throughput': 45.5,
-            'availability': 99.9  # percentage
+            "response_times": [0.1, 0.2, 0.15, 0.3],
+            "error_rates": [0.01, 0.02, 0.015, 0.008],
+            "throughput": 45.5,
+            "availability": 99.9,  # percentage
         }
 
         # When & Then - 验证性能指标的有效性
-        assert 'response_times' in performance_metrics
-        assert 'error_rates' in performance_metrics
-        assert 'throughput' in performance_metrics
-        assert 'availability' in performance_metrics
+        assert "response_times" in performance_metrics
+        assert "error_rates" in performance_metrics
+        assert "throughput" in performance_metrics
+        assert "availability" in performance_metrics
 
         # 验证指标值合理性
-        for rt in performance_metrics['response_times']:
+        for rt in performance_metrics["response_times"]:
             assert rt > 0 and rt < 10.0
 
-        for er in performance_metrics['error_rates']:
+        for er in performance_metrics["error_rates"]:
             assert er >= 0 and er < 1.0
 
-        assert performance_metrics['throughput'] > 0
-        assert performance_metrics['availability'] >= 0 and performance_metrics['availability'] <= 100
+        assert performance_metrics["throughput"] > 0
+        assert (
+            performance_metrics["availability"] >= 0
+            and performance_metrics["availability"] <= 100
+        )

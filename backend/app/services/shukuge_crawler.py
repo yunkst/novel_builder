@@ -137,21 +137,24 @@ class ShukugeCrawler(BaseCrawler):
                         title = a.get_text().strip()
                         href = a.get("href", "")
                         if (
-                            title
-                            and href
-                            and (
-                                ".html" in href or "/book/" in href or "/read/" in href
-                            )
-                        ):
-                            if len(title) > 1 and not any(
-                                sw in title for sw in skip_words
-                            ):
-                                results.append(
-                                    {
-                                        "title": title,
-                                        "url": urllib.parse.urljoin(base, href),
-                                    }
+                            (
+                                title
+                                and href
+                                and (
+                                    ".html" in href
+                                    or "/book/" in href
+                                    or "/read/" in href
                                 )
+                            )
+                            and len(title) > 1
+                            and not any(sw in title for sw in skip_words)
+                        ):
+                            results.append(
+                                {
+                                    "title": title,
+                                    "url": urllib.parse.urljoin(base, href),
+                                }
+                            )
                     # 若容器内提取足够，直接返回
                     if len(results) >= 5:
                         # 去重保持顺序
