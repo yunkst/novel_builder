@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -44,7 +45,7 @@ class CacheService:
             if cache:
                 # 更新访问统计
                 cache.access_count += 1
-                cache.last_accessed_at = func.now()
+                cache.last_accessed_at = datetime.now()
                 db.commit()
                 return cache.to_dict()
             return None
@@ -81,9 +82,9 @@ class CacheService:
                 # 更新现有缓存
                 cache.title = title
                 cache.content = content
-                cache.updated_at = func.now()
+                cache.updated_at = datetime.now()
                 cache.access_count += 1
-                cache.last_accessed_at = func.now()
+                cache.last_accessed_at = datetime.now()
             else:
                 # 创建新缓存
                 cache = ChapterCache(
@@ -161,7 +162,7 @@ class CacheService:
 
             return {
                 "total_chapters": total_count,
-                "by_source": dict(source_stats),
+                "by_source": {row.source: row.count for row in source_stats},
                 "hot_chapters": [
                     {
                         "url": ch.url,

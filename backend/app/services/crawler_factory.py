@@ -7,6 +7,31 @@ from .base_crawler import BaseCrawler
 from .shukuge_crawler import ShukugeCrawler
 from .xspsw_crawler import XspswCrawler
 
+# 源站元数据配置
+SOURCE_SITES_METADATA = {
+    "alice_sw": {
+        "name": "轻小说文库",
+        "base_url": "https://www.alicesw.com",
+        "description": "专业的轻小说网站，包含大量日系轻小说",
+        "search_enabled": True,
+        "crawler_class": AliceSWCrawler
+    },
+    "shukuge": {
+        "name": "书库",
+        "base_url": "http://www.shukuge.com",
+        "description": "综合性小说书库，资源丰富",
+        "search_enabled": True,
+        "crawler_class": ShukugeCrawler
+    },
+    "xspsw": {
+        "name": "小说网",
+        "base_url": "https://m.xspsw.com",
+        "description": "移动端优化的小说网站",
+        "search_enabled": True,
+        "crawler_class": XspswCrawler
+    }
+}
+
 
 def get_enabled_crawlers() -> dict[str, BaseCrawler]:
     """
@@ -40,3 +65,25 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
         if hasattr(crawler, "base_url") and crawler.base_url in url:
             return crawler
     return None
+
+
+def get_source_sites_info() -> list[dict]:
+    """获取所有源站信息，包括启用的和未启用的"""
+    enabled = os.getenv("NOVEL_ENABLED_SITES", "").lower()
+
+    sites = []
+    for site_id, metadata in SOURCE_SITES_METADATA.items():
+        # 根据环境变量判断站点是否启用
+        site_key = site_id.replace("_sw", "").replace("_", "")
+        is_enabled = not enabled or site_key in enabled
+
+        sites.append({
+            "id": site_id,
+            "name": metadata["name"],
+            "base_url": metadata["base_url"],
+            "description": metadata["description"],
+            "enabled": is_enabled,
+            "search_enabled": metadata["search_enabled"]
+        })
+
+    return sites

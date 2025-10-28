@@ -622,16 +622,15 @@ class BackendTestRunner:
                     "skipped": r['results']['skipped'],
                     "pass_rate": (r['results']['passed'] / r['results']['total']) * 100 if r['results']['total'] > 0 else 0,
                 }
-                for r in results
+                for category, r in zip(self.test_categories.keys(), results)
             },
-        },
         "performance_metrics": {
                 "total_tests_run": sum(r.get('results', {}).get('total', 0) for r in results),
                 "average_response_time": sum(r.get('results', {}).get('duration', 0.0) for r in results) / len(results),
                 "max_response_time": max(r.get('results', {}).get('duration', 0.0) for r in results),
                 "min_response_time": min(r.get('results', {}).get('duration', 0.0) for r in results),
                 "total_coverage": sum(r.get('results', {}).get('total', 0) for r in results),
-        },
+        }
 
         # 保存JSON报告
         report_filename = f"backend_test_report_{int(time.time())}.json"

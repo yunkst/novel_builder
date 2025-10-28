@@ -30,3 +30,14 @@ class ChapterContent(BaseModel):
     title: str
     content: str
     from_cache: bool = False
+
+
+class SourceSite(BaseModel):
+    """Source site information schema."""
+
+    id: str              # 站点标识 (alice_sw, shukuge, xspsw)
+    name: str            # 站点名称
+    base_url: str        # 站点基础URL
+    description: str     # 站点描述
+    enabled: bool        # 是否启用
+    search_enabled: bool # 是否支持搜索功能

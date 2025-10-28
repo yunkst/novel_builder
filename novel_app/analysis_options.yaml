@@ -13,6 +13,7 @@ analyzer:
   exclude:
     # 排除生成的 API 代码
     - lib/generated/**
+    - generated/**
     # 排除构建生成的文件
     - "**/*.g.dart"
     - "**/*.freezed.dart"

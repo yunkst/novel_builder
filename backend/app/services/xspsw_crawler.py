@@ -216,7 +216,7 @@ class XspswCrawler(BaseCrawler):
 
             if total_chapters_text:
                 # 提取总章节数
-                total_match = re.search(r"共\s*(\d+)\s*章", total_chapters_text)
+                total_match = re.search(r"共\s*(\d+)\s*章", str(total_chapters_text))
                 if total_match:
                     total_chapters = int(total_match.group(1))
                     # 每页大约100章，计算最大页数
