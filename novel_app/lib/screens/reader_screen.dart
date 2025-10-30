@@ -40,19 +40,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // 特写模式相关状态
   bool _isCloseupMode = false;
   List<int> _selectedParagraphIndices = [];
-  final ValueNotifier<String> _rewriteResultNotifier = ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingRewriteNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> _rewriteResultNotifier =
+      ValueNotifier<String>('');
+  final ValueNotifier<bool> _isGeneratingRewriteNotifier =
+      ValueNotifier<bool>(false);
 
   // 全文重写相关状态
-  final ValueNotifier<String> _fullRewriteResultNotifier = ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingFullRewriteNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> _fullRewriteResultNotifier =
+      ValueNotifier<String>('');
+  final ValueNotifier<bool> _isGeneratingFullRewriteNotifier =
+      ValueNotifier<bool>(false);
 
   // 全文重写要求的用户输入缓存
   String _lastFullRewriteInput = '';
 
   // 总结相关状态
-  final ValueNotifier<String> _summarizeResultNotifier = ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingSummarizeNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> _summarizeResultNotifier =
+      ValueNotifier<String>('');
+  final ValueNotifier<bool> _isGeneratingSummarizeNotifier =
+      ValueNotifier<bool>(false);
 
   // 预加载相关状态
   final Set<String> _preloadedChapterUrls = {};
@@ -105,7 +111,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     });
 
     try {
-      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
+      final cachedContent =
+          await _databaseService.getCachedChapter(_currentChapter.url);
       String content;
 
       if (cachedContent != null) {
@@ -117,7 +124,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _updateReadingProgress();
 
         // 如果有搜索结果，跳转到匹配位置
-        if (widget.searchResult != null && widget.searchResult!.chapterUrl == _currentChapter.url) {
+        if (widget.searchResult != null &&
+            widget.searchResult!.chapterUrl == _currentChapter.url) {
           _scrollToSearchMatch();
         }
 
@@ -127,12 +135,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
         // 从网络获取内容
         try {
           content = await _apiService.getChapterContent(_currentChapter.url);
-          
+
           // 验证内容有效性
           if (content.isNotEmpty && content.length > 50) {
             // 缓存有效内容
-            await _databaseService.cacheChapter(widget.novel.url, _currentChapter, content);
-            
+            await _databaseService.cacheChapter(
+                widget.novel.url, _currentChapter, content);
+
             setState(() {
               _content = content;
               _isLoading = false;
@@ -165,12 +174,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// 根据异常类型返回用户友好的错误信息
   String _getErrorMessage(dynamic error) {
     final errorStr = error.toString();
-    
+
     if (errorStr.contains('请求过于频繁')) {
       return '请求过于频繁，请稍后重试';
     } else if (errorStr.contains('超时') || errorStr.contains('timeout')) {
       return '网络连接超时，请检查网络后重试';
-    } else if (errorStr.contains('网络错误') || errorStr.contains('SocketException')) {
+    } else if (errorStr.contains('网络错误') ||
+        errorStr.contains('SocketException')) {
       return '网络连接失败，请检查网络设置';
     } else if (errorStr.contains('状态码')) {
       return '服务器响应异常，请稍后重试';
@@ -182,13 +192,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _updateReadingProgress() async {
-    final chapterIndex = _currentChapter.chapterIndex ?? widget.chapters.indexOf(_currentChapter);
-    await _databaseService.updateLastReadChapter(widget.novel.url, chapterIndex);
+    final chapterIndex = _currentChapter.chapterIndex ??
+        widget.chapters.indexOf(_currentChapter);
+    await _databaseService.updateLastReadChapter(
+        widget.novel.url, chapterIndex);
   }
 
   /// 滚动到搜索匹配位置
   void _scrollToSearchMatch() {
-    if (widget.searchResult == null || widget.searchResult!.matchPositions.isEmpty) {
+    if (widget.searchResult == null ||
+        widget.searchResult!.matchPositions.isEmpty) {
       return;
     }
 
@@ -202,7 +215,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
           final estimatedScrollOffset = (firstMatch.start * 0.3).toDouble();
 
           final maxScrollExtent = _scrollController.position.maxScrollExtent;
-          final targetOffset = estimatedScrollOffset.clamp(0.0, maxScrollExtent);
+          final targetOffset =
+              estimatedScrollOffset.clamp(0.0, maxScrollExtent);
 
           _scrollController.animateTo(
             targetOffset,
@@ -213,7 +227,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
           // 显示跳转提示
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('已跳转到匹配位置 (${widget.searchResult!.matchCount} 处匹配)'),
+              content:
+                  Text('已跳转到匹配位置 (${widget.searchResult!.matchCount} 处匹配)'),
               duration: const Duration(seconds: 2),
               action: SnackBarAction(
                 label: '查看全部',
@@ -245,18 +260,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
               const SizedBox(height: 8),
               Text('匹配数量: ${widget.searchResult!.matchCount} 处'),
               const SizedBox(height: 16),
-              const Text('搜索关键词:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('搜索关键词:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               Wrap(
                 children: widget.searchResult!.searchKeywords.map((keyword) {
                   return Chip(
                     label: Text(keyword),
-                    backgroundColor: Theme.of(context).colorScheme.primary..withValues(alpha:0.1),
+                    backgroundColor: Theme.of(context).colorScheme.primary
+                      ..withValues(alpha: 0.1),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 16),
-              const Text('匹配预览:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('匹配预览:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Container(
                 width: double.maxFinite,
@@ -292,19 +310,24 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _isPreloading = true;
 
     try {
-      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      final currentIndex =
+          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
       if (currentIndex == -1) return;
 
       // 构建预加载列表：优先后续章节
       final List<Chapter> chaptersToPreload = [];
 
       // 添加后续章节（优先）
-      for (int i = currentIndex + 1; i < widget.chapters.length && chaptersToPreload.length < 10; i++) {
+      for (int i = currentIndex + 1;
+          i < widget.chapters.length && chaptersToPreload.length < 10;
+          i++) {
         chaptersToPreload.add(widget.chapters[i]);
       }
 
       // 添加前面的章节
-      for (int i = currentIndex - 1; i >= 0 && chaptersToPreload.length < 15; i--) {
+      for (int i = currentIndex - 1;
+          i >= 0 && chaptersToPreload.length < 15;
+          i--) {
         chaptersToPreload.add(widget.chapters[i]);
       }
 
@@ -323,7 +346,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
       try {
         // 检查是否已缓存
-        final cachedContent = await _databaseService.getCachedChapter(chapter.url);
+        final cachedContent =
+            await _databaseService.getCachedChapter(chapter.url);
         if (cachedContent != null) {
           _preloadedChapterUrls.add(chapter.url);
           continue;
@@ -336,19 +360,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
         // 从后端获取并缓存
         final content = await _apiService.getChapterContent(chapter.url);
         if (content.isNotEmpty) {
-          await _databaseService.cacheChapter(widget.novel.url, chapter, content);
+          await _databaseService.cacheChapter(
+              widget.novel.url, chapter, content);
           _preloadedChapterUrls.add(chapter.url);
-    debugPrint('预加载成功: ${chapter.title}');
+          debugPrint('预加载成功: ${chapter.title}');
         }
       } catch (e) {
         // 静默处理预加载错误，不影响用户阅读
-    debugPrint('预加载章节失败: ${chapter.title}, 错误: $e');
+        debugPrint('预加载章节失败: ${chapter.title}, 错误: $e');
       }
     }
   }
 
   void _goToPreviousChapter() {
-    final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+    final currentIndex =
+        widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
     if (currentIndex > 0) {
       setState(() {
         _currentChapter = widget.chapters[currentIndex - 1];
@@ -363,7 +389,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _goToNextChapter() {
-    final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+    final currentIndex =
+        widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
     if (currentIndex != -1 && currentIndex < widget.chapters.length - 1) {
       setState(() {
         _currentChapter = widget.chapters[currentIndex + 1];
@@ -421,13 +448,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // 开始自动滚动
   void _startAutoScroll() {
     if (_isAutoScrolling) return;
-    
+
     setState(() {
       _isAutoScrolling = true;
     });
 
     const duration = Duration(milliseconds: 50); // 每50毫秒滚动一次
-    final scrollStep = (_baseScrollSpeed * _scrollSpeed * 50) / 1000; // 每次滚动的像素数
+    final scrollStep =
+        (_baseScrollSpeed * _scrollSpeed * 50) / 1000; // 每次滚动的像素数
 
     _autoScrollTimer = Timer.periodic(duration, (timer) {
       if (!_isAutoScrolling) {
@@ -508,7 +536,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
               children: [
                 Text(
                   '当前速度: ${_scrollSpeed.toStringAsFixed(1)}x',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 Slider(
@@ -528,8 +557,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('慢 (0.1x)', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                    Text('快 (5.0x)', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    Text('慢 (0.1x)',
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    Text('快 (5.0x)',
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 12)),
                   ],
                 ),
               ],
@@ -666,16 +699,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     try {
       final List<String> historyChaptersContent = [];
-      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      final currentIndex =
+          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
 
       if (currentIndex > 1) {
         final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter2.url) ??
+                await _apiService.getChapterContent(prevChapter2.url);
         historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
       }
       if (currentIndex > 0) {
         final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter1.url) ??
+                await _apiService.getChapterContent(prevChapter1.url);
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
@@ -689,15 +727,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
         historyChaptersContent: historyChaptersContent,
         backgroundSetting: widget.novel.backgroundSetting ?? '',
         onChunk: (chunk) {
-    debugPrint('onChunk 回调收到: $chunk');
+          debugPrint('onChunk 回调收到: $chunk');
           _rewriteResultNotifier.value += chunk;
         },
         onComplete: () {
-    debugPrint('onComplete 回调被调用');
+          debugPrint('onComplete 回调被调用');
           _isGeneratingRewriteNotifier.value = false;
         },
       );
-
     } catch (e) {
       _isGeneratingRewriteNotifier.value = false;
       _rewriteResultNotifier.value = '生成失败: $e';
@@ -781,7 +818,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ? null
                       : () {
                           Navigator.pop(dialogContext);
-                          final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+                          final paragraphs = _content
+                              .split('\n')
+                              .where((p) => p.trim().isNotEmpty)
+                              .toList();
                           _showRewriteRequirementDialog(paragraphs);
                         },
                   icon: const Icon(Icons.refresh),
@@ -821,15 +861,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   // 替换选中的段落
   void _replaceSelectedParagraphs() async {
-    if (_selectedParagraphIndices.isEmpty || _rewriteResultNotifier.value.isEmpty) return;
+    if (_selectedParagraphIndices.isEmpty ||
+        _rewriteResultNotifier.value.isEmpty) {
+      return;
+    }
 
-    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs =
+        _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
     // 替换选中的段落
     for (int i = _selectedParagraphIndices.length - 1; i >= 0; i--) {
       paragraphs.removeAt(_selectedParagraphIndices[i]);
     }
-    paragraphs.insert(_selectedParagraphIndices.first, _rewriteResultNotifier.value);
+    paragraphs.insert(
+        _selectedParagraphIndices.first, _rewriteResultNotifier.value);
 
     final newContent = paragraphs.join('\n');
 
@@ -842,9 +887,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     // 保存修改后的内容到数据库
     try {
-      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
+      await _databaseService.updateChapterContent(
+          _currentChapter.url, newContent);
     } catch (e) {
-    debugPrint('保存章节内容失败: $e');
+      debugPrint('保存章节内容失败: $e');
     }
   }
 
@@ -912,17 +958,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     try {
       final List<String> historyChaptersContent = [];
-      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      final currentIndex =
+          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
 
       // 获取历史章节内容（最多前2章）
       if (currentIndex > 1) {
         final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter2.url) ??
+                await _apiService.getChapterContent(prevChapter2.url);
         historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
       }
       if (currentIndex > 0) {
         final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter1.url) ??
+                await _apiService.getChapterContent(prevChapter1.url);
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
@@ -936,7 +987,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         'current_chapter_content': _content,
         'choice_content': '',
         'ai_writer_setting': '',
-        'background_setting': widget.novel.backgroundSetting ?? widget.novel.description ?? '',
+        'background_setting':
+            widget.novel.backgroundSetting ?? widget.novel.description ?? '',
         'next_chapter_overview': '',
         'characters_info': '',
       };
@@ -965,7 +1017,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
           _isGeneratingSummarizeNotifier.value = false;
         },
       );
-
     } catch (e) {
       _isGeneratingSummarizeNotifier.value = false;
       _summarizeResultNotifier.value = '生成失败: $e';
@@ -1068,7 +1119,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   // 显示全文重写要求输入弹窗
   Future<void> _showFullRewriteRequirementDialog() async {
-    final userInputController = TextEditingController(text: _lastFullRewriteInput);
+    final userInputController =
+        TextEditingController(text: _lastFullRewriteInput);
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1146,17 +1198,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     try {
       final List<String> historyChaptersContent = [];
-      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      final currentIndex =
+          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
 
       // 获取历史章节内容（最多前2章）
       if (currentIndex > 1) {
         final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content = await _databaseService.getCachedChapter(prevChapter2.url) ?? await _apiService.getChapterContent(prevChapter2.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter2.url) ??
+                await _apiService.getChapterContent(prevChapter2.url);
         historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
       }
       if (currentIndex > 0) {
         final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content = await _databaseService.getCachedChapter(prevChapter1.url) ?? await _apiService.getChapterContent(prevChapter1.url);
+        final content =
+            await _databaseService.getCachedChapter(prevChapter1.url) ??
+                await _apiService.getChapterContent(prevChapter1.url);
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
@@ -1170,7 +1227,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         'current_chapter_content': _content,
         'choice_content': '', // 空的choice_content参数
         'ai_writer_setting': '',
-        'background_setting': widget.novel.backgroundSetting ?? widget.novel.description ?? '',
+        'background_setting':
+            widget.novel.backgroundSetting ?? widget.novel.description ?? '',
         'next_chapter_overview': '',
         'characters_info': '',
       };
@@ -1199,7 +1257,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
           _isGeneratingFullRewriteNotifier.value = false;
         },
       );
-
     } catch (e) {
       _isGeneratingFullRewriteNotifier.value = false;
       _fullRewriteResultNotifier.value = '生成失败: $e';
@@ -1337,7 +1394,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
     // 保存修改后的内容到数据库
     try {
-      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
+      await _databaseService.updateChapterContent(
+          _currentChapter.url, newContent);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1361,14 +1419,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+    final currentIndex =
+        widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
     final hasPrevious = currentIndex > 0;
-    final hasNext = currentIndex != -1 && currentIndex < widget.chapters.length - 1;
+    final hasNext =
+        currentIndex != -1 && currentIndex < widget.chapters.length - 1;
 
-    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs =
+        _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -1478,20 +1538,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         itemCount: paragraphs.length,
                         itemBuilder: (context, index) {
                           final paragraph = paragraphs[index];
-                          final isSelected = _selectedParagraphIndices.contains(index);
+                          final isSelected =
+                              _selectedParagraphIndices.contains(index);
 
                           return InkWell(
                             onTap: _isCloseupMode
                                 ? () => _handleParagraphTap(index)
                                 : null,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6.0, horizontal: 8.0),
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.blue.withValues(alpha: 0.2) : null,
+                                color: isSelected
+                                    ? Colors.blue.withValues(alpha: 0.2)
+                                    : null,
                                 border: isSelected
                                     ? Border.all(color: Colors.blue, width: 2)
                                     : _isCloseupMode
-                                        ? Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1)
+                                        ? Border.all(
+                                            color: Colors.blue
+                                                .withValues(alpha: 0.3),
+                                            width: 1)
                                         : null,
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -1529,7 +1596,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               ElevatedButton.icon(
-                                onPressed: hasPrevious ? _goToPreviousChapter : null,
+                                onPressed:
+                                    hasPrevious ? _goToPreviousChapter : null,
                                 icon: const Icon(Icons.arrow_back),
                                 label: const Text('上一章'),
                               ),
@@ -1565,7 +1633,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_isCloseupMode && _selectedParagraphIndices.isNotEmpty) {
       return FloatingActionButton.extended(
         onPressed: () {
-          final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+          final paragraphs =
+              _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
           _showRewriteRequirementDialog(paragraphs);
         },
         icon: const Icon(Icons.edit),
@@ -1604,7 +1673,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
             tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
             heroTag: 'closeup_mode',
             backgroundColor: _isCloseupMode ? Colors.blue : null,
-            child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
+            child:
+                Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
           ),
         ],
       ),

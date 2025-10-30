@@ -183,7 +183,8 @@ class DatabaseService {
   }
 
   /// 更新小说背景设定
-  Future<int> updateBackgroundSetting(String novelUrl, String? backgroundSetting) async {
+  Future<int> updateBackgroundSetting(
+      String novelUrl, String? backgroundSetting) async {
     if (isWebPlatform) {
       return 0; // Web平台什么都不做，返回0
     }
@@ -224,7 +225,7 @@ class DatabaseService {
       where: 'url = ?',
       whereArgs: [novelUrl],
     );
-    
+
     if (maps.isNotEmpty) {
       return maps.first['lastReadChapter'] as int? ?? 0;
     }
@@ -234,7 +235,8 @@ class DatabaseService {
   // ========== 章节缓存操作 ==========
 
   /// 缓存章节内容
-  Future<int> cacheChapter(String novelUrl, Chapter chapter, String content) async {
+  Future<int> cacheChapter(
+      String novelUrl, Chapter chapter, String content) async {
     final db = await database;
     return await db.insert(
       'chapter_cache',
@@ -325,21 +327,21 @@ class DatabaseService {
   Future<void> clearNovelCache(String novelUrl) async {
     final db = await database;
     final batch = db.batch();
-    
+
     // 删除章节内容缓存
     batch.delete(
       'chapter_cache',
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );
-    
+
     // 删除章节列表缓存
     batch.delete(
       'novel_chapters',
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );
-    
+
     await batch.commit(noResult: true);
   }
 
@@ -350,21 +352,21 @@ class DatabaseService {
     }
 
     final db = await database;
-    
+
     // 获取缓存的章节内容数量
     final contentResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM chapter_cache WHERE novelUrl = ?',
       [novelUrl],
     );
     final contentCount = contentResult.first['count'] as int;
-    
+
     // 获取章节列表数量
     final chaptersResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM novel_chapters WHERE novelUrl = ?',
       [novelUrl],
     );
     final chaptersCount = chaptersResult.first['count'] as int;
-    
+
     return {
       'cachedChapters': contentCount,
       'totalChapters': chaptersCount,
@@ -372,7 +374,8 @@ class DatabaseService {
   }
 
   /// 缓存整本小说
-  Future<void> cacheWholeNovel(String novelUrl, List<Chapter> chapters, Future<String> Function(String) getContent) async {
+  Future<void> cacheWholeNovel(String novelUrl, List<Chapter> chapters,
+      Future<String> Function(String) getContent) async {
     for (var chapter in chapters) {
       // 已缓存则跳过，避免重复网络请求与写入
       final already = await isChapterCached(chapter.url);
@@ -388,7 +391,8 @@ class DatabaseService {
   // ========== 章节列表缓存操作 ==========
 
   /// 缓存小说章节列表
-  Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters) async {
+  Future<void> cacheNovelChapters(
+      String novelUrl, List<Chapter> chapters) async {
     final db = await database;
     final batch = db.batch();
 
@@ -463,7 +467,8 @@ class DatabaseService {
   }
 
   /// 插入用户章节
-  Future<void> insertUserChapter(String novelUrl, String title, String content, int insertIndex) async {
+  Future<void> insertUserChapter(
+      String novelUrl, String title, String content, int insertIndex) async {
     final db = await database;
     final batch = db.batch();
 
@@ -514,9 +519,11 @@ class DatabaseService {
   }
 
   /// 创建用户自定义空小说
-  Future<int> createCustomNovel(String title, String author, {String? description}) async {
+  Future<int> createCustomNovel(String title, String author,
+      {String? description}) async {
     if (isWebPlatform) {
-      throw Exception('Creating custom novels is not supported on web platform');
+      throw Exception(
+          'Creating custom novels is not supported on web platform');
     }
 
     final db = await database;
@@ -537,7 +544,8 @@ class DatabaseService {
   }
 
   /// 创建用户自定义章节
-  Future<int> createCustomChapter(String novelUrl, String title, String content) async {
+  Future<int> createCustomChapter(
+      String novelUrl, String title, String content) async {
     final db = await database;
 
     // 获取当前最大章节索引
@@ -548,7 +556,8 @@ class DatabaseService {
     final maxIndex = result.first['maxIndex'] as int? ?? 0;
 
     // 生成章节URL
-    final chapterUrl = 'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
+    final chapterUrl =
+        'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
 
     // 插入章节元数据
     await db.insert(
@@ -594,7 +603,8 @@ class DatabaseService {
   }
 
   /// 更新用户创建的章节内容
-  Future<void> updateCustomChapter(String chapterUrl, String title, String content) async {
+  Future<void> updateCustomChapter(
+      String chapterUrl, String title, String content) async {
     final db = await database;
 
     // 更新章节标题
@@ -635,7 +645,8 @@ class DatabaseService {
   }
 
   /// 在缓存内容中搜索关键字
-  Future<List<ChapterSearchResult>> searchInCachedContent(String keyword, {String? novelUrl}) async {
+  Future<List<ChapterSearchResult>> searchInCachedContent(String keyword,
+      {String? novelUrl}) async {
     final db = await database;
 
     String whereClause = "content LIKE ? OR title LIKE ?";
@@ -660,7 +671,8 @@ class DatabaseService {
       final title = maps[i]['title'] ?? '';
 
       // 查找所有匹配位置
-      final List<MatchPosition> matchPositions = _findMatchPositions(content, keyword);
+      final List<MatchPosition> matchPositions =
+          _findMatchPositions(content, keyword);
 
       results.add(ChapterSearchResult(
         novelUrl: maps[i]['novelUrl'] ?? '',
@@ -672,7 +684,8 @@ class DatabaseService {
         content: content,
         searchKeywords: [keyword],
         matchPositions: matchPositions,
-        cachedAt: DateTime.tryParse(maps[i]['cachedAt'] ?? '') ?? DateTime.now(),
+        cachedAt:
+            DateTime.tryParse(maps[i]['cachedAt'] ?? '') ?? DateTime.now(),
       ));
     }
 
@@ -698,7 +711,6 @@ class DatabaseService {
     return positions;
   }
 
-  
   /// 获取所有已缓存小说的列表（用于搜索筛选）
   Future<List<CachedNovelInfo>> getCachedNovels() async {
     final db = await database;
@@ -726,7 +738,8 @@ class DatabaseService {
         coverUrl: maps[i]['coverUrl'],
         description: maps[i]['description'],
         chapterCount: maps[i]['cachedChapterCount'] ?? 0,
-        lastUpdated: DateTime.tryParse(maps[i]['lastUpdated'] ?? '') ?? DateTime.now(),
+        lastUpdated:
+            DateTime.tryParse(maps[i]['lastUpdated'] ?? '') ?? DateTime.now(),
       );
     });
   }

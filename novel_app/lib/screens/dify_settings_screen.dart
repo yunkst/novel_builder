@@ -40,7 +40,8 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
     _difyUrlController.text = prefs.getString('dify_url') ?? '';
     _difyTokenController.text = prefs.getString('dify_token') ?? '';
     _aiWriterPromptController.text = prefs.getString('ai_writer_prompt') ?? '';
-    _maxHistoryLengthController.text = (prefs.getInt('max_history_length') ?? 3000).toString();
+    _maxHistoryLengthController.text =
+        (prefs.getInt('max_history_length') ?? 3000).toString();
     setState(() {
       _isLoading = false;
     });
@@ -51,8 +52,10 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('dify_url', _difyUrlController.text.trim());
       await prefs.setString('dify_token', _difyTokenController.text.trim());
-      await prefs.setString('ai_writer_prompt', _aiWriterPromptController.text.trim());
-      await prefs.setInt('max_history_length', int.tryParse(_maxHistoryLengthController.text) ?? 3000);
+      await prefs.setString(
+          'ai_writer_prompt', _aiWriterPromptController.text.trim());
+      await prefs.setInt('max_history_length',
+          int.tryParse(_maxHistoryLengthController.text) ?? 3000);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

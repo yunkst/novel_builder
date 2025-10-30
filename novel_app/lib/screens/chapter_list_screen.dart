@@ -32,9 +32,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   // 生成章节相关的状态
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<String> _generatedContentNotifier = ValueNotifier<String>('');
+  final ValueNotifier<String> _generatedContentNotifier =
+      ValueNotifier<String>('');
   final ValueNotifier<String> _insertResultNotifier = ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingInsertNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isGeneratingInsertNotifier =
+      ValueNotifier<bool>(false);
   String _currentGeneratingTitle = '';
 
   @override
@@ -76,7 +78,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
     try {
       // 先尝试从缓存加载
-      final cachedChapters = await _databaseService.getCachedNovelChapters(widget.novel.url);
+      final cachedChapters =
+          await _databaseService.getCachedNovelChapters(widget.novel.url);
 
       if (cachedChapters.isNotEmpty && !forceRefresh) {
         // 有缓存且不强制刷新时，直接显示缓存
@@ -121,7 +124,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         await _databaseService.cacheNovelChapters(widget.novel.url, chapters);
 
         // 重新从数据库获取合并后的章节列表（包括用户插入的章节）
-        final updatedChapters = await _databaseService.getCachedNovelChapters(widget.novel.url);
+        final updatedChapters =
+            await _databaseService.getCachedNovelChapters(widget.novel.url);
 
         setState(() {
           _chapters = updatedChapters;
@@ -160,7 +164,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   Future<void> _loadLastReadChapter() async {
     try {
-      final lastReadIndex = await _databaseService.getLastReadChapter(widget.novel.url);
+      final lastReadIndex =
+          await _databaseService.getLastReadChapter(widget.novel.url);
       setState(() {
         _lastReadChapterIndex = lastReadIndex;
       });
@@ -174,20 +179,19 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       // 延迟执行滚动，确保ListView已经构建完成
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          final targetIndex = _lastReadChapterIndex.clamp(0, _chapters.length - 1);
-          
+          final targetIndex =
+              _lastReadChapterIndex.clamp(0, _chapters.length - 1);
+
           // 使用简单的滚动方法，避免复杂计算导致的过头问题
           // 计算目标位置：让目标章节显示在可视区域的上方1/4处
           final itemHeight = 56.0; // ListTile默认高度
           final targetOffset = targetIndex * itemHeight;
-          
+
           // 获取可视区域高度，让目标章节显示在上方1/4处
           final viewportHeight = _scrollController.position.viewportDimension;
-          final adjustedOffset = (targetOffset - viewportHeight * 0.25).clamp(
-            0.0, 
-            _scrollController.position.maxScrollExtent
-          );
-          
+          final adjustedOffset = (targetOffset - viewportHeight * 0.25)
+              .clamp(0.0, _scrollController.position.maxScrollExtent);
+
           _scrollController.animateTo(
             adjustedOffset,
             duration: const Duration(milliseconds: 600),
@@ -199,7 +203,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   Future<void> _checkBookshelfStatus() async {
-    final isInBookshelf = await _databaseService.isInBookshelf(widget.novel.url);
+    final isInBookshelf =
+        await _databaseService.isInBookshelf(widget.novel.url);
     setState(() {
       _isInBookshelf = isInBookshelf;
     });
@@ -224,7 +229,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     await _checkBookshelfStatus();
   }
 
-  
   Future<void> _showClearCacheDialog() async {
     showDialog(
       context: context,
@@ -327,7 +331,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (titleController.text.trim().isNotEmpty && 
+              if (titleController.text.trim().isNotEmpty &&
                   userInputController.text.trim().isNotEmpty) {
                 Navigator.pop(context, {
                   'title': titleController.text.trim(),
@@ -347,10 +351,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   // 生成新章节内容
-  Future<void> _generateNewChapter(int afterIndex, String title, String userInput) async {
+  Future<void> _generateNewChapter(
+      int afterIndex, String title, String userInput) async {
     // 保存当前生成的章节标题
     _currentGeneratingTitle = title;
-    
+
     // 显示生成进度弹框
     showDialog(
       context: context,
@@ -419,7 +424,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       ? null
                       : () {
                           Navigator.pop(dialogContext);
-                          _generateNewChapter(afterIndex, _currentGeneratingTitle, userInput);
+                          _generateNewChapter(
+                              afterIndex, _currentGeneratingTitle, userInput);
                         },
                   icon: const Icon(Icons.refresh),
                   label: Text(isGenerating ? '生成中...' : '重新生成'),
@@ -436,7 +442,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       onPressed: (isGenerating || value.isEmpty)
                           ? null
                           : () {
-                              _insertGeneratedChapter(afterIndex, _currentGeneratingTitle, value);
+                              _insertGeneratedChapter(
+                                  afterIndex, _currentGeneratingTitle, value);
                               Navigator.pop(dialogContext);
                             },
                       icon: const Icon(Icons.check),
@@ -460,7 +467,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   // 调用Dify生成章节内容
-  Future<void> _callDifyToGenerateChapter(int afterIndex, String userInput) async {
+  Future<void> _callDifyToGenerateChapter(
+      int afterIndex, String userInput) async {
     _isGeneratingNotifier.value = true;
     _generatedContentNotifier.value = '';
 
@@ -473,7 +481,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _chapters[i].url,
         );
         if (content != null && content.isNotEmpty) {
-          historyChaptersContent += '第${i + 1}章 ${_chapters[i].title}\n$content\n\n';
+          historyChaptersContent +=
+              '第${i + 1}章 ${_chapters[i].title}\n$content\n\n';
         }
       }
 
@@ -519,7 +528,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   // 插入生成的章节
-  Future<void> _insertGeneratedChapter(int afterIndex, String title, String content) async {
+  Future<void> _insertGeneratedChapter(
+      int afterIndex, String title, String content) async {
     try {
       // 使用新的数据库方法插入用户章节
       await _databaseService.insertUserChapter(
@@ -668,7 +678,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ChapterSearchScreen(novel: widget.novel),
+                  builder: (context) =>
+                      ChapterSearchScreen(novel: widget.novel),
                 ),
               );
             },
@@ -702,7 +713,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 value: 'toggle_bookmark',
                 child: Row(
                   children: [
-                    Icon(_isInBookshelf ? Icons.bookmark : Icons.bookmark_border),
+                    Icon(_isInBookshelf
+                        ? Icons.bookmark
+                        : Icons.bookmark_border),
                     const SizedBox(width: 8),
                     Text(_isInBookshelf ? '移出书架' : '加入书架'),
                   ],
@@ -834,7 +847,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                   ),
                                   const SizedBox(height: 24),
                                   ElevatedButton.icon(
-                                    onPressed: () => _showCreateFirstChapterDialog(),
+                                    onPressed: () =>
+                                        _showCreateFirstChapterDialog(),
                                     icon: const Icon(Icons.add_circle_outline),
                                     label: const Text('创建章节'),
                                     style: ElevatedButton.styleFrom(
@@ -846,10 +860,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                       ),
                                     ),
                                   ),
-                                  if (!widget.novel.url.startsWith('custom://')) ...[
+                                  if (!widget.novel.url
+                                      .startsWith('custom://')) ...[
                                     const SizedBox(height: 16),
                                     TextButton.icon(
-                                      onPressed: () => _loadChapters(forceRefresh: true),
+                                      onPressed: () =>
+                                          _loadChapters(forceRefresh: true),
                                       icon: const Icon(Icons.refresh),
                                       label: const Text('从源网站获取章节'),
                                     ),
@@ -862,58 +878,63 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               itemCount: _chapters.length,
                               itemBuilder: (context, index) {
                                 final chapter = _chapters[index];
-                                final isLastRead = index == _lastReadChapterIndex;
+                                final isLastRead =
+                                    index == _lastReadChapterIndex;
 
                                 return ListTile(
-                            title: Text(
-                              chapter.title,
-                              style: TextStyle(
-                                fontWeight: isLastRead ? FontWeight.bold : FontWeight.normal,
-                                color: isLastRead ? Colors.red : null,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // 插入章节按钮
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle_outline,
-                                    color: Colors.blue,
+                                  title: Text(
+                                    chapter.title,
+                                    style: TextStyle(
+                                      fontWeight: isLastRead
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isLastRead ? Colors.red : null,
+                                    ),
                                   ),
-                                  onPressed: () => _showInsertChapterDialog(index),
-                                  tooltip: '在此章节后插入新章节',
-                                ),
-                                // 缓存状态图标
-                                FutureBuilder<bool>(
-                                  future: _databaseService.isChapterCached(chapter.url),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.data == true) {
-                                      return const Icon(
-                                        Icons.download_done,
-                                        color: Colors.green,
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // 插入章节按钮
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                          color: Colors.blue,
+                                        ),
+                                        onPressed: () =>
+                                            _showInsertChapterDialog(index),
+                                        tooltip: '在此章节后插入新章节',
+                                      ),
+                                      // 缓存状态图标
+                                      FutureBuilder<bool>(
+                                        future: _databaseService
+                                            .isChapterCached(chapter.url),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.data == true) {
+                                            return const Icon(
+                                              Icons.download_done,
+                                              color: Colors.green,
+                                            );
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ReaderScreen(
+                                          novel: widget.novel,
+                                          chapter: chapter,
+                                          chapters: _chapters,
+                                        ),
+                                      ),
+                                    );
                                   },
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ReaderScreen(
-                                    novel: widget.novel,
-                                    chapter: chapter,
-                                    chapters: _chapters,
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
                     ),
                   ],
                 ),
@@ -933,7 +954,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   /// 使用服务端缓存
   Future<void> _enqueueServerCache() async {
     try {
-      final taskId = await _cacheManager.createServerCacheTask(widget.novel.url);
+      final taskId =
+          await _cacheManager.createServerCacheTask(widget.novel.url);
       if (taskId != null && taskId > 0) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

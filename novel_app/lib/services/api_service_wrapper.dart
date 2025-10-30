@@ -56,7 +56,8 @@ class ApiServiceWrapper {
         // CORS headers for web requests
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-TOKEN',
+        'Access-Control-Allow-Headers':
+            'Content-Type, Authorization, X-API-TOKEN',
       },
     ));
 
@@ -109,7 +110,8 @@ class ApiServiceWrapper {
   // ========== 业务方法 ==========
 
   /// 搜索小说
-  Future<List<local.Novel>> searchNovels(String keyword, {List<String>? sites}) async {
+  Future<List<local.Novel>> searchNovels(String keyword,
+      {List<String>? sites}) async {
     _ensureInitialized();
     try {
       final token = await getToken();
@@ -121,7 +123,10 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200) {
-        return response.data?.map((apiNovel) => apiNovel.toLocalModel()).toList() ?? [];
+        return response.data
+                ?.map((apiNovel) => apiNovel.toLocalModel())
+                .toList() ??
+            [];
       } else {
         throw Exception('搜索失败: ${response.statusCode}');
       }
@@ -199,7 +204,8 @@ class ApiServiceWrapper {
   Exception _handleError(dynamic error) {
     if (error is DioException) {
       if (error.response != null) {
-        return Exception('API 错误: ${error.response?.statusCode} - ${error.response?.data}');
+        return Exception(
+            'API 错误: ${error.response?.statusCode} - ${error.response?.data}');
       } else {
         return Exception('网络错误: ${error.message}');
       }
@@ -225,14 +231,7 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        Map<String, dynamic> data;
-
-        if (response.data is Map<String, dynamic>) {
-          data = response.data as Map<String, dynamic>;
-        } else {
-          data = Map<String, dynamic>.from(response.data);
-        }
-
+        final data = response.data as Map<String, dynamic>;
         return CacheTask.fromJson(data);
       } else {
         throw Exception('创建缓存任务失败：${response.statusCode}');
@@ -253,28 +252,13 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        // 处理 Built Value 的 MapJsonObject 类型
-        Map<String, dynamic> data;
-
-        if (response.data is Map<String, dynamic>) {
-          data = response.data as Map<String, dynamic>;
-        } else {
-          // 如果是 MapJsonObject 或其他类型，转换为标准 Map
-          data = Map<String, dynamic>.from(response.data);
-        }
-
+        // JsonObject 实现了 Map<String, dynamic> 接口，可以直接使用
+        final data = response.data as Map<String, dynamic>;
         final tasksList = data['tasks'] as List<dynamic>? ?? [];
 
         return tasksList.map((taskData) {
-          // 确保每个任务数据也是标准的 Map<String, dynamic>
-          Map<String, dynamic> taskMap;
-
-          if (taskData is Map<String, dynamic>) {
-            taskMap = taskData;
-          } else {
-            taskMap = Map<String, dynamic>.from(taskData);
-          }
-
+          // 每个任务项也应该是 JsonObject，实现了 Map<String, dynamic>
+          final taskMap = taskData as Map<String, dynamic>;
           return CacheTask.fromJson(taskMap);
         }).toList();
       }
@@ -296,8 +280,8 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data;
-        return CacheTaskUpdate.fromJson(data as Map<String, dynamic>);
+        final data = response.data as Map<String, dynamic>;
+        return CacheTaskUpdate.fromJson(data);
       } else {
         throw Exception('获取缓存状态失败：${response.statusCode}');
       }
@@ -323,7 +307,8 @@ class ApiServiceWrapper {
   }
 
   /// 下载已缓存小说
-  Future<String> downloadCachedNovel(int taskId, {String format = 'json'}) async {
+  Future<String> downloadCachedNovel(int taskId,
+      {String format = 'json'}) async {
     _ensureInitialized();
     try {
       final token = await getToken();
@@ -334,4 +319,12 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200) {
-        return respo
+        return response.toString();
+      } else {
+        throw Exception('下载缓存失败：${response.statusCode}');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+}

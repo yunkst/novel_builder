@@ -54,7 +54,8 @@ class ToastUtils {
   }
 
   /// 显示搜索状态提示
-  static void showSearchStatus(BuildContext context, String message, {bool isError = false}) {
+  static void showSearchStatus(BuildContext context, String message,
+      {bool isError = false}) {
     if (isError) {
       showError(context, message);
     } else {
@@ -71,15 +72,16 @@ class ToastUtils {
   }
 
   /// 显示爬虫失败提示
-  static void showCrawlerError(BuildContext context, String siteName, {String? reason}) {
-    final message = reason != null 
-        ? '$siteName 搜索失败: $reason'
-        : '$siteName 搜索失败，正在尝试其他站点';
+  static void showCrawlerError(BuildContext context, String siteName,
+      {String? reason}) {
+    final message =
+        reason != null ? '$siteName 搜索失败: $reason' : '$siteName 搜索失败，正在尝试其他站点';
     showWarning(context, message);
   }
 
   /// 显示搜索结果提示
-  static void showSearchResult(BuildContext context, int totalResults, int failedSites) {
+  static void showSearchResult(
+      BuildContext context, int totalResults, int failedSites) {
     if (totalResults == 0) {
       showWarning(context, '未找到相关小说，请尝试其他关键词');
     } else if (failedSites > 0) {

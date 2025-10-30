@@ -117,7 +117,8 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       // 构建搜索信息
       String searchInfo = '正在搜索 "$keyword"';
-      if (_selectedSites.isNotEmpty && _selectedSites.length < _sourceSites.length) {
+      if (_selectedSites.isNotEmpty &&
+          _selectedSites.length < _sourceSites.length) {
         // 获取选中站点的显示名称
         final selectedSiteNames = _sourceSites
             .where((site) => _selectedSites.contains(site['id'] as String))
@@ -151,7 +152,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ToastUtils.showInfo(context, '未找到相关小说，请尝试其他关键词或调整源站筛选');
         }
       }
-
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -176,7 +176,9 @@ class _SearchScreenState extends State<SearchScreen> {
             IconButton(
               icon: Icon(
                 _showSiteFilter ? Icons.filter_list_off : Icons.filter_list,
-                color: _selectedSites.length < _sourceSites.length ? Colors.blue : null,
+                color: _selectedSites.length < _sourceSites.length
+                    ? Colors.blue
+                    : null,
               ),
               tooltip: '源站筛选',
               onPressed: () {
@@ -213,7 +215,8 @@ class _SearchScreenState extends State<SearchScreen> {
       body: Column(
         children: [
           // 源站过滤面板
-          if (_showSiteFilter && _sourceSites.isNotEmpty) _buildSiteFilterPanel(),
+          if (_showSiteFilter && _sourceSites.isNotEmpty)
+            _buildSiteFilterPanel(),
 
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -226,7 +229,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       hintText: '请输入小说名称或作者',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.search),
-                      suffixText: _selectedSites.isNotEmpty && _selectedSites.length < _sourceSites.length
+                      suffixText: _selectedSites.isNotEmpty &&
+                              _selectedSites.length < _sourceSites.length
                           ? '${_selectedSites.length}个源站'
                           : null,
                       suffixStyle: TextStyle(
@@ -276,13 +280,15 @@ class _SearchScreenState extends State<SearchScreen> {
                         novel.title,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('作者: ${novel.author} · 来源: ${Uri.tryParse(novel.url)?.host ?? '未知站点'}'),
+                      subtitle: Text(
+                          '作者: ${novel.author} · 来源: ${Uri.tryParse(novel.url)?.host ?? '未知站点'}'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ChapterListScreen(novel: novel),
+                            builder: (context) =>
+                                ChapterListScreen(novel: novel),
                           ),
                         );
                       },
@@ -355,7 +361,8 @@ class _SearchScreenState extends State<SearchScreen> {
             children: _sourceSites.map((site) {
               final siteId = site['id'] as String;
               final siteName = site['name'] as String;
-              final siteDescription = site['description'] as String? ?? siteName;
+              final siteDescription =
+                  site['description'] as String? ?? siteName;
               final isSelected = _selectedSites.contains(siteId);
 
               return FilterChip(
@@ -373,7 +380,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 tooltip: siteDescription,
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                checkmarkColor:
+                    Theme.of(context).colorScheme.onPrimaryContainer,
               );
             }).toList(),
           ),
