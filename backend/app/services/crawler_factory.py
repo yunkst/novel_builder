@@ -43,7 +43,7 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
     """
     enabled = os.getenv("NOVEL_ENABLED_SITES", "").lower()
     crawlers: dict[str, BaseCrawler] = {}
-    if not enabled or "alice" in enabled:
+    if not enabled or "alice" in enabled or "alice_sw" in enabled:
         crawlers["alice_sw"] = AliceSWCrawler()
     if not enabled or "shukuge" in enabled:
         crawlers["shukuge"] = ShukugeCrawler()

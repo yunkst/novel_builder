@@ -5,7 +5,8 @@
       "Bash(dart run:*)",
       "Bash(flutter pub:*)",
       "Bash(flutter analyze)",
-      "Bash(flutter analyze --no-fatal-infos)"
+      "Bash(flutter analyze --no-fatal-infos)",
+      "Read(//d/myspace/novel_builder/backend/**)"
     ],
     "deny": [],
     "ask": []
