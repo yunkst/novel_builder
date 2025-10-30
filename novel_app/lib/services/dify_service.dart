@@ -14,7 +14,10 @@ class DifyService {
     final difyUrl = prefs.getString('dify_url');
     final difyToken = prefs.getString('dify_token');
 
-    if (difyUrl == null || difyUrl.isEmpty || difyToken == null || difyToken.isEmpty) {
+    if (difyUrl == null ||
+        difyUrl.isEmpty ||
+        difyToken == null ||
+        difyToken.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL 和 Token');
     }
 
@@ -60,7 +63,8 @@ class DifyService {
       }
       return 'No valid output from workflow.';
     } else {
-      throw Exception('Dify API 请求失败: ${response.statusCode}\n${response.body}');
+      throw Exception(
+          'Dify API 请求失败: ${response.statusCode}\n${response.body}');
     }
   }
 
@@ -72,14 +76,17 @@ class DifyService {
     required List<String> historyChaptersContent,
     String backgroundSetting = '',
     required Function(String chunk) onChunk,
-    Function()? onComplete,  // 新增完成回调
+    Function()? onComplete, // 新增完成回调
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final difyUrl = prefs.getString('dify_url');
     final difyToken = prefs.getString('dify_token');
     final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
 
-    if (difyUrl == null || difyUrl.isEmpty || difyToken == null || difyToken.isEmpty) {
+    if (difyUrl == null ||
+        difyUrl.isEmpty ||
+        difyToken == null ||
+        difyToken.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL 和 Token');
     }
 
@@ -175,11 +182,14 @@ class DifyService {
 
       try {
         final errorData = jsonDecode(errorBody);
-        final errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
+        final errorMessage =
+            errorData['message'] ?? errorData['error'] ?? '未知错误';
         final errorCode = errorData['code'] ?? '';
-        throw Exception('Dify API 请求失败 (${streamedResponse.statusCode})\n错误码: $errorCode\n错误信息: $errorMessage');
+        throw Exception(
+            'Dify API 请求失败 (${streamedResponse.statusCode})\n错误码: $errorCode\n错误信息: $errorMessage');
       } catch (e) {
-        throw Exception('Dify API 流式请求失败 (${streamedResponse.statusCode}): $errorBody');
+        throw Exception(
+            'Dify API 流式请求失败 (${streamedResponse.statusCode}): $errorBody');
       }
     }
   }
@@ -195,7 +205,10 @@ class DifyService {
     final difyUrl = prefs.getString('dify_url');
     final difyToken = prefs.getString('dify_token');
 
-    if (difyUrl == null || difyUrl.isEmpty || difyToken == null || difyToken.isEmpty) {
+    if (difyUrl == null ||
+        difyUrl.isEmpty ||
+        difyToken == null ||
+        difyToken.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL 和 Token');
     }
 
@@ -229,7 +242,8 @@ class DifyService {
       if (streamedResponse.statusCode == 200) {
         bool doneCalled = false;
 
-        await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        await for (var chunk
+            in streamedResponse.stream.transform(utf8.decoder)) {
           debugPrint('收到流式数据块: $chunk');
 
           // 解析 SSE 格式的数据
@@ -284,16 +298,19 @@ class DifyService {
 
         try {
           final errorData = jsonDecode(errorBody);
-          final errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
+          final errorMessage =
+              errorData['message'] ?? errorData['error'] ?? '未知错误';
           final errorCode = errorData['code'] ?? '';
-          final fullError = 'Dify API 请求失败 (${streamedResponse.statusCode})\n错误码: $errorCode\n错误信息: $errorMessage';
+          final fullError =
+              'Dify API 请求失败 (${streamedResponse.statusCode})\n错误码: $errorCode\n错误信息: $errorMessage';
           if (onError != null) {
             onError(fullError);
           } else {
             throw Exception(fullError);
           }
         } catch (e) {
-          final fullError = 'Dify API 流式请求失败 (${streamedResponse.statusCode}): $errorBody';
+          final fullError =
+              'Dify API 流式请求失败 (${streamedResponse.statusCode}): $errorBody';
           if (onError != null) {
             onError(fullError);
           } else {

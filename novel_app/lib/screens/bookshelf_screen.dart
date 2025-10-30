@@ -234,7 +234,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
   // 显示背景设定编辑对话框
   Future<void> _showBackgroundSettingDialog(Novel novel) async {
-    final controller = TextEditingController(text: novel.backgroundSetting ?? '');
+    final controller =
+        TextEditingController(text: novel.backgroundSetting ?? '');
 
     final result = await showDialog<Map<String, String>>(
       context: context,
@@ -284,7 +285,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
-          if (novel.backgroundSetting != null && novel.backgroundSetting!.isNotEmpty)
+          if (novel.backgroundSetting != null &&
+              novel.backgroundSetting!.isNotEmpty)
             TextButton(
               onPressed: () {
                 controller.clear();
@@ -306,7 +308,11 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     );
 
     if (result != null) {
-      await _databaseService.updateBackgroundSetting(novel.url, result['backgroundSetting']!.isEmpty ? null : result['backgroundSetting']);
+      await _databaseService.updateBackgroundSetting(
+          novel.url,
+          result['backgroundSetting']!.isEmpty
+              ? null
+              : result['backgroundSetting']);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -373,16 +379,20 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                     itemBuilder: (context, index) {
                       final novel = _bookshelf[index];
                       final stats = _progress[novel.url];
-                      final cached = stats != null ? (stats['cachedChapters'] ?? 0) : 0;
-                      final total = stats != null ? (stats['totalChapters'] ?? 0) : 0;
-                      final double percent = (total > 0) ? (cached / total).clamp(0.0, 1.0) : 0.0;
+                      final cached =
+                          stats != null ? (stats['cachedChapters'] ?? 0) : 0;
+                      final total =
+                          stats != null ? (stats['totalChapters'] ?? 0) : 0;
+                      final double percent =
+                          (total > 0) ? (cached / total).clamp(0.0, 1.0) : 0.0;
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 4,
                         ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           leading: Container(
                             width: 50,
                             height: 70,
@@ -420,11 +430,15 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                   ),
                                   if (novel.url.startsWith('custom://')) ...[
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.purple.withValues(alpha: 0.1),
+                                        color: Colors.purple
+                                            .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                                        border: Border.all(
+                                            color: Colors.purple
+                                                .withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
                                         '原创',
@@ -437,9 +451,11 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                   ],
-                                  if (novel.backgroundSetting != null && novel.backgroundSetting!.isNotEmpty) ...[
+                                  if (novel.backgroundSetting != null &&
+                                      novel.backgroundSetting!.isNotEmpty) ...[
                                     const SizedBox(width: 8),
-                                    Icon(Icons.edit_note, size: 16, color: Colors.blue),
+                                    Icon(Icons.edit_note,
+                                        size: 16, color: Colors.blue),
                                   ],
                                 ],
                               ),

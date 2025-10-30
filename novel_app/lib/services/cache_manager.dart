@@ -93,7 +93,8 @@ class CacheManager {
     if (!_appActive) return;
 
     debugPrint('CacheManager: 开始同步服务端任务状态');
-    _serverTaskPollTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _serverTaskPollTimer =
+        Timer.periodic(const Duration(seconds: 10), (timer) async {
       await _pollServerTasks();
     });
   }
@@ -115,7 +116,8 @@ class CacheManager {
         final cachedTask = _serverTasks[task.id];
 
         // 只处理运行中的任务，避免不必要的网络请求
-        if (task.isRunning && (cachedTask == null || cachedTask.status != task.status)) {
+        if (task.isRunning &&
+            (cachedTask == null || cachedTask.status != task.status)) {
           // 推送进度更新
           _progressController.add(CacheProgressUpdate(
             novelUrl: task.novelUrl,
@@ -123,7 +125,8 @@ class CacheManager {
             totalChapters: task.totalChapters,
           ));
 
-          debugPrint('CacheManager: 任务 ${task.id} 状态更新: ${task.status} (${task.cachedChapters}/${task.totalChapters})');
+          debugPrint(
+              'CacheManager: 任务 ${task.id} 状态更新: ${task.status} (${task.cachedChapters}/${task.totalChapters})');
         }
 
         _serverTasks[task.id] = task;
@@ -246,11 +249,14 @@ class CacheManager {
 
       try {
         final content = await _api.getChapterContent(chapter.url);
-        await _db.cacheChapter(novelUrl, Chapter(
-          title: chapter.title,
-          url: chapter.url,
-          chapterIndex: chapter.chapterIndex,
-        ), content);
+        await _db.cacheChapter(
+            novelUrl,
+            Chapter(
+              title: chapter.title,
+              url: chapter.url,
+              chapterIndex: chapter.chapterIndex,
+            ),
+            content);
         cachedCount += 1;
         _progressController.add(CacheProgressUpdate(
           novelUrl: novelUrl,
