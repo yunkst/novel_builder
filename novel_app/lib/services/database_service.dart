@@ -266,6 +266,16 @@ class DatabaseService {
     );
   }
 
+  /// 删除章节缓存
+  Future<int> deleteChapterCache(String chapterUrl) async {
+    final db = await database;
+    return await db.delete(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+  }
+
   /// 获取缓存的章节内容
   Future<String?> getCachedChapter(String chapterUrl) async {
     final db = await database;

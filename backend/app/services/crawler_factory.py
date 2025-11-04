@@ -2,10 +2,23 @@
 
 import os
 
-from .alice_sw_crawler import AliceSWCrawler
+# 导入重构版爬虫
+from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
+from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
+from .xspsw_crawler_refactored import XspswCrawlerRefactored
+from .wdscw_crawler_refactored import WdscwCrawlerRefactored
 from .base_crawler import BaseCrawler
-from .shukuge_crawler import ShukugeCrawler
-from .xspsw_crawler import XspswCrawler
+
+# 为了向后兼容，保留原有导入
+try:
+    from .alice_sw_crawler import AliceSWCrawler
+    from .shukuge_crawler import ShukugeCrawler
+    from .xspsw_crawler import XspswCrawler
+except ImportError:
+    # 如果原版不存在，使用重构版作为别名
+    AliceSWCrawler = AliceSWCrawlerRefactored
+    ShukugeCrawler = ShukugeCrawlerRefactored
+    XspswCrawler = XspswCrawlerRefactored
 
 # 源站元数据配置
 SOURCE_SITES_METADATA = {
@@ -14,21 +27,28 @@ SOURCE_SITES_METADATA = {
         "base_url": "https://www.alicesw.com",
         "description": "专业的轻小说网站，包含大量日系轻小说",
         "search_enabled": True,
-        "crawler_class": AliceSWCrawler
+        "crawler_class": AliceSWCrawlerRefactored  # 使用重构版
     },
     "shukuge": {
         "name": "书库",
         "base_url": "http://www.shukuge.com",
         "description": "综合性小说书库，资源丰富",
         "search_enabled": True,
-        "crawler_class": ShukugeCrawler
+        "crawler_class": ShukugeCrawlerRefactored  # 使用重构版
     },
     "xspsw": {
         "name": "小说网",
         "base_url": "https://m.xspsw.com",
         "description": "移动端优化的小说网站",
         "search_enabled": True,
-        "crawler_class": XspswCrawler
+        "crawler_class": XspswCrawlerRefactored  # 使用重构版
+    },
+    "wdscw": {
+        "name": "我的书城",
+        "base_url": "https://www.5dscw.com",
+        "description": "精品小说免费阅读网站，包含玄幻、奇幻、武侠等多种类型小说",
+        "search_enabled": True,
+        "crawler_class": WdscwCrawlerRefactored  # 使用重构版
     }
 }
 
@@ -36,7 +56,7 @@ SOURCE_SITES_METADATA = {
 def get_enabled_crawlers() -> dict[str, BaseCrawler]:
     """
     根据环境变量 NOVEL_ENABLED_SITES 启用站点；未设置时默认全部启用。
-    示例：NOVEL_ENABLED_SITES="alice,shukuge,xspsw"
+    示例：NOVEL_ENABLED_SITES="alice,shukuge,xspsw,wdscw"
 
     Returns:
         Dict mapping site names to crawler instances
@@ -49,17 +69,21 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
         crawlers["shukuge"] = ShukugeCrawler()
     if not enabled or "xspsw" in enabled:
         crawlers["xspsw"] = XspswCrawler()
+    if not enabled or "5dscw" in enabled or "wdscw" in enabled:
+        crawlers["wdscw"] = WdscwCrawlerRefactored()
     return crawlers
 
 
 def get_crawler_for_url(url: str) -> BaseCrawler | None:
     """根据 URL 判断使用哪个爬虫。"""
     if "alicesw.com" in url:
-        return AliceSWCrawler()
+        return AliceSWCrawlerRefactored()
     if "shukuge.com" in url:
-        return ShukugeCrawler()
+        return ShukugeCrawlerRefactored()
     if "m.xspsw.com" in url:
-        return XspswCrawler()
+        return XspswCrawlerRefactored()
+    if "5dscw.com" in url:
+        return WdscwCrawlerRefactored()
     # 兜底：尝试匹配 base_url
     for crawler in get_enabled_crawlers().values():
         if hasattr(crawler, "base_url") and crawler.base_url in url:

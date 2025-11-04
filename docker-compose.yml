@@ -14,6 +14,10 @@ services:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
       - DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
+      # 代理配置 - 使用宿主机代理
+      - HTTP_PROXY=http://host.docker.internal:7897
+      - HTTPS_PROXY=http://host.docker.internal:7897
+      - NO_PROXY=localhost,127.0.0.1,postgres
     depends_on:
       postgres:
         condition: service_healthy

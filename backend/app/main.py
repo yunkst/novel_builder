@@ -97,11 +97,11 @@ async def search(
 @app.get(
     "/chapters", response_model=list[Chapter], dependencies=[Depends(verify_token)]
 )
-def chapters(url: str = Query(..., description="小说详情页或阅读页URL")) -> list[dict[str, Any]]:
+async def chapters(url: str = Query(..., description="小说详情页或阅读页URL")) -> list[dict[str, Any]]:
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
-    chapters = crawler.get_chapter_list(url)
+    chapters = await crawler.get_chapter_list(url)
     return chapters
 
 
@@ -110,7 +110,7 @@ def chapters(url: str = Query(..., description="小说详情页或阅读页URL")
     response_model=ChapterContent,
     dependencies=[Depends(verify_token)],
 )
-def chapter_content(
+async def chapter_content(
     url: str = Query(..., description="章节URL"),
     force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
     db: Session = Depends(get_db),
@@ -132,18 +132,23 @@ def chapter_content(
         )
 
         if cached_chapter:
-            return {
-                "title": cached_chapter.chapter_title,
-                "content": cached_chapter.chapter_content,
-                "from_cache": True,
-            }
+            # 检查缓存内容的字数，如果小于300则认为缓存无效，需要重新获取
+            if cached_chapter.word_count < 300:
+                # 缓存字数不足，标记为需要重新获取
+                pass  # 继续执行下面的源站获取逻辑
+            else:
+                return {
+                    "title": cached_chapter.chapter_title,
+                    "content": cached_chapter.chapter_content,
+                    "from_cache": True,
+                }
 
     # 2. 从源站获取内容
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
 
-    content_data = crawler.get_chapter_content(url)
+    content_data = await crawler.get_chapter_content(url)
 
     # 3. 保存到缓存（不阻塞响应）
     if content_data and content_data.get("content"):
@@ -406,7 +411,7 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
         title: 章节标题
         content: 章节内容
     """
-    if not content or len(content) < 100:  # 跳过过短的内容
+    if not content or len(content) < 300:  # 跳过过短的内容，字数小于300的缓存无效
         return
 
     try:
