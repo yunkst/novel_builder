@@ -10,11 +10,11 @@ import re
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
-from .enhanced_base_crawler import EnhancedBaseCrawler
+from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
 
 
-class WdscwCrawlerRefactored(EnhancedBaseCrawler):
+class WdscwCrawlerRefactored(BaseCrawler):
     """重构版5dscw小说网站爬虫"""
 
     def __init__(self):

@@ -2,23 +2,18 @@
 
 import os
 
-# 导入重构版爬虫
+# 导入爬虫
 from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
 from .xspsw_crawler_refactored import XspswCrawlerRefactored
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
 from .base_crawler import BaseCrawler
 
-# 为了向后兼容，保留原有导入
-try:
-    from .alice_sw_crawler import AliceSWCrawler
-    from .shukuge_crawler import ShukugeCrawler
-    from .xspsw_crawler import XspswCrawler
-except ImportError:
-    # 如果原版不存在，使用重构版作为别名
-    AliceSWCrawler = AliceSWCrawlerRefactored
-    ShukugeCrawler = ShukugeCrawlerRefactored
-    XspswCrawler = XspswCrawlerRefactored
+# 为了向后兼容，创建别名
+AliceSWCrawler = AliceSWCrawlerRefactored
+ShukugeCrawler = ShukugeCrawlerRefactored
+XspswCrawler = XspswCrawlerRefactored
+WdscwCrawler = WdscwCrawlerRefactored
 
 # 源站元数据配置
 SOURCE_SITES_METADATA = {
@@ -70,7 +65,7 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
     if not enabled or "xspsw" in enabled:
         crawlers["xspsw"] = XspswCrawler()
     if not enabled or "5dscw" in enabled or "wdscw" in enabled:
-        crawlers["wdscw"] = WdscwCrawlerRefactored()
+        crawlers["wdscw"] = WdscwCrawler()
     return crawlers
 
 

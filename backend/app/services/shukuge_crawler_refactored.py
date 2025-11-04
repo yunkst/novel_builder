@@ -9,11 +9,11 @@ import re
 import urllib.parse
 from typing import Any, Dict, List
 
-from .enhanced_base_crawler import EnhancedBaseCrawler
+from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
 
 
-class ShukugeCrawlerRefactored(EnhancedBaseCrawler):
+class ShukugeCrawlerRefactored(BaseCrawler):
     """重构版书库爬虫"""
 
     def __init__(self):

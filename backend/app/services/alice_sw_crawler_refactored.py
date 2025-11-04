@@ -10,11 +10,11 @@ import re
 import urllib.parse
 from typing import Any, Dict, List
 
-from .enhanced_base_crawler import EnhancedBaseCrawler
+from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
 
 
-class AliceSWCrawlerRefactored(EnhancedBaseCrawler):
+class AliceSWCrawlerRefactored(BaseCrawler):
     """重构版轻小说文库爬虫"""
 
     def __init__(self):
