@@ -84,10 +84,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Install Playwright browsers and system dependencies as root
-RUN python -m playwright install chromium
-RUN python -m playwright install-deps chromium
-
 # Copy application code
 COPY ./app ./app
 
@@ -95,10 +91,14 @@ COPY ./app ./app
 COPY ./alembic.ini ./
 COPY ./alembic ./alembic
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
-USER app
+# Install Playwright browsers and system dependencies
+RUN python -m playwright install chromium
+RUN python -m playwright install-deps chromium
+
+# Create non-root user for security (optional for development)
+# RUN useradd --create-home --shell /bin/bash app \
+#     && chown -R app:app /app
+# USER app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

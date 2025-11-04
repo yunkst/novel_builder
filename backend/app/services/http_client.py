@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import os
 import random
 import time
 from abc import ABC, abstractmethod
@@ -36,6 +37,12 @@ class RequestConfig:
     proxy: Optional[str] = None
     use_session: bool = True
     respect_robots_txt: bool = False
+    # SSL配置
+    verify_ssl: bool = True
+    # 自定义浏览器参数（Playwright使用）
+    browser_args: Optional[List[str]] = None
+    # 自定义请求头
+    custom_headers: Optional[Dict[str, str]] = None
 
 
 @dataclass
@@ -88,17 +95,48 @@ class RequestsClient(IHttpClient):
         self.session = requests.Session()
         self._cache: Dict[str, Response] = {}
         self._setup_default_headers()
+        self._setup_ssl_context()
+        self._setup_proxy_from_env()
 
     def _setup_default_headers(self):
         """设置默认请求头"""
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0"
         })
+
+    def _setup_ssl_context(self):
+        """设置SSL上下文"""
+        import ssl
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        # 创建SSL上下文
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # 设置适配器
+        adapter = HTTPAdapter(
+            max_retries=Retry(
+                total=5,
+                backoff_factor=0.5,
+                status_forcelist=[500, 502, 503, 504],
+                allowed_methods=["GET", "POST"]
+            )
+        )
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
 
     async def get(self, url: str, config: Optional[RequestConfig] = None) -> Response:
         """发送GET请求"""
@@ -128,6 +166,21 @@ class RequestsClient(IHttpClient):
         """执行HTTP请求"""
         loop = asyncio.get_event_loop()
 
+        # 准备请求头
+        headers = {}
+        if config.custom_headers:
+            headers.update(config.custom_headers)
+        if config.headers:
+            headers.update(config.headers)
+
+        # 准备请求参数
+        request_kwargs = {
+            "timeout": config.timeout,
+            "headers": headers,
+            "proxies": self._get_proxies(config.proxy),
+            "verify": config.verify_ssl
+        }
+
         for attempt in range(config.max_retries):
             try:
                 if attempt > 0:
@@ -138,15 +191,12 @@ class RequestsClient(IHttpClient):
 
                 if method == "GET":
                     r = await loop.run_in_executor(
-                        None,
-                        lambda: self.session.get(url, timeout=config.timeout,
-                                              headers=config.headers, proxies=self._get_proxies(config.proxy))
+                        None, lambda: self.session.get(url, **request_kwargs)
                     )
                 else:  # POST
+                    request_kwargs["data"] = data
                     r = await loop.run_in_executor(
-                        None,
-                        lambda: self.session.post(url, data=data, timeout=config.timeout,
-                                                headers=config.headers, proxies=self._get_proxies(config.proxy))
+                        None, lambda: self.session.post(url, **request_kwargs)
                     )
 
                 elapsed = time.time() - start_time
@@ -203,6 +253,26 @@ class RequestsClient(IHttpClient):
             }
         return None
 
+    def _setup_proxy_from_env(self):
+        """从环境变量设置代理"""
+        # 获取环境变量中的代理配置
+        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+        no_proxy = os.environ.get('NO_PROXY') or os.environ.get('no_proxy')
+
+        if http_proxy or https_proxy:
+            proxies = {}
+            if http_proxy:
+                proxies['http'] = http_proxy
+            if https_proxy:
+                proxies['https'] = https_proxy
+
+            # 设置session的代理
+            self.session.proxies.update(proxies)
+            print(f"✅ 已配置代理: {proxies}")
+        else:
+            print("ℹ️  未检测到代理环境变量，使用直连")
+
     def set_cookies(self, cookies: Dict[str, str]) -> None:
         """设置Cookie"""
         self.session.cookies.update(cookies)
@@ -221,17 +291,44 @@ class PlaywrightClient(IHttpClient):
         self.page = None
         self._cache: Dict[str, Response] = {}
 
-    async def _ensure_browser(self):
+    async def _ensure_browser(self, config: Optional[RequestConfig] = None):
         """确保浏览器已初始化"""
         if self.browser is None:
             try:
                 from playwright.async_api import async_playwright
                 playwright = await async_playwright().start()
-                self.browser = await playwright.chromium.launch(headless=True)
-                self.context = await self.browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+                # 默认浏览器参数
+                default_args = [
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+
+                # 合并自定义参数
+                browser_args = default_args
+                if config and config.browser_args:
+                    browser_args = default_args + config.browser_args
+
+                self.browser = await playwright.chromium.launch(
+                    headless=True,
+                    args=browser_args
                 )
+
+                # 设置上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+
+                # 添加自定义请求头
+                if config and config.custom_headers:
+                    context_options["extra_http_headers"] = config.custom_headers
+
+                self.context = await self.browser.new_context(**context_options)
                 self.page = await self.context.new_page()
+
             except ImportError:
                 raise Exception("Playwright未安装，请安装: pip install playwright")
             except Exception as e:
@@ -247,7 +344,7 @@ class PlaywrightClient(IHttpClient):
             cached_response.from_cache = True
             return cached_response
 
-        await self._ensure_browser()
+        await self._ensure_browser(config)
 
         try:
             start_time = time.time()
@@ -411,6 +508,8 @@ class HybridHttpClient(IHttpClient):
     async def close(self):
         """关闭资源"""
         await self.playwright_client.close()
+
+
 
 
 # 全局客户端实例

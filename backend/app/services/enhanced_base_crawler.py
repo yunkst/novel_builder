@@ -47,22 +47,24 @@ class EnhancedBaseCrawler(ABC):
     # ==================== 通用工具方法 ====================
 
     async def get_page(self, url: str, timeout: int = 10,
-                      max_retries: int = 3) -> Response:
+                      max_retries: int = 3, **kwargs) -> Response:
         """获取页面内容的通用方法"""
         config = RequestConfig(
             timeout=timeout,
             max_retries=max_retries,
-            strategy=self.strategy
+            strategy=self.strategy,
+            **kwargs
         )
         return await http_get(url, config)
 
     async def post_form(self, url: str, data: Dict[str, str],
-                       timeout: int = 10, max_retries: int = 3) -> Response:
+                       timeout: int = 10, max_retries: int = 3, **kwargs) -> Response:
         """提交表单的通用方法"""
         config = RequestConfig(
             timeout=timeout,
             max_retries=max_retries,
-            strategy=self.strategy
+            strategy=self.strategy,
+            **kwargs
         )
         return await http_post(url, data, config)
 
