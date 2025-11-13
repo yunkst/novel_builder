@@ -31,9 +31,9 @@ class SearchService:
 
         for site_name, crawler in target_crawlers.items():
             try:
-                # Check if crawler has search method
-                if hasattr(crawler, "search") and callable(crawler.search):
-                    items = await crawler.search(keyword)
+                # Check if crawler has search method (uses search_novels as per BaseCrawler spec)
+                if hasattr(crawler, "search_novels") and callable(crawler.search_novels):
+                    items = await crawler.search_novels(keyword)
                     if items:
                         results.extend(items)
             except Exception as e:

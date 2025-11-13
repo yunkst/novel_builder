@@ -629,8 +629,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         _errorMessage = '';
       });
 
-      // 强制从网络获取内容
-      final content = await _apiService.getChapterContent(_currentChapter.url);
+      // 强制从网络获取内容（使用forceRefresh参数绕过后端缓存）
+      final content = await _apiService.getChapterContent(_currentChapter.url, forceRefresh: true);
 
       // 验证内容有效性
       if (content.isNotEmpty && content.length > 50) {
@@ -905,26 +905,39 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
           debugPrint('🔥 onChunk 回调收到: "$chunk"');
           debugPrint('📝 当前result长度: ${_rewriteResultNotifier.value.length}');
 
-          // 立即更新内容
-          final currentContent = _rewriteResultNotifier.value;
-          final newContent = currentContent + chunk;
+          // 检查是否是完整内容的特殊标记
+          final bool isCompleteContent = chunk.startsWith('<<COMPLETE_CONTENT>>');
 
-          debugPrint('✅ 准备更新内容: "${newContent.substring(0, newContent.length > 50 ? 50 : newContent.length)}..."');
+          if (isCompleteContent) {
+            debugPrint('🎯 检测到完整内容标记，直接替换');
+            // 提取实际内容（移除特殊标记）
+            final completeContent = chunk.substring('<<COMPLETE_CONTENT>>'.length);
 
-          // 在主线程上立即更新ValueNotifier
-          if (mounted) {
-            _rewriteResultNotifier.value = newContent;
+            if (mounted) {
+              _rewriteResultNotifier.value = completeContent;
+              debugPrint('✅ 完整内容替换完成，长度: ${completeContent.length}');
+            }
+          } else {
+            // 流式模式：追加内容
+            final currentContent = _rewriteResultNotifier.value;
+            final newContent = currentContent + chunk;
 
-            debugPrint('✅ 更新后result长度: ${_rewriteResultNotifier.value.length}');
+            debugPrint('📝 流式追加内容，新长度: ${newContent.length}');
 
-            // 使用scheduleMicrotask确保在下一帧前更新UI
-            scheduleMicrotask(() {
-              if (mounted) {
-                setState(() {});
-                debugPrint('🔄 microtask UI更新完成');
-              }
-            });
+            // 在主线程上立即更新ValueNotifier
+            if (mounted) {
+              _rewriteResultNotifier.value = newContent;
+              debugPrint('✅ 更新后result长度: ${_rewriteResultNotifier.value.length}');
+            }
           }
+
+          // 使用scheduleMicrotask确保在下一帧前更新UI
+          scheduleMicrotask(() {
+            if (mounted) {
+              setState(() {});
+              debugPrint('🔄 microtask UI更新完成');
+            }
+          });
         },
         onComplete: () {
           debugPrint('✅ onComplete 回调被调用');
@@ -2023,91 +2036,104 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                     ],
                   ),
                 )
-              : Column(
+              : Stack(
                   children: [
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: paragraphs.length,
-                        itemBuilder: (context, index) {
-                          final paragraph = paragraphs[index];
-                          final isSelected =
-                              _selectedParagraphIndices.contains(index);
+                    // 主要内容区域
+                    ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16.0),
+                      itemCount: paragraphs.length + 1, // +1 为了添加底部空白
+                      itemBuilder: (context, index) {
+                        // 最后一个位置添加空白
+                        if (index == paragraphs.length) {
+                          return SizedBox(
+                            height: 160, // 底部留白高度，避免被按钮遮挡
+                            child: Container(), // 空容器只占位
+                          );
+                        }
 
-                          return InkWell(
-                            onTap: _isCloseupMode
-                                ? () => _handleParagraphTap(index)
-                                : null,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 6.0, horizontal: 8.0),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.blue.withValues(alpha: 0.2)
-                                    : null,
-                                border: isSelected
-                                    ? Border.all(color: Colors.blue, width: 2)
-                                    : _isCloseupMode
-                                        ? Border.all(
-                                            color: Colors.blue
-                                                .withValues(alpha: 0.3),
-                                            width: 1)
-                                        : null,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                paragraph.trim(),
-                                style: TextStyle(
-                                  fontSize: _fontSize,
-                                  height: 1.8,
-                                  letterSpacing: 0.5,
-                                ),
+                        final paragraph = paragraphs[index];
+                        final isSelected =
+                            _selectedParagraphIndices.contains(index);
+
+                        return InkWell(
+                          onTap: _isCloseupMode
+                              ? () => _handleParagraphTap(index)
+                              : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6.0, horizontal: 8.0),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.blue.withValues(alpha: 0.2)
+                                  : null,
+                              border: isSelected
+                                  ? Border.all(color: Colors.blue, width: 2)
+                                  : _isCloseupMode
+                                      ? Border.all(
+                                          color: Colors.blue
+                                              .withValues(alpha: 0.3),
+                                          width: 1)
+                                      : null,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              paragraph.trim(),
+                              style: TextStyle(
+                                fontSize: _fontSize,
+                                height: 1.8,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed:
-                                    hasPrevious ? _goToPreviousChapter : null,
-                                icon: const Icon(Icons.arrow_back),
-                                label: const Text('上一章'),
-                              ),
-                              Text(
-                                '${currentIndex + 1}/${widget.chapters.length}',
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: hasNext ? _goToNextChapter : null,
-                                icon: const Icon(Icons.arrow_forward),
-                                label: const Text('下一章'),
-                                style: ElevatedButton.styleFrom(
-                                  iconAlignment: IconAlignment.end,
+                    // 固定在底部的章节切换按钮
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, -2),
+                            ),
+                          ],
+                        ),
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 8.0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed:
+                                      hasPrevious ? _goToPreviousChapter : null,
+                                  icon: const Icon(Icons.arrow_back),
+                                  label: const Text('上一章'),
                                 ),
-                              ),
-                            ],
+                                Text(
+                                  '${currentIndex + 1}/${widget.chapters.length}',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: hasNext ? _goToNextChapter : null,
+                                  icon: const Icon(Icons.arrow_forward),
+                                  label: const Text('下一章'),
+                                  style: ElevatedButton.styleFrom(
+                                    iconAlignment: IconAlignment.end,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2138,39 +2164,15 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       );
     }
 
-    // 正常阅读模式下，显示快速访问工具栏
+    // 正常阅读模式下，只显示特写模式切换按钮
     return Padding(
-      padding: const EdgeInsets.only(bottom: 80.0), // 避免与底部导航重叠
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // 字体大小调整
-          FloatingActionButton.small(
-            onPressed: _showFontSizeDialog,
-            tooltip: '字体大小',
-            heroTag: 'font_size',
-            child: const Icon(Icons.text_fields),
-          ),
-          const SizedBox(height: 8),
-          // 滚动速度调整
-          FloatingActionButton.small(
-            onPressed: _showScrollSpeedDialog,
-            tooltip: '滚动速度',
-            heroTag: 'scroll_speed',
-            child: const Icon(Icons.speed),
-          ),
-          const SizedBox(height: 8),
-          // 特写模式切换
-          FloatingActionButton.small(
-            onPressed: _toggleCloseupMode,
-            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
-            heroTag: 'closeup_mode',
-            backgroundColor: _isCloseupMode ? Colors.blue : null,
-            child:
-                Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: 120.0), // 避免与底部章节切换按钮重叠
+      child: FloatingActionButton(
+        onPressed: _toggleCloseupMode,
+        tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
+        heroTag: 'closeup_mode',
+        backgroundColor: _isCloseupMode ? Colors.blue : null,
+        child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
       ),
     );
   }

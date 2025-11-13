@@ -7,6 +7,7 @@ from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
 from .xspsw_crawler_refactored import XspswCrawlerRefactored
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
+from .syshangguan_crawler import SyshangguanCrawler
 from .base_crawler import BaseCrawler
 
 # 为了向后兼容，创建别名
@@ -44,6 +45,13 @@ SOURCE_SITES_METADATA = {
         "description": "精品小说免费阅读网站，包含玄幻、奇幻、武侠等多种类型小说",
         "search_enabled": True,
         "crawler_class": WdscwCrawlerRefactored  # 使用重构版
+    },
+    "syshangguan": {
+        "name": "爱尚小说网",
+        "base_url": "https://m.syshangguan.com",
+        "description": "全网小说免费精选阅读平台，包含玄幻、仙侠、都市等多种类型小说",
+        "search_enabled": True,
+        "crawler_class": SyshangguanCrawler
     }
 }
 
@@ -66,6 +74,8 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
         crawlers["xspsw"] = XspswCrawler()
     if not enabled or "5dscw" in enabled or "wdscw" in enabled:
         crawlers["wdscw"] = WdscwCrawler()
+    if not enabled or "syshangguan" in enabled or "syshangguan" in enabled:
+        crawlers["syshangguan"] = SyshangguanCrawler()
     return crawlers
 
 
@@ -79,6 +89,8 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
         return XspswCrawlerRefactored()
     if "5dscw.com" in url:
         return WdscwCrawlerRefactored()
+    if "syshangguan.com" in url:
+        return SyshangguanCrawler()
     # 兜底：尝试匹配 base_url
     for crawler in get_enabled_crawlers().values():
         if hasattr(crawler, "base_url") and crawler.base_url in url:

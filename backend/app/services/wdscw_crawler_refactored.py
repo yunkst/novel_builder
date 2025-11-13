@@ -44,13 +44,10 @@ class WdscwCrawlerRefactored(BaseCrawler):
     async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
         """搜索小说"""
         try:
-            # 使用外部搜索引擎API
-            from urllib.parse import urlencode
-            params = {
-                'q': keyword,
-                'site': '5dscw'
-            }
-            search_url = f"{self.search_base_url}/?{urlencode(params)}"
+            # 使用5dscw的内部搜索功能，跳转到外部搜索结果页
+            from urllib.parse import urlencode, quote
+            encoded_keyword = quote(keyword)
+            search_url = f"https://www.sososhu.com/?q={encoded_keyword}&site=5dscw"
 
             response = await self.get_page(search_url, custom_headers=self.custom_headers, timeout=30)
             if response.status_code != 200:
@@ -58,22 +55,56 @@ class WdscwCrawlerRefactored(BaseCrawler):
 
             soup = response.soup()
 
-            # 解析搜索结果
+            # 解析搜索结果页面
             novels = []
-            novel_links = soup.find_all('a', href=re.compile(r'www\.5dscw\.com/book_\d+'))
 
-            for link in novel_links:
-                title = link.get_text(strip=True)
-                href = link.get('href')
-                if title and href and len(title) > 2:
-                    novels.append({
-                        'title': title,
-                        'url': href,
-                        'author': '',  # 5dscw的搜索结果中作者信息不明显
-                        'cover': '',  # 暂时无法获取封面
-                        'description': '',  # 暂时无法获取简介
-                        'source': '5dscw'
-                    })
+            # 查找包含小说结果的容器
+            result_container = soup.find('div', class_='result')
+            if result_container:
+                # 查找所有小说链接
+                novel_links = result_container.find_all('a', href=re.compile(r'www\.5dscw\.com/book_\d+'))
+
+                for link in novel_links:
+                    title = link.get_text(strip=True)
+                    href = link.get('href')
+                    if title and href and len(title) > 2:
+                        # 尝试获取作者信息
+                        author = ''
+                        author_elem = link.find_next('span', string=re.compile(r'著|作者'))
+                        if author_elem:
+                            author = author_elem.get_text(strip=True).replace('著：', '').replace('作者：', '')
+
+                        # 尝试获取简介
+                        description = ''
+                        desc_elem = link.find_next('p') or link.find_next('div')
+                        if desc_elem and len(desc_elem.get_text(strip=True)) > 20:
+                            description = desc_elem.get_text(strip=True)[:200] + '...'
+
+                        novels.append({
+                            'title': title,
+                            'url': href,
+                            'author': author,
+                            'cover': '',  # 封面信息在搜索结果中不明显
+                            'description': description,
+                            'source': '5dscw'
+                        })
+
+            # 如果上述方法没找到结果，尝试备用方法
+            if not novels:
+                # 查找所有包含5dscw链接的元素
+                all_links = soup.find_all('a', href=re.compile(r'www\.5dscw\.com/book_\d+'))
+                for link in all_links:
+                    title = link.get_text(strip=True)
+                    href = link.get('href')
+                    if title and href and len(title) > 2:
+                        novels.append({
+                            'title': title,
+                            'url': href,
+                            'author': '',
+                            'cover': '',
+                            'description': '',
+                            'source': '5dscw'
+                        })
 
             # 去重
             seen_urls = set()
@@ -189,22 +220,95 @@ class WdscwCrawlerRefactored(BaseCrawler):
     async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
         """获取章节内容"""
         try:
-            response = await self.get_page(chapter_url, custom_headers=self.custom_headers, timeout=30)
-            if response.status_code != 200:
-                return {"title": "", "content": ""}
+            all_content = []
+            current_url = chapter_url
+            page_num = 1
 
-            soup = response.soup()
+            while current_url:
+                response = await self.get_page(current_url, custom_headers=self.custom_headers, timeout=30)
+                if response.status_code != 200:
+                    break
 
-            # 提取章节标题
-            title_elem = soup.find('h1')
-            title = title_elem.get_text(strip=True) if title_elem else ""
+                soup = response.soup()
 
-            # 提取章节内容
-            chapter_content = self._extract_chapter_content(soup)
+                # 提取章节标题（只在第一页获取）
+                if page_num == 1:
+                    title_elem = soup.find('h1')
+                    title = title_elem.get_text(strip=True) if title_elem else ""
+                else:
+                    title = ""
 
+                # 提取当前页内容
+                page_content = self._extract_chapter_content(soup)
+                if page_content:
+                    if all_content:
+                        # 添加分页分隔
+                        all_content.append(f"\n\n[第{page_num}页]\n\n")
+                    all_content.append(page_content)
+
+                # 查找下一页链接
+                next_page_link = None
+
+                # 提取当前章节的基础名称（不含页码）
+                current_chapter_id = chapter_url.split("/")[-1].split(".")[0]
+
+                # 优先查找包含"下一页"文本的链接
+                next_page_elem = soup.find('a', string=re.compile(r'下一页|下页|下一頁'))
+                if next_page_elem:
+                    href = next_page_elem.get('href')
+                    if href:
+                        if href.startswith('/'):
+                            next_page_link = urllib.parse.urljoin(self.base_url, href)
+                        elif href.startswith('http'):
+                            next_page_link = href
+                        else:
+                            next_page_link = urllib.parse.urljoin(current_url, href)
+
+                # 如果没找到"下一页"链接，查找符合当前章节翻页格式的链接
+                if not next_page_link:
+                    # 查找格式为: chapterId_2.html, chapterId_3.html 等的链接
+                    page_pattern = re.compile(rf'{re.escape(current_chapter_id)}_(\d+)\.html$')
+                    all_links = soup.find_all('a', href=True)
+
+                    for link in all_links:
+                        href = link.get('href', '')
+                        match = page_pattern.search(href)
+                        if match:
+                            found_page_num = int(match.group(1))
+                            # 只接受比当前页码大的页面
+                            if found_page_num > page_num:
+                                if href.startswith('/'):
+                                    next_page_link = urllib.parse.urljoin(self.base_url, href)
+                                elif href.startswith('http'):
+                                    next_page_link = href
+                                else:
+                                    next_page_link = urllib.parse.urljoin(current_url, href)
+                                break
+
+                # 避免无限循环和跳转到其他章节
+                if next_page_link:
+                    # 检查是否还在同一章节
+                    next_chapter_id = next_page_link.split("/")[-1].split(".")[0].split("_")[0]
+                    if next_chapter_id != current_chapter_id:
+                        next_page_link = None
+                    elif next_page_link == current_url:
+                        next_page_link = None
+
+                if not next_page_link:
+                    break
+
+                current_url = next_page_link
+                page_num += 1
+
+                # 安全限制，最多抓取20页
+                if page_num > 20:
+                    print(f"章节分页过多，停止在20页: {chapter_url}")
+                    break
+
+            final_content = ''.join(all_content)
             return {
                 "title": title,
-                "content": chapter_content
+                "content": final_content
             }
 
         except Exception as e:
