@@ -181,12 +181,15 @@ class ApiServiceWrapper {
   }
 
   /// 获取章节内容
-  Future<String> getChapterContent(String chapterUrl) async {
+  ///
+  /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
+  Future<String> getChapterContent(String chapterUrl, {bool forceRefresh = false}) async {
     _ensureInitialized();
     try {
       final token = await getToken();
       final response = await _api.chapterContentChapterContentGet(
         url: chapterUrl,
+        forceRefresh: forceRefresh,
         X_API_TOKEN: token,
       );
 

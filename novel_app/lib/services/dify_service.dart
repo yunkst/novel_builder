@@ -97,8 +97,16 @@ class DifyService {
     late final StreamStateManager stateManager;
     stateManager = StreamStateManager(
       onTextChunk: onChunk,
-      onCompleted: () {
+      onCompleted: (String completeContent) {
         debugPrint('🎯 === 特写生成完成 ===');
+        debugPrint('完整内容长度: ${completeContent.length}');
+        debugPrint('完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+
+        // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
+        if (completeContent.isNotEmpty) {
+          onChunk('<<COMPLETE_CONTENT>>$completeContent'); // 使用特殊标记标识完整内容
+        }
+
         onComplete?.call();
         stateManager.dispose();
       },
@@ -152,11 +160,13 @@ class DifyService {
         final eventStream = DifySSEParser.parseStream(inputStream);
         final textStream = DifySSEParser.extractTextStream(eventStream);
 
-        // 同时监听文本流和完成事件
+        // 使用更安全的流处理方式，避免时序问题
         final completer = Completer<bool>();
+        bool textStreamDone = false;
+        bool textStreamError = false;
 
         // 监听文本流
-        textStream.listen(
+        final textSubscription = textStream.listen(
           (textChunk) {
             debugPrint('🔥 === onChunk回调 ===');
             debugPrint('文本块: "$textChunk"');
@@ -166,29 +176,74 @@ class DifyService {
             debugPrint('========================');
           },
           onDone: () {
-            debugPrint('📝 文本流结束，但不一定表示工作流完成');
+            debugPrint('📝 文本流结束');
+            textStreamDone = true;
+
+            // 添加短暂延迟，确保最后的文本块被处理
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (completer.isCompleted) return;
+              debugPrint('⏰ 文本流结束后的延迟检查');
+              if (!textStreamError) {
+                completer.complete(true);
+              }
+            });
           },
           onError: (error) {
             debugPrint('❌ 文本流错误: $error');
+            textStreamError = true;
+            if (!completer.isCompleted) {
+              completer.completeError(error);
+            }
           },
         );
 
-        // 监听工作流完成事件（不终止文本流）
-        DifySSEParser.waitForCompletion(eventStream).then((isCompleted) {
-          debugPrint('✅ 工作流完成监听完成，成功: $isCompleted');
+        // 监听工作流完成事件，作为备用完成机制
+        DifySSEParser.waitForCompletion(eventStream).then((workflowCompleted) {
+          debugPrint('✅ 工作流完成事件: $workflowCompleted');
           debugPrint('📊 完成时总字符数: ${stateManager.currentState.characterCount}');
-          completer.complete(isCompleted);
+
+          // 如果文本流已经结束，不重复处理
+          if (textStreamDone || completer.isCompleted) return;
+
+          // 工作流完成时，给文本流一些时间处理最后的数据
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (completer.isCompleted) return;
+            debugPrint('⏰ 工作流完成后的延迟检查');
+            completer.complete(workflowCompleted);
+          });
         }).catchError((error) {
           debugPrint('❌ 等待工作流完成时出错: $error');
-          completer.complete(false);
+          if (!completer.isCompleted) {
+            completer.completeError(error);
+          }
         });
 
-        // 等待工作流完成
-        final isCompleted = await completer.future;
-        if (isCompleted) {
-          stateManager.complete();
-        } else {
-          stateManager.handleError('工作流执行失败');
+        try {
+          // 等待流处理完成
+          final isCompleted = await completer.future.timeout(
+            const Duration(minutes: 10), // 10分钟超时
+            onTimeout: () {
+              debugPrint('⏰ 流处理超时');
+              return textStreamDone && !textStreamError;
+            }
+          );
+
+          debugPrint('🎯 === 流处理最终结果 ===');
+          debugPrint('完成状态: $isCompleted');
+          debugPrint('最终字符数: ${stateManager.currentState.characterCount}');
+
+          if (isCompleted) {
+            stateManager.complete();
+          } else {
+            stateManager.handleError('流处理未正确完成');
+          }
+        } catch (e) {
+          debugPrint('❌ === 流处理异常 ===');
+          debugPrint('异常: $e');
+          stateManager.handleError('流处理异常: $e');
+        } finally {
+          // 确保取消订阅
+          await textSubscription.cancel();
         }
       } else {
         final errorBody = await streamedResponse.stream.bytesToString();
@@ -216,226 +271,6 @@ class DifyService {
   }
 
   
-  // 处理解析后的事件数据
-  void _processEventData(
-    Map<String, dynamic> data,
-    String? eventType,
-    Function(String chunk) onChunk,
-    Function()? onComplete,
-    Function() onDataReceived,
-  ) {
-    // 1. 检查是否是工作流完成事件
-    if (_isWorkflowFinishedEvent(data)) {
-      debugPrint('✅ 检测到工作流完成事件');
-      if (onComplete != null) {
-        onComplete();
-      }
-      return;
-    }
-
-    // 2. 检查是否是错误事件
-    if (_isWorkflowErrorEvent(data)) {
-      debugPrint('❌ 检测到工作流错误事件');
-      if (onComplete != null) {
-        onComplete();
-      }
-      return;
-    }
-
-    // 3. 尝试提取文本内容 - 支持多种可能的格式
-    final textContent = _extractTextContent(data);
-    if (textContent != null && textContent.isNotEmpty) {
-      debugPrint('✅ 成功提取文本内容: "$textContent"');
-      onDataReceived();
-      onChunk(textContent);
-    } else {
-      debugPrint('⚠️ 事件中未找到有效文本内容');
-      debugPrint('事件类型: $eventType');
-      debugPrint('数据结构: ${data.keys}');
-    }
-  }
-
-  // 检查是否是工作流完成事件
-  bool _isWorkflowFinishedEvent(Map<String, dynamic> data) {
-    // 检查多种可能的完成事件标识
-    return data['event'] == 'workflow_finished' ||
-        data['event'] == 'finished' ||
-        data['status'] == 'succeeded' ||
-        data['status'] == 'finished' ||
-        data['type'] == 'end';
-  }
-
-  // 检查是否是工作流错误事件
-  bool _isWorkflowErrorEvent(Map<String, dynamic> data) {
-    return data['event'] == 'workflow_error' ||
-        data['event'] == 'error' ||
-        data['status'] == 'failed' ||
-        data['status'] == 'error';
-  }
-
-  // 提取文本内容 - 精确识别AI生成内容，过滤SSE事件信号
-  String? _extractTextContent(Map<String, dynamic> data) {
-    debugPrint('🔍 === 开始提取AI生成内容 ===');
-
-    // 首先检查是否是事件信号，如果是则跳过
-    if (_isEventSignal(data)) {
-      debugPrint('⚠️ 检测到事件信号，跳过文本提取');
-      return null;
-    }
-
-    // 方式1: data.data.text (标准的Dify流式文本格式)
-    if (data['data'] != null) {
-      final dataField = data['data'];
-      if (dataField is Map) {
-        final text = dataField['text'];
-        if (text != null && _isValidAIText(text.toString())) {
-          debugPrint('✅ 方式1成功 - data.data.text: "$text"');
-          return text.toString();
-        }
-      } else if (dataField is String && _isValidAIText(dataField)) {
-        debugPrint('✅ 方式1成功 - data直接是文本: "$dataField"');
-        return dataField;
-      }
-    }
-
-    // 方式2: 直接的text字段 (非事件格式)
-    if (data['text'] != null) {
-      final text = data['text'].toString();
-      if (_isValidAIText(text)) {
-        debugPrint('✅ 方式2成功 - 直接text字段: "$text"');
-        return text;
-      }
-    }
-
-    // 方式3: content字段 (纯文本内容)
-    if (data['content'] != null) {
-      final content = data['content'].toString();
-      if (_isValidAIText(content)) {
-        debugPrint('✅ 方式3成功 - content字段: "$content"');
-        return content;
-      }
-    }
-
-    // 方式4: answer字段 (对话响应格式)
-    if (data['answer'] != null) {
-      final answer = data['answer'].toString();
-      if (_isValidAIText(answer)) {
-        debugPrint('✅ 方式4成功 - answer字段: "$answer"');
-        return answer;
-      }
-    }
-
-    // 方式5: 流式响应字段 (delta, chunk等)
-    for (String fieldName in ['delta', 'chunk']) {
-      if (data[fieldName] != null) {
-        final fieldData = data[fieldName];
-        String? text;
-
-        if (fieldData is Map) {
-          text = fieldData['text']?.toString() ??
-                 fieldData['content']?.toString();
-        } else if (fieldData is String) {
-          text = fieldData;
-        }
-
-        if (text != null && _isValidAIText(text)) {
-          debugPrint('✅ 方式5成功 - $fieldName字段: "$text"');
-          return text;
-        }
-      }
-    }
-
-    // 方式6: outputs字段 (最终结果，但只提取有意义的文本)
-    if (data['outputs'] != null) {
-      final outputs = data['outputs'];
-      if (outputs is Map) {
-        for (final entry in outputs.entries) {
-          final value = entry.value?.toString();
-          if (value != null && _isValidAIText(value) && value.length > 10) {
-            debugPrint('✅ 方式6成功 - outputs.${entry.key}: "$value"');
-            return value;
-          }
-        }
-      }
-    }
-
-    debugPrint('❌ 没有找到有效的AI生成内容');
-    return null;
-  }
-
-  // 检查是否是事件信号而非文本内容
-  bool _isEventSignal(Map<String, dynamic> data) {
-    // 检查包含事件类型标识的字段
-    final eventIndicators = [
-      'event', 'status', 'type', 'workflow_run_id', 'task_id',
-      'created_at', 'finished_at', 'elapsed_time', 'total_tokens'
-    ];
-
-    // 如果数据主要是事件元数据，则认为是事件信号
-    int eventFieldCount = 0;
-    int totalFields = data.keys.length;
-
-    for (final key in data.keys) {
-      if (eventIndicators.contains(key) ||
-          key.endsWith('_id') ||
-          key.endsWith('_time') ||
-          key.startsWith('workflow_')) {
-        eventFieldCount++;
-      }
-    }
-
-    // 如果超过一半的字段是事件相关，则认为是事件信号
-    final isEvent = (eventFieldCount > totalFields / 2) ||
-                   (data['event'] != null && data['text'] == null);
-
-    if (isEvent) {
-      debugPrint('🚫 识别为事件信号: eventFieldCount=$eventFieldCount, totalFields=$totalFields');
-    }
-
-    return isEvent;
-  }
-
-  // 验证是否是有效的AI生成文本
-  bool _isValidAIText(String text) {
-    if (text.isEmpty) return false;
-
-    // 过滤明显的事件信号或元数据
-    final invalidPatterns = [
-      RegExp(r'^[a-z_]+$'), // 纯小写字母加下划线（事件类型）
-      RegExp(r'^\d+$'), // 纯数字
-      RegExp(r'^[a-f0-9-]{36}$'), // UUID格式
-      RegExp(r'^workflow_'), // workflow相关字段
-      RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'), // 时间戳
-      RegExp(r'^\{\s*\}$'), // 空JSON对象
-      RegExp(r'^\[\s*\]$'), // 空JSON数组
-    ];
-
-    for (final pattern in invalidPatterns) {
-      if (pattern.hasMatch(text.trim())) {
-        debugPrint('🚫 文本匹配无效模式: "$text"');
-        return false;
-      }
-    }
-
-    // 检查最小长度（排除过短的可能是标识符的内容）
-    if (text.trim().length < 2) {
-      debugPrint('🚫 文本过短: "$text"');
-      return false;
-    }
-
-    // 检查是否包含有意义的内容（至少包含一个中文字符或足够多的英文单词）
-    final hasChineseChars = RegExp(r'[\u4e00-\u9fff]').hasMatch(text);
-    final hasEnglishWords = RegExp(r'\b[a-zA-Z]{3,}\b').hasMatch(text);
-
-    if (!hasChineseChars && !hasEnglishWords && text.trim().length < 10) {
-      debugPrint('🚫 文本缺少有意义内容: "$text"');
-      return false;
-    }
-
-    debugPrint('✅ 文本验证通过: "$text"');
-    return true;
-  }
-
   
   // 通用的流式工作流执行方法
   Future<void> runWorkflowStreaming({
