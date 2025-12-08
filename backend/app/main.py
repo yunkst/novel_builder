@@ -515,6 +515,8 @@ def index():
         "supported_sites": [
             "alice_sw - 轻小说文库",
             "shukuge - 书库",
-            "xspsw - 小说网"
+            "xspsw - 小说网",
+            "wdscw - 我的书城",
+            "wodeshucheng - 我的书城(wodeshucheng)"
         ]
     }
