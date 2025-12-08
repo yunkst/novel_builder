@@ -1,466 +1,277 @@
-# CLAUDE.md
+[根目录](../../CLAUDE.md) > **novel_app**
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Flutter移动应用模块
 
-## Project Overview
+## 变更记录 (Changelog)
 
-This is a full-stack novel reading platform with two main components:
+- **2025-11-13**: 模块文档初始化，详细描述应用架构和核心功能
 
-### 1. Flutter Novel Reader App (`novel_app/`)
-A Flutter-based novel reader application (小说阅读器) that allows users to search, read, cache, and interact with novels. Features include:
-- Multi-source novel crawling via backend API
-- Local SQLite caching for offline reading
-- AI-powered content generation using Dify workflows
-- User-inserted custom chapters
-- Bookshelf management with reading progress tracking
+## 模块职责
 
-### 2. Python Backend API (`backend/`)
-FastAPI-based backend service that provides novel content crawling from multiple websites with unified API endpoints.
+Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的小说阅读体验。主要负责：
+- 小说搜索与发现
+- 本地书架管理
+- 离线阅读体验
+- AI增强功能
+- 用户偏好设置
 
-### 3. Vue.js Frontend (`frontend/`)
-Vue.js frontend interface for the novel platform.
+## 入口与启动
 
-## Architecture Overview
+### 主入口文件
+- **路径**: `lib/main.dart`
+- **应用类**: `NovelReaderApp`
+- **主页**: `HomePage` 底部导航结构
 
-The project follows a microservices architecture with:
-- **Flutter Mobile App**: Cross-platform mobile client
-- **FastAPI Backend**: Python REST API service (port 8000, exposed as 3800)
-- **Vue.js Frontend**: Web interface (port 5173, exposed as 3154)
-- **Docker Compose**: Orchestrates all services
+### 应用启动流程
+1. **初始化Flutter绑定**: `WidgetsFlutterBinding.ensureInitialized()`
+2. **API服务初始化**: `ApiServiceWrapper().init()`
+3. **Material3主题设置**: 默认暗色主题
+4. **底部导航**: 书架、搜索、设置三个标签页
 
-## Development Commands
+## 对外接口
 
-### Flutter App (`novel_app/`)
+### API服务层
+- **Backend API Service**: `lib/services/backend_api_service.dart`
+  - 搜索小说 (`/search`)
+  - 获取章节列表 (`/chapters`)
+  - 获取章节内容 (`/chapter-content`)
+- **API Service Wrapper**: `lib/services/api_service_wrapper.dart`
+  - OpenAPI生成代码的包装器
+  - 自动初始化和错误处理
 
-#### Setup
-```bash
-cd novel_app
-flutter pub get
+### AI集成接口
+- **Dify Service**: `lib/services/dify_service.dart`
+  - 流式AI响应处理
+  - 特写功能内容生成
+  - SSE解析器支持
 
-# Generate JSON serialization code (if needed)
-dart run build_runner build --delete-conflicting-outputs
+## 关键依赖与配置
+
+### 核心依赖
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.1.0
+  dio: ^5.4.0
+  built_value: ^8.9.0
+  html: ^0.15.4
+  json_annotation: ^4.8.0
+  sqflite: ^2.3.0
+  path_provider: ^2.1.1
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
 ```
 
-#### Code Quality
-```bash
-# Always run after making changes
-flutter analyze
-
-# Format code
-flutter format lib/
+### 代码生成工具
+```yaml
+dev_dependencies:
+  build_runner: ^2.4.0
+  json_serializable: ^6.7.0
+  built_value_generator: ^8.9.0
 ```
 
-#### Testing
-```bash
-# Run all tests
-flutter test
+### 配置文件
+- **pubspec.yaml**: 项目依赖和配置
+- **analysis_options.yaml**: 代码分析配置
+- **openapi-config.yaml**: API客户端生成配置
 
-# Run a specific test file
-flutter test test/widget_test.dart
+## 数据模型
 
-# Run with coverage
-flutter test --coverage
+### Novel模型 (`lib/models/novel.dart`)
+```dart
+class Novel {
+  final String title;
+  final String author;
+  final String url;
+  final bool isInBookshelf;
+  final String? coverUrl;
+  final String? description;
+  final String? backgroundSetting;
+}
 ```
 
-#### Building
+### Chapter模型 (`lib/models/chapter.dart`)
+```dart
+class Chapter {
+  final String title;
+  final String url;
+  final String? content;
+  final bool isCached;
+  final int? chapterIndex;
+  final bool isUserInserted;
+}
+```
+
+### 其他模型
+- **SearchResult**: 搜索结果封装
+- **CacheTask**: 缓存任务状态管理
+
+## 数据库设计
+
+### 本地数据库
+- **类型**: SQLite
+- **版本**: v3
+- **位置**: 应用私有目录
+
+### 表结构
+1. **bookshelf**: 用户书架
+   - 小说元数据、阅读进度
+   - 添加时间、最后阅读时间
+
+2. **chapter_cache**: 章节内容缓存
+   - 章节内容、索引
+   - 缓存时间管理
+
+3. **novel_chapters**: 章节列表元数据
+   - 支持用户插入章节 (`isUserInserted`)
+   - 章节索引自动管理
+
+### 数据库服务
+- **Database Service**: `lib/services/database_service.dart`
+  - 单例模式管理
+  - 自动迁移支持
+  - 事务处理
+
+## 核心功能
+
+### 1. 书架管理
+- **Screen**: `bookshelf_screen.dart`
+- **功能**: 小说收藏、进度跟踪、批量操作
+- **状态**: 本地SQLite存储
+
+### 2. 搜索功能
+- **Screen**: `search_screen.dart`
+- **Service**: `chapter_search_service.dart`
+- **支持**: 跨站点搜索、结果过滤
+
+### 3. 阅读体验
+- **Screen**: `reader_screen.dart`
+- **功能**: 章节阅读、AI特写、缓存管理
+- **特色**: 支持用户插入章节
+
+### 4. 设置管理
+- **Screen**: `settings_screen.dart`
+- **子页面**:
+  - `backend_settings_screen.dart`
+  - `dify_settings_screen.dart`
+- **存储**: SharedPreferences
+
+## 缓存系统
+
+### 缓存管理器
+- **Cache Manager**: `lib/services/cache_manager.dart`
+  - 应用生命周期管理
+  - 服务端缓存同步
+  - 存储空间优化
+
+### 缓存策略
+- **章节内容**: 本地SQLite + 服务端PostgreSQL
+- **搜索结果**: 内存缓存
+- **图片资源**: 文件系统缓存
+
+## AI集成功能
+
+### Dify工作流
+- **配置**: URL、Token、提示词
+- **模式**: 流式响应 + 阻塞响应
+- **用途**: "特写"内容生成
+
+### SSE处理
+- **Parser**: `dify_sse_parser.dart`
+- **状态管理**: `stream_state_manager.dart`
+- **错误处理**: 自动重连机制
+
+## 测试与质量
+
+### 测试文件
+- **主测试**: `test/widget_test.dart`
+- **E2E测试**: Playwright集成
+
+### 代码质量
+- **静态分析**: `flutter analyze`
+- **代码格式**: `flutter format`
+- **依赖管理**: `flutter pub get`
+
+### 开发工具
+- **API生成**: `tool/generate_api.dart`
+- **E2E脚本**: `run-e2e-tests.sh`
+
+## 构建与部署
+
+### 构建配置
 ```bash
-# Build for Android
+# Android
 flutter build apk
 flutter build appbundle
 
-# Build for Windows
+# Windows
 flutter build windows
 
-# Build for iOS (macOS only)
+# iOS (仅macOS)
 flutter build ios
 ```
 
-#### API Code Generation
-```bash
-# Install openapi-generator-cli first
-npm install -g @openapitools/openapi-generator-cli
-
-# Generate API client code
-dart run tool/generate_api.dart
-
-# Then install generated dependencies
-flutter pub get
-```
-
-**Note:** Generated code goes into `lib/generated/api/` and should NOT be committed to Git.
-
-### Vue.js Frontend (`frontend/`)
-
-#### Setup
-```bash
-cd frontend
-npm install
-```
-
-#### Development
-```bash
-npm run dev
-npm run build
-npm run type-check
-npm run lint
-npm run format
-```
-
-### Python Backend (`backend/`)
-
-#### Setup
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-#### Development
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Docker Services
-
-#### Start All Services
-```bash
-docker-compose up -d
-```
-
-#### Stop Services
-```bash
-docker-compose down
-```
-
-#### View Logs
-```bash
-docker-compose logs -f
-```
-
-## Detailed Architecture
-
-### Flutter App Structure
-
-#### Application Structure
-- **Main Entry**: `lib/main.dart` - Sets up Material3 theme with dark mode default and bottom navigation
-- **Screens**: Bottom nav with 3 main tabs:
-  - Bookshelf (`bookshelf_screen.dart`) - Display saved novels
-  - Search (`search_screen.dart`) - Search for novels
-  - Settings (`settings_screen.dart`) - App configuration
-- **Additional Screens**:
-  - `chapter_list_screen.dart` - Show all chapters for a novel
-  - `reader_screen.dart` - Novel reading interface with AI features
-  - `backend_settings_screen.dart` - Configure backend API endpoint
-
-#### Data Layer
-
-**Models (`lib/models/`)**
-- `novel.dart` - Novel metadata (title, author, url, cover, description)
-- `chapter.dart` - Chapter data with support for user-inserted chapters
-
-**Services (`lib/services/`)**
-- `database_service.dart` - SQLite database management with caching
-- `backend_api_service.dart` - HTTP client for backend API
-- `api_service_wrapper.dart` - Wrapper for auto-generated OpenAPI client
-- `dify_service.dart` - AI integration via Dify workflows
-- `cache_manager.dart` - Content caching coordination
-
-### Backend API Structure
-
-**Core Architecture:**
-- FastAPI-based REST API
-- Token-based authentication via `X-API-TOKEN` header
-- Multi-site novel crawling with unified interface
-- No database required (stateless service)
-
-**Key Endpoints:**
-- `/search` - Search novels across sources
-- `/chapters` - Get chapter list for a novel
-- `/chapter-content` - Get specific chapter content
-- `/openapi.json` - OpenAPI specification for client generation
-
-**Crawler System:**
-- Pluggable crawler architecture for different novel sites
-- Consistent API responses regardless of source
-- Environment-based site enablement (`NOVEL_ENABLED_SITES`)
-
-### Vue.js Frontend Structure
-
-**Technology Stack:**
-- Vue 3 with Composition API
-- TypeScript for type safety
-- Pinia for state management
-- Vite for build tooling
-
-**Key Features:**
-- Web interface for novel browsing
-- Responsive design
-- Type-safe development
-
-## Development Workflow
-
-### Setting Up Development Environment
-
-1. **Clone and Setup**
-```bash
-git clone <repository>
-cd novel_builder
-```
-
-2. **Flutter App Setup**
-```bash
-cd novel_app
-flutter pub get
-dart run tool/generate_api.dart  # After backend is running
-```
-
-3. **Backend Setup**
-```bash
-cd backend
-# Set environment variables:
-export NOVEL_API_TOKEN=your_token_here
-export NOVEL_ENABLED_SITES=site1,site2
-
-# Install dependencies and run
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-4. **Frontend Setup**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### API Client Generation Workflow
-
-When the backend API changes:
-
-1. **Ensure backend is running** at `http://localhost:3800` with `/openapi.json` available
-2. **Regenerate client code**: `dart run tool/generate_api.dart`
-3. **Install dependencies**: `flutter pub get`
-4. **Update wrapper**: Modify `lib/services/api_service_wrapper.dart` to use new generated methods
-5. **Verify**: `flutter analyze`
-
-### Docker Development
-
-**Full Stack Development:**
-```bash
-# Start all services
-docker-compose up -d
-
-# View individual service logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-```
-
-**Environment Configuration:**
-Create `.env` file with:
-```
-NOVEL_API_TOKEN=your_api_token
-NOVEL_ENABLED_SITES=site1,site2,site3
-```
-
-## Important Constraints
-
-### Flutter App
-1. **Never attempt to run the Flutter app** - Analysis only, no execution
-2. **Always run `flutter analyze`** after making changes
-3. **Do not commit generated code** - The `lib/generated/` directory is git-ignored
-4. **Preserve user-inserted chapters** - When modifying database operations
-
-### Backend
-1. **Token required** - All API calls must include `X-API-TOKEN` header
-2. **Stateless design** - No persistent storage required
-3. **Unified interface** - All crawlers must return consistent response formats
-
-### General
-1. **Use type-safe clients** - Leverage OpenAPI generation for Flutter
-2. **Environment-based configuration** - Use environment variables for deployment settings
-3. **Docker-first deployment** - Services should be containerizable
-
-## Configuration Management
-
-### Flutter App SharedPreferences
-- `backend_host` - Backend API URL
-- `backend_token` - Optional API authentication token
-- `dify_url` - Dify workflow API endpoint
-- `dify_token` - Dify authentication token
-- `ai_writer_prompt` - Custom AI writer settings/prompt
-
-### Backend Environment Variables
-- `NOVEL_API_TOKEN` - Required token for API access
-- `NOVEL_ENABLED_SITES` - Comma-separated list of enabled crawling sites
-
-## Code Generation and Build Exclusions
-
-The following patterns are excluded from analysis (`analysis_options.yaml`):
-- `lib/generated/**` - OpenAPI generated code
-- `**/*.g.dart` - JSON serialization code
-- `**/*.freezed.dart` - Freezed immutable classes
-
-## Testing Strategy
-
-### Flutter App
-- Unit tests for business logic
-- Widget tests for UI components
-- Integration tests for user flows
-- Mock external dependencies (HTTP, database)
-
-### Backend
-- Unit tests for crawler logic
-- Integration tests for API endpoints
-- Mock external novel sites during testing
-
-### Frontend
-- Component unit tests
-- E2E tests for user workflows
-- Type checking via TypeScript
-
-## Key Dependencies
-
-### Flutter App
-- `sqflite` - SQLite database
-- `dio` - HTTP client for API calls
-- `html` - HTML parsing
-- `provider` - State management
-- `shared_preferences` - Persistent storage
-- `json_annotation` - JSON serialization
-
-### Backend
-- `fastapi` - Web framework
-- `uvicorn` - ASGI server
-- `requests` - HTTP client
-- `beautifulsoup4` - HTML parsing
-- `lxml` - XML/HTML parser
-
-### Frontend
-- `vue` - Frontend framework
-- `typescript` - Type safety
-- `pinia` - State management
-- `vite` - Build tool
-
-## Architecture
-
-### Application Structure
-- **Main Entry**: `lib/main.dart` - Sets up Material3 theme with dark mode default and bottom navigation
-- **Screens**: Bottom nav with 3 main tabs:
-  - Bookshelf (`bookshelf_screen.dart`) - Display saved novels
-  - Search (`search_screen.dart`) - Search for novels
-  - Settings (`settings_screen.dart`) - App configuration
-- **Additional Screens**:
-  - `chapter_list_screen.dart` - Show all chapters for a novel
-  - `reader_screen.dart` - Novel reading interface with AI features
-  - `backend_settings_screen.dart` - Configure backend API endpoint
-  - `dify_settings_screen.dart` - Configure Dify AI integration
-
-### Data Layer
-
-#### Models (`lib/models/`)
-- `novel.dart` - Novel metadata (title, author, url, cover, description)
-- `chapter.dart` - Chapter data with support for:
-  - `isCached` - Whether content is stored locally
-  - `isUserInserted` - Distinguishes user-created chapters from source chapters
-  - `chapterIndex` - Position in chapter list
-
-#### Services (`lib/services/`)
-
-**Database Service** (`database_service.dart`)
-- Singleton pattern managing SQLite database
-- Three tables:
-  - `bookshelf` - User's saved novels with reading progress
-  - `chapter_cache` - Cached chapter content
-  - `novel_chapters` - Chapter list metadata
-- Key features:
-  - Batch caching for whole novels
-  - User-inserted chapters preserved during updates
-  - Automatic reordering of chapter indices
-  - Cache statistics tracking
-
-**Backend API Service** (`backend_api_service.dart`)
-- HTTP client for novel content backend
-- Configuration stored in SharedPreferences (host, optional token)
-- Token sent via `X-API-TOKEN` header
-- Endpoints: `/search`, `/chapters`, `/chapter-content`
-
-**API Service Wrapper** (`api_service_wrapper.dart`)
-- Wrapper for auto-generated OpenAPI client (from `lib/generated/api/`)
-- Uses Dio with interceptors for auth and logging
-- Must call `init()` before use
-- **Note:** Business methods are commented out until API code is generated
-
-**Dify Service** (`dify_service.dart`)
-- Integrates with Dify AI workflows for content generation
-- Supports both blocking and streaming response modes
-- Used for "close-up" (特写) feature in reader
-- Parses SSE (Server-Sent Events) format for streaming
-- Configuration stored in SharedPreferences (url, token, ai_writer_prompt)
-
-### Database Schema Details
-
-**Version 2** (current) - Added user-inserted chapter support:
-- `novel_chapters.isUserInserted` - Flag for user-created chapters
-- `novel_chapters.insertedAt` - Timestamp of insertion
-
-**Important Database Behaviors:**
-- User-inserted chapters are preserved when updating chapter lists from source
-- Chapter indices are automatically reordered to maintain consistency
-- When inserting a user chapter, all subsequent chapters increment their index
-- Cache clearing operations distinguish between content cache and metadata cache
-
-### State Management
-- Uses Provider package (see `pubspec.yaml`)
-- Current implementation uses setState for local state
-- SharedPreferences for persistent configuration
-
-## Important Constraints
-
-1. **Never attempt to run the Flutter app** - Analysis only, no execution
-2. **Always run `flutter analyze`** after making changes
-3. **Do not commit generated code** - The `lib/generated/` directory is git-ignored
-4. **Preserve user-inserted chapters** - When modifying database operations, ensure `isUserInserted=1` chapters are never accidentally deleted
-
-## Code Generation Files
-
-The analyzer excludes these patterns (see `analysis_options.yaml`):
-- `lib/generated/**` - OpenAPI generated code
-- `**/*.g.dart` - JSON serialization code
-- `**/*.freezed.dart` - Freezed immutable classes
-
-## Configuration Management
-
-All user settings are stored in SharedPreferences with these keys:
-- `backend_host` - Backend API URL
-- `backend_token` - Optional API authentication token
-- `dify_url` - Dify workflow API endpoint
-- `dify_token` - Dify authentication token
-- `ai_writer_prompt` - Custom AI writer settings/prompt
-
-## Development Workflow for API Changes
-
-When the backend API changes:
-
-1. Ensure backend is running at `http://localhost:3800` with `/openapi.json` available
-2. Run `dart run tool/generate_api.dart` to regenerate client
-3. Run `flutter pub get` to install any new dependencies
-4. Update `lib/services/api_service_wrapper.dart` to:
-   - Uncomment the generated API import
-   - Uncomment the API instance initialization
-   - Add/update business methods wrapping the generated API
-5. Run `flutter analyze` to verify
-
-## Testing Notes
-
-- Main test file: `test/widget_test.dart`
-- Tests should mock external dependencies (HTTP, database)
-- When adding new services, create corresponding test files
-- Use `setUp()` and `tearDown()` for test isolation
-
-## Key Dependencies
-
-- `sqflite` - SQLite database
-- `http` / `dio` - HTTP clients (both used, consolidating to dio for generated code)
-- `html` - HTML parsing for web crawling
-- `provider` - State management
-- `shared_preferences` - Persistent key-value storage
-- `json_annotation` / `json_serializable` - JSON serialization
+### 平台支持
+- **Android**: 完整支持
+- **iOS**: 支持开发(需要macOS)
+- **Windows**: 支持开发
+- **Web**: 实验性支持
+
+## 常见问题 (FAQ)
+
+### Q: 如何解决API连接失败？
+A: 检查后端服务状态和网络配置，在设置页面重新配置API地址。
+
+### Q: 用户插入章节如何保护？
+A: 数据库操作中 `isUserInserted=1` 的章节不会被自动删除。
+
+### Q: 如何更新API客户端代码？
+A: 运行 `dart run tool/generate_api.dart` 后执行 `flutter pub get`。
+
+## 相关文件清单
+
+### 核心文件
+- `lib/main.dart` - 应用入口
+- `lib/models/` - 数据模型
+- `lib/services/` - 业务服务
+- `lib/screens/` - UI界面
+
+### 配置文件
+- `pubspec.yaml` - 项目配置
+- `analysis_options.yaml` - 代码规范
+- `.gitignore` - Git忽略规则
+
+### 工具和脚本
+- `tool/generate_api.dart` - API代码生成
+- `test/` - 测试文件
+- `android/` - Android平台配置
+
+### 构建产物
+- `build/` - 构建输出(忽略提交)
+- `lib/generated/` - API生成代码(忽略提交)
+
+## 开发工作流
+
+### 新功能开发
+1. 创建功能分支
+2. 更新相关模型和服务
+3. 编写UI界面
+4. 添加测试用例
+5. 运行代码检查
+6. 提交代码审查
+
+### API集成更新
+1. 确保后端服务运行
+2. 重新生成API客户端
+3. 更新API包装器
+4. 测试集成功能
+5. 验证错误处理
+
+### 数据库变更
+1. 更新Database Service
+2. 添加迁移逻辑
+3. 测试数据兼容性
+4. 更新模型定义
+5. 验证回滚机制

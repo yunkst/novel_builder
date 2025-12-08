@@ -7,7 +7,8 @@ from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
 from .xspsw_crawler_refactored import XspswCrawlerRefactored
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
-from .syshangguan_crawler import SyshangguanCrawler
+from .wodeshucheng_crawler import WodeshuchengCrawler
+from .smxku_crawler import SmxkuCrawler
 from .base_crawler import BaseCrawler
 
 # 为了向后兼容，创建别名
@@ -15,6 +16,8 @@ AliceSWCrawler = AliceSWCrawlerRefactored
 ShukugeCrawler = ShukugeCrawlerRefactored
 XspswCrawler = XspswCrawlerRefactored
 WdscwCrawler = WdscwCrawlerRefactored
+WodeshuchengCrawler = WodeshuchengCrawler
+SmxkuCrawler = SmxkuCrawler
 
 # 源站元数据配置
 SOURCE_SITES_METADATA = {
@@ -46,12 +49,19 @@ SOURCE_SITES_METADATA = {
         "search_enabled": True,
         "crawler_class": WdscwCrawlerRefactored  # 使用重构版
     },
-    "syshangguan": {
-        "name": "爱尚小说网",
-        "base_url": "https://m.syshangguan.com",
-        "description": "全网小说免费精选阅读平台，包含玄幻、仙侠、都市等多种类型小说",
+    "wodeshucheng": {
+        "name": "我的书城(wodeshucheng)",
+        "base_url": "https://www.wodeshucheng.net",
+        "description": "综合性小说阅读网站，提供多种类型小说的在线阅读",
         "search_enabled": True,
-        "crawler_class": SyshangguanCrawler
+        "crawler_class": WodeshuchengCrawler
+    },
+    "smxku": {
+        "name": "蜘蛛小说网",
+        "base_url": "https://www.smxku.com",
+        "description": "海量小说免费在线阅读，包含玄幻、都市、言情等多种类型",
+        "search_enabled": True,
+        "crawler_class": SmxkuCrawler
     }
 }
 
@@ -74,8 +84,10 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
         crawlers["xspsw"] = XspswCrawler()
     if not enabled or "5dscw" in enabled or "wdscw" in enabled:
         crawlers["wdscw"] = WdscwCrawler()
-    if not enabled or "syshangguan" in enabled or "syshangguan" in enabled:
-        crawlers["syshangguan"] = SyshangguanCrawler()
+    if not enabled or "wodeshucheng" in enabled:
+        crawlers["wodeshucheng"] = WodeshuchengCrawler()
+    if not enabled or "smxku" in enabled:
+        crawlers["smxku"] = SmxkuCrawler()
     return crawlers
 
 
@@ -89,8 +101,10 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
         return XspswCrawlerRefactored()
     if "5dscw.com" in url:
         return WdscwCrawlerRefactored()
-    if "syshangguan.com" in url:
-        return SyshangguanCrawler()
+    if "wodeshucheng.net" in url:
+        return WodeshuchengCrawler()
+    if "smxku.com" in url:
+        return SmxkuCrawler()
     # 兜底：尝试匹配 base_url
     for crawler in get_enabled_crawlers().values():
         if hasattr(crawler, "base_url") and crawler.base_url in url:

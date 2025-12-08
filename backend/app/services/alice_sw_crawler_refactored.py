@@ -88,11 +88,20 @@ class AliceSWCrawlerRefactored(BaseCrawler):
                 browser_args=self.browser_args
             )
 
-            # 获取小说详情页
+            # 首先获取小说详情页，查找章节列表页面链接
             response = await self.get_page(novel_url, timeout=15)
+            soup = response.soup()
 
-            # 提取章节列表
-            chapters = self._extract_alice_sw_chapters(response.soup(), novel_url)
+            # 查找指向章节列表页面的链接
+            chapter_list_url = self._find_chapter_list_url(soup, novel_url)
+
+            if chapter_list_url:
+                # 如果找到章节列表页面，访问该页面
+                list_response = await self.get_page(chapter_list_url, timeout=15)
+                chapters = self._extract_alice_sw_chapters_from_list_page(list_response.soup(), chapter_list_url)
+            else:
+                # 如果没有找到专门的章节列表页面，尝试在详情页中提取章节
+                chapters = self._extract_alice_sw_chapters(soup, novel_url)
 
             return chapters
 
@@ -214,6 +223,118 @@ class AliceSWCrawlerRefactored(BaseCrawler):
 
         return "未知"
 
+    def _find_chapter_list_url(self, soup, novel_url: str) -> str:
+        """查找章节列表页面的URL"""
+        # AliceSW特定的章节列表链接模式
+        chapter_list_patterns = [
+            # 查找包含"查看所有章节"、"更多章节"、"目录"等关键词的链接
+            ("a", {"text": re.compile(r"查看所有章节|更多章节|更多|目录|查看全部|所有章节", re.I)}),
+            # 查找特定格式的章节列表链接
+            ("a", {"href": re.compile(r"/other/chapters/id/\d+\.html")}),
+            # 通用章节列表链接模式
+            ("a", {"href": re.compile(r"chapter|list|index|directory", re.I)}),
+        ]
+
+        for tag_name, attrs in chapter_list_patterns:
+            links = soup.find_all(tag_name, attrs)
+            for link in links:
+                href = link.get("href", "")
+                text = link.get_text().strip()
+
+                if href and not href.startswith("javascript"):
+                    full_url = urllib.parse.urljoin(self.base_url, href)
+                    # 确保URL不是当前页面本身或无效链接
+                    if (full_url != novel_url and
+                        "bookshelf" not in href and
+                        "user/" not in href):
+                        return full_url
+
+        # 如果没找到专门的链接，尝试构造章节列表URL
+        # AliceSW的章节列表URL模式: /other/chapters/id/{novel_id}.html
+        novel_id_match = re.search(r'/novel/(\d+)\.html', novel_url)
+        if novel_id_match:
+            novel_id = novel_id_match.group(1)
+            # 构造AliceSW标准的章节列表URL
+            chapter_list_url = f"{self.base_url}/other/chapters/id/{novel_id}.html"
+            return chapter_list_url
+
+        return None
+
+    def _extract_alice_sw_chapters_from_list_page(self, soup, chapter_list_url: str) -> List[Dict[str, Any]]:
+        """从章节列表页面提取章节"""
+        chapters = []
+
+        # 1. 查找章节列表的主要容器
+        chapter_containers = soup.find_all("div", class_="book_newchap")
+        if not chapter_containers:
+            # 备用选择器
+            chapter_containers = soup.find_all(["div", "ul", "ol"], class_=re.compile(r"chapter|list|content", re.I))
+
+        # 2. 从容器中提取章节链接
+        for container in chapter_containers:
+            # 查找章节链接，可能是不同的HTML结构
+            chapter_links = []
+
+            # AliceSW常见的章节链接结构
+            possible_selectors = [
+                "p.ti > a",           # 章节标题在p.ti中的链接
+                "li > a",             # 列表项中的链接
+                "div.chapter > a",    # 章节div中的链接
+                "a[href*='/book/']",  # 所有包含/book/的链接
+            ]
+
+            for selector in possible_selectors:
+                chapter_links = container.select(selector)
+                if chapter_links:
+                    break
+
+            # 如果容器中没有找到，尝试在整个页面中查找
+            if not chapter_links:
+                chapter_links = soup.select("a[href*='/book/']")
+
+            for a_tag in chapter_links:
+                href = a_tag.get("href", "")
+                title = a_tag.get_text().strip()
+
+                # 构建完整URL
+                if href.startswith("/"):
+                    full_url = urllib.parse.urljoin(self.base_url, href)
+                else:
+                    full_url = urllib.parse.urljoin(chapter_list_url, href)
+
+                # 验证是否为有效的章节链接
+                if self._is_valid_alice_sw_chapter(title, href):
+                    chapters.append({
+                        "title": title,
+                        "url": full_url
+                    })
+
+        # 3. 如果仍然没有找到章节，尝试全局搜索
+        if not chapters:
+            # 查找所有符合AliceSW章节URL模式的链接
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag.get("href", "")
+                title = a_tag.get_text().strip()
+
+                # AliceSW章节URL模式: /book/数字/字符串.html
+                if re.match(r'^/book/\d+/[a-f0-9\-]+\.html$', href):
+                    full_url = urllib.parse.urljoin(self.base_url, href)
+                    if self._is_valid_alice_sw_chapter(title, href):
+                        chapters.append({
+                            "title": title,
+                            "url": full_url
+                        })
+
+        # 4. 去重并保持顺序
+        seen = set()
+        unique_chapters = []
+        for chapter in chapters:
+            if chapter["url"] not in seen and chapter["title"].strip():
+                unique_chapters.append(chapter)
+                seen.add(chapter["url"])
+
+        return unique_chapters
+
     def _extract_alice_sw_chapters(self, soup, novel_url: str) -> List[Dict[str, Any]]:
         """提取AliceSW章节列表 - 基于实际HTML结构"""
         chapters = []
@@ -284,8 +405,8 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return False
 
         # 2. 检查URL模式 - AliceSW特定的章节URL格式
-        # 主要格式: /book/数字/字符串.html
-        if not re.match(r'^/book/\d+/[a-f0-9]+\.html$', href):
+        # 主要格式: /book/数字/字符串.html 或 /book/数字/字符串.html（带连字符）
+        if not re.match(r'^/book/\d+/[a-f0-9\-]+\.html$', href):
             return False
 
         # 3. 基本标题验证 - 排除明显不是章节的标题
@@ -294,6 +415,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             r'^(登录|注册|首页|分类|排行)$',
             r'^(书架|收藏|推荐|设置)$',
             r'^(javascript:void\(0\)|#)$',
+            r'^(more|more chapters|read more)$',
         ]
 
         for pattern in skip_patterns:
@@ -367,13 +489,71 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         for elem in content_elem(["script", "style", "ins", "iframe", "div[class*='ad']"]):
             elem.decompose()
 
-        # 获取文本内容
-        content = content_elem.get_text()
+        # 智能提取内容，保留段落结构
+        content = self._extract_content_with_paragraphs(content_elem)
 
         # 清理内容
-        content = self.clean_text(content)
+        content = self.clean_text_with_paragraphs(content)
 
         return content
+
+    def _extract_content_with_paragraphs(self, element) -> str:
+        """智能提取内容，保留段落结构"""
+        content_parts = []
+
+        # 递归处理元素内容
+        for child in element.children:
+            # 检查是否是 BeautifulSoup 标签对象
+            if hasattr(child, 'name') and child.name:  # 是标签元素
+                if child.name in ['p', 'div', 'section', 'article']:
+                    # 段落标签，提取其文本内容并添加段落标记
+                    paragraph_text = child.get_text().strip()
+                    if paragraph_text:
+                        content_parts.append(paragraph_text)
+                elif child.name == 'br':
+                    # 换行标签
+                    content_parts.append('')
+                elif child.name not in ['script', 'style', 'ins', 'iframe']:
+                    # 其他标签，递归处理
+                    nested_content = self._extract_content_with_paragraphs(child)
+                    if nested_content.strip():
+                        content_parts.append(nested_content.strip())
+            else:  # 是文本节点（NavigableString 或其他）
+                text = str(child).strip()
+                if text:
+                    content_parts.append(text)
+
+        # 将内容用双换行符连接，保持段落结构
+        return '\n\n'.join(filter(None, content_parts))
+
+    def clean_text_with_paragraphs(self, text: str) -> str:
+        """清理文本内容，保持段落结构"""
+        if not text:
+            return ""
+
+        # 移除多余的空行（超过2个连续换行符）
+        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        # 移除每行开头和结尾的多余空格
+        lines = text.split('\n')
+        cleaned_lines = [line.strip() for line in lines]
+
+        # 重新组合，保持双换行符作为段落分隔
+        text = '\n'.join(cleaned_lines)
+
+        # 确保段落之间有适当的分隔
+        text = re.sub(r'([.!?。！？])\n([A-Z\u4e00-\u9fa5])', r'\1\n\n\2', text)
+
+        # 移除段落内部的多余空格
+        paragraphs = text.split('\n\n')
+        cleaned_paragraphs = []
+        for paragraph in paragraphs:
+            # 保留段落内的正常空格，但移除多余的连续空格
+            cleaned_paragraph = re.sub(r' +', ' ', paragraph.strip())
+            if cleaned_paragraph:
+                cleaned_paragraphs.append(cleaned_paragraph)
+
+        return '\n\n'.join(cleaned_paragraphs)
 
 
 # 为了向后兼容，创建别名
