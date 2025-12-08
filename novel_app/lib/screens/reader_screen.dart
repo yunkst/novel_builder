@@ -7,6 +7,8 @@ import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../widgets/highlighted_text.dart';
+import '../providers/reader_edit_mode_provider.dart';
+import 'package:provider/provider.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Novel novel;
@@ -133,83 +135,122 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     });
 
     try {
-      final cachedContent =
-          await _databaseService.getCachedChapter(_currentChapter.url);
-      String content;
-
-      if (cachedContent != null) {
-        content = cachedContent;
-        setState(() {
-          _content = content;
-          _isLoading = false;
-        });
-        _updateReadingProgress();
-
-        // 如果有搜索结果，跳转到匹配位置
-        if (widget.searchResult != null &&
-            widget.searchResult!.chapterUrl == _currentChapter.url) {
-          _scrollToSearchMatch();
-        } else if (resetScrollPosition) {
-          // 没有搜索结果且需要重置滚动位置时，滚动到顶部
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients) {
-              _scrollController.jumpTo(0);
-            }
-          });
-        }
-
-        // 开始预加载其他章节
-        _startPreloadingChapters();
+      // 判断章节来源：本地章节直接从数据库获取，网络章节使用原有逻辑
+      if (_isLocalChapter(_currentChapter.url)) {
+        await _loadLocalChapterContent(resetScrollPosition);
       } else {
-        // 从网络获取内容
-        try {
-          content = await _apiService.getChapterContent(_currentChapter.url);
-
-          // 验证内容有效性
-          if (content.isNotEmpty && content.length > 50) {
-            // 缓存有效内容
-            await _databaseService.cacheChapter(
-                widget.novel.url, _currentChapter, content);
-
-            setState(() {
-              _content = content;
-              _isLoading = false;
-            });
-            _updateReadingProgress();
-
-            // 如果有搜索结果，跳转到匹配位置
-            if (widget.searchResult != null &&
-                widget.searchResult!.chapterUrl == _currentChapter.url) {
-              _scrollToSearchMatch();
-            } else if (resetScrollPosition) {
-              // 没有搜索结果且需要重置滚动位置时，滚动到顶部
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (_scrollController.hasClients) {
-                  _scrollController.jumpTo(0);
-                }
-              });
-            }
-
-            // 开始预加载其他章节
-            _startPreloadingChapters();
-          } else {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = '章节内容为空或过短，请稍后重试';
-            });
-          }
-        } catch (e) {
-          // 网络获取失败，显示错误信息而不是将错误作为内容
-          setState(() {
-            _isLoading = false;
-            _errorMessage = _getErrorMessage(e);
-          });
-        }
+        await _loadNetworkChapterContent(resetScrollPosition);
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '加载章节时发生错误: ${e.toString()}';
+        _errorMessage = '加载章节内容时出错: $e';
+      });
+    }
+  }
+
+  // 判断是否为本地章节
+  bool _isLocalChapter(String chapterUrl) {
+    return DatabaseService.isLocalChapter(chapterUrl);
+  }
+
+  // 加载本地章节内容
+  Future<void> _loadLocalChapterContent(bool resetScrollPosition) async {
+    try {
+      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
+
+      if (cachedContent != null && cachedContent.isNotEmpty) {
+        setState(() {
+          _content = cachedContent;
+          _isLoading = false;
+        });
+        _updateReadingProgress();
+
+        // 处理滚动位置
+        _handleScrollPosition(resetScrollPosition);
+        // 开始预加载其他章节
+        _startPreloadingChapters();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '本地章节内容不存在';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '获取本地章节内容失败: $e';
+      });
+    }
+  }
+
+  // 加载网络章节内容
+  Future<void> _loadNetworkChapterContent(bool resetScrollPosition) async {
+    try {
+      // 先尝试从缓存获取
+      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
+
+      if (cachedContent != null) {
+        setState(() {
+          _content = cachedContent;
+          _isLoading = false;
+        });
+        _updateReadingProgress();
+        _handleScrollPosition(resetScrollPosition);
+        _startPreloadingChapters();
+        return;
+      }
+
+      // 从网络获取内容
+      try {
+        final content = await _apiService.getChapterContent(_currentChapter.url);
+
+        // 验证内容有效性
+        if (content.isNotEmpty && content.length > 50) {
+          // 缓存有效内容
+          await _databaseService.cacheChapter(
+              widget.novel.url, _currentChapter, content);
+
+          setState(() {
+            _content = content;
+            _isLoading = false;
+          });
+          _updateReadingProgress();
+          _handleScrollPosition(resetScrollPosition);
+          _startPreloadingChapters();
+        } else {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = '章节内容为空或过短，请稍后重试';
+          });
+        }
+      } catch (e) {
+        // 网络获取失败，显示错误信息而不是将错误作为内容
+        setState(() {
+          _isLoading = false;
+          _errorMessage = _getErrorMessage(e);
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '加载网络章节内容时出错: $e';
+      });
+    }
+  }
+
+  // 处理滚动位置的通用方法
+  void _handleScrollPosition(bool resetScrollPosition) {
+    // 如果有搜索结果，跳转到匹配位置
+    if (widget.searchResult != null &&
+        widget.searchResult!.chapterUrl == _currentChapter.url) {
+      _scrollToSearchMatch();
+    } else if (resetScrollPosition) {
+      // 没有搜索结果且需要重置滚动位置时，滚动到顶部
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
       });
     }
   }
@@ -1916,6 +1957,35 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     }
   }
 
+  // 保存编辑后的章节内容
+  Future<void> _saveEditedContent() async {
+    try {
+      await _databaseService.updateChapterContent(
+          _currentChapter.url, _content);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('章节内容已保存'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('保存编辑内容失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存失败: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentIndex =
@@ -1927,22 +1997,62 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     final paragraphs =
         _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
+    // 使用 ChangeNotifierProvider 包装整个页面
+    return ChangeNotifierProvider(
+      create: (_) => ReaderEditModeProvider(),
+      child: Consumer<ReaderEditModeProvider>(
+        builder: (context, editModeProvider, child) {
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _currentChapter.title,
-          style: const TextStyle(fontSize: 18),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 2,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _currentChapter.title,
+                style: const TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+            // 编辑模式状态指示器
+            if (editModeProvider.isEditMode)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('编辑模式', style: TextStyle(fontSize: 12, color: Colors.white)),
+                  ],
+                ),
+              ),
+          ],
         ),
         actions: [
-          // 主要功能：自动滚动
-          IconButton(
-            icon: Icon(_isAutoScrolling ? Icons.pause : Icons.play_arrow),
-            onPressed: _toggleAutoScroll,
-            tooltip: _isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
-            color: _isAutoScrolling ? Colors.red : null,
-          ),
+          // 编辑模式切换按钮
+          if (!editModeProvider.isEditMode)
+            IconButton(
+              onPressed: editModeProvider.toggleEditMode,
+              tooltip: '进入编辑模式',
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          // 编辑完成按钮
+          if (editModeProvider.isEditMode)
+            IconButton(
+              onPressed: () async {
+                // 保存编辑内容并退出编辑模式
+                await _saveEditedContent();
+                editModeProvider.toggleEditMode();
+              },
+              tooltip: '完成编辑并保存',
+              icon: const Icon(Icons.check, color: Colors.green),
+            ),
           // 更多功能菜单
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
@@ -2056,6 +2166,43 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                         final isSelected =
                             _selectedParagraphIndices.contains(index);
 
+                        // 编辑模式使用TextField，阅读模式使用Text
+                        if (editModeProvider.isEditMode) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6.0, horizontal: 8.0),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.1),
+                              border: Border.all(
+                                  color: Colors.grey.withValues(alpha: 0.3),
+                                  width: 1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: TextField(
+                              controller: TextEditingController(text: paragraph),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              style: TextStyle(
+                                fontSize: _fontSize,
+                                height: 1.8,
+                                letterSpacing: 0.5,
+                                color: Theme.of(context).textTheme.bodyLarge?.color,
+                              ),
+                              maxLines: null,
+                              onChanged: (value) {
+                                // 更新内容
+                                final updatedParagraphs = List<String>.from(paragraphs);
+                                updatedParagraphs[index] = value;
+                                setState(() {
+                                  _content = updatedParagraphs.join('\n');
+                                });
+                              },
+                            ),
+                          );
+                        }
+
                         return InkWell(
                           onTap: _isCloseupMode
                               ? () => _handleParagraphTap(index)
@@ -2138,10 +2285,13 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                         ),
                       ),
                     ),
-                  ],
-                ),
+              ],
+            ),
       // 悬浮工具栏
       floatingActionButton: _buildFloatingActions(),
+    );
+        },
+      ),
     );
   }
 
@@ -2164,15 +2314,31 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       );
     }
 
-    // 正常阅读模式下，只显示特写模式切换按钮
+    // 正常阅读模式下，显示特写模式和自动滚屏按钮
     return Padding(
       padding: const EdgeInsets.only(bottom: 120.0), // 避免与底部章节切换按钮重叠
-      child: FloatingActionButton(
-        onPressed: _toggleCloseupMode,
-        tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
-        heroTag: 'closeup_mode',
-        backgroundColor: _isCloseupMode ? Colors.blue : null,
-        child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // 特写模式切换按钮（上方）
+          FloatingActionButton(
+            onPressed: _toggleCloseupMode,
+            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
+            heroTag: 'closeup_mode',
+            backgroundColor: _isCloseupMode ? Colors.blue : null,
+            child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
+          ),
+          const SizedBox(height: 16), // 按钮间距
+          // 自动滚屏按钮（下方）
+          FloatingActionButton(
+            onPressed: _toggleAutoScroll,
+            tooltip: _isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
+            heroTag: 'auto_scroll',
+            backgroundColor: _isAutoScrolling ? Colors.red : null,
+            child: Icon(_isAutoScrolling ? Icons.pause : Icons.play_arrow),
+          ),
+        ],
       ),
     );
   }

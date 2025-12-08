@@ -437,17 +437,25 @@ class DatabaseService {
   /// 获取缓存的章节列表
   Future<List<Chapter>> getCachedNovelChapters(String novelUrl) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'novel_chapters',
-      where: 'novelUrl = ?',
-      whereArgs: [novelUrl],
-      orderBy: 'chapterIndex ASC',
-    );
+
+    // 使用JOIN查询同时获取章节元数据和内容，确保用户章节包含完整内容
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT
+        nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
+        nc.chapterIndex, nc.isUserInserted, nc.insertedAt,
+        cc.content
+      FROM novel_chapters nc
+      LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
+      WHERE nc.novelUrl = ?
+      ORDER BY nc.chapterIndex ASC
+    ''', [novelUrl]);
 
     return List.generate(maps.length, (i) {
       return Chapter(
         title: maps[i]['title'],
         url: maps[i]['chapterUrl'],
+        content: maps[i]['content'] ?? '', // 直接包含内容，特别对用户章节重要
+        isCached: maps[i]['content'] != null,
         chapterIndex: maps[i]['chapterIndex'],
         isUserInserted: maps[i]['isUserInserted'] == 1,
       );
@@ -482,8 +490,8 @@ class DatabaseService {
     final db = await database;
     final batch = db.batch();
 
-    // 生成唯一的章节URL
-    final chapterUrl = 'user_chapter_${DateTime.now().millisecondsSinceEpoch}';
+    // 生成唯一的章节URL，统一使用 custom:// 格式
+    final chapterUrl = 'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // 将插入位置之后的章节索引都加1
@@ -526,6 +534,12 @@ class DatabaseService {
     final db = await database;
     await db.delete('chapter_cache');
     await db.delete('novel_chapters');
+  }
+
+  /// 判断是否为本地章节
+  static bool isLocalChapter(String chapterUrl) {
+    return chapterUrl.startsWith('custom://') ||
+           chapterUrl.startsWith('user_chapter_');
   }
 
   /// 创建用户自定义空小说
@@ -758,5 +772,130 @@ class DatabaseService {
   Future<void> close() async {
     final db = await database;
     await db.close();
+  }
+
+  /// 更新小说在书架中的信息
+  Future<void> updateNovelInBookshelf(Novel novel) async {
+    final db = await database;
+    await db.update(
+      'bookshelf',
+      {
+        'title': novel.title,
+        'author': novel.author,
+        'coverUrl': novel.coverUrl,
+        'description': novel.description,
+        'lastReadChapterIndex': novel.lastReadChapterIndex ?? 0,
+        'readingProgress': novel.readingProgress ?? 0.0,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'url = ?',
+      whereArgs: [novel.url],
+    );
+  }
+
+  /// 清理书架缓存（保留阅读进度）
+  Future<void> clearBookshelfCache() async {
+    final db = await database;
+    await db.update(
+      'bookshelf',
+      {'coverUrl': null, 'description': null},
+      where: '1 = 1',
+    );
+  }
+
+  /// 获取章节数量
+  Future<int> getCachedChaptersCount(String novelUrl) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM novel_chapters WHERE novelUrl = ?',
+      [novelUrl],
+    );
+    return result.first['count'] as int;
+  }
+
+  /// 根据URL获取章节
+  Future<Chapter?> getChapterByUrl(String chapterUrl) async {
+    final db = await database;
+    final maps = await db.query(
+      'novel_chapters',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      final map = maps.first;
+      return Chapter(
+        title: map['title'] as String,
+        url: map['chapterUrl'] as String,
+        chapterIndex: map['chapterIndex'] as int?,
+        isUserInserted: (map['isUserInserted'] as int?) == 1,
+      );
+    }
+    return null;
+  }
+
+  /// 删除用户章节
+  Future<void> deleteUserChapter(String chapterUrl) async {
+    final db = await database;
+
+    // 先获取要删除章节的信息
+    final chapterResult = await db.query(
+      'novel_chapters',
+      where: 'chapterUrl = ? AND isUserInserted = 1',
+      whereArgs: [chapterUrl],
+    );
+
+    if (chapterResult.isEmpty) {
+      return; // 章节不存在或不是用户章节
+    }
+
+    final deletedChapter = chapterResult.first;
+    final novelUrl = deletedChapter['novelUrl'] as String;
+    final deletedIndex = deletedChapter['chapterIndex'] as int;
+
+    final batch = db.batch();
+
+    // 删除章节元数据
+    batch.delete(
+      'novel_chapters',
+      where: 'chapterUrl = ? AND isUserInserted = 1',
+      whereArgs: [chapterUrl],
+    );
+
+    // 删除章节内容
+    batch.delete(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    await batch.commit(noResult: true);
+
+    // 重新排序章节索引：将删除位置之后的章节索引都减1
+    await db.rawUpdate(
+      'UPDATE novel_chapters SET chapterIndex = chapterIndex - 1 WHERE novelUrl = ? AND chapterIndex > ?',
+      [novelUrl, deletedIndex],
+    );
+
+    // 同时更新章节缓存表中的索引
+    await db.rawUpdate(
+      'UPDATE chapter_cache SET chapterIndex = chapterIndex - 1 WHERE novelUrl = ? AND chapterIndex > ?',
+      [novelUrl, deletedIndex],
+    );
+  }
+
+  /// 更新阅读进度
+  Future<void> updateReadingProgress(String novelUrl, int chapterIndex, double progress) async {
+    final db = await database;
+    await db.update(
+      'bookshelf',
+      {
+        'lastReadChapterIndex': chapterIndex,
+        'readingProgress': progress,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
   }
 }

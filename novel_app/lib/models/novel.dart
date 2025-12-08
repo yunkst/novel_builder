@@ -6,6 +6,8 @@ class Novel {
   final String? coverUrl;
   final String? description;
   final String? backgroundSetting;
+  final int? lastReadChapterIndex;
+  final double? readingProgress;
 
   Novel({
     required this.title,
@@ -15,6 +17,8 @@ class Novel {
     this.coverUrl,
     this.description,
     this.backgroundSetting,
+    this.lastReadChapterIndex,
+    this.readingProgress,
   });
 
   Map<String, dynamic> toMap() {

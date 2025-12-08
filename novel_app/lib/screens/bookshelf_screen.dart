@@ -174,9 +174,11 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
             child: const Text('取消'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (titleController.text.trim().isEmpty ||
-                  authorController.text.trim().isEmpty) {
+            onPressed: () async {
+              final title = titleController.text.trim();
+              final author = authorController.text.trim();
+
+              if (title.isEmpty || author.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('请填写小说标题和作者'),
@@ -185,12 +187,18 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                 );
                 return;
               }
-              Navigator.pop(context, {
-                'title': titleController.text.trim(),
-                'author': authorController.text.trim(),
-                'description': descriptionController.text.trim().isEmpty
-                    ? null
-                    : descriptionController.text.trim(),
+
+              final Map<String, String> resultData = {
+                'title': title,
+                'author': author,
+                'description': descriptionController.text.trim(),
+              };
+
+              // 使用微任务确保 Navigator 调用时机正确
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) {
+                  Navigator.pop(context, resultData);
+                }
               });
             },
             style: ElevatedButton.styleFrom(

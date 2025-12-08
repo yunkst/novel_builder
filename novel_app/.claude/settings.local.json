@@ -6,7 +6,8 @@
       "Bash(flutter pub:*)",
       "Bash(flutter analyze)",
       "Bash(flutter analyze --no-fatal-infos)",
-      "Read(//d/myspace/novel_builder/backend/**)"
+      "Read(//d/myspace/novel_builder/backend/**)",
+      "Bash(flutter analyze:*)"
     ],
     "deny": [],
     "ask": []
