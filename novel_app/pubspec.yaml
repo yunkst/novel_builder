@@ -78,6 +78,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
+  # 测试数据库
+  sqflite_common_ffi: ^2.3.0
+
   # JSON序列化代码生成
   build_runner: ^2.4.0
   json_serializable: ^6.7.0

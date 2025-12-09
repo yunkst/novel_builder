@@ -195,17 +195,24 @@ class _SearchScreenState extends State<SearchScreen> {
                 return const SizedBox.shrink();
               }
 
-              return IconButton(
-                icon: const Icon(Icons.storage),
-                tooltip: '搜索缓存内容',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CacheSearchScreen(),
-                    ),
-                  );
-                },
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey.shade50,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.storage),
+                  tooltip: '搜索本地已缓存章节内容（可能包含多个小说）',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CacheSearchScreen(),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           ),

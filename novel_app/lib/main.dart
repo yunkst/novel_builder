@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
@@ -9,15 +10,69 @@ void main() async {
   // 确保 Flutter 初始化完成
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化 API 服务
-  try {
-    await ApiServiceWrapper().init();
-  } catch (e) {
-    debugPrint('API 服务初始化失败: $e');
-    // 继续运行，用户可以在设置中配置
-  }
+  // 启用详细的错误日志 - 全局错误处理器
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('=== Flutter Error ===');
+    debugPrint('Exception: ${details.exception}');
+    debugPrint('Stack trace: ${details.stack}');
+    debugPrint('Library: ${details.library}');
+    debugPrint('Context: ${details.context}');
+    debugPrint('Information Collector: ${details.informationCollector}');
+    debugPrint('==================');
 
-  runApp(const NovelReaderApp());
+    // 同时确保错误信息输出到控制台
+    print('=== Flutter Error (print) ===');
+    print('Exception: ${details.exception}');
+    print('Stack trace: ${details.stack}');
+    print('==============================');
+  };
+
+  // 设置平台错误处理
+  // 注释掉PlatformDispatcher，因为某些Flutter版本不支持
+  // PlatformDispatcher.instance.onError = (error, stack) {
+  //   debugPrint('=== Platform Error ===');
+  //   debugPrint('Error: $error');
+  //   debugPrint('Stack trace: $stack');
+  //   debugPrint('====================');
+  //
+  //   print('=== Platform Error (print) ===');
+  //   print('Error: $error');
+  //   print('Stack trace: $stack');
+  //   print('==============================');
+  //
+  //   return true;
+  // };
+
+  // 捕获未处理的异步错误
+  runZonedGuarded(() async {
+    // 初始化 API 服务
+    try {
+      await ApiServiceWrapper().init();
+    } catch (e, stackTrace) {
+      debugPrint('=== API Service Error ===');
+      debugPrint('Exception: $e');
+      debugPrint('Stack trace: $stackTrace');
+      debugPrint('========================');
+
+      print('=== API Service Error (print) ===');
+      print('Exception: $e');
+      print('Stack trace: $stackTrace');
+      print('==============================');
+      // 继续运行，用户可以在设置中配置
+    }
+
+    runApp(const NovelReaderApp());
+  }, (error, stackTrace) {
+    debugPrint('=== Unhandled Async Error ===');
+    debugPrint('Error: $error');
+    debugPrint('Stack trace: $stackTrace');
+    debugPrint('==============================');
+
+    print('=== Unhandled Async Error (print) ===');
+    print('Error: $error');
+    print('Stack trace: $stackTrace');
+    print('==============================');
+  });
 }
 
 class NovelReaderApp extends StatelessWidget {
@@ -40,6 +95,37 @@ class NovelReaderApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       home: const HomePage(),
       debugShowCheckedModeBanner: true,
+      builder: (context, child) {
+        // 捕获并记录所有Widget错误
+        ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
+          debugPrint('=== Widget Error ===');
+          debugPrint('Exception: ${errorDetails.exception}');
+          debugPrint('Stack: ${errorDetails.stack}');
+          debugPrint('==================');
+          return MaterialApp(
+            home: Scaffold(
+              appBar: AppBar(title: const Text('Error Occurred')),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text('An error occurred. Check console for details.'),
+                    const SizedBox(height: 8),
+                    Text(
+                      errorDetails.exception.toString(),
+                      style: const TextStyle(fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        };
+        return child!;
+      },
     );
   }
 }

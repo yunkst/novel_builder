@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/character.dart';
 import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../widgets/highlighted_text.dart';
+import '../widgets/character_selector.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -45,6 +47,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   // 特写模式相关状态
   bool _isCloseupMode = false;
+  List<int> _selectedCharacterIds = []; // 新增：选中的人物ID列表
   List<int> _selectedParagraphIndices = [];
   final ValueNotifier<String> _rewriteResultNotifier =
       ValueNotifier<String>('');
@@ -861,28 +864,56 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('输入改写要求'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: userInputController,
-              decoration: const InputDecoration(
-                hintText: '例如：增加细节描述、改变语气、加强情感表达等...',
-                border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '已选择 ${_selectedParagraphIndices.length} 个段落',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
               ),
-              autofocus: true,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '已选择 ${_selectedParagraphIndices.length} 个段落',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+              const SizedBox(height: 12),
+              TextField(
+                controller: userInputController,
+                decoration: const InputDecoration(
+                  hintText: '例如：增加细节描述、改变语气、加强情感表达等...',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                maxLines: 3,
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // ✨ 新增：人物选择器
+              const Text(
+                '出场人物（可选）',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              CharacterSelector(
+                novelUrl: widget.novel.url,
+                initialSelectedIds: _selectedCharacterIds,
+                onSelectionChanged: (selectedIds) {
+                  _selectedCharacterIds = selectedIds;
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'AI将根据选中的角色特征来改写内容',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blue.shade600,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -933,6 +964,15 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
+      // 获取选中人物信息并格式化为AI可读文本
+      String rolesInfo = '';
+      if (_selectedCharacterIds.isNotEmpty) {
+        final selectedCharacters = await _databaseService.getCharactersByIds(_selectedCharacterIds);
+        rolesInfo = Character.formatForAI(selectedCharacters);
+      } else {
+        rolesInfo = '无特定角色出场';
+      }
+
       final difyService = DifyService();
 
       // 使用流式 API
@@ -942,6 +982,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         currentChapterContent: _content,
         historyChaptersContent: historyChaptersContent,
         backgroundSetting: widget.novel.backgroundSetting ?? '',
+        roles: rolesInfo, // ✨ 新增角色参数
         onChunk: (chunk) {
           debugPrint('🔥 onChunk 回调收到: "$chunk"');
           debugPrint('📝 当前result长度: ${_rewriteResultNotifier.value.length}');

@@ -1,9 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
+import '../models/character.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -33,7 +34,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -82,6 +83,26 @@ class DatabaseService {
         UNIQUE(novelUrl, chapterUrl)
       )
     ''');
+
+    // 创建人物表
+    await db.execute('''
+      CREATE TABLE characters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        novelUrl TEXT NOT NULL,
+        name TEXT NOT NULL,
+        age INTEGER,
+        gender TEXT,
+        occupation TEXT,
+        personality TEXT,
+        bodyType TEXT,
+        clothingStyle TEXT,
+        appearanceFeatures TEXT,
+        backgroundStory TEXT,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
+        UNIQUE(novelUrl, name)
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -98,6 +119,27 @@ class DatabaseService {
       // 添加背景设定字段
       await db.execute('''
         ALTER TABLE bookshelf ADD COLUMN backgroundSetting TEXT
+      ''');
+    }
+    if (oldVersion < 4) {
+      // 创建人物表
+      await db.execute('''
+        CREATE TABLE characters (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          novelUrl TEXT NOT NULL,
+          name TEXT NOT NULL,
+          age INTEGER,
+          gender TEXT,
+          occupation TEXT,
+          personality TEXT,
+          bodyType TEXT,
+          clothingStyle TEXT,
+          appearanceFeatures TEXT,
+          backgroundStory TEXT,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER,
+          UNIQUE(novelUrl, name)
+        )
       ''');
     }
   }
@@ -673,7 +715,7 @@ class DatabaseService {
       {String? novelUrl}) async {
     final db = await database;
 
-    String whereClause = "content LIKE ? OR title LIKE ?";
+    String whereClause = "(content LIKE ? OR title LIKE ?)";
     List<dynamic> whereArgs = ['%$keyword%', '%$keyword%'];
 
     if (novelUrl != null && novelUrl.isNotEmpty) {
@@ -699,17 +741,17 @@ class DatabaseService {
           _findMatchPositions(content, keyword);
 
       results.add(ChapterSearchResult(
-        novelUrl: maps[i]['novelUrl'] ?? '',
+        novelUrl: maps[i]['novelUrl']?.toString() ?? '',
         novelTitle: title, // 使用章节标题作为小说标题（临时解决方案）
         novelAuthor: '未知作者', // 数据库中没有作者信息，需要从书架表获取
-        chapterUrl: maps[i]['chapterUrl'] ?? '',
+        chapterUrl: maps[i]['chapterUrl']?.toString() ?? '',
         chapterTitle: title,
-        chapterIndex: maps[i]['chapterIndex'] ?? 0,
+        chapterIndex: int.tryParse(maps[i]['chapterIndex']?.toString() ?? '0') ?? 0,
         content: content,
         searchKeywords: [keyword],
         matchPositions: matchPositions,
         cachedAt:
-            DateTime.tryParse(maps[i]['cachedAt'] ?? '') ?? DateTime.now(),
+            DateTime.tryParse(maps[i]['cachedAt']?.toString() ?? '') ?? DateTime.now(),
       ));
     }
 
@@ -895,6 +937,128 @@ class DatabaseService {
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+  }
+
+  // ========== 人物卡操作 ==========
+
+  /// 创建人物卡
+  Future<int> createCharacter(Character character) async {
+    final db = await database;
+    return await db.insert(
+      'characters',
+      character.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// 获取小说的所有人物卡
+  Future<List<Character>> getCharacters(String novelUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+      orderBy: 'createdAt ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Character.fromMap(maps[i]);
+    });
+  }
+
+  /// 根据ID获取人物卡
+  Future<Character?> getCharacter(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Character.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  /// 更新人物卡
+  Future<int> updateCharacter(Character character) async {
+    final db = await database;
+    final updatedCharacter = character.copyWith(
+      updatedAt: DateTime.now(),
+    );
+
+    return await db.update(
+      'characters',
+      updatedCharacter.toMap(),
+      where: 'id = ?',
+      whereArgs: [character.id],
+    );
+  }
+
+  /// 删除人物卡
+  Future<int> deleteCharacter(int id) async {
+    final db = await database;
+    return await db.delete(
+      'characters',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 根据名称查找人物卡
+  Future<Character?> findCharacterByName(String novelUrl, String name) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      where: 'novelUrl = ? AND name = ?',
+      whereArgs: [novelUrl, name],
+    );
+
+    if (maps.isNotEmpty) {
+      return Character.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  /// 检查人物卡是否存在
+  Future<bool> characterExists(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return maps.isNotEmpty;
+  }
+
+  /// 根据ID列表获取多个人物卡
+  Future<List<Character>> getCharactersByIds(List<int> ids) async {
+    if (ids.isEmpty) return [];
+
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+      orderBy: 'createdAt ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Character.fromMap(maps[i]);
+    });
+  }
+
+  /// 删除小说的所有人物卡
+  Future<int> deleteAllCharacters(String novelUrl) async {
+    final db = await database;
+    return await db.delete(
+      'characters',
+      where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );
   }

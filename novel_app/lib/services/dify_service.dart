@@ -78,6 +78,7 @@ class DifyService {
     required String currentChapterContent,
     required List<String> historyChaptersContent,
     String backgroundSetting = '',
+    String? roles, // 新增角色参数
     required Function(String chunk) onChunk,
     Function()? onComplete,
   }) async {
@@ -131,6 +132,7 @@ class DifyService {
           'current_chapter_content': currentChapterContent,
           'choice_content': selectedParagraph,
           'background_setting': backgroundSetting,
+          'roles': roles ?? '无特定角色出场',
         },
         'response_mode': 'streaming',
         'user': 'novel-builder-app',

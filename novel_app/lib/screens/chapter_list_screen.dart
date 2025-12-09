@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/character.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
 import '../services/cache_sync_service.dart';
-import 'reader_screen.dart';
-import 'chapter_search_screen.dart';
+import '../widgets/character_selector.dart';
+import '../screens/reader_screen.dart';
+import '../screens/chapter_search_screen.dart';
+import '../screens/character_management_screen.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -25,6 +28,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   final CacheManager _cacheManager = CacheManager();
   final ScrollController _scrollController = ScrollController();
   List<Chapter> _chapters = [];
+  List<int> _selectedCharacterIds = []; // 新增：选中的人物ID列表
   bool _isLoading = true;
   bool _isInBookshelf = false;
   String _errorMessage = '';
@@ -345,6 +349,17 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               ),
               maxLines: 5,
             ),
+            const SizedBox(height: 16),
+
+            // ✨ 新增：人物选择器
+            CharacterSelector(
+              novelUrl: widget.novel.url,
+              initialSelectedIds: _selectedCharacterIds,
+              onSelectionChanged: (selectedIds) {
+                _selectedCharacterIds = selectedIds;
+              },
+            ),
+
             const SizedBox(height: 8),
             Text(
               '提示：AI将根据你的要求生成新的章节内容',
@@ -535,6 +550,15 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         historyChaptersContent += '作者：${widget.novel.author}\n';
       }
 
+      // 获取选中人物信息并格式化为AI可读文本
+      String rolesInfo = '';
+      if (_selectedCharacterIds.isNotEmpty) {
+        final selectedCharacters = await _databaseService.getCharactersByIds(_selectedCharacterIds);
+        rolesInfo = Character.formatForAI(selectedCharacters);
+      } else {
+        rolesInfo = '无特定角色出场';
+      }
+
       // 构建Dify请求参数（参考特写功能，但cmd为空，current_chapter_content为空）
       final inputs = {
         'user_input': userInput,
@@ -544,7 +568,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         'background_setting': widget.novel.description ?? '',
         'ai_writer_setting': '', // 可以从设置中获取
         'next_chapter_overview': '',
-        'characters_info': '',
+        'roles': rolesInfo, // ✨ 新增角色信息
       };
 
       // 调用Dify流式生成
@@ -839,6 +863,20 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               );
             },
             tooltip: '搜索章节内容',
+          ),
+          // 人物管理按钮
+          IconButton(
+            icon: const Icon(Icons.people),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      CharacterManagementScreen(novel: widget.novel),
+                ),
+              );
+            },
+            tooltip: '人物管理',
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
