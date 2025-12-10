@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/services/chapter_search_service.dart';
-import 'package:novel_app/models/search_result.dart';
 
 void main() {
   // 初始化FFI数据库工厂
@@ -42,10 +42,10 @@ void main() {
       // 先查看数据库中的数据
       final db = await databaseService.database;
       final allData = await db.query('chapter_cache');
-      print('数据库中所有数据:');
+      debugPrint('数据库中所有数据:');
       for (final row in allData) {
-        print('  ${row['novelUrl']}: ${row['title']}');
-        print('    内容: ${row['content']}');
+        debugPrint('  ${row['novelUrl']}: ${row['title']}');
+        debugPrint('    内容: ${row['content']}');
       }
 
       // 手动测试SQL查询
@@ -55,9 +55,9 @@ void main() {
         WHERE (content LIKE ? OR title LIKE ?) AND novelUrl = ?
       ''', ['%$keyword%', '%$keyword%', targetNovelUrl]);
 
-      print('手动SQL查询结果:');
+      debugPrint('手动SQL查询结果:');
       for (final row in manualResults) {
-        print('  ${row['novelUrl']}: ${row['title']}');
+        debugPrint('  ${row['novelUrl']}: ${row['title']}');
       }
 
       // 直接调用数据库服务
@@ -66,9 +66,9 @@ void main() {
         novelUrl: targetNovelUrl,
       );
 
-      print('数据库服务搜索结果:');
+      debugPrint('数据库服务搜索结果:');
       for (final result in results) {
-        print('  ${result.novelUrl}: ${result.chapterTitle}');
+        debugPrint('  ${result.novelUrl}: ${result.chapterTitle}');
       }
 
       // 验证结果

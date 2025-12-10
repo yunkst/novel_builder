@@ -221,7 +221,7 @@ void main() {
       final character3 = Character(name: '角色3', novelUrl: testNovelUrl);
 
       final id1 = await databaseService.createCharacter(character1);
-      final id2 = await databaseService.createCharacter(character2);
+      await databaseService.createCharacter(character2);
       final id3 = await databaseService.createCharacter(character3);
 
       // 批量获取角色

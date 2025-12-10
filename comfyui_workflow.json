@@ -1,0 +1,61 @@
+{
+  "prompt": {
+    "1": {
+      "inputs": {
+        "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
+      },
+      "class_type": "CheckpointLoaderSimple"
+    },
+    "2": {
+      "inputs": {
+        "text": "beautiful young woman, professional ID photo, portrait, formal attire, clean background, studio lighting, high quality, detailed face, realistic",
+        "clip": ["1", 1]
+      },
+      "class_type": "CLIPTextEncode"
+    },
+    "3": {
+      "inputs": {
+        "text": "blurry, low quality, distorted, ugly, bad anatomy, extra limbs, poorly drawn face, poorly drawn hands, missing fingers, extra fingers, mutated hands, fused fingers, too many fingers",
+        "clip": ["1", 1]
+      },
+      "class_type": "CLIPTextEncode"
+    },
+    "4": {
+      "inputs": {
+        "width": 512,
+        "height": 512,
+        "batch_size": 1
+      },
+      "class_type": "EmptyLatentImage"
+    },
+    "5": {
+      "inputs": {
+        "seed": 123456789,
+        "steps": 20,
+        "cfg": 7,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": ["1", 0],
+        "positive": ["2", 0],
+        "negative": ["3", 0],
+        "latent_image": ["4", 0]
+      },
+      "class_type": "KSampler"
+    },
+    "6": {
+      "inputs": {
+        "samples": ["5", 0],
+        "vae": ["1", 2]
+      },
+      "class_type": "VAEDecode"
+    },
+    "7": {
+      "inputs": {
+        "filename_prefix": "ID_photo_woman",
+        "images": ["6", 0]
+      },
+      "class_type": "SaveImage"
+    }
+  }
+}

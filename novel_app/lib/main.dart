@@ -20,12 +20,7 @@ void main() async {
     debugPrint('Information Collector: ${details.informationCollector}');
     debugPrint('==================');
 
-    // 同时确保错误信息输出到控制台
-    print('=== Flutter Error (print) ===');
-    print('Exception: ${details.exception}');
-    print('Stack trace: ${details.stack}');
-    print('==============================');
-  };
+      };
 
   // 设置平台错误处理
   // 注释掉PlatformDispatcher，因为某些Flutter版本不支持
@@ -54,11 +49,7 @@ void main() async {
       debugPrint('Stack trace: $stackTrace');
       debugPrint('========================');
 
-      print('=== API Service Error (print) ===');
-      print('Exception: $e');
-      print('Stack trace: $stackTrace');
-      print('==============================');
-      // 继续运行，用户可以在设置中配置
+            // 继续运行，用户可以在设置中配置
     }
 
     runApp(const NovelReaderApp());
@@ -68,11 +59,7 @@ void main() async {
     debugPrint('Stack trace: $stackTrace');
     debugPrint('==============================');
 
-    print('=== Unhandled Async Error (print) ===');
-    print('Error: $error');
-    print('Stack trace: $stackTrace');
-    print('==============================');
-  });
+      });
 }
 
 class NovelReaderApp extends StatelessWidget {

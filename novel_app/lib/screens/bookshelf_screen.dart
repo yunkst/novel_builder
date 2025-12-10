@@ -88,6 +88,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   Future<void> _removeFromBookshelf(Novel novel) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
         content: Text('确定要从书架移除《${novel.title}》吗？'),
@@ -123,6 +124,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
     final result = await showDialog<Map<String, String>>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
@@ -247,6 +249,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
     final result = await showDialog<Map<String, String>>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: Row(
           children: [

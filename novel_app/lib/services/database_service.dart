@@ -5,6 +5,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../models/character.dart';
+import '../services/api_service_wrapper.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -1023,6 +1024,88 @@ class DatabaseService {
     return null;
   }
 
+  /// 更新或插入角色（去重逻辑）
+  /// 如果角色已存在（按novelUrl和name匹配），则更新现有角色
+  /// 如果角色不存在，则创建新角色
+  Future<Character> updateOrInsertCharacter(Character newCharacter) async {
+    final db = await database;
+
+    // 查找是否已存在同名角色
+    final existingCharacter = await findCharacterByName(
+      newCharacter.novelUrl,
+      newCharacter.name,
+    );
+
+    if (existingCharacter != null) {
+      // 更新现有角色，保留原有ID和创建时间
+      final updatedCharacter = existingCharacter.copyWith(
+        age: newCharacter.age,
+        gender: newCharacter.gender,
+        occupation: newCharacter.occupation,
+        personality: newCharacter.personality,
+        bodyType: newCharacter.bodyType,
+        clothingStyle: newCharacter.clothingStyle,
+        appearanceFeatures: newCharacter.appearanceFeatures,
+        backgroundStory: newCharacter.backgroundStory,
+        updatedAt: DateTime.now(),
+      );
+
+      await db.update(
+        'characters',
+        updatedCharacter.toMap(),
+        where: 'id = ?',
+        whereArgs: [existingCharacter.id],
+      );
+
+      debugPrint('更新角色: ${newCharacter.name} (ID: ${existingCharacter.id})');
+      return updatedCharacter;
+    } else {
+      // 创建新角色
+      final id = await db.insert(
+        'characters',
+        newCharacter.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      debugPrint('创建新角色: ${newCharacter.name} (ID: $id)');
+      return newCharacter.copyWith(id: id);
+    }
+  }
+
+  /// 批量更新角色
+  /// 接受新角色列表，对每个角色执行去重更新逻辑
+  Future<List<Character>> batchUpdateCharacters(List<Character> newCharacters) async {
+    final updatedCharacters = <Character>[];
+
+    for (final character in newCharacters) {
+      try {
+        final updatedCharacter = await updateOrInsertCharacter(character);
+        updatedCharacters.add(updatedCharacter);
+      } catch (e) {
+        debugPrint('批量更新角色失败: ${character.name}, 错误: $e');
+        // 继续处理其他角色，不中断整个批量操作
+        continue;
+      }
+    }
+
+    debugPrint('批量更新完成，成功更新 ${updatedCharacters.length}/${newCharacters.length} 个角色');
+    return updatedCharacters;
+  }
+
+  /// 获取小说的所有角色名称
+  Future<List<String>> getCharacterNames(String novelUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      columns: ['name'],
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+      orderBy: 'name ASC',
+    );
+
+    return maps.map((map) => map['name'] as String).toList();
+  }
+
   /// 检查人物卡是否存在
   Future<bool> characterExists(int id) async {
     final db = await database;
@@ -1061,5 +1144,69 @@ class DatabaseService {
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );
+  }
+
+  // ========== 角色上下文提取功能 ==========
+
+  /// 获取小说的所有章节（按索引排序）
+  Future<List<Chapter>> getChapters(String novelUrl) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'novel_chapters',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+      orderBy: 'chapterIndex ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Chapter(
+        title: maps[i]['title'] ?? '',
+        url: maps[i]['chapterUrl'] ?? '',
+        chapterIndex: maps[i]['chapterIndex'] ?? 0,
+      );
+    });
+  }
+
+  /// 获取章节内容
+  Future<String> getChapterContent(String chapterUrl) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first['content'] ?? '';
+    }
+
+    // 如果本地缓存没有，尝试从API获取
+    try {
+      final apiService = ApiServiceWrapper();
+      final content = await apiService.getChapterContent(chapterUrl);
+      return content;
+    } catch (e) {
+      debugPrint('获取章节内容失败: $e');
+      return '';
+    }
+  }
+
+  /// 仅从本地缓存获取章节内容（不调用API）
+  Future<String> getCachedChapterContent(String chapterUrl) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chapter_cache',
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first['content'] ?? '';
+    }
+
+    return ''; // 本地缓存没有时直接返回空字符串
   }
 }

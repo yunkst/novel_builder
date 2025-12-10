@@ -3,74 +3,38 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import '../models/character.dart';
 import 'dify_sse_parser.dart';
 import 'stream_state_manager.dart';
 
 class DifyService {
-  Future<String> generateCloseUp({
-    required String selectedParagraph,
-    required String userInput,
-    required String currentChapterContent,
-    required List<String> historyChaptersContent,
-  }) async {
+  // 获取流式响应token
+  Future<String> _getFlowToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
-    final difyToken = prefs.getString('dify_token');
-
-    if (difyUrl == null ||
-        difyUrl.isEmpty ||
-        difyToken == null ||
-        difyToken.isEmpty) {
-      throw Exception('请先在设置中配置 Dify URL 和 Token');
+    final token = prefs.getString('dify_flow_token');
+    if (token == null || token.isEmpty) {
+      throw Exception('请先在设置中配置 Flow Token (流式响应)');
     }
-
-    final url = Uri.parse('$difyUrl/workflows/run');
-
-    final body = jsonEncode({
-      'inputs': {
-        'user_input': userInput,
-        'cmd': '特写',
-        'history_chapters_content': historyChaptersContent.join('\n\n'),
-        'current_chapter_content': currentChapterContent,
-        'choice_content': selectedParagraph,
-      },
-      'response_mode': 'blocking',
-      'user': 'novel-builder-app',
-    });
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Authorization': 'Bearer $difyToken',
-        'Content-Type': 'application/json',
-      },
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-
-      final workflowData = data['data'];
-      if (workflowData != null && workflowData['status'] == 'succeeded') {
-        final outputs = workflowData['outputs'];
-        if (outputs != null) {
-          if (outputs.values.isNotEmpty) {
-            return outputs.values.first.toString();
-          } else {
-            return 'Workflow executed successfully, but returned no output.';
-          }
-        }
-      } else {
-        final error = workflowData?['error'] ?? 'Unknown workflow error';
-        throw Exception('Workflow execution failed: $error');
-      }
-      return 'No valid output from workflow.';
-    } else {
-      throw Exception(
-          'Dify API 请求失败: ${response.statusCode}\n${response.body}');
-    }
+    return token;
   }
 
+  // 获取结构化响应token
+  // TODO: 为未来功能预留，当前未使用
+  Future<String> _getStructToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('dify_struct_token');
+    if (token == null || token.isEmpty) {
+      // 如果struct_token不存在，尝试使用flow_token作为降级
+      final flowToken = prefs.getString('dify_flow_token');
+      if (flowToken != null && flowToken.isNotEmpty) {
+        debugPrint('⚠️ Struct Token未配置，使用Flow Token作为降级');
+        return flowToken;
+      }
+      throw Exception('请先在设置中配置 Struct Token (结构化响应)');
+    }
+    return token;
+  }
+  
   // 流式生成特写内容 - 使用新的SSE解析器
   Future<void> generateCloseUpStreaming({
     required String selectedParagraph,
@@ -84,14 +48,11 @@ class DifyService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final difyUrl = prefs.getString('dify_url');
-    final difyToken = prefs.getString('dify_token');
+    final difyToken = await _getFlowToken();
     final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
 
-    if (difyUrl == null ||
-        difyUrl.isEmpty ||
-        difyToken == null ||
-        difyToken.isEmpty) {
-      throw Exception('请先在设置中配置 Dify URL 和 Token');
+    if (difyUrl == null || difyUrl.isEmpty) {
+      throw Exception('请先在设置中配置 Dify URL');
     }
 
       // 创建状态管理器
@@ -283,13 +244,10 @@ class DifyService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final difyUrl = prefs.getString('dify_url');
-    final difyToken = prefs.getString('dify_token');
+    final difyToken = await _getFlowToken();
 
-    if (difyUrl == null ||
-        difyUrl.isEmpty ||
-        difyToken == null ||
-        difyToken.isEmpty) {
-      throw Exception('请先在设置中配置 Dify URL 和 Token');
+    if (difyUrl == null || difyUrl.isEmpty) {
+      throw Exception('请先在设置中配置 Dify URL');
     }
 
     final url = Uri.parse('$difyUrl/workflows/run');
@@ -423,6 +381,231 @@ class DifyService {
       } else {
         rethrow;
       }
+    }
+  }
+
+  // 通用的阻塞式工作流执行方法
+  Future<Map<String, dynamic>?> runWorkflowBlocking({
+    required Map<String, dynamic> inputs,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final difyUrl = prefs.getString('dify_url');
+    final difyToken = await _getStructToken();
+
+    if (difyUrl == null || difyUrl.isEmpty) {
+      throw Exception('请先在设置中配置 Dify URL');
+    }
+
+    final url = Uri.parse('$difyUrl/workflows/run');
+
+    final requestBody = {
+      'inputs': inputs,
+      'response_mode': 'blocking',
+      'user': 'novel-builder-app',
+    };
+
+    debugPrint('=== Dify API 非流式请求 ===');
+    debugPrint('URL: $url');
+    debugPrint('Request Body: ${jsonEncode(requestBody)}');
+    debugPrint('========================');
+
+    final body = jsonEncode(requestBody);
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $difyToken',
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+
+      debugPrint('=== Dify API 非流式响应 ===');
+      debugPrint('Response: $data');
+      debugPrint('==========================');
+
+      final workflowData = data['data'];
+      if (workflowData != null && workflowData['status'] == 'succeeded') {
+        final outputs = workflowData['outputs'];
+        return outputs;
+      } else {
+        final error = workflowData?['error'] ?? 'Unknown workflow error';
+        throw Exception('Workflow execution failed: $error');
+      }
+    } else {
+      final errorBody = response.body;
+      debugPrint('=== Dify API 错误响应 ===');
+      debugPrint('状态码: ${response.statusCode}');
+      debugPrint('响应体: $errorBody');
+      debugPrint('========================');
+
+      String errorMessage = '未知错误';
+      try {
+        final errorData = jsonDecode(errorBody);
+        errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
+        final errorCode = errorData['code'] ?? '';
+        errorMessage = '错误码: $errorCode\n错误信息: $errorMessage';
+      } catch (e) {
+        errorMessage = errorBody;
+      }
+
+      throw Exception('Dify API 请求失败 (${response.statusCode}): $errorMessage');
+    }
+  }
+
+  // AI生成角色专用方法
+  Future<List<Character>> generateCharacters({
+    required String userInput,
+    required String novelUrl,
+    required String backgroundSetting,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+
+    final inputs = {
+      'user_input': userInput,
+      'cmd': '生成',
+      'ai_writer_setting': aiWriterSetting,
+      'background_setting': backgroundSetting,
+    };
+
+    debugPrint('=== 开始AI生成角色 ===');
+    debugPrint('用户输入: $userInput');
+    debugPrint('小说背景: $backgroundSetting');
+    debugPrint('作家设定: $aiWriterSetting');
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('AI生成失败：未收到有效响应');
+    }
+
+    // 获取content字段
+    final content = outputs['content'];
+
+    try {
+      // 解析JSON数据
+
+      debugPrint('=== JSON解析成功 ===');
+
+      // 获取roles数组
+      final List<dynamic> charactersData = content['roles'] ?? [];
+      debugPrint('=== 角色数组长度: ${charactersData.length} ===');
+      final List<Character> characters = [];
+
+      for (var characterData in charactersData) {
+        try {
+          final character = Character(
+            novelUrl: novelUrl,
+            name: characterData['name']?.toString() ?? '未知角色',
+            gender: characterData['gender']?.toString(),
+            age: characterData['age'] is String
+                ? int.tryParse(characterData['age']) ?? 0
+                : characterData['age']?.toInt(),
+            occupation: characterData['occupation']?.toString(),
+            personality: characterData['personality']?.toString(),
+            bodyType: characterData['bodyType']?.toString(),
+            clothingStyle: characterData['clothingStyle']?.toString(),
+            appearanceFeatures: characterData['appearanceFeatures']?.toString(),
+            backgroundStory: characterData['backgroundStory']?.toString(),
+          );
+          characters.add(character);
+        } catch (e) {
+          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          // 跳过无效的角色数据，继续处理其他角色
+          continue;
+        }
+      }
+
+      debugPrint('成功解析 ${characters.length} 个角色');
+      return characters;
+
+    } catch (e) {
+      debugPrint('解析角色列表失败: $e, 原始数据: $content');
+      throw Exception('角色数据解析失败: $e');
+    }
+  }
+
+  // 更新角色卡专用方法
+  Future<List<Character>> updateCharacterCards({
+    required String chaptersContent,
+    required String roles,
+    required String novelUrl,
+    String backgroundSetting = '',
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+
+    final inputs = {
+      'chapters_content': chaptersContent,
+      'roles': roles,
+      'cmd': 'update_characters', // 使用新的命令类型
+      'ai_writer_setting': aiWriterSetting,
+      'background_setting': backgroundSetting,
+    };
+
+    debugPrint('=== 开始AI更新角色卡 ===');
+    debugPrint('章节内容长度: ${chaptersContent.length} 字符');
+    debugPrint('现有角色信息: $roles');
+    debugPrint('小说背景: $backgroundSetting');
+    debugPrint('作家设定: $aiWriterSetting');
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('角色更新失败：未收到有效响应');
+    }
+
+    // 获取content字段
+    final content = outputs['content'];
+
+    try {
+      // 解析JSON数据
+      debugPrint('=== JSON解析成功 ===');
+
+      // 获取roles数组
+      final List<dynamic> charactersData = content['roles'] ?? [];
+      debugPrint('=== 更新后角色数组长度: ${charactersData.length} ===');
+      final List<Character> characters = [];
+
+      for (var characterData in charactersData) {
+        try {
+          final character = Character(
+            novelUrl: novelUrl,
+            name: characterData['name']?.toString() ?? '未知角色',
+            gender: characterData['gender']?.toString(),
+            age: characterData['age'] is String
+                ? int.tryParse(characterData['age']) ?? 0
+                : characterData['age']?.toInt(),
+            occupation: characterData['occupation']?.toString(),
+            personality: characterData['personality']?.toString(),
+            bodyType: characterData['bodyType']?.toString(),
+            clothingStyle: characterData['clothingStyle']?.toString(),
+            appearanceFeatures: characterData['appearanceFeatures']?.toString(),
+            backgroundStory: characterData['backgroundStory']?.toString(),
+          );
+          characters.add(character);
+          debugPrint('成功解析角色: ${character.name}');
+        } catch (e) {
+          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          // 跳过无效的角色数据，继续处理其他角色
+          continue;
+        }
+      }
+
+      debugPrint('成功更新 ${characters.length} 个角色');
+      return characters;
+
+    } catch (e) {
+      debugPrint('解析更新角色列表失败: $e, 原始数据: $content');
+      throw Exception('角色更新数据解析失败: $e');
     }
   }
 }

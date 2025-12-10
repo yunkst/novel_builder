@@ -20,9 +20,7 @@ void main() {
   group('搜索结果点击跳转逻辑测试', () {
     late DatabaseService databaseService;
     late Novel testNovel;
-    late List<Chapter> testChapters;
-    late List<ChapterSearchResult> testSearchResults;
-
+        
     setUpAll(() async {
       databaseService = DatabaseService();
       await databaseService.database;
@@ -34,68 +32,6 @@ void main() {
         url: 'https://example.com/test-novel',
         isInBookshelf: true,
       );
-
-      // 创建测试章节
-      testChapters = [
-        Chapter(
-          title: '第一章：开始',
-          url: 'https://example.com/test-novel/chapter1',
-          content: '这是第一章的内容，包含了重要的情节。',
-          chapterIndex: 1,
-        ),
-        Chapter(
-          title: '第二章：发展',
-          url: 'https://example.com/test-novel/chapter2',
-          content: '这是第二章的内容，主角遇到了重要的人。',
-          chapterIndex: 2,
-        ),
-        Chapter(
-          title: '第三章：高潮',
-          url: 'https://example.com/test-novel/chapter3',
-          content: '这是第三章的内容，故事达到高潮。',
-          chapterIndex: 3,
-        ),
-      ];
-
-      // 创建测试搜索结果
-      testSearchResults = [
-        ChapterSearchResult(
-          novelUrl: testNovel.url,
-          novelTitle: testNovel.title,
-          novelAuthor: testNovel.author,
-          chapterUrl: testChapters[0].url,
-          chapterTitle: testChapters[0].title!,
-          chapterIndex: 1,
-          content: '这是第一章的内容，包含了重要的情节。',
-          searchKeywords: ['内容'],
-          matchPositions: [
-            MatchPosition(
-              start: 6,
-              end: 8,
-              matchedText: '内容',
-            ),
-          ],
-          cachedAt: DateTime.now(),
-        ),
-        ChapterSearchResult(
-          novelUrl: testNovel.url,
-          novelTitle: testNovel.title,
-          novelAuthor: testNovel.author,
-          chapterUrl: testChapters[1].url,
-          chapterTitle: testChapters[1].title!,
-          chapterIndex: 2,
-          content: '这是第二章的内容，主角遇到了重要的人。',
-          searchKeywords: ['内容'],
-          matchPositions: [
-            MatchPosition(
-              start: 6,
-              end: 8,
-              matchedText: '内容',
-            ),
-          ],
-          cachedAt: DateTime.now(),
-        ),
-      ];
     });
 
     setUp(() async {

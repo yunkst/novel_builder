@@ -66,7 +66,7 @@ void main() {
         novelTitle: testNovel.title,
         novelAuthor: testNovel.author,
         chapterUrl: testChapter.url,
-        chapterTitle: testChapter.title!,
+        chapterTitle: testChapter.title,
         chapterIndex: testChapter.chapterIndex!,
         content: testChapter.content!,
         searchKeywords: ['导航', '测试'],
@@ -115,7 +115,7 @@ void main() {
         novelTitle: testNovel.title,
         novelAuthor: testNovel.author,
         chapterUrl: testChapter.url,
-        chapterTitle: testChapter.title!,
+        chapterTitle: testChapter.title,
         chapterIndex: testChapter.chapterIndex!,
         content: testChapter.content!,
         searchKeywords: ['测试'],
@@ -156,7 +156,7 @@ void main() {
       expect(testChapter.chapterIndex, greaterThanOrEqualTo(0), reason: '章节索引应该为非负数');
 
       // 3. 验证标题不为空
-      expect(testChapter.title!.isNotEmpty, isTrue, reason: '章节标题不应为空');
+      expect(testChapter.title.isNotEmpty, isTrue, reason: '章节标题不应为空');
       expect(testNovel.title.isNotEmpty, isTrue, reason: '小说标题不应为空');
     });
 
@@ -187,7 +187,7 @@ void main() {
         novelTitle: testNovel.title,
         novelAuthor: testNovel.author,
         chapterUrl: testChapter.url,
-        chapterTitle: testChapter.title!,
+        chapterTitle: testChapter.title,
         chapterIndex: testChapter.chapterIndex!,
         content: testChapter.content!,
         searchKeywords: [],

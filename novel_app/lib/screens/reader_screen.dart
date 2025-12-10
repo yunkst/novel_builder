@@ -9,6 +9,8 @@ import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/character_selector.dart';
+import '../widgets/character_preview_dialog.dart';
+import '../utils/character_matcher.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -336,6 +338,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
     showDialog(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Text('搜索匹配详情'),
         content: SingleChildScrollView(
@@ -404,19 +407,20 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       // 构建预加载列表：优先后续章节
       final List<Chapter> chaptersToPreload = [];
 
-      // 添加后续章节（优先）
-      for (int i = currentIndex + 1;
-          i < widget.chapters.length && chaptersToPreload.length < 10;
-          i++) {
+      // 添加后续章节（优先）- 移除数量限制
+      for (int i = currentIndex + 1; i < widget.chapters.length; i++) {
         chaptersToPreload.add(widget.chapters[i]);
       }
 
-      // 添加前面的章节
-      for (int i = currentIndex - 1;
-          i >= 0 && chaptersToPreload.length < 15;
-          i--) {
+      // 添加前面的章节 - 移除数量限制
+      for (int i = currentIndex - 1; i >= 0; i--) {
         chaptersToPreload.add(widget.chapters[i]);
       }
+
+      debugPrint('=== 开始预加载章节 ===');
+      debugPrint('当前章节: ${_currentChapter.title}');
+      debugPrint('总章节数: ${widget.chapters.length}');
+      debugPrint('预加载章节数: ${chaptersToPreload.length}');
 
       // 后台预加载
       _preloadChaptersInBackground(chaptersToPreload);
@@ -427,9 +431,19 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   /// 后台预加载章节
   Future<void> _preloadChaptersInBackground(List<Chapter> chapters) async {
-    for (final chapter in chapters) {
+    int loadedCount = 0;
+    final totalCount = chapters.length;
+
+    debugPrint('=== 开始后台预加载，总数: $totalCount ===');
+
+    for (int i = 0; i < chapters.length; i++) {
+      final chapter = chapters[i];
+
       // 检查是否已预加载或已缓存
-      if (_preloadedChapterUrls.contains(chapter.url)) continue;
+      if (_preloadedChapterUrls.contains(chapter.url)) {
+        debugPrint('章节已缓存，跳过: ${chapter.title}');
+        continue;
+      }
 
       try {
         // 检查是否已缓存
@@ -437,11 +451,12 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             await _databaseService.getCachedChapter(chapter.url);
         if (cachedContent != null) {
           _preloadedChapterUrls.add(chapter.url);
+          debugPrint('章节已存在，标记为已预加载: ${chapter.title}');
           continue;
         }
 
-        // 延迟加载，避免请求过于频繁 (3-5秒随机延迟)
-        final delaySeconds = 3 + (chapter.url.hashCode % 3);
+        // 延迟加载，避免请求过于频繁 (10-12秒随机延迟)
+        final delaySeconds = 10 + (chapter.url.hashCode % 3);
         await Future.delayed(Duration(seconds: delaySeconds));
 
         // 从后端获取并缓存
@@ -450,13 +465,16 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
           await _databaseService.cacheChapter(
               widget.novel.url, chapter, content);
           _preloadedChapterUrls.add(chapter.url);
-          debugPrint('预加载成功: ${chapter.title}');
+          loadedCount++;
+          debugPrint('预加载成功 ($loadedCount/$totalCount): ${chapter.title}');
         }
       } catch (e) {
         // 静默处理预加载错误，不影响用户阅读
         debugPrint('预加载章节失败: ${chapter.title}, 错误: $e');
       }
     }
+
+    debugPrint('=== 预加载完成，成功: $loadedCount/$totalCount ===');
   }
 
   void _goToPreviousChapter() {
@@ -492,6 +510,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   void _showFontSizeDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Text('调整字体大小'),
         content: StatefulBuilder(
@@ -589,6 +608,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     // 先显示确认对话框
     final shouldRefresh = await showDialog<bool>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
@@ -715,6 +735,154 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     }
   }
 
+  // 更新角色卡功能
+  Future<void> _updateCharacterCards() async {
+    if (_content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('章节内容为空，无法更新角色卡'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Expanded(child: Text('正在分析章节内容并更新角色信息...')),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      debugPrint('=== 开始更新角色卡 ===');
+      debugPrint('小说: ${widget.novel.title}');
+      debugPrint('章节: ${_currentChapter.title}');
+
+      // 准备Dify参数
+      final updateData = await CharacterMatcher.prepareUpdateData(
+        widget.novel.url,
+        _content,
+      );
+
+      debugPrint('章节内容长度: ${updateData['chapters_content']!.length}');
+      debugPrint('角色信息: ${updateData['roles']}');
+
+      // 关闭加载对话框
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // 调用Dify服务更新角色信息
+      final difyService = DifyService();
+      final updatedCharacters = await difyService.updateCharacterCards(
+        chaptersContent: updateData['chapters_content']!,
+        roles: updateData['roles']!,
+        novelUrl: widget.novel.url,
+        backgroundSetting: widget.novel.backgroundSetting ?? '',
+      );
+
+      debugPrint('=== Dify返回角色数量: ${updatedCharacters.length} ===');
+
+      // 显示角色预览对话框
+      await CharacterPreviewDialog.show(
+        context,
+        characters: updatedCharacters,
+        onConfirmed: (selectedCharacters) async {
+          debugPrint('=== 用户确认保存角色: ${selectedCharacters.map((c) => c.name).toList()} ===');
+          await _saveUpdatedCharacters(selectedCharacters);
+        },
+      );
+
+    } catch (e) {
+      // 关闭加载对话框
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      debugPrint('=== 更新角色卡失败: $e ===');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('更新角色卡失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // 保存更新后的角色
+  Future<void> _saveUpdatedCharacters(List<Character> selectedCharacters) async {
+    try {
+      debugPrint('=== 开始保存角色到数据库 ===');
+
+      // 显示保存进度对话框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Expanded(child: Text('正在保存角色信息...')),
+            ],
+          ),
+        ),
+      );
+
+      // 使用批量更新方法保存角色
+      final databaseService = DatabaseService();
+      final savedCharacters = await databaseService.batchUpdateCharacters(selectedCharacters);
+
+      // 关闭保存进度对话框
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('成功更新 ${savedCharacters.length} 个角色卡'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      debugPrint('=== 角色保存完成: ${savedCharacters.length} 个 ===');
+
+    } catch (e) {
+      // 关闭保存进度对话框
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      debugPrint('=== 保存角色失败: $e ===');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存角色失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   // 处理菜单动作
   void _handleMenuAction(String action) {
     switch (action) {
@@ -729,6 +897,9 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         break;
       case 'full_rewrite':
         _showFullRewriteRequirementDialog();
+        break;
+      case 'update_character_cards':
+        _updateCharacterCards();
         break;
       case 'closeup_mode':
         _toggleCloseupMode();
@@ -746,6 +917,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   void _showScrollSpeedDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Text('调整滚动速度'),
         content: StatefulBuilder(
@@ -862,6 +1034,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     final userInputController = TextEditingController(text: _lastRewriteInput);
     final result = await showDialog<String>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Text('输入改写要求'),
         content: SingleChildScrollView(
@@ -1423,6 +1596,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   Future<void> _showSummarizeDialog() async {
     showDialog(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
@@ -1675,6 +1849,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         TextEditingController(text: _lastFullRewriteInput);
     final result = await showDialog<String>(
       context: context,
+      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
@@ -2147,6 +2322,16 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                     Icon(Icons.auto_stories, size: 18, color: Colors.green),
                     SizedBox(width: 12),
                     Text('全文重写'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'update_character_cards',
+                child: Row(
+                  children: [
+                    Icon(Icons.person_search, size: 18, color: Colors.purple),
+                    SizedBox(width: 12),
+                    Text('更新角色卡'),
                   ],
                 ),
               ),
