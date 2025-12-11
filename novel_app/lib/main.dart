@@ -19,8 +19,7 @@ void main() async {
     debugPrint('Context: ${details.context}');
     debugPrint('Information Collector: ${details.informationCollector}');
     debugPrint('==================');
-
-      };
+  };
 
   // 设置平台错误处理
   // 注释掉PlatformDispatcher，因为某些Flutter版本不支持
@@ -49,7 +48,7 @@ void main() async {
       debugPrint('Stack trace: $stackTrace');
       debugPrint('========================');
 
-            // 继续运行，用户可以在设置中配置
+      // 继续运行，用户可以在设置中配置
     }
 
     runApp(const NovelReaderApp());
@@ -59,7 +58,7 @@ void main() async {
     debugPrint('Stack trace: $stackTrace');
     debugPrint('==============================');
 
-      });
+  });
 }
 
 class NovelReaderApp extends StatelessWidget {

@@ -8,7 +8,8 @@
       "Bash(flutter analyze --no-fatal-infos)",
       "Read(//d/myspace/novel_builder/backend/**)",
       "Bash(flutter analyze:*)",
-      "Bash(flutter test:*)"
+      "Bash(flutter test:*)",
+      "Bash(flutter run:*)"
     ],
     "deny": [],
     "ask": []

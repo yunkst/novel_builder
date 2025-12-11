@@ -25,7 +25,7 @@ from .config import settings
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
-from .schemas import Chapter, ChapterContent, Novel, SourceSite
+from .schemas import Chapter, ChapterContent, Novel, SourceSite, Text2ImgStartRequest, Text2ImgStatusResponse
 from .services.crawler_factory import (
     get_crawler_for_url,
     get_enabled_crawlers,
@@ -33,6 +33,7 @@ from .services.crawler_factory import (
 )
 from .services.novel_cache_service import novel_cache_service
 from .services.search_service import SearchService
+from .services.text2img_service import create_text2img_service
 
 app = FastAPI(
     title="Novel Builder Backend",
@@ -169,6 +170,117 @@ async def chapter_content(
         "title": content_data.get("title", "章节内容"),
         "content": content_data.get("content", ""),
         "from_cache": False,
+    }
+
+
+# ================= 文生图 API =================
+
+# 初始化文生图服务
+text2img_service = None
+
+def get_text2img_service():
+    """获取文生图服务实例（延迟初始化）"""
+    global text2img_service
+    if text2img_service is None:
+        try:
+            text2img_service = create_text2img_service()
+            print("✓ 文生图服务初始化成功")
+        except Exception as e:
+            print(f"✗ 文生图服务初始化失败: {e}")
+            text2img_service = None
+    return text2img_service
+
+
+@app.post("/text2img/start", dependencies=[Depends(verify_token)])
+async def start_illustration(
+    request: Text2ImgStartRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    开始配图
+
+    - **novel_content**: 需要插入图片的小说内容
+    - **roles**: 出场角色信息
+    - **require**: 配图要求
+    - **chapter_id**: 章节ID，唯一标识章节
+    """
+    service = get_text2img_service()
+    if not service:
+        raise HTTPException(status_code=503, detail="文生图服务不可用，请检查配置")
+
+    success = await service.start_illustration(
+        db=db,
+        chapter_id=request.chapter_id,
+        novel_content=request.novel_content,
+        roles=request.roles,
+        require=request.require
+    )
+
+    if success:
+        return {"message": "配图任务已启动", "chapter_id": request.chapter_id}
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="配图任务启动失败，可能已存在正在进行的任务"
+        )
+
+
+@app.get("/text2img/status/{chapter_id}", response_model=Text2ImgStatusResponse, dependencies=[Depends(verify_token)])
+async def get_illustration_status(
+    chapter_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    获取配图状态
+
+    - **chapter_id**: 章节ID，唯一标识章节
+    """
+    service = get_text2img_service()
+    if not service:
+        raise HTTPException(status_code=503, detail="文生图服务不可用")
+
+    return await service.get_illustration_status(db, chapter_id)
+
+
+@app.get("/text2img/image/{filename}")
+async def get_image_proxy(filename: str):
+    """
+    图片代理接口 - 从ComfyUI获取图片并转发给用户
+
+    - **filename**: 图片文件名
+    """
+    service = get_text2img_service()
+    if not service:
+        raise HTTPException(status_code=503, detail="文生图服务不可用")
+
+    image_data = await service.get_image_data(filename)
+    if image_data:
+        return Response(
+            content=image_data,
+            media_type="image/png",
+            headers={
+                "Cache-Control": "public, max-age=86400",  # 缓存1天
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+    else:
+        raise HTTPException(status_code=404, detail="图片不存在")
+
+
+@app.get("/text2img/health", dependencies=[Depends(verify_token)])
+async def text2img_health_check():
+    """检查文生图服务健康状态"""
+    service = get_text2img_service()
+    if not service:
+        return {
+            "status": "unavailable",
+            "message": "文生图服务未初始化或配置错误"
+        }
+
+    health_status = await service.health_check()
+    return {
+        "status": "healthy" if health_status["overall"] else "unhealthy",
+        "services": health_status
     }
 
 
@@ -505,12 +617,19 @@ def index():
             "实时内容抓取",
             "后台缓存任务",
             "WebSocket进度推送",
+            "AI文生图配图功能",
+            "ComfyUI图片生成",
+            "Dify工作流集成",
         ],
         "endpoints": [
             "GET /source-sites - 获取源站列表",
             "GET /search?keyword=xxx&sites=alice_sw,shukuge - 搜索小说（可指定站点）",
             "GET /chapters?url=xxx - 获取章节列表",
             "GET /chapter-content?url=xxx&force_refresh=true - 获取章节内容",
+            "POST /text2img/start - 开始章节配图",
+            "GET /text2img/status/{chapter_id} - 获取配图状态",
+            "GET /text2img/image/{filename} - 获取生成的图片",
+            "GET /text2img/health - 文生图服务健康检查",
         ],
         "supported_sites": [
             "alice_sw - 轻小说文库",

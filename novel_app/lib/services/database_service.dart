@@ -611,11 +611,17 @@ class DatabaseService {
   }
 
   /// 创建用户自定义章节
+  ///
+  /// 索引系统说明：
+  /// - 使用0-based索引系统，与网络章节保持一致
+  /// - 空数据库时创建的第一章：chapterIndex = 0
+  /// - 显示时使用 chapterIndex + 1 来呈现用户友好的章节号
   Future<int> createCustomChapter(
       String novelUrl, String title, String content) async {
     final db = await database;
 
     // 获取当前最大章节索引
+    // 注意：使用0-based索引系统，空数据库时默认值为0
     final result = await db.rawQuery(
       'SELECT MAX(chapterIndex) as maxIndex FROM novel_chapters WHERE novelUrl = ?',
       [novelUrl],
@@ -626,14 +632,14 @@ class DatabaseService {
     final chapterUrl =
         'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
 
-    // 插入章节元数据
+    // 插入章节元数据（使用0-based索引）
     await db.insert(
       'novel_chapters',
       {
         'novelUrl': novelUrl,
         'chapterUrl': chapterUrl,
         'title': title,
-        'chapterIndex': maxIndex + 1,
+        'chapterIndex': maxIndex, // 0-based索引，与网络章节一致
         'isUserInserted': 1,
         'insertedAt': DateTime.now().millisecondsSinceEpoch,
       },
@@ -647,12 +653,40 @@ class DatabaseService {
         'novelUrl': novelUrl,
         'chapterUrl': chapterUrl,
         'content': content,
+        'chapterIndex': maxIndex,
         'cachedAt': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    return maxIndex + 1;
+    return maxIndex;
+  }
+
+  /// 更新章节顺序
+  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters) async {
+    final db = await database;
+    final batch = db.batch();
+
+    // 批量更新所有章节的索引
+    for (int i = 0; i < chapters.length; i++) {
+      final chapter = chapters[i];
+      batch.update(
+        'novel_chapters',
+        {'chapterIndex': i},
+        where: 'novelUrl = ? AND chapterUrl = ?',
+        whereArgs: [novelUrl, chapter.url],
+      );
+
+      // 同时更新章节缓存表中的索引
+      batch.update(
+        'chapter_cache',
+        {'chapterIndex': i},
+        where: 'novelUrl = ? AND chapterUrl = ?',
+        whereArgs: [novelUrl, chapter.url],
+      );
+    }
+
+    await batch.commit(noResult: true);
   }
 
   /// 获取用户创建的章节内容

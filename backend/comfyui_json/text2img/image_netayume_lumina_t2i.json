@@ -1,0 +1,119 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "miaomiaoHarem_v18.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Checkpoint加载器（简易）"
+    }
+  },
+  "2": {
+    "inputs": {
+      "seed": 1047332967694915,
+      "steps": 30,
+      "cfg": 5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "K采样器"
+    }
+  },
+  "3": {
+    "inputs": {
+      "samples": [
+        "2",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "4": {
+    "inputs": {
+      "text": "anime style, Xishi from Honor of Kings, beautiful Chinese girl, purple dress, magical staff, masterpiece, best quality",
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "prompts"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "𝐍𝐒𝐅𝐖lazypos character tags detail tags related to character background tagslazypos, 1girl, makima \\(chainsaw man\\), yandere stare, smile, dress shirt, grey jacket, red hair, sidelocks, black necktie, looking at viewer, jacket, long sleeves, upper body, suit, necktie, shirt, simple background, medium hair, collared shirt, ringed eyes, shaded face, braided ponytail, head tilt, braid, white background, formal, yellow eyes, holding own arm, wing collar, closed mouth, solo\nlazyneg",
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "6": {
+    "inputs": {
+      "width": 704,
+      "height": 1408,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "空Latent图像"
+    }
+  },
+  "7": {
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "预览图像"
+    }
+  },
+  "8": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  }
+}

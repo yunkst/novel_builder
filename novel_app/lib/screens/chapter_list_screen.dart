@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
-import '../models/character.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
 import '../services/cache_sync_service.dart';
-import '../widgets/character_selector.dart';
 import '../screens/reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
@@ -28,11 +26,13 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   final CacheManager _cacheManager = CacheManager();
   final ScrollController _scrollController = ScrollController();
   List<Chapter> _chapters = [];
-  List<int> _selectedCharacterIds = []; // 新增：选中的人物ID列表
   bool _isLoading = true;
   bool _isInBookshelf = false;
   String _errorMessage = '';
   int _lastReadChapterIndex = 0;
+
+  // 重排相关状态
+  bool _isReorderingMode = false;
 
   // 生成章节相关的状态
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
@@ -256,6 +256,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   Future<void> _showClearCacheDialog() async {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('清除缓存'),
         content: const Text('确定要清除该小说的所有缓存吗？'),
@@ -306,6 +307,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
     final result = await showDialog<Map<String, String>>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
@@ -349,17 +351,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               ),
               maxLines: 5,
             ),
-            const SizedBox(height: 16),
-
-            // ✨ 新增：人物选择器
-            CharacterSelector(
-              novelUrl: widget.novel.url,
-              initialSelectedIds: _selectedCharacterIds,
-              onSelectionChanged: (selectedIds) {
-                _selectedCharacterIds = selectedIds;
-              },
-            ),
-
             const SizedBox(height: 8),
             Text(
               '提示：AI将根据你的要求生成新的章节内容',
@@ -550,14 +541,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         historyChaptersContent += '作者：${widget.novel.author}\n';
       }
 
-      // 获取选中人物信息并格式化为AI可读文本
-      String rolesInfo = '';
-      if (_selectedCharacterIds.isNotEmpty) {
-        final selectedCharacters = await _databaseService.getCharactersByIds(_selectedCharacterIds);
-        rolesInfo = Character.formatForAI(selectedCharacters);
-      } else {
-        rolesInfo = '无特定角色出场';
-      }
+      // 角色信息设置为空，不使用角色选择功能
+      const String rolesInfo = '无特定角色出场';
 
       // 构建Dify请求参数（参考特写功能，但cmd为空，current_chapter_content为空）
       final inputs = {
@@ -604,12 +589,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   Future<void> _insertGeneratedChapter(
       int afterIndex, String title, String content) async {
     try {
-      // 使用新的数据库方法插入用户章节
+      // 统一使用insertUserChapter方法，空列表时插入到位置0
+      final insertIndex = _chapters.isEmpty ? 0 : afterIndex + 1;
+      debugPrint('AI生成章节：使用insertUserChapter插入到位置$insertIndex');
       await _databaseService.insertUserChapter(
         widget.novel.url,
         title,
         content,
-        afterIndex + 1,
+        insertIndex,
       );
 
       // 重新加载章节列表
@@ -629,10 +616,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
+  
   // 显示删除章节确认对话框
   Future<void> _showDeleteChapterDialog(Chapter chapter, int index) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
@@ -735,114 +724,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-  // 显示创建第一个章节的对话框
-  Future<void> _showCreateFirstChapterDialog() async {
-    final titleController = TextEditingController();
-    final contentController = TextEditingController();
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.add_circle, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('创建第一章'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('为你的小说创建第一个章节'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(
-                labelText: '章节标题',
-                hintText: '例如：第一章 开始',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: contentController,
-              decoration: const InputDecoration(
-                labelText: '章节内容',
-                hintText: '请输入章节内容...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 8,
-              minLines: 4,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final title = titleController.text.trim();
-              final content = contentController.text.trim();
-              if (title.isEmpty || content.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('请填写章节标题和内容'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(context, {
-                'title': title,
-                'content': content,
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('创建'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      try {
-        await _databaseService.createCustomChapter(
-          widget.novel.url,
-          result['title']!,
-          result['content']!,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('章节创建成功！'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-
-        // 重新加载章节列表
-        await _loadChapters();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('创建失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -850,6 +732,33 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         title: Text(widget.novel.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 重排模式切换按钮
+          if (_isReorderingMode)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: () {
+                setState(() {
+                  _isReorderingMode = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已退出重排模式'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+              tooltip: '完成重排',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.reorder),
+              onPressed: _toggleReorderingMode,
+              tooltip: '重排章节',
+            ),
           // 搜索按钮
           IconButton(
             icon: const Icon(Icons.search),
@@ -1057,20 +966,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
-                                  // 副按钮：手动创建章节
-                                  OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _showCreateFirstChapterDialog(),
-                                    icon: const Icon(Icons.edit),
-                                    label: const Text('手动创建'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
-                                      ),
-                                    ),
-                                  ),
                                   if (!widget.novel.url
                                       .startsWith('custom://')) ...[
                                     const SizedBox(height: 16),
@@ -1084,123 +979,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                 ],
                               ),
                             )
-                          : ListView.builder(
-                              controller: _scrollController,
-                              itemCount: _chapters.length,
-                              itemBuilder: (context, index) {
-                                final chapter = _chapters[index];
-                                final isLastRead =
-                                    index == _lastReadChapterIndex;
-                                final isUserChapter = chapter.isUserInserted;
-
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    // 为用户自创章节添加轻微的背景色区分
-                                    color: isUserChapter
-                                        ? Colors.blue.withValues(alpha: 0.05)
-                                        : null,
-                                    border: isUserChapter
-                                        ? Border(left: BorderSide(
-                                            color: Colors.blue.withValues(alpha: 0.3),
-                                            width: 3,
-                                          ))
-                                        : null,
-                                  ),
-                                  child: ListTile(
-                                  title: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          chapter.title,
-                                          style: TextStyle(
-                                            fontWeight: isLastRead
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                            color: isLastRead ? Colors.red : null,
-                                            fontStyle: isUserChapter
-                                                ? FontStyle.italic
-                                                : FontStyle.normal,
-                                          ),
-                                        ),
-                                      ),
-                                      // 为用户自创章节添加小标识
-                                      if (isUserChapter)
-                                        Container(
-                                          margin: const EdgeInsets.only(left: 8),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                            '用户',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.blue[700],
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // 删除章节按钮（仅用户自创章节显示）
-                                      if (chapter.isUserInserted)
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                          ),
-                                          onPressed: () => _showDeleteChapterDialog(chapter, index),
-                                          tooltip: '删除此章节',
-                                        ),
-                                      // 插入章节按钮
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.add_circle_outline,
-                                          color: Colors.blue,
-                                        ),
-                                        onPressed: () =>
-                                            _showInsertChapterDialog(index),
-                                        tooltip: '在此章节后插入新章节',
-                                      ),
-                                      // 缓存状态图标
-                                      FutureBuilder<bool>(
-                                        future: _databaseService
-                                            .isChapterCached(chapter.url),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.data == true) {
-                                            return const Icon(
-                                              Icons.download_done,
-                                              color: Colors.green,
-                                            );
-                                          }
-                                          return const SizedBox.shrink();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ReaderScreen(
-                                          novel: widget.novel,
-                                          chapter: chapter,
-                                          chapters: _chapters,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                );
-                              },
-                            ),
+                          : _isReorderingMode
+                              ? _buildReorderableChapterList()
+                              : _buildNormalChapterList(),
                     ),
                   ],
                 ),
@@ -1266,6 +1047,317 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('同步缓存失败: $e')),
+        );
+      }
+    }
+  }
+
+  // 构建正常的章节列表（支持长按进入重排模式）
+  Widget _buildNormalChapterList() {
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: _chapters.length,
+      itemBuilder: (context, index) {
+        final chapter = _chapters[index];
+        final isLastRead = index == _lastReadChapterIndex;
+        final isUserChapter = chapter.isUserInserted;
+
+        return Container(
+          decoration: BoxDecoration(
+            // 为用户自创章节添加轻微的背景色区分
+            color: isUserChapter
+                ? Colors.blue.withValues(alpha: 0.05)
+                : null,
+            border: isUserChapter
+                ? Border(left: BorderSide(
+                    color: Colors.blue.withValues(alpha: 0.3),
+                    width: 3,
+                  ))
+                : null,
+          ),
+          child: ListTile(
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    chapter.title,
+                    style: TextStyle(
+                      fontWeight: isLastRead
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isLastRead ? Colors.red : null,
+                      fontStyle: isUserChapter
+                          ? FontStyle.italic
+                          : FontStyle.normal,
+                    ),
+                  ),
+                ),
+                // 为用户自创章节添加小标识
+                if (isUserChapter)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '用户',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 删除章节按钮（仅用户自创章节显示）
+                if (chapter.isUserInserted)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                    ),
+                    onPressed: () => _showDeleteChapterDialog(chapter, index),
+                    tooltip: '删除此章节',
+                  ),
+                // 插入章节按钮
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: Colors.blue,
+                  ),
+                  onPressed: () =>
+                      _showInsertChapterDialog(index),
+                  tooltip: '在此章节后插入新章节',
+                ),
+                // 缓存状态图标
+                FutureBuilder<bool>(
+                  future: _databaseService
+                      .isChapterCached(chapter.url),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return const Icon(
+                        Icons.download_done,
+                        color: Colors.green,
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReaderScreen(
+                    novel: widget.novel,
+                    chapter: chapter,
+                    chapters: _chapters,
+                  ),
+                ),
+              );
+            },
+            onLongPress: () {
+              _toggleReorderingMode();
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // 构建可重排的章节列表
+  Widget _buildReorderableChapterList() {
+    return ReorderableListView.builder(
+      itemCount: _chapters.length,
+      onReorder: _onReorder,
+      itemBuilder: (context, index) {
+        final chapter = _chapters[index];
+        final isLastRead = index == _lastReadChapterIndex;
+        final isUserChapter = chapter.isUserInserted;
+
+        return Container(
+          key: ValueKey(chapter.url),
+          decoration: BoxDecoration(
+            // 为用户自创章节添加轻微的背景色区分
+            color: isUserChapter
+                ? Colors.blue.withValues(alpha: 0.05)
+                : Colors.orange.withValues(alpha: 0.05),
+            border: isUserChapter
+                ? Border(
+                    left: BorderSide(
+                      color: Colors.blue.withValues(alpha: 0.3),
+                      width: 3,
+                    ),
+                    right: BorderSide(
+                      color: Colors.orange.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                    top: BorderSide(
+                      color: Colors.orange.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                    bottom: BorderSide(
+                      color: Colors.orange.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                  )
+                : Border.all(
+                    color: Colors.orange.withValues(alpha: 0.5),
+                    width: 1,
+                  ),
+          ),
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          child: ListTile(
+            leading: Icon(
+              Icons.drag_handle,
+              color: Colors.grey[600],
+            ),
+            title: Row(
+              children: [
+                // 显示章节序号
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    chapter.title,
+                    style: TextStyle(
+                      fontWeight: isLastRead
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isLastRead ? Colors.red : null,
+                      fontStyle: isUserChapter
+                          ? FontStyle.italic
+                          : FontStyle.normal,
+                    ),
+                  ),
+                ),
+                // 为用户自创章节添加小标识
+                if (isUserChapter)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '用户',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onTap: () {
+              // 重排模式下点击不跳转到阅读页面
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // 切换重排模式
+  void _toggleReorderingMode() {
+    setState(() {
+      _isReorderingMode = !_isReorderingMode;
+    });
+
+    if (_isReorderingMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已进入重排模式，拖拽章节调整顺序'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // 处理章节重排
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    setState(() {
+      final Chapter item = _chapters.removeAt(oldIndex);
+      _chapters.insert(newIndex, item);
+    });
+
+    // 保存重排后的顺序到数据库
+    await _saveReorderedChapters();
+  }
+
+  // 保存重排后的章节顺序
+  Future<void> _saveReorderedChapters() async {
+    try {
+      // 显示保存进度提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('正在保存章节顺序...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      // 批量更新章节索引
+      await _databaseService.updateChaptersOrder(
+        widget.novel.url,
+        _chapters,
+      );
+
+      // 重新加载章节列表以确保数据一致性
+      await _loadChapters();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('章节顺序已保存'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存章节顺序失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }

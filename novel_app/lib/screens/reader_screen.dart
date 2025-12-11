@@ -793,14 +793,16 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       debugPrint('=== Dify返回角色数量: ${updatedCharacters.length} ===');
 
       // 显示角色预览对话框
-      await CharacterPreviewDialog.show(
-        context,
-        characters: updatedCharacters,
-        onConfirmed: (selectedCharacters) async {
-          debugPrint('=== 用户确认保存角色: ${selectedCharacters.map((c) => c.name).toList()} ===');
-          await _saveUpdatedCharacters(selectedCharacters);
-        },
-      );
+      if (mounted) {
+        await CharacterPreviewDialog.show(
+          context,
+          characters: updatedCharacters,
+          onConfirmed: (selectedCharacters) async {
+            debugPrint('=== 用户确认保存角色: ${selectedCharacters.map((c) => c.name).toList()} ===');
+            await _saveUpdatedCharacters(selectedCharacters);
+          },
+        );
+      }
 
     } catch (e) {
       // 关闭加载对话框

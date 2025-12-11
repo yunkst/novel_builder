@@ -378,4 +378,9 @@ class ApiServiceWrapper {
       throw _handleError(e);
     }
   }
+
+  
+  
+  /// 获取 Dio 实例（用于构建图片URL）
+  Dio get dio => _dio;
 }
