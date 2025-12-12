@@ -9,7 +9,9 @@
       "Read(//d/myspace/novel_builder/backend/**)",
       "Bash(flutter analyze:*)",
       "Bash(flutter test:*)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(dart test:*)",
+      "Bash(dart:*)"
     ],
     "deny": [],
     "ask": []

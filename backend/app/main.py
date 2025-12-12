@@ -8,6 +8,9 @@ for novel searching, chapter management, and caching functionality.
 
 from datetime import datetime
 from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 from fastapi import (
     Depends,
@@ -18,14 +21,24 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response,FileResponse
+from fastapi.openapi.docs import get_redoc_html
+from fastapi.openapi.utils import get_openapi
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
-from .schemas import Chapter, ChapterContent, Novel, SourceSite, Text2ImgStartRequest, Text2ImgStatusResponse
+from .models.text2img import RoleImageGallery
+from .schemas import (
+    Chapter, ChapterContent, Novel, SourceSite,
+    Text2ImgStartRequest, Text2ImgStatusResponse,
+    RoleCardGenerateRequest, RoleGalleryResponse,
+    RoleImageDeleteRequest, RoleRegenerateRequest, RoleGenerateResponse,
+    RoleCardTaskCreateResponse, RoleCardTaskStatusResponse
+)
 from .services.crawler_factory import (
     get_crawler_for_url,
     get_enabled_crawlers,
@@ -34,7 +47,8 @@ from .services.crawler_factory import (
 from .services.novel_cache_service import novel_cache_service
 from .services.search_service import SearchService
 from .services.text2img_service import create_text2img_service
-
+from .services.role_card_service import role_card_service
+from .services.role_card_async_service import role_card_async_service
 app = FastAPI(
     title="Novel Builder Backend",
     version="0.2.0",
@@ -242,12 +256,34 @@ async def get_illustration_status(
     return await service.get_illustration_status(db, chapter_id)
 
 
-@app.get("/text2img/image/{filename}")
+@app.get("/text2img/image/{filename}", response_class=Response,
+         responses={
+             200: {
+                 "content": {
+                     "image/png": {
+                         "schema": {
+                             "type": "string",
+                             "format": "binary"
+                         }
+                     }
+                 },
+                 "description": "成功返回图片二进制数据 (PNG格式)"
+             },
+             404: {
+                 "description": "图片文件不存在"
+             },
+             503: {
+                 "description": "文生图服务不可用"
+             }
+         })
 async def get_image_proxy(filename: str):
     """
     图片代理接口 - 从ComfyUI获取图片并转发给用户
 
+    返回图片二进制数据 (PNG格式)
+
     - **filename**: 图片文件名
+    - **返回**: 图片二进制数据 (Content-Type: image/png)
     """
     service = get_text2img_service()
     if not service:
@@ -282,6 +318,134 @@ async def text2img_health_check():
         "status": "healthy" if health_status["overall"] else "unhealthy",
         "services": health_status
     }
+
+
+# ================= 人物卡图片生成 API =================
+
+
+@app.post("/api/role-card/generate", dependencies=[Depends(verify_token)])
+async def generate_role_card_images(
+    request: RoleCardGenerateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    异步生成人物卡图片
+
+    - **role_id**: 人物卡ID
+    - **roles**: 人物卡设定信息
+    - **user_input**: 用户要求
+
+    返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度
+    """
+    try:
+        result = await role_card_async_service.create_task(request, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"创建人物卡生成任务失败: {e}")
+        raise HTTPException(status_code=500, detail="创建任务失败")
+
+
+@app.get("/api/role-card/status/{task_id}", response_model=RoleCardTaskStatusResponse, dependencies=[Depends(verify_token)])
+async def get_role_card_task_status(
+    task_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    查询人物卡生成任务状态
+
+    - **task_id**: 任务ID
+    """
+    try:
+        result = await role_card_async_service.get_task_status(task_id, db)
+        if not result:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        return result
+    except Exception as e:
+        logger.error(f"查询任务状态失败: {e}")
+        raise HTTPException(status_code=500, detail="查询任务状态失败")
+
+
+@app.get("/api/role-card/gallery/{role_id}", response_model=RoleGalleryResponse, dependencies=[Depends(verify_token)])
+async def get_role_card_gallery(
+    role_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    查看角色图集
+
+    - **role_id**: 人物卡ID
+    """
+    try:
+        result = await role_card_service.get_role_gallery(role_id, db)
+        return result
+    except Exception as e:
+        logger.error(f"获取角色图集失败: {e}")
+        raise HTTPException(status_code=500, detail="获取图集失败")
+
+
+@app.delete("/api/role-card/image", dependencies=[Depends(verify_token)])
+async def delete_role_card_image(
+    request: RoleImageDeleteRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    从角色图集中删除图片
+
+    - **role_id**: 人物卡ID
+    - **img_url**: 要删除的图片URL
+    """
+    try:
+        success = await role_card_service.delete_role_image(request, db)
+        if success:
+            return {"message": "图片删除成功"}
+        else:
+            raise HTTPException(status_code=404, detail="图片不存在")
+    except Exception as e:
+        logger.error(f"删除角色图片失败: {e}")
+        raise HTTPException(status_code=500, detail="删除图片失败")
+
+
+@app.post("/api/role-card/regenerate", dependencies=[Depends(verify_token)])
+async def regenerate_similar_images(
+    request: RoleRegenerateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    重新生成相似图片
+
+    - **img_url**: 参考图片URL
+    - **count**: 生成图片数量
+    """
+    try:
+        result = await role_card_service.regenerate_similar_images(request, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"重新生成相似图片失败: {e}")
+        raise HTTPException(status_code=500, detail="重新生成图片失败")
+
+
+@app.get("/api/role-card/health", dependencies=[Depends(verify_token)])
+async def role_card_health_check():
+    """检查人物卡服务健康状态"""
+    try:
+        health_status = await role_card_service.health_check()
+        overall_healthy = all(health_status.values())
+
+        return {
+            "status": "healthy" if overall_healthy else "unhealthy",
+            "services": health_status
+        }
+    except Exception as e:
+        logger.error(f"人物卡健康检查失败: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "services": {}
+        }
 
 
 # ================= 缓存管理 API =================

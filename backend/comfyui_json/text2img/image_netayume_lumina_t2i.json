@@ -10,7 +10,7 @@
   },
   "2": {
     "inputs": {
-      "seed": 1047332967694915,
+      "seed": 879328239770797,
       "steps": 30,
       "cfg": 5,
       "sampler_name": "euler",
@@ -56,7 +56,7 @@
   },
   "4": {
     "inputs": {
-      "text": "anime style, Xishi from Honor of Kings, beautiful Chinese girl, purple dress, magical staff, masterpiece, best quality",
+      "text": "lazypos,A 20-year-old Asian woman with a cute and pretty face, short ear-length hair, gentle and shy expression, kind eyes, delicate features, soft skin, blushing cheeks, looking slightly worried, ethereal glow as a summoned spirit, retaining memories until death, in a healing angel form. Petite and small frame with exaggerated hourglass figure, full bust and curvy hips, slender waist, delicate limbs, wearing a white emergency nurse uniform or ethereal healing angel attire with flowing elements, glowing aura, gentle posture while casting healing magic, soft and graceful movements, standing in a clinical or mystical setting, overhead or aerial view, showing full scene and healing magic effects.",
       "clip": [
         "1",
         1
@@ -69,7 +69,7 @@
   },
   "5": {
     "inputs": {
-      "text": "𝐍𝐒𝐅𝐖lazypos character tags detail tags related to character background tagslazypos, 1girl, makima \\(chainsaw man\\), yandere stare, smile, dress shirt, grey jacket, red hair, sidelocks, black necktie, looking at viewer, jacket, long sleeves, upper body, suit, necktie, shirt, simple background, medium hair, collared shirt, ringed eyes, shaded face, braided ponytail, head tilt, braid, white background, formal, yellow eyes, holding own arm, wing collar, closed mouth, solo\nlazyneg",
+      "text": "lazyneg",
       "clip": [
         "1",
         1
@@ -89,18 +89,6 @@
     "class_type": "EmptyLatentImage",
     "_meta": {
       "title": "空Latent图像"
-    }
-  },
-  "7": {
-    "inputs": {
-      "images": [
-        "3",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "预览图像"
     }
   },
   "8": {

@@ -35,7 +35,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -137,10 +137,28 @@ class DatabaseService {
           clothingStyle TEXT,
           appearanceFeatures TEXT,
           backgroundStory TEXT,
+          facePrompts TEXT,
+          bodyPrompts TEXT,
+          cachedImageUrl TEXT,
           createdAt INTEGER NOT NULL,
           updatedAt INTEGER,
           UNIQUE(novelUrl, name)
         )
+      ''');
+    }
+    if (oldVersion < 5) {
+      // 添加提示词字段
+      await db.execute('''
+        ALTER TABLE characters ADD COLUMN facePrompts TEXT
+      ''');
+      await db.execute('''
+        ALTER TABLE characters ADD COLUMN bodyPrompts TEXT
+      ''');
+    }
+    if (oldVersion < 6) {
+      // 添加缓存图片URL字段
+      await db.execute('''
+        ALTER TABLE characters ADD COLUMN cachedImageUrl TEXT
       ''');
     }
   }
@@ -1175,6 +1193,50 @@ class DatabaseService {
     final db = await database;
     return await db.delete(
       'characters',
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+    );
+  }
+
+  // ========== 角色图集缓存管理功能 ==========
+
+  /// 更新角色的缓存图片URL
+  Future<int> updateCharacterCachedImage(int characterId, String? imageUrl) async {
+    final db = await database;
+    return await db.update(
+      'characters',
+      {
+        'cachedImageUrl': imageUrl,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [characterId],
+    );
+  }
+
+  /// 清除角色的缓存图片URL
+  Future<int> clearCharacterCachedImage(int characterId) async {
+    final db = await database;
+    return await db.update(
+      'characters',
+      {
+        'cachedImageUrl': null,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [characterId],
+    );
+  }
+
+  /// 批量清除角色的缓存图片URL
+  Future<int> clearAllCharacterCachedImages(String novelUrl) async {
+    final db = await database;
+    return await db.update(
+      'characters',
+      {
+        'cachedImageUrl': null,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );

@@ -81,6 +81,9 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
   static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
 
+  // 手势交互相关状态
+  bool _isUserTouching = false; // 用户触摸状态
+
   @override
   void initState() {
     super.initState();
@@ -599,6 +602,27 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     if (_isAutoScrolling) {
       _stopAutoScroll();
     } else {
+      _startAutoScroll();
+    }
+  }
+
+  // 处理手指按下事件
+  void _handleTouchStart() {
+    if (!_isUserTouching && _isAutoScrolling) {
+      setState(() {
+        _isUserTouching = true;
+      });
+      _stopAutoScroll();
+    }
+  }
+
+  // 处理手指抬起事件
+  void _handleTouchEnd() {
+    if (_isUserTouching) {
+      setState(() {
+        _isUserTouching = false;
+      });
+      // 立即恢复自动滚动
       _startAutoScroll();
     }
   }
@@ -2377,11 +2401,28 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
               : Stack(
                   children: [
                     // 主要内容区域
-                    ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16.0),
-                      itemCount: paragraphs.length + 1, // +1 为了添加底部空白
-                      itemBuilder: (context, index) {
+                    GestureDetector(
+                      onTapDown: (_) => _handleTouchStart(),
+                      onTapUp: (_) => _handleTouchEnd(),
+                      onPanStart: (_) => _handleTouchStart(),
+                      onPanEnd: (_) => _handleTouchEnd(),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          // 检测滚动是否停止
+                          if (notification is ScrollUpdateNotification) {
+                            return false;
+                          }
+                          if (notification is ScrollEndNotification && _isUserTouching) {
+                            // 滚动停止且用户已离开屏幕，恢复自动滚动
+                            _handleTouchEnd();
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16.0),
+                          itemCount: paragraphs.length + 1, // +1 为了添加底部空白
+                          itemBuilder: (context, index) {
                         // 最后一个位置添加空白
                         if (index == paragraphs.length) {
                           return SizedBox(
@@ -2463,6 +2504,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                           ),
                         );
                       },
+                        ),
+                      ),
                     ),
                     // 固定在底部的章节切换按钮
                     Positioned(

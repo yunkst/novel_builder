@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 import requests
 from requests.exceptions import RequestException, Timeout
 
-from ..schemas import DifyPromptResult
+from ..schemas import DifyPromptResult, DifyPhotoResult
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class DifyClient:
 
             # 发送请求
             response = requests.post(
-                f"{self.api_url}/workflows/run",
+                self.api_url,
                 headers=self.headers,
                 json=request_data,
                 timeout=60  # Dify工作流可能需要较长时间
@@ -162,7 +162,7 @@ class DifyClient:
             }
 
             response = requests.post(
-                f"{self.api_url}/workflows/run",
+                self.api_url,
                 headers=self.headers,
                 json=test_request,
                 timeout=10
@@ -174,6 +174,124 @@ class DifyClient:
         except Exception as e:
             logger.error(f"Dify健康检查失败: {e}")
             return False
+
+    async def generate_photo_prompts(self, roles: Dict[str, Any], user_input: str) -> List[str]:
+        """生成人物卡拍照提示词.
+
+        Args:
+            roles: 人物卡设定信息
+            user_input: 用户要求
+
+        Returns:
+            生成的拍照提示词列表
+        """
+        try:
+            # 准备请求数据
+            request_data = {
+                "inputs": {
+                    "roles": json.dumps(roles, ensure_ascii=False),
+                    "user_input": user_input,
+                    "cmd": "拍照"
+                },
+                "response_mode": "blocking",
+                "user": "role_card_user"
+            }
+
+            logger.info(f"调用Dify拍照工作流: {self.api_url}")
+
+            # 发送请求
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json=request_data,
+                timeout=60
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                logger.info("Dify拍照工作流调用成功")
+
+                # 解析返回结果
+                return self._parse_photo_response(result)
+
+            else:
+                logger.error(f"Dify拍照API请求失败: {response.status_code} - {response.text}")
+                return []
+
+        except Timeout:
+            logger.error("Dify拍照API请求超时")
+            return []
+        except RequestException as e:
+            logger.error(f"Dify拍照API请求异常: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Dify拍照工作流调用失败: {e}")
+            return []
+
+    def _parse_photo_response(self, response_data: Dict[str, Any]) -> List[str]:
+        """解析Dify拍照工作流返回结果.
+
+        Args:
+            response_data: Dify API响应数据
+
+        Returns:
+            解析后的提示词列表
+        """
+        try:
+            # 获取工作流输出数据
+            data = response_data.get("data", {})
+            outputs = data.get("outputs", {})
+
+            # 查找拍照提示词结果
+            if "content" in outputs:
+                content_data = outputs["content"]
+
+                # 添加调试信息
+                logger.info(f"Dify返回的content数据类型: {type(content_data)}")
+                logger.info(f"Dify返回的content内容: {content_data}")
+
+                # 如果是字符串，尝试解析JSON
+                if isinstance(content_data, str):
+                    try:
+                        content_list = json.loads(content_data)
+                    except json.JSONDecodeError:
+                        # 如果不是JSON，可能是直接的字符串列表
+                        content_list = [content_data]
+                elif isinstance(content_data, list):
+                    content_list = content_data
+                elif isinstance(content_data, dict):
+                    # 如果是字典，尝试提取提示词列表
+                    content_list = []
+                    for key, value in content_data.items():
+                        if isinstance(value, str):
+                            content_list.append(value)
+                        elif isinstance(value, list):
+                            content_list.extend([str(item) for item in value if item])
+                    logger.info(f"从dict中提取的content_list: {content_list}")
+                else:
+                    logger.error(f"不支持的Dify拍照返回数据类型: {type(content_data)}")
+                    return []
+
+                # 确保返回字符串列表
+                prompts = []
+                for item in content_list:
+                    if isinstance(item, str):
+                        prompts.append(item)
+                    elif isinstance(item, dict) and "prompt" in item:
+                        prompts.append(str(item["prompt"]))
+                    else:
+                        logger.warning(f"跳过无效的提示词项: {item}")
+
+                logger.info(f"从Dify获取到 {len(prompts)} 个拍照提示词")
+                return prompts
+
+            else:
+                logger.error("Dify拍照响应中未找到content字段")
+                return []
+
+        except Exception as e:
+            logger.error(f"解析Dify拍照响应失败: {e}")
+            return []
 
 
 def create_dify_client() -> DifyClient:

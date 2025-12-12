@@ -17,6 +17,8 @@ analyzer:
     # 排除构建生成的文件
     - "**/*.g.dart"
     - "**/*.freezed.dart"
+    # 排除测试目录
+    - test/**
 
 linter:
   # The lint rules applied to this project can be customized in the

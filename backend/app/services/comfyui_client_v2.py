@@ -5,6 +5,8 @@
 import json
 import logging
 import os
+import random
+import time
 from typing import Dict, Any, Optional, List, Set
 import asyncio
 from pathlib import Path
@@ -86,7 +88,23 @@ class ComfyUIClientV2:
 
             # 方法3: 基于节点类型和内容的启发式检测
             class_type = node_data.get("class_type")
-            if class_type == "PrimitiveStringMultiline":
+
+            # 支持 CLIPTextEncode 类型（ComfyUI 的标准文本编码节点）
+            if class_type == "CLIPTextEncode":
+                text_value = node_data.get("inputs", {}).get("text", "")
+                meta_title = node_data.get("_meta", {}).get("title", "")
+
+                # 只替换标题为 "prompts" 的节点（正向提示词）
+                if meta_title == "prompts":
+                    replaceable_nodes[node_id] = {
+                        "class_type": class_type,
+                        "method": "heuristic",
+                        "target": "text",
+                        "prompt_type": "positive"
+                    }
+
+            # 支持 PrimitiveStringMultiline 类型
+            elif class_type == "PrimitiveStringMultiline":
                 value = node_data.get("inputs", {}).get("value", "")
                 if self._is_likely_prompt_node(node_id, value):
                     replaceable_nodes[node_id] = {
@@ -134,12 +152,19 @@ class ComfyUIClientV2:
         """检测提示词类型."""
         value_lower = value.lower()
 
-        if any(neg_word in value_lower for neg_word in ["blurry", "worst quality", "low quality", "jpeg artifacts"]):
+        # 检查负面提示词关键词
+        negative_keywords = ["blurry", "worst quality", "low quality", "jpeg artifacts", "nsfw", "bad", "ugly", "deformed"]
+        if any(neg_word in value_lower for neg_word in negative_keywords):
             return "negative"
-        elif any(pos_word in value_lower for pos_word in ["high quality", "masterpiece", "best quality"]):
+
+        # 检查正面提示词关键词
+        positive_keywords = ["high quality", "masterpiece", "best quality", "beautiful", "anime style", "detailed"]
+        if any(pos_word in value_lower for pos_word in positive_keywords):
             return "positive"
-        else:
-            return "user"
+
+        # 根据节点元数据标题判断
+        # 这个会在 _find_replaceable_nodes 中被元数据覆盖，但作为后备方案
+        return "user"
 
     def _prepare_workflow_v2(self, user_prompt: str, negative_prompt: str = None,
                            style_prefix: str = None, style_suffix: str = None,
@@ -188,7 +213,7 @@ class ComfyUIClientV2:
                     if input_key in inputs:
                         original_value = inputs[input_key]
                         for placeholder in placeholders:
-                            replacement_key = f"{{{{{placeholder}}}}"
+                            replacement_key = f"{{{{{placeholder}}}}}"
                             if replacement_key in replacements:
                                 original_value = original_value.replace(replacement_key, replacements[replacement_key])
                         inputs[input_key] = original_value
@@ -220,6 +245,27 @@ class ComfyUIClientV2:
                 self._set_parameter(workflow_data, cfg, "cfg")
 
         return workflow_data
+
+    def _set_random_seed(self, workflow_data: Dict[str, Any], seed: int = None):
+        """设置随机种子."""
+        if seed is None:
+            # 生成随机种子
+            seed = random.randint(0, 2**31 - 1)
+            logger.info(f"生成随机种子: {seed}")
+        else:
+            logger.info(f"使用指定种子: {seed}")
+
+        for node_id, node_data in workflow_data.items():
+            if node_id == "config":
+                continue
+
+            class_type = node_data.get("class_type")
+            if class_type == "KSampler":
+                inputs = node_data.get("inputs", {})
+                if "seed" in inputs:
+                    inputs["seed"] = seed
+                    logger.info(f"设置种子 = {seed} 在KSampler节点 {node_id}")
+                    break
 
     def _set_parameter(self, workflow_data: Dict[str, Any], value: Any, param_name: str):
         """设置工作流参数."""
@@ -265,6 +311,9 @@ class ComfyUIClientV2:
                 steps=steps,
                 cfg=cfg
             )
+
+            # 设置随机种子
+            self._set_random_seed(workflow_data)
 
             # 调用ComfyUI API
             response = requests.post(
@@ -363,6 +412,150 @@ class ComfyUIClientV2:
                 return None
         except Exception as e:
             logger.error(f"获取图片异常: {e}")
+            return None
+
+    async def generate_images_batch(self, prompts: List[str],
+                                   negative_prompt: str = None,
+                                   style_prefix: str = None,
+                                   style_suffix: str = None,
+                                   steps: int = None,
+                                   cfg: float = None) -> List[str]:
+        """批量生成图片.
+
+        Args:
+            prompts: 提示词列表
+            negative_prompt: 负面提示词
+            style_prefix: 风格前缀
+            style_suffix: 风格后缀
+            steps: 采样步数
+            cfg: CFG值
+
+        Returns:
+            生成的图片文件名列表
+        """
+        if not self.workflow_json:
+            logger.error("工作流JSON未加载")
+            return []
+
+        if not prompts:
+            logger.warning("提示词列表为空")
+            return []
+
+        logger.info(f"开始批量生成 {len(prompts)} 张图片")
+
+        generated_images = []
+
+        # 并发生成图片（限制并发数以避免过载）
+        semaphore = asyncio.Semaphore(3)  # 最多同时3个生成任务
+
+        async def generate_single_image(prompt: str, index: int) -> Optional[str]:
+            """生成单张图片."""
+            async with semaphore:
+                try:
+                    logger.info(f"生成第 {index + 1} 张图片: {prompt[:50]}...")
+
+                    task_id = await self.generate_image_v2(
+                        user_prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        style_prefix=style_prefix,
+                        style_suffix=style_suffix,
+                        steps=steps,
+                        cfg=cfg
+                    )
+
+                    if task_id:
+                        # 等待生成完成并获取结果
+                        await asyncio.sleep(1)  # 等待任务开始
+
+                        # 轮询任务状态
+                        max_wait_time = 120  # 最大等待2分钟
+                        wait_interval = 2
+                        waited_time = 0
+
+                        while waited_time < max_wait_time:
+                            history = await self.get_history(task_id)
+
+                            if history and task_id in history:
+                                task_data = history[task_id]
+
+                                if task_data.get("status", {}).get("completed", False):
+                                    # 获取输出图片 - 优先查找最终输出文件(type="output")，而不是临时文件
+                                    outputs = task_data.get("outputs", {})
+                                    output_filename = None
+                                    temp_filename = None
+
+                                    for node_id, node_output in outputs.items():
+                                        if "images" in node_output:
+                                            for image_info in node_output["images"]:
+                                                filename = image_info.get("filename")
+                                                image_type = image_info.get("type", "")
+                                                if filename:
+                                                    if image_type == "output":
+                                                        output_filename = filename
+                                                    elif image_type == "temp":
+                                                        temp_filename = filename
+
+                                    # 优先返回最终输出文件，如果没有则返回临时文件
+                                    final_filename = output_filename or temp_filename
+                                    if final_filename:
+                                        logger.info(f"第 {index + 1} 张图片生成完成: {final_filename} (类型: {'output' if output_filename else 'temp'})")
+                                        return final_filename
+
+                                # 如果任务失败，跳出循环
+                                if task_data.get("status", {}).get("status_str") == "error":
+                                    logger.error(f"第 {index + 1} 张图片生成失败")
+                                    break
+
+                            await asyncio.sleep(wait_interval)
+                            waited_time += wait_interval
+
+                        logger.warning(f"第 {index + 1} 张图片生成超时")
+                    return None
+
+                except Exception as e:
+                    logger.error(f"生成第 {index + 1} 张图片时出错: {e}")
+                    return None
+
+        # 创建并发任务
+        tasks = [
+            generate_single_image(prompt, i)
+            for i, prompt in enumerate(prompts)
+        ]
+
+        # 等待所有任务完成
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 处理结果
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"第 {i + 1} 张图片生成异常: {result}")
+            elif result:
+                generated_images.append(result)
+                logger.info(f"第 {i + 1} 张图片成功: {result}")
+            else:
+                logger.error(f"第 {i + 1} 张图片生成失败")
+
+        logger.info(f"批量生成完成，成功生成 {len(generated_images)} 张图片")
+        return generated_images
+
+    async def get_history(self, prompt_id: str) -> Optional[Dict[str, Any]]:
+        """获取ComfyUI任务历史记录.
+
+        Args:
+            prompt_id: 任务ID
+
+        Returns:
+            历史记录数据
+        """
+        try:
+            response = requests.get(f"{self.base_url}/history/{prompt_id}", timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"获取历史记录失败: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"获取历史记录异常: {e}")
             return None
 
     async def health_check(self) -> bool:

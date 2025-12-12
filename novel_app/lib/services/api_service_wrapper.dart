@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
+import 'package:built_collection/built_collection.dart';
+import 'package:built_value/json_object.dart';
 import 'package:flutter/foundation.dart';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
@@ -50,6 +52,7 @@ class ApiServiceWrapper {
       baseUrl: host,
       connectTimeout: Duration(seconds: 10),
       receiveTimeout: Duration(seconds: 90),
+      sendTimeout: Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -380,6 +383,196 @@ class ApiServiceWrapper {
   }
 
   
+  
+  /// 生成人物卡图片
+  Future<Map<String, dynamic>> generateRoleCardImages({
+    required String roleId,
+    required Map<String, dynamic> roles,
+    required String userInput,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      // 使用生成的 API 客户端方法
+      final rolesMap = <String, JsonObject?>{};
+      roles.forEach((key, value) {
+        if (value != null) {
+          rolesMap[key] = JsonObject(value);
+        }
+      });
+
+      final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
+        roleCardGenerateRequest: RoleCardGenerateRequest((b) => b
+          ..roleId = roleId
+          ..roles.replace(BuiltMap<String, JsonObject?>(rolesMap))
+          ..userInput = userInput),
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        // 对于 JsonObject 响应，简单地返回成功状态
+        debugPrint('角色卡生成请求成功: ${response.data}');
+        return {
+          'message': '图片生成中，请耐心等待',
+          'status': 'success'
+        };
+      } else {
+        throw Exception('生成人物卡失败：${response.statusCode}');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  
+  /// 获取角色图集
+  Future<Map<String, dynamic>> getRoleGallery(String roleId) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.getRoleCardGalleryApiRoleCardGalleryRoleIdGet(
+        roleId: roleId,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        debugPrint('图集API响应数据类型: ${responseData.runtimeType}'); // 调试日志
+        debugPrint('图集API响应数据: $responseData');
+
+        if (responseData != null) {
+          try {
+            debugPrint('开始解析RoleGalleryResponse对象');
+
+            // 直接处理RoleGalleryResponse对象
+            final apiImages = responseData.images; // BuiltList<String>
+            final imageList = apiImages.toList();
+
+            debugPrint('直接解析到的图片列表: $imageList');
+
+            return {
+              'role_id': responseData.roleId,
+              'images': imageList,
+              'message': '图集获取成功'
+            };
+          } catch (e) {
+            debugPrint('解析图集数据失败: $e');
+            return {
+              'role_id': roleId,
+              'images': [],
+              'message': '图集数据解析失败'
+            };
+          }
+        }
+        return {
+          'role_id': roleId,
+          'images': [],
+          'message': '图集响应为空'
+        };
+      } else {
+        throw Exception('获取图集失败：${response.statusCode}');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 删除角色图片
+  Future<bool> deleteRoleImage({
+    required String roleId,
+    required String imageUrl,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      // 创建删除请求对象
+      final deleteRequest = RoleImageDeleteRequest((b) => b
+        ..roleId = roleId
+        ..imgUrl = imageUrl
+      );
+
+      final response = await _api.deleteRoleCardImageApiRoleCardImageDelete(
+        roleImageDeleteRequest: deleteRequest,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('角色图片删除成功: $imageUrl');
+        return true;
+      } else {
+        throw Exception('删除图片失败：${response.statusCode}');
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 生成更多相似图片
+  Future<Map<String, dynamic>> generateMoreImages({
+    required String roleId,
+    required int count,
+    String? referenceImageUrl, // 可选的参考图片URL
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      debugPrint('生成图片请求，角色ID: $roleId, 数量: $count');
+
+      if (referenceImageUrl != null && referenceImageUrl.isNotEmpty) {
+        // 使用参考图片生成相似图片
+        final regenerateRequest = RoleRegenerateRequest((b) => b
+          ..imgUrl = referenceImageUrl
+          ..count = count
+        );
+
+        final response = await _api.regenerateSimilarImagesApiRoleCardRegeneratePost(
+          roleRegenerateRequest: regenerateRequest,
+          X_API_TOKEN: token,
+        );
+
+        if (response.statusCode == 200) {
+          return {
+            'message': '图片生成请求已提交，正在根据参考图片生成 $count 张相似图片',
+            'count': count,
+            'status': 'processing',
+            'reference_image': referenceImageUrl
+          };
+        } else {
+          throw Exception('生成图片失败：${response.statusCode}');
+        }
+      } else {
+        // 如果没有参考图片，使用角色ID重新生成
+        final generateRequest = RoleCardGenerateRequest((b) => b
+          ..roleId = roleId
+          ..userInput = '生成更多角色图片'
+          ..roles.replace(BuiltMap<String, JsonObject?>({}))
+        );
+
+        final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
+          roleCardGenerateRequest: generateRequest,
+          X_API_TOKEN: token,
+        );
+
+        if (response.statusCode == 200) {
+          return {
+            'message': '图片生成请求已提交，正在生成 $count 张新图片',
+            'count': count,
+            'status': 'processing',
+            'type': 'new_generation'
+          };
+        } else {
+          throw Exception('生成图片失败：${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ 生成图片失败: $e');
+      throw _handleError(e);
+    }
+  }
+
   
   /// 获取 Dio 实例（用于构建图片URL）
   Dio get dio => _dio;

@@ -608,4 +608,50 @@ class DifyService {
       throw Exception('角色更新数据解析失败: $e');
     }
   }
+
+  /// 生成角色卡提示词
+  Future<Map<String, String>> generateCharacterPrompts({
+    required String characterDescription,
+  }) async {
+    final inputs = {
+      'roles': characterDescription,
+      'cmd': '角色卡提示词描写',
+    };
+
+    debugPrint('=== 开始AI生成角色卡提示词 ===');
+    debugPrint('角色描述: $characterDescription');
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('AI生成提示词失败：未收到有效响应');
+    }
+
+    try {
+      // 获取content字段
+      final content = outputs['content'];
+
+      if (content == null) {
+        throw Exception('返回数据缺少content字段');
+      }
+
+      // 解析face_prompts和body_prompts
+      final facePrompts = content['face_prompts']?.toString() ?? '';
+      final bodyPrompts = content['body_prompts']?.toString() ?? '';
+
+      debugPrint('=== 面部提示词: $facePrompts ===');
+      debugPrint('=== 身材提示词: $bodyPrompts ===');
+
+      return {
+        'face_prompts': facePrompts,
+        'body_prompts': bodyPrompts,
+      };
+
+    } catch (e) {
+      debugPrint('解析角色卡提示词失败: $e, 原始数据: $outputs');
+      throw Exception('角色卡提示词解析失败: $e');
+    }
+  }
 }

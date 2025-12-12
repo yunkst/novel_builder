@@ -102,3 +102,95 @@ class Text2ImgErrorResponse(BaseModel):
     error: str = Field(..., description="错误类型")
     message: str = Field(..., description="错误信息")
     chapter_id: Optional[str] = Field(None, description="章节ID")
+
+
+# ============================================================================
+# 人物卡功能相关API模式
+# ============================================================================
+
+class RoleCardGenerateRequest(BaseModel):
+    """人物卡图片生成请求模式."""
+
+    role_id: str = Field(..., description="人物卡ID")
+    roles: Dict[str, Any] = Field(..., description="人物卡设定信息")
+    user_input: str = Field(..., description="用户要求")
+
+
+class RoleImageInfo(BaseModel):
+    """角色图片信息模式."""
+
+    img_url: str = Field(..., description="图片URL")
+    prompt: str = Field(..., description="生成提示词")
+    created_at: str = Field(..., description="创建时间")
+
+
+class RoleGalleryResponse(BaseModel):
+    """角色图集响应模式."""
+
+    role_id: str = Field(..., description="人物卡ID")
+    images: List[str] = Field(..., description="图片URL列表")
+
+
+class RoleImageDeleteRequest(BaseModel):
+    """删除角色图片请求模式."""
+
+    role_id: str = Field(..., description="人物卡ID")
+    img_url: str = Field(..., description="要删除的图片URL")
+
+
+class RoleRegenerateRequest(BaseModel):
+    """重新生成相似图片请求模式."""
+
+    img_url: str = Field(..., description="参考图片URL")
+    count: int = Field(..., ge=1, le=10, description="生成图片数量")
+
+
+class RoleGenerateResponse(BaseModel):
+    """人物卡图片生成响应模式."""
+
+    role_id: str = Field(..., description="人物卡ID")
+    total_prompts: int = Field(..., description="生成的提示词数量")
+    message: str = Field(..., description="处理消息")
+
+
+class DifyPhotoResult(BaseModel):
+    """Dify拍照工作流返回结果."""
+
+    content: List[str] = Field(..., description="生成的提示词列表")
+
+
+class RoleCardErrorResponse(BaseModel):
+    """人物卡错误响应模式."""
+
+    error: str = Field(..., description="错误类型")
+    message: str = Field(..., description="错误信息")
+    role_id: Optional[str] = Field(None, description="人物卡ID")
+
+
+# ============================================================================
+# 异步任务相关API模式
+# ============================================================================
+
+class RoleCardTaskCreateResponse(BaseModel):
+    """人物卡任务创建响应模式."""
+
+    task_id: int = Field(..., description="任务ID")
+    role_id: str = Field(..., description="人物卡ID")
+    status: str = Field(..., description="任务状态")
+    message: str = Field(..., description="响应消息")
+
+
+class RoleCardTaskStatusResponse(BaseModel):
+    """人物卡任务状态响应模式."""
+
+    task_id: int = Field(..., description="任务ID")
+    role_id: str = Field(..., description="人物卡ID")
+    status: str = Field(..., description="任务状态: pending/running/completed/failed")
+    total_prompts: int = Field(..., description="生成的提示词数量")
+    generated_images: int = Field(..., description="成功生成的图片数量")
+    result_message: Optional[str] = Field(None, description="处理结果消息")
+    error_message: Optional[str] = Field(None, description="错误信息")
+    created_at: str = Field(..., description="创建时间")
+    started_at: Optional[str] = Field(None, description="开始处理时间")
+    completed_at: Optional[str] = Field(None, description="完成时间")
+    progress_percentage: float = Field(..., description="进度百分比")
