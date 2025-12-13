@@ -5,6 +5,7 @@ import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/cache_manager.dart';
 import 'services/api_service_wrapper.dart';
+import 'core/di/api_service_provider.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
@@ -41,7 +42,7 @@ void main() async {
   runZonedGuarded(() async {
     // 初始化 API 服务
     try {
-      await ApiServiceWrapper().init();
+      await ApiServiceProvider.initialize();
     } catch (e, stackTrace) {
       debugPrint('=== API Service Error ===');
       debugPrint('Exception: $e');

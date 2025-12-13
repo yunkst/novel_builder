@@ -6,6 +6,7 @@ import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../models/character.dart';
 import '../services/api_service_wrapper.dart';
+import '../core/di/api_service_provider.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -1280,7 +1281,7 @@ class DatabaseService {
 
     // 如果本地缓存没有，尝试从API获取
     try {
-      final apiService = ApiServiceWrapper();
+      final apiService = ApiServiceProvider.instance;
       final content = await apiService.getChapterContent(chapterUrl);
       return content;
     } catch (e) {
@@ -1304,5 +1305,67 @@ class DatabaseService {
     }
 
     return ''; // 本地缓存没有时直接返回空字符串
+  }
+
+  // ========== 角色头像获取功能 ==========
+
+  /// 获取角色的缓存图片URL
+  /// [characterId] 角色ID
+  /// 返回头像缓存路径，如果没有设置则返回null
+  Future<String?> getCharacterCachedImage(int characterId) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'characters',
+      columns: ['cachedImageUrl'],
+      where: 'id = ?',
+      whereArgs: [characterId],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty && maps.first['cachedImageUrl'] != null) {
+      return maps.first['cachedImageUrl'] as String?;
+    }
+
+    return null;
+  }
+
+  /// 更新角色头像信息（扩展方法，支持更多元数据）
+  /// [characterId] 角色ID
+  /// [imageUrl] 头像URL/路径
+  /// [originalFilename] 原始图集文件名
+  /// [originalImageUrl] 原始图片URL
+  Future<int> updateCharacterAvatar(
+    int characterId, {
+    String? imageUrl,
+    String? originalFilename,
+    String? originalImageUrl,
+  }) async {
+    final db = await database;
+
+    final Map<String, dynamic> updateData = {
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    if (imageUrl != null) {
+      updateData['cachedImageUrl'] = imageUrl;
+    } else {
+      updateData['cachedImageUrl'] = null;
+    }
+
+    return await db.update(
+      'characters',
+      updateData,
+      where: 'id = ?',
+      whereArgs: [characterId],
+    );
+  }
+
+  /// 检查角色是否有头像缓存
+  /// [characterId] 角色ID
+  /// 返回是否有头像缓存
+  Future<bool> hasCharacterAvatar(int characterId) async {
+    final cachedUrl = await getCharacterCachedImage(characterId);
+    return cachedUrl != null && cachedUrl.isNotEmpty;
   }
 }

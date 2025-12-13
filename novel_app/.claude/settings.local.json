@@ -11,7 +11,9 @@
       "Bash(flutter test:*)",
       "Bash(flutter run:*)",
       "Bash(dart test:*)",
-      "Bash(dart:*)"
+      "Bash(dart:*)",
+      "mcp__context7__get-library-docs",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

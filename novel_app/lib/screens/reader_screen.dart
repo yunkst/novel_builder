@@ -7,6 +7,7 @@ import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
+import '../core/di/api_service_provider.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/character_preview_dialog.dart';
@@ -33,7 +34,7 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMixin {
-  final ApiServiceWrapper _apiService = ApiServiceWrapper();
+  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
 
@@ -125,7 +126,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     _autoScrollTimer?.cancel();
     _cursorController.dispose();
     _scrollController.dispose();
-    _apiService.dispose();
+    // 移除 _apiService.dispose() 调用，避免关闭共享的Dio连接
+    // _apiService.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     _rewriteResultNotifier.dispose();
     _isGeneratingRewriteNotifier.dispose();
     _fullRewriteResultNotifier.dispose();

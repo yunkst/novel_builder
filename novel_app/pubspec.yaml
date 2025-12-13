@@ -60,6 +60,9 @@ dependencies:
   # 图片缓存
   cached_network_image: ^3.3.1
 
+  # 图片裁剪
+  image_cropper: ^8.0.2
+
   # 依赖注入
   get_it: ^7.6.4
 

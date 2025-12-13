@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/toast_utils.dart';
+import '../core/di/api_service_provider.dart';
 
 class BackendSettingsScreen extends StatefulWidget {
   const BackendSettingsScreen({super.key});
@@ -11,7 +12,7 @@ class BackendSettingsScreen extends StatefulWidget {
 }
 
 class _BackendSettingsScreenState extends State<BackendSettingsScreen> {
-  final ApiServiceWrapper _api = ApiServiceWrapper();
+  final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final TextEditingController _hostController = TextEditingController();
   final TextEditingController _tokenController = TextEditingController();
   bool _isLoading = true;
@@ -70,7 +71,8 @@ class _BackendSettingsScreenState extends State<BackendSettingsScreen> {
 
   @override
   void dispose() {
-    _api.dispose();
+    // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
+    // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     _hostController.dispose();
     _tokenController.dispose();
     super.dispose();

@@ -6,6 +6,7 @@ import '../models/cache_task.dart';
 import 'api_service_wrapper.dart';
 import 'database_service.dart';
 import 'cache_sync_service.dart';
+import '../core/di/api_service_provider.dart';
 import 'package:flutter/foundation.dart';
 
 class CacheProgressUpdate {
@@ -26,7 +27,7 @@ class CacheManager {
   CacheManager._internal();
 
   final DatabaseService _db = DatabaseService();
-  final ApiServiceWrapper _api = ApiServiceWrapper();
+  final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final CacheSyncService _syncService = CacheSyncService();
 
   final Queue<String> _queue = Queue<String>();

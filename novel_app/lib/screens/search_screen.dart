@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import 'chapter_list_screen.dart';
 import 'cache_search_screen.dart';
 import '../utils/toast_utils.dart';
+import '../core/di/api_service_provider.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,7 +16,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final ApiServiceWrapper _api = ApiServiceWrapper();
+  final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   List<Novel> _searchResults = [];
   bool _isLoading = false;
@@ -72,7 +73,8 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _api.dispose();
+    // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
+    // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     super.dispose();
   }
 

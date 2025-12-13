@@ -3,6 +3,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
+import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
 import '../services/cache_sync_service.dart';
@@ -20,7 +21,7 @@ class ChapterListScreen extends StatefulWidget {
 }
 
 class _ChapterListScreenState extends State<ChapterListScreen> {
-  final ApiServiceWrapper _api = ApiServiceWrapper();
+  final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final DifyService _difyService = DifyService();
   final CacheManager _cacheManager = CacheManager();
@@ -73,7 +74,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _api.dispose();
+    // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
+    // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     _insertResultNotifier.dispose();
     _isGeneratingInsertNotifier.dispose();
     _isGeneratingNotifier.dispose();

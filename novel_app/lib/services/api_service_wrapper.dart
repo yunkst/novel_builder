@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:built_value/json_object.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/cache_task.dart';
@@ -33,6 +35,9 @@ class ApiServiceWrapper {
   late Serializers _serializers;
 
   bool _initialized = false;
+  DateTime? _lastInitTime;
+  int _lastErrorCount = 0;
+  DateTime? _lastErrorTime;
 
   /// 初始化 API 客户端
   ///
@@ -64,6 +69,22 @@ class ApiServiceWrapper {
       },
     ));
 
+    // 配置优化的HttpClientAdapter
+    _dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        // 优化连接池配置：减少连接数避免资源耗尽
+        client.maxConnectionsPerHost = 20; // 从100减少到20
+        // 设置连接空闲超时，避免长时间占用连接
+        client.idleTimeout = const Duration(seconds: 60); // 60秒空闲超时
+        // 设置连接超时
+        client.connectionTimeout = const Duration(seconds: 15);
+        return client;
+      },
+    );
+
+    debugPrint('✅ Dio连接池配置已优化: 20个并发连接/主机，60秒空闲超时');
+
     // 添加日志拦截器（仅在调试模式）
     _dio.interceptors.add(LogInterceptor(
       requestBody: true,
@@ -76,6 +97,9 @@ class ApiServiceWrapper {
     _api = DefaultApi(_dio, _serializers);
 
     _initialized = true;
+    _lastInitTime = DateTime.now();
+    _lastErrorCount = 0;
+    _lastErrorTime = null;
     debugPrint('✓ ApiServiceWrapper 初始化完成');
   }
 
@@ -83,6 +107,89 @@ class ApiServiceWrapper {
   void _ensureInitialized() {
     if (!_initialized) {
       throw Exception('ApiServiceWrapper 未初始化，请先调用 init()');
+    }
+  }
+
+  /// 检查连接健康状态
+  bool _isConnectionHealthy() {
+    if (!_initialized || _dio == null) return false;
+
+    // 检查初始化时间是否过期（30分钟）
+    if (_lastInitTime != null) {
+      final age = DateTime.now().difference(_lastInitTime!);
+      if (age.inMinutes > 30) {
+        debugPrint('⚠️ 连接过期，需要重新初始化 (${age.inMinutes}分钟)');
+        return false;
+      }
+    }
+
+    // 检查错误频率（如果最近错误过多，认为连接不健康）
+    if (_lastErrorTime != null) {
+      final timeSinceLastError = DateTime.now().difference(_lastErrorTime!);
+      if (timeSinceLastError.inMinutes < 2 && _lastErrorCount >= 3) {
+        debugPrint('⚠️ 最近错误频繁，连接可能不稳定');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /// 确保连接健康，必要时重新初始化
+  Future<void> _ensureHealthyConnection() async {
+    if (!_isConnectionHealthy()) {
+      debugPrint('🔄 检测到连接不健康，正在重新初始化...');
+      await _reinitializeConnection();
+    }
+  }
+
+  /// 重新初始化连接
+  Future<void> _reinitializeConnection() async {
+    try {
+      debugPrint('🔧 重新初始化API连接...');
+
+      // 强制关闭旧连接（如果存在）
+      try {
+        _dio?.close(force: true);
+      } catch (e) {
+        debugPrint('关闭旧连接时出错: $e');
+      }
+
+      // 重新初始化
+      await init();
+
+      debugPrint('✅ API连接重新初始化成功');
+    } catch (e) {
+      debugPrint('❌ API连接重新初始化失败: $e');
+      throw Exception('连接重新初始化失败: $e');
+    }
+  }
+
+  /// 检查是否为连接错误
+  bool _isConnectionError(dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+    return errorStr.contains('closed') ||
+           errorStr.contains('connection') ||
+           errorStr.contains('establish') ||
+           errorStr.contains('dio') ||
+           errorStr.contains('socket') ||
+           errorStr.contains('timeout') ||
+           errorStr.contains('network');
+  }
+
+  /// 记录连接错误
+  void _recordConnectionError(dynamic error) {
+    _lastErrorTime = DateTime.now();
+    _lastErrorCount++;
+
+    debugPrint('🔌 记录连接错误 #$_lastErrorCount: $error');
+
+    // 如果错误过多，尝试自动重新初始化
+    if (_lastErrorCount >= 3) {
+      debugPrint('🔄 错误次数过多，尝试自动恢复连接...');
+      _reinitializeConnection().catchError((e) {
+        debugPrint('❌ 自动恢复连接失败: $e');
+      });
     }
   }
 
@@ -112,11 +219,59 @@ class ApiServiceWrapper {
 
   // ========== 业务方法 ==========
 
+  /// 带自动重试的通用请求包装器
+  Future<T> _withRetry<T>(Future<T> Function() operation, String operationName) async {
+    int retryCount = 0;
+    const maxRetries = 2; // 最多重试2次
+
+    while (retryCount <= maxRetries) {
+      try {
+        // 确保连接健康
+        await _ensureHealthyConnection();
+        _ensureInitialized();
+
+        final result = await operation();
+
+        // 成功时重置错误计数
+        if (_lastErrorCount > 0) {
+          debugPrint('✅ 请求成功，重置错误计数 (之前: $_lastErrorCount)');
+          _lastErrorCount = 0;
+          _lastErrorTime = null;
+        }
+
+        return result;
+      } catch (e) {
+        retryCount++;
+
+        // 记录连接错误
+        _recordConnectionError(e);
+
+        if (retryCount > maxRetries) {
+          debugPrint('❌ $operationName 最终失败: $e');
+          throw _handleError(e);
+        }
+
+        // 如果是连接错误，尝试重新初始化并重试
+        if (_isConnectionError(e)) {
+          debugPrint('🔄 检测到连接错误，重新初始化并重试 ($retryCount/$maxRetries)');
+          await _reinitializeConnection();
+          await Future.delayed(Duration(milliseconds: 1000 * retryCount)); // 指数退避
+          continue;
+        }
+
+        // 其他错误也重试，但延迟更短
+        debugPrint('⚠️ $operationName 失败，重试中 ($retryCount/$maxRetries): $e');
+        await Future.delayed(Duration(milliseconds: 500 * retryCount));
+      }
+    }
+
+    throw Exception('$operationName 重试失败');
+  }
+
   /// 搜索小说
   Future<List<local.Novel>> searchNovels(String keyword,
       {List<String>? sites}) async {
-    _ensureInitialized();
-    try {
+    return _withRetry<List<local.Novel>>(() async {
       final token = await getToken();
 
       final response = await _api.searchSearchGet(
@@ -133,15 +288,12 @@ class ApiServiceWrapper {
       } else {
         throw Exception('搜索失败: ${response.statusCode}');
       }
-    } catch (e) {
-      throw _handleError(e);
-    }
+    }, '搜索小说');
   }
 
   /// 获取源站列表
   Future<List<Map<String, dynamic>>> getSourceSites() async {
-    _ensureInitialized();
-    try {
+    return _withRetry<List<Map<String, dynamic>>>(() async {
       final token = await getToken();
 
       final response = await _api.getSourceSitesSourceSitesGet(
@@ -153,15 +305,12 @@ class ApiServiceWrapper {
       } else {
         throw Exception('获取源站列表失败: ${response.statusCode}');
       }
-    } catch (e) {
-      throw _handleError(e);
-    }
+    }, '获取源站列表');
   }
 
   /// 获取章节列表
   Future<List<local.Chapter>> getChapters(String novelUrl) async {
-    _ensureInitialized();
-    try {
+    return _withRetry<List<local.Chapter>>(() async {
       final token = await getToken();
       final response = await _api.chaptersChaptersGet(
         url: novelUrl,
@@ -178,17 +327,14 @@ class ApiServiceWrapper {
       } else {
         throw Exception('获取章节列表失败: ${response.statusCode}');
       }
-    } catch (e) {
-      throw _handleError(e);
-    }
+    }, '获取章节列表');
   }
 
   /// 获取章节内容
   ///
   /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
   Future<String> getChapterContent(String chapterUrl, {bool forceRefresh = false}) async {
-    _ensureInitialized();
-    try {
+    return _withRetry<String>(() async {
       final token = await getToken();
       final response = await _api.chapterContentChapterContentGet(
         url: chapterUrl,
@@ -201,9 +347,7 @@ class ApiServiceWrapper {
       } else {
         throw Exception('获取章节内容失败: ${response.statusCode}');
       }
-    } catch (e) {
-      throw _handleError(e);
-    }
+    }, '获取章节内容');
   }
 
   /// 统一错误处理
@@ -220,8 +364,13 @@ class ApiServiceWrapper {
   }
 
   /// 释放资源
+  ///
+  /// 注意：由于ApiServiceWrapper使用单例模式，不应关闭共享的Dio实例
+  /// 所以此方法改为空操作，避免连接被过早关闭导致后续请求失败
   void dispose() {
-    _dio.close();
+    debugPrint('ApiServiceWrapper.dispose() called (no-op to maintain connection)');
+    // 不再关闭Dio连接，保持单例连接可用
+    // _dio.close(); // 已注释，避免关闭共享连接
   }
 
   // ========== 缓存相关方法 ==========
