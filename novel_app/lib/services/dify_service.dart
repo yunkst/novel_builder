@@ -7,6 +7,7 @@ import '../models/character.dart';
 import 'dify_sse_parser.dart';
 import 'stream_state_manager.dart';
 
+
 class DifyService {
   // 获取流式响应token
   Future<String> _getFlowToken() async {
@@ -652,6 +653,220 @@ class DifyService {
     } catch (e) {
       debugPrint('解析角色卡提示词失败: $e, 原始数据: $outputs');
       throw Exception('角色卡提示词解析失败: $e');
+    }
+  }
+
+  /// 格式化场景描写输入参数
+  Map<String, dynamic> _formatSceneDescriptionInput({
+    required String chapterContent,
+    required List<Character> characters,
+  }) {
+    // 使用Character.formatForAI方法生成AI友好的角色信息格式
+    final rolesText = Character.formatForAI(characters);
+
+    final inputs = {
+      'current_chapter_content': chapterContent,
+      'roles': rolesText,
+      'cmd': '场景描写',
+    };
+
+    debugPrint('=== 格式化场景描写输入参数 ===');
+    debugPrint('章节内容长度: ${chapterContent.length} 字符');
+    debugPrint('角色数量: ${characters.length}');
+    debugPrint('角色信息格式化结果:\n$rolesText');
+
+    return inputs;
+  }
+
+  
+  /// 场景描写流式生成
+  Future<void> generateSceneDescriptionStream({
+    required String chapterContent,
+    required List<Character> characters,
+    required Function(String) onChunk,        // 文本块回调
+    required Function(String) onCompleted,    // 完成回调，传递完整内容
+    required Function(String) onError,        // 错误回调
+  }) async {
+    // 格式化输入参数
+    final inputs = _formatSceneDescriptionInput(
+      chapterContent: chapterContent,
+      characters: characters,
+    );
+
+    debugPrint('🚀 === 开始场景描写流式生成 ===');
+    debugPrint('章节内容长度: ${chapterContent.length} 字符');
+    debugPrint('角色数量: ${characters.length}');
+    debugPrint('输入参数: ${jsonEncode(inputs)}');
+
+    // 创建状态管理器
+    late final StreamStateManager stateManager;
+    stateManager = StreamStateManager(
+      onTextChunk: onChunk,
+      onCompleted: (String completeContent) {
+        debugPrint('🎯 === 场景描写生成完成 ===');
+        debugPrint('完整内容长度: ${completeContent.length}');
+        debugPrint('完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+
+        // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
+        if (completeContent.isNotEmpty) {
+          onChunk('<<COMPLETE_CONTENT>>$completeContent'); // 使用特殊标记标识完整内容
+        }
+
+        onCompleted(completeContent);
+        stateManager.dispose();
+      },
+      onError: (error) {
+        debugPrint('❌ === 场景描写生成错误 ===');
+        debugPrint('错误: $error');
+        stateManager.dispose();
+        throw Exception('场景描写生成失败: $error');
+      },
+    );
+
+    try {
+      stateManager.startStreaming();
+
+      final prefs = await SharedPreferences.getInstance();
+      final difyUrl = prefs.getString('dify_url');
+      final difyToken = await _getFlowToken();
+
+      if (difyUrl == null || difyUrl.isEmpty) {
+        throw Exception('请先在设置中配置 Dify URL');
+      }
+
+      final url = Uri.parse('$difyUrl/workflows/run');
+
+      final requestBody = {
+        'inputs': inputs,
+        'response_mode': 'streaming',
+        'user': 'novel-builder-app',
+      };
+
+      debugPrint('🌐 === 场景描写 API 请求 ===');
+      debugPrint('URL: $url');
+      debugPrint('Request Body: ${jsonEncode(requestBody)}');
+      debugPrint('==========================');
+
+      final request = http.Request('POST', url);
+      request.headers.addAll({
+        'Authorization': 'Bearer $difyToken',
+        'Content-Type': 'application/json',
+      });
+      request.body = jsonEncode(requestBody);
+
+      final streamedResponse = await request.send();
+
+      debugPrint('📡 === 响应状态码: ${streamedResponse.statusCode} ===');
+
+      if (streamedResponse.statusCode == 200) {
+        stateManager.startReceiving();
+
+        // 使用SSE解析器处理流式响应
+        final inputStream = streamedResponse.stream.transform(utf8.decoder);
+        final eventStream = DifySSEParser.parseStream(inputStream);
+        final textStream = DifySSEParser.extractTextStream(eventStream);
+
+        // 安全的流处理机制
+        final completer = Completer<bool>();
+        bool textStreamDone = false;
+        bool textStreamError = false;
+
+        // 监听文本流
+        final textSubscription = textStream.listen(
+          (textChunk) {
+            debugPrint('🔥 === 场景描写文本块 ===');
+            debugPrint('内容: "$textChunk"');
+            stateManager.handleTextChunk(textChunk);
+            debugPrint('✅ 文本块处理完成');
+          },
+          onDone: () {
+            debugPrint('📝 场景描写文本流结束');
+            textStreamDone = true;
+
+            // 短暂延迟确保最后的文本块被处理
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (completer.isCompleted) return;
+              if (!textStreamError) {
+                completer.complete(true);
+              }
+            });
+          },
+          onError: (error) {
+            debugPrint('❌ 场景描写文本流错误: $error');
+            textStreamError = true;
+            if (!completer.isCompleted) {
+              completer.completeError(error);
+            }
+          },
+        );
+
+        // 监听工作流完成事件
+        DifySSEParser.waitForCompletion(eventStream).then((workflowCompleted) {
+          debugPrint('✅ 场景描写工作流完成: $workflowCompleted');
+          debugPrint('📊 完成时总字符数: ${stateManager.currentState.characterCount}');
+
+          if (textStreamDone || completer.isCompleted) return;
+
+          // 给文本流一些时间处理最后的数据
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (completer.isCompleted) return;
+            completer.complete(workflowCompleted);
+          });
+        }).catchError((error) {
+          debugPrint('❌ 场景描写工作流完成错误: $error');
+          if (!completer.isCompleted) {
+            completer.completeError(error);
+          }
+        });
+
+        try {
+          // 等待流处理完成
+          final isCompleted = await completer.future.timeout(
+            const Duration(minutes: 5), // 5分钟超时
+            onTimeout: () {
+              debugPrint('⏰ 场景描写流处理超时');
+              return textStreamDone && !textStreamError;
+            }
+          );
+
+          debugPrint('🎯 === 场景描写流处理结果 ===');
+          debugPrint('完成状态: $isCompleted');
+          debugPrint('最终字符数: ${stateManager.currentState.characterCount}');
+
+          if (isCompleted) {
+            stateManager.complete();
+          } else {
+            stateManager.handleError('场景描写流处理未正确完成');
+          }
+        } catch (e) {
+          debugPrint('❌ === 场景描写流处理异常 ===');
+          debugPrint('异常: $e');
+          stateManager.handleError('场景描写流处理异常: $e');
+        } finally {
+          await textSubscription.cancel();
+        }
+      } else {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        debugPrint('❌ === 场景描写 API 错误 ===');
+        debugPrint('状态码: ${streamedResponse.statusCode}');
+        debugPrint('响应体: $errorBody');
+
+        String errorMessage = '未知错误';
+        try {
+          final errorData = jsonDecode(errorBody);
+          errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
+          final errorCode = errorData['code'] ?? '';
+          errorMessage = '错误码: $errorCode\n错误信息: $errorMessage';
+        } catch (e) {
+          errorMessage = errorBody;
+        }
+
+        stateManager.handleError('场景描写API请求失败 (${streamedResponse.statusCode}): $errorMessage');
+      }
+    } catch (e) {
+      debugPrint('❌ === 场景描写生成异常 ===');
+      debugPrint('异常: $e');
+      stateManager.handleError('场景描写网络或解析异常: $e');
     }
   }
 }

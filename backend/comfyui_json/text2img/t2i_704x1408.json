@@ -10,7 +10,7 @@
   },
   "2": {
     "inputs": {
-      "seed": 879328239770797,
+      "seed": "在这替换随机数",
       "steps": 30,
       "cfg": 5,
       "sampler_name": "euler",
@@ -56,7 +56,10 @@
   },
   "4": {
     "inputs": {
-      "text": "lazypos",
+      "text": [
+        "9",
+        0
+      ],
       "clip": [
         "1",
         1
@@ -69,7 +72,7 @@
   },
   "5": {
     "inputs": {
-      "text": "lazyneg",
+      "text": "worst quality,bad quality,simple_background,low quality,jpeg artifacts,mutated hands and fingers,old,oldest,signature,,bad hands,shiny_skin,",
       "clip": [
         "1",
         1
@@ -82,8 +85,8 @@
   },
   "6": {
     "inputs": {
-      "width": 704,
-      "height": 1408,
+      "width": 768,
+      "height": 1280,
       "batch_size": 1
     },
     "class_type": "EmptyLatentImage",
@@ -102,6 +105,41 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "保存图像"
+    }
+  },
+  "9": {
+    "inputs": {
+      "string_a": [
+        "10",
+        0
+      ],
+      "string_b": [
+        "11",
+        0
+      ],
+      "delimiter": ","
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "连接"
+    }
+  },
+  "10": {
+    "inputs": {
+      "value": "提示词在这里替换"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "prompts"
+    }
+  },
+  "11": {
+    "inputs": {
+      "value": "nsfw,very aesthetic, masterpiece, best quality, ultra-detailed,pale_skin,"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "字符串"
     }
   }
 }

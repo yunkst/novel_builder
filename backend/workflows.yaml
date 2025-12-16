@@ -1,0 +1,20 @@
+# ComfyUI工作流配置文件
+# 支持多种工作流类型：t2i(文生图), i2v(图生视频)
+
+t2i:
+  - title: "动漫风"
+    path: "./comfyui_json/text2img/t2i_704x1408.json"
+    description: "用于生成角色卡的标准文生图工作流"
+    model_type: "character"
+
+i2v:
+  - title: "视频生成"
+    path: "./comfyui_json/img2video/i2v.json"
+    description: "图片转视频工作流"
+    model_type: "video"
+
+# 全局配置
+settings:
+  default_t2i_model: "动漫风"
+  api_timeout: 300
+  max_concurrent_tasks: 5

@@ -4,7 +4,6 @@ import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/cache_manager.dart';
-import 'services/api_service_wrapper.dart';
 import 'core/di/api_service_provider.dart';
 
 void main() async {

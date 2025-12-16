@@ -31,13 +31,14 @@ from .config import settings
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
-from .models.text2img import RoleImageGallery
 from .schemas import (
     Chapter, ChapterContent, Novel, SourceSite,
-    Text2ImgStartRequest, Text2ImgStatusResponse,
     RoleCardGenerateRequest, RoleGalleryResponse,
     RoleImageDeleteRequest, RoleRegenerateRequest, RoleGenerateResponse,
-    RoleCardTaskCreateResponse, RoleCardTaskStatusResponse
+    RoleCardTaskCreateResponse, RoleCardTaskStatusResponse,
+    SceneIllustrationRequest, SceneIllustrationResponse,
+    SceneGalleryResponse, SceneImageDeleteRequest,
+    EnhancedSceneIllustrationRequest
 )
 from .services.crawler_factory import (
     get_crawler_for_url,
@@ -46,9 +47,15 @@ from .services.crawler_factory import (
 )
 from .services.novel_cache_service import novel_cache_service
 from .services.search_service import SearchService
-from .services.text2img_service import create_text2img_service
 from .services.role_card_service import role_card_service
 from .services.role_card_async_service import role_card_async_service
+from .services.dify_client import create_dify_client
+from .services.scene_illustration_service import create_scene_illustration_service
+
+# 创建场面绘制服务实例
+dify_client = create_dify_client()
+scene_illustration_service = create_scene_illustration_service(dify_client)
+
 app = FastAPI(
     title="Novel Builder Backend",
     version="0.2.0",
@@ -187,73 +194,8 @@ async def chapter_content(
     }
 
 
-# ================= 文生图 API =================
-
-# 初始化文生图服务
-text2img_service = None
-
-def get_text2img_service():
-    """获取文生图服务实例（延迟初始化）"""
-    global text2img_service
-    if text2img_service is None:
-        try:
-            text2img_service = create_text2img_service()
-            print("✓ 文生图服务初始化成功")
-        except Exception as e:
-            print(f"✗ 文生图服务初始化失败: {e}")
-            text2img_service = None
-    return text2img_service
 
 
-@app.post("/text2img/start", dependencies=[Depends(verify_token)])
-async def start_illustration(
-    request: Text2ImgStartRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    开始配图
-
-    - **novel_content**: 需要插入图片的小说内容
-    - **roles**: 出场角色信息
-    - **require**: 配图要求
-    - **chapter_id**: 章节ID，唯一标识章节
-    """
-    service = get_text2img_service()
-    if not service:
-        raise HTTPException(status_code=503, detail="文生图服务不可用，请检查配置")
-
-    success = await service.start_illustration(
-        db=db,
-        chapter_id=request.chapter_id,
-        novel_content=request.novel_content,
-        roles=request.roles,
-        require=request.require
-    )
-
-    if success:
-        return {"message": "配图任务已启动", "chapter_id": request.chapter_id}
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="配图任务启动失败，可能已存在正在进行的任务"
-        )
-
-
-@app.get("/text2img/status/{chapter_id}", response_model=Text2ImgStatusResponse, dependencies=[Depends(verify_token)])
-async def get_illustration_status(
-    chapter_id: str,
-    db: Session = Depends(get_db)
-):
-    """
-    获取配图状态
-
-    - **chapter_id**: 章节ID，唯一标识章节
-    """
-    service = get_text2img_service()
-    if not service:
-        raise HTTPException(status_code=503, detail="文生图服务不可用")
-
-    return await service.get_illustration_status(db, chapter_id)
 
 
 @app.get("/text2img/image/{filename}", response_class=Response,
@@ -271,9 +213,6 @@ async def get_illustration_status(
              },
              404: {
                  "description": "图片文件不存在"
-             },
-             503: {
-                 "description": "文生图服务不可用"
              }
          })
 async def get_image_proxy(filename: str):
@@ -285,39 +224,65 @@ async def get_image_proxy(filename: str):
     - **filename**: 图片文件名
     - **返回**: 图片二进制数据 (Content-Type: image/png)
     """
-    service = get_text2img_service()
-    if not service:
-        raise HTTPException(status_code=503, detail="文生图服务不可用")
+    import requests
 
-    image_data = await service.get_image_data(filename)
-    if image_data:
-        return Response(
-            content=image_data,
-            media_type="image/png",
-            headers={
-                "Cache-Control": "public, max-age=86400",  # 缓存1天
-                "X-Content-Type-Options": "nosniff"
-            }
-        )
-    else:
-        raise HTTPException(status_code=404, detail="图片不存在")
+    try:
+        # 直接从ComfyUI获取图片
+        comfyui_url = "http://host.docker.internal:8000"
+        image_url = f"{comfyui_url}/view?filename={filename}"
+
+        response = requests.get(image_url, timeout=None)
+        if response.status_code == 200:
+            return Response(
+                content=response.content,
+                media_type="image/png",
+                headers={
+                    "Cache-Control": "public, max-age=86400",  # 缓存1天
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
+        else:
+            raise HTTPException(status_code=404, detail="图片不存在")
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="无法连接到ComfyUI服务")
 
 
 @app.get("/text2img/health", dependencies=[Depends(verify_token)])
 async def text2img_health_check():
-    """检查文生图服务健康状态"""
-    service = get_text2img_service()
-    if not service:
-        return {
-            "status": "unavailable",
-            "message": "文生图服务未初始化或配置错误"
-        }
+    """检查ComfyUI服务健康状态"""
+    import requests
 
-    health_status = await service.health_check()
-    return {
-        "status": "healthy" if health_status["overall"] else "unhealthy",
-        "services": health_status
-    }
+    try:
+        comfyui_url = "http://host.docker.internal:8000"
+        response = requests.get(f"{comfyui_url}/system_stats", timeout=5)
+
+        if response.status_code == 200:
+            return {
+                "status": "healthy",
+                "message": "ComfyUI服务正常",
+                "services": {
+                    "comfyui": True,
+                    "api_accessible": True
+                }
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "message": f"ComfyUI服务响应异常: {response.status_code}",
+                "services": {
+                    "comfyui": False,
+                    "api_accessible": False
+                }
+            }
+    except requests.RequestException as e:
+        return {
+            "status": "unhealthy",
+            "message": f"无法连接ComfyUI服务: {str(e)}",
+            "services": {
+                "comfyui": False,
+                "api_accessible": False
+            }
+        }
 
 
 # ================= 人物卡图片生成 API =================
@@ -417,15 +382,32 @@ async def regenerate_similar_images(
 
     - **img_url**: 参考图片URL
     - **count**: 生成图片数量
+    - **model**: 指定使用的模型名称（可选）
     """
     try:
-        result = await role_card_service.regenerate_similar_images(request, db)
+        result = await role_card_service.regenerate_similar_images(request, db, model=request.model)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"重新生成相似图片失败: {e}")
         raise HTTPException(status_code=500, detail="重新生成图片失败")
+
+
+@app.get("/api/role-card/models", dependencies=[Depends(verify_token)])
+async def get_available_models():
+    """获取可用的工作流模型列表"""
+    try:
+        from app.workflow_config.workflow_config import workflow_config_manager
+        workflows = workflow_config_manager.list_t2i_workflows()
+
+        return {
+            "models": workflows,
+            "total_count": len(workflows)
+        }
+    except Exception as e:
+        logger.error(f"获取可用模型失败: {e}")
+        raise HTTPException(status_code=500, detail="获取模型列表失败")
 
 
 @app.get("/api/role-card/health", dependencies=[Depends(verify_token)])
@@ -446,6 +428,81 @@ async def role_card_health_check():
             "message": str(e),
             "services": {}
         }
+
+
+# ================= 场面绘制 API =================
+
+
+@app.post("/api/scene-illustration/generate", dependencies=[Depends(verify_token)])
+async def generate_scene_images(
+    request: EnhancedSceneIllustrationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    生成场面绘制图片
+
+    - **chapters_content**: 章节内容
+    - **task_id**: 任务标识符
+    - **roles**: 角色信息
+    - **num**: 生成图片数量
+    - **model_name**: 指定使用的模型名称（可选）
+
+    返回任务ID，可通过后续接口查询和获取图片
+    """
+    try:
+        result = await scene_illustration_service.generate_scene_images(request, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"创建场面绘制任务失败: {e}")
+        raise HTTPException(status_code=500, detail="创建任务失败")
+
+
+@app.get("/api/scene-illustration/gallery/{task_id}", response_model=SceneGalleryResponse, dependencies=[Depends(verify_token)])
+async def get_scene_gallery(
+    task_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    查看场面绘制图片列表
+
+    - **task_id**: 场面绘制任务ID
+    """
+    try:
+        result = await scene_illustration_service.get_scene_gallery(task_id, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"获取场面图集失败: {e}")
+        raise HTTPException(status_code=500, detail="获取图集失败")
+
+
+@app.delete("/api/scene-illustration/image", dependencies=[Depends(verify_token)])
+async def delete_scene_image(
+    request: SceneImageDeleteRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    从场面绘制结果中删除图片
+
+    - **task_id**: 场面绘制任务ID
+    - **filename**: 要删除的图片文件名
+    """
+    try:
+        success = await scene_illustration_service.delete_scene_image(request, db)
+        if success:
+            return {"message": "图片删除成功"}
+        else:
+            raise HTTPException(status_code=404, detail="图片不存在")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"删除场面图片失败: {e}")
+        raise HTTPException(status_code=500, detail="删除图片失败")
+
+
 
 
 # ================= 缓存管理 API =================
@@ -781,7 +838,7 @@ def index():
             "实时内容抓取",
             "后台缓存任务",
             "WebSocket进度推送",
-            "AI文生图配图功能",
+            "角色卡AI图片生成",
             "ComfyUI图片生成",
             "Dify工作流集成",
         ],
@@ -790,8 +847,6 @@ def index():
             "GET /search?keyword=xxx&sites=alice_sw,shukuge - 搜索小说（可指定站点）",
             "GET /chapters?url=xxx - 获取章节列表",
             "GET /chapter-content?url=xxx&force_refresh=true - 获取章节内容",
-            "POST /text2img/start - 开始章节配图",
-            "GET /text2img/status/{chapter_id} - 获取配图状态",
             "GET /text2img/image/{filename} - 获取生成的图片",
             "GET /text2img/health - 文生图服务健康检查",
         ],

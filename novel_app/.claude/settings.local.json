@@ -13,7 +13,9 @@
       "Bash(dart test:*)",
       "Bash(dart:*)",
       "mcp__context7__get-library-docs",
-      "WebSearch"
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

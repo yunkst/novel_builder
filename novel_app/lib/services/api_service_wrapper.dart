@@ -4,12 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
-import 'package:built_value/json_object.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/cache_task.dart';
+import '../models/character.dart';
 import '../extensions/api_novel_extension.dart';
 import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
@@ -112,7 +112,7 @@ class ApiServiceWrapper {
 
   /// 检查连接健康状态
   bool _isConnectionHealthy() {
-    if (!_initialized || _dio == null) return false;
+    if (!_initialized) return false;
 
     // 检查初始化时间是否过期（30分钟）
     if (_lastInitTime != null) {
@@ -150,7 +150,7 @@ class ApiServiceWrapper {
 
       // 强制关闭旧连接（如果存在）
       try {
-        _dio?.close(force: true);
+        _dio.close(force: true);
       } catch (e) {
         debugPrint('关闭旧连接时出错: $e');
       }
@@ -169,12 +169,12 @@ class ApiServiceWrapper {
   bool _isConnectionError(dynamic error) {
     final errorStr = error.toString().toLowerCase();
     return errorStr.contains('closed') ||
-           errorStr.contains('connection') ||
-           errorStr.contains('establish') ||
-           errorStr.contains('dio') ||
-           errorStr.contains('socket') ||
-           errorStr.contains('timeout') ||
-           errorStr.contains('network');
+        errorStr.contains('connection') ||
+        errorStr.contains('establish') ||
+        errorStr.contains('dio') ||
+        errorStr.contains('socket') ||
+        errorStr.contains('timeout') ||
+        errorStr.contains('network');
   }
 
   /// 记录连接错误
@@ -220,7 +220,8 @@ class ApiServiceWrapper {
   // ========== 业务方法 ==========
 
   /// 带自动重试的通用请求包装器
-  Future<T> _withRetry<T>(Future<T> Function() operation, String operationName) async {
+  Future<T> _withRetry<T>(
+      Future<T> Function() operation, String operationName) async {
     int retryCount = 0;
     const maxRetries = 2; // 最多重试2次
 
@@ -255,7 +256,8 @@ class ApiServiceWrapper {
         if (_isConnectionError(e)) {
           debugPrint('🔄 检测到连接错误，重新初始化并重试 ($retryCount/$maxRetries)');
           await _reinitializeConnection();
-          await Future.delayed(Duration(milliseconds: 1000 * retryCount)); // 指数退避
+          await Future.delayed(
+              Duration(milliseconds: 1000 * retryCount)); // 指数退避
           continue;
         }
 
@@ -333,7 +335,8 @@ class ApiServiceWrapper {
   /// 获取章节内容
   ///
   /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
-  Future<String> getChapterContent(String chapterUrl, {bool forceRefresh = false}) async {
+  Future<String> getChapterContent(String chapterUrl,
+      {bool forceRefresh = false}) async {
     return _withRetry<String>(() async {
       final token = await getToken();
       final response = await _api.chapterContentChapterContentGet(
@@ -368,7 +371,8 @@ class ApiServiceWrapper {
   /// 注意：由于ApiServiceWrapper使用单例模式，不应关闭共享的Dio实例
   /// 所以此方法改为空操作，避免连接被过早关闭导致后续请求失败
   void dispose() {
-    debugPrint('ApiServiceWrapper.dispose() called (no-op to maintain connection)');
+    debugPrint(
+        'ApiServiceWrapper.dispose() called (no-op to maintain connection)');
     // 不再关闭Dio连接，保持单例连接可用
     // _dio.close(); // 已注释，避免关闭共享连接
   }
@@ -457,7 +461,6 @@ class ApiServiceWrapper {
               );
             }
           }).toList();
-
         } catch (e) {
           debugPrint('解析缓存任务数据失败: $e');
           debugPrint('响应数据详情: ${response.data}');
@@ -531,8 +534,6 @@ class ApiServiceWrapper {
     }
   }
 
-  
-  
   /// 生成人物卡图片
   Future<Map<String, dynamic>> generateRoleCardImages({
     required String roleId,
@@ -543,18 +544,14 @@ class ApiServiceWrapper {
     try {
       final token = await getToken();
 
-      // 使用生成的 API 客户端方法
-      final rolesMap = <String, JsonObject?>{};
-      roles.forEach((key, value) {
-        if (value != null) {
-          rolesMap[key] = JsonObject(value);
-        }
-      });
+      // 将Map格式的角色数据转换为Character对象，然后转换为RoleInfo列表
+      final character = _mapToCharacter(roles);
+      final roleInfoList = Character.toRoleInfoList([character]);
 
       final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
         roleCardGenerateRequest: RoleCardGenerateRequest((b) => b
           ..roleId = roleId
-          ..roles.replace(BuiltMap<String, JsonObject?>(rolesMap))
+          ..roles.replace(BuiltList<RoleInfo>(roleInfoList))
           ..userInput = userInput),
         X_API_TOKEN: token,
       );
@@ -562,10 +559,7 @@ class ApiServiceWrapper {
       if (response.statusCode == 200) {
         // 对于 JsonObject 响应，简单地返回成功状态
         debugPrint('角色卡生成请求成功: ${response.data}');
-        return {
-          'message': '图片生成中，请耐心等待',
-          'status': 'success'
-        };
+        return {'message': '图片生成中，请耐心等待', 'status': 'success'};
       } else {
         throw Exception('生成人物卡失败：${response.statusCode}');
       }
@@ -574,7 +568,6 @@ class ApiServiceWrapper {
     }
   }
 
-  
   /// 获取角色图集
   Future<Map<String, dynamic>> getRoleGallery(String roleId) async {
     _ensureInitialized();
@@ -608,18 +601,10 @@ class ApiServiceWrapper {
             };
           } catch (e) {
             debugPrint('解析图集数据失败: $e');
-            return {
-              'role_id': roleId,
-              'images': [],
-              'message': '图集数据解析失败'
-            };
+            return {'role_id': roleId, 'images': [], 'message': '图集数据解析失败'};
           }
         }
-        return {
-          'role_id': roleId,
-          'images': [],
-          'message': '图集响应为空'
-        };
+        return {'role_id': roleId, 'images': [], 'message': '图集响应为空'};
       } else {
         throw Exception('获取图集失败：${response.statusCode}');
       }
@@ -640,8 +625,7 @@ class ApiServiceWrapper {
       // 创建删除请求对象
       final deleteRequest = RoleImageDeleteRequest((b) => b
         ..roleId = roleId
-        ..imgUrl = imageUrl
-      );
+        ..imgUrl = imageUrl);
 
       final response = await _api.deleteRoleCardImageApiRoleCardImageDelete(
         roleImageDeleteRequest: deleteRequest,
@@ -674,10 +658,10 @@ class ApiServiceWrapper {
         // 使用参考图片生成相似图片
         final regenerateRequest = RoleRegenerateRequest((b) => b
           ..imgUrl = referenceImageUrl
-          ..count = count
-        );
+          ..count = count);
 
-        final response = await _api.regenerateSimilarImagesApiRoleCardRegeneratePost(
+        final response =
+            await _api.regenerateSimilarImagesApiRoleCardRegeneratePost(
           roleRegenerateRequest: regenerateRequest,
           X_API_TOKEN: token,
         );
@@ -697,10 +681,10 @@ class ApiServiceWrapper {
         final generateRequest = RoleCardGenerateRequest((b) => b
           ..roleId = roleId
           ..userInput = '生成更多角色图片'
-          ..roles.replace(BuiltMap<String, JsonObject?>({}))
-        );
+          ..roles.replace(BuiltList<RoleInfo>([])));
 
-        final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
+        final response =
+            await _api.generateRoleCardImagesApiRoleCardGeneratePost(
           roleCardGenerateRequest: generateRequest,
           X_API_TOKEN: token,
         );
@@ -722,7 +706,168 @@ class ApiServiceWrapper {
     }
   }
 
-  
   /// 获取 Dio 实例（用于构建图片URL）
   Dio get dio => _dio;
+
+  // ================= 场景插图相关API =================
+
+  /// 创建场景插图任务
+  Future<Map<String, dynamic>> createSceneIllustration({
+    required String chaptersContent,
+    required String taskId,
+    required dynamic roles, // 支持新的 List<RoleInfo> 和旧的 Map<String, dynamic> 格式
+    required int num,
+    String? modelName,
+  }) async {
+    return _withRetry<Map<String, dynamic>>(() async {
+      final token = await getToken();
+
+      // 创建 EnhancedSceneIllustrationRequest
+      final request = EnhancedSceneIllustrationRequest((b) => b
+        ..chaptersContent = chaptersContent
+        ..taskId = taskId
+        ..roles.replace(roles is List
+            ? BuiltList<RoleInfo>(roles)
+            : BuiltList<RoleInfo>([]))
+        ..num_ = num
+        ..modelName = modelName);
+
+      final response =
+          await _api.generateSceneImagesApiSceneIllustrationGeneratePost(
+        enhancedSceneIllustrationRequest: request,
+        X_API_TOKEN: token,
+      );
+
+      if (response.data != null) {
+        // 简单返回，让调用方处理 JsonObject
+        return {'data': response.data.toString()};
+      } else {
+        throw Exception('操作失败：响应为空');
+      }
+    }, '创建场景插图');
+  }
+
+  /// 获取场景插图图集
+  Future<Map<String, dynamic>> getSceneIllustrationGallery(
+      String taskId) async {
+    return _withRetry<Map<String, dynamic>>(() async {
+      final token = await getToken();
+
+      final response =
+          await _api.getSceneGalleryApiSceneIllustrationGalleryTaskIdGet(
+        taskId: taskId,
+        X_API_TOKEN: token,
+      );
+
+      if (response.data != null) {
+        // SceneGalleryResponse 转 Map
+        return _sceneGalleryResponseToMap(response.data!);
+      } else {
+        throw Exception('获取场景插图图集失败：响应为空');
+      }
+    }, '获取场景插图图集');
+  }
+
+  /// 删除场景插图图片
+  Future<Map<String, dynamic>> deleteSceneIllustrationImage({
+    required String taskId,
+    required String filename,
+  }) async {
+    return _withRetry<Map<String, dynamic>>(() async {
+      final token = await getToken();
+
+      // 创建 SceneImageDeleteRequest
+      final request = SceneImageDeleteRequest((b) => b
+        ..taskId = taskId
+        ..filename = filename);
+
+      final response =
+          await _api.deleteSceneImageApiSceneIllustrationImageDelete(
+        sceneImageDeleteRequest: request,
+        X_API_TOKEN: token,
+      );
+
+      if (response.data != null) {
+        // 简单返回，让调用方处理 JsonObject
+        return {'data': response.data.toString()};
+      } else {
+        throw Exception('删除场景插图图片失败：响应为空');
+      }
+    }, '删除场景插图图片');
+  }
+
+  /// 重新生成场景插图图片
+  /// 注意：后端暂未实现此功能，此方法目前不可用
+  Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+    required String taskId,
+    required int count,
+    String? modelName,
+  }) async {
+    throw Exception(
+        '场景插图重新生成功能暂未实现，请联系后端开发团队添加 /api/scene-illustration/regenerate 接口');
+  }
+
+  /// 将 SceneGalleryResponse 转换为 Map
+  Map<String, dynamic> _sceneGalleryResponseToMap(
+      SceneGalleryResponse response) {
+    return {
+      'task_id': response.taskId,
+      'images': response.images.toList(),
+    };
+  }
+
+  /// 获取图片二进制数据
+  Future<Uint8List> getImageProxy(String filename) async {
+    return _withRetry<Uint8List>(() async {
+      final response =
+          await _api.getImageProxyText2imgImageFilenameGet(filename: filename);
+
+      if (response.data != null) {
+        return response.data!;
+      } else {
+        throw Exception('获取图片失败：响应为空');
+      }
+    }, '获取图片');
+  }
+
+  /// 将Map格式的角色数据转换为Character对象
+  ///
+  /// 此方法用于角色卡生成功能，将用户输入的表单数据（Map格式）
+  /// 转换为标准的Character对象，然后可以通过toRoleInfoList方法
+  /// 进一步转换为API所需的RoleInfo格式。
+  ///
+  /// [roles] 包含角色信息的Map，键为字段名，值为字段值
+  ///
+  /// 返回转换后的Character对象
+  ///
+  /// 支持的字段：
+  /// - name: 角色姓名（必需）
+  /// - age: 年龄（字符串，会尝试转换为int）
+  /// - gender: 性别
+  /// - occupation: 职业
+  /// - personality: 性格特点
+  /// - appearance_features: 外貌特征
+  /// - body_type: 身材体型
+  /// - clothing_style: 穿衣风格
+  /// - background_story: 背景经历
+  /// - face_prompts: 面部绘图提示词
+  /// - body_prompts: 身材绘图提示词
+  Character _mapToCharacter(Map<String, dynamic> roles) {
+    return Character(
+      id: 0, // 临时ID，由数据库分配
+      novelUrl: '', // 临时空值，角色卡功能不需要
+      name: roles['name']?.toString() ?? '',
+      age: roles['age'] != null ? int.tryParse(roles['age'].toString()) : null,
+      gender: roles['gender']?.toString(),
+      occupation: roles['occupation']?.toString(),
+      personality: roles['personality']?.toString(),
+      appearanceFeatures: roles['appearance_features']?.toString(),
+      bodyType: roles['body_type']?.toString(),
+      clothingStyle: roles['clothing_style']?.toString(),
+      backgroundStory: roles['background_story']?.toString(),
+      facePrompts: roles['face_prompts']?.toString(),
+      bodyPrompts: roles['body_prompts']?.toString(),
+      createdAt: DateTime.now(),
+    );
+  }
 }

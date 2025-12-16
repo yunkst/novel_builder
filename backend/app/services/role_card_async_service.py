@@ -20,6 +20,7 @@ from ..schemas import (
 from .role_card_service import role_card_service
 from .dify_client import DifyClient
 from .comfyui_client_v2 import ComfyUIClientV2
+from .comfyui_client import MediaFileResult
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class RoleCardAsyncService:
                 status="pending",
                 roles=request.roles,
                 user_input=request.user_input,
+                model=request.model,  # 保存模型信息
                 total_prompts=0,
                 generated_images=0
             )
@@ -147,7 +149,7 @@ class RoleCardAsyncService:
 
             # 任务完成后清理
             background_task.add_done_callback(
-                lambda t: self._cleanup_task(task_id)
+                lambda t: asyncio.create_task(self._cleanup_task(task_id))
             )
 
     async def _process_task_async(
@@ -193,9 +195,44 @@ class RoleCardAsyncService:
             await self._update_task_progress(db, task_id, total_prompts=len(prompts))
             logger.info(f"任务 {task_id}: 生成 {len(prompts)} 个提示词")
 
-            # 2. 批量调用ComfyUI生成图片
+            # 2. 根据model参数创建ComfyUI客户端并生成图片
             logger.info(f"任务 {task_id}: 开始生成图片")
-            image_filenames = await role_card_service.comfyui_client.generate_images_batch(prompts)
+
+            # 获取任务记录中的模型信息
+            task = db.query(RoleCardTask).filter(RoleCardTask.id == task_id).first()
+            model_name = task.model if task else None
+
+            # 创建对应的ComfyUI客户端
+            from .comfyui_client import create_comfyui_client_for_model
+            from ..workflow_config.workflow_config import workflow_config_manager
+
+            if model_name:
+                logger.info(f"任务 {task_id}: 使用指定模型 {model_name}")
+                comfyui_client = create_comfyui_client_for_model(model_name)
+            else:
+                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                logger.info(f"任务 {task_id}: 使用默认模型 {default_workflow.title}")
+                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+
+            # 逐个生成图片（ComfyUIClient只支持单张生成）
+            image_filenames = []
+            for i, prompt in enumerate(prompts):
+                logger.info(f"任务 {task_id}: 生成第 {i+1}/{len(prompts)} 张图片")
+                # 首先提交生成任务，获取ComfyUI任务ID
+                comfyui_task_id = await comfyui_client.generate_image(prompt)
+                if comfyui_task_id:
+                    logger.info(f"任务 {task_id}: ComfyUI任务ID {comfyui_task_id}")
+                    # 等待任务完成并获取实际图片文件名
+                    completed_filenames = await comfyui_client.wait_for_completion(comfyui_task_id)
+                    if completed_filenames and len(completed_filenames) > 0:
+                        media_file = completed_filenames[0]  # 使用第一个生成的媒体文件
+                        filename = media_file.filename  # 获取文件名
+                        image_filenames.append(filename)
+                        logger.info(f"任务 {task_id}: 第 {i+1} 张图片生成成功，文件名: {filename}")
+                    else:
+                        logger.warning(f"任务 {task_id}: 第 {i+1} 张图片生成失败（未获取到文件名）")
+                else:
+                    logger.warning(f"任务 {task_id}: 第 {i+1} 张图片生成失败（提交任务失败）")
 
             if not image_filenames:
                 await self._update_task_status(
@@ -205,7 +242,7 @@ class RoleCardAsyncService:
                 )
                 return
 
-            logger.info(f"任务 {task_id}: 生成 {len(image_filenames)} 张图片")
+            logger.info(f"任务 {task_id}: 成功生成 {len(image_filenames)} 张图片")
 
             # 3. 保存图片信息到数据库
             saved_count = 0
