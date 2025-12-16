@@ -19,6 +19,7 @@ from ..schemas import (
 )
 from .dify_client import DifyClient
 from .comfyui_client import create_comfyui_client_for_model, MediaFileResult
+from ..workflow_config.workflow_config import workflow_config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,13 @@ class SceneIllustrationService:
             ValueError: 当请求参数无效时
         """
         try:
+            # 验证model_name是否有效
+            available_models = [wf["title"] for wf in workflow_config_manager.list_t2i_workflows()]
+            if request.model_name not in available_models:
+                raise ValueError(f"无效的model_name '{request.model_name}'，可用模型: {', '.join(available_models)}")
+
+            logger.info(f"验证model_name '{request.model_name}' 有效")
+
             # 检查是否已存在相同task_id的任务
             existing_task = db.query(SceneIllustrationTask).filter(
                 SceneIllustrationTask.task_id == request.task_id

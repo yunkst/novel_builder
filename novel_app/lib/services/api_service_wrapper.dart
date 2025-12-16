@@ -538,7 +538,6 @@ class ApiServiceWrapper {
   Future<Map<String, dynamic>> generateRoleCardImages({
     required String roleId,
     required Map<String, dynamic> roles,
-    required String userInput,
   }) async {
     _ensureInitialized();
     try {
@@ -551,8 +550,7 @@ class ApiServiceWrapper {
       final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
         roleCardGenerateRequest: RoleCardGenerateRequest((b) => b
           ..roleId = roleId
-          ..roles.replace(BuiltList<RoleInfo>(roleInfoList))
-          ..userInput = userInput),
+          ..roles.replace(BuiltList<RoleInfo>(roleInfoList))),
         X_API_TOKEN: token,
       );
 
@@ -680,7 +678,6 @@ class ApiServiceWrapper {
         // 如果没有参考图片，使用角色ID重新生成
         final generateRequest = RoleCardGenerateRequest((b) => b
           ..roleId = roleId
-          ..userInput = '生成更多角色图片'
           ..roles.replace(BuiltList<RoleInfo>([])));
 
         final response =

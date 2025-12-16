@@ -176,12 +176,11 @@ class DifyClient:
             logger.error(f"Dify健康检查失败: {e}")
             return False
 
-    async def generate_photo_prompts(self, roles: Dict[str, Any], user_input: str) -> List[str]:
+    async def generate_photo_prompts(self, roles: Dict[str, Any]) -> List[str]:
         """生成人物卡拍照提示词.
 
         Args:
             roles: 人物卡设定信息
-            user_input: 用户要求
 
         Returns:
             生成的拍照提示词列表
@@ -194,7 +193,7 @@ class DifyClient:
             request_data = {
                 "inputs": {
                     "roles": formatted_roles,
-                    "user_input": user_input,
+                    "user_input": "生成人物卡",
                     "cmd": "拍照"
                 },
                 "response_mode": "blocking",
@@ -507,6 +506,105 @@ class DifyClient:
 
         else:
             raise TypeError(f"不支持的角色数据类型: {type(roles).__name__}，期望 List[RoleInfo] 或 Dict[str, Any]")
+
+
+  async def generate_video_prompts(self, prompts: str, user_input: str) -> Optional[str]:
+        """生成图生视频提示词.
+
+        Args:
+            prompts: 图片对应的提示词内容
+            user_input: 用户要求
+
+        Returns:
+            生成的视频提示词字符串，失败时返回None
+        """
+        try:
+            request_data = {
+                "inputs": {
+                    "prompts": prompts,
+                    "user_input": user_input,
+                    "cmd": "图生视频"
+                },
+                "response_mode": "blocking",
+                "user": "image_to_video_user"
+            }
+
+            logger.info(f"调用Dify图生视频工作流: {self.api_url}")
+
+            # 发送请求
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json=request_data,
+                timeout=60
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                logger.info("Dify图生视频工作流调用成功")
+
+                # 解析返回结果 - 期望格式: {content:{prompts:xx}}
+                return self._parse_video_response(result)
+
+            else:
+                logger.error(f"Dify图生视频API请求失败: {response.status_code} - {response.text}")
+                return None
+
+        except Timeout:
+            logger.error("Dify图生视频API请求超时")
+            return None
+        except RequestException as e:
+            logger.error(f"Dify图生视频API请求异常: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Dify图生视频工作流调用失败: {e}")
+            return None
+
+    def _parse_video_response(self, response_data: Dict[str, Any]) -> Optional[str]:
+        """解析Dify图生视频工作流返回结果.
+
+        Args:
+            response_data: Dify API响应数据
+
+        Returns:
+            解析后的视频提示词字符串，失败时返回None
+        """
+        try:
+            # 获取工作流输出数据
+            data = response_data.get("data", {})
+            outputs = data.get("outputs", {})
+
+            # 查找图生视频提示词结果
+            if "content" in outputs:
+                content_data = outputs["content"]
+
+                # 添加调试信息
+                logger.info(f"Dify图生视频返回的content数据类型: {type(content_data)}")
+                logger.info(f"Dify图生视频返回的content内容: {content_data}")
+
+                # 期望格式: {content:{prompts:xx}}
+                if isinstance(content_data, dict) and "prompts" in content_data:
+                    prompts = content_data["prompts"]
+                    if isinstance(prompts, str):
+                        logger.info(f"从Dify获取到图生视频提示词: {prompts}")
+                        return prompts
+                    else:
+                        logger.warning(f"prompts不是字符串类型: {type(prompts)}")
+                        return str(prompts) if prompts else None
+                elif isinstance(content_data, str):
+                    # 如果直接是字符串，返回该字符串
+                    logger.info(f"从Dify获取到图生视频提示词(直接字符串): {content_data}")
+                    return content_data
+                else:
+                    logger.error(f"Dify图生视频返回数据格式不符合预期: {content_data}")
+                    return None
+            else:
+                logger.error("Dify图生视频响应中未找到content字段")
+                return None
+
+        except Exception as e:
+            logger.error(f"解析Dify图生视频响应失败: {e}")
+            return None
 
 
 def create_dify_client() -> DifyClient:

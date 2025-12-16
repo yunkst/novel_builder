@@ -179,8 +179,7 @@ class RoleCardAsyncService:
             # 1. 调用Dify生成提示词
             logger.info(f"任务 {task_id}: 生成提示词")
             prompts = await role_card_service.dify_client.generate_photo_prompts(
-                roles=request.roles,
-                user_input=request.user_input
+                roles=request.roles
             )
 
             if not prompts:

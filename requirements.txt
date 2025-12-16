@@ -1,4 +1,26 @@
-requests>=2.25.1
-beautifulsoup4>=4.9.3
-lxml>=4.6.3
-urllib3>=1.26.5
+# Novel Builder - Legacy Requirements File
+# This file is maintained for compatibility with old deployment scripts
+# For new development, please use backend/pyproject.toml
+
+# Core dependencies - minimal set for basic functionality
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+pydantic>=2.4.0
+python-multipart>=0.0.6
+
+# Database support
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.12.0
+
+# Web scraping
+playwright>=1.55.0
+
+# Development tools (optional)
+pytest>=7.4.0
+ruff>=0.1.0
+
+# For full dependency management, see: backend/pyproject.toml

@@ -25,6 +25,17 @@ class RoleImageGallery(Base):
     img_url = Column(String(500), nullable=False, comment="图片URL（文件名）")
     prompt = Column(Text, nullable=False, comment="生成图片的提示词")
 
+    # 视频相关字段
+    video_status = Column(
+        String(20),
+        default="none",
+        nullable=False,
+        comment="视频生成状态: none/pending/running/completed/failed"
+    )
+    video_filename = Column(String(500), comment="生成的视频文件名")
+    video_prompt = Column(Text, comment="视频生成提示词")
+    video_created_at = Column(DateTime(timezone=True), comment="视频创建时间")
+
     # 时间戳
     created_at = Column(
         DateTime(timezone=True),
@@ -39,7 +50,7 @@ class RoleImageGallery(Base):
 
     def __repr__(self) -> str:
         """返回模型的字符串表示."""
-        return f"<RoleImageGallery(role_id='{self.role_id}', img_url='{self.img_url}')>"
+        return f"<RoleImageGallery(role_id='{self.role_id}', img_url='{self.img_url}', video_status='{self.video_status}')>"
 
 
 class RoleCardTask(Base):
@@ -82,3 +93,44 @@ class RoleCardTask(Base):
     def __repr__(self) -> str:
         """返回模型的字符串表示."""
         return f"<RoleCardTask(id={self.id}, role_id='{self.role_id}', status='{self.status}')>"
+
+
+class ImageToVideoTask(Base):
+    """图片转视频生成任务模型."""
+
+    __tablename__ = "image_to_video_task"
+
+    # 主键
+    id = Column(Integer, primary_key=True, comment="任务ID")
+
+    # 任务信息
+    img_name = Column(String(255), nullable=False, index=True, comment="图片名称")
+    status = Column(
+        String(20),
+        nullable=False,
+        default="pending",
+        comment="任务状态: pending/running/completed/failed"
+    )
+
+    # 输入参数
+    model_name = Column(String(100), nullable=True, comment="图生视频模型名称")
+    user_input = Column(Text, nullable=False, comment="用户要求")
+
+    # 输出结果
+    video_prompt = Column(Text, comment="处理后的视频生成提示词")
+    video_filename = Column(String(500), comment="生成的视频文件名")
+    result_message = Column(Text, comment="处理结果消息")
+    error_message = Column(Text, comment="错误信息")
+
+    # 时间戳
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        comment="创建时间"
+    )
+    started_at = Column(DateTime(timezone=True), comment="开始处理时间")
+    completed_at = Column(DateTime(timezone=True), comment="完成时间")
+
+    def __repr__(self) -> str:
+        """返回模型的字符串表示."""
+        return f"<ImageToVideoTask(id={self.id}, img_name='{self.img_name}', status='{self.status}')>"
