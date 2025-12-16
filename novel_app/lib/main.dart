@@ -3,6 +3,7 @@ import 'dart:async';
 import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/illustration_debug_screen.dart';
 import 'services/cache_manager.dart';
 import 'core/di/api_service_provider.dart';
 
@@ -130,6 +131,7 @@ class _HomePageState extends State<HomePage> {
   static const List<Widget> _pages = <Widget>[
     BookshelfScreen(),
     SearchScreen(),
+    IllustrationDebugScreen(),
     SettingsScreen(),
   ];
 
@@ -172,6 +174,10 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(
             icon: Icon(Icons.search),
             label: '搜索',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.image),
+            label: '生图调试',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings),

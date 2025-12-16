@@ -38,7 +38,8 @@ from .schemas import (
     RoleCardTaskCreateResponse, RoleCardTaskStatusResponse,
     SceneIllustrationRequest, SceneIllustrationResponse,
     SceneGalleryResponse, SceneImageDeleteRequest,
-    EnhancedSceneIllustrationRequest
+    EnhancedSceneIllustrationRequest, SceneRegenerateRequest,
+    SceneRegenerateResponse
 )
 from .services.crawler_factory import (
     get_crawler_for_url,
@@ -501,6 +502,28 @@ async def delete_scene_image(
     except Exception as e:
         logger.error(f"删除场面图片失败: {e}")
         raise HTTPException(status_code=500, detail="删除图片失败")
+
+
+@app.post("/api/scene-illustration/regenerate", dependencies=[Depends(verify_token)])
+async def regenerate_scene_images(
+    request: SceneRegenerateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    基于现有任务重新生成场面图片
+
+    - **task_id**: 原始任务ID
+    - **count**: 生成图片数量
+    - **model**: 指定使用的模型名称（可选，会使用原始任务的模型）
+    """
+    try:
+        result = await scene_illustration_service.regenerate_scene_images(request, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"重新生成场面图片失败: {e}")
+        raise HTTPException(status_code=500, detail="重新生成图片失败")
 
 
 

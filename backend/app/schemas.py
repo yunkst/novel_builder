@@ -328,3 +328,19 @@ class SceneImageDeleteRequest(BaseModel):
 
     task_id: str = Field(..., description="场面绘制任务ID")
     filename: str = Field(..., description="要删除的图片文件名")
+
+
+class SceneRegenerateRequest(BaseModel):
+    """场面绘制重新生成请求模式."""
+
+    task_id: str = Field(..., description="原始任务ID")
+    count: int = Field(..., ge=1, le=20, description="生成图片数量")
+    model: Optional[str] = Field(None, description="指定使用的模型名称（可选）")
+
+
+class SceneRegenerateResponse(BaseModel):
+    """场面绘制重新生成响应模式."""
+
+    task_id: str = Field(..., description="原始任务ID")
+    total_prompts: int = Field(..., description="生成的提示词数量")
+    message: str = Field(..., description="处理消息")
