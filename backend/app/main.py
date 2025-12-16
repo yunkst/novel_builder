@@ -31,6 +31,7 @@ from .config import settings
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
+from .models.text2img import RoleImageGallery, ImageToVideoTask
 from .schemas import (
     Chapter, ChapterContent, Novel, SourceSite,
     RoleCardGenerateRequest, RoleGalleryResponse,
@@ -39,7 +40,8 @@ from .schemas import (
     SceneIllustrationRequest, SceneIllustrationResponse,
     SceneGalleryResponse, SceneImageDeleteRequest,
     EnhancedSceneIllustrationRequest, SceneRegenerateRequest,
-    SceneRegenerateResponse
+    SceneRegenerateResponse, ImageToVideoRequest, ImageToVideoResponse,
+    VideoStatusResponse, ImageToVideoTaskStatusResponse
 )
 from .services.crawler_factory import (
     get_crawler_for_url,
@@ -52,10 +54,14 @@ from .services.role_card_service import role_card_service
 from .services.role_card_async_service import role_card_async_service
 from .services.dify_client import create_dify_client
 from .services.scene_illustration_service import create_scene_illustration_service
+from .services.image_to_video_service import create_image_to_video_service
 
 # 创建场面绘制服务实例
 dify_client = create_dify_client()
 scene_illustration_service = create_scene_illustration_service(dify_client)
+
+# 创建图生视频服务实例
+image_to_video_service = create_image_to_video_service()
 
 app = FastAPI(
     title="Novel Builder Backend",
@@ -528,6 +534,137 @@ async def regenerate_scene_images(
 
 
 
+# ================= 图生视频 API =================
+
+
+@app.post("/api/image-to-video/generate", dependencies=[Depends(verify_token)])
+async def generate_video_from_image(
+    request: ImageToVideoRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    生成图生视频
+
+    - **img_name**: 图片名称
+    - **user_input**: 用户要求
+    - **model_name**: 图生视频模型名称
+
+    返回任务ID，可通过后续接口查询视频生成状态
+    """
+    try:
+        result = await image_to_video_service.create_video_generation_task(request, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"创建图生视频任务失败: {e}")
+        raise HTTPException(status_code=500, detail="创建任务失败")
+
+
+@app.get("/api/image-to-video/has-video/{img_name}", response_model=VideoStatusResponse, dependencies=[Depends(verify_token)])
+async def check_video_status(
+    img_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    检查图片是否有视频
+
+    - **img_name**: 图片名称
+    """
+    try:
+        result = await image_to_video_service.get_video_status(img_name, db)
+        return result
+    except Exception as e:
+        logger.error(f"检查视频状态失败: {e}")
+        raise HTTPException(status_code=500, detail="检查视频状态失败")
+
+
+@app.get("/api/image-to-video/status/{task_id}", response_model=ImageToVideoTaskStatusResponse, dependencies=[Depends(verify_token)])
+async def get_video_task_status(
+    task_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    查询图生视频任务状态
+
+    - **task_id**: 任务ID
+    """
+    try:
+        result = await image_to_video_service.get_task_status(task_id, db)
+        if not result:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        return result
+    except Exception as e:
+        logger.error(f"查询任务状态失败: {e}")
+        raise HTTPException(status_code=500, detail="查询任务状态失败")
+
+
+@app.get("/api/image-to-video/video/{img_name}", response_class=Response,
+         responses={
+             200: {
+                 "content": {
+                     "video/mp4": {
+                         "schema": {
+                             "type": "string",
+                             "format": "binary"
+                         }
+                     }
+                 },
+                 "description": "成功返回视频二进制数据 (MP4格式)"
+             },
+             404: {
+                 "description": "视频文件不存在"
+             }
+         })
+async def get_video_file(img_name: str):
+    """
+    获取视频文件
+
+    返回视频二进制数据 (MP4格式)
+
+    - **img_name**: 图片名称
+    - **返回**: 视频二进制数据 (Content-Type: video/mp4)
+    """
+    try:
+        db = next(get_db())
+        try:
+            video_data = await image_to_video_service.get_video_file(img_name, db)
+            if video_data:
+                return Response(
+                    content=video_data,
+                    media_type="video/mp4",
+                    headers={
+                        "Cache-Control": "public, max-age=3600",  # 缓存1小时
+                        "X-Content-Type-Options": "nosniff"
+                    }
+                )
+            else:
+                raise HTTPException(status_code=404, detail="视频文件不存在")
+        finally:
+            db.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取视频文件失败: {e}")
+        raise HTTPException(status_code=500, detail="获取视频文件失败")
+
+
+@app.get("/api/image-to-video/health", dependencies=[Depends(verify_token)])
+async def image_to_video_health_check():
+    """检查图生视频服务健康状态"""
+    try:
+        health_status = await image_to_video_service.health_check()
+        return health_status
+    except Exception as e:
+        logger.error(f"图生视频健康检查失败: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "services": {}
+        }
+
+
 # ================= 缓存管理 API =================
 
 
@@ -863,6 +1000,7 @@ def index():
             "WebSocket进度推送",
             "角色卡AI图片生成",
             "ComfyUI图片生成",
+            "图生视频功能",
             "Dify工作流集成",
         ],
         "endpoints": [
@@ -872,6 +1010,10 @@ def index():
             "GET /chapter-content?url=xxx&force_refresh=true - 获取章节内容",
             "GET /text2img/image/{filename} - 获取生成的图片",
             "GET /text2img/health - 文生图服务健康检查",
+            "POST /api/image-to-video/generate - 图生视频生成",
+            "GET /api/image-to-video/has-video/{img_name} - 检查图片是否有视频",
+            "GET /api/image-to-video/video/{img_name} - 获取视频文件",
+            "GET /api/image-to-video/status/{task_id} - 查询视频生成任务状态",
         ],
         "supported_sites": [
             "alice_sw - 轻小说文库",

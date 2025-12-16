@@ -1,0 +1,126 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.py text diff=python
+*.dart text diff=dart
+*.md text diff=markdown
+*.yml text diff=yaml
+*.yaml text diff=yaml
+*.json text diff=json
+*.toml text diff=toml
+*.txt text
+*.cfg text
+*.ini text
+*.sh text eol=lf
+*.gitignore text
+*.gitattributes text
+*.editorconfig text
+
+# Declare binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.deb binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Generated files
+*.pb.go binary
+*.pb.h binary
+*.pb.cc binary
+
+# Large files
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.mkv binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Lock files (should not be modified)
+package-lock.json binary
+yarn.lock binary
+pubspec.lock binary
+Poetry.lock binary
+Pipfile.lock binary
+
+# Certificate files
+*.pem binary
+*.key binary
+*.crt binary
+*.cer binary
+
+# Docker layers
+*.tar binary
+
+# VS Code
+.vscode/ linguist-generated
+
+# Temporary files
+*.tmp binary
+*.temp binary
+*.log binary
+*.cache binary
+
+# Compiled files
+*.pyc binary
+*.pyo binary
+*.pyd binary
+*.pyi text
+*.pyc.* binary
+
+# Dart/Flutter
+*.dart_tool linguist-generated
+*.packages linguist-generated
+*.plugin_dependencies linguist-generated
+.dart_tool/ linguist-generated
+build/ linguist-generated
+
+# Node modules
+node_modules/ linguist-generated
+
+# Python
+__pycache__/ linguist-generated
+*.egg-info/ linguist-generated
+.venv linguist-generated
+venv linguist-generated
+env linguist-generated
+.mypy_cache/ linguist-generated
+.pytest_cache/ linguist-generated
+.coverage linguist-generated
+htmlcov/ linguist-generated
+
+# Environment files
+.env text
+.env.* text
+
+# Documentation
+docs/ text
+
+# Configuration files
+*.yml text
+*.yaml text
+*.json text
+*.toml text
+*.ini text
+*.cfg text
+
+# Scripts
+scripts/*.sh text eol=lf
+scripts/*.py text
+
+# Linguist language detection
+backend/ linguist-language=Python
+novel_app/ linguist-language=Dart
+scripts/ linguist-language=Python

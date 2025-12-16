@@ -142,7 +142,6 @@ class RoleCardGenerateRequest(BaseModel):
 
     role_id: str = Field(..., description="人物卡ID")
     roles: List[RoleInfo] = Field(..., description="人物卡设定信息列表")
-    user_input: str = Field(..., description="用户要求")
     model: Optional[str] = Field(None, description="指定使用的模型名称，不填则使用默认模型")
 
 
@@ -344,3 +343,51 @@ class SceneRegenerateResponse(BaseModel):
     task_id: str = Field(..., description="原始任务ID")
     total_prompts: int = Field(..., description="生成的提示词数量")
     message: str = Field(..., description="处理消息")
+
+
+# ============================================================================
+# 图生视频功能模式
+# ============================================================================
+
+
+class ImageToVideoRequest(BaseModel):
+    """图生视频请求模式."""
+
+    img_name: str = Field(..., description="图片名称")
+    user_input: str = Field(..., description="用户要求")
+    model_name: str = Field(..., description="图生视频模型名称")
+
+
+class ImageToVideoResponse(BaseModel):
+    """图生视频生成响应模式."""
+
+    task_id: int = Field(..., description="视频生成任务ID")
+    img_name: str = Field(..., description="图片名称")
+    status: str = Field(..., description="任务状态: pending/running/completed/failed")
+    message: str = Field(..., description="处理消息")
+
+
+class VideoStatusResponse(BaseModel):
+    """视频状态查询响应模式."""
+
+    img_name: str = Field(..., description="图片名称")
+    has_video: bool = Field(..., description="是否存在视频")
+    video_status: Optional[str] = Field(None, description="视频生成状态")
+    video_filename: Optional[str] = Field(None, description="视频文件名")
+
+
+class ImageToVideoTaskStatusResponse(BaseModel):
+    """图生视频任务状态响应模式."""
+
+    task_id: int = Field(..., description="任务ID")
+    img_name: str = Field(..., description="图片名称")
+    status: str = Field(..., description="任务状态: pending/running/completed/failed")
+    model_name: Optional[str] = Field(None, description="使用的模型名称")
+    user_input: str = Field(..., description="用户要求")
+    video_prompt: Optional[str] = Field(None, description="处理后的视频生成提示词")
+    video_filename: Optional[str] = Field(None, description="生成的视频文件名")
+    result_message: Optional[str] = Field(None, description="处理结果消息")
+    error_message: Optional[str] = Field(None, description="错误信息")
+    created_at: str = Field(..., description="创建时间")
+    started_at: Optional[str] = Field(None, description="开始处理时间")
+    completed_at: Optional[str] = Field(None, description="完成时间")

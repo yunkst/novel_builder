@@ -78,8 +78,7 @@ class RoleCardService:
             # 1. 调用Dify生成提示词
             logger.info(f"为角色 {request.role_id} 生成拍照提示词")
             prompts = await self.dify_client.generate_photo_prompts(
-                roles=request.roles,
-                user_input=request.user_input
+                roles=request.roles
             )
 
             if not prompts:

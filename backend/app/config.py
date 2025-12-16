@@ -27,5 +27,9 @@ class Settings(BaseSettings):
     # Database settings for caching functionality
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///novel_cache.db")
 
+    # 图生视频相关配置
+    video_generation_timeout: int = int(os.getenv("VIDEO_GENERATION_TIMEOUT", "600"))  # 10分钟
+    video_workflow_path: str = os.getenv("COMFYUI_VIDEO_WORKFLOW_PATH", "./comfyui_json/image2video/image_to_video.json")
+
 
 settings = Settings()
