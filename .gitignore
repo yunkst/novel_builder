@@ -234,4 +234,5 @@ dev-debug.log
 
 # Large files
 *.deb
-google-chrome-stable_current_amd64.deb 
+google-chrome-stable_current_amd64.deb
+chrome.deb 
