@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/character.dart';
@@ -7,11 +8,18 @@ import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
+import '../services/unified_stream_manager.dart';
+import '../services/scene_illustration_service.dart';
+import '../models/stream_config.dart';
 import '../core/di/api_service_provider.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/character_preview_dialog.dart';
+import '../widgets/scene_image_preview.dart';
+import '../widgets/scene_gallery_dialog.dart';
+import '../widgets/scene_illustration_dialog.dart';
 import '../utils/character_matcher.dart';
+import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -78,6 +86,10 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   // 自动滚动相关状态
   bool _isAutoScrolling = false;
+  bool _wasAutoScrollingBeforeTouch = false; // 记录触摸前的自动滚动状态
+
+  // 场景插图相关服务
+  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
   Timer? _autoScrollTimer;
   double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
   static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
@@ -113,6 +125,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       await _apiService.init();
       // 初始加载时不重置滚动位置，以保持搜索匹配跳转行为
       _loadChapterContent(resetScrollPosition: false);
+      // 新系统不需要 _loadIllustrations()
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -157,6 +170,112 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         _errorMessage = '加载章节内容时出错: $e';
       });
     }
+  }
+
+  // 删除了 _loadIllustrations 和 _refreshIllustrations，新系统基于内容标记
+
+  // 删除了 _getIllustrationForParagraph 方法，不再使用 paragraph_index
+
+  
+  // 删除了 _showIllustrationGallery 方法，新系统使用 _showIllustrationGalleryByTaskId
+
+  // 删除了 _toggleIllustrationMode 方法，新的插图系统不需要单独的模式
+
+  // 处理段落长按 - 显示操作菜单
+  void _handleLongPress(int index) {
+    if (_isCloseupMode) return; // 特写模式下不处理长按
+
+    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+
+    if (index >= 0 && index < paragraphs.length) {
+      final paragraph = paragraphs[index].trim();
+
+      // 显示选项菜单
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '段落操作',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 段落预览
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    paragraph.length > 100 ? '${paragraph.substring(0, 100)}...' : paragraph,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // 操作选项
+                ListTile(
+                  leading: Icon(Icons.add_photo_alternate, color: Colors.blue),
+                  title: Text('创建插图'),
+                  subtitle: Text('为这个段落生成插图'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showIllustrationDialog(paragraph, index);
+                  },
+                ),
+                if (MediaMarkupParser.isMediaMarkup(paragraph)) ...[
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(Icons.info_outline, color: Colors.green),
+                    title: Text('插图信息'),
+                    subtitle: Text('查看插图详情'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+                      if (markup.isIllustration) {
+                        _showIllustrationGalleryByTaskId(markup.id);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  // 显示插图创建弹窗
+  void _showIllustrationDialog(String paragraphText, int paragraphIndex) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return SceneIllustrationDialog(
+          paragraphText: paragraphText,
+          novelUrl: widget.novel.url,
+          chapterId: _currentChapter.url,
+          paragraphIndex: paragraphIndex,
+          onRefresh: (String taskId) {
+            // 重新加载章节内容以显示新的插图标记
+            _loadChapterContent(resetScrollPosition: false);
+          },
+        );
+      },
+    );
   }
 
   // 判断是否为本地章节
@@ -490,6 +609,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         _currentChapter = widget.chapters[currentIndex - 1];
       });
       _loadChapterContent(resetScrollPosition: true);
+      // 新系统不需要 _loadIllustrations()
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已经是第一章了')),
@@ -505,6 +625,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         _currentChapter = widget.chapters[currentIndex + 1];
       });
       _loadChapterContent(resetScrollPosition: true);
+      // 新系统不需要 _loadIllustrations()
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已经是最后一章了')),
@@ -603,6 +724,9 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   void _toggleAutoScroll() {
     if (_isAutoScrolling) {
       _stopAutoScroll();
+      setState(() {
+        _wasAutoScrollingBeforeTouch = false; // 重置触摸状态记录
+      });
     } else {
       _startAutoScroll();
     }
@@ -613,6 +737,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     if (!_isUserTouching && _isAutoScrolling) {
       setState(() {
         _isUserTouching = true;
+        _wasAutoScrollingBeforeTouch = true; // 记录触摸前自动滚动状态
       });
       _stopAutoScroll();
     }
@@ -624,8 +749,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       setState(() {
         _isUserTouching = false;
       });
-      // 立即恢复自动滚动
-      _startAutoScroll();
+      // 不立即恢复自动滚动，等待ScrollEndNotification
     }
   }
 
@@ -929,9 +1053,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       case 'update_character_cards':
         _updateCharacterCards();
         break;
-      case 'closeup_mode':
-        _toggleCloseupMode();
-        break;
       case 'refresh':
         _refreshChapter();
         break;
@@ -1014,6 +1135,13 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   void _handleParagraphTap(int index) {
     if (!_isCloseupMode) return;
 
+    // 检查段落是否为媒体标记（插图、视频等），如果是则不允许选择
+    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    if (index < paragraphs.length && MediaMarkupParser.isMediaMarkup(paragraphs[index])) {
+      // 媒体标记段落不允许在特写模式下选择
+      return;
+    }
+
     setState(() {
       if (_selectedParagraphIndices.contains(index)) {
         _selectedParagraphIndices.remove(index);
@@ -1043,12 +1171,31 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     return true;
   }
 
-  // 获取选中的文本
+  // 获取选中的文本（支持插图段落）
   String _getSelectedText(List<String> paragraphs) {
     if (_selectedParagraphIndices.isEmpty) return '';
-    return _selectedParagraphIndices
-        .map((index) => paragraphs[index])
-        .join('\n');
+
+    final selectedTexts = <String>[];
+
+    for (final index in _selectedParagraphIndices) {
+      if (index < 0 || index >= paragraphs.length) continue;
+
+      final paragraph = paragraphs[index];
+
+      // 如果是插图标记，转换为描述性文本
+      if (MediaMarkupParser.isMediaMarkup(paragraph)) {
+        final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+        if (markup.isIllustration) {
+          selectedTexts.add('[插图：此处应显示图片内容，taskId: ${markup.id}]');
+        } else {
+          selectedTexts.add('[${markup.type}：${markup.id}]');
+        }
+      } else {
+        selectedTexts.add(paragraph.trim());
+      }
+    }
+
+    return selectedTexts.join('\n\n'); // 用双空行分隔，保持结构清晰
   }
 
   // 改写要求的用户输入缓存
@@ -1174,16 +1321,30 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         rolesInfo = '无特定角色出场';
       }
 
-      final difyService = DifyService();
+      // 获取AI作家设定
+      final prefs = await SharedPreferences.getInstance();
+      final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
 
-      // 使用流式 API
-      await difyService.generateCloseUpStreaming(
-        selectedParagraph: selectedText,
-        userInput: userInput,
-        currentChapterContent: _content,
-        historyChaptersContent: historyChaptersContent,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
-        roles: rolesInfo, // ✨ 新增角色参数
+      final streamManager = UnifiedStreamManager();
+
+      // 创建特写配置
+      final config = StreamConfig.closeUp(
+        inputs: {
+          'user_input': userInput,
+          'cmd': '特写',
+          'ai_writer_setting': aiWriterSetting,
+          'history_chapters_content': historyChaptersContent.join('\n\n'),
+          'current_chapter_content': _content,
+          'choice_content': selectedText,
+          'background_setting': widget.novel.backgroundSetting ?? '',
+          'roles': rolesInfo,
+        },
+        generatingHint: 'AI正在生成特写内容，请稍候...',
+      );
+
+      // 使用统一流式管理器
+      await streamManager.executeStream(
+        config: config,
         onChunk: (chunk) {
           debugPrint('🔥 onChunk 回调收到: "$chunk"');
           debugPrint('📝 当前result长度: ${_rewriteResultNotifier.value.length}');
@@ -1222,9 +1383,10 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             }
           });
         },
-        onComplete: () {
+        onComplete: (fullContent) {
           debugPrint('✅ onComplete 回调被调用');
           debugPrint('📊 完成时result长度: ${_rewriteResultNotifier.value.length}');
+          debugPrint('📊 接收到的完整内容长度: ${fullContent.length}');
 
           // 确保显示所有已接收的数据
           if (_rewriteResultNotifier.value.isNotEmpty) {
@@ -1238,12 +1400,28 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             setState(() {});
           }
         },
+        onError: (error) {
+          debugPrint('❌ onError 回调被调用: $error');
+          _isGeneratingRewriteNotifier.value = false;
+          _rewriteResultNotifier.value = '生成失败: $error';
+
+          // 显示 SnackBar 提示
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('改写生成失败: $error'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        },
       );
     } catch (e) {
+      debugPrint('❌ 流式生成异常: $e');
       _isGeneratingRewriteNotifier.value = false;
       _rewriteResultNotifier.value = '生成失败: $e';
 
-      // 同时显示 SnackBar 提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1253,12 +1431,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
           ),
         );
       }
-    }
-
-    // 确保在方法结束时状态正确（安全网）
-    if (_isGeneratingRewriteNotifier.value) {
-      debugPrint('安全网：强制结束生成状态');
-      _isGeneratingRewriteNotifier.value = false;
     }
   }
 
@@ -1585,8 +1757,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     );
   }
 
-  // 替换选中的段落
-  void _replaceSelectedParagraphs() async {
+  // 替换选中的段落（支持插图段落处理）
+  Future<void> _replaceSelectedParagraphs() async {
     if (_selectedParagraphIndices.isEmpty ||
         _rewriteResultNotifier.value.isEmpty) {
       return;
@@ -1595,12 +1767,137 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     final paragraphs =
         _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
-    // 替换选中的段落
-    for (int i = _selectedParagraphIndices.length - 1; i >= 0; i--) {
-      paragraphs.removeAt(_selectedParagraphIndices[i]);
+    // 分析选中的段落，检查是否包含插图
+    final selectedIllustrations = <MediaMarkup>[];
+    for (final index in _selectedParagraphIndices) {
+      if (index < 0 || index >= paragraphs.length) continue;
+
+      final paragraph = paragraphs[index];
+      if (MediaMarkupParser.isMediaMarkup(paragraph)) {
+        final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+        if (markup.isIllustration) {
+          selectedIllustrations.add(markup);
+        }
+      }
     }
-    paragraphs.insert(
-        _selectedParagraphIndices.first, _rewriteResultNotifier.value);
+
+    // 如果有插图，询问用户如何处理
+    if (selectedIllustrations.isNotEmpty) {
+      final action = await _showIllustrationHandlingDialog(selectedIllustrations);
+      if (action == null) {
+        // 用户取消操作
+        return;
+      }
+
+      // 根据用户选择处理插图
+      if (action == 'keep_illustrations') {
+        // 保留插图：不删除插图段落，只替换文本段落
+        await _replaceTextParagraphsOnly(paragraphs);
+        return;
+      }
+    }
+
+    // 直接替换所有选中的段落
+    await _performReplacement(paragraphs);
+  }
+
+  /// 显示插图处理选择对话框
+  Future<String?> _showIllustrationHandlingDialog(List<MediaMarkup> illustrations) async {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('插图处理'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('改写区域包含 ${illustrations.length} 个插图，您希望如何处理？'),
+            const SizedBox(height: 12),
+            ...illustrations.map((markup) => Text(
+              '• 插图 (ID: ${markup.id})',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'replace_all'),
+            child: const Text('全部替换'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, 'keep_illustrations'),
+            child: const Text('保留插图'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 只替换文本段落，保留插图段落
+  Future<void> _replaceTextParagraphsOnly(List<String> paragraphs) async {
+    final textIndices = <int>[];
+
+    // 找出要替换的文本段落索引
+    for (final index in _selectedParagraphIndices) {
+      if (index < 0 || index >= paragraphs.length) continue;
+
+      final paragraph = paragraphs[index];
+      if (!MediaMarkupParser.isMediaMarkup(paragraph)) {
+        textIndices.add(index);
+      }
+    }
+
+    // 如果没有文本段落需要替换，直接返回
+    if (textIndices.isEmpty) {
+      setState(() {
+        _selectedParagraphIndices.clear();
+        _rewriteResultNotifier.value = '';
+        _isCloseupMode = false;
+      });
+      return;
+    }
+
+    // 替换文本段落
+    final updatedParagraphs = List<String>.from(paragraphs);
+    for (int i = textIndices.length - 1; i >= 0; i--) {
+      updatedParagraphs.removeAt(textIndices[i]);
+    }
+    updatedParagraphs.insert(textIndices.first, _rewriteResultNotifier.value);
+
+    final newContent = updatedParagraphs.join('\n');
+
+    setState(() {
+      _content = newContent;
+      _selectedParagraphIndices.clear();
+      _rewriteResultNotifier.value = '';
+      _isCloseupMode = false;
+    });
+
+    // 保存修改后的内容到数据库
+    try {
+      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
+    } catch (e) {
+      debugPrint('保存章节内容失败: $e');
+    }
+  }
+
+  /// 执行段落替换
+  Future<void> _performReplacement(List<String> paragraphs) async {
+    // 从后往前删除，避免索引错乱
+    for (int i = _selectedParagraphIndices.length - 1; i >= 0; i--) {
+      final index = _selectedParagraphIndices[i];
+      if (index >= 0 && index < paragraphs.length) {
+        paragraphs.removeAt(index);
+      }
+    }
+
+    // 插入生成的内容
+    paragraphs.insert(_selectedParagraphIndices.first, _rewriteResultNotifier.value);
 
     final newContent = paragraphs.join('\n');
 
@@ -1613,8 +1910,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
     // 保存修改后的内容到数据库
     try {
-      await _databaseService.updateChapterContent(
-          _currentChapter.url, newContent);
+      await _databaseService.updateChapterContent(_currentChapter.url, newContent);
     } catch (e) {
       debugPrint('保存章节内容失败: $e');
     }
@@ -2363,21 +2659,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                   ],
                 ),
               ),
-              PopupMenuItem(
-                value: 'closeup_mode',
-                child: Row(
-                  children: [
-                    Icon(
-                      _isCloseupMode ? Icons.visibility : Icons.visibility_off,
-                      size: 18,
-                      color: _isCloseupMode ? Colors.blue : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(_isCloseupMode ? '关闭特写模式' : '开启特写模式'),
-                  ],
-                ),
-              ),
-            ],
+              // 删除了插图模式菜单项，新的插图系统通过长按段落创建
+              ],
           ),
         ],
       ),
@@ -2414,9 +2697,12 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                           if (notification is ScrollUpdateNotification) {
                             return false;
                           }
-                          if (notification is ScrollEndNotification && _isUserTouching) {
-                            // 滚动停止且用户已离开屏幕，恢复自动滚动
-                            _handleTouchEnd();
+                          if (notification is ScrollEndNotification && !_isUserTouching && _wasAutoScrollingBeforeTouch) {
+                            // 滚动停止且用户之前开启了自动滚动，恢复自动滚动
+                            setState(() {
+                              _wasAutoScrollingBeforeTouch = false; // 重置状态
+                            });
+                            _startAutoScroll();
                           }
                           return false;
                         },
@@ -2437,6 +2723,67 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                         final isSelected =
                             _selectedParagraphIndices.contains(index);
 
+                        // 检查是否为插图标记
+                        if (MediaMarkupParser.isMediaMarkup(paragraph)) {
+                          final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+
+                          // 只处理插图类型
+                          if (markup.isIllustration) {
+                            // 插图段落 - 在特写模式下不可选择，因为特写功能只针对文本段落
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 插图内容
+                                  _buildIllustrationParagraph(markup.id, index + 1, editModeProvider.isEditMode),
+                                ],
+                              ),
+                            );
+                          } else {
+                            // 其他媒体类型暂不处理，显示占位符 - 特写模式下不可选择
+                            return Container(
+                              padding: const EdgeInsets.all(16.0),
+                              margin: const EdgeInsets.symmetric(vertical: 8.0),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                border: Border.all(color: Colors.orange, width: 1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '📎 ${markup.type}',
+                                    style: TextStyle(
+                                      fontSize: _fontSize * 0.9,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'ID: ${markup.id}',
+                                    style: TextStyle(
+                                      fontSize: _fontSize * 0.8,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '暂不支持此媒体类型的显示',
+                                    style: TextStyle(
+                                      fontSize: _fontSize * 0.9,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        }
+
+                        // 普通文本段落
                         // 编辑模式使用TextField，阅读模式使用Text
                         if (editModeProvider.isEditMode) {
                           return Container(
@@ -2474,36 +2821,54 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                           );
                         }
 
-                        return InkWell(
-                          onTap: _isCloseupMode
-                              ? () => _handleParagraphTap(index)
-                              : null,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 6.0, horizontal: 8.0),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.blue.withValues(alpha: 0.2)
+                        // 阅读模式的文本段落
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 段落内容
+                            InkWell(
+                              onTap: _isCloseupMode
+                                  ? () => _handleParagraphTap(index)
                                   : null,
-                              border: isSelected
-                                  ? Border.all(color: Colors.blue, width: 2)
-                                  : _isCloseupMode
-                                      ? Border.all(
-                                          color: Colors.blue
-                                              .withValues(alpha: 0.3),
-                                          width: 1)
+                              onLongPress: () => _handleLongPress(index),
+                              onTapDown: (_) => _handleTouchStart(),
+                              onTapUp: (_) => _handleTouchEnd(),
+                              onHighlightChanged: (highlighted) {
+                                // 处理触摸状态变化
+                                if (highlighted) {
+                                  _handleTouchStart();
+                                } else {
+                                  _handleTouchEnd();
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 6.0, horizontal: 8.0),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.blue.withValues(alpha: 0.2)
                                       : null,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              paragraph.trim(),
-                              style: TextStyle(
-                                fontSize: _fontSize,
-                                height: 1.8,
-                                letterSpacing: 0.5,
+                                  border: isSelected
+                                      ? Border.all(color: Colors.blue, width: 2)
+                                      : _isCloseupMode
+                                          ? Border.all(
+                                              color: Colors.blue
+                                                  .withValues(alpha: 0.3),
+                                              width: 1)
+                                          : null,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  paragraph.trim(),
+                                  style: TextStyle(
+                                    fontSize: _fontSize,
+                                    height: 1.8,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         );
                       },
                         ),
@@ -2614,5 +2979,182 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         ],
       ),
     );
+  }
+
+  /// 渲染插图段落
+  Widget _buildIllustrationParagraph(String taskId, int paragraphIndex, bool isEditMode) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 插图标题
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Text(
+              '插图 $paragraphIndex',
+              style: TextStyle(
+                fontSize: _fontSize * 0.8,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
+          // 插图内容
+          GestureDetector(
+            onTapDown: (_) => _handleTouchStart(),
+            onTapUp: (_) => _handleTouchEnd(),
+            onPanStart: (_) => _handleTouchStart(),
+            onPanEnd: (_) => _handleTouchEnd(),
+            child: SceneImagePreview(
+              taskId: taskId, // 使用 taskId 而非 illustration
+              onImageTap: () => _showIllustrationGalleryByTaskId(taskId),
+              onDelete: () => _deleteIllustrationByTaskId(taskId),
+            ),
+          ),
+
+          // 编辑模式下显示可编辑的标记文本
+          if (isEditMode) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                MediaMarkupParser.createIllustrationMarkup(taskId),
+                style: TextStyle(
+                  fontSize: _fontSize * 0.9,
+                  fontFamily: 'monospace',
+                  color: Colors.grey[700],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 通过 taskId 显示插图画廊
+  Future<void> _showIllustrationGalleryByTaskId(String taskId) async {
+    try {
+      // 根据 taskId 获取插图信息
+      final illustrations = await _databaseService.getSceneIllustrationsByChapter(
+        widget.novel.url,
+        _currentChapter.url
+      );
+
+      final illustration = illustrations.firstWhere(
+        (ill) => ill.taskId == taskId,
+        orElse: () => throw Exception('插图不存在'),
+      );
+
+      if (illustration.images.isNotEmpty) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => SceneGalleryDialog(
+              taskId: taskId,
+              images: illustration.images,
+              novelUrl: widget.novel.url,
+              chapterId: _currentChapter.url,
+              onRefresh: () async {
+                await _sceneIllustrationService.refreshChapterIllustrations(
+                  widget.novel.url,
+                  _currentChapter.url,
+                );
+                if (mounted) setState(() {});
+              },
+            ),
+          );
+        }
+      } else {
+        debugPrint('插图为空，taskId: $taskId');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('图片正在生成中，请稍后查看')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('查看插图失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 通过 taskId 删除插图
+  Future<void> _deleteIllustrationByTaskId(String taskId) async {
+    try {
+      // 根据 taskId 获取插图信息
+      final illustrations = await _databaseService.getSceneIllustrationsByChapter(
+        widget.novel.url,
+        _currentChapter.url
+      );
+
+      final illustration = illustrations.firstWhere(
+        (ill) => ill.taskId == taskId,
+        orElse: () => throw Exception('插图不存在'),
+      );
+
+      final confirmed = mounted ? await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: const Text('确定要删除这个插图吗？此操作无法撤销。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      ) : false;
+
+      if (confirmed == true) {
+        final success = await _sceneIllustrationService.deleteIllustration(illustration.id);
+        if (success) {
+          setState(() {});
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('插图已删除'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          debugPrint('删除插图失败: 服务返回false');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('删除插图失败'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除插图失败: $e')),
+        );
+      }
+    }
   }
 }

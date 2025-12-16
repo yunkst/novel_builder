@@ -18,7 +18,9 @@ from ..schemas import (
     RoleImageDeleteRequest, RoleRegenerateRequest, RoleGenerateResponse
 )
 from .dify_client import create_dify_client
+from .comfyui_client import create_comfyui_client_for_model
 from .comfyui_client_v2 import create_comfyui_client_v2
+from ..workflow_config.workflow_config import workflow_config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -48,20 +50,31 @@ class RoleCardService:
             logger.error(f"ComfyUI客户端初始化失败: {e}")
             self.comfyui_client = None
 
-    async def generate_role_images(self, request: RoleCardGenerateRequest, db: Session) -> RoleGenerateResponse:
+    async def generate_role_images(self, request: RoleCardGenerateRequest, db: Session, model: Optional[str] = None) -> RoleGenerateResponse:
         """生成人物卡图片.
 
         Args:
             request: 生成请求
             db: 数据库会话
+            model: 指定的模型名称，如果为None则使用默认模型
 
         Returns:
             生成响应
         """
-        if not self.dify_client or not self.comfyui_client:
-            raise ValueError("外部服务客户端未正确初始化")
+        if not self.dify_client:
+            raise ValueError("Dify客户端未正确初始化")
 
         try:
+            # 根据model参数创建ComfyUI客户端
+            if model:
+                logger.info(f"使用指定模型生成图片: {model}")
+                comfyui_client = create_comfyui_client_for_model(model)
+            else:
+                # 使用默认模型
+                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                logger.info(f"使用默认模型生成图片: {default_workflow.title}")
+                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+
             # 1. 调用Dify生成提示词
             logger.info(f"为角色 {request.role_id} 生成拍照提示词")
             prompts = await self.dify_client.generate_photo_prompts(
@@ -81,7 +94,7 @@ class RoleCardService:
 
             # 2. 批量调用ComfyUI生成图片
             logger.info(f"开始批量生成 {len(prompts)} 张图片")
-            image_filenames = await self.comfyui_client.generate_images_batch(prompts)
+            image_filenames = await comfyui_client.generate_images_batch(prompts)
 
             if not image_filenames:
                 logger.error("ComfyUI未生成任何图片")
@@ -144,6 +157,14 @@ class RoleCardService:
                 message=f"成功生成并保存 {saved_count} 张图片"
             )
 
+        except ValueError as e:
+            # 处理模型不存在的错误
+            logger.error(f"模型错误: {e}")
+            return RoleGenerateResponse(
+                role_id=request.role_id,
+                total_prompts=0,
+                message=str(e)
+            )
         except Exception as e:
             logger.error(f"生成人物卡图片失败: {e}")
             raise
@@ -214,20 +235,28 @@ class RoleCardService:
             logger.error(f"删除图片失败: {e}")
             raise
 
-    async def regenerate_similar_images(self, request: RoleRegenerateRequest, db: Session) -> RoleGenerateResponse:
+    async def regenerate_similar_images(self, request: RoleRegenerateRequest, db: Session, model: Optional[str] = None) -> RoleGenerateResponse:
         """基于现有图片重新生成相似图片.
 
         Args:
             request: 重新生成请求
             db: 数据库会话
+            model: 指定的模型名称，如果为None则使用默认模型
 
         Returns:
             生成响应
         """
-        if not self.comfyui_client:
-            raise ValueError("ComfyUI客户端未正确初始化")
-
         try:
+            # 根据model参数创建ComfyUI客户端
+            if model:
+                logger.info(f"使用指定模型重新生成图片: {model}")
+                comfyui_client = create_comfyui_client_for_model(model)
+            else:
+                # 使用默认模型
+                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                logger.info(f"使用默认模型重新生成图片: {default_workflow.title}")
+                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+
             # 1. 查询参考图片的生成提示词
             reference_image = db.query(RoleImageGallery).filter(
                 RoleImageGallery.img_url == request.img_url
@@ -248,7 +277,7 @@ class RoleCardService:
             prompts = [original_prompt] * request.count
 
             # 3. 批量生成图片
-            image_filenames = await self.comfyui_client.generate_images_batch(prompts)
+            image_filenames = await comfyui_client.generate_images_batch(prompts)
 
             if not image_filenames:
                 logger.error("ComfyUI未生成任何图片")
@@ -308,6 +337,14 @@ class RoleCardService:
                 message=f"成功生成并保存 {saved_count} 张相似图片"
             )
 
+        except ValueError as e:
+            # 处理模型不存在的错误
+            logger.error(f"模型错误: {e}")
+            return RoleGenerateResponse(
+                role_id="",  # 这里role_id暂时为空，因为可能在查询参考图片前就出错
+                total_prompts=0,
+                message=str(e)
+            )
         except Exception as e:
             logger.error(f"重新生成相似图片失败: {e}")
             raise

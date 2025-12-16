@@ -5,7 +5,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../models/character.dart';
-import '../services/api_service_wrapper.dart';
+import '../models/scene_illustration.dart';
 import '../core/di/api_service_provider.dart';
 
 class DatabaseService {
@@ -36,7 +36,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -105,6 +105,24 @@ class DatabaseService {
         UNIQUE(novelUrl, name)
       )
     ''');
+
+    // 创建场景插图表
+    await db.execute('''
+      CREATE TABLE scene_illustrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        novel_url TEXT NOT NULL,
+        chapter_id TEXT NOT NULL,
+        task_id TEXT NOT NULL UNIQUE,
+        content TEXT NOT NULL,
+        roles TEXT NOT NULL,
+        image_count INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        images TEXT DEFAULT '',
+        prompts TEXT,
+        created_at TEXT NOT NULL,
+        completed_at TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -161,6 +179,59 @@ class DatabaseService {
       await db.execute('''
         ALTER TABLE characters ADD COLUMN cachedImageUrl TEXT
       ''');
+    }
+    if (oldVersion < 7) {
+      // 创建场景插图表
+      await db.execute('''
+        CREATE TABLE scene_illustrations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          novel_url TEXT NOT NULL,
+          chapter_id TEXT NOT NULL,
+          task_id TEXT NOT NULL UNIQUE,
+          content TEXT NOT NULL,
+          roles TEXT NOT NULL,
+          image_count INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          images TEXT DEFAULT '',
+          prompts TEXT,
+          created_at TEXT NOT NULL,
+          completed_at TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 8) {
+      // 检查是否已经有旧版本的 scene_illustrations 表（没有 task_id 字段）
+      final tableInfo = await db.rawQuery("PRAGMA table_info(scene_illustrations)");
+      final hasTaskId = tableInfo.any((column) => column['name'] == 'task_id');
+
+      if (!hasTaskId) {
+        // 备份现有数据（如果有的话）
+        // 注意：这里备份了数据但没有使用，因为表结构已改变
+        await db.query('scene_illustrations');
+
+        // 删除旧表
+        await db.execute('DROP TABLE IF EXISTS scene_illustrations');
+
+        // 创建新表
+        await db.execute('''
+          CREATE TABLE scene_illustrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            novel_url TEXT NOT NULL,
+            chapter_id TEXT NOT NULL,
+            task_id TEXT NOT NULL UNIQUE,
+            content TEXT NOT NULL,
+            roles TEXT NOT NULL,
+            image_count INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            images TEXT DEFAULT '',
+            prompts TEXT,
+            created_at TEXT NOT NULL,
+            completed_at TEXT
+          )
+        ''');
+
+        debugPrint('数据库升级：重新创建了 scene_illustrations 表，添加了 task_id 字段');
+      }
     }
   }
 
@@ -1367,5 +1438,125 @@ class DatabaseService {
   Future<bool> hasCharacterAvatar(int characterId) async {
     final cachedUrl = await getCharacterCachedImage(characterId);
     return cachedUrl != null && cachedUrl.isNotEmpty;
+  }
+
+  // ========== 场景插图操作 ==========
+
+  /// 插入场景插图记录
+  Future<int> insertSceneIllustration(SceneIllustration illustration) async {
+    final db = await database;
+    return await db.insert('scene_illustrations', illustration.toMap());
+  }
+
+  /// 更新场景插图状态
+  Future<int> updateSceneIllustrationStatus(int id, String status, {List<String>? images, String? prompts}) async {
+    final db = await database;
+    final Map<String, dynamic> updateData = {
+      'status': status,
+      'completed_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
+    };
+
+    if (images != null) {
+      updateData['images'] = images.join(',');
+    }
+
+    if (prompts != null) {
+      updateData['prompts'] = prompts;
+    }
+
+    return await db.update(
+      'scene_illustrations',
+      updateData,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 根据小说和章节获取场景插图列表（新版本推荐）
+  Future<List<SceneIllustration>> getSceneIllustrationsByChapter(String novelUrl, String chapterId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'scene_illustrations',
+      where: 'novel_url = ? AND chapter_id = ?',
+      whereArgs: [novelUrl, chapterId],
+      orderBy: 'created_at ASC', // 不再使用 paragraph_index 排序
+    );
+
+    return List.generate(maps.length, (i) {
+      return SceneIllustration.fromMap(maps[i]);
+    });
+  }
+
+  /// 根据 taskId 获取场景插图（新版本推荐）
+  Future<SceneIllustration?> getSceneIllustrationByTaskId(String taskId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'scene_illustrations',
+      where: 'task_id = ?',
+      whereArgs: [taskId],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      return SceneIllustration.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  // 删除了 getSceneIllustrationByParagraph 方法，不再使用 paragraph_index
+
+  /// 删除场景插图记录
+  Future<int> deleteSceneIllustration(int id) async {
+    final db = await database;
+    return await db.delete(
+      'scene_illustrations',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 删除章节的所有场景插图
+  Future<int> deleteSceneIllustrationsByChapter(String novelUrl, String chapterId) async {
+    final db = await database;
+    return await db.delete(
+      'scene_illustrations',
+      where: 'novel_url = ? AND chapter_id = ?',
+      whereArgs: [novelUrl, chapterId],
+    );
+  }
+
+  /// 获取所有待处理或正在处理的场景插图
+  Future<List<SceneIllustration>> getPendingSceneIllustrations() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'scene_illustrations',
+      where: 'status IN (?, ?)',
+      whereArgs: ['pending', 'processing'],
+      orderBy: 'created_at ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return SceneIllustration.fromMap(maps[i]);
+    });
+  }
+
+  /// 批量更新场景插图状态
+  Future<int> batchUpdateSceneIllustrations(List<int> ids, String status) async {
+    final db = await database;
+    int count = 0;
+
+    for (final id in ids) {
+      count += await db.update(
+        'scene_illustrations',
+        {
+          'status': status,
+          'completed_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+
+    return count;
   }
 }

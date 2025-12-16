@@ -19,12 +19,9 @@ services:
       - HTTPS_PROXY=http://host.docker.internal:7897
       - NO_PROXY=localhost,127.0.0.1,postgres,host.docker.internal
       # 文生图功能配置
+      # 注意：ComfyUI工作流配置已迁移到 workflows.yaml 文件
       - DIFY_API_URL=${DIFY_API_URL:-http://host.docker.internal/v1/workflows/run}
       - DIFY_API_TOKEN=${DIFY_API_TOKEN}
-      - COMFYUI_API_URL=${COMFYUI_API_URL:-http://host.docker.internal:8000}
-      - COMFYUI_WORKFLOW_PATH=${COMFYUI_WORKFLOW_PATH:-./comfyui_json/text2img/image_netayume_lumina_t2i.json}
-      # ComfyUI提示词节点标题配置（可选，默认使用预定义的正面提示词标题）
-      - COMFYUI_TARGET_TITLES=${COMFYUI_TARGET_TITLES:-prompts,提示词,positive prompt,positive,prompt,text,输入}
     depends_on:
       postgres:
         condition: service_healthy
