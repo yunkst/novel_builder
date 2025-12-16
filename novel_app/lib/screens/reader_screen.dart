@@ -3011,6 +3011,10 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
               taskId: taskId, // 使用 taskId 而非 illustration
               onImageTap: () => _showIllustrationGalleryByTaskId(taskId),
               onDelete: () => _deleteIllustrationByTaskId(taskId),
+              onImageDeleted: () {
+                // 单张图片删除成功后，可以选择性刷新
+                debugPrint('单张图片删除成功: $taskId');
+              },
             ),
           ),
 

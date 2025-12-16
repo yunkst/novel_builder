@@ -14,7 +14,8 @@ from ..models.scene_illustration import SceneIllustrationTask, SceneImageGallery
 from ..schemas import (
     SceneIllustrationRequest, SceneIllustrationResponse,
     SceneGalleryResponse, SceneImageDeleteRequest,
-    EnhancedSceneIllustrationRequest, RoleInfo
+    EnhancedSceneIllustrationRequest, RoleInfo,
+    SceneRegenerateRequest, SceneRegenerateResponse
 )
 from .dify_client import DifyClient
 from .comfyui_client import create_comfyui_client_for_model, MediaFileResult
@@ -402,6 +403,139 @@ class SceneIllustrationService:
             db.commit()
         except Exception as e:
             logger.error(f"更新任务状态失败: {e}")
+
+    async def regenerate_scene_images(
+        self,
+        request: SceneRegenerateRequest,
+        db: Session
+    ) -> SceneRegenerateResponse:
+        """基于现有任务重新生成场面图片
+
+        Args:
+            request: 重新生成请求
+            db: 数据库会话
+
+        Returns:
+            生成响应
+
+        Raises:
+            ValueError: 当任务不存在或参数无效时
+        """
+        try:
+            # 1. 查找原始任务
+            original_task = db.query(SceneIllustrationTask).filter(
+                SceneIllustrationTask.task_id == request.task_id
+            ).first()
+
+            if not original_task:
+                raise ValueError("原始任务不存在")
+
+            if original_task.status != "completed":
+                raise ValueError("只能基于已完成的任务重新生成图片")
+
+            # 2. 获取原始任务的提示词
+            original_prompt = original_task.prompts
+            if not original_prompt:
+                raise ValueError("原始任务的提示词不存在")
+
+            logger.info(f"基于任务 {request.task_id} 重新生成 {request.count} 张图片")
+
+            # 3. 创建ComfyUI客户端
+            if request.model:
+                logger.info(f"使用指定模型重新生成图片: {request.model}")
+                comfyui_client = create_comfyui_client_for_model(request.model)
+            elif original_task.model_name:
+                logger.info(f"使用原始任务模型重新生成图片: {original_task.model_name}")
+                comfyui_client = create_comfyui_client_for_model(original_task.model_name)
+            else:
+                from ..workflow_config.workflow_config import workflow_config_manager
+                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                logger.info(f"使用默认模型重新生成图片: {default_workflow.title}")
+                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+
+            # 4. 生成多个相似的提示词（可以在这里添加提示词变体逻辑）
+            prompts = [original_prompt] * request.count
+
+            # 5. 批量生成图片
+            image_filenames = []
+            for i in range(request.count):
+                logger.info(f"重新生成第 {i+1}/{request.count} 张图片")
+
+                # 提交生成任务
+                comfyui_task_id = await comfyui_client.generate_image(prompts)
+                if comfyui_task_id:
+                    # 等待任务完成并获取图片文件名
+                    completed_filenames = await comfyui_client.wait_for_completion(comfyui_task_id)
+                    if completed_filenames and len(completed_filenames) > 0:
+                        media_file = completed_filenames[0]
+                        filename = media_file.filename
+                        image_filenames.append(filename)
+                        logger.info(f"第 {i+1} 张图片重新生成成功，文件名: {filename}")
+
+            if not image_filenames:
+                logger.error("ComfyUI未生成任何图片")
+                return SceneRegenerateResponse(
+                    task_id=request.task_id,
+                    total_prompts=len(prompts),
+                    message="图片生成失败"
+                )
+
+            logger.info(f"成功重新生成 {len(image_filenames)} 张图片")
+
+            # 6. 保存新图片到数据库
+            saved_count = 0
+            for filename in image_filenames:
+                try:
+                    # 检查是否已存在相同的图片
+                    existing_image = db.query(SceneImageGallery).filter(
+                        SceneImageGallery.task_id == request.task_id,
+                        SceneImageGallery.img_url == filename
+                    ).first()
+
+                    if existing_image:
+                        logger.warning(f"图片 {filename} 已存在，跳过保存")
+                        continue
+
+                    # 保存新图片记录
+                    scene_image = SceneImageGallery(
+                        task_id=request.task_id,
+                        img_url=filename,
+                        prompt=original_prompt,
+                        created_at=datetime.now()
+                    )
+
+                    db.add(scene_image)
+                    saved_count += 1
+
+                except Exception as e:
+                    logger.error(f"保存图片 {filename} 失败: {e}")
+                    continue
+
+            # 提交数据库事务
+            try:
+                db.commit()
+                logger.info(f"成功保存 {saved_count} 张重新生成的图片到数据库")
+            except SQLAlchemyError as e:
+                db.rollback()
+                logger.error(f"数据库提交失败: {e}")
+                return SceneRegenerateResponse(
+                    task_id=request.task_id,
+                    total_prompts=len(prompts),
+                    message="图片生成成功，但数据库保存失败"
+                )
+
+            return SceneRegenerateResponse(
+                task_id=request.task_id,
+                total_prompts=len(prompts),
+                message=f"成功重新生成并保存 {saved_count} 张图片"
+            )
+
+        except ValueError as e:
+            logger.error(f"参数错误: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"重新生成场面图片失败: {e}")
+            raise ValueError(f"重新生成图片失败: {str(e)}")
 
 
 # 创建服务实例（需要在调用时传入DifyClient）

@@ -797,14 +797,31 @@ class ApiServiceWrapper {
   }
 
   /// 重新生成场景插图图片
-  /// 注意：后端暂未实现此功能，此方法目前不可用
-  Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+  Future<Map<String, dynamic>> regenerateSceneIllustration({
     required String taskId,
     required int count,
-    String? modelName,
+    String? model,
   }) async {
-    throw Exception(
-        '场景插图重新生成功能暂未实现，请联系后端开发团队添加 /api/scene-illustration/regenerate 接口');
+    return _withRetry<Map<String, dynamic>>(() async {
+      final token = await getToken();
+
+      // 使用生成的 SceneRegenerateRequest 模型
+      final request = SceneRegenerateRequest((b) => b
+        ..taskId = taskId
+        ..count = count
+        ..model = model);
+
+      final response = await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
+        sceneRegenerateRequest: request,
+        X_API_TOKEN: token,
+      );
+
+      if (response.data != null) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception('重新生成场景插图图片失败：响应为空');
+      }
+    }, '重新生成场景插图图片');
   }
 
   /// 将 SceneGalleryResponse 转换为 Map
