@@ -494,10 +494,12 @@ def create_comfyui_client(workflow_path: str | None = None, model_title: str | N
         workflow_path = workflow_info.path
     elif workflow_path is None:
         # 使用默认工作流
+        from ..workflow_config import WorkflowType
+
         if workflow_type == "t2i":
-            default_workflow = workflow_config_manager.get_default_t2i_workflow()
+            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
         elif workflow_type == "i2v":
-            default_workflow = workflow_config_manager.get_default_i2v_workflow()
+            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.I2V)
         else:
             raise ValueError(f"不支持的工作流类型: {workflow_type}")
         workflow_path = default_workflow.path

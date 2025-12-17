@@ -339,13 +339,13 @@ class ComfyUIVideoClient:
 
 def create_comfyui_video_client() -> ComfyUIVideoClient:
     """创建ComfyUI图生视频客户端实例."""
-    from ..workflow_config.workflow_config import workflow_config_manager
+    from ..workflow_config import WorkflowType, workflow_config_manager
 
     base_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
 
     # 从workflow配置中获取默认的i2v工作流
     try:
-        i2v_workflow = workflow_config_manager.get_default_i2v_workflow()
+        i2v_workflow = workflow_config_manager.get_default_workflow(WorkflowType.I2V)
         workflow_path = i2v_workflow.path
         logger.info(f"使用i2v工作流: {i2v_workflow.title}, 路径: {workflow_path}")
     except Exception as e:

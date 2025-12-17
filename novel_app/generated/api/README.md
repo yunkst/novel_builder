@@ -75,8 +75,8 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**generateRoleCardImagesApiRoleCardGeneratePost**](doc/DefaultApi.md#generaterolecardimagesapirolecardgeneratepost) | **POST** /api/role-card/generate | Generate Role Card Images
 [*DefaultApi*](doc/DefaultApi.md) | [**generateSceneImagesApiSceneIllustrationGeneratePost**](doc/DefaultApi.md#generatesceneimagesapisceneillustrationgeneratepost) | **POST** /api/scene-illustration/generate | Generate Scene Images
 [*DefaultApi*](doc/DefaultApi.md) | [**generateVideoFromImageApiImageToVideoGeneratePost**](doc/DefaultApi.md#generatevideofromimageapiimagetovideogeneratepost) | **POST** /api/image-to-video/generate | Generate Video From Image
-[*DefaultApi*](doc/DefaultApi.md) | [**getAvailableModelsApiRoleCardModelsGet**](doc/DefaultApi.md#getavailablemodelsapirolecardmodelsget) | **GET** /api/role-card/models | Get Available Models
 [*DefaultApi*](doc/DefaultApi.md) | [**getImageProxyText2imgImageFilenameGet**](doc/DefaultApi.md#getimageproxytext2imgimagefilenameget) | **GET** /text2img/image/{filename} | Get Image Proxy
+[*DefaultApi*](doc/DefaultApi.md) | [**getModelsApiModelsGet**](doc/DefaultApi.md#getmodelsapimodelsget) | **GET** /api/models | Get Models
 [*DefaultApi*](doc/DefaultApi.md) | [**getRoleCardGalleryApiRoleCardGalleryRoleIdGet**](doc/DefaultApi.md#getrolecardgalleryapirolecardgalleryroleidget) | **GET** /api/role-card/gallery/{role_id} | Get Role Card Gallery
 [*DefaultApi*](doc/DefaultApi.md) | [**getRoleCardTaskStatusApiRoleCardStatusTaskIdGet**](doc/DefaultApi.md#getrolecardtaskstatusapirolecardstatustaskidget) | **GET** /api/role-card/status/{task_id} | Get Role Card Task Status
 [*DefaultApi*](doc/DefaultApi.md) | [**getSceneGalleryApiSceneIllustrationGalleryTaskIdGet**](doc/DefaultApi.md#getscenegalleryapisceneillustrationgallerytaskidget) | **GET** /api/scene-illustration/gallery/{task_id} | Get Scene Gallery
@@ -90,6 +90,7 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**regenerateSimilarImagesApiRoleCardRegeneratePost**](doc/DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
 [*DefaultApi*](doc/DefaultApi.md) | [**roleCardHealthCheckApiRoleCardHealthGet**](doc/DefaultApi.md#rolecardhealthcheckapirolecardhealthget) | **GET** /api/role-card/health | Role Card Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**searchSearchGet**](doc/DefaultApi.md#searchsearchget) | **GET** /search | Search
+[*DefaultApi*](doc/DefaultApi.md) | [**securityCheckSecurityCheckGet**](doc/DefaultApi.md#securitychecksecuritycheckget) | **GET** /security-check | Security Check
 [*DefaultApi*](doc/DefaultApi.md) | [**text2imgHealthCheckText2imgHealthGet**](doc/DefaultApi.md#text2imghealthchecktext2imghealthget) | **GET** /text2img/health | Text2Img Health Check
 
 
@@ -120,7 +121,11 @@ Class | Method | HTTP request | Description
 
 ## Documentation For Authorization
 
-Endpoints do not require authorization.
+
+Authentication schemes defined for the API:
+### HTTPBearer
+
+- **Type**: HTTP Bearer Token authentication
 
 
 ## Author

@@ -57,7 +57,7 @@ class RoleCardService:
         Args:
             request: 生成请求
             db: 数据库会话
-            model: 指定的模型名称，如果为None则使用默认模型
+            model: 指定的模型名称（已弃用，使用request.model_name）
 
         Returns:
             生成响应
@@ -66,15 +66,28 @@ class RoleCardService:
             raise ValueError("Dify客户端未正确初始化")
 
         try:
-            # 根据model参数创建ComfyUI客户端
-            if model:
-                logger.info(f"使用指定模型生成图片: {model}")
-                comfyui_client = create_comfyui_client_for_model(model)
+            # 获取可用模型列表和默认模型
+            from ..workflow_config import WorkflowType
+            workflows_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+            available_models = [wf.title for wf in workflows_response.workflows]
+            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+
+            # 优先使用request.model_name，其次使用传入的model参数（向后兼容）
+            selected_model = request.model_name or model
+
+            # 处理模型验证和默认值替换
+            if selected_model:
+                if selected_model not in available_models:
+                    logger.warning(f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}")
+                    selected_model = default_workflow.title
+                else:
+                    logger.info(f"使用指定模型生成图片: {selected_model}")
             else:
-                # 使用默认模型
-                default_workflow = workflow_config_manager.get_default_t2i_workflow()
-                logger.info(f"使用默认模型生成图片: {default_workflow.title}")
-                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+                selected_model = default_workflow.title
+                logger.info(f"未指定模型，使用默认模型: {selected_model}")
+
+            # 创建ComfyUI客户端
+            comfyui_client = create_comfyui_client_for_model(selected_model)
 
             # 1. 调用Dify生成提示词
             logger.info(f"为角色 {request.role_id} 生成拍照提示词")
@@ -241,21 +254,34 @@ class RoleCardService:
         Args:
             request: 重新生成请求
             db: 数据库会话
-            model: 指定的模型名称，如果为None则使用默认模型
+            model: 指定的模型名称（已弃用，使用request.model_name）
 
         Returns:
             生成响应
         """
         try:
-            # 根据model参数创建ComfyUI客户端
-            if model:
-                logger.info(f"使用指定模型重新生成图片: {model}")
-                comfyui_client = create_comfyui_client_for_model(model)
+            # 获取可用模型列表和默认模型
+            from ..workflow_config import WorkflowType
+            workflows_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+            available_models = [wf.title for wf in workflows_response.workflows]
+            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+
+            # 优先使用request.model_name，其次使用传入的model参数（向后兼容）
+            selected_model = request.model_name or model
+
+            # 处理模型验证和默认值替换
+            if selected_model:
+                if selected_model not in available_models:
+                    logger.warning(f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}")
+                    selected_model = default_workflow.title
+                else:
+                    logger.info(f"使用指定模型重新生成图片: {selected_model}")
             else:
-                # 使用默认模型
-                default_workflow = workflow_config_manager.get_default_t2i_workflow()
-                logger.info(f"使用默认模型重新生成图片: {default_workflow.title}")
-                comfyui_client = create_comfyui_client_for_model(default_workflow.title)
+                selected_model = default_workflow.title
+                logger.info(f"未指定模型，使用默认模型: {selected_model}")
+
+            # 创建ComfyUI客户端
+            comfyui_client = create_comfyui_client_for_model(selected_model)
 
             # 1. 查询参考图片的生成提示词
             reference_image = db.query(RoleImageGallery).filter(

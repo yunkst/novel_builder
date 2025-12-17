@@ -3072,9 +3072,16 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
       // 显示视频输入对话框
       if (!mounted) return;
-      final userInput = await VideoInputDialog.show(context);
-      if (userInput == null || userInput.isEmpty || !mounted) {
-        return; // 用户取消、未输入或widget已销毁
+      final videoInput = await VideoInputDialog.show(context);
+      if (videoInput == null || !mounted) {
+        return; // 用户取消或widget已销毁
+      }
+
+      final userInput = videoInput['user_input'] ?? '';
+      final modelName = videoInput['model_name'] ?? 'SVD';
+
+      if (userInput.isEmpty) {
+        return; // 未输入内容
       }
 
       // 显示加载提示
@@ -3091,7 +3098,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       final response = await _apiService.generateVideoFromImage(
         imgName: fileName,
         userInput: userInput,
-        modelName: '',
+        modelName: modelName,
       );
 
       if (mounted) {
@@ -3134,9 +3141,15 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
       // 显示视频输入对话框
       if (!mounted) return;
-      final userInput = await VideoInputDialog.show(context);
-      if (userInput == null || userInput.isEmpty || !mounted) {
-        return; // 用户取消、未输入或widget已销毁
+      final videoInput = await VideoInputDialog.show(context);
+      if (videoInput == null || !mounted) {
+        return; // 用户取消或widget已销毁
+      }
+
+      final userInput = videoInput['user_input'] ?? '';
+
+      if (userInput.isEmpty) {
+        return; // 未输入内容
       }
 
       // 设置生成状态

@@ -11,6 +11,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from .models import WorkflowType, WorkflowResponse, WorkflowListResponse
+
 logger = logging.getLogger(__name__)
 
 
@@ -121,66 +123,79 @@ class WorkflowConfigManager:
                 return workflow
         return None
 
-    def get_default_t2i_workflow(self) -> WorkflowInfo:
+    def list_workflows(self, workflow_type: WorkflowType) -> WorkflowListResponse:
         """
-        获取默认t2i工作流
+        统一的工作流列表获取方法
+
+        Args:
+            workflow_type: 工作流类型
 
         Returns:
-            默认工作流信息
-
-        Raises:
-            ValueError: 当没有可用的t2i工作流时
+            工作流列表响应
         """
         config = self.get_config()
 
-        # 首先尝试使用配置中指定的默认模型
-        default_title = config.settings.default_t2i_model
-        default_workflow = self.get_t2i_workflow_by_title(default_title)
+        # 根据类型选择对应的工作流列表
+        if workflow_type == WorkflowType.T2I:
+            workflows = config.t2i
+        elif workflow_type == WorkflowType.I2V:
+            workflows = config.i2v
+        else:
+            raise ValueError(f"不支持的工作流类型: {workflow_type}")
 
-        if default_workflow:
-            return default_workflow
-
-        # 如果指定的默认模型不存在，使用第一个可用的
-        if config.t2i:
-            logger.warning(f"指定的默认模型 '{default_title}' 不存在，使用第一个可用模型")
-            return config.t2i[0]
-
-        raise ValueError("没有可用的t2i工作流配置")
-
-    def get_default_i2v_workflow(self) -> WorkflowInfo:
-        """
-        获取默认i2v工作流
-
-        Returns:
-            默认工作流信息
-
-        Raises:
-            ValueError: 当没有可用的i2v工作流时
-        """
-        config = self.get_config()
-
-        if config.i2v:
-            return config.i2v[0]
-
-        raise ValueError("没有可用的i2v工作流配置")
-
-    def list_t2i_workflows(self) -> list[dict[str, Any]]:
-        """
-        列出所有可用的t2i工作流
-
-        Returns:
-            工作流信息列表
-        """
-        config = self.get_config()
-        return [
-            {
-                "title": workflow.title,
-                "path": workflow.path,
-                "description": workflow.description,
-                "model_type": workflow.model_type
-            }
-            for workflow in config.t2i
+        # 转换为响应模型
+        workflow_responses = [
+            WorkflowResponse(
+                title=workflow.title,
+                description=workflow.description or "",
+                path=workflow.path
+            )
+            for workflow in workflows
         ]
+
+        return WorkflowListResponse(
+            workflows=workflow_responses,
+            total_count=len(workflow_responses),
+            workflow_type=workflow_type
+        )
+
+    def get_default_workflow(self, workflow_type: WorkflowType) -> WorkflowInfo:
+        """
+        统一的默认工作流获取方法
+
+        Args:
+            workflow_type: 工作流类型
+
+        Returns:
+            默认工作流信息
+
+        Raises:
+            ValueError: 当没有可用的工作流时
+        """
+        config = self.get_config()
+
+        if workflow_type == WorkflowType.T2I:
+            # 首先尝试使用配置中指定的默认模型
+            default_title = config.settings.default_t2i_model
+            default_workflow = self.get_t2i_workflow_by_title(default_title)
+
+            if default_workflow:
+                return default_workflow
+
+            # 如果指定的默认模型不存在，使用第一个可用的
+            if config.t2i:
+                logger.warning(f"指定的默认模型 '{default_title}' 不存在，使用第一个可用模型")
+                return config.t2i[0]
+
+            raise ValueError("没有可用的t2i工作流配置")
+
+        elif workflow_type == WorkflowType.I2V:
+            if config.i2v:
+                return config.i2v[0]
+            raise ValueError("没有可用的i2v工作流配置")
+
+        else:
+            raise ValueError(f"不支持的工作流类型: {workflow_type}")
 
     def validate_workflow_path(self, workflow_path: str) -> bool:
         """

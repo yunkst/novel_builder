@@ -464,7 +464,7 @@ async def regenerate_similar_images(
 
     - **img_url**: 参考图片URL
     - **count**: 生成图片数量
-    - **model**: 指定使用的模型名称（可选）
+    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     """
     try:
         result = await role_card_service.regenerate_similar_images(request, db, model=request.model)
@@ -476,19 +476,38 @@ async def regenerate_similar_images(
         raise HTTPException(status_code=500, detail="重新生成图片失败")
 
 
-@app.get("/api/role-card/models", dependencies=[Depends(verify_token)])
-async def get_available_models():
-    """获取可用的工作流模型列表"""
+@app.get("/api/models", dependencies=[Depends(verify_token)])
+async def get_models():
+    """获取所有可用模型，按文生图和图生视频分类"""
     try:
-        from app.workflow_config.workflow_config import workflow_config_manager
-        workflows = workflow_config_manager.list_t2i_workflows()
+        from app.workflow_config import WorkflowType, workflow_config_manager
+
+        # 获取文生图工作流
+        t2i_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+        text2img_models = [
+            {
+                "title": workflow.title,
+                "description": workflow.description
+            }
+            for workflow in t2i_response.workflows
+        ]
+
+        # 获取图生视频工作流
+        i2v_response = workflow_config_manager.list_workflows(WorkflowType.I2V)
+        img2video_models = [
+            {
+                "title": workflow.title,
+                "description": workflow.description
+            }
+            for workflow in i2v_response.workflows
+        ]
 
         return {
-            "models": workflows,
-            "total_count": len(workflows)
+            "text2img": text2img_models,
+            "img2video": img2video_models
         }
     except Exception as e:
-        logger.error(f"获取可用模型失败: {e}")
+        logger.error(f"获取模型列表失败: {e}")
         raise HTTPException(status_code=500, detail="获取模型列表失败")
 
 
@@ -527,7 +546,7 @@ async def generate_scene_images(
     - **task_id**: 任务标识符
     - **roles**: 角色信息
     - **num**: 生成图片数量
-    - **model_name**: 指定使用的模型名称（可选）
+    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型）
 
     返回任务ID，可通过后续接口查询和获取图片
     """
@@ -595,7 +614,7 @@ async def regenerate_scene_images(
 
     - **task_id**: 原始任务ID
     - **count**: 生成图片数量
-    - **model**: 指定使用的模型名称（可选，会使用原始任务的模型）
+    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     """
     try:
         result = await scene_illustration_service.regenerate_scene_images(request, db)
@@ -625,7 +644,7 @@ async def generate_video_from_image(
     **请求参数:**
     - **img_name**: 要处理的图片文件名称
     - **user_input**: 用户对视频生成的要求描述
-    - **model_name**: 图生视频模型名称
+    - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）
 
     **返回值:**
     - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询
