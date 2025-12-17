@@ -69,6 +69,30 @@ class ImageToVideoService:
 
             logger.info(f"找到图片 {request.img_name}，来源: {source_type}")
 
+            # 获取可用的图生视频模型和默认模型
+            try:
+                from ..workflow_config import WorkflowType, workflow_config_manager
+                workflows_response = workflow_config_manager.list_workflows(WorkflowType.I2V)
+                available_models = [wf.title for wf in workflows_response.workflows]
+                default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.I2V)
+                default_model = default_workflow.title
+            except Exception as e:
+                logger.warning(f"获取图生视频模型配置失败，使用默认值: {e}")
+                available_models = ["视频生成"]
+                default_model = "视频生成"
+
+            # 处理model_name，实现智能默认值替换
+            model_name = request.model_name
+            if model_name:
+                if model_name not in available_models:
+                    logger.warning(f"指定的model_name '{model_name}' 不在可用模型列表中，将使用默认模型: {default_model}")
+                    model_name = default_model
+                else:
+                    logger.info(f"使用指定的model_name '{model_name}'")
+            else:
+                model_name = default_model
+                logger.info(f"未指定model_name，使用默认模型: {default_model}")
+
             # 3. 创建或更新视频状态记录
             if not video_status:
                 video_status = ImageVideoStatus(
@@ -85,7 +109,7 @@ class ImageToVideoService:
             video_task = ImageToVideoTask(
                 img_name=request.img_name,
                 status="pending",
-                model_name=request.model_name,
+                model_name=model_name,  # 使用处理后的model_name
                 user_input=request.user_input
             )
             db.add(video_task)
@@ -94,7 +118,7 @@ class ImageToVideoService:
             # 5. 更新视频状态为pending
             video_status.video_status = "pending"
             video_status.current_task_id = video_task.id
-            video_status.model_name = request.model_name
+            video_status.model_name = model_name  # 使用处理后的model_name
             video_status.user_input = request.user_input
             video_status.first_requested_at = datetime.now()
             video_status.retry_count = 0
@@ -107,7 +131,7 @@ class ImageToVideoService:
                 loop.create_task(self._process_video_generation_async(
                     task_id=video_task.id,
                     img_name=request.img_name,
-                    model_name=request.model_name,
+                    model_name=model_name,  # 使用处理后的model_name
                     user_input=request.user_input,
                     db=db
                 ))

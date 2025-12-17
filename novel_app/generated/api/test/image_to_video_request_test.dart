@@ -19,7 +19,6 @@ void main() {
       // TODO
     });
 
-    // 图生视频模型名称
     // String modelName
     test('to test the property `modelName`', () async {
       // TODO

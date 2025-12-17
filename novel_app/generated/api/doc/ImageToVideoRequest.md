@@ -10,7 +10,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **imgName** | **String** | 图片名称 | 
 **userInput** | **String** | 用户要求 | 
-**modelName** | **String** | 图生视频模型名称 | 
+**modelName** | **String** |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

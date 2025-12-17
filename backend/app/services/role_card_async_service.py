@@ -199,14 +199,14 @@ class RoleCardAsyncService:
             model_name = task.model if task else None
 
             # 创建对应的ComfyUI客户端
-            from ..workflow_config.workflow_config import workflow_config_manager
+            from ..workflow_config import WorkflowType, workflow_config_manager
             from .comfyui_client import create_comfyui_client_for_model
 
             if model_name:
                 logger.info(f"任务 {task_id}: 使用指定模型 {model_name}")
                 comfyui_client = create_comfyui_client_for_model(model_name)
             else:
-                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
                 logger.info(f"任务 {task_id}: 使用默认模型 {default_workflow.title}")
                 comfyui_client = create_comfyui_client_for_model(default_workflow.title)
 

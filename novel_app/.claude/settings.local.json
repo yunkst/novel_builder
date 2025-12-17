@@ -16,7 +16,8 @@
       "WebSearch",
       "Bash(curl:*)",
       "Bash(python:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

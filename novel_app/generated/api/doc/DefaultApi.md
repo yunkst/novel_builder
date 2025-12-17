@@ -17,8 +17,8 @@ Method | HTTP request | Description
 [**generateRoleCardImagesApiRoleCardGeneratePost**](DefaultApi.md#generaterolecardimagesapirolecardgeneratepost) | **POST** /api/role-card/generate | Generate Role Card Images
 [**generateSceneImagesApiSceneIllustrationGeneratePost**](DefaultApi.md#generatesceneimagesapisceneillustrationgeneratepost) | **POST** /api/scene-illustration/generate | Generate Scene Images
 [**generateVideoFromImageApiImageToVideoGeneratePost**](DefaultApi.md#generatevideofromimageapiimagetovideogeneratepost) | **POST** /api/image-to-video/generate | Generate Video From Image
-[**getAvailableModelsApiRoleCardModelsGet**](DefaultApi.md#getavailablemodelsapirolecardmodelsget) | **GET** /api/role-card/models | Get Available Models
 [**getImageProxyText2imgImageFilenameGet**](DefaultApi.md#getimageproxytext2imgimagefilenameget) | **GET** /text2img/image/{filename} | Get Image Proxy
+[**getModelsApiModelsGet**](DefaultApi.md#getmodelsapimodelsget) | **GET** /api/models | Get Models
 [**getRoleCardGalleryApiRoleCardGalleryRoleIdGet**](DefaultApi.md#getrolecardgalleryapirolecardgalleryroleidget) | **GET** /api/role-card/gallery/{role_id} | Get Role Card Gallery
 [**getRoleCardTaskStatusApiRoleCardStatusTaskIdGet**](DefaultApi.md#getrolecardtaskstatusapirolecardstatustaskidget) | **GET** /api/role-card/status/{task_id} | Get Role Card Task Status
 [**getSceneGalleryApiSceneIllustrationGalleryTaskIdGet**](DefaultApi.md#getscenegalleryapisceneillustrationgallerytaskidget) | **GET** /api/scene-illustration/gallery/{task_id} | Get Scene Gallery
@@ -32,6 +32,7 @@ Method | HTTP request | Description
 [**regenerateSimilarImagesApiRoleCardRegeneratePost**](DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
 [**roleCardHealthCheckApiRoleCardHealthGet**](DefaultApi.md#rolecardhealthcheckapirolecardhealthget) | **GET** /api/role-card/health | Role Card Health Check
 [**searchSearchGet**](DefaultApi.md#searchsearchget) | **GET** /search | Search
+[**securityCheckSecurityCheckGet**](DefaultApi.md#securitychecksecuritycheckget) | **GET** /security-check | Security Check
 [**text2imgHealthCheckText2imgHealthGet**](DefaultApi.md#text2imghealthchecktext2imghealthget) | **GET** /text2img/health | Text2Img Health Check
 
 
@@ -73,7 +74,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -116,7 +117,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -161,7 +162,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -206,7 +207,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -251,7 +252,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -265,7 +266,7 @@ No authorization required
 
 Generate Role Card Images
 
-异步生成人物卡图片  - **role_id**: 人物卡ID - **roles**: 人物卡设定信息 - **user_input**: 用户要求  返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度
+异步生成人物卡图片  - **role_id**: 人物卡ID - **roles**: 人物卡设定信息 - **model**: 使用的模型名称（可选）  返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度  注意：用户要求已固定为\"生成人物卡\"，无需手动输入
 
 ### Example
 ```dart
@@ -296,7 +297,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -310,7 +311,7 @@ No authorization required
 
 Generate Scene Images
 
-生成场面绘制图片  - **chapters_content**: 章节内容 - **task_id**: 任务标识符 - **roles**: 角色信息 - **num**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选）  返回任务ID，可通过后续接口查询和获取图片
+生成场面绘制图片  - **chapters_content**: 章节内容 - **task_id**: 任务标识符 - **roles**: 角色信息 - **num**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型）  返回任务ID，可通过后续接口查询和获取图片
 
 ### Example
 ```dart
@@ -341,7 +342,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -355,7 +356,7 @@ No authorization required
 
 Generate Video From Image
 
-生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
+生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
 
 ### Example
 ```dart
@@ -386,54 +387,11 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
  - **Content-Type**: application/json
- - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **getAvailableModelsApiRoleCardModelsGet**
-> JsonObject getAvailableModelsApiRoleCardModelsGet(X_API_TOKEN)
-
-Get Available Models
-
-获取可用的工作流模型列表
-
-### Example
-```dart
-import 'package:novel_api/api.dart';
-
-final api = NovelApi().getDefaultApi();
-final String X_API_TOKEN = X_API_TOKEN_example; // String | 
-
-try {
-    final response = api.getAvailableModelsApiRoleCardModelsGet(X_API_TOKEN);
-    print(response);
-} catch on DioException (e) {
-    print('Exception when calling DefaultApi->getAvailableModelsApiRoleCardModelsGet: $e\n');
-}
-```
-
-### Parameters
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **X_API_TOKEN** | **String**|  | [optional] 
-
-### Return type
-
-[**JsonObject**](JsonObject.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
- - **Content-Type**: Not defined
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
@@ -481,6 +439,49 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **getModelsApiModelsGet**
+> JsonObject getModelsApiModelsGet(X_API_TOKEN)
+
+Get Models
+
+获取所有可用模型，按文生图和图生视频分类
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+final String X_API_TOKEN = X_API_TOKEN_example; // String | 
+
+try {
+    final response = api.getModelsApiModelsGet(X_API_TOKEN);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->getModelsApiModelsGet: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **X_API_TOKEN** | **String**|  | [optional] 
+
+### Return type
+
+[**JsonObject**](JsonObject.md)
+
+### Authorization
+
+[HTTPBearer](../README.md#HTTPBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **getRoleCardGalleryApiRoleCardGalleryRoleIdGet**
 > RoleGalleryResponse getRoleCardGalleryApiRoleCardGalleryRoleIdGet(roleId, X_API_TOKEN)
 
@@ -517,7 +518,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -562,7 +563,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -607,7 +608,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -650,7 +651,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -738,7 +739,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -818,7 +819,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -869,7 +870,7 @@ No authorization required
 
 Regenerate Scene Images
 
-基于现有任务重新生成场面图片  - **task_id**: 原始任务ID - **count**: 生成图片数量 - **model**: 指定使用的模型名称（可选，会使用原始任务的模型）
+基于现有任务重新生成场面图片  - **task_id**: 原始任务ID - **count**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
 
 ### Example
 ```dart
@@ -900,7 +901,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -914,7 +915,7 @@ No authorization required
 
 Regenerate Similar Images
 
-重新生成相似图片  - **img_url**: 参考图片URL - **count**: 生成图片数量 - **model**: 指定使用的模型名称（可选）
+重新生成相似图片  - **img_url**: 参考图片URL - **count**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
 
 ### Example
 ```dart
@@ -945,7 +946,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -988,7 +989,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 
@@ -1035,6 +1036,45 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
+[HTTPBearer](../README.md#HTTPBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **securityCheckSecurityCheckGet**
+> BuiltMap<String, JsonObject> securityCheckSecurityCheckGet()
+
+Security Check
+
+安全配置检查端点，仅在开发环境可用
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+
+try {
+    final response = api.securityCheckSecurityCheckGet();
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->securityCheckSecurityCheckGet: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**BuiltMap&lt;String, JsonObject&gt;**](JsonObject.md)
+
+### Authorization
+
 No authorization required
 
 ### HTTP request headers
@@ -1078,7 +1118,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[HTTPBearer](../README.md#HTTPBearer)
 
 ### HTTP request headers
 

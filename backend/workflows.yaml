@@ -5,13 +5,11 @@ t2i:
   - title: "动漫风"
     path: "./comfyui_json/text2img/t2i_704x1408.json"
     description: "用于生成角色卡的标准文生图工作流"
-    model_type: "character"
 
 i2v:
   - title: "视频生成"
     path: "./comfyui_json/img2video/i2v.json"
     description: "图片转视频工作流"
-    model_type: "video"
 
 # 全局配置
 settings:

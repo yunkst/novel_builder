@@ -143,7 +143,7 @@ class RoleCardGenerateRequest(BaseModel):
 
     role_id: str = Field(..., description="人物卡ID")
     roles: list[RoleInfo] = Field(..., description="人物卡设定信息列表")
-    model: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
 
 
 class RoleImageInfo(BaseModel):
@@ -173,7 +173,7 @@ class RoleRegenerateRequest(BaseModel):
 
     img_url: str = Field(..., description="参考图片URL")
     count: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
 
 
 class RoleGenerateResponse(BaseModel):
@@ -335,7 +335,7 @@ class SceneRegenerateRequest(BaseModel):
 
     task_id: str = Field(..., description="原始任务ID")
     count: int = Field(..., ge=1, le=20, description="生成图片数量")
-    model: str | None = Field(None, description="指定使用的模型名称（可选）")
+    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
 
 
 class SceneRegenerateResponse(BaseModel):
@@ -356,7 +356,7 @@ class ImageToVideoRequest(BaseModel):
 
     img_name: str = Field(..., description="图片名称")
     user_input: str = Field(..., description="用户要求")
-    model_name: str = Field(..., description="图生视频模型名称")
+    model_name: str | None = Field(None, description="图生视频模型名称（可选，不填则使用默认模型）")
 
 
 class ImageToVideoResponse(BaseModel):

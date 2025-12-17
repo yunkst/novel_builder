@@ -1505,6 +1505,26 @@ class DatabaseService {
 
   // 删除了 getSceneIllustrationByParagraph 方法，不再使用 paragraph_index
 
+  /// 获取分页的场景插图列表
+  Future<List<SceneIllustration>> getSceneIllustrationsPaginated({
+    required int page,
+    required int limit,
+  }) async {
+    final db = await database;
+    final offset = (page - 1) * limit;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'scene_illustrations',
+      orderBy: 'created_at DESC',
+      limit: limit,
+      offset: offset,
+    );
+
+    return List.generate(maps.length, (i) {
+      return SceneIllustration.fromMap(maps[i]);
+    });
+  }
+
   /// 删除场景插图记录
   Future<int> deleteSceneIllustration(int id) async {
     final db = await database;

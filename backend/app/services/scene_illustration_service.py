@@ -93,12 +93,23 @@ class SceneIllustrationService:
             ValueError: 当请求参数无效时
         """
         try:
-            # 验证model_name是否有效
-            available_models = [wf["title"] for wf in workflow_config_manager.list_t2i_workflows()]
-            if request.model_name not in available_models:
-                raise ValueError(f"无效的model_name '{request.model_name}'，可用模型: {', '.join(available_models)}")
+            # 获取默认模型和处理model_name验证
+            from ..workflow_config import WorkflowType
+            workflows_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+            available_models = [wf.title for wf in workflows_response.workflows]
+            default_model = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
 
-            logger.info(f"验证model_name '{request.model_name}' 有效")
+            # 处理model_name，实现智能默认值替换
+            model_name = request.model_name
+            if model_name:
+                if model_name not in available_models:
+                    logger.warning(f"指定的model_name '{model_name}' 不在可用模型列表中，将使用默认模型: {default_model.title}")
+                    model_name = default_model.title
+                else:
+                    logger.info(f"使用指定的model_name '{model_name}'")
+            else:
+                model_name = default_model.title
+                logger.info(f"未指定model_name，使用默认模型: {default_model.title}")
 
             # 检查是否已存在相同task_id的任务
             existing_task = db.query(SceneIllustrationTask).filter(
@@ -127,7 +138,7 @@ class SceneIllustrationService:
                 chapters_content=request.chapters_content,
                 roles=request.to_roles_json(),  # 使用JSON字符串存储
                 num=request.num,
-                model_name=request.model_name,
+                model_name=model_name,  # 使用处理后的model_name
                 generated_images=0
             )
 
@@ -305,8 +316,8 @@ class SceneIllustrationService:
                 logger.info(f"任务 {task_id}: 使用指定模型 {task.model_name}")
                 comfyui_client = create_comfyui_client_for_model(task.model_name)
             else:
-                from ..workflow_config.workflow_config import workflow_config_manager
-                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                from ..workflow_config import WorkflowType, workflow_config_manager
+                default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
                 logger.info(f"任务 {task_id}: 使用默认模型 {default_workflow.title}")
                 comfyui_client = create_comfyui_client_for_model(default_workflow.title)
 
@@ -460,8 +471,8 @@ class SceneIllustrationService:
                 logger.info(f"使用原始任务模型重新生成图片: {original_task.model_name}")
                 comfyui_client = create_comfyui_client_for_model(original_task.model_name)
             else:
-                from ..workflow_config.workflow_config import workflow_config_manager
-                default_workflow = workflow_config_manager.get_default_t2i_workflow()
+                from ..workflow_config import WorkflowType, workflow_config_manager
+                default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
                 logger.info(f"使用默认模型重新生成图片: {default_workflow.title}")
                 comfyui_client = create_comfyui_client_for_model(default_workflow.title)
 

@@ -6,7 +6,7 @@ import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
-import '../screens/reader_screen.dart';
+import 'reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
 

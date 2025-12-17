@@ -34,6 +34,12 @@ class ApiServiceWrapper {
   late Serializers _serializers;
 
   bool _initialized = false;
+
+  /// 提供对底层 DefaultApi 实例的访问
+  DefaultApi get defaultApi {
+    _ensureInitialized();
+    return _api;
+  }
   DateTime? _lastInitTime;
   int _lastErrorCount = 0;
   DateTime? _lastErrorTime;
