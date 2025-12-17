@@ -5,13 +5,12 @@
 使用网络请求抽象层，专注于业务逻辑实现
 """
 
-import asyncio
 import re
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base_crawler import BaseCrawler
-from .http_client import RequestConfig, RequestStrategy
+from .http_client import RequestStrategy
 
 
 class WdscwCrawlerRefactored(BaseCrawler):
@@ -41,11 +40,11 @@ class WdscwCrawlerRefactored(BaseCrawler):
         # 搜索引擎配置
         self.search_base_url = "https://www.sososhu.com"
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             # 使用5dscw的内部搜索功能，跳转到外部搜索结果页
-            from urllib.parse import urlencode, quote
+            from urllib.parse import quote
             encoded_keyword = quote(keyword)
             search_url = f"https://www.sososhu.com/?q={encoded_keyword}&site=5dscw"
 
@@ -120,7 +119,7 @@ class WdscwCrawlerRefactored(BaseCrawler):
             print(f"搜索小说失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             response = await self.get_page(novel_url, custom_headers=self.custom_headers, timeout=30)
@@ -131,7 +130,7 @@ class WdscwCrawlerRefactored(BaseCrawler):
 
             # 提取小说标题
             title_elem = soup.find('h1')
-            novel_title = title_elem.get_text(strip=True) if title_elem else "未知标题"
+            title_elem.get_text(strip=True) if title_elem else "未知标题"
 
             # 查找章节列表
             chapters = []
@@ -217,7 +216,7 @@ class WdscwCrawlerRefactored(BaseCrawler):
             print(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             all_content = []
@@ -289,9 +288,7 @@ class WdscwCrawlerRefactored(BaseCrawler):
                 if next_page_link:
                     # 检查是否还在同一章节
                     next_chapter_id = next_page_link.split("/")[-1].split(".")[0].split("_")[0]
-                    if next_chapter_id != current_chapter_id:
-                        next_page_link = None
-                    elif next_page_link == current_url:
+                    if next_chapter_id != current_chapter_id or next_page_link == current_url:
                         next_page_link = None
 
                 if not next_page_link:

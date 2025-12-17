@@ -7,12 +7,12 @@ Dify工作流API客户端服务.
 import json
 import logging
 import os
-from typing import Dict, Any, List, Optional, Union
+from typing import Any
 
 import requests
 from requests.exceptions import RequestException, Timeout
 
-from ..schemas import DifyPhotoResult, RoleInfo
+from ..schemas import RoleInfo
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class DifyClient:
             "Content-Type": "application/json"
         }
 
-    async def generate_prompts(self, novel_content: str, roles: Optional[Dict[str, Any]] = None,
-                             require: str = "") -> List[str]:
+    async def generate_prompts(self, novel_content: str, roles: dict[str, Any] | None = None,
+                             require: str = "") -> list[str]:
         """生成图片提示词.
 
         Args:
@@ -90,7 +90,7 @@ class DifyClient:
             logger.error(f"Dify工作流调用失败: {e}")
             return []
 
-    def _parse_dify_response(self, response_data: Dict[str, Any]) -> List[str]:
+    def _parse_dify_response(self, response_data: dict[str, Any]) -> list[str]:
         """解析Dify工作流返回结果.
 
         Args:
@@ -176,11 +176,11 @@ class DifyClient:
             logger.error(f"Dify健康检查失败: {e}")
             return False
 
-    async def generate_photo_prompts(self, roles: Dict[str, Any]) -> List[str]:
+    async def generate_photo_prompts(self, roles: list[RoleInfo]) -> list[str]:
         """生成人物卡拍照提示词.
 
         Args:
-            roles: 人物卡设定信息
+            roles: 人物卡设定信息列表 (RoleInfo 对象列表)
 
         Returns:
             生成的拍照提示词列表
@@ -231,7 +231,7 @@ class DifyClient:
             logger.error(f"Dify拍照工作流调用失败: {e}")
             return []
 
-    def _parse_photo_response(self, response_data: Dict[str, Any]) -> List[str]:
+    def _parse_photo_response(self, response_data: dict[str, Any]) -> list[str]:
         """解析Dify拍照工作流返回结果.
 
         Args:
@@ -265,7 +265,7 @@ class DifyClient:
                 elif isinstance(content_data, dict):
                     # 如果是字典，尝试提取提示词列表
                     content_list = []
-                    for key, value in content_data.items():
+                    for value in content_data.values():
                         if isinstance(value, str):
                             content_list.append(value)
                         elif isinstance(value, list):
@@ -296,7 +296,7 @@ class DifyClient:
             logger.error(f"解析Dify拍照响应失败: {e}")
             return []
 
-    async def generate_scene_prompts(self, chapters_content: str, roles: Dict[str, Any]) -> Optional[str]:
+    async def generate_scene_prompts(self, chapters_content: str, roles: dict[str, Any]) -> str | None:
         """生成场面绘制提示词.
 
         Args:
@@ -348,7 +348,7 @@ class DifyClient:
             logger.error(f"Dify场面绘制工作流调用失败: {e}")
             return None
 
-    def _parse_scene_response(self, response_data: Dict[str, Any]) -> Optional[str]:
+    def _parse_scene_response(self, response_data: dict[str, Any]) -> str | None:
         """解析Dify场面绘制工作流返回结果.
 
         Args:
@@ -394,7 +394,7 @@ class DifyClient:
             logger.error(f"解析Dify场面绘制响应失败: {e}")
             return None
 
-    def _format_roles_for_ai(self, roles: Union[List[RoleInfo], Dict[str, Any]]) -> str:
+    def _format_roles_for_ai(self, roles: list[RoleInfo] | dict[str, Any]) -> str:
         """将角色信息格式化为便于 AI 阅读的文本格式.
 
         Args:
@@ -492,7 +492,7 @@ class DifyClient:
             }
 
             for field, label in field_mappings.items():
-                if field in roles and roles[field]:
+                if roles.get(field):
                     value = roles[field]
                     # 特殊处理AI绘图提示词
                     if field in ['face_prompts', 'body_prompts']:
@@ -508,7 +508,7 @@ class DifyClient:
             raise TypeError(f"不支持的角色数据类型: {type(roles).__name__}，期望 List[RoleInfo] 或 Dict[str, Any]")
 
 
-  async def generate_video_prompts(self, prompts: str, user_input: str) -> Optional[str]:
+    async def generate_video_prompts(self, prompts: str, user_input: str) -> str | None:
         """生成图生视频提示词.
 
         Args:
@@ -560,7 +560,7 @@ class DifyClient:
             logger.error(f"Dify图生视频工作流调用失败: {e}")
             return None
 
-    def _parse_video_response(self, response_data: Dict[str, Any]) -> Optional[str]:
+    def _parse_video_response(self, response_data: dict[str, Any]) -> str | None:
         """解析Dify图生视频工作流返回结果.
 
         Args:

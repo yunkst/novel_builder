@@ -4,23 +4,24 @@
 提供人物卡图片生成、管理、查询等核心业务逻辑。
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
 
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from ..models.text2img import RoleImageGallery
 from ..schemas import (
-    RoleCardGenerateRequest, RoleGalleryResponse,
-    RoleImageDeleteRequest, RoleRegenerateRequest, RoleGenerateResponse
+    RoleCardGenerateRequest,
+    RoleGalleryResponse,
+    RoleGenerateResponse,
+    RoleImageDeleteRequest,
+    RoleRegenerateRequest,
 )
-from .dify_client import create_dify_client
+from ..workflow_config.workflow_config import workflow_config_manager
 from .comfyui_client import create_comfyui_client_for_model
 from .comfyui_client_v2 import create_comfyui_client_v2
-from ..workflow_config.workflow_config import workflow_config_manager
+from .dify_client import create_dify_client
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class RoleCardService:
             logger.error(f"ComfyUI客户端初始化失败: {e}")
             self.comfyui_client = None
 
-    async def generate_role_images(self, request: RoleCardGenerateRequest, db: Session, model: Optional[str] = None) -> RoleGenerateResponse:
+    async def generate_role_images(self, request: RoleCardGenerateRequest, db: Session, model: str | None = None) -> RoleGenerateResponse:
         """生成人物卡图片.
 
         Args:
@@ -234,7 +235,7 @@ class RoleCardService:
             logger.error(f"删除图片失败: {e}")
             raise
 
-    async def regenerate_similar_images(self, request: RoleRegenerateRequest, db: Session, model: Optional[str] = None) -> RoleGenerateResponse:
+    async def regenerate_similar_images(self, request: RoleRegenerateRequest, db: Session, model: str | None = None) -> RoleGenerateResponse:
         """基于现有图片重新生成相似图片.
 
         Args:
@@ -290,7 +291,7 @@ class RoleCardService:
 
             # 4. 保存新图片到数据库
             saved_count = 0
-            for i, filename in enumerate(image_filenames):
+            for _i, filename in enumerate(image_filenames):
                 try:
                     # 检查是否已存在相同的图片
                     existing_image = db.query(RoleImageGallery).filter(
@@ -348,7 +349,7 @@ class RoleCardService:
             logger.error(f"重新生成相似图片失败: {e}")
             raise
 
-    async def health_check(self) -> Dict[str, bool]:
+    async def health_check(self) -> dict[str, bool]:
         """检查服务健康状态.
 
         Returns:

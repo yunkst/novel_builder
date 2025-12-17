@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
-import 'cache_management_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -40,21 +39,6 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const DifySettingsScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.storage),
-            title: const Text('缓存管理'),
-            subtitle: const Text('查看和管理缓存任务'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CacheManagementScreen(),
                 ),
               );
             },

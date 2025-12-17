@@ -2,12 +2,12 @@
 基于节点标题的通用ComfyUI客户端
 """
 
+import asyncio
 import json
 import logging
 import os
-from typing import Dict, Any, Optional, List
-import asyncio
 from pathlib import Path
+from typing import Any
 
 import requests
 from requests.exceptions import RequestException, Timeout
@@ -37,7 +37,7 @@ class ComfyUIClientTitleBased:
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {self.workflow_path}")
 
-            with open(workflow_file, 'r', encoding='utf-8') as f:
+            with open(workflow_file, encoding='utf-8') as f:
                 self.workflow_json = json.load(f)
 
             logger.info(f"成功加载ComfyUI工作流: {self.workflow_path}")
@@ -46,7 +46,7 @@ class ComfyUIClientTitleBased:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
-    def find_nodes_by_title(self, target_titles: List[str]) -> Dict[str, Dict[str, Any]]:
+    def find_nodes_by_title(self, target_titles: list[str]) -> dict[str, dict[str, Any]]:
         """根据节点标题查找节点.
 
         Args:
@@ -76,7 +76,7 @@ class ComfyUIClientTitleBased:
 
         return matching_nodes
 
-    def prepare_workflow_by_title(self, prompt: str, target_titles: List[str] = None) -> Dict[str, Any]:
+    def prepare_workflow_by_title(self, prompt: str, target_titles: list[str] | None = None) -> dict[str, Any]:
         """根据节点标题准备工作流.
 
         Args:
@@ -102,7 +102,7 @@ class ComfyUIClientTitleBased:
         replaced_count = 0
         for node_id, node_info in matching_nodes.items():
             if "text" in node_info["inputs"]:
-                original_text = workflow_data[node_id]["inputs"]["text"]
+                workflow_data[node_id]["inputs"]["text"]
                 workflow_data[node_id]["inputs"]["text"] = prompt
                 logger.info(f"已替换节点 {node_id} ({node_info['title']})")
                 replaced_count += 1
@@ -110,7 +110,7 @@ class ComfyUIClientTitleBased:
         logger.info(f"总共替换了 {replaced_count} 个节点的提示词")
         return workflow_data
 
-    async def generate_image_by_title(self, prompt: str, target_titles: List[str] = None) -> Optional[str]:
+    async def generate_image_by_title(self, prompt: str, target_titles: list[str] | None = None) -> str | None:
         """根据节点标题生成图片.
 
         Args:
@@ -159,7 +159,7 @@ class ComfyUIClientTitleBased:
             return None
 
     # 保持原有的其他方法...
-    async def check_task_status(self, task_id: str) -> Dict[str, Any]:
+    async def check_task_status(self, task_id: str) -> dict[str, Any]:
         """检查任务状态."""
         try:
             response = requests.get(
@@ -175,7 +175,7 @@ class ComfyUIClientTitleBased:
             logger.error(f"查询任务状态异常: {e}")
             return {}
 
-    async def wait_for_completion(self, task_id: str, timeout: int = 300) -> Optional[List[str]]:
+    async def wait_for_completion(self, task_id: str, timeout: int = 300) -> list[str] | None:
         """等待任务完成并获取生成的图片文件名."""
         start_time = asyncio.get_event_loop().time()
 
@@ -193,7 +193,7 @@ class ComfyUIClientTitleBased:
             if status.get("status_str") == "completed":
                 outputs = task_info.get("outputs", {})
                 images = []
-                for node_id, node_output in outputs.items():
+                for node_output in outputs.values():
                     if "images" in node_output:
                         for image in node_output["images"]:
                             filename = image.get("filename")
@@ -211,7 +211,7 @@ class ComfyUIClientTitleBased:
         """获取图片访问URL."""
         return f"{self.base_url}/view?filename={filename}"
 
-    async def get_image_data(self, filename: str) -> Optional[bytes]:
+    async def get_image_data(self, filename: str) -> bytes | None:
         """获取图片二进制数据."""
         try:
             response = requests.get(
@@ -236,7 +236,7 @@ class ComfyUIClientTitleBased:
             logger.error(f"ComfyUI健康检查失败: {e}")
             return False
 
-    def analyze_workflow(self) -> Dict[str, Any]:
+    def analyze_workflow(self) -> dict[str, Any]:
         """分析工作流结构."""
         if not self.workflow_json:
             return {"error": "工作流未加载"}

@@ -5,10 +5,9 @@
 使用网络请求抽象层，专注于业务逻辑实现
 """
 
-import asyncio
 import re
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any
 
 from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
@@ -46,11 +45,11 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ]
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             # 构建搜索请求配置
-            config = RequestConfig(
+            RequestConfig(
                 timeout=30,  # AliceSW响应较慢
                 max_retries=3,
                 strategy=RequestStrategy.HYBRID,  # 优先使用Playwright
@@ -72,14 +71,14 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return novels[:20]  # 限制返回数量
 
         except Exception as e:
-            print(f"AliceSW搜索失败: {str(e)}")
+            print(f"AliceSW搜索失败: {e!s}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=15,
                 max_retries=3,
                 strategy=RequestStrategy.HYBRID,
@@ -106,14 +105,14 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"AliceSW获取章节列表失败: {str(e)}")
+            print(f"AliceSW获取章节列表失败: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=15,
                 max_retries=3,
                 strategy=RequestStrategy.HYBRID,
@@ -137,12 +136,12 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return {"title": title, "content": content}
 
         except Exception as e:
-            print(f"AliceSW获取章节内容失败: {str(e)}")
-            return {"title": "章节内容", "content": f"获取失败: {str(e)}"}
+            print(f"AliceSW获取章节内容失败: {e!s}")
+            return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     # ==================== AliceSW专用提取方法 ====================
 
-    def _extract_alice_sw_search_results(self, soup, keyword: str) -> List[Dict[str, Any]]:
+    def _extract_alice_sw_search_results(self, soup, keyword: str) -> list[dict[str, Any]]:
         """提取AliceSW搜索结果"""
         novels = []
 
@@ -239,7 +238,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             links = soup.find_all(tag_name, attrs)
             for link in links:
                 href = link.get("href", "")
-                text = link.get_text().strip()
+                link.get_text().strip()
 
                 if href and not href.startswith("javascript"):
                     full_url = urllib.parse.urljoin(self.base_url, href)
@@ -260,7 +259,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
 
         return None
 
-    def _extract_alice_sw_chapters_from_list_page(self, soup, chapter_list_url: str) -> List[Dict[str, Any]]:
+    def _extract_alice_sw_chapters_from_list_page(self, soup, chapter_list_url: str) -> list[dict[str, Any]]:
         """从章节列表页面提取章节"""
         chapters = []
 
@@ -335,7 +334,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
 
         return unique_chapters
 
-    def _extract_alice_sw_chapters(self, soup, novel_url: str) -> List[Dict[str, Any]]:
+    def _extract_alice_sw_chapters(self, soup, novel_url: str) -> list[dict[str, Any]]:
         """提取AliceSW章节列表 - 基于实际HTML结构"""
         chapters = []
 

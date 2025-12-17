@@ -4,10 +4,8 @@
 本章包含用于章节场面绘制任务和图片管理的数据模型。
 """
 
-from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 
 from ..database import Base

@@ -6,13 +6,11 @@ This module contains database models for managing cache tasks and chapter storag
 """
 
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-Base: Any = declarative_base()
+from ..database import Base
 
 
 class CacheTask(Base):

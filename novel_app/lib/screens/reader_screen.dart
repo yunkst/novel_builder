@@ -16,10 +16,11 @@ import '../widgets/highlighted_text.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/scene_image_preview.dart';
-import '../widgets/scene_gallery_dialog.dart';
 import '../widgets/scene_illustration_dialog.dart';
+import '../widgets/video_input_dialog.dart';
 import '../utils/character_matcher.dart';
 import '../utils/media_markup_parser.dart';
+import '../utils/video_generation_state_manager.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -246,7 +247,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                       Navigator.pop(context);
                       final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
                       if (markup.isIllustration) {
-                        _showIllustrationGalleryByTaskId(markup.id);
+                        _generateVideoFromIllustration(markup.id);
                       }
                     },
                   ),
@@ -575,7 +576,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             await _databaseService.getCachedChapter(chapter.url);
         if (cachedContent != null) {
           _preloadedChapterUrls.add(chapter.url);
-          debugPrint('章节已存在，标记为已预加载: ${chapter.title}');
           continue;
         }
 
@@ -3009,7 +3009,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             onPanEnd: (_) => _handleTouchEnd(),
             child: SceneImagePreview(
               taskId: taskId, // 使用 taskId 而非 illustration
-              onImageTap: () => _showIllustrationGalleryByTaskId(taskId),
+              onImageTap: (String taskId, String imageUrl, int imageIndex) => _generateVideoFromSpecificImage(taskId, imageUrl, imageIndex),
               onDelete: () => _deleteIllustrationByTaskId(taskId),
               onImageDeleted: () {
                 // 单张图片删除成功后，可以选择性刷新
@@ -3043,8 +3043,8 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     );
   }
 
-  /// 通过 taskId 显示插图画廊
-  Future<void> _showIllustrationGalleryByTaskId(String taskId) async {
+  /// 通过 taskId 直接生成视频
+  Future<void> _generateVideoFromIllustration(String taskId) async {
     try {
       // 根据 taskId 获取插图信息
       final illustrations = await _databaseService.getSceneIllustrationsByChapter(
@@ -3057,41 +3057,136 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         orElse: () => throw Exception('插图不存在'),
       );
 
-      if (illustration.images.isNotEmpty) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => SceneGalleryDialog(
-              taskId: taskId,
-              images: illustration.images,
-              novelUrl: widget.novel.url,
-              chapterId: _currentChapter.url,
-              onRefresh: () async {
-                await _sceneIllustrationService.refreshChapterIllustrations(
-                  widget.novel.url,
-                  _currentChapter.url,
-                );
-                if (mounted) setState(() {});
-              },
-            ),
-          );
-        }
-      } else {
-        debugPrint('插图为空，taskId: $taskId');
+      if (illustration.images.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('图片正在生成中，请稍后查看')),
           );
         }
+        return;
       }
+
+      // 获取第一张图片的文件名
+      final firstImageUrl = illustration.images.first;
+      final fileName = firstImageUrl.split('/').last;
+
+      // 显示视频输入对话框
+      if (!mounted) return;
+      final userInput = await VideoInputDialog.show(context);
+      if (userInput == null || userInput.isEmpty || !mounted) {
+        return; // 用户取消、未输入或widget已销毁
+      }
+
+      // 显示加载提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在创建视频生成任务...'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+
+      // 调用API生成视频
+      final response = await _apiService.generateVideoFromImage(
+        imgName: fileName,
+        userInput: userInput,
+        modelName: '',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('查看插图失败: $e')),
+          SnackBar(content: Text('生成视频失败: $e')),
         );
       }
     }
   }
+
+  /// 为特定图片生成视频
+  Future<void> _generateVideoFromSpecificImage(String taskId, String imageUrl, int imageIndex) async {
+    try {
+      // 检查图片是否正在生成视频
+      if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('该图片正在生成视频，请稍后再试'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 从imageUrl中提取文件名
+      final fileName = imageUrl.split('/').last;
+
+      // 显示视频输入对话框
+      if (!mounted) return;
+      final userInput = await VideoInputDialog.show(context);
+      if (userInput == null || userInput.isEmpty || !mounted) {
+        return; // 用户取消、未输入或widget已销毁
+      }
+
+      // 设置生成状态
+      _setImageGeneratingStatus(imageUrl, true);
+
+      // 显示加载提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在为选中图片创建视频生成任务...'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+
+      // 调用API生成视频
+      final response = await _apiService.generateVideoFromImage(
+        imgName: fileName,
+        userInput: userInput,
+        modelName: '', // 使用空字符串
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+    } catch (e) {
+      // 清除生成状态
+      _setImageGeneratingStatus(imageUrl, false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('生成视频失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 设置图片生成状态 - 通过状态管理器设置全局状态
+  void _setImageGeneratingStatus(String imageUrl, bool isGenerating) {
+    // 通过视频生成状态管理器设置全局状态
+    VideoGenerationStateManager.setImageGenerating(imageUrl, isGenerating);
+  }
+
 
   /// 通过 taskId 删除插图
   Future<void> _deleteIllustrationByTaskId(String taskId) async {

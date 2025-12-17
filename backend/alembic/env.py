@@ -13,6 +13,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.config import settings
 from app.database import Base
 
+# 导入所有模型以确保autogenerate能检测到所有表
+from app.models.cache import CacheTask, ChapterCache
+from app.models.scene_illustration import SceneIllustrationTask, SceneImageGallery
+from app.models.text2img import RoleImageGallery, RoleCardTask
+from app.models.video_status import ImageVideoStatus
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

@@ -1,0 +1,87 @@
+# Debug version of Dockerfile with remote debugging support
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Configure apt to use Aliyun mirror for faster downloads
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
+
+# Install system dependencies for development and debugging
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    wget \
+    gdb \
+    strace \
+    netcat-openbsd \
+    vim \
+    # Playwright browser dependencies (minimal working set)
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libxss1 \
+    libgtk-3-0 \
+    # Additional libraries that are commonly available
+    libglib2.0-0 \
+    libdbus-1-3 \
+    libx11-6 \
+    libxcb1 \
+    libxext6 \
+    libxrender1 \
+    libxi6 \
+    libxcursor1 \
+    libxinerama1 \
+    libxtst6 \
+    libxt6 \
+    libpng16-16 \
+    libjpeg62-turbo \
+    libtiff6 \
+    # Font support
+    fonts-liberation \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Configure PyPI to use Aliyun mirror
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+# Install debugpy for remote debugging
+RUN pip install debugpy
+
+# Copy configuration files
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir -e .[dev]
+
+# Copy application code
+COPY ./app ./app
+
+# Copy alembic config
+COPY ./alembic.ini ./
+COPY ./alembic ./alembic
+
+# Install Playwright browsers and system dependencies
+RUN python -m playwright install chromium
+RUN python -m playwright install-deps chromium
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000 5678
+
+# Start the application in debug mode
+CMD ["sh", "-c", "if [ \"$DEBUG_WAIT\" = \"true\" ]; then echo \"Waiting for debugger to attach...\" && python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; else echo \"Starting in debug mode (no wait)\" && python -m debugpy --listen 0.0.0.0:5678 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; fi"]

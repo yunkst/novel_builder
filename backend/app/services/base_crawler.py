@@ -5,11 +5,10 @@
 使用抽象网络请求层的爬虫基类，爬虫开发者只需要关注业务逻辑
 """
 
-import asyncio
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .http_client import (
     RequestConfig,
@@ -17,7 +16,7 @@ from .http_client import (
     Response,
     get_http_client,
     http_get,
-    http_post
+    http_post,
 )
 
 
@@ -30,17 +29,17 @@ class BaseCrawler(ABC):
         self.http_client = get_http_client(strategy)
 
     @abstractmethod
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说 - 必须实现"""
         pass
 
     @abstractmethod
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表 - 必须实现"""
         pass
 
     @abstractmethod
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容 - 必须实现"""
         pass
 
@@ -57,7 +56,7 @@ class BaseCrawler(ABC):
         )
         return await http_get(url, config)
 
-    async def post_form(self, url: str, data: Dict[str, str],
+    async def post_form(self, url: str, data: dict[str, str],
                        timeout: int = 10, max_retries: int = 3, **kwargs) -> Response:
         """提交表单的通用方法"""
         config = RequestConfig(
@@ -80,7 +79,7 @@ class BaseCrawler(ABC):
 
         return text
 
-    def extract_novel_info(self, soup, keyword: str = "") -> List[Dict[str, Any]]:
+    def extract_novel_info(self, soup, keyword: str = "") -> list[dict[str, Any]]:
         """通用的小说信息提取方法"""
         novels = []
 
@@ -132,7 +131,7 @@ class BaseCrawler(ABC):
 
         return unique_novels
 
-    def extract_chapters(self, soup, base_url: str) -> List[Dict[str, Any]]:
+    def extract_chapters(self, soup, base_url: str) -> list[dict[str, Any]]:
         """通用的章节列表提取方法"""
         chapters = []
 
@@ -351,7 +350,7 @@ class BaseCrawler(ABC):
             r'\d+\.+.*'  # 数字开头的标题
         ]
 
-        title_lower = title.lower()
+        title.lower()
 
         # 检查是否包含章节关键词
         if any(re.search(pattern, title) for pattern in chapter_patterns):
@@ -363,10 +362,7 @@ class BaseCrawler(ABC):
             return True
 
         # 检查是否以"第"开头
-        if title.startswith('第'):
-            return True
-
-        return False
+        return bool(title.startswith('第'))
 
 
 # ==================== 使用示例 ====================
@@ -377,7 +373,7 @@ class ExampleCrawler(BaseCrawler):
     def __init__(self):
         super().__init__("https://www.example.com", RequestStrategy.HYBRID)
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说 - 只需要关注业务逻辑"""
         try:
             # 发送搜索请求 - 不需要关心底层实现
@@ -393,7 +389,7 @@ class ExampleCrawler(BaseCrawler):
             print(f"搜索失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表 - 只需要关注业务逻辑"""
         try:
             # 获取页面 - 不需要关心底层实现
@@ -408,7 +404,7 @@ class ExampleCrawler(BaseCrawler):
             print(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容 - 只需要关注业务逻辑"""
         try:
             # 获取页面 - 不需要关心底层实现
@@ -428,4 +424,4 @@ class ExampleCrawler(BaseCrawler):
 
         except Exception as e:
             print(f"获取章节内容失败: {e}")
-            return {"title": "章节内容", "content": f"获取失败: {str(e)}"}
+            return {"title": "章节内容", "content": f"获取失败: {e!s}"}

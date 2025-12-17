@@ -5,17 +5,18 @@ ComfyUI API客户端服务.
 支持基于YAML配置的多工作流动态选择。
 """
 
+import asyncio
+import base64
 import json
 import logging
+import os
 import random
-import base64
-from typing import Dict, Any, Optional, List, Union
 from enum import Enum
-import asyncio
 from pathlib import Path
+from typing import Any
 
 import requests
-from requests.exceptions import RequestException, Timeout
+from requests.exceptions import RequestException
 
 from ..workflow_config.workflow_config import workflow_config_manager
 
@@ -71,7 +72,7 @@ class ComfyUIClient:
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {full_path}")
 
-            with open(workflow_file, 'r', encoding='utf-8') as f:
+            with open(workflow_file, encoding='utf-8') as f:
                 self.workflow_json = json.load(f)
 
             logger.info(f"成功加载ComfyUI工作流: {full_path}")
@@ -80,7 +81,7 @@ class ComfyUIClient:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
-    async def generate_image(self, prompt: str) -> Optional[str]:
+    async def generate_image(self, prompt: str) -> str | None:
         """生成图片.
 
         Args:
@@ -124,7 +125,7 @@ class ComfyUIClient:
             logger.error(f"ComfyUI图片生成失败: {e}")
             return None
 
-    async def generate_images_batch(self, prompts: List[str]) -> Optional[List[str]]:
+    async def generate_images_batch(self, prompts: list[str]) -> list[str] | None:
         """批量生成图片.
 
         Args:
@@ -167,7 +168,7 @@ class ComfyUIClient:
         logger.info(f"批量图片生成完成，共生成 {len(image_filenames)} 张图片")
         return image_filenames
 
-    async def check_task_status(self, task_id: str) -> Dict[str, Any]:
+    async def check_task_status(self, task_id: str) -> dict[str, Any]:
         """检查任务状态.
 
         Args:
@@ -193,7 +194,7 @@ class ComfyUIClient:
             logger.error(f"查询任务状态异常: {e}")
             return {}
 
-    async def wait_for_completion(self, task_id: str) -> Optional[List[MediaFileResult]]:
+    async def wait_for_completion(self, task_id: str) -> list[MediaFileResult] | None:
         """等待任务完成并获取生成的媒体文件名（支持图片和视频）.
 
         Args:
@@ -219,7 +220,7 @@ class ComfyUIClient:
                 media_files = []
 
                 # 遍历输出节点查找图片和视频
-                for node_id, node_output in outputs.items():
+                for node_output in outputs.values():
                     # 处理图片文件
                     if "images" in node_output:
                         for image in node_output["images"]:
@@ -273,7 +274,7 @@ class ComfyUIClient:
         """
         return self.get_media_url(filename)
 
-    async def get_media_data(self, filename: str) -> Optional[bytes]:
+    async def get_media_data(self, filename: str) -> bytes | None:
         """获取媒体文件二进制数据（支持图片和视频）.
 
         Args:
@@ -298,7 +299,7 @@ class ComfyUIClient:
             logger.error(f"获取媒体文件异常: {e}")
             return None
 
-    async def get_image_data(self, filename: str) -> Optional[bytes]:
+    async def get_image_data(self, filename: str) -> bytes | None:
         """获取图片二进制数据（保持向后兼容）.
 
         Args:
@@ -309,7 +310,7 @@ class ComfyUIClient:
         """
         return await self.get_media_data(filename)
 
-    async def generate_video(self, prompt: str, image_data: bytes, image_filename: str = "input_image.png") -> Optional[str]:
+    async def generate_video(self, prompt: str, image_data: bytes, image_filename: str = "input_image.png") -> str | None:
         """生成视频（图生视频）.
 
         Args:
@@ -373,7 +374,7 @@ class ComfyUIClient:
             logger.error(f"ComfyUI视频生成失败: {e}")
             return None
 
-    def _prepare_workflow(self, prompt: str, image_base64: Optional[str] = None) -> str:
+    def _prepare_workflow(self, prompt: str, image_base64: str | None = None) -> str:
         """准备ComfyUI工作流数据 - 使用固定字符串替换模式.
 
         Args:
@@ -464,7 +465,7 @@ class ComfyUIClient:
             return False
 
 
-def create_comfyui_client(workflow_path: Optional[str] = None, model_title: Optional[str] = None,
+def create_comfyui_client(workflow_path: str | None = None, model_title: str | None = None,
                          workflow_type: str = "t2i") -> ComfyUIClient:
     """创建ComfyUI客户端实例.
 
@@ -476,7 +477,7 @@ def create_comfyui_client(workflow_path: Optional[str] = None, model_title: Opti
     Returns:
         ComfyUI客户端实例
     """
-    base_url = "http://host.docker.internal:8000"  # 固定的ComfyUI服务地址
+    base_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")  # 固定的ComfyUI服务地址
 
     # 根据参数确定工作流路径
     if workflow_path is None and model_title is not None:
@@ -520,7 +521,7 @@ def create_comfyui_client_for_model(model_title: str, workflow_type: str = "t2i"
     return create_comfyui_client(model_title=model_title, workflow_type=workflow_type)
 
 
-def create_t2i_client(model_title: Optional[str] = None) -> ComfyUIClient:
+def create_t2i_client(model_title: str | None = None) -> ComfyUIClient:
     """创建文生图客户端实例.
 
     Args:
@@ -532,7 +533,7 @@ def create_t2i_client(model_title: Optional[str] = None) -> ComfyUIClient:
     return create_comfyui_client(model_title=model_title, workflow_type="t2i")
 
 
-def create_i2v_client(model_title: Optional[str] = None) -> ComfyUIClient:
+def create_i2v_client(model_title: str | None = None) -> ComfyUIClient:
     """创建图生视频客户端实例.
 
     Args:

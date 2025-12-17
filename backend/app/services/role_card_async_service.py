@@ -5,22 +5,19 @@
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
+
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from ..models.text2img import RoleCardTask, RoleImageGallery
 from ..schemas import (
-    RoleCardGenerateRequest, RoleCardTaskCreateResponse,
-    RoleCardTaskStatusResponse
+    RoleCardGenerateRequest,
+    RoleCardTaskCreateResponse,
+    RoleCardTaskStatusResponse,
 )
 from .role_card_service import role_card_service
-from .dify_client import DifyClient
-from .comfyui_client_v2 import ComfyUIClientV2
-from .comfyui_client import MediaFileResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +27,7 @@ class RoleCardAsyncService:
 
     def __init__(self):
         """初始化异步任务服务."""
-        self.running_tasks: Dict[int, asyncio.Task] = {}
+        self.running_tasks: dict[int, asyncio.Task] = {}
         self.task_lock = asyncio.Lock()
 
     async def create_task(
@@ -52,8 +49,8 @@ class RoleCardAsyncService:
             task_record = RoleCardTask(
                 role_id=request.role_id,
                 status="pending",
-                roles=request.roles,
-                user_input=request.user_input,
+                roles=[role.to_dict() for role in request.roles],
+                user_input="生成人物卡",
                 model=request.model,  # 保存模型信息
                 total_prompts=0,
                 generated_images=0
@@ -87,7 +84,7 @@ class RoleCardAsyncService:
         self,
         task_id: int,
         db: Session
-    ) -> Optional[RoleCardTaskStatusResponse]:
+    ) -> RoleCardTaskStatusResponse | None:
         """获取任务状态.
 
         Args:
@@ -202,8 +199,8 @@ class RoleCardAsyncService:
             model_name = task.model if task else None
 
             # 创建对应的ComfyUI客户端
-            from .comfyui_client import create_comfyui_client_for_model
             from ..workflow_config.workflow_config import workflow_config_manager
+            from .comfyui_client import create_comfyui_client_for_model
 
             if model_name:
                 logger.info(f"任务 {task_id}: 使用指定模型 {model_name}")
@@ -271,7 +268,7 @@ class RoleCardAsyncService:
                     saved_count += 1
 
                     # 更新进度
-                    progress = int((i + 1) / len(image_filenames) * 100)
+                    int((i + 1) / len(image_filenames) * 100)
                     await self._update_task_progress(db, task_id, generated_images=i + 1)
 
                 except Exception as e:
@@ -361,9 +358,7 @@ class RoleCardAsyncService:
         """
         if task.status == "completed":
             return 100.0
-        elif task.status == "failed":
-            return 0.0
-        elif task.status == "pending":
+        elif task.status == "failed" or task.status == "pending":
             return 0.0
         elif task.status == "running":
             # 基于提示词和图片生成进度计算

@@ -8,7 +8,7 @@ https://www.wodeshucheng.net/
 
 import re
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -24,7 +24,7 @@ class WodeshuchengCrawler(BaseCrawler):
         self.name = "我的书城"
         self.site_id = "wodeshucheng"
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """
         搜索小说
         由于原网站搜索功能跳转到外部，使用分类页面作为替代方案
@@ -113,7 +113,7 @@ class WodeshuchengCrawler(BaseCrawler):
             print(f"搜索小说失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 获取小说详情页
@@ -170,13 +170,13 @@ class WodeshuchengCrawler(BaseCrawler):
             print(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 获取章节页面
             response = await self.get_page(chapter_url)
             if not response.success:
-                return {"title": "章节内容", "content": f"获取失败: 无法访问页面"}
+                return {"title": "章节内容", "content": "获取失败: 无法访问页面"}
 
             soup = response.soup()
 
@@ -233,11 +233,11 @@ class WodeshuchengCrawler(BaseCrawler):
 
         except Exception as e:
             print(f"获取章节内容失败: {e}")
-            return {"title": "章节内容", "content": f"获取失败: {str(e)}"}
+            return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     # ==================== 私有辅助方法 ====================
 
-    def _extract_novels_from_category(self, soup: BeautifulSoup, keyword: str) -> List[Dict[str, Any]]:
+    def _extract_novels_from_category(self, soup: BeautifulSoup, keyword: str) -> list[dict[str, Any]]:
         """从分类页面提取小说信息"""
         novels = []
 

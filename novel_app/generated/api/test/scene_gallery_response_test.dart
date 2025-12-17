@@ -1,0 +1,23 @@
+import 'package:test/test.dart';
+import 'package:novel_api/novel_api.dart';
+
+// tests for SceneGalleryResponse
+void main() {
+  final instance = SceneGalleryResponseBuilder();
+  // TODO add properties to the builder and call build()
+
+  group(SceneGalleryResponse, () {
+    // 场面绘制任务ID
+    // String taskId
+    test('to test the property `taskId`', () async {
+      // TODO
+    });
+
+    // 图片文件名列表
+    // BuiltList<String> images
+    test('to test the property `images`', () async {
+      // TODO
+    });
+
+  });
+}

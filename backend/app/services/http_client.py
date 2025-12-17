@@ -7,12 +7,10 @@
 
 import asyncio
 import os
-import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
 
 import requests
 from bs4 import BeautifulSoup
@@ -33,16 +31,16 @@ class RequestConfig:
     max_retries: int = 3
     retry_delay: float = 1.0
     strategy: RequestStrategy = RequestStrategy.SIMPLE
-    headers: Optional[Dict[str, str]] = None
-    proxy: Optional[str] = None
+    headers: dict[str, str] | None = None
+    proxy: str | None = None
     use_session: bool = True
     respect_robots_txt: bool = False
     # SSL配置
     verify_ssl: bool = True
     # 自定义浏览器参数（Playwright使用）
-    browser_args: Optional[List[str]] = None
+    browser_args: list[str] | None = None
     # 自定义请求头
-    custom_headers: Optional[Dict[str, str]] = None
+    custom_headers: dict[str, str] | None = None
 
 
 @dataclass
@@ -50,10 +48,10 @@ class Response:
     """统一响应格式"""
     url: str
     status_code: int
-    headers: Dict[str, str]
+    headers: dict[str, str]
     content: str
     encoding: str
-    cookies: Dict[str, str]
+    cookies: dict[str, str]
     elapsed: float  # 请求耗时(秒)
     strategy_used: RequestStrategy
     from_cache: bool = False
@@ -67,18 +65,18 @@ class IHttpClient(ABC):
     """HTTP客户端抽象接口"""
 
     @abstractmethod
-    async def get(self, url: str, config: Optional[RequestConfig] = None) -> Response:
+    async def get(self, url: str, config: RequestConfig | None = None) -> Response:
         """发送GET请求"""
         pass
 
     @abstractmethod
-    async def post(self, url: str, data: Optional[Dict] = None,
-                  config: Optional[RequestConfig] = None) -> Response:
+    async def post(self, url: str, data: dict | None = None,
+                  config: RequestConfig | None = None) -> Response:
         """发送POST请求"""
         pass
 
     @abstractmethod
-    def set_cookies(self, cookies: Dict[str, str]) -> None:
+    def set_cookies(self, cookies: dict[str, str]) -> None:
         """设置Cookie"""
         pass
 
@@ -93,7 +91,7 @@ class RequestsClient(IHttpClient):
 
     def __init__(self):
         self.session = requests.Session()
-        self._cache: Dict[str, Response] = {}
+        self._cache: dict[str, Response] = {}
         self._setup_default_headers()
         self._setup_ssl_context()
         self._setup_proxy_from_env()
@@ -118,6 +116,7 @@ class RequestsClient(IHttpClient):
     def _setup_ssl_context(self):
         """设置SSL上下文"""
         import ssl
+
         from requests.adapters import HTTPAdapter
         from urllib3.util.retry import Retry
 
@@ -138,7 +137,7 @@ class RequestsClient(IHttpClient):
         self.session.mount('https://', adapter)
         self.session.mount('http://', adapter)
 
-    async def get(self, url: str, config: Optional[RequestConfig] = None) -> Response:
+    async def get(self, url: str, config: RequestConfig | None = None) -> Response:
         """发送GET请求"""
         config = config or RequestConfig()
 
@@ -155,13 +154,13 @@ class RequestsClient(IHttpClient):
         self._cache[url] = response
         return response
 
-    async def post(self, url: str, data: Optional[Dict] = None,
-                  config: Optional[RequestConfig] = None) -> Response:
+    async def post(self, url: str, data: dict | None = None,
+                  config: RequestConfig | None = None) -> Response:
         """发送POST请求"""
         config = config or RequestConfig()
         return await self._execute_request("POST", url, data, config)
 
-    async def _execute_request(self, method: str, url: str, data: Optional[Dict],
+    async def _execute_request(self, method: str, url: str, data: dict | None,
                               config: RequestConfig) -> Response:
         """执行HTTP请求"""
         loop = asyncio.get_event_loop()
@@ -219,7 +218,7 @@ class RequestsClient(IHttpClient):
 
             except Exception as e:
                 if attempt == config.max_retries - 1:
-                    raise Exception(f"请求失败，已重试{config.max_retries}次: {str(e)}")
+                    raise Exception(f"请求失败，已重试{config.max_retries}次: {e!s}")
                 continue
 
         raise Exception("未知错误")
@@ -244,7 +243,7 @@ class RequestsClient(IHttpClient):
         # 3. 默认utf-8
         return 'utf-8'
 
-    def _get_proxies(self, proxy: Optional[str]) -> Optional[Dict[str, str]]:
+    def _get_proxies(self, proxy: str | None) -> dict[str, str] | None:
         """获取代理配置"""
         if proxy:
             return {
@@ -258,7 +257,7 @@ class RequestsClient(IHttpClient):
         # 获取环境变量中的代理配置
         http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
         https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-        no_proxy = os.environ.get('NO_PROXY') or os.environ.get('no_proxy')
+        os.environ.get('NO_PROXY') or os.environ.get('no_proxy')
 
         if http_proxy or https_proxy:
             proxies = {}
@@ -273,7 +272,7 @@ class RequestsClient(IHttpClient):
         else:
             print("ℹ️  未检测到代理环境变量，使用直连")
 
-    def set_cookies(self, cookies: Dict[str, str]) -> None:
+    def set_cookies(self, cookies: dict[str, str]) -> None:
         """设置Cookie"""
         self.session.cookies.update(cookies)
 
@@ -289,9 +288,9 @@ class PlaywrightClient(IHttpClient):
         self.browser = None
         self.context = None
         self.page = None
-        self._cache: Dict[str, Response] = {}
+        self._cache: dict[str, Response] = {}
 
-    async def _ensure_browser(self, config: Optional[RequestConfig] = None):
+    async def _ensure_browser(self, config: RequestConfig | None = None):
         """确保浏览器已初始化"""
         if self.browser is None:
             try:
@@ -332,9 +331,9 @@ class PlaywrightClient(IHttpClient):
             except ImportError:
                 raise Exception("Playwright未安装，请安装: pip install playwright")
             except Exception as e:
-                raise Exception(f"Playwright初始化失败: {str(e)}")
+                raise Exception(f"Playwright初始化失败: {e!s}")
 
-    async def get(self, url: str, config: Optional[RequestConfig] = None) -> Response:
+    async def get(self, url: str, config: RequestConfig | None = None) -> Response:
         """发送GET请求"""
         config = config or RequestConfig()
 
@@ -383,10 +382,10 @@ class PlaywrightClient(IHttpClient):
                 raise Exception(f"Playwright请求失败: {response.status if response else 'Unknown'}")
 
         except Exception as e:
-            raise Exception(f"Playwright请求异常: {str(e)}")
+            raise Exception(f"Playwright请求异常: {e!s}")
 
-    async def post(self, url: str, data: Optional[Dict] = None,
-                  config: Optional[RequestConfig] = None) -> Response:
+    async def post(self, url: str, data: dict | None = None,
+                  config: RequestConfig | None = None) -> Response:
         """发送POST请求"""
         await self._ensure_browser()
 
@@ -435,9 +434,9 @@ class PlaywrightClient(IHttpClient):
             )
 
         except Exception as e:
-            raise Exception(f"Playwright POST请求异常: {str(e)}")
+            raise Exception(f"Playwright POST请求异常: {e!s}")
 
-    def set_cookies(self, cookies: Dict[str, str]) -> None:
+    def set_cookies(self, cookies: dict[str, str]) -> None:
         """设置Cookie"""
         # 需要在context初始化后设置
         pass
@@ -459,7 +458,7 @@ class HybridHttpClient(IHttpClient):
         self.requests_client = RequestsClient()
         self.playwright_client = PlaywrightClient()
 
-    async def get(self, url: str, config: Optional[RequestConfig] = None) -> Response:
+    async def get(self, url: str, config: RequestConfig | None = None) -> Response:
         """发送GET请求，优先使用requests，失败时尝试playwright"""
         config = config or RequestConfig()
 
@@ -471,14 +470,14 @@ class HybridHttpClient(IHttpClient):
             try:
                 return await self.requests_client.get(url, config)
             except Exception as e:
-                print(f"Requests请求失败，尝试Playwright: {str(e)}")
+                print(f"Requests请求失败，尝试Playwright: {e!s}")
                 return await self.playwright_client.get(url, config)
         else:  # STEALTH
             # 总是使用Playwright，添加更多反检测策略
             return await self.playwright_client.get(url, config)
 
-    async def post(self, url: str, data: Optional[Dict] = None,
-                  config: Optional[RequestConfig] = None) -> Response:
+    async def post(self, url: str, data: dict | None = None,
+                  config: RequestConfig | None = None) -> Response:
         """发送POST请求"""
         config = config or RequestConfig()
 
@@ -490,12 +489,12 @@ class HybridHttpClient(IHttpClient):
             try:
                 return await self.requests_client.post(url, data, config)
             except Exception as e:
-                print(f"Requests请求失败，尝试Playwright: {str(e)}")
+                print(f"Requests请求失败，尝试Playwright: {e!s}")
                 return await self.playwright_client.post(url, data, config)
         else:  # STEALTH
             return await self.playwright_client.post(url, data, config)
 
-    def set_cookies(self, cookies: Dict[str, str]) -> None:
+    def set_cookies(self, cookies: dict[str, str]) -> None:
         """设置Cookie"""
         self.requests_client.set_cookies(cookies)
         self.playwright_client.set_cookies(cookies)
@@ -513,7 +512,7 @@ class HybridHttpClient(IHttpClient):
 
 
 # 全局客户端实例
-_default_client: Optional[IHttpClient] = None
+_default_client: IHttpClient | None = None
 
 
 def get_http_client(strategy: RequestStrategy = RequestStrategy.HYBRID) -> IHttpClient:
@@ -531,14 +530,14 @@ def get_http_client(strategy: RequestStrategy = RequestStrategy.HYBRID) -> IHttp
     return _default_client
 
 
-async def http_get(url: str, config: Optional[RequestConfig] = None) -> Response:
+async def http_get(url: str, config: RequestConfig | None = None) -> Response:
     """便捷的GET请求函数"""
     client = get_http_client()
     return await client.get(url, config)
 
 
-async def http_post(url: str, data: Optional[Dict] = None,
-                   config: Optional[RequestConfig] = None) -> Response:
+async def http_post(url: str, data: dict | None = None,
+                   config: RequestConfig | None = None) -> Response:
     """便捷的POST请求函数"""
     client = get_http_client()
     return await client.post(url, data, config)

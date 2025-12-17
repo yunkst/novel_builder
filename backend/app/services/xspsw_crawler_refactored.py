@@ -8,7 +8,7 @@
 import asyncio
 import re
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any
 
 from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
@@ -33,14 +33,14 @@ class XspswCrawlerRefactored(BaseCrawler):
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
         }
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             # 使用真实的搜索功能
             search_url = f"{self.base_url}/search.html"
 
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
@@ -62,11 +62,11 @@ class XspswCrawlerRefactored(BaseCrawler):
             return novels[:10]  # 限制返回数量
 
         except Exception as e:
-            print(f"Xspsw搜索失败: {str(e)}")
+            print(f"Xspsw搜索失败: {e!s}")
             # 如果搜索失败，返回一些热门小说作为推荐
             return await self._get_popular_novels()
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取小说章节列表（支持分页获取完整列表）"""
         try:
             # 从小说URL提取novel_id
@@ -78,7 +78,7 @@ class XspswCrawlerRefactored(BaseCrawler):
             all_chapters = []
 
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
@@ -117,21 +117,21 @@ class XspswCrawlerRefactored(BaseCrawler):
                         await asyncio.sleep(0.5)
 
                 except Exception as e:
-                    print(f"获取第{page_num}页章节失败: {str(e)}")
+                    print(f"获取第{page_num}页章节失败: {e!s}")
                     continue
 
             # 去重保持顺序
             return self._deduplicate_chapters(all_chapters)
 
         except Exception as e:
-            print(f"Xspsw获取章节列表异常: {str(e)}")
+            print(f"Xspsw获取章节列表异常: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=10,
                 max_retries=3,
                 retry_delay=0.6,
@@ -155,12 +155,12 @@ class XspswCrawlerRefactored(BaseCrawler):
             return {"title": title, "content": content}
 
         except Exception as e:
-            print(f"Xspsw获取章节内容失败: {str(e)}")
-            return {"title": "章节内容", "content": f"获取失败: {str(e)}"}
+            print(f"Xspsw获取章节内容失败: {e!s}")
+            return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     # ==================== Xspsw专用提取方法 ====================
 
-    def _parse_xspsw_search_results(self, soup) -> List[Dict[str, Any]]:
+    def _parse_xspsw_search_results(self, soup) -> list[dict[str, Any]]:
         """解析Xspsw搜索结果页面"""
         novels = []
 
@@ -180,10 +180,7 @@ class XspswCrawlerRefactored(BaseCrawler):
 
                 # 从图片alt属性获取标题
                 img = item.find("img")
-                if img:
-                    title = img.get("alt", "").strip()
-                else:
-                    title = link.get_text(strip=True)
+                title = img.get("alt", "").strip() if img else link.get_text(strip=True)
 
                 if not title or len(title) < 2:
                     continue
@@ -255,7 +252,7 @@ class XspswCrawlerRefactored(BaseCrawler):
                 return category
         return "unknown"
 
-    async def _get_popular_novels(self) -> List[Dict[str, Any]]:
+    async def _get_popular_novels(self) -> list[dict[str, Any]]:
         """获取热门小说作为搜索fallback"""
         try:
             # 访问首页获取热门小说
@@ -313,7 +310,7 @@ class XspswCrawlerRefactored(BaseCrawler):
 
         return max_page
 
-    def _extract_chapters_from_page(self, soup, base_url: str) -> List[Dict[str, Any]]:
+    def _extract_chapters_from_page(self, soup, base_url: str) -> list[dict[str, Any]]:
         """从分页中提取章节链接"""
         chapters = []
 
@@ -339,7 +336,7 @@ class XspswCrawlerRefactored(BaseCrawler):
 
         return chapters
 
-    def _deduplicate_chapters(self, chapters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_chapters(self, chapters: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """章节去重保持顺序"""
         seen = set()
         unique = []
@@ -349,7 +346,7 @@ class XspswCrawlerRefactored(BaseCrawler):
                 seen.add(chapter["url"])
         return unique
 
-    def _deduplicate_novels(self, novels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_novels(self, novels: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """小说去重"""
         seen = set()
         unique_novels = []
