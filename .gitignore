@@ -210,29 +210,8 @@ build/
 .claude/settings.local.json
 
 # Project specific
-backend;D/
 ch1.txt
 
-# Logs
-logs
-dev-debug.log
-# Dependency directories
-# Environment variables
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# OS specific
-
-# Task files
-# tasks.json
-# tasks/
-
-# Large files
-*.deb
-google-chrome-stable_current_amd64.deb
-chrome.deb 
+# Logs (already defined above, keeping for reference)
+logs/
+dev-debug.log 

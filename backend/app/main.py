@@ -8,6 +8,7 @@ for novel searching, chapter management, and caching functionality.
 
 import logging
 import os
+import secrets
 from datetime import datetime
 from typing import Any
 
@@ -16,12 +17,21 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Query,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
 
 from .config import settings
+from .exceptions import (
+    NovelBuilderException,
+    CrawlerError,
+    DatabaseError,
+    NetworkError,
+    handle_exception,
+)
+from .logging_config import setup_logging
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
@@ -71,12 +81,17 @@ app = FastAPI(
     description="FastAPI backend for novel crawling and management",
 )
 
-# CORS（允许前端在局域网访问）
+# CORS配置 - 使用环境变量控制允许的源
+allowed_origins = settings.cors_origins.split(",") if settings.cors_origins else []
+if settings.debug and not allowed_origins:
+    # 开发环境默认允许本地访问
+    allowed_origins = ["http://localhost:3154", "http://127.0.0.1:3154"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 如需更严格控制，可改为具体前端地址
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],  # 限制HTTP方法
     allow_headers=["*"],
 )
 
@@ -84,17 +99,68 @@ app.add_middleware(
 # 应用启动事件
 @app.on_event("startup")
 async def startup_event() -> None:
+    # 初始化日志系统
+    logger = setup_logging()
+
     # 初始化数据库
     init_db()
-    print("✓ Novel Builder Backend 启动完成")
-    print(f"✓ 启用的爬虫站点: {settings.enabled_sites}")
+
+    logger.info("Novel Builder Backend 启动完成")
+    logger.info(f"启用的爬虫站点: {settings.enabled_sites}")
+
     if settings.debug:
-        print("✓ 调试模式已开启")
+        logger.warning("调试模式已开启")
+
+    if not settings.is_secure():
+        logger.warning("当前配置不安全，请检查环境变量设置")
+
+
+# 全局异常处理器
+@app.exception_handler(NovelBuilderException)
+async def novel_builder_exception_handler(request: Request, exc: NovelBuilderException):
+    """处理自定义应用异常"""
+    logger.error(f"应用异常: {exc.error_code} - {exc.message}")
+    return JSONResponse(
+        status_code=500,
+        content=exc.to_dict()
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """处理未预期的异常"""
+    novel_exc = handle_exception(exc, logger)
+    logger.error(f"未处理异常: {novel_exc.message}")
+    return JSONResponse(
+        status_code=500,
+        content=novel_exc.to_dict()
+    )
 
 
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/security-check")
+def security_check() -> dict[str, Any]:
+    """安全配置检查端点，仅在开发环境可用"""
+    if not settings.debug:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    return {
+        "is_secure": settings.is_secure(),
+        "has_api_token": bool(settings.api_token),
+        "has_custom_secret_key": settings.secret_key != secrets.token_urlsafe(32),
+        "is_debug_mode": settings.debug,
+        "cors_origins": settings.cors_origins.split(",") if settings.cors_origins else [],
+        "warnings": [
+            "DEBUG模式已启用" if settings.debug else None,
+            "未设置API_TOKEN" if not settings.api_token else None,
+            "使用默认SECRET_KEY" if settings.secret_key == "your-secret-key-here" else None,
+            "CORS设置为允许所有源" if "*" in (settings.cors_origins or "") else None,
+        ]
+    }
 
 
 @app.get("/source-sites", response_model=list[SourceSite], dependencies=[Depends(verify_token)])
@@ -192,9 +258,9 @@ async def chapter_content(
             )
             thread.daemon = True
             thread.start()
-        except Exception:
-            # 缓存保存失败不影响正常响应
-            pass
+        except Exception as e:
+            # 缓存保存失败不影响正常响应，但记录日志
+            logger.warning(f"缓存章节保存失败: {e}")
 
     return {
         "title": content_data.get("title", "章节内容"),
@@ -317,10 +383,15 @@ async def generate_role_card_images(
         result = await role_card_async_service.create_task(request, db)
         return result
     except ValueError as e:
+        logger.warning(f"创建人物卡生成任务参数错误: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"创建人物卡生成任务失败: {e}")
-        raise HTTPException(status_code=500, detail="创建任务失败")
+        novel_exc = handle_exception(e, logger)
+        logger.error(f"创建人物卡生成任务失败: {novel_exc.message}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": novel_exc.error_code, "message": novel_exc.message}
+        )
 
 
 @app.get("/api/role-card/status/{task_id}", response_model=RoleCardTaskStatusResponse, dependencies=[Depends(verify_token)])
