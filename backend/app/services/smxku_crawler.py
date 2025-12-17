@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 SMXKU 小说网站爬虫
 网站地址: https://www.smxku.com
 功能: 搜索小说、获取目录、获取章节内容
 """
 
-import asyncio
 import re
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import urljoin
 
 from .base_crawler import BaseCrawler
@@ -23,7 +21,7 @@ class SmxkuCrawler(BaseCrawler):
         self.source_name = "smxku"
         self.source_display_name = "蜘蛛小说网"
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             # 构建搜索URL
@@ -111,10 +109,10 @@ class SmxkuCrawler(BaseCrawler):
             return results[:50]  # 限制返回数量
 
         except Exception as e:
-            print(f"SMXKU搜索失败: {str(e)}")
+            print(f"SMXKU搜索失败: {e!s}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 从URL中提取小说ID
@@ -125,7 +123,7 @@ class SmxkuCrawler(BaseCrawler):
             novel_id = novel_id_match.group(1)
 
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=15,
                 max_retries=3,
                 strategy=RequestStrategy.HYBRID
@@ -193,14 +191,14 @@ class SmxkuCrawler(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"SMXKU获取章节列表失败: {str(e)}")
+            print(f"SMXKU获取章节列表失败: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=15,
                 max_retries=3,
                 strategy=RequestStrategy.HYBRID
@@ -270,16 +268,16 @@ class SmxkuCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"SMXKU获取章节内容失败: {str(e)}")
+            print(f"SMXKU获取章节内容失败: {e!s}")
             return {
                 'title': "章节内容",
-                'content': f"获取失败: {str(e)}",
+                'content': f"获取失败: {e!s}",
                 'url': chapter_url,
                 'word_count': 0,
                 'source': self.source_name
             }
 
-    async def _extract_novel_from_detail_page(self, soup, novel_url: str, novel_id: str) -> Dict[str, Any]:
+    async def _extract_novel_from_detail_page(self, soup, novel_url: str, novel_id: str) -> dict[str, Any]:
         """从小说详情页提取小说信息"""
         try:
             # 查找小说标题 - 通常在 h1 或其他标题元素中
@@ -349,7 +347,7 @@ class SmxkuCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"从详情页提取小说信息失败: {str(e)}")
+            print(f"从详情页提取小说信息失败: {e!s}")
             # 返回基本信息
             return {
                 'id': novel_id,

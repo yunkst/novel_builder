@@ -4,12 +4,12 @@ import os
 
 # 导入爬虫
 from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
+from .base_crawler import BaseCrawler
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
-from .xspsw_crawler_refactored import XspswCrawlerRefactored
+from .smxku_crawler import SmxkuCrawler
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
 from .wodeshucheng_crawler import WodeshuchengCrawler
-from .smxku_crawler import SmxkuCrawler
-from .base_crawler import BaseCrawler
+from .xspsw_crawler_refactored import XspswCrawlerRefactored
 
 # 为了向后兼容，创建别名
 AliceSWCrawler = AliceSWCrawlerRefactored

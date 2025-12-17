@@ -6,55 +6,57 @@ This module contains the main FastAPI application with all API endpoints
 for novel searching, chapter management, and caching functionality.
 """
 
+import logging
+import os
 from datetime import datetime
 from typing import Any
-import logging
-
-logger = logging.getLogger(__name__)
 
 from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
     Query,
-    WebSocket,
-    WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response,FileResponse
-from fastapi.openapi.docs import get_redoc_html
-from fastapi.openapi.utils import get_openapi
-from typing import Dict, Any
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
-from .models.text2img import RoleImageGallery, ImageToVideoTask
 from .schemas import (
-    Chapter, ChapterContent, Novel, SourceSite,
-    RoleCardGenerateRequest, RoleGalleryResponse,
-    RoleImageDeleteRequest, RoleRegenerateRequest, RoleGenerateResponse,
-    RoleCardTaskCreateResponse, RoleCardTaskStatusResponse,
-    SceneIllustrationRequest, SceneIllustrationResponse,
-    SceneGalleryResponse, SceneImageDeleteRequest,
-    EnhancedSceneIllustrationRequest, SceneRegenerateRequest,
-    SceneRegenerateResponse, ImageToVideoRequest, ImageToVideoResponse,
-    VideoStatusResponse, ImageToVideoTaskStatusResponse
+    Chapter,
+    ChapterContent,
+    EnhancedSceneIllustrationRequest,
+    ImageToVideoRequest,
+    ImageToVideoResponse,
+    ImageToVideoTaskStatusResponse,
+    Novel,
+    RoleCardGenerateRequest,
+    RoleCardTaskStatusResponse,
+    RoleGalleryResponse,
+    RoleImageDeleteRequest,
+    RoleRegenerateRequest,
+    SceneGalleryResponse,
+    SceneImageDeleteRequest,
+    SceneRegenerateRequest,
+    SourceSite,
+    VideoStatusResponse,
 )
 from .services.crawler_factory import (
     get_crawler_for_url,
     get_enabled_crawlers,
     get_source_sites_info,
 )
-from .services.novel_cache_service import novel_cache_service
-from .services.search_service import SearchService
-from .services.role_card_service import role_card_service
-from .services.role_card_async_service import role_card_async_service
 from .services.dify_client import create_dify_client
-from .services.scene_illustration_service import create_scene_illustration_service
 from .services.image_to_video_service import create_image_to_video_service
+from .services.role_card_async_service import role_card_async_service
+from .services.role_card_service import role_card_service
+from .services.scene_illustration_service import create_scene_illustration_service
+from .services.search_service import SearchService
+
+logger = logging.getLogger(__name__)
 
 # 创建场面绘制服务实例
 dify_client = create_dify_client()
@@ -235,7 +237,7 @@ async def get_image_proxy(filename: str):
 
     try:
         # 直接从ComfyUI获取图片
-        comfyui_url = "http://host.docker.internal:8000"
+        comfyui_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
         image_url = f"{comfyui_url}/view?filename={filename}"
 
         response = requests.get(image_url, timeout=None)
@@ -260,7 +262,7 @@ async def text2img_health_check():
     import requests
 
     try:
-        comfyui_url = "http://host.docker.internal:8000"
+        comfyui_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
         response = requests.get(f"{comfyui_url}/system_stats", timeout=5)
 
         if response.status_code == 200:
@@ -284,7 +286,7 @@ async def text2img_health_check():
     except requests.RequestException as e:
         return {
             "status": "unhealthy",
-            "message": f"无法连接ComfyUI服务: {str(e)}",
+            "message": f"无法连接ComfyUI服务: {e!s}",
             "services": {
                 "comfyui": False,
                 "api_accessible": False
@@ -305,9 +307,11 @@ async def generate_role_card_images(
 
     - **role_id**: 人物卡ID
     - **roles**: 人物卡设定信息
-    - **user_input**: 用户要求
+    - **model**: 使用的模型名称（可选）
 
     返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度
+
+    注意：用户要求已固定为"生成人物卡"，无需手动输入
     """
     try:
         result = await role_card_async_service.create_task(request, db)
@@ -537,7 +541,7 @@ async def regenerate_scene_images(
 # ================= 图生视频 API =================
 
 
-@app.post("/api/image-to-video/generate", dependencies=[Depends(verify_token)])
+@app.post("/api/image-to-video/generate", response_model=ImageToVideoResponse, dependencies=[Depends(verify_token)])
 async def generate_video_from_image(
     request: ImageToVideoRequest,
     db: Session = Depends(get_db)
@@ -545,11 +549,31 @@ async def generate_video_from_image(
     """
     生成图生视频
 
-    - **img_name**: 图片名称
-    - **user_input**: 用户要求
+    创建一个图生视频任务，将指定的图片转换为动态视频。
+
+    **请求参数:**
+    - **img_name**: 要处理的图片文件名称
+    - **user_input**: 用户对视频生成的要求描述
     - **model_name**: 图生视频模型名称
 
-    返回任务ID，可通过后续接口查询视频生成状态
+    **返回值:**
+    - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询
+    - **img_name**: 处理的图片名称
+    - **status**: 任务初始状态（通常为 "pending"）
+    - **message**: 任务创建的状态消息
+
+    **使用示例:**
+    ```json
+    {
+        "task_id": 123,
+        "img_name": "example.jpg",
+        "status": "pending",
+        "message": "图生视频任务创建成功"
+    }
+    ```
+
+    **后续操作:**
+    使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
     """
     try:
         result = await image_to_video_service.create_video_generation_task(request, db)
@@ -567,9 +591,22 @@ async def check_video_status(
     db: Session = Depends(get_db)
 ):
     """
-    检查图片是否有视频
+    检查图片是否有已生成的视频
 
+    根据图片名称快速查询是否已有对应的视频文件存在。
+
+    **路径参数:**
+    - **img_name**: 要查询的图片文件名称
+
+    **返回值:**
     - **img_name**: 图片名称
+    - **has_video**: 是否有对应的视频文件（true/false）
+    - **video_url**: 视频文件URL（如果有）
+    - **created_at**: 视频创建时间（如果有）
+
+    **使用场景:**
+    - 在显示图片时快速判断是否显示视频播放按钮
+    - 避免重复创建已有视频的任务
     """
     try:
         result = await image_to_video_service.get_video_status(img_name, db)
@@ -587,7 +624,23 @@ async def get_video_task_status(
     """
     查询图生视频任务状态
 
+    获取指定任务的详细状态信息，包括生成进度和结果。
+
+    **路径参数:**
+    - **task_id**: 图生视频任务的唯一标识符
+
+    **返回值:**
     - **task_id**: 任务ID
+    - **img_name**: 处理的图片名称
+    - **status**: 任务状态（pending/running/completed/failed）
+    - **model_name**: 使用的模型名称
+    - **user_input**: 用户输入要求
+    - **video_prompt**: 生成的视频提示词（如果有）
+    - **video_filename**: 生成的视频文件名（完成时）
+    - **result_message**: 结果描述信息
+    - **error_message**: 错误信息（失败时）
+    - **created_at**: 任务创建时间
+    - **updated_at**: 任务更新时间
     """
     try:
         result = await image_to_video_service.get_task_status(task_id, db)
@@ -668,228 +721,16 @@ async def image_to_video_health_check():
 # ================= 缓存管理 API =================
 
 
-@app.post("/api/cache/create", dependencies=[Depends(verify_token)])
-async def create_cache_task(
-    novel_url: str = Query(..., description="小说URL"), db: Session = Depends(get_db)
-):
-    """
-    创建缓存任务
-
-    - **novel_url**: 小说详情页URL
-    """
-    try:
-        task = await novel_cache_service.create_cache_task(novel_url, db)
-        return {
-            "task_id": task.id,
-            "status": task.status,
-            "novel_title": task.novel_title,
-            "novel_author": task.novel_author,
-            "total_chapters": task.total_chapters,
-            "message": "缓存任务创建成功",
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建缓存任务失败: {e!s}")
 
 
-@app.get("/api/cache/status/{task_id}", dependencies=[Depends(verify_token)])
-async def get_cache_status(task_id: int, db: Session = Depends(get_db)):
-    """获取缓存任务状态"""
-    task = await novel_cache_service.get_task_status(task_id, db)
-    if not task:
-        raise HTTPException(status_code=404, detail="缓存任务不存在")
-
-    progress = (
-        (task.cached_chapters / task.total_chapters * 100)
-        if task.total_chapters > 0
-        else 0
-    )
-
-    return {
-        "task_id": task.id,
-        "status": task.status,
-        "novel_title": task.novel_title,
-        "novel_author": task.novel_author,
-        "novel_url": task.novel_url,
-        "total_chapters": task.total_chapters,
-        "cached_chapters": task.cached_chapters,
-        "failed_chapters": task.failed_chapters,
-        "progress": round(progress, 2),
-        "created_at": task.created_at.isoformat(),
-        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
-        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-        "error_message": task.error_message,
-    }
 
 
-@app.get("/api/cache/tasks", dependencies=[Depends(verify_token)])
-async def get_cache_tasks(
-    status: str = Query(
-        None, description="任务状态筛选: pending, running, completed, failed, cancelled"
-    ),
-    limit: int = Query(20, ge=1, le=100, description="返回数量限制"),
-    offset: int = Query(0, ge=0, description="偏移量"),
-    db: Session = Depends(get_db),
-):
-    """获取缓存任务列表"""
-    tasks = await novel_cache_service.get_cache_tasks(status, limit, offset, db)
-
-    return {
-        "tasks": [
-            {
-                "task_id": task.id,
-                "status": task.status,
-                "novel_title": task.novel_title,
-                "novel_author": task.novel_author,
-                "total_chapters": task.total_chapters,
-                "cached_chapters": task.cached_chapters,
-                "failed_chapters": task.failed_chapters,
-                "progress": round(
-                    (task.cached_chapters / task.total_chapters * 100)
-                    if task.total_chapters > 0
-                    else 0,
-                    2,
-                ),
-                "created_at": task.created_at.isoformat(),
-                "completed_at": task.completed_at.isoformat()
-                if task.completed_at
-                else None,
-            }
-            for task in tasks
-        ],
-        "total": len(tasks),
-    }
 
 
-@app.post("/api/cache/cancel/{task_id}", dependencies=[Depends(verify_token)])
-async def cancel_cache_task(task_id: int, db: Session = Depends(get_db)):
-    """取消缓存任务"""
-    success = await novel_cache_service.cancel_task(task_id, db)
-    if success:
-        return {"message": "任务已取消", "task_id": task_id}
-    else:
-        raise HTTPException(status_code=404, detail="任务不存在或无法取消")
 
 
-@app.get("/api/cache/download/{task_id}", dependencies=[Depends(verify_token)])
-async def download_cached_novel(
-    task_id: int,
-    format: str = Query("json", description="下载格式: json, txt"),
-    db: Session = Depends(get_db),
-):
-    """
-    下载已缓存的小说
-
-    - **task_id**: 缓存任务ID
-    - **format**: 下载格式 (json/txt)
-    """
-    # 检查任务是否存在且已完成
-    task = await novel_cache_service.get_task_status(task_id, db)
-    if not task or task.status != "completed":
-        raise HTTPException(status_code=404, detail="缓存任务不存在或未完成")
-
-    # 获取所有已缓存的章节
-    chapters = await novel_cache_service.get_cached_chapters(task_id, db)
-
-    if format == "json":
-        return {
-            "novel": {
-                "title": task.novel_title,
-                "author": task.novel_author,
-                "url": task.novel_url,
-                "total_chapters": len(chapters),
-                "cached_at": task.completed_at.isoformat()
-                if task.completed_at
-                else None,
-            },
-            "chapters": [
-                {
-                    "title": ch.chapter_title,
-                    "url": ch.chapter_url,
-                    "content": ch.chapter_content,
-                    "word_count": ch.word_count,
-                    "index": ch.chapter_index,
-                    "cached_at": ch.cached_at.isoformat() if ch.cached_at else None,
-                }
-                for ch in chapters
-            ],
-        }
-
-    elif format == "txt":
-        # 生成TXT格式
-        content = (
-            f"{task.novel_title}\n作者：{task.novel_author}\n来源：{task.novel_url}\n\n"
-        )
-        content += "=" * 50 + "\n\n"
-
-        for ch in chapters:
-            content += f"第{ch.chapter_index + 1}章 {ch.chapter_title}\n\n"
-            content += str(ch.chapter_content) + "\n\n"
-            content += "-" * 30 + "\n\n"
-
-        return Response(
-            content=content,
-            media_type="text/plain; charset=utf-8",
-            headers={
-                "Content-Disposition": f"attachment; filename={task.novel_title}.txt"
-            },
-        )
-
-    else:
-        raise HTTPException(status_code=400, detail="不支持的格式，请使用 json 或 txt")
 
 
-@app.websocket("/ws/cache/{task_id}")
-async def cache_progress_websocket(websocket: WebSocket, task_id: int):
-    """缓存进度WebSocket连接"""
-    await websocket.accept()
-
-    try:
-        # 添加WebSocket连接
-        await novel_cache_service.add_websocket_connection(task_id, websocket)
-
-        # 立即发送当前状态
-        db = next(get_db())
-        try:
-            task = await novel_cache_service.get_task_status(task_id, db)
-            if task:
-                progress = (
-                    (task.cached_chapters / task.total_chapters * 100)
-                    if task.total_chapters > 0
-                    else 0
-                )
-                await websocket.send_json(
-                    {
-                        "task_id": task_id,
-                        "status": task.status,
-                        "total_chapters": task.total_chapters,
-                        "cached_chapters": task.cached_chapters,
-                        "failed_chapters": task.failed_chapters,
-                        "progress": round(progress, 2),
-                        "updated_at": task.updated_at.isoformat()
-                        if task.updated_at
-                        else None,
-                        "error_message": task.error_message,
-                    }
-                )
-        finally:
-            db.close()
-
-        # 保持连接活跃
-        while True:
-            try:
-                await websocket.receive_text()
-            except WebSocketDisconnect:
-                break
-
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        print(f"WebSocket错误: {e}")
-    finally:
-        # 移除WebSocket连接
-        await novel_cache_service.remove_websocket_connection(task_id, websocket)
 
 
 # ================= 辅助函数 =================
@@ -908,8 +749,6 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
         return
 
     try:
-        from .models.cache import CacheTask
-
         with next(get_db()) as db:
             # 检查是否已存在
             existing = (
@@ -925,30 +764,9 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
                 existing.word_count = len(content)
                 existing.cached_at = datetime.now()
             else:
-                # 创建或获取一个默认的缓存任务
-                default_task = (
-                    db.query(CacheTask)
-                    .filter(CacheTask.novel_url == "individual_chapters")
-                    .first()
-                )
-
-                if not default_task:
-                    default_task = CacheTask(
-                        novel_url="individual_chapters",
-                        novel_title="独立缓存章节",
-                        novel_author="系统",
-                        status="completed",
-                        total_chapters=1,
-                        cached_chapters=1,
-                        failed_chapters=0,
-                        completed_at=datetime.now()
-                    )
-                    db.add(default_task)
-                    db.flush()  # 确保获取ID
-
-                # 创建新缓存记录
+                # 创建新缓存记录（不依赖CacheTask）
                 cached_chapter = Cache(
-                    task_id=default_task.id,
+                    task_id=None,  # 独立章节不需要任务ID
                     novel_url="individual_chapters",
                     chapter_title=title,
                     chapter_url=chapter_url,

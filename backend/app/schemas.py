@@ -6,8 +6,9 @@ This module contains data models used throughout the application
 for request validation and response serialization.
 """
 
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class Novel(BaseModel):
@@ -52,15 +53,15 @@ class ComfyUIPromptRequest(BaseModel):
     """ComfyUI生图请求模式."""
 
     prompt: str = Field(..., description="图片生成提示词")
-    workflow_json: Dict[str, Any] = Field(..., description="ComfyUI工作流JSON")
+    workflow_json: dict[str, Any] = Field(..., description="ComfyUI工作流JSON")
 
 
 class ComfyUIImageResponse(BaseModel):
     """ComfyUI图片响应模式."""
 
     filename: str = Field(..., description="图片文件名")
-    subfolder: Optional[str] = Field(None, description="子文件夹")
-    type: Optional[str] = Field("output", description="图片类型")
+    subfolder: str | None = Field(None, description="子文件夹")
+    type: str | None = Field("output", description="图片类型")
 
 
 # ============================================================================
@@ -72,18 +73,18 @@ class RoleInfo(BaseModel):
 
     id: int = Field(..., description="Flutter自增ID")
     name: str = Field(..., description="角色姓名")
-    gender: Optional[str] = Field(None, description="性别")
-    age: Optional[int] = Field(None, description="年龄")
-    occupation: Optional[str] = Field(None, description="职业")
-    personality: Optional[str] = Field(None, description="性格特点")
-    appearance_features: Optional[str] = Field(None, description="外貌特征")
-    body_type: Optional[str] = Field(None, description="身材体型")
-    clothing_style: Optional[str] = Field(None, description="穿衣风格")
-    background_story: Optional[str] = Field(None, description="背景经历")
-    face_prompts: Optional[str] = Field(None, description="AI绘图专用-面部描述")
-    body_prompts: Optional[str] = Field(None, description="AI绘图专用-身材描述")
+    gender: str | None = Field(None, description="性别")
+    age: int | None = Field(None, description="年龄")
+    occupation: str | None = Field(None, description="职业")
+    personality: str | None = Field(None, description="性格特点")
+    appearance_features: str | None = Field(None, description="外貌特征")
+    body_type: str | None = Field(None, description="身材体型")
+    clothing_style: str | None = Field(None, description="穿衣风格")
+    background_story: str | None = Field(None, description="背景经历")
+    face_prompts: str | None = Field(None, description="AI绘图专用-面部描述")
+    body_prompts: str | None = Field(None, description="AI绘图专用-身材描述")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式，用于数据库存储"""
         result = {"id": self.id, "name": self.name}
 
@@ -116,7 +117,7 @@ class RoleInfo(BaseModel):
         return "，".join(parts) if parts else self.name
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'RoleInfo':
+    def from_dict(cls, data: dict[str, Any]) -> 'RoleInfo':
         """从字典创建RoleInfo对象"""
         return cls(**data)
 
@@ -141,8 +142,8 @@ class RoleCardGenerateRequest(BaseModel):
     """人物卡图片生成请求模式."""
 
     role_id: str = Field(..., description="人物卡ID")
-    roles: List[RoleInfo] = Field(..., description="人物卡设定信息列表")
-    model: Optional[str] = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    roles: list[RoleInfo] = Field(..., description="人物卡设定信息列表")
+    model: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
 
 
 class RoleImageInfo(BaseModel):
@@ -157,7 +158,7 @@ class RoleGalleryResponse(BaseModel):
     """角色图集响应模式."""
 
     role_id: str = Field(..., description="人物卡ID")
-    images: List[str] = Field(..., description="图片URL列表")
+    images: list[str] = Field(..., description="图片URL列表")
 
 
 class RoleImageDeleteRequest(BaseModel):
@@ -172,7 +173,7 @@ class RoleRegenerateRequest(BaseModel):
 
     img_url: str = Field(..., description="参考图片URL")
     count: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model: Optional[str] = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
 
 
 class RoleGenerateResponse(BaseModel):
@@ -186,7 +187,7 @@ class RoleGenerateResponse(BaseModel):
 class DifyPhotoResult(BaseModel):
     """Dify拍照工作流返回结果."""
 
-    content: List[str] = Field(..., description="生成的提示词列表")
+    content: list[str] = Field(..., description="生成的提示词列表")
 
 
 class RoleCardErrorResponse(BaseModel):
@@ -194,7 +195,7 @@ class RoleCardErrorResponse(BaseModel):
 
     error: str = Field(..., description="错误类型")
     message: str = Field(..., description="错误信息")
-    role_id: Optional[str] = Field(None, description="人物卡ID")
+    role_id: str | None = Field(None, description="人物卡ID")
 
 
 # ============================================================================
@@ -218,11 +219,11 @@ class RoleCardTaskStatusResponse(BaseModel):
     status: str = Field(..., description="任务状态: pending/running/completed/failed")
     total_prompts: int = Field(..., description="生成的提示词数量")
     generated_images: int = Field(..., description="成功生成的图片数量")
-    result_message: Optional[str] = Field(None, description="处理结果消息")
-    error_message: Optional[str] = Field(None, description="错误信息")
+    result_message: str | None = Field(None, description="处理结果消息")
+    error_message: str | None = Field(None, description="错误信息")
     created_at: str = Field(..., description="创建时间")
-    started_at: Optional[str] = Field(None, description="开始处理时间")
-    completed_at: Optional[str] = Field(None, description="完成时间")
+    started_at: str | None = Field(None, description="开始处理时间")
+    completed_at: str | None = Field(None, description="完成时间")
     progress_percentage: float = Field(..., description="进度百分比")
 
 
@@ -235,9 +236,9 @@ class SceneIllustrationRequest(BaseModel):
 
     chapters_content: str = Field(..., description="章节内容")
     task_id: str = Field(..., description="任务标识符")
-    roles: List[RoleInfo] = Field(..., description="角色信息列表")
+    roles: list[RoleInfo] = Field(..., description="角色信息列表")
     num: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model_name: Optional[str] = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
 
 
 class EnhancedSceneIllustrationRequest(BaseModel):
@@ -245,9 +246,9 @@ class EnhancedSceneIllustrationRequest(BaseModel):
 
     chapters_content: str = Field(..., description="章节内容")
     task_id: str = Field(..., description="任务标识符")
-    roles: List[RoleInfo] = Field(..., description="角色信息列表")
+    roles: list[RoleInfo] = Field(..., description="角色信息列表")
     num: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model_name: Optional[str] = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
 
     @field_validator('roles', mode='before')
     @classmethod
@@ -277,7 +278,7 @@ class EnhancedSceneIllustrationRequest(BaseModel):
         else:
             raise ValueError(f"不支持的roles格式: {type(v)}")
 
-    def to_roles_dict(self) -> Dict[str, str]:
+    def to_roles_dict(self) -> dict[str, str]:
         """转换为Dify客户端期望的字典格式"""
         roles_dict = {}
         for role in self.roles:
@@ -306,12 +307,12 @@ class SceneIllustrationStatusResponse(BaseModel):
     status: str = Field(..., description="任务状态: pending/running/completed/failed")
     num: int = Field(..., description="请求生成的图片数量")
     generated_images: int = Field(..., description="已生成的图片数量")
-    prompts: Optional[str] = Field(None, description="Dify生成的提示词")
-    result_message: Optional[str] = Field(None, description="处理结果消息")
-    error_message: Optional[str] = Field(None, description="错误信息")
+    prompts: str | None = Field(None, description="Dify生成的提示词")
+    result_message: str | None = Field(None, description="处理结果消息")
+    error_message: str | None = Field(None, description="错误信息")
     created_at: str = Field(..., description="创建时间")
-    started_at: Optional[str] = Field(None, description="开始处理时间")
-    completed_at: Optional[str] = Field(None, description="完成时间")
+    started_at: str | None = Field(None, description="开始处理时间")
+    completed_at: str | None = Field(None, description="完成时间")
     progress_percentage: float = Field(..., description="进度百分比")
 
 
@@ -319,7 +320,7 @@ class SceneGalleryResponse(BaseModel):
     """场面图片列表响应模式."""
 
     task_id: str = Field(..., description="场面绘制任务ID")
-    images: List[str] = Field(..., description="图片文件名列表")
+    images: list[str] = Field(..., description="图片文件名列表")
 
 
 class SceneImageDeleteRequest(BaseModel):
@@ -334,7 +335,7 @@ class SceneRegenerateRequest(BaseModel):
 
     task_id: str = Field(..., description="原始任务ID")
     count: int = Field(..., ge=1, le=20, description="生成图片数量")
-    model: Optional[str] = Field(None, description="指定使用的模型名称（可选）")
+    model: str | None = Field(None, description="指定使用的模型名称（可选）")
 
 
 class SceneRegenerateResponse(BaseModel):
@@ -372,8 +373,8 @@ class VideoStatusResponse(BaseModel):
 
     img_name: str = Field(..., description="图片名称")
     has_video: bool = Field(..., description="是否存在视频")
-    video_status: Optional[str] = Field(None, description="视频生成状态")
-    video_filename: Optional[str] = Field(None, description="视频文件名")
+    video_status: str | None = Field(None, description="视频生成状态")
+    video_filename: str | None = Field(None, description="视频文件名")
 
 
 class ImageToVideoTaskStatusResponse(BaseModel):
@@ -382,12 +383,12 @@ class ImageToVideoTaskStatusResponse(BaseModel):
     task_id: int = Field(..., description="任务ID")
     img_name: str = Field(..., description="图片名称")
     status: str = Field(..., description="任务状态: pending/running/completed/failed")
-    model_name: Optional[str] = Field(None, description="使用的模型名称")
+    model_name: str | None = Field(None, description="使用的模型名称")
     user_input: str = Field(..., description="用户要求")
-    video_prompt: Optional[str] = Field(None, description="处理后的视频生成提示词")
-    video_filename: Optional[str] = Field(None, description="生成的视频文件名")
-    result_message: Optional[str] = Field(None, description="处理结果消息")
-    error_message: Optional[str] = Field(None, description="错误信息")
+    video_prompt: str | None = Field(None, description="处理后的视频生成提示词")
+    video_filename: str | None = Field(None, description="生成的视频文件名")
+    result_message: str | None = Field(None, description="处理结果消息")
+    error_message: str | None = Field(None, description="错误信息")
     created_at: str = Field(..., description="创建时间")
-    started_at: Optional[str] = Field(None, description="开始处理时间")
-    completed_at: Optional[str] = Field(None, description="完成时间")
+    started_at: str | None = Field(None, description="开始处理时间")
+    completed_at: str | None = Field(None, description="完成时间")

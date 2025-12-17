@@ -7,7 +7,7 @@
 
 import re
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any
 
 from .base_crawler import BaseCrawler
 from .http_client import RequestConfig, RequestStrategy
@@ -31,7 +31,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             "Connection": "keep-alive"
         }
 
-    async def search_novels(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
             # 尝试多个搜索入口
@@ -43,7 +43,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
             for i, search_url in enumerate(search_urls):
                 try:
-                    config = RequestConfig(
+                    RequestConfig(
                         timeout=10,
                         max_retries=2,
                         strategy=RequestStrategy.SIMPLE,
@@ -68,20 +68,20 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                         return novels[:20]
 
                 except Exception as e:
-                    print(f"搜索入口{i+1}失败: {str(e)}")
+                    print(f"搜索入口{i+1}失败: {e!s}")
                     continue
 
             return []
 
         except Exception as e:
-            print(f"Shukuge搜索失败: {str(e)}")
+            print(f"Shukuge搜索失败: {e!s}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> List[Dict[str, Any]]:
+    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
@@ -105,14 +105,14 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"Shukuge获取章节列表失败: {str(e)}")
+            print(f"Shukuge获取章节列表失败: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> Dict[str, Any]:
+    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 配置请求
-            config = RequestConfig(
+            RequestConfig(
                 timeout=10,
                 max_retries=3,
                 retry_delay=0.8,  # Shukuge需要稍长的延迟
@@ -135,12 +135,12 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             return {"title": title, "content": content}
 
         except Exception as e:
-            print(f"Shukuge获取章节内容失败: {str(e)}")
-            return {"title": "章节内容", "content": f"获取失败: {str(e)}"}
+            print(f"Shukuge获取章节内容失败: {e!s}")
+            return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     # ==================== Shukuge专用提取方法 ====================
 
-    def _extract_shukuge_search_results(self, soup, keyword: str) -> List[Dict[str, Any]]:
+    def _extract_shukuge_search_results(self, soup, keyword: str) -> list[dict[str, Any]]:
         """提取Shukuge搜索结果"""
         novels = []
 
@@ -198,7 +198,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
         return author
 
-    async def _try_special_chapter_page(self, novel_url: str, soup) -> List[Dict[str, Any]]:
+    async def _try_special_chapter_page(self, novel_url: str, soup) -> list[dict[str, Any]]:
         """尝试从专用章节页获取章节列表"""
         try:
             # 提取小说ID
@@ -218,7 +218,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
         except Exception:
             return []
 
-    async def _try_reading_links(self, novel_url: str, soup) -> List[Dict[str, Any]]:
+    async def _try_reading_links(self, novel_url: str, soup) -> list[dict[str, Any]]:
         """尝试从阅读链接获取章节列表"""
         try:
             # 查找阅读链接

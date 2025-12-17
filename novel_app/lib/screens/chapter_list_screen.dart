@@ -6,7 +6,6 @@ import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
 import '../services/cache_manager.dart';
-import '../services/cache_sync_service.dart';
 import '../screens/reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
@@ -798,13 +797,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 case 'cache_all':
                   _enqueueCacheWholeNovel();
                   break;
-                case 'cache_server':
-                  _enqueueServerCache();
-                  break;
-                case 'cache_sync':
-                  _syncServerCache();
-                  break;
-                case 'clear_cache':
+                                case 'clear_cache':
                   _showClearCacheDialog();
                   break;
                 case 'refresh':
@@ -837,27 +830,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                     ],
                   ),
                 ),
-                if (!isCustomNovel) const PopupMenuItem(
-                  value: 'cache_server',
-                  child: Row(
-                    children: [
-                      Icon(Icons.cloud_download),
-                      SizedBox(width: 8),
-                      Text('服务端缓存'),
-                    ],
-                  ),
-                ),
-                if (!isCustomNovel) const PopupMenuItem(
-                  value: 'cache_sync',
-                  child: Row(
-                    children: [
-                      Icon(Icons.sync),
-                      SizedBox(width: 8),
-                      Text('同步缓存'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
+                                const PopupMenuItem(
                   value: 'clear_cache',
                   child: Row(
                     children: [
@@ -1000,60 +973,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-  /// 使用服务端缓存
-  Future<void> _enqueueServerCache() async {
-    try {
-      final taskId =
-          await _cacheManager.createServerCacheTask(widget.novel.url);
-      if (taskId != null && taskId > 0) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已开始服务端缓存')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('创建服务端缓存任务失败')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('服务端缓存失败: $e')),
-        );
-      }
-    }
-  }
-
-  /// 同步服务端缓存
-  Future<void> _syncServerCache() async {
-    try {
-      final cacheSyncService = CacheSyncService();
-      final success = await cacheSyncService.syncNovel(widget.novel.url);
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('正在同步服务端缓存...')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('服务端未找到该小说的缓存任务')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步缓存失败: $e')),
-        );
-      }
-    }
-  }
-
+  
+  
   // 构建正常的章节列表（支持长按进入重排模式）
   Widget _buildNormalChapterList() {
     return ListView.builder(

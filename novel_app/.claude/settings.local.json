@@ -15,7 +15,8 @@
       "mcp__context7__get-library-docs",
       "WebSearch",
       "Bash(curl:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

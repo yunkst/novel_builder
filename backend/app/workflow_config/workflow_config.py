@@ -3,12 +3,13 @@ ComfyUI工作流配置管理器
 负责加载和管理YAML格式的工作流配置
 """
 
-import os
-import yaml
-from typing import Dict, List, Optional, Any
-from pathlib import Path
-from pydantic import BaseModel, Field
 import logging
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,8 @@ class WorkflowInfo(BaseModel):
     """工作流信息模型"""
     title: str = Field(..., description="工作流标题")
     path: str = Field(..., description="工作流文件路径")
-    description: Optional[str] = Field(None, description="工作流描述")
-    model_type: Optional[str] = Field(None, description="模型类型")
+    description: str | None = Field(None, description="工作流描述")
+    model_type: str | None = Field(None, description="模型类型")
 
 
 class WorkflowSettings(BaseModel):
@@ -30,15 +31,15 @@ class WorkflowSettings(BaseModel):
 
 class WorkflowConfig(BaseModel):
     """完整工作流配置模型"""
-    t2i: List[WorkflowInfo] = Field(default_factory=list, description="文生图工作流列表")
-    i2v: List[WorkflowInfo] = Field(default_factory=list, description="图生视频工作流列表")
+    t2i: list[WorkflowInfo] = Field(default_factory=list, description="文生图工作流列表")
+    i2v: list[WorkflowInfo] = Field(default_factory=list, description="图生视频工作流列表")
     settings: WorkflowSettings = Field(..., description="全局设置")
 
 
 class WorkflowConfigManager:
     """工作流配置管理器"""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """
         初始化配置管理器
 
@@ -49,7 +50,6 @@ class WorkflowConfigManager:
             # 根据运行环境确定配置文件路径
             # 在Docker容器中，backend目录挂载到/app，所以配置文件在/app/workflows.yaml
             # 在本地开发中，相对于当前文件的路径
-            import os
 
             # 检查是否在Docker容器中运行（通过检查/app目录是否存在）
             if Path("/app").exists() and Path("/app/app").exists():
@@ -61,7 +61,7 @@ class WorkflowConfigManager:
                 config_path = current_dir / "workflows.yaml"
 
         self.config_path = Path(config_path)
-        self._config: Optional[WorkflowConfig] = None
+        self._config: WorkflowConfig | None = None
         self._load_config()
 
     def _load_config(self) -> None:
@@ -70,7 +70,7 @@ class WorkflowConfigManager:
             if not self.config_path.exists():
                 raise FileNotFoundError(f"工作流配置文件不存在: {self.config_path}")
 
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with self.config_path.open(encoding='utf-8') as f:
                 config_data = yaml.safe_load(f)
 
             if not config_data:
@@ -89,7 +89,7 @@ class WorkflowConfigManager:
             raise RuntimeError("配置未初始化")
         return self._config
 
-    def get_t2i_workflow_by_title(self, title: str) -> Optional[WorkflowInfo]:
+    def get_t2i_workflow_by_title(self, title: str) -> WorkflowInfo | None:
         """
         根据标题获取t2i工作流
 
@@ -105,7 +105,7 @@ class WorkflowConfigManager:
                 return workflow
         return None
 
-    def get_i2v_workflow_by_title(self, title: str) -> Optional[WorkflowInfo]:
+    def get_i2v_workflow_by_title(self, title: str) -> WorkflowInfo | None:
         """
         根据标题获取i2v工作流
 
@@ -164,7 +164,7 @@ class WorkflowConfigManager:
 
         raise ValueError("没有可用的i2v工作流配置")
 
-    def list_t2i_workflows(self) -> List[Dict[str, Any]]:
+    def list_t2i_workflows(self) -> list[dict[str, Any]]:
         """
         列出所有可用的t2i工作流
 

@@ -6,20 +6,24 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
+from typing import Any
+
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from ..models.scene_illustration import SceneIllustrationTask, SceneImageGallery
 from ..schemas import (
-    SceneIllustrationRequest, SceneIllustrationResponse,
-    SceneGalleryResponse, SceneImageDeleteRequest,
-    EnhancedSceneIllustrationRequest, RoleInfo,
-    SceneRegenerateRequest, SceneRegenerateResponse
+    EnhancedSceneIllustrationRequest,
+    RoleInfo,
+    SceneGalleryResponse,
+    SceneIllustrationResponse,
+    SceneImageDeleteRequest,
+    SceneRegenerateRequest,
+    SceneRegenerateResponse,
 )
-from .dify_client import DifyClient
-from .comfyui_client import create_comfyui_client_for_model, MediaFileResult
 from ..workflow_config.workflow_config import workflow_config_manager
+from .comfyui_client import create_comfyui_client_for_model
+from .dify_client import DifyClient
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +39,7 @@ class SceneIllustrationService:
         """
         self.dify_client = dify_client
 
-    def _restore_roles_from_json(self, roles_json: str) -> Dict[str, Any]:
+    def _restore_roles_from_json(self, roles_json: str) -> dict[str, Any]:
         """从JSON字符串恢复角色数据为字典格式
 
         Args:
@@ -543,7 +547,7 @@ class SceneIllustrationService:
             raise
         except Exception as e:
             logger.error(f"重新生成场面图片失败: {e}")
-            raise ValueError(f"重新生成图片失败: {str(e)}")
+            raise ValueError(f"重新生成图片失败: {e!s}")
 
 
 # 创建服务实例（需要在调用时传入DifyClient）

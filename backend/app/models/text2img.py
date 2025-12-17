@@ -4,10 +4,8 @@
 本章包含用于角色卡图片生成和管理的数据库模型。
 """
 
-from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 
 from ..database import Base
@@ -25,17 +23,6 @@ class RoleImageGallery(Base):
     img_url = Column(String(500), nullable=False, comment="图片URL（文件名）")
     prompt = Column(Text, nullable=False, comment="生成图片的提示词")
 
-    # 视频相关字段
-    video_status = Column(
-        String(20),
-        default="none",
-        nullable=False,
-        comment="视频生成状态: none/pending/running/completed/failed"
-    )
-    video_filename = Column(String(500), comment="生成的视频文件名")
-    video_prompt = Column(Text, comment="视频生成提示词")
-    video_created_at = Column(DateTime(timezone=True), comment="视频创建时间")
-
     # 时间戳
     created_at = Column(
         DateTime(timezone=True),
@@ -50,7 +37,7 @@ class RoleImageGallery(Base):
 
     def __repr__(self) -> str:
         """返回模型的字符串表示."""
-        return f"<RoleImageGallery(role_id='{self.role_id}', img_url='{self.img_url}', video_status='{self.video_status}')>"
+        return f"<RoleImageGallery(role_id='{self.role_id}', img_url='{self.img_url}')>"
 
 
 class RoleCardTask(Base):

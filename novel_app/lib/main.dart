@@ -6,6 +6,7 @@ import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'services/cache_manager.dart';
 import 'core/di/api_service_provider.dart';
+import 'utils/video_cache_manager.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
@@ -124,7 +125,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final CacheManager _cacheManager = CacheManager();
 
@@ -142,21 +143,66 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    debugPrint('HomePage: 初始化并添加生命周期监听器');
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 标记应用活跃
     _cacheManager.setAppActive(true);
 
-    // 应用启动时同步服务端缓存（异步执行，不阻塞UI）
+    // 应用启动时检查API可用性（异步执行，不阻塞UI）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _cacheManager.syncOnAppStart();
+      _cacheManager.checkApiAvailability();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cacheManager.setAppActive(false);
+    // 应用退出时清理所有视频控制器
+    VideoCacheManager.disposeAll();
+    debugPrint('HomePage: 移除生命周期监听器并清理资源');
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    debugPrint('HomePage: 应用生命周期状态变化: $state');
+
+    switch (state) {
+      case AppLifecycleState.paused:
+        // 应用进入后台时，暂停所有视频播放
+        VideoCacheManager.pauseAllExcept(null);
+        debugPrint('HomePage: 应用进入后台，暂停所有视频播放');
+        break;
+      case AppLifecycleState.resumed:
+        // 应用恢复前台时，不自动恢复播放，让可见性检测器处理
+        debugPrint('HomePage: 应用恢复前台');
+        break;
+      case AppLifecycleState.inactive:
+        // 应用不活跃时，暂停所有视频播放
+        VideoCacheManager.pauseAllExcept(null);
+        debugPrint('HomePage: 应用变为不活跃，暂停所有视频播放');
+        break;
+      case AppLifecycleState.detached:
+        // 应用分离时，清理所有视频控制器
+        VideoCacheManager.disposeAll();
+        debugPrint('HomePage: 应用分离，清理所有视频控制器');
+        break;
+      case AppLifecycleState.hidden:
+        // 应用隐藏时，暂停所有视频播放
+        VideoCacheManager.pauseAllExcept(null);
+        debugPrint('HomePage: 应用隐藏，暂停所有视频播放');
+        break;
+    }
   }
 
   @override

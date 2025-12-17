@@ -4,9 +4,10 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.debug
     ports:
       - "3800:8000"
+      - "6678:5678"   # Debugpy debugger port
     volumes:
       # 添加这行，把本地 backend 目录挂载到容器中
       - ./backend:/app

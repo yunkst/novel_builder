@@ -1,0 +1,221 @@
+import 'package:test/test.dart';
+import 'package:novel_api/novel_api.dart';
+
+
+/// tests for DefaultApi
+void main() {
+  final instance = NovelApi().getDefaultApi();
+
+  group(DefaultApi, () {
+    // Chapter Content
+    //
+    // 获取章节内容  - **url**: 章节URL - **force_refresh**: 是否强制刷新（默认 False）   - False: 优先从缓存获取，缓存不存在时从源站抓取   - True: 强制从源站重新获取（用于更新内容）
+    //
+    //Future<ChapterContent> chapterContentChapterContentGet(String url, { bool forceRefresh, String X_API_TOKEN }) async
+    test('test chapterContentChapterContentGet', () async {
+      // TODO
+    });
+
+    // Chapters
+    //
+    //Future<BuiltList<Chapter>> chaptersChaptersGet(String url, { String X_API_TOKEN }) async
+    test('test chaptersChaptersGet', () async {
+      // TODO
+    });
+
+    // Check Video Status
+    //
+    // 检查图片是否有已生成的视频  根据图片名称快速查询是否已有对应的视频文件存在。  **路径参数:** - **img_name**: 要查询的图片文件名称  **返回值:** - **img_name**: 图片名称 - **has_video**: 是否有对应的视频文件（true/false） - **video_url**: 视频文件URL（如果有） - **created_at**: 视频创建时间（如果有）  **使用场景:** - 在显示图片时快速判断是否显示视频播放按钮 - 避免重复创建已有视频的任务
+    //
+    //Future<VideoStatusResponse> checkVideoStatusApiImageToVideoHasVideoImgNameGet(String imgName, { String X_API_TOKEN }) async
+    test('test checkVideoStatusApiImageToVideoHasVideoImgNameGet', () async {
+      // TODO
+    });
+
+    // Delete Role Card Image
+    //
+    // 从角色图集中删除图片  - **role_id**: 人物卡ID - **img_url**: 要删除的图片URL
+    //
+    //Future<JsonObject> deleteRoleCardImageApiRoleCardImageDelete(RoleImageDeleteRequest roleImageDeleteRequest, { String X_API_TOKEN }) async
+    test('test deleteRoleCardImageApiRoleCardImageDelete', () async {
+      // TODO
+    });
+
+    // Delete Scene Image
+    //
+    // 从场面绘制结果中删除图片  - **task_id**: 场面绘制任务ID - **filename**: 要删除的图片文件名
+    //
+    //Future<JsonObject> deleteSceneImageApiSceneIllustrationImageDelete(SceneImageDeleteRequest sceneImageDeleteRequest, { String X_API_TOKEN }) async
+    test('test deleteSceneImageApiSceneIllustrationImageDelete', () async {
+      // TODO
+    });
+
+    // Generate Role Card Images
+    //
+    // 异步生成人物卡图片  - **role_id**: 人物卡ID - **roles**: 人物卡设定信息 - **user_input**: 用户要求  返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度
+    //
+    //Future<JsonObject> generateRoleCardImagesApiRoleCardGeneratePost(RoleCardGenerateRequest roleCardGenerateRequest, { String X_API_TOKEN }) async
+    test('test generateRoleCardImagesApiRoleCardGeneratePost', () async {
+      // TODO
+    });
+
+    // Generate Scene Images
+    //
+    // 生成场面绘制图片  - **chapters_content**: 章节内容 - **task_id**: 任务标识符 - **roles**: 角色信息 - **num**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选）  返回任务ID，可通过后续接口查询和获取图片
+    //
+    //Future<JsonObject> generateSceneImagesApiSceneIllustrationGeneratePost(EnhancedSceneIllustrationRequest enhancedSceneIllustrationRequest, { String X_API_TOKEN }) async
+    test('test generateSceneImagesApiSceneIllustrationGeneratePost', () async {
+      // TODO
+    });
+
+    // Generate Video From Image
+    //
+    // 生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
+    //
+    //Future<ImageToVideoResponse> generateVideoFromImageApiImageToVideoGeneratePost(ImageToVideoRequest imageToVideoRequest, { String X_API_TOKEN }) async
+    test('test generateVideoFromImageApiImageToVideoGeneratePost', () async {
+      // TODO
+    });
+
+    // Get Available Models
+    //
+    // 获取可用的工作流模型列表
+    //
+    //Future<JsonObject> getAvailableModelsApiRoleCardModelsGet({ String X_API_TOKEN }) async
+    test('test getAvailableModelsApiRoleCardModelsGet', () async {
+      // TODO
+    });
+
+    // Get Image Proxy
+    //
+    // 图片代理接口 - 从ComfyUI获取图片并转发给用户  返回图片二进制数据 (PNG格式)  - **filename**: 图片文件名 - **返回**: 图片二进制数据 (Content-Type: image/png)
+    //
+    //Future<Uint8List> getImageProxyText2imgImageFilenameGet(String filename) async
+    test('test getImageProxyText2imgImageFilenameGet', () async {
+      // TODO
+    });
+
+    // Get Role Card Gallery
+    //
+    // 查看角色图集  - **role_id**: 人物卡ID
+    //
+    //Future<RoleGalleryResponse> getRoleCardGalleryApiRoleCardGalleryRoleIdGet(String roleId, { String X_API_TOKEN }) async
+    test('test getRoleCardGalleryApiRoleCardGalleryRoleIdGet', () async {
+      // TODO
+    });
+
+    // Get Role Card Task Status
+    //
+    // 查询人物卡生成任务状态  - **task_id**: 任务ID
+    //
+    //Future<RoleCardTaskStatusResponse> getRoleCardTaskStatusApiRoleCardStatusTaskIdGet(int taskId, { String X_API_TOKEN }) async
+    test('test getRoleCardTaskStatusApiRoleCardStatusTaskIdGet', () async {
+      // TODO
+    });
+
+    // Get Scene Gallery
+    //
+    // 查看场面绘制图片列表  - **task_id**: 场面绘制任务ID
+    //
+    //Future<SceneGalleryResponse> getSceneGalleryApiSceneIllustrationGalleryTaskIdGet(String taskId, { String X_API_TOKEN }) async
+    test('test getSceneGalleryApiSceneIllustrationGalleryTaskIdGet', () async {
+      // TODO
+    });
+
+    // Get Source Sites
+    //
+    // 获取所有源站列表
+    //
+    //Future<BuiltList<SourceSite>> getSourceSitesSourceSitesGet({ String X_API_TOKEN }) async
+    test('test getSourceSitesSourceSitesGet', () async {
+      // TODO
+    });
+
+    // Get Video File
+    //
+    // 获取视频文件  返回视频二进制数据 (MP4格式)  - **img_name**: 图片名称 - **返回**: 视频二进制数据 (Content-Type: video/mp4)
+    //
+    //Future<Uint8List> getVideoFileApiImageToVideoVideoImgNameGet(String imgName) async
+    test('test getVideoFileApiImageToVideoVideoImgNameGet', () async {
+      // TODO
+    });
+
+    // Get Video Task Status
+    //
+    // 查询图生视频任务状态  获取指定任务的详细状态信息，包括生成进度和结果。  **路径参数:** - **task_id**: 图生视频任务的唯一标识符  **返回值:** - **task_id**: 任务ID - **img_name**: 处理的图片名称 - **status**: 任务状态（pending/running/completed/failed） - **model_name**: 使用的模型名称 - **user_input**: 用户输入要求 - **video_prompt**: 生成的视频提示词（如果有） - **video_filename**: 生成的视频文件名（完成时） - **result_message**: 结果描述信息 - **error_message**: 错误信息（失败时） - **created_at**: 任务创建时间 - **updated_at**: 任务更新时间
+    //
+    //Future<ImageToVideoTaskStatusResponse> getVideoTaskStatusApiImageToVideoStatusTaskIdGet(int taskId, { String X_API_TOKEN }) async
+    test('test getVideoTaskStatusApiImageToVideoStatusTaskIdGet', () async {
+      // TODO
+    });
+
+    // Health Check
+    //
+    //Future<BuiltMap<String, String>> healthCheckHealthGet() async
+    test('test healthCheckHealthGet', () async {
+      // TODO
+    });
+
+    // Image To Video Health Check
+    //
+    // 检查图生视频服务健康状态
+    //
+    //Future<JsonObject> imageToVideoHealthCheckApiImageToVideoHealthGet({ String X_API_TOKEN }) async
+    test('test imageToVideoHealthCheckApiImageToVideoHealthGet', () async {
+      // TODO
+    });
+
+    // Index
+    //
+    //Future<JsonObject> indexGet() async
+    test('test indexGet', () async {
+      // TODO
+    });
+
+    // Regenerate Scene Images
+    //
+    // 基于现有任务重新生成场面图片  - **task_id**: 原始任务ID - **count**: 生成图片数量 - **model**: 指定使用的模型名称（可选，会使用原始任务的模型）
+    //
+    //Future<JsonObject> regenerateSceneImagesApiSceneIllustrationRegeneratePost(SceneRegenerateRequest sceneRegenerateRequest, { String X_API_TOKEN }) async
+    test('test regenerateSceneImagesApiSceneIllustrationRegeneratePost', () async {
+      // TODO
+    });
+
+    // Regenerate Similar Images
+    //
+    // 重新生成相似图片  - **img_url**: 参考图片URL - **count**: 生成图片数量 - **model**: 指定使用的模型名称（可选）
+    //
+    //Future<JsonObject> regenerateSimilarImagesApiRoleCardRegeneratePost(RoleRegenerateRequest roleRegenerateRequest, { String X_API_TOKEN }) async
+    test('test regenerateSimilarImagesApiRoleCardRegeneratePost', () async {
+      // TODO
+    });
+
+    // Role Card Health Check
+    //
+    // 检查人物卡服务健康状态
+    //
+    //Future<JsonObject> roleCardHealthCheckApiRoleCardHealthGet({ String X_API_TOKEN }) async
+    test('test roleCardHealthCheckApiRoleCardHealthGet', () async {
+      // TODO
+    });
+
+    // Search
+    //
+    // 搜索小说，支持指定站点
+    //
+    //Future<BuiltList<Novel>> searchSearchGet(String keyword, { String sites, String X_API_TOKEN }) async
+    test('test searchSearchGet', () async {
+      // TODO
+    });
+
+    // Text2Img Health Check
+    //
+    // 检查ComfyUI服务健康状态
+    //
+    //Future<JsonObject> text2imgHealthCheckText2imgHealthGet({ String X_API_TOKEN }) async
+    test('test text2imgHealthCheckText2imgHealthGet', () async {
+      // TODO
+    });
+
+  });
+}

@@ -165,7 +165,8 @@
   },
   "97": {
     "inputs": {
-      "image": "图片base64在这里替换"
+      "image": "图片base64在这里替换",
+      "upload":"output"
     },
     "class_type": "LoadImage",
     "_meta": {

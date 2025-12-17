@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
-import '../models/cache_task.dart';
 import '../models/character.dart';
 import '../extensions/api_novel_extension.dart';
 import '../extensions/api_chapter_extension.dart';
@@ -377,163 +376,7 @@ class ApiServiceWrapper {
     // _dio.close(); // 已注释，避免关闭共享连接
   }
 
-  // ========== 缓存相关方法 ==========
-
-  /// 创建缓存任务
-  Future<CacheTask> createCacheTask(String novelUrl) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      final response = await _api.createCacheTaskApiCacheCreatePost(
-        novelUrl: novelUrl,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        return CacheTask.fromJson(data);
-      } else {
-        throw Exception('创建缓存任务失败：${response.statusCode}');
-      }
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// 获取缓存任务列表
-  Future<List<CacheTask>> getCacheTasks() async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-
-      final response = await _api.getCacheTasksApiCacheTasksGet(
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        try {
-          // 使用动态类型转换来处理JsonObject
-          final data = response.data;
-          debugPrint('API响应数据类型: ${data.runtimeType}');
-
-          // 尝试获取tasks列表
-          List<dynamic> tasksList = [];
-
-          try {
-            if (data != null) {
-              // 将数据转换为字符串进行调试
-              final dataString = data.toString();
-              debugPrint('数据字符串: $dataString');
-
-              // 目前直接返回空列表，避免复杂的JsonObject解析
-              // 实际项目中需要修改API响应格式或使用proper JSON解析
-              debugPrint('暂时返回空缓存任务列表，避免JsonObject解析问题');
-            }
-          } catch (e) {
-            debugPrint('处理API响应数据失败: $e');
-          }
-
-          debugPrint('获取到 ${tasksList.length} 个缓存任务');
-
-          return tasksList.map((taskData) {
-            // 对于现在，由于我们返回空列表，这里不会执行
-            // 但保留结构以备将来使用
-            if (taskData is Map) {
-              final Map<String, dynamic> taskMap = <String, dynamic>{};
-              for (final key in taskData.keys) {
-                if (key != null) {
-                  taskMap[key.toString()] = taskData[key];
-                }
-              }
-              return CacheTask.fromJson(taskMap);
-            } else {
-              debugPrint('任务数据不是Map类型: ${taskData.runtimeType}');
-              // 返回一个默认的空任务
-              return CacheTask(
-                id: 0,
-                novelUrl: '',
-                novelTitle: '',
-                status: 'unknown',
-                totalChapters: 0,
-                cachedChapters: 0,
-                failedChapters: 0,
-                createdAt: DateTime.now(),
-              );
-            }
-          }).toList();
-        } catch (e) {
-          debugPrint('解析缓存任务数据失败: $e');
-          debugPrint('响应数据详情: ${response.data}');
-          // 返回空列表而不是抛出异常
-          return [];
-        }
-      }
-
-      return [];
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// 获取缓存任务状态
-  Future<CacheTaskUpdate> getCacheTaskStatus(int taskId) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      final response = await _api.getCacheStatusApiCacheStatusTaskIdGet(
-        taskId: taskId,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        return CacheTaskUpdate.fromJson(data);
-      } else {
-        throw Exception('获取缓存状态失败：${response.statusCode}');
-      }
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// 取消缓存任务
-  Future<bool> cancelCacheTask(int taskId) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      final response = await _api.cancelCacheTaskApiCacheCancelTaskIdPost(
-        taskId: taskId,
-        X_API_TOKEN: token,
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// 下载已缓存小说
-  Future<String> downloadCachedNovel(int taskId,
-      {String format = 'json'}) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      final response = await _api.downloadCachedNovelApiCacheDownloadTaskIdGet(
-        taskId: taskId,
-        format: format,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.toString();
-      } else {
-        throw Exception('下载缓存失败：${response.statusCode}');
-      }
-    } catch (e) {
-      throw _handleError(e);
-    }
-  }
-
+  
   /// 生成人物卡图片
   Future<Map<String, dynamic>> generateRoleCardImages({
     required String roleId,
@@ -883,5 +726,150 @@ class ApiServiceWrapper {
       bodyPrompts: roles['body_prompts']?.toString(),
       createdAt: DateTime.now(),
     );
+  }
+
+  // ============================================================================
+  // 图生视频功能
+  // ============================================================================
+
+  /// 生成图生视频
+  Future<ImageToVideoResponse> generateVideoFromImage({
+    required String imgName,
+    required String userInput,
+    required String modelName,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.generateVideoFromImageApiImageToVideoGeneratePost(
+        imageToVideoRequest: ImageToVideoRequest((b) => b
+          ..imgName = imgName
+          ..userInput = userInput
+          ..modelName = modelName),
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('图生视频生成请求成功: ${response.data}');
+        return response.data!;
+      } else {
+        throw Exception('生成图生视频失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('生成图生视频异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 检查图片是否有视频
+  Future<VideoStatusResponse> checkVideoStatus(String imgName) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.checkVideoStatusApiImageToVideoHasVideoImgNameGet(
+        imgName: imgName,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data ?? VideoStatusResponse((b) => b
+          ..imgName = imgName
+          ..hasVideo = false);
+      } else {
+        throw Exception('检查视频状态失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('检查视频状态异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 查询图生视频任务状态
+  Future<Map<String, dynamic>> getVideoTaskStatus(int taskId) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.getVideoTaskStatusApiImageToVideoStatusTaskIdGet(
+        taskId: taskId,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception('查询视频任务状态失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('查询视频任务状态异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取视频文件URL
+  Future<String> getVideoFileUrl(String imgName) async {
+    _ensureInitialized();
+    final host = await getHost();
+    if (host == null) {
+      throw Exception('后端地址未配置');
+    }
+    return buildVideoUrl(host, imgName);
+  }
+
+  /// 构建视频URL（静态方法，直接拼接）
+  static String buildVideoUrl(String host, String imgName) {
+    return '$host/api/image-to-video/video/${Uri.encodeComponent(imgName)}';
+  }
+
+  /// 重新生成场景插图
+  Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+    required String taskId,
+    required int count,
+    String? modelName,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
+        sceneRegenerateRequest: SceneRegenerateRequest((b) => b
+          ..taskId = taskId
+          ..count = count
+          ..model = modelName ?? ''),
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>? ?? {'status': 'failed'};
+      } else {
+        throw Exception('重新生成场景插图失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('重新生成场景插图异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 图生视频健康检查
+  Future<Map<String, dynamic>> checkImageToVideoHealth() async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.imageToVideoHealthCheckApiImageToVideoHealthGet(
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>? ?? {'status': 'unhealthy'};
+      } else {
+        throw Exception('图生视频健康检查失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('图生视频健康检查异常: $e');
+      throw _handleError(e);
+    }
   }
 }
