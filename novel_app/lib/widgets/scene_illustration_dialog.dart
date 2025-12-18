@@ -5,9 +5,8 @@ import '../widgets/character_selector.dart';
 import '../widgets/model_selector.dart';
 import '../services/database_service.dart';
 import '../services/unified_stream_manager.dart';
+import '../services/scene_illustration_service.dart';
 import '../models/stream_config.dart';
-import '../core/di/api_service_provider.dart';
-import 'package:novel_api/novel_api.dart';
 
 class SceneIllustrationDialog extends StatefulWidget {
   final String paragraphText;
@@ -35,6 +34,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
   final _scrollController = ScrollController();
 
   final DatabaseService _databaseService = DatabaseService();
+  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
   List<int> _selectedCharacterIds = [];
   List<Character> _characters = [];
   int _imageCount = 1;
@@ -63,12 +63,12 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     _contentController.text = '';
     _loadCharacters();
 
-    // 延迟启动AI生成，确保角色加载完成后再开始
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        _startSceneDescriptionGeneration();
-      }
-    });
+    // 移除自动AI生成逻辑，改为用户手动触发
+    // Future.delayed(const Duration(milliseconds: 500), () {
+    //   if (mounted) {
+    //     _startSceneDescriptionGeneration();
+    //   }
+    // });
   }
 
   Future<void> _loadCharacters() async {
@@ -159,13 +159,30 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
 
   /// 开始场景描写流式生成
   Future<void> _startSceneDescriptionGeneration() async {
+    // 防止重复调用
+    if (_isSceneGenerating) {
+      debugPrint('AI生成正在进行中，忽略重复调用');
+      return;
+    }
+
     debugPrint('🚀 === 开始场景描写生成 ===');
+
+    // 重置状态并清空现有内容
+    setState(() {
+      _contentController.text = '';
+      _isSceneGenerating = true;
+      _sceneGenerationError = null;
+    });
 
     // 检查Dify配置
     final prefs = await SharedPreferences.getInstance();
     final difyUrl = prefs.getString('dify_url');
     if (difyUrl == null || difyUrl.isEmpty) {
       debugPrint('Dify未配置，跳过场景描写生成');
+      setState(() {
+        _isSceneGenerating = false;
+        _sceneGenerationError = 'Dify服务未配置，请在设置中配置Dify URL';
+      });
       return;
     }
 
@@ -173,23 +190,22 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     final chapterContent = await _databaseService.getCachedChapter(widget.chapterId);
     if (chapterContent == null || chapterContent.isEmpty) {
       debugPrint('章节内容为空，跳过场景描写生成');
+      setState(() {
+        _isSceneGenerating = false;
+        _sceneGenerationError = '章节内容为空，无法生成场景描写';
+      });
       return;
     }
 
-    // 获取当前选择段落之前的内容
-    final contentBeforeParagraph = _getMatchableContent(chapterContent, widget.paragraphIndex - 1);
+    // 获取当前段落及之前的内容作为AI上下文
+    final fullContext = _getMatchableContent(chapterContent, widget.paragraphIndex);
 
-    // 重新筛选在contentBeforeParagraph中出现的角色
+    // 重新筛选在fullContext中出现的角色
     final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
-    final appearingCharacters = _findAppearingCharacters(contentBeforeParagraph, allCharacters);
+    final appearingCharacters = _findAppearingCharacters(fullContext, allCharacters);
     final selectedCharacters = allCharacters.where((c) => appearingCharacters.contains(c.id)).toList();
 
-    if (mounted) {
-      setState(() {
-        _isSceneGenerating = true;
-        _sceneGenerationError = null;
-      });
-    }
+    // 状态已在函数开始时设置，这里无需重复设置
 
     try {
       // 使用统一流式管理器
@@ -198,7 +214,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
       // 创建场景描写配置
       final config = StreamConfig.sceneDescription(
         inputs: {
-          'current_chapter_content': contentBeforeParagraph,
+          'current_chapter_content': fullContext,
           'roles': Character.formatForAI(selectedCharacters),
           'cmd': '场景描写',
         },
@@ -269,21 +285,6 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     super.dispose();
   }
 
-  Future<void> regenerateSceneDescription() async {
-    if (_isSceneGenerating) return;
-
-    // 清空当前内容
-    if (mounted) {
-      setState(() {
-        _contentController.text = '';
-        _isSceneGenerating = false;
-        _sceneGenerationError = null;
-      });
-    }
-
-    await _startSceneDescriptionGeneration();
-  }
-
   Future<void> generateIllustration() async {
     if (_contentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,27 +304,22 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
       // 获取选中的角色
       final selectedCharacters = _characters.where((c) => _selectedCharacterIds.contains(c.id)).toList();
 
-      // 使用生成的API客户端
-      final api = ApiServiceProvider.instance.defaultApi;
-
       // 创建角色信息列表（使用新的RoleInfo格式）
       final rolesList = Character.toRoleInfoList(selectedCharacters);
 
-      // 构建任务ID
-      final taskId = 'scene_${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('开始创建插图，段落索引: ${widget.paragraphIndex}');
 
-      // 调用生成的API
-      final request = EnhancedSceneIllustrationRequest((b) => b
-        ..chaptersContent = _contentController.text.trim()
-        ..taskId = taskId
-        ..roles.addAll(rolesList)
-        ..num_ = _imageCount
-        ..modelName = _selectedModel);
-
-      final response = await api.generateSceneImagesApiSceneIllustrationGeneratePost(
-        enhancedSceneIllustrationRequest: request,
+      // 使用SceneIllustrationService创建插图（自动插入标记）
+      final illustrationId = await _sceneIllustrationService.createSceneIllustrationWithMarkup(
+        novelUrl: widget.novelUrl,
+        chapterId: widget.chapterId,
+        paragraphText: _contentController.text.trim(),
+        roles: rolesList,
+        imageCount: _imageCount,
+        modelName: _selectedModel,
+        insertionPosition: 'after', // 在段落后插入插图
+        paragraphIndex: widget.paragraphIndex,
       );
-      final illustrationId = response.data;
 
       if (mounted) {
         setState(() {
@@ -337,7 +333,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
           ),
         );
 
-        // 通知父组件刷新 (转换为字符串taskId)
+        // 通知父组件刷新
         widget.onRefresh?.call(illustrationId.toString());
 
         // 关闭对话框
@@ -465,28 +461,35 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
                 maxLines: 4,
                 enabled: !_isSceneGenerating, // 生成时禁用编辑
                 style: const TextStyle(color: Colors.white), // 始终白色文字
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(12),
                   filled: true,
                   fillColor: Colors.black, // 始终黑色背景
+                  hintText: '请输入场景描述，或点击下方"AI生成画面"按钮自动生成',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
                 ),
               ),
             ),
 
-            // 重新生成按钮
-            if (!_isSceneGenerating) ...[
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
-                onPressed: regenerateSceneDescription,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重新生成场景描写'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
+            // AI生成画面按钮 - 替换原来的重新生成按钮
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _isSceneGenerating ? null : _startSceneDescriptionGeneration,
+              icon: _isSceneGenerating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.auto_awesome),
+              label: Text(_isSceneGenerating ? 'AI生成中...' : 'AI生成画面'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
               ),
-            ],
+            ),
 
             // 显示生成错误信息
             if (_sceneGenerationError != null) ...[

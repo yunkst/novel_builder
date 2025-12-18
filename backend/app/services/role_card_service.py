@@ -382,17 +382,10 @@ class RoleCardService:
             各服务的健康状态
         """
         health_status = {
-            "dify": False,
             "comfyui": False
         }
 
-        # 检查Dify服务
-        if self.dify_client:
-            try:
-                health_status["dify"] = await self.dify_client.health_check()
-            except Exception as e:
-                logger.error(f"Dify健康检查异常: {e}")
-
+        
         # 检查ComfyUI服务
         if self.comfyui_client:
             try:

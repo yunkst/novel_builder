@@ -51,7 +51,7 @@ class RoleCardAsyncService:
                 status="pending",
                 roles=[role.to_dict() for role in request.roles],
                 user_input="生成人物卡",
-                model=request.model,  # 保存模型信息
+                model=request.model_name,  # 保存模型信息
                 total_prompts=0,
                 generated_images=0
             )

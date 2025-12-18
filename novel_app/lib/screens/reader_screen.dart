@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:async/async.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
@@ -10,6 +11,7 @@ import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../services/unified_stream_manager.dart';
 import '../services/scene_illustration_service.dart';
+import '../services/chapter_manager.dart';
 import '../models/stream_config.dart';
 import '../core/di/api_service_provider.dart';
 import '../widgets/highlighted_text.dart';
@@ -82,8 +84,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       ValueNotifier<bool>(false);
 
   // 预加载相关状态
-  final Set<String> _preloadedChapterUrls = {};
-  bool _isPreloading = false;
+  final ChapterManager _chapterManager = ChapterManager();
 
   // 自动滚动相关状态
   bool _isAutoScrolling = false;
@@ -140,8 +141,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     _autoScrollTimer?.cancel();
     _cursorController.dispose();
     _scrollController.dispose();
-    // 移除 _apiService.dispose() 调用，避免关闭共享的Dio连接
-    // _apiService.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     _rewriteResultNotifier.dispose();
     _isGeneratingRewriteNotifier.dispose();
     _fullRewriteResultNotifier.dispose();
@@ -172,15 +171,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       });
     }
   }
-
-  // 删除了 _loadIllustrations 和 _refreshIllustrations，新系统基于内容标记
-
-  // 删除了 _getIllustrationForParagraph 方法，不再使用 paragraph_index
-
-  
-  // 删除了 _showIllustrationGallery 方法，新系统使用 _showIllustrationGalleryByTaskId
-
-  // 删除了 _toggleIllustrationMode 方法，新的插图系统不需要单独的模式
 
   // 处理段落长按 - 显示操作菜单
   void _handleLongPress(int index) {
@@ -520,85 +510,49 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   /// 开始预加载章节
   /// 优先加载后续章节，然后是前面的章节
+  /// 现在使用ChapterManager单例管理预加载状态
   Future<void> _startPreloadingChapters() async {
-    if (_isPreloading) return;
-    _isPreloading = true;
-
     try {
       final currentIndex =
           widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
       if (currentIndex == -1) return;
 
       // 构建预加载列表：优先后续章节
-      final List<Chapter> chaptersToPreload = [];
+      final List<String> chapterUrlsToPreload = [];
 
-      // 添加后续章节（优先）- 移除数量限制
+      // 添加后续章节（优先）
       for (int i = currentIndex + 1; i < widget.chapters.length; i++) {
-        chaptersToPreload.add(widget.chapters[i]);
+        chapterUrlsToPreload.add(widget.chapters[i].url);
       }
 
-      // 添加前面的章节 - 移除数量限制
+      // 添加前面的章节
       for (int i = currentIndex - 1; i >= 0; i--) {
-        chaptersToPreload.add(widget.chapters[i]);
+        chapterUrlsToPreload.add(widget.chapters[i].url);
       }
 
-      debugPrint('=== 开始预加载章节 ===');
+      debugPrint('=== 开始预加载章节（使用ChapterManager）===');
       debugPrint('当前章节: ${_currentChapter.title}');
       debugPrint('总章节数: ${widget.chapters.length}');
-      debugPrint('预加载章节数: ${chaptersToPreload.length}');
+      debugPrint('预加载章节数: ${chapterUrlsToPreload.length}');
 
-      // 后台预加载
-      _preloadChaptersInBackground(chaptersToPreload);
-    } finally {
-      _isPreloading = false;
+      // 使用ChapterManager进行批量预加载
+      unawaited(_chapterManager.preloadChapters(
+        chapterUrlsToPreload,
+        fetchFunction: (chapterUrl) => _apiService.getChapterContent(chapterUrl),
+        onProgress: (message, current, total) {
+          debugPrint('预加载进度: $message ($current/$total)');
+        },
+        maxConcurrent: 2, // 控制并发数，避免过多请求
+      ));
+    } catch (e) {
+      debugPrint('预加载启动失败: $e');
     }
   }
 
-  /// 后台预加载章节
+  /// 注：旧的预加载方法已被ChapterManager替代，保留此方法以防有其他地方调用
   Future<void> _preloadChaptersInBackground(List<Chapter> chapters) async {
-    int loadedCount = 0;
-    final totalCount = chapters.length;
-
-    debugPrint('=== 开始后台预加载，总数: $totalCount ===');
-
-    for (int i = 0; i < chapters.length; i++) {
-      final chapter = chapters[i];
-
-      // 检查是否已预加载或已缓存
-      if (_preloadedChapterUrls.contains(chapter.url)) {
-        debugPrint('章节已缓存，跳过: ${chapter.title}');
-        continue;
-      }
-
-      try {
-        // 检查是否已缓存
-        final cachedContent =
-            await _databaseService.getCachedChapter(chapter.url);
-        if (cachedContent != null) {
-          _preloadedChapterUrls.add(chapter.url);
-          continue;
-        }
-
-        // 延迟加载，避免请求过于频繁 (10-12秒随机延迟)
-        final delaySeconds = 10 + (chapter.url.hashCode % 3);
-        await Future.delayed(Duration(seconds: delaySeconds));
-
-        // 从后端获取并缓存
-        final content = await _apiService.getChapterContent(chapter.url);
-        if (content.isNotEmpty) {
-          await _databaseService.cacheChapter(
-              widget.novel.url, chapter, content);
-          _preloadedChapterUrls.add(chapter.url);
-          loadedCount++;
-          debugPrint('预加载成功 ($loadedCount/$totalCount): ${chapter.title}');
-        }
-      } catch (e) {
-        // 静默处理预加载错误，不影响用户阅读
-        debugPrint('预加载章节失败: ${chapter.title}, 错误: $e');
-      }
-    }
-
-    debugPrint('=== 预加载完成，成功: $loadedCount/$totalCount ===');
+    debugPrint('⚠️ _preloadChaptersInBackground 已被废弃，请使用ChapterManager');
+    // 空实现，功能已迁移到ChapterManager
   }
 
   void _goToPreviousChapter() {
@@ -658,7 +612,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                     setState(() {
                       _fontSize = value;
                     });
-                    this.setState(() {});
                   },
                 ),
               ],
@@ -1090,7 +1043,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                     setState(() {
                       _scrollSpeed = value;
                     });
-                    this.setState(() {});
                   },
                 ),
                 const SizedBox(height: 8),
@@ -1354,7 +1306,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
           if (isCompleteContent) {
             debugPrint('🎯 检测到完整内容标记，直接替换');
-            // 提取实际内容（移除特殊标记）
             final completeContent = chunk.substring('<<COMPLETE_CONTENT>>'.length);
 
             if (mounted) {
@@ -1375,13 +1326,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
             }
           }
 
-          // 使用scheduleMicrotask确保在下一帧前更新UI
-          scheduleMicrotask(() {
-            if (mounted) {
-              setState(() {});
-              debugPrint('🔄 microtask UI更新完成');
-            }
-          });
+          // ValueNotifier已经处理了UI更新，无需额外的setState
         },
         onComplete: (fullContent) {
           debugPrint('✅ onComplete 回调被调用');
@@ -1397,7 +1342,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
           // 强制更新UI以确保最终内容正确显示
           if (mounted) {
-            setState(() {});
+            // ValueNotifier已经处理了状态更新，无需额外的setState
           }
         },
         onError: (error) {
@@ -2659,7 +2604,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                   ],
                 ),
               ),
-              // 删除了插图模式菜单项，新的插图系统通过长按段落创建
               ],
           ),
         ],
@@ -3078,7 +3022,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       }
 
       final userInput = videoInput['user_input'] ?? '';
-      final modelName = videoInput['model_name'] ?? 'SVD';
+      final modelName = videoInput['model_name'];
 
       if (userInput.isEmpty) {
         return; // 未输入内容
@@ -3172,6 +3116,9 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         modelName: '', // 使用空字符串
       );
 
+      // 清除生成状态
+      _setImageGeneratingStatus(imageUrl, false);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3240,7 +3187,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       if (confirmed == true) {
         final success = await _sceneIllustrationService.deleteIllustration(illustration.id);
         if (success) {
-          setState(() {});
+          // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

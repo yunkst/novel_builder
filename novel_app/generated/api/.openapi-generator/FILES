@@ -10,6 +10,7 @@ doc/HTTPValidationError.md
 doc/ImageToVideoRequest.md
 doc/ImageToVideoResponse.md
 doc/ImageToVideoTaskStatusResponse.md
+doc/ModelsResponse.md
 doc/Novel.md
 doc/RoleCardGenerateRequest.md
 doc/RoleCardTaskStatusResponse.md
@@ -24,6 +25,7 @@ doc/SourceSite.md
 doc/ValidationError.md
 doc/ValidationErrorLocInner.md
 doc/VideoStatusResponse.md
+doc/WorkflowInfo.md
 lib/novel_api.dart
 lib/src/api.dart
 lib/src/api/default_api.dart
@@ -42,6 +44,7 @@ lib/src/model/http_validation_error.dart
 lib/src/model/image_to_video_request.dart
 lib/src/model/image_to_video_response.dart
 lib/src/model/image_to_video_task_status_response.dart
+lib/src/model/models_response.dart
 lib/src/model/novel.dart
 lib/src/model/role_card_generate_request.dart
 lib/src/model/role_card_task_status_response.dart
@@ -56,6 +59,7 @@ lib/src/model/source_site.dart
 lib/src/model/validation_error.dart
 lib/src/model/validation_error_loc_inner.dart
 lib/src/model/video_status_response.dart
+lib/src/model/workflow_info.dart
 lib/src/serializers.dart
 pubspec.yaml
 test/chapter_content_test.dart
@@ -66,6 +70,7 @@ test/http_validation_error_test.dart
 test/image_to_video_request_test.dart
 test/image_to_video_response_test.dart
 test/image_to_video_task_status_response_test.dart
+test/models_response_test.dart
 test/novel_test.dart
 test/role_card_generate_request_test.dart
 test/role_card_task_status_response_test.dart
@@ -80,3 +85,4 @@ test/source_site_test.dart
 test/validation_error_loc_inner_test.dart
 test/validation_error_test.dart
 test/video_status_response_test.dart
+test/workflow_info_test.dart

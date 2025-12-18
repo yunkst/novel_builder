@@ -90,7 +90,7 @@ void main() {
     //
     // 获取所有可用模型，按文生图和图生视频分类
     //
-    //Future<JsonObject> getModelsApiModelsGet({ String X_API_TOKEN }) async
+    //Future<ModelsResponse> getModelsApiModelsGet({ String X_API_TOKEN }) async
     test('test getModelsApiModelsGet', () async {
       // TODO
     });

@@ -19,6 +19,7 @@ import 'package:novel_api/src/model/http_validation_error.dart';
 import 'package:novel_api/src/model/image_to_video_request.dart';
 import 'package:novel_api/src/model/image_to_video_response.dart';
 import 'package:novel_api/src/model/image_to_video_task_status_response.dart';
+import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
 import 'package:novel_api/src/model/role_card_task_status_response.dart';
@@ -909,9 +910,9 @@ class DefaultApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [JsonObject] as data
+  /// Returns a [Future] containing a [Response] with a [ModelsResponse] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<JsonObject>> getModelsApiModelsGet({ 
+  Future<Response<ModelsResponse>> getModelsApiModelsGet({ 
     String? X_API_TOKEN,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -948,14 +949,14 @@ class DefaultApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    JsonObject? _responseData;
+    ModelsResponse? _responseData;
 
     try {
       final rawResponse = _response.data;
       _responseData = rawResponse == null ? null : _serializers.deserialize(
         rawResponse,
-        specifiedType: const FullType(JsonObject),
-      ) as JsonObject;
+        specifiedType: const FullType(ModelsResponse),
+      ) as ModelsResponse;
 
     } catch (error, stackTrace) {
       throw DioException(
@@ -967,7 +968,7 @@ class DefaultApi {
       );
     }
 
-    return Response<JsonObject>(
+    return Response<ModelsResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

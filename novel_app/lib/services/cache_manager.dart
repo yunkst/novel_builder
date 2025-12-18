@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'api_service_wrapper.dart';
 import 'database_service.dart';
+import 'chapter_manager.dart';
 import '../core/di/api_service_provider.dart';
 import 'package:flutter/foundation.dart';
 
@@ -25,6 +26,7 @@ class CacheManager {
 
   final DatabaseService _db = DatabaseService();
   final ApiServiceWrapper _api = ApiServiceProvider.instance;
+  final ChapterManager _chapterManager = ChapterManager();
   final Queue<String> _queue = Queue<String>();
   final StreamController<CacheProgressUpdate> _progressController =
       StreamController<CacheProgressUpdate>.broadcast();
@@ -95,7 +97,11 @@ class CacheManager {
         }
 
         try {
-          final content = await _api.getChapterContent(chapter.url);
+          // 使用ChapterManager获取章节内容，避免重复请求
+          final content = await _chapterManager.getChapterContent(
+            chapter.url,
+            fetchFunction: () => _api.getChapterContent(chapter.url),
+          );
           if (content.isNotEmpty) {
             await _db.cacheChapter(
               novelUrl,

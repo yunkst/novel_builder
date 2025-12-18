@@ -9,8 +9,8 @@ class VideoInputDialog extends StatefulWidget {
   State<VideoInputDialog> createState() => _VideoInputDialogState();
 
   /// 显示对话框并返回用户输入
-  static Future<Map<String, String>?> show(BuildContext context) async {
-    return await showDialog<Map<String, String>>(
+  static Future<Map<String, String?>?> show(BuildContext context) async {
+    return await showDialog<Map<String, String?>>(
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => const VideoInputDialog(),
@@ -20,7 +20,7 @@ class VideoInputDialog extends StatefulWidget {
 
 class _VideoInputDialogState extends State<VideoInputDialog> {
   final _controller = TextEditingController();
-  String? _selectedModel = 'SVD'; // 默认使用SVD模型
+  String? _selectedModel; // 从API动态获取模型列表
   final bool _isLoading = false;
 
   @override
@@ -164,7 +164,7 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
     // 返回用户输入和模型选择
     final result = {
       'user_input': input,
-      'model_name': _selectedModel ?? 'SVD',
+      'model_name': _selectedModel,
     };
     Navigator.of(context).pop(result);
   }

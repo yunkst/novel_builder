@@ -291,8 +291,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       // 使用角色ID或临时ID
       final String roleId = widget.character?.id?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
 
-      // 使用生成的API客户端
-      final api = ApiServiceProvider.instance.defaultApi;
+      // 使用ApiServiceWrapper确保正确的token认证
+      final apiService = ApiServiceProvider.instance;
 
       // 构建RoleInfo列表（使用built_value构建方式）
       final roleInfo = RoleInfo((b) => b
@@ -309,14 +309,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         ..facePrompts = roles['face_prompts']?.toString()
         ..bodyPrompts = roles['body_prompts']?.toString());
 
-      // 调用生成的API
-      final request = RoleCardGenerateRequest((b) => b
-        ..roleId = roleId
-        ..roles.add(roleInfo)
-        ..model = _selectedModel);
-
-      final response = await api.generateRoleCardImagesApiRoleCardGeneratePost(
-        roleCardGenerateRequest: request,
+      // 调用API服务包装器的方法，自动处理token认证
+      final response = await apiService.generateRoleCardImages(
+        roleId: roleId,
+        roles: roles,
       );
 
       if (mounted) {

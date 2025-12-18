@@ -1,6 +1,7 @@
 import '../../models/chapter.dart';
 import '../../services/database_service.dart';
 import '../../services/api_service_wrapper.dart';
+import '../../services/chapter_manager.dart';
 import '../../core/repositories/chapter_repository.dart';
 import '../../core/utils/result.dart';
 import '../../core/failures/database_failure.dart';
@@ -12,12 +13,15 @@ import '../../core/utils/error_handler.dart';
 class ChapterRepositoryImpl implements ChapterRepository {
   final DatabaseService _databaseService;
   final ApiServiceWrapper _apiService;
+  final ChapterManager _chapterManager;
 
   ChapterRepositoryImpl({
     required DatabaseService databaseService,
     required ApiServiceWrapper apiService,
+    ChapterManager? chapterManager,
   }) : _databaseService = databaseService,
-       _apiService = apiService;
+       _apiService = apiService,
+       _chapterManager = chapterManager ?? ChapterManager();
 
   @override
   Future<Result<List<Chapter>>> getChapters(String novelUrl, {bool forceRefresh = false}) async {
@@ -86,9 +90,12 @@ class ChapterRepositoryImpl implements ChapterRepository {
         return Result.success(cachedContent);
       }
 
-      // 从网络获取
+      // 使用ChapterManager从网络获取（带请求去重）
       await _apiService.init();
-      final content = await _apiService.getChapterContent(chapterUrl);
+      final content = await _chapterManager.getChapterContent(
+        chapterUrl,
+        fetchFunction: () => _apiService.getChapterContent(chapterUrl),
+      );
 
       // 验证内容有效性
       if (content.isNotEmpty && content.length > 50) {

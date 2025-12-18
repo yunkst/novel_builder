@@ -21,6 +21,7 @@ import 'package:novel_api/src/model/http_validation_error.dart';
 import 'package:novel_api/src/model/image_to_video_request.dart';
 import 'package:novel_api/src/model/image_to_video_response.dart';
 import 'package:novel_api/src/model/image_to_video_task_status_response.dart';
+import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
 import 'package:novel_api/src/model/role_card_task_status_response.dart';
@@ -35,6 +36,7 @@ import 'package:novel_api/src/model/source_site.dart';
 import 'package:novel_api/src/model/validation_error.dart';
 import 'package:novel_api/src/model/validation_error_loc_inner.dart';
 import 'package:novel_api/src/model/video_status_response.dart';
+import 'package:novel_api/src/model/workflow_info.dart';
 
 part 'serializers.g.dart';
 
@@ -46,6 +48,7 @@ part 'serializers.g.dart';
   ImageToVideoRequest,
   ImageToVideoResponse,
   ImageToVideoTaskStatusResponse,
+  ModelsResponse,
   Novel,
   RoleCardGenerateRequest,
   RoleCardTaskStatusResponse,
@@ -60,6 +63,7 @@ part 'serializers.g.dart';
   ValidationError,
   ValidationErrorLocInner,
   VideoStatusResponse,
+  WorkflowInfo,
 ])
 Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(

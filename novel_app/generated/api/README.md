@@ -103,6 +103,7 @@ Class | Method | HTTP request | Description
  - [ImageToVideoRequest](doc/ImageToVideoRequest.md)
  - [ImageToVideoResponse](doc/ImageToVideoResponse.md)
  - [ImageToVideoTaskStatusResponse](doc/ImageToVideoTaskStatusResponse.md)
+ - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
  - [RoleCardGenerateRequest](doc/RoleCardGenerateRequest.md)
  - [RoleCardTaskStatusResponse](doc/RoleCardTaskStatusResponse.md)
@@ -117,6 +118,7 @@ Class | Method | HTTP request | Description
  - [ValidationError](doc/ValidationError.md)
  - [ValidationErrorLocInner](doc/ValidationErrorLocInner.md)
  - [VideoStatusResponse](doc/VideoStatusResponse.md)
+ - [WorkflowInfo](doc/WorkflowInfo.md)
 
 
 ## Documentation For Authorization

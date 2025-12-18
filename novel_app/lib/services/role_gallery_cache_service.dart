@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
+import '../core/di/api_service_provider.dart';
 
 /// 角色图集缓存服务
 class RoleGalleryCacheService {
@@ -82,61 +83,32 @@ class RoleGalleryCacheService {
         return existingFile;
       }
 
-      // 使用配置的Host创建API客户端
-      final host = await _getHost();
-      final api = NovelApi(basePathOverride: host).getDefaultApi();
-      final response = await api.getImageProxyText2imgImageFilenameGet(filename: filename);
+      // 使用ApiServiceWrapper确保正确的token认证和连接管理
+      final apiService = ApiServiceProvider.instance;
+      final bytes = await apiService.getImageProxy(filename);
 
-      if (response.statusCode == 200 && response.data != null) {
-        Uint8List bytes;
+      // ApiServiceWrapper.getImageProxy 直接返回 Uint8List
 
-        // 根据响应数据类型正确处理二进制数据
-        if (response.data is Uint8List) {
-          bytes = response.data as Uint8List;
-        } else if (response.data is List<int>) {
-          bytes = Uint8List.fromList(response.data as List<int>);
-        } else {
-          // 如果是字符串，尝试作为base64解码
-          try {
-            final imageData = response.data.toString();
-            // 检查是否是base64数据
-            if (imageData.startsWith('data:image/')) {
-              final base64Data = imageData.split(',')[1];
-              bytes = base64Decode(base64Data);
-            } else {
-              // 尝试直接作为base64解码
-              bytes = base64Decode(imageData);
-            }
-          } catch (e) {
-            debugPrint('❌ 图片数据解码失败: $e');
-            return null;
-          }
-        }
-
-        // 验证图片数据有效性
-        if (bytes.isEmpty) {
-          debugPrint('❌ 图片数据为空: $filename');
-          return null;
-        }
-
-        // 检查图片头部标识
-        if (!_isValidImageData(bytes)) {
-          debugPrint('❌ 无效的图片数据格式: $filename');
-          return null;
-        }
-
-        // 保存到文件
-        final filePath = _getCacheFilePath(filename);
-        final file = File(filePath);
-        await file.writeAsBytes(bytes);
-
-        _addToMemoryCache(filename, filePath);
-        debugPrint('✓ 图片缓存成功: $filename, 大小: ${bytes.length} bytes');
-        return file;
-      } else {
-        debugPrint('❌ 图片缓存失败: ${response.statusCode}');
+      // 验证图片数据有效性
+      if (bytes.isEmpty) {
+        debugPrint('❌ 图片数据为空: $filename');
         return null;
       }
+
+      // 检查图片头部标识
+      if (!_isValidImageData(bytes)) {
+        debugPrint('❌ 无效的图片数据格式: $filename');
+        return null;
+      }
+
+      // 保存到文件
+      final filePath = _getCacheFilePath(filename);
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      _addToMemoryCache(filename, filePath);
+      debugPrint('✓ 图片缓存成功: $filename, 大小: ${bytes.length} bytes');
+      return file;
     } catch (e) {
       debugPrint('❌ 图片缓存异常: $filename, 错误: $e');
       return null;

@@ -42,6 +42,7 @@ from .schemas import (
     ImageToVideoRequest,
     ImageToVideoResponse,
     ImageToVideoTaskStatusResponse,
+    ModelsResponse,
     Novel,
     RoleCardGenerateRequest,
     RoleCardTaskStatusResponse,
@@ -53,6 +54,7 @@ from .schemas import (
     SceneRegenerateRequest,
     SourceSite,
     VideoStatusResponse,
+    WorkflowInfo,
 )
 from .services.crawler_factory import (
     get_crawler_for_url,
@@ -477,7 +479,7 @@ async def regenerate_similar_images(
 
 
 @app.get("/api/models", dependencies=[Depends(verify_token)])
-async def get_models():
+async def get_models() -> ModelsResponse:
     """获取所有可用模型，按文生图和图生视频分类"""
     try:
         from app.workflow_config import WorkflowType, workflow_config_manager
@@ -485,27 +487,29 @@ async def get_models():
         # 获取文生图工作流
         t2i_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
         text2img_models = [
-            {
-                "title": workflow.title,
-                "description": workflow.description
-            }
+            WorkflowInfo(
+                title=workflow.title,
+                description=workflow.description,
+                path=workflow.path
+            )
             for workflow in t2i_response.workflows
         ]
 
         # 获取图生视频工作流
         i2v_response = workflow_config_manager.list_workflows(WorkflowType.I2V)
         img2video_models = [
-            {
-                "title": workflow.title,
-                "description": workflow.description
-            }
+            WorkflowInfo(
+                title=workflow.title,
+                description=workflow.description,
+                path=workflow.path
+            )
             for workflow in i2v_response.workflows
         ]
 
-        return {
-            "text2img": text2img_models,
-            "img2video": img2video_models
-        }
+        return ModelsResponse(
+            text2img=text2img_models,
+            img2video=img2video_models
+        )
     except Exception as e:
         logger.error(f"获取模型列表失败: {e}")
         raise HTTPException(status_code=500, detail="获取模型列表失败")

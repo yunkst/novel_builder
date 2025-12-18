@@ -14,6 +14,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ImageToVideoRequest.serializer)
       ..add(ImageToVideoResponse.serializer)
       ..add(ImageToVideoTaskStatusResponse.serializer)
+      ..add(ModelsResponse.serializer)
       ..add(Novel.serializer)
       ..add(RoleCardGenerateRequest.serializer)
       ..add(RoleCardTaskStatusResponse.serializer)
@@ -28,6 +29,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ValidationError.serializer)
       ..add(ValidationErrorLocInner.serializer)
       ..add(VideoStatusResponse.serializer)
+      ..add(WorkflowInfo.serializer)
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(RoleInfo)]),
           () => ListBuilder<RoleInfo>())
@@ -46,7 +48,13 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(
               BuiltList, const [const FullType(ValidationErrorLocInner)]),
-          () => ListBuilder<ValidationErrorLocInner>()))
+          () => ListBuilder<ValidationErrorLocInner>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(WorkflowInfo)]),
+          () => ListBuilder<WorkflowInfo>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(WorkflowInfo)]),
+          () => ListBuilder<WorkflowInfo>()))
     .build();
 
 // ignore_for_file: deprecated_member_use_from_same_package,type=lint
