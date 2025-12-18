@@ -681,17 +681,14 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         ),
       );
 
-      // 使用生成的API客户端
-      final api = ApiServiceProvider.instance.defaultApi;
+      // 使用ApiServiceWrapper确保正确的token认证
+      final apiService = ApiServiceProvider.instance;
 
-      // 调用重新生成API
-      final request = SceneRegenerateRequest((b) => b
-        ..taskId = widget.taskId!
-        ..count = count
-        ..model = modelName);
-
-      await api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
-        sceneRegenerateRequest: request,
+      // 调用API服务包装器的方法，自动处理token认证
+      await apiService.regenerateSceneIllustrationImages(
+        taskId: widget.taskId!,
+        count: count,
+        modelName: modelName,
       );
 
       // 刷新图片列表

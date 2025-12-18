@@ -392,3 +392,22 @@ class ImageToVideoTaskStatusResponse(BaseModel):
     created_at: str = Field(..., description="创建时间")
     started_at: str | None = Field(None, description="开始处理时间")
     completed_at: str | None = Field(None, description="完成时间")
+
+
+# ============================================================================
+# 模型管理相关API模式
+# ============================================================================
+
+class WorkflowInfo(BaseModel):
+    """工作流信息模式."""
+
+    title: str = Field(..., description="工作流标题")
+    description: str = Field(..., description="工作流描述")
+    path: str | None = Field(None, description="工作流文件路径")
+
+
+class ModelsResponse(BaseModel):
+    """模型列表响应模式."""
+
+    text2img: list[WorkflowInfo] = Field(default=[], description="文生图模型列表")
+    img2video: list[WorkflowInfo] = Field(default=[], description="图生视频模型列表")

@@ -12,6 +12,7 @@ import '../models/character.dart';
 import '../extensions/api_novel_extension.dart';
 import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
+import 'chapter_manager.dart';
 
 /// API 服务封装层
 ///
@@ -32,6 +33,9 @@ class ApiServiceWrapper {
   late Dio _dio;
   late DefaultApi _api;
   late Serializers _serializers;
+
+  /// 章节管理器单例
+  final ChapterManager _chapterManager = ChapterManager();
 
   bool _initialized = false;
 
@@ -342,6 +346,16 @@ class ApiServiceWrapper {
   /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
   Future<String> getChapterContent(String chapterUrl,
       {bool forceRefresh = false}) async {
+    // 使用章节管理器进行请求去重和管理
+    return _chapterManager.getChapterContent(
+      chapterUrl,
+      forceRefresh: forceRefresh,
+      fetchFunction: () => _fetchChapterContentFromNetwork(chapterUrl, forceRefresh: forceRefresh),
+    );
+  }
+
+  /// 从网络获取章节内容的实际实现
+  Future<String> _fetchChapterContentFromNetwork(String chapterUrl, {bool forceRefresh = false}) async {
     return _withRetry<String>(() async {
       final token = await getToken();
       final response = await _api.chapterContentChapterContentGet(
@@ -742,7 +756,7 @@ class ApiServiceWrapper {
   Future<ImageToVideoResponse> generateVideoFromImage({
     required String imgName,
     required String userInput,
-    required String modelName,
+    String? modelName,
   }) async {
     _ensureInitialized();
     try {
@@ -875,6 +889,55 @@ class ApiServiceWrapper {
       }
     } catch (e) {
       debugPrint('图生视频健康检查异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取所有可用模型列表
+  Future<ModelsResponse> getModels() async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      final response = await _api.getModelsApiModelsGet(
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data!;
+      } else {
+        throw Exception('获取模型列表失败：${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('获取模型列表异常: $e');
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取指定类型的模型标题列表
+  Future<List<String>> getModelTitles({String? apiType}) async {
+    try {
+      final models = await getModels();
+
+      switch (apiType) {
+        case 'i2v':
+          final img2videoModels = models.img2video ?? BuiltList<WorkflowInfo>();
+          return img2videoModels.map((model) => model.title).toList();
+        case 't2i':
+          final text2imgModels = models.text2img ?? BuiltList<WorkflowInfo>();
+          return text2imgModels.map((model) => model.title).toList();
+        default:
+          final allModels = <String>[];
+          if (models.text2img != null) {
+            allModels.addAll(models.text2img!.map((model) => model.title));
+          }
+          if (models.img2video != null) {
+            allModels.addAll(models.img2video!.map((model) => model.title));
+          }
+          return allModels;
+      }
+    } catch (e) {
+      debugPrint('获取模型标题列表异常: $e');
       throw _handleError(e);
     }
   }

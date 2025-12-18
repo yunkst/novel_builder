@@ -143,39 +143,7 @@ class DifyClient:
             logger.error(f"解析Dify响应失败: {e}")
             return []
 
-    async def health_check(self) -> bool:
-        """检查Dify服务健康状态.
-
-        Returns:
-            服务是否可用
-        """
-        try:
-            # 尝试调用一个简单的请求来检查连通性
-            test_request = {
-                "inputs": {
-                    "chapters_content": "test",
-                    "roles": "{}",
-                    "user_input": "test",
-                    "cmd": "test"
-                },
-                "response_mode": "blocking",
-                "user": "health_check"
-            }
-
-            response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json=test_request,
-                timeout=10
-            )
-
-            # 只要能连通就认为健康，不管业务逻辑结果
-            return response.status_code in [200, 400, 422]  # 422可能是因为参数验证失败，但说明服务可用
-
-        except Exception as e:
-            logger.error(f"Dify健康检查失败: {e}")
-            return False
-
+    
     async def generate_photo_prompts(self, roles: list[RoleInfo]) -> list[str]:
         """生成人物卡拍照提示词.
 
@@ -296,12 +264,12 @@ class DifyClient:
             logger.error(f"解析Dify拍照响应失败: {e}")
             return []
 
-    async def generate_scene_prompts(self, chapters_content: str, roles: dict[str, Any]) -> str | None:
+    async def generate_scene_prompts(self, chapters_content: str, roles: str) -> str | None:
         """生成场面绘制提示词.
 
         Args:
             chapters_content: 章节内容
-            roles: 角色信息
+            roles: 格式化的角色信息字符串
 
         Returns:
             生成的提示词字符串，失败时返回None
@@ -310,7 +278,7 @@ class DifyClient:
             request_data = {
                 "inputs": {
                     "chapters_content": chapters_content,
-                    "roles": json.dumps(roles, ensure_ascii=False),
+                    "roles": roles,
                     "cmd": "场面绘制"
                 },
                 "response_mode": "blocking",

@@ -440,7 +440,7 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getModelsApiModelsGet**
-> JsonObject getModelsApiModelsGet(X_API_TOKEN)
+> ModelsResponse getModelsApiModelsGet(X_API_TOKEN)
 
 Get Models
 
@@ -469,7 +469,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+[**ModelsResponse**](ModelsResponse.md)
 
 ### Authorization
 

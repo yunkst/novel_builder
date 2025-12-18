@@ -523,13 +523,12 @@ class ImageToVideoService:
         Returns:
             健康状态信息
         """
-        dify_healthy = await self.dify_client.health_check()
+        # 只检查ComfyUI服务
         comfyui_healthy = await self.comfyui_client.health_check()
 
         return {
-            "status": "healthy" if dify_healthy and comfyui_healthy else "unhealthy",
+            "status": "healthy" if comfyui_healthy else "unhealthy",
             "services": {
-                "dify": dify_healthy,
                 "comfyui": comfyui_healthy
             }
         }

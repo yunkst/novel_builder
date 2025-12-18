@@ -50,7 +50,7 @@ class ChapterCache(Base):
     __tablename__ = "novel_chapters_cache"
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("novel_cache_tasks.id"), nullable=False)
+    task_id = Column(Integer, ForeignKey("novel_cache_tasks.id"), nullable=True)
     novel_url = Column(String(500), nullable=False, index=True)
     chapter_title = Column(String(500), nullable=False)
     chapter_url = Column(String(500), nullable=False, unique=True)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service_wrapper.dart';
 
 /// 统一的模型选择组件
 /// 支持从后端API动态获取模型列表并提供下拉选择功能
@@ -50,15 +51,8 @@ class _ModelSelectorState extends State<ModelSelector> {
 
   /// 从后端API加载模型列表
   Future<List<String>> _loadModels() async {
-    // 直接返回默认模型列表，避免API调用问题
-    return _getDefaultModels();
-  }
-
-  /// 获取默认模型列表
-  List<String> _getDefaultModels() {
-    return widget.apiType == 'i2v'
-      ? ['SVD', 'AnimateDiff']
-      : ['通用模型', 'Stable Diffusion', 'Midjourney Style'];
+    final apiService = ApiServiceWrapper();
+    return await apiService.getModelTitles(apiType: widget.apiType);
   }
 
   @override

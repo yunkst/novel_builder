@@ -39,17 +39,18 @@ class SceneIllustrationService:
         """
         self.dify_client = dify_client
 
-    def _restore_roles_from_json(self, roles_json: str) -> dict[str, Any]:
-        """从JSON字符串恢复角色数据为字典格式
+    def _restore_roles_from_json(self, roles_json: str) -> str:
+        """从JSON字符串恢复角色数据并格式化为场景绘制的文本格式
 
         Args:
             roles_json: 数据库中存储的JSON字符串
 
         Returns:
-            角色信息字典，用于Dify客户端
+            格式化的角色信息字符串，用于Dify客户端
+            只包含名字、face_prompts、body_prompts字段
         """
         if not roles_json or roles_json.strip() == "":
-            return {}
+            return ""
 
         try:
             import json
@@ -57,23 +58,43 @@ class SceneIllustrationService:
 
             # 如果是列表格式（新版本存储）
             if isinstance(roles_data, list):
-                roles_dict = {}
-                for role_data in roles_data:
+                role_lines = []
+                for i, role_data in enumerate(roles_data):
                     if isinstance(role_data, dict) and 'name' in role_data:
-                        # 重建RoleInfo对象以获取简单描述
+                        # 重建RoleInfo对象
                         role_info = RoleInfo.from_dict(role_data)
-                        roles_dict[role_info.name] = role_info.to_simple_description()
-                return roles_dict
 
-            # 如果已经是字典格式（旧版本兼容）
+                        # 添加角色序号和名称
+                        role_lines.append(f"{i + 1}. {role_info.name}")
+
+                        # 添加面部描述（如果存在且非空）
+                        if hasattr(role_info, 'face_prompts') and role_info.face_prompts:
+                            role_lines.append(f"   面部描述：{role_info.face_prompts}")
+
+                        # 添加身材描述（如果存在且非空）
+                        if hasattr(role_info, 'body_prompts') and role_info.body_prompts:
+                            role_lines.append(f"   身材描述：{role_info.body_prompts}")
+
+                        # 如果角色有描述信息，添加空行分隔（最后一个角色除外）
+                        has_descriptions = (
+                            (hasattr(role_info, 'face_prompts') and role_info.face_prompts) or
+                            (hasattr(role_info, 'body_prompts') and role_info.body_prompts)
+                        )
+                        if has_descriptions and i < len(roles_data) - 1:
+                            role_lines.append("")
+
+                return "\n".join(role_lines)
+
+            # 如果已经是字典格式（旧版本兼容，直接返回空字符串）
             elif isinstance(roles_data, dict):
-                return roles_data
+                logger.warning("检测到旧版本角色数据格式，不支持转换为场景绘制格式")
+                return ""
 
-            return {}
+            return ""
 
         except (json.JSONDecodeError, TypeError, Exception) as e:
             logger.error(f"解析角色数据失败: {e}")
-            return {}
+            return ""
 
     async def generate_scene_images(
         self,
@@ -289,11 +310,12 @@ class SceneIllustrationService:
 
             # 1. 调用Dify生成提示词
             logger.info(f"任务 {task_id}: 生成场面绘制提示词")
-            # 恢复角色数据为字典格式
-            roles_dict = self._restore_roles_from_json(task.roles)
+            # 恢复角色数据为文本格式
+            roles_text = self._restore_roles_from_json(task.roles)
+            logger.info(f"任务 {task_id}: 格式化的角色信息:\n{roles_text}")
             prompts = await self.dify_client.generate_scene_prompts(
                 chapters_content=task.chapters_content,
-                roles=roles_dict
+                roles=roles_text
             )
 
             if not prompts:

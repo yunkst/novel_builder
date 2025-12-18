@@ -19,6 +19,7 @@ export 'package:novel_api/src/model/http_validation_error.dart';
 export 'package:novel_api/src/model/image_to_video_request.dart';
 export 'package:novel_api/src/model/image_to_video_response.dart';
 export 'package:novel_api/src/model/image_to_video_task_status_response.dart';
+export 'package:novel_api/src/model/models_response.dart';
 export 'package:novel_api/src/model/novel.dart';
 export 'package:novel_api/src/model/role_card_generate_request.dart';
 export 'package:novel_api/src/model/role_card_task_status_response.dart';
@@ -33,4 +34,5 @@ export 'package:novel_api/src/model/source_site.dart';
 export 'package:novel_api/src/model/validation_error.dart';
 export 'package:novel_api/src/model/validation_error_loc_inner.dart';
 export 'package:novel_api/src/model/video_status_response.dart';
+export 'package:novel_api/src/model/workflow_info.dart';
 
