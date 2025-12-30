@@ -12,14 +12,5 @@ class NovelCacheService:
         pass  # 简化的初始化，移除了任务管理相关的属性
 
 
-
-
-
-
-
-
-
-
-
 # 全局缓存服务实例
 novel_cache_service = NovelCacheService()

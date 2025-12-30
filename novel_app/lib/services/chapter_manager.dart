@@ -1,18 +1,14 @@
-/// 统一章节管理单例
+import 'dart:async';
+import 'dart:collection';
+import 'package:flutter/foundation.dart';
+
+/// 统一章节管理器单例
 ///
 /// 负责管理所有章节相关的操作，包括：
 /// - 章节内容获取
 /// - 预加载管理
 /// - 请求去重
 /// - 状态同步
-library chapter_manager;
-
-import 'dart:async';
-import 'dart:math';
-import 'dart:collection';
-import 'package:flutter/foundation.dart';
-
-/// 统一章节管理器单例
 ///
 /// 提供全局的章节管理功能，解决多实例重复请求问题
 class ChapterManager {

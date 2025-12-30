@@ -9,7 +9,6 @@ import asyncio
 import base64
 import json
 import logging
-import os
 import random
 from enum import Enum
 from pathlib import Path
@@ -25,12 +24,14 @@ logger = logging.getLogger(__name__)
 
 class WorkflowType(str, Enum):
     """工作流类型枚举"""
+
     TEXT_TO_IMAGE = "t2i"
     IMAGE_TO_VIDEO = "i2v"
 
 
 class MediaFileType(str, Enum):
     """媒体文件类型枚举"""
+
     IMAGE = "image"
     VIDEO = "video"
 
@@ -56,7 +57,7 @@ class ComfyUIClient:
             base_url: ComfyUI服务器基础URL
             workflow_path: 工作流JSON文件路径
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.workflow_path = workflow_path
         self.workflow_json = None
         self._load_workflow()
@@ -66,18 +67,20 @@ class ComfyUIClient:
         """加载ComfyUI工作流JSON配置."""
         try:
             # 获取工作流的完整路径
-            full_path = workflow_config_manager.get_full_workflow_path(self.workflow_path)
+            full_path = workflow_config_manager.get_full_workflow_path(
+                self.workflow_path
+            )
             workflow_file = Path(full_path)
 
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {full_path}")
 
-            with open(workflow_file, encoding='utf-8') as f:
+            with open(workflow_file, encoding="utf-8") as f:
                 self.workflow_json = json.load(f)
 
             logger.info(f"成功加载ComfyUI工作流: {full_path}")
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
@@ -102,7 +105,7 @@ class ComfyUIClient:
             response = requests.post(
                 f"{self.base_url}/prompt",
                 json={"prompt": json.loads(workflow_json_str)},
-                timeout=None  # 移除超时限制
+                timeout=None,  # 移除超时限制
             )
 
             if response.status_code == 200:
@@ -115,13 +118,15 @@ class ComfyUIClient:
                     logger.error("ComfyUI响应中未找到task_id")
                     return None
             else:
-                logger.error(f"ComfyUI API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
         except RequestException as e:
             logger.error(f"ComfyUI API请求异常: {e}")
             return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI图片生成失败: {e}")
             return None
 
@@ -140,7 +145,7 @@ class ComfyUIClient:
 
         image_filenames = []
         for i, prompt in enumerate(prompts):
-            logger.info(f"生成第 {i+1}/{len(prompts)} 张图片")
+            logger.info(f"生成第 {i + 1}/{len(prompts)} 张图片")
             try:
                 # 提交生成任务，获取ComfyUI任务ID
                 task_id = await self.generate_image(prompt)
@@ -152,13 +157,13 @@ class ComfyUIClient:
                         media_file = completed_files[0]  # 使用第一个生成的媒体文件
                         filename = media_file.filename  # 获取文件名
                         image_filenames.append(filename)
-                        logger.info(f"第 {i+1} 张图片生成成功，文件名: {filename}")
+                        logger.info(f"第 {i + 1} 张图片生成成功，文件名: {filename}")
                     else:
-                        logger.warning(f"第 {i+1} 张图片生成失败（未获取到文件名）")
+                        logger.warning(f"第 {i + 1} 张图片生成失败（未获取到文件名）")
                 else:
-                    logger.warning(f"第 {i+1} 张图片生成失败（提交任务失败）")
-            except Exception as e:
-                logger.error(f"生成第 {i+1} 张图片时发生异常: {e}")
+                    logger.warning(f"第 {i + 1} 张图片生成失败（提交任务失败）")
+            except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
+                logger.error(f"生成第 {i + 1} 张图片时发生异常: {e}")
                 continue
 
         if not image_filenames:
@@ -178,10 +183,7 @@ class ComfyUIClient:
             任务状态信息
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/history/{task_id}",
-                timeout=10
-            )
+            response = requests.get(f"{self.base_url}/history/{task_id}", timeout=10)
 
             if response.status_code == 200:
                 history = response.json()
@@ -190,7 +192,7 @@ class ComfyUIClient:
                 logger.error(f"查询任务状态失败: {response.status_code}")
                 return {}
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"查询任务状态异常: {e}")
             return {}
 
@@ -226,16 +228,26 @@ class ComfyUIClient:
                         for image in node_output["images"]:
                             filename = image.get("filename")
                             if filename:
-                                file_type_enum = MediaFileType.VIDEO if filename.lower().endswith('.mp4') else MediaFileType.IMAGE
-                                media_files.append(MediaFileResult(filename, file_type_enum))
-                                logger.info(f"找到生成的{file_type_enum.value}: {filename}")
+                                file_type_enum = (
+                                    MediaFileType.VIDEO
+                                    if filename.lower().endswith(".mp4")
+                                    else MediaFileType.IMAGE
+                                )
+                                media_files.append(
+                                    MediaFileResult(filename, file_type_enum)
+                                )
+                                logger.info(
+                                    f"找到生成的{file_type_enum.value}: {filename}"
+                                )
 
                     # 处理视频文件（可能在不同的输出字段）
                     if "videos" in node_output:
                         for video in node_output["videos"]:
                             filename = video.get("filename")
                             if filename:
-                                media_files.append(MediaFileResult(filename, MediaFileType.VIDEO))
+                                media_files.append(
+                                    MediaFileResult(filename, MediaFileType.VIDEO)
+                                )
                                 logger.info(f"找到生成的视频: {filename}")
 
                 if media_files:
@@ -286,7 +298,7 @@ class ComfyUIClient:
         try:
             response = requests.get(
                 self.get_media_url(filename),
-                timeout=None  # 移除超时限制
+                timeout=None,  # 移除超时限制
             )
 
             if response.status_code == 200:
@@ -295,7 +307,7 @@ class ComfyUIClient:
                 logger.error(f"获取媒体文件失败: {response.status_code}")
                 return None
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"获取媒体文件异常: {e}")
             return None
 
@@ -310,7 +322,9 @@ class ComfyUIClient:
         """
         return await self.get_media_data(filename)
 
-    async def generate_video(self, prompt: str, image_data: bytes, image_filename: str = "input_image.png") -> str | None:
+    async def generate_video(
+        self, prompt: str, image_data: bytes, image_filename: str = "input_image.png"
+    ) -> str | None:
         """生成视频（图生视频）.
 
         Args:
@@ -327,19 +341,19 @@ class ComfyUIClient:
 
         try:
             # 第一步：上传图片到ComfyUI
-            files = {'image': (image_filename, image_data, 'image/png')}
+            files = {"image": (image_filename, image_data, "image/png")}
             upload_response = requests.post(
-                f"{self.base_url}/upload/image",
-                files=files,
-                timeout=None
+                f"{self.base_url}/upload/image", files=files, timeout=None
             )
 
             if upload_response.status_code != 200:
-                logger.error(f"图片上传失败: {upload_response.status_code} - {upload_response.text}")
+                logger.error(
+                    f"图片上传失败: {upload_response.status_code} - {upload_response.text}"
+                )
                 return None
 
             upload_result = upload_response.json()
-            uploaded_filename = upload_result.get('name')
+            uploaded_filename = upload_result.get("name")
 
             if not uploaded_filename:
                 logger.error("图片上传成功但未获取到文件名")
@@ -348,13 +362,15 @@ class ComfyUIClient:
             logger.info(f"图片上传成功: {uploaded_filename}")
 
             # 第二步：准备工作流数据（使用上传的文件名）
-            workflow_json_str = self._prepare_workflow_with_filename(prompt, uploaded_filename)
+            workflow_json_str = self._prepare_workflow_with_filename(
+                prompt, uploaded_filename
+            )
 
             # 调用ComfyUI API
             response = requests.post(
                 f"{self.base_url}/prompt",
                 json={"prompt": json.loads(workflow_json_str)},
-                timeout=None  # 移除超时限制
+                timeout=None,  # 移除超时限制
             )
 
             if response.status_code == 200:
@@ -367,10 +383,12 @@ class ComfyUIClient:
                     logger.error("ComfyUI响应中未找到task_id")
                     return None
             else:
-                logger.error(f"ComfyUI API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI视频生成失败: {e}")
             return None
 
@@ -399,11 +417,15 @@ class ComfyUIClient:
 
         # 执行固定替换
         workflow_content = workflow_content.replace("提示词在这里替换", prompt)
-        workflow_content = workflow_content.replace('"在这替换随机数"', str(random.randint(1, 999999)))
+        workflow_content = workflow_content.replace(
+            '"在这替换随机数"', str(random.randint(1, 999999))
+        )
 
         # 图生视频时替换图片base64数据
         if image_base64:
-            workflow_content = workflow_content.replace("图片base64在这里替换", image_base64)
+            workflow_content = workflow_content.replace(
+                "图片base64在这里替换", image_base64
+            )
             logger.info("已注入图片base64数据到工作流")
 
         logger.info(f"工作流准备完成，提示词长度: {len(prompt)}")
@@ -418,7 +440,7 @@ class ComfyUIClient:
         Returns:
             base64编码的字符串
         """
-        return base64.b64encode(image_data).decode('utf-8')
+        return base64.b64encode(image_data).decode("utf-8")
 
     def _prepare_workflow_with_filename(self, prompt: str, image_filename: str) -> str:
         """准备ComfyUI工作流数据 - 使用图片文件名替换模式（用于图生视频）.
@@ -445,10 +467,16 @@ class ComfyUIClient:
 
         # 执行固定替换
         workflow_content = workflow_content.replace("提示词在这里替换", prompt)
-        workflow_content = workflow_content.replace('"在这替换随机数"', str(random.randint(1, 999999)))
-        workflow_content = workflow_content.replace("图片base64在这里替换", image_filename)
+        workflow_content = workflow_content.replace(
+            '"在这替换随机数"', str(random.randint(1, 999999))
+        )
+        workflow_content = workflow_content.replace(
+            "图片base64在这里替换", image_filename
+        )
 
-        logger.info(f"图生视频工作流准备完成，提示词长度: {len(prompt)}, 图片: {image_filename}")
+        logger.info(
+            f"图生视频工作流准备完成，提示词长度: {len(prompt)}, 图片: {image_filename}"
+        )
         return workflow_content
 
     async def health_check(self) -> bool:
@@ -460,13 +488,16 @@ class ComfyUIClient:
         try:
             response = requests.get(f"{self.base_url}/system_stats", timeout=5)
             return response.status_code == 200
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI健康检查失败: {e}")
             return False
 
 
-def create_comfyui_client(workflow_path: str | None = None, model_title: str | None = None,
-                         workflow_type: str = "t2i") -> ComfyUIClient:
+def create_comfyui_client(
+    workflow_path: str | None = None,
+    model_title: str | None = None,
+    workflow_type: str = "t2i",
+) -> ComfyUIClient:
     """创建ComfyUI客户端实例.
 
     Args:
@@ -477,29 +508,41 @@ def create_comfyui_client(workflow_path: str | None = None, model_title: str | N
     Returns:
         ComfyUI客户端实例
     """
-    base_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")  # 固定的ComfyUI服务地址
+    from ..config import settings
+
+    base_url = settings.comfyui_api_url  # 固定的ComfyUI服务地址
 
     # 根据参数确定工作流路径
     if workflow_path is None and model_title is not None:
         # 根据模型标题和工作流类型查找工作流
         if workflow_type == "t2i":
-            workflow_info = workflow_config_manager.get_t2i_workflow_by_title(model_title)
+            workflow_info = workflow_config_manager.get_t2i_workflow_by_title(
+                model_title
+            )
         elif workflow_type == "i2v":
-            workflow_info = workflow_config_manager.get_i2v_workflow_by_title(model_title)
+            workflow_info = workflow_config_manager.get_i2v_workflow_by_title(
+                model_title
+            )
         else:
             raise ValueError(f"不支持的工作流类型: {workflow_type}")
 
         if workflow_info is None:
-            raise ValueError(f"未找到模型 '{model_title}' 对应的{workflow_type}工作流配置")
+            raise ValueError(
+                f"未找到模型 '{model_title}' 对应的{workflow_type}工作流配置"
+            )
         workflow_path = workflow_info.path
     elif workflow_path is None:
         # 使用默认工作流
         from ..workflow_config import WorkflowType
 
         if workflow_type == "t2i":
-            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+            default_workflow = workflow_config_manager.get_default_workflow(
+                WorkflowType.T2I
+            )
         elif workflow_type == "i2v":
-            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.I2V)
+            default_workflow = workflow_config_manager.get_default_workflow(
+                WorkflowType.I2V
+            )
         else:
             raise ValueError(f"不支持的工作流类型: {workflow_type}")
         workflow_path = default_workflow.path
@@ -507,7 +550,9 @@ def create_comfyui_client(workflow_path: str | None = None, model_title: str | N
     return ComfyUIClient(base_url, workflow_path)
 
 
-def create_comfyui_client_for_model(model_title: str, workflow_type: str = "t2i") -> ComfyUIClient:
+def create_comfyui_client_for_model(
+    model_title: str, workflow_type: str = "t2i"
+) -> ComfyUIClient:
     """为指定模型创建ComfyUI客户端实例.
 
     Args:

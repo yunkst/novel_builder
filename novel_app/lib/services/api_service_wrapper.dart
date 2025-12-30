@@ -119,6 +119,19 @@ class ApiServiceWrapper {
     }
   }
 
+  /// 检查服务是否已初始化（用于调试）
+  bool get isInitialized => _initialized;
+
+  /// 获取初始化状态信息（用于调试）
+  Map<String, dynamic> getInitStatus() {
+    return {
+      'initialized': _initialized,
+      'lastInitTime': _lastInitTime?.toIso8601String(),
+      'lastErrorCount': _lastErrorCount,
+      'lastErrorTime': _lastErrorTime?.toIso8601String(),
+    };
+  }
+
   /// 检查连接健康状态
   bool _isConnectionHealthy() {
     if (!_initialized) return false;
@@ -396,7 +409,7 @@ class ApiServiceWrapper {
     // _dio.close(); // 已注释，避免关闭共享连接
   }
 
-  
+
   /// 生成人物卡图片
   Future<Map<String, dynamic>> generateRoleCardImages({
     required String roleId,
@@ -782,7 +795,7 @@ class ApiServiceWrapper {
     }
   }
 
-  /// 检查图片是否有视频
+  /// 检查图片是否有视频创建
   Future<VideoStatusResponse> checkVideoStatus(String imgName) async {
     _ensureInitialized();
     try {
@@ -802,28 +815,6 @@ class ApiServiceWrapper {
       }
     } catch (e) {
       debugPrint('检查视频状态异常: $e');
-      throw _handleError(e);
-    }
-  }
-
-  /// 查询图生视频任务状态
-  Future<Map<String, dynamic>> getVideoTaskStatus(int taskId) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-
-      final response = await _api.getVideoTaskStatusApiImageToVideoStatusTaskIdGet(
-        taskId: taskId,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>;
-      } else {
-        throw Exception('查询视频任务状态失败：${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('查询视频任务状态异常: $e');
       throw _handleError(e);
     }
   }
@@ -849,26 +840,51 @@ class ApiServiceWrapper {
     required int count,
     String? modelName,
   }) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
+    debugPrint('=== ApiServiceWrapper.regenerateSceneIllustrationImages ===');
+    debugPrint('参数: taskId=$taskId, count=$count, modelName=$modelName');
 
+    _ensureInitialized();
+    debugPrint('✅ 初始化检查通过');
+
+    try {
+      debugPrint('🔄 获取 token...');
+      final token = await getToken();
+      debugPrint('✅ token获取成功: ${token?.substring(0, 10)}...');
+
+      debugPrint('🔄 构建请求参数...');
+      final request = SceneRegenerateRequest((b) => b
+        ..taskId = taskId
+        ..count = count
+        ..model = modelName ?? '');
+      debugPrint('请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}');
+
+      debugPrint('🔄 发起API请求...');
       final response = await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
-        sceneRegenerateRequest: SceneRegenerateRequest((b) => b
-          ..taskId = taskId
-          ..count = count
-          ..model = modelName ?? ''),
+        sceneRegenerateRequest: request,
         X_API_TOKEN: token,
       );
 
+      debugPrint('✅ API响应收到');
+      debugPrint('状态码: ${response.statusCode}');
+      debugPrint('响应类型: ${response.data.runtimeType}');
+
       if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>? ?? {'status': 'failed'};
+        debugPrint('✅ 请求成功');
+        debugPrint('响应数据: ${response.data}');
+        final result = response.data as Map<String, dynamic>? ?? {'status': 'failed'};
+        debugPrint('返回结果: $result');
+        return result;
       } else {
+        debugPrint('❌ 请求失败，状态码: ${response.statusCode}');
         throw Exception('重新生成场景插图失败：${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint('重新生成场景插图异常: $e');
-      throw _handleError(e);
+    } catch (e, stackTrace) {
+      debugPrint('❌ API调用异常');
+      debugPrint('异常类型: ${e.runtimeType}');
+      debugPrint('异常信息: $e');
+      debugPrint('堆栈跟踪:\n$stackTrace');
+      debugPrint('====================================');
+      rethrow;
     }
   }
 

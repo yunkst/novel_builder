@@ -18,15 +18,17 @@ from bs4 import BeautifulSoup
 
 class RequestStrategy(Enum):
     """请求策略枚举"""
-    SIMPLE = "simple"          # 简单requests请求
-    BROWSER = "browser"        # 浏览器模拟请求
-    HYBRID = "hybrid"          # 混合模式，优先浏览器，失败降级
-    STEALTH = "stealth"        # 隐蔽模式，高级反检测
+
+    SIMPLE = "simple"  # 简单requests请求
+    BROWSER = "browser"  # 浏览器模拟请求
+    HYBRID = "hybrid"  # 混合模式，优先浏览器，失败降级
+    STEALTH = "stealth"  # 隐蔽模式，高级反检测
 
 
 @dataclass
 class RequestConfig:
     """请求配置"""
+
     timeout: int = 10
     max_retries: int = 3
     retry_delay: float = 1.0
@@ -46,6 +48,7 @@ class RequestConfig:
 @dataclass
 class Response:
     """统一响应格式"""
+
     url: str
     status_code: int
     headers: dict[str, str]
@@ -70,8 +73,9 @@ class IHttpClient(ABC):
         pass
 
     @abstractmethod
-    async def post(self, url: str, data: dict | None = None,
-                  config: RequestConfig | None = None) -> Response:
+    async def post(
+        self, url: str, data: dict | None = None, config: RequestConfig | None = None
+    ) -> Response:
         """发送POST请求"""
         pass
 
@@ -98,20 +102,22 @@ class RequestsClient(IHttpClient):
 
     def _setup_default_headers(self):
         """设置默认请求头"""
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0"
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0",
+            }
+        )
 
     def _setup_ssl_context(self):
         """设置SSL上下文"""
@@ -131,11 +137,11 @@ class RequestsClient(IHttpClient):
                 total=5,
                 backoff_factor=0.5,
                 status_forcelist=[500, 502, 503, 504],
-                allowed_methods=["GET", "POST"]
+                allowed_methods=["GET", "POST"],
             )
         )
-        self.session.mount('https://', adapter)
-        self.session.mount('http://', adapter)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     async def get(self, url: str, config: RequestConfig | None = None) -> Response:
         """发送GET请求"""
@@ -154,14 +160,16 @@ class RequestsClient(IHttpClient):
         self._cache[url] = response
         return response
 
-    async def post(self, url: str, data: dict | None = None,
-                  config: RequestConfig | None = None) -> Response:
+    async def post(
+        self, url: str, data: dict | None = None, config: RequestConfig | None = None
+    ) -> Response:
         """发送POST请求"""
         config = config or RequestConfig()
         return await self._execute_request("POST", url, data, config)
 
-    async def _execute_request(self, method: str, url: str, data: dict | None,
-                              config: RequestConfig) -> Response:
+    async def _execute_request(
+        self, method: str, url: str, data: dict | None, config: RequestConfig
+    ) -> Response:
         """执行HTTP请求"""
         loop = asyncio.get_event_loop()
 
@@ -177,7 +185,7 @@ class RequestsClient(IHttpClient):
             "timeout": config.timeout,
             "headers": headers,
             "proxies": self._get_proxies(config.proxy),
-            "verify": config.verify_ssl
+            "verify": config.verify_ssl,
         }
 
         for attempt in range(config.max_retries):
@@ -207,16 +215,16 @@ class RequestsClient(IHttpClient):
                         url=r.url,
                         status_code=r.status_code,
                         headers=dict(r.headers),
-                        content=r.content.decode(encoding, errors='ignore'),
+                        content=r.content.decode(encoding, errors="ignore"),
                         encoding=encoding,
                         cookies=dict(r.cookies),
                         elapsed=elapsed,
-                        strategy_used=RequestStrategy.SIMPLE
+                        strategy_used=RequestStrategy.SIMPLE,
                     )
                 else:
                     raise Exception(f"HTTP {r.status_code}")
 
-            except Exception as e:
+            except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
                 if attempt == config.max_retries - 1:
                     raise Exception(f"请求失败，已重试{config.max_retries}次: {e!s}")
                 continue
@@ -228,43 +236,40 @@ class RequestsClient(IHttpClient):
         # 1. 优先使用HTTP头指定的编码
         if response.encoding:
             encoding = response.encoding.lower()
-            if encoding in ['gb2312', 'gbk']:
-                return 'gbk'
-            elif encoding != 'utf-8':
+            if encoding in ["gb2312", "gbk"]:
+                return "gbk"
+            elif encoding != "utf-8":
                 return encoding
 
         # 2. 使用apparent_encoding
-        if hasattr(response, 'apparent_encoding') and response.apparent_encoding:
+        if hasattr(response, "apparent_encoding") and response.apparent_encoding:
             encoding = response.apparent_encoding.lower()
-            if encoding in ['gb2312', 'gbk']:
-                return 'gbk'
+            if encoding in ["gb2312", "gbk"]:
+                return "gbk"
             return encoding
 
         # 3. 默认utf-8
-        return 'utf-8'
+        return "utf-8"
 
     def _get_proxies(self, proxy: str | None) -> dict[str, str] | None:
         """获取代理配置"""
         if proxy:
-            return {
-                'http': proxy,
-                'https': proxy
-            }
+            return {"http": proxy, "https": proxy}
         return None
 
     def _setup_proxy_from_env(self):
         """从环境变量设置代理"""
         # 获取环境变量中的代理配置
-        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
-        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-        os.environ.get('NO_PROXY') or os.environ.get('no_proxy')
+        http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+        https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        os.environ.get("NO_PROXY") or os.environ.get("no_proxy")
 
         if http_proxy or https_proxy:
             proxies = {}
             if http_proxy:
-                proxies['http'] = http_proxy
+                proxies["http"] = http_proxy
             if https_proxy:
-                proxies['https'] = https_proxy
+                proxies["https"] = https_proxy
 
             # 设置session的代理
             self.session.proxies.update(proxies)
@@ -295,15 +300,16 @@ class PlaywrightClient(IHttpClient):
         if self.browser is None:
             try:
                 from playwright.async_api import async_playwright
+
                 playwright = await async_playwright().start()
 
                 # 默认浏览器参数
                 default_args = [
-                    '--no-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-web-security",
+                    "--disable-features=VizDisplayCompositor",
                 ]
 
                 # 合并自定义参数
@@ -312,8 +318,7 @@ class PlaywrightClient(IHttpClient):
                     browser_args = default_args + config.browser_args
 
                 self.browser = await playwright.chromium.launch(
-                    headless=True,
-                    args=browser_args
+                    headless=True, args=browser_args
                 )
 
                 # 设置上下文
@@ -330,7 +335,7 @@ class PlaywrightClient(IHttpClient):
 
             except ImportError:
                 raise Exception("Playwright未安装，请安装: pip install playwright")
-            except Exception as e:
+            except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
                 raise Exception(f"Playwright初始化失败: {e!s}")
 
     async def get(self, url: str, config: RequestConfig | None = None) -> Response:
@@ -361,7 +366,7 @@ class PlaywrightClient(IHttpClient):
 
                 # 获取响应头
                 headers = {}
-                if hasattr(response, 'headers'):
+                if hasattr(response, "headers"):
                     headers = dict(response.headers)
 
                 result = Response(
@@ -369,23 +374,26 @@ class PlaywrightClient(IHttpClient):
                     status_code=response.status,
                     headers=headers,
                     content=content,
-                    encoding='utf-8',  # Playwright通常返回UTF-8
+                    encoding="utf-8",  # Playwright通常返回UTF-8
                     cookies={},
                     elapsed=elapsed,
-                    strategy_used=RequestStrategy.BROWSER
+                    strategy_used=RequestStrategy.BROWSER,
                 )
 
                 # 缓存响应
                 self._cache[url] = result
                 return result
             else:
-                raise Exception(f"Playwright请求失败: {response.status if response else 'Unknown'}")
+                raise Exception(
+                    f"Playwright请求失败: {response.status if response else 'Unknown'}"
+                )
 
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
             raise Exception(f"Playwright请求异常: {e!s}")
 
-    async def post(self, url: str, data: dict | None = None,
-                  config: RequestConfig | None = None) -> Response:
+    async def post(
+        self, url: str, data: dict | None = None, config: RequestConfig | None = None
+    ) -> Response:
         """发送POST请求"""
         await self._ensure_browser()
 
@@ -394,7 +402,8 @@ class PlaywrightClient(IHttpClient):
 
             # 设置表单数据
             if data:
-                await self.page.evaluate("""
+                await self.page.evaluate(
+                    """
                     (data) => {
                         const form = document.createElement('form');
                         form.method = 'POST';
@@ -411,14 +420,16 @@ class PlaywrightClient(IHttpClient):
                         document.body.appendChild(form);
                         form.submit();
                     }
-                """, data)
+                """,
+                    data,
+                )
             else:
                 await self.page.goto(url)
 
             elapsed = time.time() - start_time
 
             # 等待页面加载
-            await self.page.wait_for_load_state('networkidle')
+            await self.page.wait_for_load_state("networkidle")
 
             content = await self.page.content()
 
@@ -427,13 +438,13 @@ class PlaywrightClient(IHttpClient):
                 status_code=200,  # Playwright中很难准确获取状态码
                 headers={},
                 content=content,
-                encoding='utf-8',
+                encoding="utf-8",
                 cookies={},
                 elapsed=elapsed,
-                strategy_used=RequestStrategy.BROWSER
+                strategy_used=RequestStrategy.BROWSER,
             )
 
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
             raise Exception(f"Playwright POST请求异常: {e!s}")
 
     def set_cookies(self, cookies: dict[str, str]) -> None:
@@ -469,15 +480,16 @@ class HybridHttpClient(IHttpClient):
         elif config.strategy == RequestStrategy.HYBRID:
             try:
                 return await self.requests_client.get(url, config)
-            except Exception as e:
+            except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
                 print(f"Requests请求失败，尝试Playwright: {e!s}")
                 return await self.playwright_client.get(url, config)
         else:  # STEALTH
             # 总是使用Playwright，添加更多反检测策略
             return await self.playwright_client.get(url, config)
 
-    async def post(self, url: str, data: dict | None = None,
-                  config: RequestConfig | None = None) -> Response:
+    async def post(
+        self, url: str, data: dict | None = None, config: RequestConfig | None = None
+    ) -> Response:
         """发送POST请求"""
         config = config or RequestConfig()
 
@@ -488,7 +500,7 @@ class HybridHttpClient(IHttpClient):
         elif config.strategy == RequestStrategy.HYBRID:
             try:
                 return await self.requests_client.post(url, data, config)
-            except Exception as e:
+            except (OSError, ValueError, AttributeError, RuntimeError, requests.RequestException) as e:
                 print(f"Requests请求失败，尝试Playwright: {e!s}")
                 return await self.playwright_client.post(url, data, config)
         else:  # STEALTH
@@ -507,8 +519,6 @@ class HybridHttpClient(IHttpClient):
     async def close(self):
         """关闭资源"""
         await self.playwright_client.close()
-
-
 
 
 # 全局客户端实例
@@ -536,8 +546,9 @@ async def http_get(url: str, config: RequestConfig | None = None) -> Response:
     return await client.get(url, config)
 
 
-async def http_post(url: str, data: dict | None = None,
-                   config: RequestConfig | None = None) -> Response:
+async def http_post(
+    url: str, data: dict | None = None, config: RequestConfig | None = None
+) -> Response:
     """便捷的POST请求函数"""
     client = get_http_client()
     return await client.post(url, data, config)

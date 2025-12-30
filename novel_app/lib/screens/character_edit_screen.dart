@@ -9,7 +9,6 @@ import '../core/di/api_service_provider.dart';
 import '../services/character_avatar_service.dart';
 import '../screens/gallery_view_screen.dart';
 import '../widgets/model_selector.dart';
-import 'package:novel_api/novel_api.dart';
 
 /// 使用方法：RoleGalleryCacheService用于检查角色图集是否为空，在头像点击时进行验证
 /// 调用方式：在_openGallery方法中调用_checkGalleryEmpty方法检查图集状态
@@ -293,21 +292,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 
       // 使用ApiServiceWrapper确保正确的token认证
       final apiService = ApiServiceProvider.instance;
-
-      // 构建RoleInfo列表（使用built_value构建方式）
-      final roleInfo = RoleInfo((b) => b
-        ..id = int.tryParse(roleId) ?? DateTime.now().millisecondsSinceEpoch
-        ..name = roles['name'] ?? ''
-        ..gender = roles['gender']?.toString()
-        ..age = int.tryParse(roles['age']?.toString() ?? '')
-        ..occupation = roles['occupation']?.toString()
-        ..personality = roles['personality']?.toString()
-        ..appearanceFeatures = roles['appearance_features']?.toString()
-        ..bodyType = roles['body_type']?.toString()
-        ..clothingStyle = roles['clothing_style']?.toString()
-        ..backgroundStory = roles['background_story']?.toString()
-        ..facePrompts = roles['face_prompts']?.toString()
-        ..bodyPrompts = roles['body_prompts']?.toString());
 
       // 调用API服务包装器的方法，自动处理token认证
       final response = await apiService.generateRoleCardImages(

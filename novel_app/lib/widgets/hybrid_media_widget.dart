@@ -42,7 +42,11 @@ class HybridMediaWidget extends StatefulWidget {
   State<HybridMediaWidget> createState() => _HybridMediaWidgetState();
 }
 
-class _HybridMediaWidgetState extends State<HybridMediaWidget> {
+class _HybridMediaWidgetState extends State<HybridMediaWidget>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   MediaType _mediaType = MediaType.loading;
   VideoPlayerController? _videoController;
   String? _videoUrl;
@@ -268,6 +272,8 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用，用于 AutomaticKeepAliveClientMixin
+
     Widget content;
 
     switch (_mediaType) {

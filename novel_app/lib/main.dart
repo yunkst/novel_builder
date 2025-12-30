@@ -129,17 +129,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final CacheManager _cacheManager = CacheManager();
 
-  static const List<Widget> _pages = <Widget>[
-    BookshelfScreen(),
-    SearchScreen(),
-    IllustrationDebugScreen(),
-    SettingsScreen(),
-  ];
+  // 为生图调试页面创建 GlobalKey，用于调用刷新方法
+  final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
+
+  // 移除静态 _pages 列表，将在 build 方法中动态创建
 
   void _onItemTapped(int index) {
     setState(() {
+      final previousIndex = _selectedIndex;
       _selectedIndex = index;
+
+      // 当切换到生图调试页面（索引2）且之前不在该页面时，触发刷新
+      if (index == 2 && previousIndex != 2) {
+        _refreshIllustrationDebugScreen();
+      }
     });
+  }
+
+  /// 刷新生图调试页面列表
+  void _refreshIllustrationDebugScreen() {
+    final debugScreenState = _debugScreenKey.currentState;
+    if (debugScreenState != null) {
+      // 通过动态调用刷新方法（不依赖具体类型）
+      (debugScreenState as dynamic).refreshData?.call();
+    }
   }
 
   @override
@@ -207,8 +220,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // 定义页面列表，使用 IndexedStack 保持所有页面状态
+    final List<Widget> pages = [
+      const BookshelfScreen(),
+      const SearchScreen(),
+      IllustrationDebugScreen(key: _debugScreenKey),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
-      body: _pages[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,

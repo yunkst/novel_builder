@@ -9,14 +9,13 @@ import logging
 import logging.handlers
 import sys
 from pathlib import Path
-from typing import Optional
 
 from .config import settings
 
 
 def setup_logging(
-    log_level: Optional[str] = None,
-    log_file: Optional[str] = None,
+    log_level: str | None = None,
+    log_file: str | None = None,
     enable_console: bool = True,
     enable_file: bool = True,
 ) -> logging.Logger:
@@ -46,7 +45,7 @@ def setup_logging(
     # 定义日志格式
     formatter = logging.Formatter(
         fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # 控制台处理器
@@ -67,7 +66,7 @@ def setup_logging(
             filename=log_path,
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
-            encoding="utf-8"
+            encoding="utf-8",
         )
         file_handler.setLevel(log_level)
         file_handler.setFormatter(formatter)

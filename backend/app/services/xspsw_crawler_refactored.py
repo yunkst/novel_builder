@@ -20,8 +20,7 @@ class XspswCrawlerRefactored(BaseCrawler):
     def __init__(self):
         # Xspsw是移动端网站，使用简单策略
         super().__init__(
-            base_url="https://m.xspsw.com",
-            strategy=RequestStrategy.SIMPLE
+            base_url="https://m.xspsw.com", strategy=RequestStrategy.SIMPLE
         )
 
         # 移动端请求头
@@ -30,7 +29,7 @@ class XspswCrawlerRefactored(BaseCrawler):
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
         }
 
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
@@ -44,17 +43,16 @@ class XspswCrawlerRefactored(BaseCrawler):
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers
+                custom_headers=self.custom_headers,
             )
 
             # 准备搜索参数
-            search_data = {
-                "searchkey": keyword.strip()
-            }
+            search_data = {"searchkey": keyword.strip()}
 
             # 发送POST请求进行搜索
-            response = await self.post_form(search_url, search_data, timeout=10,
-                                           custom_headers=self.custom_headers)
+            response = await self.post_form(
+                search_url, search_data, timeout=10, custom_headers=self.custom_headers
+            )
 
             # 解析搜索结果
             novels = self._parse_xspsw_search_results(response.soup())
@@ -82,13 +80,14 @@ class XspswCrawlerRefactored(BaseCrawler):
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers
+                custom_headers=self.custom_headers,
             )
 
             # 首先访问第一页获取总页数信息
             first_page_url = f"{self.base_url}/xianshishuwu/{novel_id}/"
-            response = await self.get_page(first_page_url, timeout=10,
-                                          custom_headers=self.custom_headers)
+            response = await self.get_page(
+                first_page_url, timeout=10, custom_headers=self.custom_headers
+            )
 
             soup = response.soup()
 
@@ -101,15 +100,20 @@ class XspswCrawlerRefactored(BaseCrawler):
                     if page_num == 1:
                         page_url = first_page_url
                     else:
-                        page_url = f"{self.base_url}/xianshishuwu/{novel_id}/0_{page_num}.html"
+                        page_url = (
+                            f"{self.base_url}/xianshishuwu/{novel_id}/0_{page_num}.html"
+                        )
 
                     # 访问分页
-                    page_response = await self.get_page(page_url, timeout=10,
-                                                      custom_headers=self.custom_headers)
+                    page_response = await self.get_page(
+                        page_url, timeout=10, custom_headers=self.custom_headers
+                    )
                     page_soup = page_response.soup()
 
                     # 提取当前页的章节链接
-                    page_chapters = self._extract_chapters_from_page(page_soup, self.base_url)
+                    page_chapters = self._extract_chapters_from_page(
+                        page_soup, self.base_url
+                    )
                     all_chapters.extend(page_chapters)
 
                     # 添加延迟避免请求过快
@@ -136,12 +140,13 @@ class XspswCrawlerRefactored(BaseCrawler):
                 max_retries=3,
                 retry_delay=0.6,
                 strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers
+                custom_headers=self.custom_headers,
             )
 
             # 获取章节页面
-            response = await self.get_page(chapter_url, timeout=10,
-                                          custom_headers=self.custom_headers)
+            response = await self.get_page(
+                chapter_url, timeout=10, custom_headers=self.custom_headers
+            )
 
             # 提取内容
             soup = response.soup()
@@ -186,8 +191,10 @@ class XspswCrawlerRefactored(BaseCrawler):
                     continue
 
                 # 过滤掉明显不是小说标题的链接
-                if any(skip in title.lower() for skip in
-                       ['首页', '下一页', '上一页', '更多', '登录', '注册']):
+                if any(
+                    skip in title.lower()
+                    for skip in ["首页", "下一页", "上一页", "更多", "登录", "注册"]
+                ):
                     continue
 
                 # 构建完整URL
@@ -199,14 +206,16 @@ class XspswCrawlerRefactored(BaseCrawler):
                 status = self._extract_xspsw_status(full_text)
                 category = self._extract_xspsw_category(full_text)
 
-                novels.append({
-                    "title": title,
-                    "url": novel_url,
-                    "author": author,
-                    "source": "xspsw",
-                    "category": category,
-                    "status": status,
-                })
+                novels.append(
+                    {
+                        "title": title,
+                        "url": novel_url,
+                        "author": author,
+                        "source": "xspsw",
+                        "category": category,
+                        "status": status,
+                    }
+                )
 
             except Exception as e:
                 print(f"处理搜索结果项时出错: {e}")
@@ -219,17 +228,19 @@ class XspswCrawlerRefactored(BaseCrawler):
         """提取Xspsw作者信息"""
         # 新格式："书名\n作者名N次元连载\n简介"
         # 尝试匹配 "作者名N次元" 格式
-        author_match = re.search(r'\n([^\n]+?)N次元', full_text)
+        author_match = re.search(r"\n([^\n]+?)N次元", full_text)
         if author_match:
             author = author_match.group(1).strip()
             if author and len(author) > 1:
                 return author
 
         # 旧格式："书名 作者 分类 状态"
-        author_match = re.search(r'作者[：:]\s*([^\s\n]+)', full_text)
+        author_match = re.search(r"作者[：:]\s*([^\s\n]+)", full_text)
         if not author_match:
             # 尝试另一种格式：在分类前的名称
-            author_match = re.search(r'([^\s]+)(?:玄幻|都市|仙侠|历史|科幻|游戏|体育)', full_text)
+            author_match = re.search(
+                r"([^\s]+)(?:玄幻|都市|仙侠|历史|科幻|游戏|体育)", full_text
+            )
 
         if author_match:
             return author_match.group(1)
@@ -256,8 +267,9 @@ class XspswCrawlerRefactored(BaseCrawler):
         """获取热门小说作为搜索fallback"""
         try:
             # 访问首页获取热门小说
-            response = await self.get_page(self.base_url, timeout=10,
-                                          custom_headers=self.custom_headers)
+            response = await self.get_page(
+                self.base_url, timeout=10, custom_headers=self.custom_headers
+            )
             soup = response.soup()
 
             novels = []
@@ -270,12 +282,14 @@ class XspswCrawlerRefactored(BaseCrawler):
                     href = link.get("href")
                     if title and href and len(title) > 2:
                         novel_url = urllib.parse.urljoin(self.base_url, href)
-                        novels.append({
-                            "title": title,
-                            "url": novel_url,
-                            "author": "未知作者",
-                            "source": "xspsw",
-                        })
+                        novels.append(
+                            {
+                                "title": title,
+                                "url": novel_url,
+                                "author": "未知作者",
+                                "source": "xspsw",
+                            }
+                        )
                 except Exception:
                     continue
 
@@ -326,17 +340,16 @@ class XspswCrawlerRefactored(BaseCrawler):
 
                 if chapter_title and chapter_href and len(chapter_title) > 1:
                     full_url = urllib.parse.urljoin(base_url, chapter_href)
-                    chapters.append({
-                        "title": chapter_title,
-                        "url": full_url
-                    })
+                    chapters.append({"title": chapter_title, "url": full_url})
 
             except Exception:
                 continue
 
         return chapters
 
-    def _deduplicate_chapters(self, chapters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _deduplicate_chapters(
+        self, chapters: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """章节去重保持顺序"""
         seen = set()
         unique = []
@@ -359,13 +372,7 @@ class XspswCrawlerRefactored(BaseCrawler):
     def _extract_chapter_title(self, soup) -> str:
         """提取章节标题"""
         # Xspsw特定的标题选择器
-        title_selectors = [
-            "h1",
-            "h2",
-            ".chapter-title",
-            ".title",
-            "title"
-        ]
+        title_selectors = ["h1", "h2", ".chapter-title", ".title", "title"]
 
         for selector in title_selectors:
             title_elem = soup.select_one(selector)
@@ -395,9 +402,7 @@ class XspswCrawlerRefactored(BaseCrawler):
             content_elem = soup.select_one(selector)
             if content_elem:
                 # 移除广告和无关元素
-                for ad in content_elem.find_all(
-                    ["script", "style", "ins", "iframe"]
-                ):
+                for ad in content_elem.find_all(["script", "style", "ins", "iframe"]):
                     ad.decompose()
 
                 content = content_elem.get_text("\n", strip=True)
@@ -419,9 +424,7 @@ class XspswCrawlerRefactored(BaseCrawler):
 
             if longest_div and max_text_length > 500:
                 # 移除广告和无关元素
-                for ad in longest_div.find_all(
-                    ["script", "style", "ins", "iframe"]
-                ):
+                for ad in longest_div.find_all(["script", "style", "ins", "iframe"]):
                     ad.decompose()
                 content = longest_div.get_text("\n", strip=True)
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/scene_illustration.dart';
 import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
-import 'package:novel_api/novel_api.dart';
 import '../utils/video_generation_state_manager.dart';
 import 'hybrid_media_widget.dart';
 import 'generate_more_dialog.dart';

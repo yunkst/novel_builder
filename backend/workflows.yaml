@@ -8,7 +8,7 @@ t2i:
 
 i2v:
   - title: "视频生成"
-    path: "./comfyui_json/img2video/i2v.json"
+    path: "./comfyui_json/img2video/smooth_i2v.json"
     description: "图片转视频工作流"
 
 # 全局配置

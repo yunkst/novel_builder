@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/character.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
@@ -9,6 +10,7 @@ import '../services/cache_manager.dart';
 import 'reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
+import '../widgets/character_selector.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -43,6 +45,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       ValueNotifier<bool>(false);
   String _currentGeneratingTitle = '';
   String _currentGeneratingContent = '';
+  List<int> _selectedCharacterIds = []; // 选中的角色ID列表
 
   @override
   void initState() {
@@ -306,7 +309,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     final userInputController = TextEditingController(
       text: prefillContent ?? '',
     );
-    final result = await showDialog<Map<String, String>>(
+
+    // 重置选中的角色
+    _selectedCharacterIds = [];
+
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
@@ -317,50 +324,68 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             Text(_chapters.isEmpty ? '创建新章节' : '插入新章节'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _chapters.isEmpty
-                ? '将为小说"${widget.novel.title}"创建第一章'
-                : '将在第${afterIndex + 1}章"${_chapters[afterIndex].title}"后插入新章节',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _chapters.isEmpty
+                  ? '将为小说"${widget.novel.title}"创建第一章'
+                  : '将在第${afterIndex + 1}章"${_chapters[afterIndex].title}"后插入新章节',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: '章节标题',
-                hintText: _chapters.isEmpty
-                  ? '例如：第一章 故事的开始'
-                  : '例如：第十五章 意外的相遇',
-                border: const OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  labelText: '章节标题',
+                  hintText: _chapters.isEmpty
+                    ? '例如：第一章 故事的开始'
+                    : '例如：第十五章 意外的相遇',
+                  border: const OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: userInputController,
-              decoration: const InputDecoration(
-                labelText: '章节内容要求',
-                hintText: '描述你想要的故事情节、人物对话、场景描述等...',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: userInputController,
+                decoration: const InputDecoration(
+                  labelText: '章节内容要求',
+                  hintText: '描述你想要的故事情节、人物对话、场景描述等...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 5,
               ),
-              maxLines: 5,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '提示：AI将根据你的要求生成新的章节内容',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+              const SizedBox(height: 16),
+              const Text(
+                '出场人物（可选）',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              CharacterSelector(
+                novelUrl: widget.novel.url,
+                initialSelectedIds: _selectedCharacterIds,
+                onSelectionChanged: (selectedIds) {
+                  _selectedCharacterIds = selectedIds;
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'AI将根据选中的角色特征来生成章节内容',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blue.shade600,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -374,6 +399,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 Navigator.pop(context, {
                   'title': titleController.text.trim(),
                   'content': userInputController.text.trim(),
+                  'characterIds': _selectedCharacterIds,
                 });
               }
             },
@@ -384,13 +410,18 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
 
     if (result != null && result.isNotEmpty) {
-      _generateNewChapter(afterIndex, result['title']!, result['content']!);
+      _generateNewChapter(
+        afterIndex,
+        result['title']!,
+        result['content']!,
+        result['characterIds'] as List<int>? ?? [],
+      );
     }
   }
 
   // 生成新章节内容
   Future<void> _generateNewChapter(
-      int afterIndex, String title, String userInput) async {
+      int afterIndex, String title, String userInput, List<int> characterIds) async {
     // 保存当前生成的章节标题和用户输入内容
     _currentGeneratingTitle = title;
     _currentGeneratingContent = userInput;
@@ -508,12 +539,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
 
     // 开始生成内容
-    await _callDifyToGenerateChapter(afterIndex, userInput);
+    await _callDifyToGenerateChapter(afterIndex, userInput, characterIds);
   }
 
   // 调用Dify生成章节内容
   Future<void> _callDifyToGenerateChapter(
-      int afterIndex, String userInput) async {
+      int afterIndex, String userInput, List<int> characterIds) async {
     _isGeneratingNotifier.value = true;
     _generatedContentNotifier.value = '';
 
@@ -542,8 +573,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         historyChaptersContent += '作者：${widget.novel.author}\n';
       }
 
-      // 角色信息设置为空，不使用角色选择功能
-      const String rolesInfo = '无特定角色出场';
+      // 获取选中人物信息并格式化为AI可读文本
+      String rolesInfo = '';
+      if (characterIds.isNotEmpty) {
+        final selectedCharacters = await _databaseService.getCharactersByIds(characterIds);
+        rolesInfo = Character.formatForAI(selectedCharacters);
+      } else {
+        rolesInfo = '无特定角色出场';
+      }
 
       // 构建Dify请求参数（参考特写功能，但cmd为空，current_chapter_content为空）
       final inputs = {

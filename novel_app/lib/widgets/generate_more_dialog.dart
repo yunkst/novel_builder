@@ -31,17 +31,26 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
   }
 
   void _handleQuickSelect(int count) {
-    _controller.text = count.toString();
-    _controller.selection = TextSelection.fromPosition(
-      TextPosition(offset: _controller.text.length),
-    );
+    setState(() {
+      _controller.text = count.toString();
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
   }
 
   void _handleConfirm() {
+    debugPrint('=== GenerateMoreDialog: 用户点击确认生成 ===');
+    debugPrint('输入的文本: ${_controller.text}');
+
     final text = _controller.text.trim();
     final count = int.tryParse(text);
 
+    debugPrint('解析的数量: $count');
+    debugPrint('选中的模型: $_selectedModel');
+
     if (count == null || count <= 0) {
+      debugPrint('❌ 数量验证失败');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('请输入有效的图片数量'),
@@ -51,18 +60,24 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
       return;
     }
 
-    if (count > 20) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('一次最多生成20张图片'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    debugPrint('✅ 数量验证通过，调用 onConfirm 回调');
 
-    Navigator.of(context).pop();
-    widget.onConfirm(count, _selectedModel);
+    try {
+      if (!mounted) {
+        debugPrint('❌ widget已销毁，取消操作');
+        return;
+      }
+
+      // 只调用回调，不要在这里调用 Navigator.pop
+      // onConfirm 回调会负责关闭对话框并返回数据
+      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=$_selectedModel');
+      widget.onConfirm(count, _selectedModel);
+      debugPrint('✅ onConfirm 回调调用完成');
+    } catch (e, stackTrace) {
+      debugPrint('❌❌❌ onConfirm 回调异常 ❌❌❌');
+      debugPrint('异常: $e');
+      debugPrint('堆栈:\n$stackTrace');
+    }
   }
 
   @override
@@ -83,10 +98,11 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // 标题
             Row(
               children: [
@@ -144,19 +160,13 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
               ],
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(8)),
                 ),
                 filled: true,
-                fillColor: Colors.black,
-                suffix: Text(
-                  '张',
-                  style: TextStyle(
-                    color: Colors.white,
-                  ),
-                ),
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                suffix: const Text('张'),
               ),
             ),
             const SizedBox(height: 16),
@@ -205,6 +215,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

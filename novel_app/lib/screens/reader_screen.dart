@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:async/async.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
@@ -9,21 +8,28 @@ import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
-import '../services/unified_stream_manager.dart';
 import '../services/scene_illustration_service.dart';
 import '../services/chapter_manager.dart';
-import '../models/stream_config.dart';
 import '../core/di/api_service_provider.dart';
 import '../widgets/highlighted_text.dart';
-import '../widgets/character_selector.dart';
 import '../widgets/character_preview_dialog.dart';
-import '../widgets/scene_image_preview.dart';
 import '../widgets/scene_illustration_dialog.dart';
+import '../widgets/illustration_action_dialog.dart';
+import '../widgets/generate_more_dialog.dart';
 import '../widgets/video_input_dialog.dart';
+import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
+import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
+import '../widgets/reader_action_buttons.dart'; // 新增导入
+import '../widgets/paragraph_widget.dart'; // 新增导入
+import '../services/auto_scroll_controller.dart'; // 新增导入
+
 import '../utils/character_matcher.dart';
 import '../utils/media_markup_parser.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../providers/reader_edit_mode_provider.dart';
+import '../controllers/paragraph_rewrite_controller.dart';
+import '../controllers/summarize_controller.dart';
+import '../data/repositories/reader_repository.dart';
 import 'package:provider/provider.dart';
 
 class ReaderScreen extends StatefulWidget {
@@ -47,7 +53,11 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMixin {
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
+  final ReaderRepository _readerRepository = ReaderRepository();
   final ScrollController _scrollController = ScrollController();
+  final ParagraphRewriteController _paragraphRewriteController = ParagraphRewriteController();
+  final SummarizeController _summarizeController = SummarizeController();
+  late final HighPerformanceAutoScrollController _autoScrollController; // 新增
 
   // 光标动画控制器
   late AnimationController _cursorController;
@@ -61,12 +71,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   // 特写模式相关状态
   bool _isCloseupMode = false;
-  List<int> _selectedCharacterIds = []; // 新增：选中的人物ID列表
   List<int> _selectedParagraphIndices = [];
-  final ValueNotifier<String> _rewriteResultNotifier =
-      ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingRewriteNotifier =
-      ValueNotifier<bool>(false);
 
   // 全文重写相关状态
   final ValueNotifier<String> _fullRewriteResultNotifier =
@@ -77,32 +82,32 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   // 全文重写要求的用户输入缓存
   String _lastFullRewriteInput = '';
 
-  // 总结相关状态
-  final ValueNotifier<String> _summarizeResultNotifier =
-      ValueNotifier<String>('');
-  final ValueNotifier<bool> _isGeneratingSummarizeNotifier =
-      ValueNotifier<bool>(false);
-
   // 预加载相关状态
   final ChapterManager _chapterManager = ChapterManager();
 
   // 自动滚动相关状态
-  bool _isAutoScrolling = false;
-  bool _wasAutoScrollingBeforeTouch = false; // 记录触摸前的自动滚动状态
+  bool _isAutoScrolling = false;      // 实际是否正在滚动
+  bool _shouldAutoScroll = false;     // 是否应该自动滚动（意图标记，用于恢复判断）
+  bool _isUserScrolling = false;      // 标记用户是否正在滚动
+  DateTime? _autoScrollStartTime;     // 自动滚动启动时间（用于保护期）
+  static const Duration _startupProtectionDuration = Duration(milliseconds: 500);  // 启动保护期：500ms
+  // _wasAutoScrollingBeforeTouch 和 _isUserTouching 已移除 - 不再需要触摸暂停功能
+  // _autoScrollTimer 已移除 - 使用 HighPerformanceAutoScrollController 替代
 
   // 场景插图相关服务
   final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
-  Timer? _autoScrollTimer;
   double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
   static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
-
-  // 手势交互相关状态
-  bool _isUserTouching = false; // 用户触摸状态
 
   @override
   void initState() {
     super.initState();
     _currentChapter = widget.chapter;
+
+    // 初始化自动滚动控制器
+    _autoScrollController = HighPerformanceAutoScrollController(
+      scrollController: _scrollController,
+    );
 
     // 初始化光标动画
     _cursorController = AnimationController(
@@ -138,36 +143,44 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _autoScrollTimer?.cancel();
+    _autoScrollController.dispose(); // 清理自动滚动控制器
     _cursorController.dispose();
     _scrollController.dispose();
-    _rewriteResultNotifier.dispose();
-    _isGeneratingRewriteNotifier.dispose();
     _fullRewriteResultNotifier.dispose();
     _isGeneratingFullRewriteNotifier.dispose();
-    _summarizeResultNotifier.dispose();
-    _isGeneratingSummarizeNotifier.dispose();
+    _paragraphRewriteController.dispose();
+    _summarizeController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadChapterContent({bool resetScrollPosition = true}) async {
+  Future<void> _loadChapterContent({bool resetScrollPosition = true, bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
-      _content = '';
+      if (resetScrollPosition) {
+        _content = '';
+      }
     });
 
     try {
-      // 判断章节来源：本地章节直接从数据库获取，网络章节使用原有逻辑
-      if (_isLocalChapter(_currentChapter.url)) {
-        await _loadLocalChapterContent(resetScrollPosition);
-      } else {
-        await _loadNetworkChapterContent(resetScrollPosition);
-      }
+      final content = await _readerRepository.getChapterContent(
+        widget.novel.url,
+        _currentChapter,
+        forceRefresh: forceRefresh,
+      );
+
+      setState(() {
+        _content = content;
+        _isLoading = false;
+      });
+
+      _updateReadingProgress();
+      _handleScrollPosition(resetScrollPosition);
+      _startPreloadingChapters();
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '加载章节内容时出错: $e';
+        _errorMessage = '加载章节失败: ${_getErrorMessage(e)}';
       });
     }
   }
@@ -267,96 +280,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         );
       },
     );
-  }
-
-  // 判断是否为本地章节
-  bool _isLocalChapter(String chapterUrl) {
-    return DatabaseService.isLocalChapter(chapterUrl);
-  }
-
-  // 加载本地章节内容
-  Future<void> _loadLocalChapterContent(bool resetScrollPosition) async {
-    try {
-      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
-
-      if (cachedContent != null && cachedContent.isNotEmpty) {
-        setState(() {
-          _content = cachedContent;
-          _isLoading = false;
-        });
-        _updateReadingProgress();
-
-        // 处理滚动位置
-        _handleScrollPosition(resetScrollPosition);
-        // 开始预加载其他章节
-        _startPreloadingChapters();
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = '本地章节内容不存在';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '获取本地章节内容失败: $e';
-      });
-    }
-  }
-
-  // 加载网络章节内容
-  Future<void> _loadNetworkChapterContent(bool resetScrollPosition) async {
-    try {
-      // 先尝试从缓存获取
-      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
-
-      if (cachedContent != null) {
-        setState(() {
-          _content = cachedContent;
-          _isLoading = false;
-        });
-        _updateReadingProgress();
-        _handleScrollPosition(resetScrollPosition);
-        _startPreloadingChapters();
-        return;
-      }
-
-      // 从网络获取内容
-      try {
-        final content = await _apiService.getChapterContent(_currentChapter.url);
-
-        // 验证内容有效性
-        if (content.isNotEmpty && content.length > 50) {
-          // 缓存有效内容
-          await _databaseService.cacheChapter(
-              widget.novel.url, _currentChapter, content);
-
-          setState(() {
-            _content = content;
-            _isLoading = false;
-          });
-          _updateReadingProgress();
-          _handleScrollPosition(resetScrollPosition);
-          _startPreloadingChapters();
-        } else {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = '章节内容为空或过短，请稍后重试';
-          });
-        }
-      } catch (e) {
-        // 网络获取失败，显示错误信息而不是将错误作为内容
-        setState(() {
-          _isLoading = false;
-          _errorMessage = _getErrorMessage(e);
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '加载网络章节内容时出错: $e';
-      });
-    }
   }
 
   // 处理滚动位置的通用方法
@@ -549,12 +472,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     }
   }
 
-  /// 注：旧的预加载方法已被ChapterManager替代，保留此方法以防有其他地方调用
-  Future<void> _preloadChaptersInBackground(List<Chapter> chapters) async {
-    debugPrint('⚠️ _preloadChaptersInBackground 已被废弃，请使用ChapterManager');
-    // 空实现，功能已迁移到ChapterManager
-  }
-
   void _goToPreviousChapter() {
     final currentIndex =
         widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
@@ -591,122 +508,87 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     showDialog(
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => AlertDialog(
-        title: const Text('调整字体大小'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '示例文字',
-                  style: TextStyle(fontSize: _fontSize),
-                ),
-                Slider(
-                  value: _fontSize,
-                  min: 12,
-                  max: 32,
-                  divisions: 20,
-                  label: _fontSize.round().toString(),
-                  onChanged: (value) {
-                    setState(() {
-                      _fontSize = value;
-                    });
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
+      builder: (context) => FontSizeAdjusterDialog(
+        initialFontSize: _fontSize,
+        onFontSizeChanged: (newSize) {
+          setState(() {
+            _fontSize = newSize;
+          });
+        },
       ),
     );
   }
 
   // 开始自动滚动
   void _startAutoScroll() {
-    if (_isAutoScrolling) return;
+    debugPrint('🚀 [_startAutoScroll] 方法被调用，_isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
+
+    if (_isAutoScrolling) {
+      debugPrint('⚠️ [_startAutoScroll] 已在滚动中，直接返回（保护逻辑触发）');
+      return;
+    }
+
+    final pixelsPerSecond = _baseScrollSpeed * _scrollSpeed;
+    _autoScrollController.startAutoScroll(
+      pixelsPerSecond,
+      onScrollComplete: () {
+        debugPrint('🏁 [_startAutoScroll] 滚动到底部回调触发');
+        setState(() {
+          _isAutoScrolling = false;
+          _shouldAutoScroll = false;  // 到底部后清除意图
+          _autoScrollStartTime = null;  // 清除启动时间
+        });
+      },
+    );
 
     setState(() {
       _isAutoScrolling = true;
+      _shouldAutoScroll = true;  // ← 设置意图标记
+      _autoScrollStartTime = DateTime.now();  // ← 记录启动时间
     });
 
-    const duration = Duration(milliseconds: 50); // 每50毫秒滚动一次
-    final scrollStep =
-        (_baseScrollSpeed * _scrollSpeed * 50) / 1000; // 每次滚动的像素数
-
-    _autoScrollTimer = Timer.periodic(duration, (timer) {
-      if (!_isAutoScrolling) {
-        timer.cancel();
-        return;
-      }
-
-      final currentPosition = _scrollController.offset;
-      final maxPosition = _scrollController.position.maxScrollExtent;
-
-      if (currentPosition >= maxPosition) {
-        // 已滚动到底部，停止自动滚动
-        _stopAutoScroll();
-        return;
-      }
-
-      final newPosition = currentPosition + scrollStep;
-      _scrollController.animateTo(
-        newPosition.clamp(0.0, maxPosition),
-        duration: duration,
-        curve: Curves.linear,
-      );
-    });
+    debugPrint('✅ [_startAutoScroll] 自动滚动已启动，_isAutoScrolling=true, _shouldAutoScroll=true, 保护期=${_startupProtectionDuration.inMilliseconds}ms');
   }
 
-  // 停止自动滚动
-  void _stopAutoScroll() {
+  // 暂停自动滚动（临时暂停，保持意图，用于用户滑动场景）
+  void _pauseAutoScroll() {
+    debugPrint('⏸️ [_pauseAutoScroll] 方法被调用，临时暂停自动滚动');
+    _autoScrollController.stopAutoScroll();
     setState(() {
       _isAutoScrolling = false;
+      // _shouldAutoScroll 保持 true，不清除意图！
+      _autoScrollStartTime = null;  // 清除启动时间
     });
-    _autoScrollTimer?.cancel();
-    _autoScrollTimer = null;
+    debugPrint('✅ [_pauseAutoScroll] 已暂停，_isAutoScrolling=false, _shouldAutoScroll=$_shouldAutoScroll（保持不变）');
+  }
+
+  // 停止自动滚动（完全停止，清除意图）
+  void _stopAutoScroll() {
+    debugPrint('🛑 [_stopAutoScroll] 方法被调用，完全停止自动滚动');
+    _autoScrollController.stopAutoScroll();
+    setState(() {
+      _isAutoScrolling = false;
+      _shouldAutoScroll = false;  // ← 清除意图标记
+      _autoScrollStartTime = null;  // ← 清除启动时间
+    });
+    debugPrint('✅ [_stopAutoScroll] 已停止，_isAutoScrolling=false, _shouldAutoScroll=false');
   }
 
   // 切换自动滚动状态
   void _toggleAutoScroll() {
+    debugPrint('🔄 [_toggleAutoScroll] 切换自动滚动状态，当前 _isAutoScrolling=$_isAutoScrolling');
+
     if (_isAutoScrolling) {
+      debugPrint('⬇️ [_toggleAutoScroll] 停止自动滚动');
       _stopAutoScroll();
-      setState(() {
-        _wasAutoScrollingBeforeTouch = false; // 重置触摸状态记录
-      });
     } else {
+      debugPrint('⬆️ [_toggleAutoScroll] 启动自动滚动');
       _startAutoScroll();
     }
   }
 
-  // 处理手指按下事件
-  void _handleTouchStart() {
-    if (!_isUserTouching && _isAutoScrolling) {
-      setState(() {
-        _isUserTouching = true;
-        _wasAutoScrollingBeforeTouch = true; // 记录触摸前自动滚动状态
-      });
-      _stopAutoScroll();
-    }
-  }
-
-  // 处理手指抬起事件
-  void _handleTouchEnd() {
-    if (_isUserTouching) {
-      setState(() {
-        _isUserTouching = false;
-      });
-      // 不立即恢复自动滚动，等待ScrollEndNotification
-    }
-  }
-
   // 刷新当前章节 - 删除本地缓存并重新获取最新内容
+  // _handleTouchStart 和 _handleTouchEnd 已删除 - 不再需要触摸暂停功能
   Future<void> _refreshChapter() async {
     // 先显示确认对话框
     final shouldRefresh = await showDialog<bool>(
@@ -724,7 +606,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('将删除本地缓存并从服务器重新获取最新内容'),
+            Text('将从服务器重新获取最新内容并覆盖本地缓存。'),
             SizedBox(height: 8),
             Text('这可能会花费一些时间，请确认是否继续？',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -749,92 +631,17 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
     if (shouldRefresh != true) return;
 
-    try {
-      // 显示加载状态
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-      });
-
-      // 删除当前章节的本地缓存
-      await _databaseService.deleteChapterCache(_currentChapter.url);
-      debugPrint('已删除章节缓存: ${_currentChapter.title}');
-
-      // 重置滚动位置到顶部
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(0);
-        }
-      });
-
-      // 重新加载章节内容（强制从网络获取）
-      await _loadChapterContentFromNetwork();
-
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '刷新失败: $e';
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('刷新失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
-  // 强制从网络获取章节内容
-  Future<void> _loadChapterContentFromNetwork() async {
-    try {
-      setState(() {
-        _content = '';
-        _errorMessage = '';
-      });
-
-      // 强制从网络获取内容（使用forceRefresh参数绕过后端缓存）
-      final content = await _apiService.getChapterContent(_currentChapter.url, forceRefresh: true);
-
-      // 验证内容有效性
-      if (content.isNotEmpty && content.length > 50) {
-        // 缓存新内容
-        await _databaseService.cacheChapter(
-            widget.novel.url, _currentChapter, content);
-
-        setState(() {
-          _content = content;
-          _isLoading = false;
-        });
-
-        _updateReadingProgress();
-
-        // 重新开始预加载其他章节
-        _startPreloadingChapters();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('章节已刷新到最新内容'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = '获取到的章节内容为空或过短，请稍后重试';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = _getErrorMessage(e);
-      });
+    // 调用重构后的加载方法，并强制刷新
+    await _loadChapterContent(resetScrollPosition: true, forceRefresh: true);
+    
+    if (mounted && _errorMessage.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('章节已刷新到最新内容'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -1020,53 +827,14 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     showDialog(
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => AlertDialog(
-        title: const Text('调整滚动速度'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '当前速度: ${_scrollSpeed.toStringAsFixed(1)}x',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Slider(
-                  value: _scrollSpeed,
-                  min: 0.1,
-                  max: 5.0,
-                  divisions: 49,
-                  label: '${_scrollSpeed.toStringAsFixed(1)}x',
-                  onChanged: (value) {
-                    setState(() {
-                      _scrollSpeed = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('慢 (0.1x)',
-                        style:
-                            TextStyle(color: Colors.grey[600], fontSize: 12)),
-                    Text('快 (5.0x)',
-                        style:
-                            TextStyle(color: Colors.grey[600], fontSize: 12)),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
+      builder: (context) => ScrollSpeedAdjusterDialog(
+        initialScrollSpeed: _scrollSpeed,
+        onScrollSpeedChanged: (newSpeed) {
+          setState(() {
+            _scrollSpeed = newSpeed;
+          });
+          _startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度
+        },
       ),
     );
   }
@@ -1186,32 +954,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                 autofocus: true,
                 maxLines: 3,
               ),
-              const SizedBox(height: 16),
-
-              // ✨ 新增：人物选择器
-              const Text(
-                '出场人物（可选）',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              CharacterSelector(
-                novelUrl: widget.novel.url,
-                initialSelectedIds: _selectedCharacterIds,
-                onSelectionChanged: (selectedIds) {
-                  _selectedCharacterIds = selectedIds;
-                },
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'AI将根据选中的角色特征来改写内容',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.blue.shade600,
-                ),
-              ),
             ],
           ),
         ),
@@ -1238,9 +980,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   // 生成改写内容（流式）
   Future<void> _generateRewrite(String selectedText, String userInput) async {
-    _isGeneratingRewriteNotifier.value = true;
-    _rewriteResultNotifier.value = '';
-
     // 显示流式结果弹窗
     _showRewriteResultDialog();
 
@@ -1264,113 +1003,36 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
-      // 获取选中人物信息并格式化为AI可读文本
-      String rolesInfo = '';
-      if (_selectedCharacterIds.isNotEmpty) {
-        final selectedCharacters = await _databaseService.getCharactersByIds(_selectedCharacterIds);
-        rolesInfo = Character.formatForAI(selectedCharacters);
-      } else {
-        rolesInfo = '无特定角色出场';
-      }
+      // 特写功能不使用角色选择
+      const String rolesInfo = '无特定角色出场';
 
       // 获取AI作家设定
       final prefs = await SharedPreferences.getInstance();
       final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
 
-      final streamManager = UnifiedStreamManager();
+      // 构建输入参数
+      final inputs = {
+        'user_input': userInput,
+        'cmd': '特写',
+        'ai_writer_setting': aiWriterSetting,
+        'history_chapters_content': historyChaptersContent.join('\n\n'),
+        'current_chapter_content': _content,
+        'choice_content': selectedText,
+        'background_setting': widget.novel.backgroundSetting ?? '',
+        'roles': rolesInfo,
+      };
 
-      // 创建特写配置
-      final config = StreamConfig.closeUp(
-        inputs: {
-          'user_input': userInput,
-          'cmd': '特写',
-          'ai_writer_setting': aiWriterSetting,
-          'history_chapters_content': historyChaptersContent.join('\n\n'),
-          'current_chapter_content': _content,
-          'choice_content': selectedText,
-          'background_setting': widget.novel.backgroundSetting ?? '',
-          'roles': rolesInfo,
-        },
-        generatingHint: 'AI正在生成特写内容，请稍候...',
-      );
+      // 调用控制器执行生成
+      await _paragraphRewriteController.generateRewrite(inputs: inputs);
 
-      // 使用统一流式管理器
-      await streamManager.executeStream(
-        config: config,
-        onChunk: (chunk) {
-          debugPrint('🔥 onChunk 回调收到: "$chunk"');
-          debugPrint('📝 当前result长度: ${_rewriteResultNotifier.value.length}');
-
-          // 检查是否是完整内容的特殊标记
-          final bool isCompleteContent = chunk.startsWith('<<COMPLETE_CONTENT>>');
-
-          if (isCompleteContent) {
-            debugPrint('🎯 检测到完整内容标记，直接替换');
-            final completeContent = chunk.substring('<<COMPLETE_CONTENT>>'.length);
-
-            if (mounted) {
-              _rewriteResultNotifier.value = completeContent;
-              debugPrint('✅ 完整内容替换完成，长度: ${completeContent.length}');
-            }
-          } else {
-            // 流式模式：追加内容
-            final currentContent = _rewriteResultNotifier.value;
-            final newContent = currentContent + chunk;
-
-            debugPrint('📝 流式追加内容，新长度: ${newContent.length}');
-
-            // 在主线程上立即更新ValueNotifier
-            if (mounted) {
-              _rewriteResultNotifier.value = newContent;
-              debugPrint('✅ 更新后result长度: ${_rewriteResultNotifier.value.length}');
-            }
-          }
-
-          // ValueNotifier已经处理了UI更新，无需额外的setState
-        },
-        onComplete: (fullContent) {
-          debugPrint('✅ onComplete 回调被调用');
-          debugPrint('📊 完成时result长度: ${_rewriteResultNotifier.value.length}');
-          debugPrint('📊 接收到的完整内容长度: ${fullContent.length}');
-
-          // 确保显示所有已接收的数据
-          if (_rewriteResultNotifier.value.isNotEmpty) {
-            debugPrint('📄 最终内容: "${_rewriteResultNotifier.value.substring(0, _rewriteResultNotifier.value.length > 100 ? 100 : _rewriteResultNotifier.value.length)}..."');
-          }
-
-          _isGeneratingRewriteNotifier.value = false;
-
-          // 强制更新UI以确保最终内容正确显示
-          if (mounted) {
-            // ValueNotifier已经处理了状态更新，无需额外的setState
-          }
-        },
-        onError: (error) {
-          debugPrint('❌ onError 回调被调用: $error');
-          _isGeneratingRewriteNotifier.value = false;
-          _rewriteResultNotifier.value = '生成失败: $error';
-
-          // 显示 SnackBar 提示
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('改写生成失败: $error'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        },
-      );
     } catch (e) {
-      debugPrint('❌ 流式生成异常: $e');
-      _isGeneratingRewriteNotifier.value = false;
-      _rewriteResultNotifier.value = '生成失败: $e';
-
+      debugPrint('❌ 准备改写内容时发生异常: $e');
+      // 可以选择通过controller报告错误
+      // _paragraphRewriteController.setError('准备改写时失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('改写生成失败: $e'),
+            content: Text('操作失败: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -1405,262 +1067,203 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.auto_awesome, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('改写结果'),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    border: Border.all(color: Colors.grey[700]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: SingleChildScrollView(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _rewriteResultNotifier,
-                      builder: (context, resultValue, child) {
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: _isGeneratingRewriteNotifier,
-                          builder: (context, isGenerating, child) {
-                            String displayText;
-                            if (isGenerating && resultValue.isEmpty) {
-                              displayText = '正在生成中...';
-                            } else if (resultValue.isEmpty) {
-                              displayText = '等待生成...';
-                            } else {
-                              displayText = resultValue;
-                            }
+        return AnimatedBuilder(
+          animation: _paragraphRewriteController,
+          builder: (context, child) {
+            final isGenerating = _paragraphRewriteController.isLoading;
+            final resultValue = _paragraphRewriteController.streamedContent;
+            final error = _paragraphRewriteController.error;
 
-                            debugPrint('🖼️ 弹窗显示: isGenerating=$isGenerating, resultValue长度=${resultValue.length}');
-                            debugPrint('🔍 _rewriteResultNotifier.value长度: ${_rewriteResultNotifier.value.length}');
+            String displayText;
+            if (isGenerating && resultValue.isEmpty) {
+              displayText = '正在生成中...';
+            } else if (error != null) {
+              displayText = '生成失败: $error';
+            } else if (resultValue.isEmpty) {
+              displayText = '等待生成...';
+            } else {
+              displayText = resultValue;
+            }
 
-                            if (resultValue.isNotEmpty) {
-                              debugPrint('📄 弹窗内容开头: "${resultValue.substring(0, resultValue.length > 50 ? 50 : resultValue.length)}..."');
-                            } else {
-                              debugPrint('⚠️ resultValue为空，显示: "$displayText"');
-                            }
-
-                            // 优化的流式显示界面
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // 实时状态指示器
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: isGenerating
-                                        ? [Colors.orange.shade600, Colors.orange.shade800]
-                                        : [Colors.green.shade600, Colors.green.shade800],
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text('改写结果'),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        border: Border.all(color: Colors.grey[700]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isGenerating
+                                      ? [Colors.orange.shade600, Colors.orange.shade800]
+                                      : (error != null
+                                          ? [Colors.red.shade600, Colors.red.shade800]
+                                          : [Colors.green.shade600, Colors.green.shade800]),
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            isGenerating ? Icons.stream : Icons.check_circle,
-                                            size: 20,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            isGenerating ? '实时生成中...' : '生成完成',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          if (isGenerating)
-                                            SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.8)),
-                                              ),
-                                            ),
-                                        ],
+                                      Icon(
+                                        isGenerating
+                                            ? Icons.stream
+                                            : (error != null ? Icons.error_outline : Icons.check_circle),
+                                        size: 20,
+                                        color: Colors.white,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '已接收 ${resultValue.length} 字符',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.white.withValues(alpha: 0.9),
-                                            ),
-                                          ),
-                                          if (resultValue.isNotEmpty) ...[
-                                            const SizedBox(width: 16),
-                                            Container(
-                                              width: 6,
-                                              height: 6,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '流式展示',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.white.withValues(alpha: 0.8),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isGenerating
+                                            ? '实时生成中...'
+                                            : (error != null ? '生成失败' : '生成完成'),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
+                                      const Spacer(),
+                                      if (isGenerating)
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.8)),
+                                          ),
+                                        ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                // 流式文本内容区域
-                                Container(
-                                  constraints: const BoxConstraints(
-                                    maxHeight: 250,
-                                    minHeight: 100,
-                                  ),
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade900.withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.grey.shade700.withValues(alpha: 0.5),
-                                      width: 1,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '已接收 ${resultValue.length} 字符',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white.withValues(alpha: 0.9),
                                     ),
                                   ),
-                                  child: resultValue.isEmpty
-                                    ? Center(
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            if (isGenerating) ...[
-                                              SizedBox(
-                                                width: 24,
-                                                height: 24,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade400),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                            ],
-                                            Text(
-                                              isGenerating ? '等待AI生成内容...' : '暂无内容',
-                                              style: TextStyle(
-                                                color: Colors.grey.shade400,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : SingleChildScrollView(
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: SelectableText.rich(
-                                            TextSpan(
-                                              children: [
-                                                // 显示生成的文本，保持格式
-                                                TextSpan(
-                                                  text: resultValue,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    height: 1.6,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                                // 如果正在生成，添加闪烁光标效果
-                                                if (isGenerating)
-                                                  WidgetSpan(
-                                                    child: _buildCursor(),
-                                                  ),
-                                              ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              constraints: const BoxConstraints(
+                                maxHeight: 250,
+                                minHeight: 100,
+                              ),
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade900.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.grey.shade700.withValues(alpha: 0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: (resultValue.isEmpty && error == null)
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        if (isGenerating) ...[
+                                          SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade400),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                // 底部提示信息
-                                if (!isGenerating && resultValue.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade800.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.auto_awesome, size: 12, color: Colors.green.shade300),
-                                        const SizedBox(width: 4),
+                                          const SizedBox(height: 8),
+                                        ],
                                         Text(
-                                          'AI内容已完整生成',
+                                          isGenerating ? '等待AI生成内容...' : '暂无内容',
                                           style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.green.shade300,
+                                            color: Colors.grey.shade400,
+                                            fontSize: 14,
                                           ),
                                         ),
                                       ],
                                     ),
+                                  )
+                                : SingleChildScrollView(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: SelectableText.rich(
+                                        TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: displayText,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                height: 1.6,
+                                                color: error != null ? Colors.red.shade300 : Colors.white,
+                                              ),
+                                            ),
+                                            if (isGenerating)
+                                              WidgetSpan(
+                                                child: _buildCursor(),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '你可以选择替换原文、重新改写或关闭',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '你可以选择替换原文、重新改写或关闭',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            ValueListenableBuilder<bool>(
-              valueListenable: _isGeneratingRewriteNotifier,
-              builder: (context, isGenerating, child) {
-                return TextButton.icon(
+              ),
+              actions: [
+                TextButton.icon(
                   onPressed: isGenerating
                       ? null
                       : () {
-                          Navigator.pop(dialogContext);
+                          Navigator.pop(dialogContext); // 关闭当前弹窗后再打开新弹窗
                           final paragraphs = _content
                               .split('\n')
                               .where((p) => p.trim().isNotEmpty)
@@ -1669,34 +1272,27 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                         },
                   icon: const Icon(Icons.refresh),
                   label: Text(isGenerating ? '生成中...' : '重写'),
-                );
-              },
-            ),
-            ValueListenableBuilder<bool>(
-              valueListenable: _isGeneratingRewriteNotifier,
-              builder: (context, isGenerating, child) {
-                return ValueListenableBuilder<String>(
-                  valueListenable: _rewriteResultNotifier,
-                  builder: (context, value, child) {
-                    return ElevatedButton.icon(
-                      onPressed: (isGenerating || value.isEmpty)
-                          ? null
-                          : () {
-                              _replaceSelectedParagraphs();
-                              Navigator.pop(dialogContext);
-                            },
-                      icon: const Icon(Icons.check),
-                      label: const Text('替换'),
-                    );
+                ),
+                ElevatedButton.icon(
+                  onPressed: (isGenerating || resultValue.isEmpty || error != null)
+                      ? null
+                      : () {
+                          _replaceSelectedParagraphs();
+                          Navigator.pop(dialogContext);
+                        },
+                  icon: const Icon(Icons.check),
+                  label: const Text('替换'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    _paragraphRewriteController.cancel(); // 确保取消流
+                    Navigator.pop(dialogContext);
                   },
-                );
-              },
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('关闭'),
-            ),
-          ],
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1705,7 +1301,7 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
   // 替换选中的段落（支持插图段落处理）
   Future<void> _replaceSelectedParagraphs() async {
     if (_selectedParagraphIndices.isEmpty ||
-        _rewriteResultNotifier.value.isEmpty) {
+        _paragraphRewriteController.streamedContent.isEmpty) {
       return;
     }
 
@@ -1801,7 +1397,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     if (textIndices.isEmpty) {
       setState(() {
         _selectedParagraphIndices.clear();
-        _rewriteResultNotifier.value = '';
         _isCloseupMode = false;
       });
       return;
@@ -1812,14 +1407,13 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     for (int i = textIndices.length - 1; i >= 0; i--) {
       updatedParagraphs.removeAt(textIndices[i]);
     }
-    updatedParagraphs.insert(textIndices.first, _rewriteResultNotifier.value);
+    updatedParagraphs.insert(textIndices.first, _paragraphRewriteController.streamedContent);
 
     final newContent = updatedParagraphs.join('\n');
 
     setState(() {
       _content = newContent;
       _selectedParagraphIndices.clear();
-      _rewriteResultNotifier.value = '';
       _isCloseupMode = false;
     });
 
@@ -1842,14 +1436,13 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     }
 
     // 插入生成的内容
-    paragraphs.insert(_selectedParagraphIndices.first, _rewriteResultNotifier.value);
+    paragraphs.insert(_selectedParagraphIndices.first, _paragraphRewriteController.streamedContent);
 
     final newContent = paragraphs.join('\n');
 
     setState(() {
       _content = newContent;
       _selectedParagraphIndices.clear();
-      _rewriteResultNotifier.value = '';
       _isCloseupMode = false;
     });
 
@@ -1918,9 +1511,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
 
   // 生成章节总结（流式）
   Future<void> _generateSummarize() async {
-    _isGeneratingSummarizeNotifier.value = true;
-    _summarizeResultNotifier.value = '';
-
     // 显示流式结果弹窗
     _showSummarizeResultDialog();
 
@@ -1945,8 +1535,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
-      final difyService = DifyService();
-
       // 构建总结的参数
       final inputs = {
         'user_input': '总结',
@@ -1961,52 +1549,19 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         'characters_info': '',
       };
 
-      // 使用通用的流式 API
-      await difyService.runWorkflowStreaming(
-        inputs: inputs,
-        onData: (data) {
-          debugPrint('总结收到数据: $data');
-          debugPrint('总结当前result长度: ${_summarizeResultNotifier.value.length}');
-          _summarizeResultNotifier.value += data;
-          debugPrint('总结更新后result长度: ${_summarizeResultNotifier.value.length}');
-        },
-        onError: (error) {
-          debugPrint('总结错误: $error');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('章节总结失败: $error'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        },
-        onDone: () {
-          debugPrint('总结完成');
-          _isGeneratingSummarizeNotifier.value = false;
-        },
-      );
-    } catch (e) {
-      _isGeneratingSummarizeNotifier.value = false;
-      _summarizeResultNotifier.value = '生成失败: $e';
+      // 调用控制器执行
+      await _summarizeController.generateSummary(inputs: inputs);
 
-      // 同时显示 SnackBar 提示
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('章节总结失败: $e'),
+            content: Text('准备总结时出错: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
       }
-    }
-
-    // 确保在方法结束时状态正确（安全网）
-    if (_isGeneratingSummarizeNotifier.value) {
-      debugPrint('安全网：强制结束总结生成状态');
-      _isGeneratingSummarizeNotifier.value = false;
     }
   }
 
@@ -2016,97 +1571,91 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.summarize, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('章节总结'),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 400),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    border: Border.all(color: Colors.grey[700]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: SingleChildScrollView(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _summarizeResultNotifier,
-                      builder: (context, resultValue, child) {
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: _isGeneratingSummarizeNotifier,
-                          builder: (context, isGenerating, child) {
-                            String displayText;
-                            if (isGenerating && resultValue.isEmpty) {
-                              displayText = '正在生成中...';
-                            } else if (resultValue.isEmpty) {
-                              displayText = '等待生成...';
-                            } else {
-                              displayText = resultValue;
-                            }
+        return AnimatedBuilder(
+          animation: _summarizeController,
+          builder: (context, child) {
+            final isGenerating = _summarizeController.isLoading;
+            final resultValue = _summarizeController.streamedContent;
+            final error = _summarizeController.error;
 
-                            debugPrint('总结弹窗显示: isGenerating=$isGenerating, resultValue长度=${resultValue.length}');
+            String displayText;
+            if (isGenerating && resultValue.isEmpty) {
+              displayText = '正在生成中...';
+            } else if (error != null) {
+              displayText = '生成失败: $error';
+            } else if (resultValue.isEmpty) {
+              displayText = '等待生成...';
+            } else {
+              displayText = resultValue;
+            }
 
-                            return SelectableText(
-                              displayText,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: Colors.white,
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.summarize, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('章节总结'),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '您可以查看总结内容或关闭',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 400),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        border: Border.all(color: Colors.grey[700]!),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: const EdgeInsets.all(12),
+                      child: SingleChildScrollView(
+                        child: SelectableText(
+                          displayText,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: error != null ? Colors.red.shade300 : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        const Expanded(
+                          child: Text(
+                            '您可以查看总结内容或关闭',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            ValueListenableBuilder<bool>(
-              valueListenable: _isGeneratingSummarizeNotifier,
-              builder: (context, isGenerating, child) {
-                return TextButton.icon(
+              ),
+              actions: [
+                TextButton.icon(
                   onPressed: isGenerating
                       ? null
                       : () {
-                          Navigator.pop(dialogContext);
+                          Navigator.pop(dialogContext); // 关闭当前弹窗后再打开新弹窗
                           _showSummarizeDialog();
                         },
                   icon: const Icon(Icons.refresh),
                   label: Text(isGenerating ? '生成中...' : '重新总结'),
-                );
-              },
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('关闭'),
-            ),
-          ],
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -2630,194 +2179,94 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
               : Stack(
                   children: [
                     // 主要内容区域
-                    GestureDetector(
-                      onTapDown: (_) => _handleTouchStart(),
-                      onTapUp: (_) => _handleTouchEnd(),
-                      onPanStart: (_) => _handleTouchStart(),
-                      onPanEnd: (_) => _handleTouchEnd(),
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          // 检测滚动是否停止
-                          if (notification is ScrollUpdateNotification) {
-                            return false;
-                          }
-                          if (notification is ScrollEndNotification && !_isUserTouching && _wasAutoScrollingBeforeTouch) {
-                            // 滚动停止且用户之前开启了自动滚动，恢复自动滚动
+                    NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        // ✅ 只响应真正的用户滚动通知
+                        if (notification is UserScrollNotification) {
+                          // 已移除：每帧打印太频繁
+                          // debugPrint('👤 用户滚动: ${notification.direction}, _isAutoScrolling=$_isAutoScrolling');
+
+                          // 用户开始主动滚动（检查 direction 是否不是 idle）
+                          if (notification.direction.toString() != 'ScrollDirection.idle' && !_isUserScrolling) {
                             setState(() {
-                              _wasAutoScrollingBeforeTouch = false; // 重置状态
+                              _isUserScrolling = true;
                             });
-                            _startAutoScroll();
-                          }
-                          return false;
-                        },
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16.0),
-                          itemCount: paragraphs.length + 1, // +1 为了添加底部空白
-                          itemBuilder: (context, index) {
-                        // 最后一个位置添加空白
-                        if (index == paragraphs.length) {
-                          return SizedBox(
-                            height: 160, // 底部留白高度，避免被按钮遮挡
-                            child: Container(), // 空容器只占位
-                          );
-                        }
 
-                        final paragraph = paragraphs[index];
-                        final isSelected =
-                            _selectedParagraphIndices.contains(index);
-
-                        // 检查是否为插图标记
-                        if (MediaMarkupParser.isMediaMarkup(paragraph)) {
-                          final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
-
-                          // 只处理插图类型
-                          if (markup.isIllustration) {
-                            // 插图段落 - 在特写模式下不可选择，因为特写功能只针对文本段落
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // 插图内容
-                                  _buildIllustrationParagraph(markup.id, index + 1, editModeProvider.isEditMode),
-                                ],
-                              ),
-                            );
-                          } else {
-                            // 其他媒体类型暂不处理，显示占位符 - 特写模式下不可选择
-                            return Container(
-                              padding: const EdgeInsets.all(16.0),
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.1),
-                                border: Border.all(color: Colors.orange, width: 1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '📎 ${markup.type}',
-                                    style: TextStyle(
-                                      fontSize: _fontSize * 0.9,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange[700],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'ID: ${markup.id}',
-                                    style: TextStyle(
-                                      fontSize: _fontSize * 0.8,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '暂不支持此媒体类型的显示',
-                                    style: TextStyle(
-                                      fontSize: _fontSize * 0.9,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        }
-
-                        // 普通文本段落
-                        // 编辑模式使用TextField，阅读模式使用Text
-                        if (editModeProvider.isEditMode) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 6.0, horizontal: 8.0),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withValues(alpha: 0.1),
-                              border: Border.all(
-                                  color: Colors.grey.withValues(alpha: 0.3),
-                                  width: 1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextField(
-                              controller: TextEditingController(text: paragraph),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              style: TextStyle(
-                                fontSize: _fontSize,
-                                height: 1.8,
-                                letterSpacing: 0.5,
-                                color: Theme.of(context).textTheme.bodyLarge?.color,
-                              ),
-                              maxLines: null,
-                              onChanged: (value) {
-                                // 更新内容
-                                final updatedParagraphs = List<String>.from(paragraphs);
-                                updatedParagraphs[index] = value;
-                                setState(() {
-                                  _content = updatedParagraphs.join('\n');
-                                });
-                              },
-                            ),
-                          );
-                        }
-
-                        // 阅读模式的文本段落
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 段落内容
-                            InkWell(
-                              onTap: _isCloseupMode
-                                  ? () => _handleParagraphTap(index)
-                                  : null,
-                              onLongPress: () => _handleLongPress(index),
-                              onTapDown: (_) => _handleTouchStart(),
-                              onTapUp: (_) => _handleTouchEnd(),
-                              onHighlightChanged: (highlighted) {
-                                // 处理触摸状态变化
-                                if (highlighted) {
-                                  _handleTouchStart();
-                                } else {
-                                  _handleTouchEnd();
+                            if (_isAutoScrolling) {
+                              // ✅ 检查是否在保护期内
+                              if (_autoScrollStartTime != null) {
+                                final timeSinceStart = DateTime.now().difference(_autoScrollStartTime!);
+                                if (timeSinceStart < _startupProtectionDuration) {
+                                  debugPrint('🛡️ 在启动保护期内（${timeSinceStart.inMilliseconds}ms < ${_startupProtectionDuration.inMilliseconds}ms），忽略用户手势');
+                                  return false;  // 忽略这次手势
                                 }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 6.0, horizontal: 8.0),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Colors.blue.withValues(alpha: 0.2)
-                                      : null,
-                                  border: isSelected
-                                      ? Border.all(color: Colors.blue, width: 2)
-                                      : _isCloseupMode
-                                          ? Border.all(
-                                              color: Colors.blue
-                                                  .withValues(alpha: 0.3),
-                                              width: 1)
-                                          : null,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  paragraph.trim(),
-                                  style: TextStyle(
-                                    fontSize: _fontSize,
-                                    height: 1.8,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
+                              }
+
+                              _pauseAutoScroll();  // ← 改为调用暂停方法，保持意图标记
+                              debugPrint('⏸️ 检测到用户手势，暂停自动滚动');
+                            }
+                          }
+                        } else if (notification is ScrollEndNotification) {
+                          // 用户滚动结束 - 恢复自动滚动
+                          // 已移除：每帧打印太频繁
+                          // debugPrint('▶️ 用户滚动结束，_isUserScrolling=$_isUserScrolling, _isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
+
+                          if (_isUserScrolling) {
+                            setState(() {
+                              _isUserScrolling = false;
+                            });
+
+                            // ✅ 修改：检查意图标记 _shouldAutoScroll
+                            if (_shouldAutoScroll) {
+                              debugPrint('🔄 恢复自动滚动（_shouldAutoScroll=true）');
+                              _startAutoScroll();
+                            } else {
+                            // 已移除：不必要的日志
+                            // debugPrint('⏭️ 不恢复自动滚动（_shouldAutoScroll=false，用户可能手动停止了）');
+                          }
+                          }
+                        }
+                        return false; // 不阻止通知继续传递
                       },
-                        ),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16.0),
+                        itemCount: paragraphs.length + 1, // +1 为了添加底部空白
+                        itemBuilder: (context, index) {
+                          // 最后一个位置添加空白
+                          if (index == paragraphs.length) {
+                            return SizedBox(
+                              height: 160, // 底部留白高度，避免被按钮遮挡
+                              child: Container(), // 空容器只占位
+                            );
+                          }
+
+                          final paragraph = paragraphs[index];
+                          final isSelected = _selectedParagraphIndices.contains(index);
+
+                          return ParagraphWidget(
+                            paragraph: paragraph,
+                            index: index,
+                            fontSize: _fontSize,
+                            isCloseupMode: _isCloseupMode,
+                            isEditMode: editModeProvider.isEditMode, // From Consumer
+                            isSelected: isSelected,
+                            onTap: _handleParagraphTap,
+                            onLongPress: (idx) => _handleLongPress(idx), // _handleLongPress now accepts index
+                            onContentChanged: (newContent) {
+                              final updatedParagraphs = List<String>.from(paragraphs);
+                              updatedParagraphs[index] = newContent;
+                              setState(() {
+                                _content = updatedParagraphs.join('\n');
+                              });
+                            },
+                            onImageTap: (taskId, imageUrl, imageIndex) => _handleImageTap(taskId, imageUrl, imageIndex),
+                            onImageDelete: () => _deleteIllustrationByTaskId, // Pass taskId as needed
+                            generateVideoFromIllustration: _generateVideoFromIllustration, // Pass callback
+                          );
+                        },
                       ),
-                    ),
+                    ), // NotificationListener 闭合
                     // 固定在底部的章节切换按钮
                     Positioned(
                       left: 0,
@@ -2869,123 +2318,29 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
                     ),
               ],
             ),
-      // 悬浮工具栏
-      floatingActionButton: _buildFloatingActions(),
-    );
-        },
-      ),
-    );
-  }
-
-  // 构建悬浮动作组件
-  Widget? _buildFloatingActions() {
-    if (_content.isEmpty) return null;
-
-    // 如果在特写模式下且有选中段落，显示改写按钮
-    if (_isCloseupMode && _selectedParagraphIndices.isNotEmpty) {
-      return FloatingActionButton.extended(
-        onPressed: () {
-          final paragraphs =
-              _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-          _showRewriteRequirementDialog(paragraphs);
-        },
-        icon: const Icon(Icons.edit),
-        label: const Text('改写'),
-        backgroundColor: Colors.green,
-        heroTag: 'rewrite',
-      );
-    }
-
-    // 正常阅读模式下，显示特写模式和自动滚屏按钮
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 120.0), // 避免与底部章节切换按钮重叠
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // 特写模式切换按钮（上方）
-          FloatingActionButton(
-            onPressed: _toggleCloseupMode,
-            tooltip: _isCloseupMode ? '关闭特写模式' : '开启特写模式',
-            heroTag: 'closeup_mode',
-            backgroundColor: _isCloseupMode ? Colors.blue : null,
-            child: Icon(_isCloseupMode ? Icons.visibility : Icons.visibility_off),
-          ),
-          const SizedBox(height: 16), // 按钮间距
-          // 自动滚屏按钮（下方）
-          FloatingActionButton(
-            onPressed: _toggleAutoScroll,
-            tooltip: _isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
-            heroTag: 'auto_scroll',
-            backgroundColor: _isAutoScrolling ? Colors.red : null,
-            child: Icon(_isAutoScrolling ? Icons.pause : Icons.play_arrow),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 渲染插图段落
-  Widget _buildIllustrationParagraph(String taskId, int paragraphIndex, bool isEditMode) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 插图标题
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Text(
-              '插图 $paragraphIndex',
-              style: TextStyle(
-                fontSize: _fontSize * 0.8,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-
-          // 插图内容
-          GestureDetector(
-            onTapDown: (_) => _handleTouchStart(),
-            onTapUp: (_) => _handleTouchEnd(),
-            onPanStart: (_) => _handleTouchStart(),
-            onPanEnd: (_) => _handleTouchEnd(),
-            child: SceneImagePreview(
-              taskId: taskId, // 使用 taskId 而非 illustration
-              onImageTap: (String taskId, String imageUrl, int imageIndex) => _generateVideoFromSpecificImage(taskId, imageUrl, imageIndex),
-              onDelete: () => _deleteIllustrationByTaskId(taskId),
-              onImageDeleted: () {
-                // 单张图片删除成功后，可以选择性刷新
-                debugPrint('单张图片删除成功: $taskId');
+      floatingActionButton: _content.isEmpty
+          ? null
+          : ReaderActionButtons(
+              isCloseupMode: _isCloseupMode,
+              hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
+              isAutoScrolling: _isAutoScrolling,
+              onRewritePressed: () {
+                final paragraphs = _content
+                    .split('\n')
+                    .where((p) => p.trim().isNotEmpty)
+                    .toList();
+                _showRewriteRequirementDialog(paragraphs);
               },
+              onToggleCloseupMode: _toggleCloseupMode,
+              onToggleAutoScroll: _toggleAutoScroll,
             ),
-          ),
-
-          // 编辑模式下显示可编辑的标记文本
-          if (isEditMode) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                MediaMarkupParser.createIllustrationMarkup(taskId),
-                style: TextStyle(
-                  fontSize: _fontSize * 0.9,
-                  fontFamily: 'monospace',
-                  color: Colors.grey[700],
-                ),
-              ),
-            ),
-          ],
-        ],
+    );
+        },
       ),
     );
   }
+
+
 
   /// 通过 taskId 直接生成视频
   Future<void> _generateVideoFromIllustration(String taskId) async {
@@ -3062,6 +2417,122 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         );
       }
     }
+  }
+
+  /// 处理图片点击事件 - 显示功能选择对话框
+  Future<void> _handleImageTap(String taskId, String imageUrl, int imageIndex) async {
+    // 显示功能选择对话框
+    if (!mounted) return;
+    final action = await IllustrationActionDialog.show(context);
+
+    if (action == null || !mounted) {
+      return; // 用户取消或widget已销毁
+    }
+
+    if (action == 'regenerate') {
+      // 用户选择"再来几张"
+      await _regenerateMoreImages(taskId);
+    } else if (action == 'video') {
+      // 用户选择"生成视频"
+      await _generateVideoFromSpecificImage(taskId, imageUrl, imageIndex);
+    }
+  }
+
+  /// 再来几张 - 重新生成更多图片
+  Future<void> _regenerateMoreImages(String taskId) async {
+    debugPrint('=== ReaderScreen._regenerateMoreImages 开始 ===');
+    debugPrint('taskId: $taskId');
+
+    try {
+      // 显示数量选择对话框
+      if (!mounted) {
+        debugPrint('❌ widget已销毁，取消操作');
+        return;
+      }
+
+      debugPrint('🔄 显示 GenerateMoreDialog...');
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => GenerateMoreDialog(
+          apiType: 't2i', // 文生图模型
+          onConfirm: (count, modelName) {
+            debugPrint('GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            Navigator.of(context).pop({
+              'count': count,
+              'modelName': modelName,
+            });
+          },
+        ),
+      );
+
+      if (result == null || !mounted) {
+        debugPrint('用户取消或widget已销毁');
+        return;
+      }
+
+      final count = result['count'] as int;
+      final modelName = result['modelName'] as String?;
+      debugPrint('✅ 用户选择: count=$count, model=$modelName');
+
+      // 显示加载提示
+      if (mounted) {
+        debugPrint('📢 显示加载提示');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('正在生成 $count 张图片...'),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // 调用 API 生成图片
+      debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
+      debugPrint('ApiServiceWrapper 初始化状态检查...');
+      final apiService = ApiServiceWrapper();
+      debugPrint('✅ ApiServiceWrapper 实例已创建');
+      debugPrint('初始化状态: ${apiService.getInitStatus()}');
+
+      debugPrint('🔄 开始API调用...');
+      final response = await apiService.regenerateSceneIllustrationImages(
+        taskId: taskId,
+        count: count,
+        modelName: modelName,
+      );
+
+      debugPrint('✅ API调用成功');
+      debugPrint('响应: $response');
+
+      // 显示成功提示（不刷新列表，按需求）
+      if (mounted) {
+        debugPrint('📢 显示成功提示');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('图片生成任务已创建，预计需要1-3分钟'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌❌❌ _regenerateMoreImages 异常 ❌❌❌');
+      debugPrint('异常类型: ${e.runtimeType}');
+      debugPrint('异常信息: $e');
+      debugPrint('堆栈跟踪:\n$stackTrace');
+
+      if (mounted) {
+        debugPrint('📢 显示错误提示');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('生成图片失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+
+    debugPrint('=== _regenerateMoreImages 结束 ===');
   }
 
   /// 为特定图片生成视频

@@ -26,7 +26,7 @@ class ComfyUIClientV2:
             base_url: ComfyUI服务器基础URL
             workflow_path: 工作流JSON文件路径
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.workflow_path = workflow_path
         self.workflow_json = None
         self.replace_config = None
@@ -39,16 +39,18 @@ class ComfyUIClientV2:
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {self.workflow_path}")
 
-            with open(workflow_file, encoding='utf-8') as f:
+            with open(workflow_file, encoding="utf-8") as f:
                 self.workflow_json = json.load(f)
 
             # 提取替换配置
-            self.replace_config = self.workflow_json.get("config", {}).get("replace_targets", {})
+            self.replace_config = self.workflow_json.get("config", {}).get(
+                "replace_targets", {}
+            )
 
             logger.info(f"成功加载ComfyUI工作流: {self.workflow_path}")
             logger.info(f"替换配置: {self.replace_config}")
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
@@ -69,7 +71,7 @@ class ComfyUIClientV2:
                     "class_type": node_data.get("class_type"),
                     "method": "meta_tag",
                     "target": meta.get("replace_target", "value"),
-                    "prompt_type": meta.get("prompt_type", "user")
+                    "prompt_type": meta.get("prompt_type", "user"),
                 }
                 continue
 
@@ -81,9 +83,11 @@ class ComfyUIClientV2:
                             replaceable_nodes[node_id] = {
                                 "class_type": node_data.get("class_type"),
                                 "method": "placeholder",
-                                "targets": {}
+                                "targets": {},
                             }
-                        replaceable_nodes[node_id]["targets"][key] = self._extract_placeholders(value)
+                        replaceable_nodes[node_id]["targets"][key] = (
+                            self._extract_placeholders(value)
+                        )
 
             # 方法3: 基于节点类型和内容的启发式检测
             class_type = node_data.get("class_type")
@@ -99,7 +103,7 @@ class ComfyUIClientV2:
                         "class_type": class_type,
                         "method": "heuristic",
                         "target": "text",
-                        "prompt_type": "positive"
+                        "prompt_type": "positive",
                     }
 
             # 支持 PrimitiveStringMultiline 类型
@@ -110,21 +114,29 @@ class ComfyUIClientV2:
                         "class_type": class_type,
                         "method": "heuristic",
                         "target": "value",
-                        "prompt_type": self._detect_prompt_type(value)
+                        "prompt_type": self._detect_prompt_type(value),
                     }
 
         return replaceable_nodes
 
     def _has_placeholders(self, text: str) -> bool:
         """检查文本是否包含占位符."""
-        placeholders = ["{{PROMPT}}", "{{USER_PROMPT}}", "{{NEGATIVE_PROMPT}}",
-                       "{{STYLE_PREFIX}}", "{{STYLE_SUFFIX}}", "{{STEPS}}", "{{CFG}}"]
+        placeholders = [
+            "{{PROMPT}}",
+            "{{USER_PROMPT}}",
+            "{{NEGATIVE_PROMPT}}",
+            "{{STYLE_PREFIX}}",
+            "{{STYLE_SUFFIX}}",
+            "{{STEPS}}",
+            "{{CFG}}",
+        ]
         return any(placeholder in text for placeholder in placeholders)
 
     def _extract_placeholders(self, text: str) -> list[str]:
         """提取文本中的占位符."""
         import re
-        pattern = r'\{\{([^}]+)\}\}'
+
+        pattern = r"\{\{([^}]+)\}\}"
         return re.findall(pattern, text)
 
     def _is_likely_prompt_node(self, node_id: str, value: str) -> bool:
@@ -138,7 +150,9 @@ class ComfyUIClientV2:
         # 检查是否包含提示词关键词
         if any(keyword in node_id_lower for keyword in prompt_keywords):
             # 进一步检查是否不是负面提示词
-            if not any(neg_keyword in node_id_lower for neg_keyword in negative_keywords):
+            if not any(
+                neg_keyword in node_id_lower for neg_keyword in negative_keywords
+            ):
                 return True
 
         # 检查内容长度（提示词通常较长）
@@ -149,12 +163,28 @@ class ComfyUIClientV2:
         value_lower = value.lower()
 
         # 检查负面提示词关键词
-        negative_keywords = ["blurry", "worst quality", "low quality", "jpeg artifacts", "nsfw", "bad", "ugly", "deformed"]
+        negative_keywords = [
+            "blurry",
+            "worst quality",
+            "low quality",
+            "jpeg artifacts",
+            "nsfw",
+            "bad",
+            "ugly",
+            "deformed",
+        ]
         if any(neg_word in value_lower for neg_word in negative_keywords):
             return "negative"
 
         # 检查正面提示词关键词
-        positive_keywords = ["high quality", "masterpiece", "best quality", "beautiful", "anime style", "detailed"]
+        positive_keywords = [
+            "high quality",
+            "masterpiece",
+            "best quality",
+            "beautiful",
+            "anime style",
+            "detailed",
+        ]
         if any(pos_word in value_lower for pos_word in positive_keywords):
             return "positive"
 
@@ -162,9 +192,15 @@ class ComfyUIClientV2:
         # 这个会在 _find_replaceable_nodes 中被元数据覆盖，但作为后备方案
         return "user"
 
-    def _prepare_workflow_v2(self, user_prompt: str, negative_prompt: str | None = None,
-                           style_prefix: str | None = None, style_suffix: str | None = None,
-                           steps: int | None = None, cfg: float | None = None) -> dict[str, Any]:
+    def _prepare_workflow_v2(
+        self,
+        user_prompt: str,
+        negative_prompt: str | None = None,
+        style_prefix: str | None = None,
+        style_suffix: str | None = None,
+        steps: int | None = None,
+        cfg: float | None = None,
+    ) -> dict[str, Any]:
         """准备ComfyUI工作流数据 - 增强版.
 
         Args:
@@ -191,7 +227,7 @@ class ComfyUIClientV2:
             "{{STYLE_PREFIX}}": style_prefix or "",
             "{{STYLE_SUFFIX}}": style_suffix or "",
             "{{STEPS}}": str(steps) if steps else "",
-            "{{CFG}}": str(cfg) if cfg else ""
+            "{{CFG}}": str(cfg) if cfg else "",
         }
 
         # 执行替换
@@ -211,7 +247,9 @@ class ComfyUIClientV2:
                         for placeholder in placeholders:
                             replacement_key = f"{{{{{placeholder}}}}}"
                             if replacement_key in replacements:
-                                original_value = original_value.replace(replacement_key, replacements[replacement_key])
+                                original_value = original_value.replace(
+                                    replacement_key, replacements[replacement_key]
+                                )
                         inputs[input_key] = original_value
 
             elif method == "meta_tag" or method == "heuristic":
@@ -263,7 +301,9 @@ class ComfyUIClientV2:
                     logger.info(f"设置种子 = {seed} 在KSampler节点 {node_id}")
                     break
 
-    def _set_parameter(self, workflow_data: dict[str, Any], value: Any, param_name: str):
+    def _set_parameter(
+        self, workflow_data: dict[str, Any], value: Any, param_name: str
+    ):
         """设置工作流参数."""
         for node_id, node_data in workflow_data.items():
             if node_id == "config":
@@ -277,9 +317,15 @@ class ComfyUIClientV2:
                     logger.info(f"设置 {param_name} = {value} 在节点 {node_id}")
                     break
 
-    async def generate_image_v2(self, user_prompt: str, negative_prompt: str | None = None,
-                               style_prefix: str | None = None, style_suffix: str | None = None,
-                               steps: int | None = None, cfg: float | None = None) -> str | None:
+    async def generate_image_v2(
+        self,
+        user_prompt: str,
+        negative_prompt: str | None = None,
+        style_prefix: str | None = None,
+        style_suffix: str | None = None,
+        steps: int | None = None,
+        cfg: float | None = None,
+    ) -> str | None:
         """生成图片 - 增强版.
 
         Args:
@@ -305,7 +351,7 @@ class ComfyUIClientV2:
                 style_prefix=style_prefix,
                 style_suffix=style_suffix,
                 steps=steps,
-                cfg=cfg
+                cfg=cfg,
             )
 
             # 设置随机种子
@@ -313,9 +359,7 @@ class ComfyUIClientV2:
 
             # 调用ComfyUI API
             response = requests.post(
-                f"{self.base_url}/prompt",
-                json={"prompt": workflow_data},
-                timeout=30
+                f"{self.base_url}/prompt", json={"prompt": workflow_data}, timeout=30
             )
 
             if response.status_code == 200:
@@ -328,7 +372,9 @@ class ComfyUIClientV2:
                     logger.error("ComfyUI响应中未找到task_id")
                     return None
             else:
-                logger.error(f"ComfyUI API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
         except Timeout:
@@ -337,7 +383,7 @@ class ComfyUIClientV2:
         except RequestException as e:
             logger.error(f"ComfyUI API请求异常: {e}")
             return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI图片生成失败: {e}")
             return None
 
@@ -345,20 +391,19 @@ class ComfyUIClientV2:
     async def check_task_status(self, task_id: str) -> dict[str, Any]:
         """检查任务状态."""
         try:
-            response = requests.get(
-                f"{self.base_url}/history/{task_id}",
-                timeout=10
-            )
+            response = requests.get(f"{self.base_url}/history/{task_id}", timeout=10)
             if response.status_code == 200:
                 return response.json().get(task_id, {})
             else:
                 logger.error(f"查询任务状态失败: {response.status_code}")
                 return {}
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"查询任务状态异常: {e}")
             return {}
 
-    async def wait_for_completion(self, task_id: str, timeout: int = 300) -> list[str] | None:
+    async def wait_for_completion(
+        self, task_id: str, timeout: int = 300
+    ) -> list[str] | None:
         """等待任务完成并获取生成的图片文件名."""
         start_time = asyncio.get_event_loop().time()
 
@@ -397,25 +442,25 @@ class ComfyUIClientV2:
     async def get_image_data(self, filename: str) -> bytes | None:
         """获取图片二进制数据."""
         try:
-            response = requests.get(
-                self.get_image_url(filename),
-                timeout=30
-            )
+            response = requests.get(self.get_image_url(filename), timeout=30)
             if response.status_code == 200:
                 return response.content
             else:
                 logger.error(f"获取图片失败: {response.status_code}")
                 return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"获取图片异常: {e}")
             return None
 
-    async def generate_images_batch(self, prompts: list[str],
-                                   negative_prompt: str | None = None,
-                                   style_prefix: str | None = None,
-                                   style_suffix: str | None = None,
-                                   steps: int | None = None,
-                                   cfg: float | None = None) -> list[str]:
+    async def generate_images_batch(
+        self,
+        prompts: list[str],
+        negative_prompt: str | None = None,
+        style_prefix: str | None = None,
+        style_suffix: str | None = None,
+        steps: int | None = None,
+        cfg: float | None = None,
+    ) -> list[str]:
         """批量生成图片.
 
         Args:
@@ -456,7 +501,7 @@ class ComfyUIClientV2:
                         style_prefix=style_prefix,
                         style_suffix=style_suffix,
                         steps=steps,
-                        cfg=cfg
+                        cfg=cfg,
                     )
 
                     if task_id:
@@ -494,11 +539,16 @@ class ComfyUIClientV2:
                                     # 优先返回最终输出文件，如果没有则返回临时文件
                                     final_filename = output_filename or temp_filename
                                     if final_filename:
-                                        logger.info(f"第 {index + 1} 张图片生成完成: {final_filename} (类型: {'output' if output_filename else 'temp'})")
+                                        logger.info(
+                                            f"第 {index + 1} 张图片生成完成: {final_filename} (类型: {'output' if output_filename else 'temp'})"
+                                        )
                                         return final_filename
 
                                 # 如果任务失败，跳出循环
-                                if task_data.get("status", {}).get("status_str") == "error":
+                                if (
+                                    task_data.get("status", {}).get("status_str")
+                                    == "error"
+                                ):
                                     logger.error(f"第 {index + 1} 张图片生成失败")
                                     break
 
@@ -508,15 +558,12 @@ class ComfyUIClientV2:
                         logger.warning(f"第 {index + 1} 张图片生成超时")
                     return None
 
-                except Exception as e:
+                except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
                     logger.error(f"生成第 {index + 1} 张图片时出错: {e}")
                     return None
 
         # 创建并发任务
-        tasks = [
-            generate_single_image(prompt, i)
-            for i, prompt in enumerate(prompts)
-        ]
+        tasks = [generate_single_image(prompt, i) for i, prompt in enumerate(prompts)]
 
         # 等待所有任务完成
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -550,7 +597,7 @@ class ComfyUIClientV2:
             else:
                 logger.error(f"获取历史记录失败: {response.status_code}")
                 return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"获取历史记录异常: {e}")
             return None
 
@@ -559,14 +606,19 @@ class ComfyUIClientV2:
         try:
             response = requests.get(f"{self.base_url}/system_stats", timeout=5)
             return response.status_code == 200
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI健康检查失败: {e}")
             return False
 
 
 def create_comfyui_client_v2() -> ComfyUIClientV2:
     """创建增强版ComfyUI客户端实例."""
-    base_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
-    workflow_path = os.getenv("COMFYUI_WORKFLOW_PATH", "./comfyui_json/text2img/image_netayume_lumina_t2i.json")
+    from ..config import settings
+
+    base_url = settings.comfyui_api_url
+    workflow_path = os.getenv(
+        "COMFYUI_WORKFLOW_PATH",
+        "./comfyui_json/text2img/image_netayume_lumina_t2i.json",
+    )
 
     return ComfyUIClientV2(base_url, workflow_path)

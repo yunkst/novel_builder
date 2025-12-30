@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'model_selector.dart';
 
 class IllustrationRequestDialog extends StatefulWidget {
   const IllustrationRequestDialog({super.key});
@@ -11,6 +12,7 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
   final _formKey = GlobalKey<FormState>();
   final _promptController = TextEditingController();
   int _selectedImageCount = 1;
+  String? _selectedModel;
 
   final List<int> _imageCountOptions = [1, 2, 3, 4, 6, 8];
 
@@ -131,49 +133,26 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // 提示信息
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
+              // 模型选择器
+              const Text(
+                '生图模型 *',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline,
-                             size: 16,
-                             color: Colors.blue[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          '提示',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• 描述越详细，生成效果越好\n'
-                      '• 支持中文和英文描述\n'
-                      '• 生成过程可能需要几秒钟\n'
-                      '• 最多可同时生成8张图片',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[700],
-                      ),
-                    ),
-                  ],
-                ),
+              ),
+              const SizedBox(height: 8),
+              ModelSelector(
+                selectedModel: _selectedModel,
+                onModelChanged: (value) {
+                  setState(() {
+                    _selectedModel = value;
+                  });
+                },
+                apiType: 't2i',
+                hintText: '请选择生图模型',
               ),
 
               const SizedBox(height: 24),
@@ -227,6 +206,7 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
       final result = {
         'prompt': _promptController.text.trim(),
         'imageCount': _selectedImageCount,
+        'modelName': _selectedModel,
       };
 
       Navigator.of(context).pop(result);
