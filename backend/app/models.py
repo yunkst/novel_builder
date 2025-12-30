@@ -17,5 +17,5 @@ __all__ = [
     "RoleCardTask",
     "RoleImageGallery",
     "SceneIllustrationTask",
-    "SceneImageGallery"
+    "SceneImageGallery",
 ]

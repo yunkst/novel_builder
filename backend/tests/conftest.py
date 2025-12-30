@@ -66,7 +66,7 @@ def mock_settings() -> MagicMock:
 @pytest.fixture
 def valid_token() -> str:
     """Return a valid API token for testing."""
-    return "test-token"
+    return "test_token_123"
 
 
 @pytest.fixture
@@ -165,7 +165,7 @@ def pytest_configure(config):
 @pytest.fixture(autouse=True)
 def override_settings(monkeypatch):
     """Override settings for all tests."""
-    monkeypatch.setenv("NOVEL_API_TOKEN", "test-token")
+    monkeypatch.setenv("NOVEL_API_TOKEN", "test_token_123")
     monkeypatch.setenv("NOVEL_ENABLED_SITES", "test_site")
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("DEBUG", "true")

@@ -5,7 +5,7 @@
 定义应用程序中使用的各种自定义异常，提供更好的错误分类和处理。
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class NovelBuilderException(Exception):
@@ -14,15 +14,15 @@ class NovelBuilderException(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code or self.__class__.__name__
         self.details = details or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式，便于API响应"""
         return {
             "error": self.error_code,
@@ -51,9 +51,9 @@ class CrawlerError(NovelBuilderException):
     def __init__(
         self,
         message: str = "爬虫操作失败",
-        site_name: Optional[str] = None,
-        url: Optional[str] = None,
-        **kwargs
+        site_name: str | None = None,
+        url: str | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if site_name:
@@ -71,9 +71,9 @@ class NetworkError(CrawlerError):
     def __init__(
         self,
         message: str = "网络连接失败",
-        timeout: Optional[float] = None,
-        status_code: Optional[int] = None,
-        **kwargs
+        timeout: float | None = None,
+        status_code: int | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if timeout:
@@ -91,9 +91,9 @@ class ParseError(CrawlerError):
     def __init__(
         self,
         message: str = "内容解析失败",
-        selector: Optional[str] = None,
-        html_length: Optional[int] = None,
-        **kwargs
+        selector: str | None = None,
+        html_length: int | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if selector:
@@ -111,9 +111,9 @@ class DatabaseError(NovelBuilderException):
     def __init__(
         self,
         message: str = "数据库操作失败",
-        operation: Optional[str] = None,
-        table: Optional[str] = None,
-        **kwargs
+        operation: str | None = None,
+        table: str | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if operation:
@@ -131,9 +131,9 @@ class CacheError(NovelBuilderException):
     def __init__(
         self,
         message: str = "缓存操作失败",
-        task_id: Optional[str] = None,
-        cache_key: Optional[str] = None,
-        **kwargs
+        task_id: str | None = None,
+        cache_key: str | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if task_id:
@@ -151,9 +151,9 @@ class ValidationError(NovelBuilderException):
     def __init__(
         self,
         message: str = "数据验证失败",
-        field: Optional[str] = None,
-        value: Optional[Any] = None,
-        **kwargs
+        field: str | None = None,
+        value: Any | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if field:
@@ -171,9 +171,9 @@ class ContentNotFoundError(NovelBuilderException):
     def __init__(
         self,
         message: str = "请求的内容不存在",
-        content_type: Optional[str] = None,
-        identifier: Optional[str] = None,
-        **kwargs
+        content_type: str | None = None,
+        identifier: str | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if content_type:
@@ -191,9 +191,9 @@ class RateLimitError(NovelBuilderException):
     def __init__(
         self,
         message: str = "请求频率过高",
-        retry_after: Optional[int] = None,
-        limit: Optional[int] = None,
-        **kwargs
+        retry_after: int | None = None,
+        limit: int | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if retry_after:
@@ -211,9 +211,9 @@ class ExternalServiceError(NovelBuilderException):
     def __init__(
         self,
         message: str = "外部服务调用失败",
-        service_name: Optional[str] = None,
-        service_url: Optional[str] = None,
-        **kwargs
+        service_name: str | None = None,
+        service_url: str | None = None,
+        **kwargs,
     ):
         details = kwargs.get("details", {})
         if service_name:

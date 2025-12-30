@@ -33,7 +33,8 @@ class TestSearchService:
 
         # Create a real mock crawler that behaves like real one
         mock_crawler = AsyncMock()
-        mock_crawler.search.return_value = [
+        # 使用正确的方法名 search_novels
+        mock_crawler.search_novels.return_value = [
             {
                 "title": "测试小说",
                 "author": "测试作者",
@@ -51,7 +52,7 @@ class TestSearchService:
         assert len(results) == 1
         assert results[0]["title"] == "测试小说"
         assert results[0]["author"] == "测试作者"
-        mock_crawler.search.assert_called_once_with("test")
+        mock_crawler.search_novels.assert_called_once_with("test")
 
     @pytest.mark.asyncio
     async def test_search_with_multiple_crawlers(self):
@@ -60,7 +61,7 @@ class TestSearchService:
 
         # Create multiple crawlers with different results
         crawler1 = AsyncMock()
-        crawler1.search.return_value = [
+        crawler1.search_novels.return_value = [
             {
                 "title": "小说1",
                 "author": "作者1",
@@ -73,7 +74,7 @@ class TestSearchService:
         ]
 
         crawler2 = AsyncMock()
-        crawler2.search.return_value = [
+        crawler2.search_novels.return_value = [
             {
                 "title": "小说2",
                 "author": "作者2",
@@ -100,10 +101,11 @@ class TestSearchService:
 
         # One crawler fails, one succeeds
         failing_crawler = AsyncMock()
-        failing_crawler.search.side_effect = Exception("Network error")
+        # 添加 search_novels 方法使 hasattr 检查通过
+        failing_crawler.search_novels.side_effect = Exception("Network error")
 
         working_crawler = AsyncMock()
-        working_crawler.search.return_value = [
+        working_crawler.search_novels.return_value = [
             {
                 "title": "正常小说",
                 "author": "正常作者",
@@ -130,10 +132,10 @@ class TestSearchService:
 
         # Create a crawler that times out
         slow_crawler = AsyncMock()
-        slow_crawler.search.side_effect = TimeoutError("Timeout")
+        slow_crawler.search_novels.side_effect = TimeoutError("Timeout")
 
         fast_crawler = AsyncMock()
-        fast_crawler.search.return_value = [
+        fast_crawler.search_novels.return_value = [
             {
                 "title": "快速结果",
                 "author": "快速作者",

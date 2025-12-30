@@ -26,43 +26,43 @@ SOURCE_SITES_METADATA = {
         "base_url": "https://www.alicesw.com",
         "description": "专业的轻小说网站，包含大量日系轻小说",
         "search_enabled": True,
-        "crawler_class": AliceSWCrawlerRefactored  # 使用重构版
+        "crawler_class": AliceSWCrawlerRefactored,  # 使用重构版
     },
     "shukuge": {
         "name": "书库",
         "base_url": "http://www.shukuge.com",
         "description": "综合性小说书库，资源丰富",
         "search_enabled": True,
-        "crawler_class": ShukugeCrawlerRefactored  # 使用重构版
+        "crawler_class": ShukugeCrawlerRefactored,  # 使用重构版
     },
     "xspsw": {
         "name": "小说网",
         "base_url": "https://m.xspsw.com",
         "description": "移动端优化的小说网站",
         "search_enabled": True,
-        "crawler_class": XspswCrawlerRefactored  # 使用重构版
+        "crawler_class": XspswCrawlerRefactored,  # 使用重构版
     },
     "wdscw": {
         "name": "我的书城",
         "base_url": "https://www.5dscw.com",
         "description": "精品小说免费阅读网站，包含玄幻、奇幻、武侠等多种类型小说",
         "search_enabled": True,
-        "crawler_class": WdscwCrawlerRefactored  # 使用重构版
+        "crawler_class": WdscwCrawlerRefactored,  # 使用重构版
     },
     "wodeshucheng": {
         "name": "我的书城(wodeshucheng)",
         "base_url": "https://www.wodeshucheng.net",
         "description": "综合性小说阅读网站，提供多种类型小说的在线阅读",
         "search_enabled": True,
-        "crawler_class": WodeshuchengCrawler
+        "crawler_class": WodeshuchengCrawler,
     },
     "smxku": {
         "name": "蜘蛛小说网",
         "base_url": "https://www.smxku.com",
         "description": "海量小说免费在线阅读，包含玄幻、都市、言情等多种类型",
         "search_enabled": True,
-        "crawler_class": SmxkuCrawler
-    }
+        "crawler_class": SmxkuCrawler,
+    },
 }
 
 
@@ -122,13 +122,15 @@ def get_source_sites_info() -> list[dict]:
         site_key = site_id.replace("_sw", "").replace("_", "")
         is_enabled = not enabled or site_key in enabled
 
-        sites.append({
-            "id": site_id,
-            "name": metadata["name"],
-            "base_url": metadata["base_url"],
-            "description": metadata["description"],
-            "enabled": is_enabled,
-            "search_enabled": metadata["search_enabled"]
-        })
+        sites.append(
+            {
+                "id": site_id,
+                "name": metadata["name"],
+                "base_url": metadata["base_url"],
+                "description": metadata["description"],
+                "enabled": is_enabled,
+                "search_enabled": metadata["search_enabled"],
+            }
+        )
 
     return sites

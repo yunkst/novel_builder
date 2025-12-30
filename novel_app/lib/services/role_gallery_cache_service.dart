@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:novel_api/novel_api.dart';
 import '../core/di/api_service_provider.dart';
 
 /// 角色图集缓存服务
@@ -60,17 +58,6 @@ class RoleGalleryCacheService {
     final filePath = _getCacheFilePath(filename);
     final file = File(filePath);
     return file.existsSync() ? file : null;
-  }
-
-  /// 获取配置的Host
-  Future<String> _getHost() async {
-    const String prefsHostKey = 'backend_host';
-    final prefs = await SharedPreferences.getInstance();
-    final host = prefs.getString(prefsHostKey);
-    if (host == null || host.isEmpty) {
-      throw Exception('后端 HOST 未配置');
-    }
-    return host.trim();
   }
 
   /// 缓存图片

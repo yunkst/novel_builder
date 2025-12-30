@@ -64,6 +64,17 @@ per-file-ignores."__init__.py" = ["F401"]
 per-file-ignores."test_*.py" = ["ARG001", "ARG002"]
 per-file-ignores."conftest.py" = ["F401", "ARG001"]
 
+# Ignore broad exception handling in crawlers (intentional error handling)
+per-file-ignores."*_crawler*.py" = ["BLE001"]
+
+# Ignore specific rules in specific services (intentional broad exception handling)
+per-file-ignores."scene_illustration_service.py" = ["BLE001"]
+per-file-ignores."role_card_service.py" = ["BLE001"]
+per-file-ignores."cache_service.py" = ["BLE001"]
+per-file-ignores."search_service.py" = ["BLE001"]
+per-file-ignores."model_validation.py" = ["BLE001"]
+per-file-ignores."auth.py" = ["BLE001"]
+
 # Fix settings
 fixable = ["ALL"]
 unfixable = []

@@ -37,17 +37,18 @@ class ChapterContent(BaseModel):
 class SourceSite(BaseModel):
     """Source site information schema."""
 
-    id: str              # 站点标识 (alice_sw, shukuge, xspsw)
-    name: str            # 站点名称
-    base_url: str        # 站点基础URL
-    description: str     # 站点描述
-    enabled: bool        # 是否启用
-    search_enabled: bool # 是否支持搜索功能
+    id: str  # 站点标识 (alice_sw, shukuge, xspsw)
+    name: str  # 站点名称
+    base_url: str  # 站点基础URL
+    description: str  # 站点描述
+    enabled: bool  # 是否启用
+    search_enabled: bool  # 是否支持搜索功能
 
 
 # ============================================================================
 # 通用文生图工具模式（保留供角色卡功能使用）
 # ============================================================================
+
 
 class ComfyUIPromptRequest(BaseModel):
     """ComfyUI生图请求模式."""
@@ -67,6 +68,7 @@ class ComfyUIImageResponse(BaseModel):
 # ============================================================================
 # 统一角色信息模型
 # ============================================================================
+
 
 class RoleInfo(BaseModel):
     """统一角色信息模型 - 增强版，支持自动序列化."""
@@ -90,9 +92,16 @@ class RoleInfo(BaseModel):
 
         # 动态添加非空字段
         optional_fields = [
-            'gender', 'age', 'occupation', 'personality',
-            'appearance_features', 'body_type', 'clothing_style',
-            'background_story', 'face_prompts', 'body_prompts'
+            "gender",
+            "age",
+            "occupation",
+            "personality",
+            "appearance_features",
+            "body_type",
+            "clothing_style",
+            "background_story",
+            "face_prompts",
+            "body_prompts",
         ]
 
         for field in optional_fields:
@@ -117,19 +126,21 @@ class RoleInfo(BaseModel):
         return "，".join(parts) if parts else self.name
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'RoleInfo':
+    def from_dict(cls, data: dict[str, Any]) -> "RoleInfo":
         """从字典创建RoleInfo对象"""
         return cls(**data)
 
     def to_json_string(self) -> str:
         """转换为JSON字符串"""
         import json
+
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
     @classmethod
-    def from_json_string(cls, json_str: str) -> 'RoleInfo':
+    def from_json_string(cls, json_str: str) -> "RoleInfo":
         """从JSON字符串创建RoleInfo对象"""
         import json
+
         data = json.loads(json_str)
         return cls(**data)
 
@@ -138,12 +149,15 @@ class RoleInfo(BaseModel):
 # 人物卡功能相关API模式
 # ============================================================================
 
+
 class RoleCardGenerateRequest(BaseModel):
     """人物卡图片生成请求模式."""
 
     role_id: str = Field(..., description="人物卡ID")
     roles: list[RoleInfo] = Field(..., description="人物卡设定信息列表")
-    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
+    model_name: str | None = Field(
+        None, alias="model", description="模型名称(可选，默认使用默认模型)"
+    )
 
 
 class RoleImageInfo(BaseModel):
@@ -173,7 +187,9 @@ class RoleRegenerateRequest(BaseModel):
 
     img_url: str = Field(..., description="参考图片URL")
     count: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
+    model_name: str | None = Field(
+        None, alias="model", description="模型名称(可选，默认使用默认模型)"
+    )
 
 
 class RoleGenerateResponse(BaseModel):
@@ -201,6 +217,7 @@ class RoleCardErrorResponse(BaseModel):
 # ============================================================================
 # 异步任务相关API模式
 # ============================================================================
+
 
 class RoleCardTaskCreateResponse(BaseModel):
     """人物卡任务创建响应模式."""
@@ -231,26 +248,39 @@ class RoleCardTaskStatusResponse(BaseModel):
 # 场面绘制功能相关API模式
 # ============================================================================
 
+
 class SceneIllustrationRequest(BaseModel):
     """场面绘制请求模式."""
 
-    chapters_content: str = Field(..., description="章节内容")
-    task_id: str = Field(..., description="任务标识符")
-    roles: list[RoleInfo] = Field(..., description="角色信息列表")
+    chapters_content: str = Field(
+        ..., min_length=1, max_length=50000, description="章节内容"
+    )
+    task_id: str = Field(..., min_length=1, max_length=255, description="任务标识符")
+    roles: list[RoleInfo] = Field(
+        ..., min_length=0, max_length=20, description="角色信息列表"
+    )
     num: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model_name: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(
+        None, max_length=100, description="指定使用的模型名称，不填则使用默认模型"
+    )
 
 
 class EnhancedSceneIllustrationRequest(BaseModel):
     """增强的场景插图请求模型 - 支持多种输入格式和自动序列化."""
 
-    chapters_content: str = Field(..., description="章节内容")
-    task_id: str = Field(..., description="任务标识符")
-    roles: list[RoleInfo] = Field(..., description="角色信息列表")
+    chapters_content: str = Field(
+        ..., min_length=1, max_length=50000, description="章节内容"
+    )
+    task_id: str = Field(..., min_length=1, max_length=255, description="任务标识符")
+    roles: list[RoleInfo] = Field(
+        ..., min_length=0, max_length=20, description="角色信息列表"
+    )
     num: int = Field(..., ge=1, le=10, description="生成图片数量")
-    model_name: str | None = Field(None, description="指定使用的模型名称，不填则使用默认模型")
+    model_name: str | None = Field(
+        None, max_length=100, description="指定使用的模型名称，不填则使用默认模型"
+    )
 
-    @field_validator('roles', mode='before')
+    @field_validator("roles", mode="before")
     @classmethod
     def validate_roles(cls, v):
         """支持多种输入格式的roles字段验证"""
@@ -258,11 +288,9 @@ class EnhancedSceneIllustrationRequest(BaseModel):
             # 从字典格式转换 {"主角": "描述"}
             role_list = []
             for i, (name, description) in enumerate(v.items()):
-                role_list.append({
-                    "id": i + 1,
-                    "name": name,
-                    "appearance_features": description
-                })
+                role_list.append(
+                    {"id": i + 1, "name": name, "appearance_features": description}
+                )
             return [RoleInfo(**role) for role in role_list]
         elif isinstance(v, list):
             # 处理列表格式
@@ -270,7 +298,7 @@ class EnhancedSceneIllustrationRequest(BaseModel):
             for role in v:
                 if isinstance(role, dict):
                     validated_roles.append(RoleInfo(**role))
-                elif hasattr(role, 'name'):  # 已经是RoleInfo对象
+                elif hasattr(role, "name"):  # 已经是RoleInfo对象
                     validated_roles.append(role)
                 else:
                     raise ValueError(f"无法解析角色数据: {role}")
@@ -288,6 +316,7 @@ class EnhancedSceneIllustrationRequest(BaseModel):
     def to_roles_json(self) -> str:
         """转换为JSON字符串用于数据库存储"""
         import json
+
         roles_data = [role.to_dict() for role in self.roles]
         return json.dumps(roles_data, ensure_ascii=False)
 
@@ -326,16 +355,25 @@ class SceneGalleryResponse(BaseModel):
 class SceneImageDeleteRequest(BaseModel):
     """删除场面图片请求模式."""
 
-    task_id: str = Field(..., description="场面绘制任务ID")
-    filename: str = Field(..., description="要删除的图片文件名")
+    task_id: str = Field(
+        ..., min_length=1, max_length=255, description="场面绘制任务ID"
+    )
+    filename: str = Field(
+        ..., min_length=1, max_length=255, description="要删除的图片文件名"
+    )
 
 
 class SceneRegenerateRequest(BaseModel):
     """场面绘制重新生成请求模式."""
 
-    task_id: str = Field(..., description="原始任务ID")
+    task_id: str = Field(..., min_length=1, max_length=255, description="原始任务ID")
     count: int = Field(..., ge=1, le=20, description="生成图片数量")
-    model_name: str | None = Field(None, alias="model", description="指定使用的模型名称（可选，不填则使用默认模型）")
+    model_name: str | None = Field(
+        None,
+        max_length=100,
+        alias="model",
+        description="指定使用的模型名称（可选，不填则使用默认模型）",
+    )
 
 
 class SceneRegenerateResponse(BaseModel):
@@ -354,9 +392,11 @@ class SceneRegenerateResponse(BaseModel):
 class ImageToVideoRequest(BaseModel):
     """图生视频请求模式."""
 
-    img_name: str = Field(..., description="图片名称")
-    user_input: str = Field(..., description="用户要求")
-    model_name: str | None = Field(None, description="图生视频模型名称（可选，不填则使用默认模型）")
+    img_name: str = Field(..., min_length=1, max_length=255, description="图片名称")
+    user_input: str = Field(..., min_length=1, max_length=1000, description="用户要求")
+    model_name: str | None = Field(
+        None, max_length=100, description="图生视频模型名称（可选，不填则使用默认模型）"
+    )
 
 
 class ImageToVideoResponse(BaseModel):
@@ -377,26 +417,10 @@ class VideoStatusResponse(BaseModel):
     video_filename: str | None = Field(None, description="视频文件名")
 
 
-class ImageToVideoTaskStatusResponse(BaseModel):
-    """图生视频任务状态响应模式."""
-
-    task_id: int = Field(..., description="任务ID")
-    img_name: str = Field(..., description="图片名称")
-    status: str = Field(..., description="任务状态: pending/running/completed/failed")
-    model_name: str | None = Field(None, description="使用的模型名称")
-    user_input: str = Field(..., description="用户要求")
-    video_prompt: str | None = Field(None, description="处理后的视频生成提示词")
-    video_filename: str | None = Field(None, description="生成的视频文件名")
-    result_message: str | None = Field(None, description="处理结果消息")
-    error_message: str | None = Field(None, description="错误信息")
-    created_at: str = Field(..., description="创建时间")
-    started_at: str | None = Field(None, description="开始处理时间")
-    completed_at: str | None = Field(None, description="完成时间")
-
-
 # ============================================================================
 # 模型管理相关API模式
 # ============================================================================
+
 
 class WorkflowInfo(BaseModel):
     """工作流信息模式."""

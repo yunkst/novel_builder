@@ -7,7 +7,6 @@ for novel searching, chapter management, and caching functionality.
 """
 
 import logging
-import os
 import secrets
 from datetime import datetime
 from typing import Any
@@ -20,20 +19,18 @@ from fastapi import (
     Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from .config import settings
+from .constants import CACHE_ONE_DAY, CACHE_ONE_HOUR, TIMEOUT_FAST
+from .database import get_db, init_db
+from .deps.auth import verify_token
 from .exceptions import (
     NovelBuilderException,
-    CrawlerError,
-    DatabaseError,
-    NetworkError,
     handle_exception,
 )
 from .logging_config import setup_logging
-from .database import get_db, init_db
-from .deps.auth import verify_token
 from .models.cache import ChapterCache as Cache
 from .schemas import (
     Chapter,
@@ -41,7 +38,6 @@ from .schemas import (
     EnhancedSceneIllustrationRequest,
     ImageToVideoRequest,
     ImageToVideoResponse,
-    ImageToVideoTaskStatusResponse,
     ModelsResponse,
     Novel,
     RoleCardGenerateRequest,
@@ -122,10 +118,7 @@ async def startup_event() -> None:
 async def novel_builder_exception_handler(request: Request, exc: NovelBuilderException):
     """处理自定义应用异常"""
     logger.error(f"应用异常: {exc.error_code} - {exc.message}")
-    return JSONResponse(
-        status_code=500,
-        content=exc.to_dict()
-    )
+    return JSONResponse(status_code=500, content=exc.to_dict())
 
 
 @app.exception_handler(Exception)
@@ -133,10 +126,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     """处理未预期的异常"""
     novel_exc = handle_exception(exc, logger)
     logger.error(f"未处理异常: {novel_exc.message}")
-    return JSONResponse(
-        status_code=500,
-        content=novel_exc.to_dict()
-    )
+    return JSONResponse(status_code=500, content=novel_exc.to_dict())
 
 
 @app.get("/health")
@@ -155,17 +145,25 @@ def security_check() -> dict[str, Any]:
         "has_api_token": bool(settings.api_token),
         "has_custom_secret_key": settings.secret_key != secrets.token_urlsafe(32),
         "is_debug_mode": settings.debug,
-        "cors_origins": settings.cors_origins.split(",") if settings.cors_origins else [],
+        "cors_origins": settings.cors_origins.split(",")
+        if settings.cors_origins
+        else [],
         "warnings": [
             "DEBUG模式已启用" if settings.debug else None,
             "未设置API_TOKEN" if not settings.api_token else None,
-            "使用默认SECRET_KEY" if settings.secret_key == "your-secret-key-here" else None,
+            "使用默认SECRET_KEY"
+            if settings.secret_key == "your-secret-key-here"
+            else None,
             "CORS设置为允许所有源" if "*" in (settings.cors_origins or "") else None,
-        ]
+        ],
     }
 
 
-@app.get("/source-sites", response_model=list[SourceSite], dependencies=[Depends(verify_token)])
+@app.get(
+    "/source-sites",
+    response_model=list[SourceSite],
+    dependencies=[Depends(verify_token)],
+)
 async def get_source_sites() -> list[dict[str, Any]]:
     """获取所有源站列表"""
     return get_source_sites_info()
@@ -174,14 +172,17 @@ async def get_source_sites() -> list[dict[str, Any]]:
 @app.get("/search", response_model=list[Novel], dependencies=[Depends(verify_token)])
 async def search(
     keyword: str = Query(..., min_length=1, description="小说名称或作者"),
-    sites: str = Query(None, description="指定搜索站点，逗号分隔，如 alice_sw,shukuge")
+    sites: str = Query(None, description="指定搜索站点，逗号分隔，如 alice_sw,shukuge"),
 ) -> list[dict[str, Any]]:
     """搜索小说，支持指定站点"""
     if sites:
         # 解析指定站点，只使用指定的爬虫
         site_list = [s.strip() for s in sites.split(",")]
-        crawlers = {site: crawler for site, crawler in get_enabled_crawlers().items()
-                   if site in site_list}
+        crawlers = {
+            site: crawler
+            for site, crawler in get_enabled_crawlers().items()
+            if site in site_list
+        }
         if not crawlers:
             raise HTTPException(status_code=400, detail="指定的站点无效或未启用")
     else:
@@ -196,7 +197,9 @@ async def search(
 @app.get(
     "/chapters", response_model=list[Chapter], dependencies=[Depends(verify_token)]
 )
-async def chapters(url: str = Query(..., description="小说详情页或阅读页URL")) -> list[dict[str, Any]]:
+async def chapters(
+    url: str = Query(..., description="小说详情页或阅读页URL"),
+) -> list[dict[str, Any]]:
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
@@ -224,11 +227,7 @@ async def chapter_content(
     """
     # 1. 如果不强制刷新，先检查缓存
     if not force_refresh:
-        cached_chapter = (
-            db.query(Cache)
-            .filter(Cache.chapter_url == url)
-            .first()
-        )
+        cached_chapter = db.query(Cache).filter(Cache.chapter_url == url).first()
 
         if cached_chapter:
             # 检查缓存内容的字数，如果小于300则认为缓存无效，需要重新获取
@@ -254,13 +253,14 @@ async def chapter_content(
         try:
             # 在后台线程中保存缓存，不阻塞响应
             import threading
+
             thread = threading.Thread(
                 target=_save_chapter_to_cache_sync,
-                args=(url, content_data["title"], content_data["content"])
+                args=(url, content_data["title"], content_data["content"]),
             )
             thread.daemon = True
             thread.start()
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             # 缓存保存失败不影响正常响应，但记录日志
             logger.warning(f"缓存章节保存失败: {e}")
 
@@ -271,27 +271,19 @@ async def chapter_content(
     }
 
 
-
-
-
-
-@app.get("/text2img/image/{filename}", response_class=Response,
-         responses={
-             200: {
-                 "content": {
-                     "image/png": {
-                         "schema": {
-                             "type": "string",
-                             "format": "binary"
-                         }
-                     }
-                 },
-                 "description": "成功返回图片二进制数据 (PNG格式)"
-             },
-             404: {
-                 "description": "图片文件不存在"
-             }
-         })
+@app.get(
+    "/text2img/image/{filename}",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {
+                "image/png": {"schema": {"type": "string", "format": "binary"}}
+            },
+            "description": "成功返回图片二进制数据 (PNG格式)",
+        },
+        404: {"description": "图片文件不存在"},
+    },
+)
 async def get_image_proxy(filename: str):
     """
     图片代理接口 - 从ComfyUI获取图片并转发给用户
@@ -301,11 +293,22 @@ async def get_image_proxy(filename: str):
     - **filename**: 图片文件名
     - **返回**: 图片二进制数据 (Content-Type: image/png)
     """
+    import re
+
     import requests
 
     try:
+        # 安全验证：防止路径遍历攻击
+        # 只允许字母、数字、下划线、连字符、点和扩展名分隔符
+        if not re.match(r"^[a-zA-Z0-9_\-\.]+\.(png|jpg|jpeg|gif|webp)$", filename):
+            raise HTTPException(status_code=400, detail="无效的文件名格式")
+
+        # 额外检查：防止路径遍历
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(status_code=400, detail="文件名包含非法字符")
+
         # 直接从ComfyUI获取图片
-        comfyui_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
+        comfyui_url = settings.comfyui_api_url
         image_url = f"{comfyui_url}/view?filename={filename}"
 
         response = requests.get(image_url, timeout=None)
@@ -314,9 +317,9 @@ async def get_image_proxy(filename: str):
                 content=response.content,
                 media_type="image/png",
                 headers={
-                    "Cache-Control": "public, max-age=86400",  # 缓存1天
-                    "X-Content-Type-Options": "nosniff"
-                }
+                    "Cache-Control": f"public, max-age={CACHE_ONE_DAY}",  # 缓存1天
+                    "X-Content-Type-Options": "nosniff",
+                },
             )
         else:
             raise HTTPException(status_code=404, detail="图片不存在")
@@ -330,35 +333,26 @@ async def text2img_health_check():
     import requests
 
     try:
-        comfyui_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
-        response = requests.get(f"{comfyui_url}/system_stats", timeout=5)
+        comfyui_url = settings.comfyui_api_url
+        response = requests.get(f"{comfyui_url}/system_stats", timeout=TIMEOUT_FAST)
 
         if response.status_code == 200:
             return {
                 "status": "healthy",
                 "message": "ComfyUI服务正常",
-                "services": {
-                    "comfyui": True,
-                    "api_accessible": True
-                }
+                "services": {"comfyui": True, "api_accessible": True},
             }
         else:
             return {
                 "status": "unhealthy",
                 "message": f"ComfyUI服务响应异常: {response.status_code}",
-                "services": {
-                    "comfyui": False,
-                    "api_accessible": False
-                }
+                "services": {"comfyui": False, "api_accessible": False},
             }
     except requests.RequestException as e:
         return {
             "status": "unhealthy",
             "message": f"无法连接ComfyUI服务: {e!s}",
-            "services": {
-                "comfyui": False,
-                "api_accessible": False
-            }
+            "services": {"comfyui": False, "api_accessible": False},
         }
 
 
@@ -367,8 +361,7 @@ async def text2img_health_check():
 
 @app.post("/api/role-card/generate", dependencies=[Depends(verify_token)])
 async def generate_role_card_images(
-    request: RoleCardGenerateRequest,
-    db: Session = Depends(get_db)
+    request: RoleCardGenerateRequest, db: Session = Depends(get_db)
 ):
     """
     异步生成人物卡图片
@@ -387,20 +380,21 @@ async def generate_role_card_images(
     except ValueError as e:
         logger.warning(f"创建人物卡生成任务参数错误: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         novel_exc = handle_exception(e, logger)
         logger.error(f"创建人物卡生成任务失败: {novel_exc.message}")
         raise HTTPException(
             status_code=500,
-            detail={"error": novel_exc.error_code, "message": novel_exc.message}
+            detail={"error": novel_exc.error_code, "message": novel_exc.message},
         )
 
 
-@app.get("/api/role-card/status/{task_id}", response_model=RoleCardTaskStatusResponse, dependencies=[Depends(verify_token)])
-async def get_role_card_task_status(
-    task_id: int,
-    db: Session = Depends(get_db)
-):
+@app.get(
+    "/api/role-card/status/{task_id}",
+    response_model=RoleCardTaskStatusResponse,
+    dependencies=[Depends(verify_token)],
+)
+async def get_role_card_task_status(task_id: int, db: Session = Depends(get_db)):
     """
     查询人物卡生成任务状态
 
@@ -411,16 +405,17 @@ async def get_role_card_task_status(
         if not result:
             raise HTTPException(status_code=404, detail="任务不存在")
         return result
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"查询任务状态失败: {e}")
         raise HTTPException(status_code=500, detail="查询任务状态失败")
 
 
-@app.get("/api/role-card/gallery/{role_id}", response_model=RoleGalleryResponse, dependencies=[Depends(verify_token)])
-async def get_role_card_gallery(
-    role_id: str,
-    db: Session = Depends(get_db)
-):
+@app.get(
+    "/api/role-card/gallery/{role_id}",
+    response_model=RoleGalleryResponse,
+    dependencies=[Depends(verify_token)],
+)
+async def get_role_card_gallery(role_id: str, db: Session = Depends(get_db)):
     """
     查看角色图集
 
@@ -429,15 +424,14 @@ async def get_role_card_gallery(
     try:
         result = await role_card_service.get_role_gallery(role_id, db)
         return result
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"获取角色图集失败: {e}")
         raise HTTPException(status_code=500, detail="获取图集失败")
 
 
 @app.delete("/api/role-card/image", dependencies=[Depends(verify_token)])
 async def delete_role_card_image(
-    request: RoleImageDeleteRequest,
-    db: Session = Depends(get_db)
+    request: RoleImageDeleteRequest, db: Session = Depends(get_db)
 ):
     """
     从角色图集中删除图片
@@ -451,15 +445,14 @@ async def delete_role_card_image(
             return {"message": "图片删除成功"}
         else:
             raise HTTPException(status_code=404, detail="图片不存在")
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"删除角色图片失败: {e}")
         raise HTTPException(status_code=500, detail="删除图片失败")
 
 
 @app.post("/api/role-card/regenerate", dependencies=[Depends(verify_token)])
 async def regenerate_similar_images(
-    request: RoleRegenerateRequest,
-    db: Session = Depends(get_db)
+    request: RoleRegenerateRequest, db: Session = Depends(get_db)
 ):
     """
     重新生成相似图片
@@ -469,11 +462,13 @@ async def regenerate_similar_images(
     - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     """
     try:
-        result = await role_card_service.regenerate_similar_images(request, db, model=request.model)
+        result = await role_card_service.regenerate_similar_images(
+            request, db, model=request.model
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"重新生成相似图片失败: {e}")
         raise HTTPException(status_code=500, detail="重新生成图片失败")
 
@@ -490,7 +485,7 @@ async def get_models() -> ModelsResponse:
             WorkflowInfo(
                 title=workflow.title,
                 description=workflow.description,
-                path=workflow.path
+                path=workflow.path,
             )
             for workflow in t2i_response.workflows
         ]
@@ -501,16 +496,13 @@ async def get_models() -> ModelsResponse:
             WorkflowInfo(
                 title=workflow.title,
                 description=workflow.description,
-                path=workflow.path
+                path=workflow.path,
             )
             for workflow in i2v_response.workflows
         ]
 
-        return ModelsResponse(
-            text2img=text2img_models,
-            img2video=img2video_models
-        )
-    except Exception as e:
+        return ModelsResponse(text2img=text2img_models, img2video=img2video_models)
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"获取模型列表失败: {e}")
         raise HTTPException(status_code=500, detail="获取模型列表失败")
 
@@ -524,15 +516,11 @@ async def role_card_health_check():
 
         return {
             "status": "healthy" if overall_healthy else "unhealthy",
-            "services": health_status
+            "services": health_status,
         }
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"人物卡健康检查失败: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "services": {}
-        }
+        return {"status": "error", "message": str(e), "services": {}}
 
 
 # ================= 场面绘制 API =================
@@ -540,8 +528,7 @@ async def role_card_health_check():
 
 @app.post("/api/scene-illustration/generate", dependencies=[Depends(verify_token)])
 async def generate_scene_images(
-    request: EnhancedSceneIllustrationRequest,
-    db: Session = Depends(get_db)
+    request: EnhancedSceneIllustrationRequest, db: Session = Depends(get_db)
 ):
     """
     生成场面绘制图片
@@ -559,16 +546,17 @@ async def generate_scene_images(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"创建场面绘制任务失败: {e}")
         raise HTTPException(status_code=500, detail="创建任务失败")
 
 
-@app.get("/api/scene-illustration/gallery/{task_id}", response_model=SceneGalleryResponse, dependencies=[Depends(verify_token)])
-async def get_scene_gallery(
-    task_id: str,
-    db: Session = Depends(get_db)
-):
+@app.get(
+    "/api/scene-illustration/gallery/{task_id}",
+    response_model=SceneGalleryResponse,
+    dependencies=[Depends(verify_token)],
+)
+async def get_scene_gallery(task_id: str, db: Session = Depends(get_db)):
     """
     查看场面绘制图片列表
 
@@ -579,15 +567,14 @@ async def get_scene_gallery(
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"获取场面图集失败: {e}")
         raise HTTPException(status_code=500, detail="获取图集失败")
 
 
 @app.delete("/api/scene-illustration/image", dependencies=[Depends(verify_token)])
 async def delete_scene_image(
-    request: SceneImageDeleteRequest,
-    db: Session = Depends(get_db)
+    request: SceneImageDeleteRequest, db: Session = Depends(get_db)
 ):
     """
     从场面绘制结果中删除图片
@@ -603,15 +590,14 @@ async def delete_scene_image(
             raise HTTPException(status_code=404, detail="图片不存在")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"删除场面图片失败: {e}")
         raise HTTPException(status_code=500, detail="删除图片失败")
 
 
 @app.post("/api/scene-illustration/regenerate", dependencies=[Depends(verify_token)])
 async def regenerate_scene_images(
-    request: SceneRegenerateRequest,
-    db: Session = Depends(get_db)
+    request: SceneRegenerateRequest, db: Session = Depends(get_db)
 ):
     """
     基于现有任务重新生成场面图片
@@ -625,20 +611,21 @@ async def regenerate_scene_images(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"重新生成场面图片失败: {e}")
         raise HTTPException(status_code=500, detail="重新生成图片失败")
-
-
 
 
 # ================= 图生视频 API =================
 
 
-@app.post("/api/image-to-video/generate", response_model=ImageToVideoResponse, dependencies=[Depends(verify_token)])
+@app.post(
+    "/api/image-to-video/generate",
+    response_model=ImageToVideoResponse,
+    dependencies=[Depends(verify_token)],
+)
 async def generate_video_from_image(
-    request: ImageToVideoRequest,
-    db: Session = Depends(get_db)
+    request: ImageToVideoRequest, db: Session = Depends(get_db)
 ):
     """
     生成图生视频
@@ -667,23 +654,24 @@ async def generate_video_from_image(
     ```
 
     **后续操作:**
-    使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
+    使用返回的 task_id 轮询 `/api/image-to-video/has-video/{img_name}` 查询视频是否生成完成
     """
     try:
         result = await image_to_video_service.create_video_generation_task(request, db)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"创建图生视频任务失败: {e}")
         raise HTTPException(status_code=500, detail="创建任务失败")
 
 
-@app.get("/api/image-to-video/has-video/{img_name}", response_model=VideoStatusResponse, dependencies=[Depends(verify_token)])
-async def check_video_status(
-    img_name: str,
-    db: Session = Depends(get_db)
-):
+@app.get(
+    "/api/image-to-video/has-video/{img_name}",
+    response_model=VideoStatusResponse,
+    dependencies=[Depends(verify_token)],
+)
+async def check_video_status(img_name: str, db: Session = Depends(get_db)):
     """
     检查图片是否有已生成的视频
 
@@ -705,65 +693,25 @@ async def check_video_status(
     try:
         result = await image_to_video_service.get_video_status(img_name, db)
         return result
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"检查视频状态失败: {e}")
         raise HTTPException(status_code=500, detail="检查视频状态失败")
 
 
-@app.get("/api/image-to-video/status/{task_id}", response_model=ImageToVideoTaskStatusResponse, dependencies=[Depends(verify_token)])
-async def get_video_task_status(
-    task_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    查询图生视频任务状态
-
-    获取指定任务的详细状态信息，包括生成进度和结果。
-
-    **路径参数:**
-    - **task_id**: 图生视频任务的唯一标识符
-
-    **返回值:**
-    - **task_id**: 任务ID
-    - **img_name**: 处理的图片名称
-    - **status**: 任务状态（pending/running/completed/failed）
-    - **model_name**: 使用的模型名称
-    - **user_input**: 用户输入要求
-    - **video_prompt**: 生成的视频提示词（如果有）
-    - **video_filename**: 生成的视频文件名（完成时）
-    - **result_message**: 结果描述信息
-    - **error_message**: 错误信息（失败时）
-    - **created_at**: 任务创建时间
-    - **updated_at**: 任务更新时间
-    """
-    try:
-        result = await image_to_video_service.get_task_status(task_id, db)
-        if not result:
-            raise HTTPException(status_code=404, detail="任务不存在")
-        return result
-    except Exception as e:
-        logger.error(f"查询任务状态失败: {e}")
-        raise HTTPException(status_code=500, detail="查询任务状态失败")
-
-
-@app.get("/api/image-to-video/video/{img_name}", response_class=Response,
-         responses={
-             200: {
-                 "content": {
-                     "video/mp4": {
-                         "schema": {
-                             "type": "string",
-                             "format": "binary"
-                         }
-                     }
-                 },
-                 "description": "成功返回视频二进制数据 (MP4格式)"
-             },
-             404: {
-                 "description": "视频文件不存在"
-             }
-         })
-async def get_video_file(img_name: str):
+@app.get(
+    "/api/image-to-video/video/{img_name}",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {
+                "video/mp4": {"schema": {"type": "string", "format": "binary"}}
+            },
+            "description": "成功返回视频二进制数据 (MP4格式)",
+        },
+        404: {"description": "视频文件不存在"},
+    },
+)
+async def get_video_file(img_name: str, db: Session = Depends(get_db)):
     """
     获取视频文件
 
@@ -773,26 +721,22 @@ async def get_video_file(img_name: str):
     - **返回**: 视频二进制数据 (Content-Type: video/mp4)
     """
     try:
-        db = next(get_db())
-        try:
-            video_data = await image_to_video_service.get_video_file(img_name, db)
-            if video_data:
-                return Response(
-                    content=video_data,
-                    media_type="video/mp4",
-                    headers={
-                        "Cache-Control": "public, max-age=3600",  # 缓存1小时
-                        "X-Content-Type-Options": "nosniff"
-                    }
-                )
-            else:
-                raise HTTPException(status_code=404, detail="视频文件不存在")
-        finally:
-            db.close()
+        video_data = await image_to_video_service.get_video_file(img_name, db)
+        if video_data:
+            return Response(
+                content=video_data,
+                media_type="video/mp4",
+                headers={
+                    "Cache-Control": f"public, max-age={CACHE_ONE_HOUR}",  # 缓存1小时
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+        else:
+            raise HTTPException(status_code=404, detail="视频文件不存在")
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"获取视频文件失败: {e}")
         raise HTTPException(status_code=500, detail="获取视频文件失败")
 
@@ -803,28 +747,12 @@ async def image_to_video_health_check():
     try:
         health_status = await image_to_video_service.health_check()
         return health_status
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"图生视频健康检查失败: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "services": {}
-        }
+        return {"status": "error", "message": str(e), "services": {}}
 
 
 # ================= 缓存管理 API =================
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ================= 辅助函数 =================
@@ -845,11 +773,7 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
     try:
         with next(get_db()) as db:
             # 检查是否已存在
-            existing = (
-                db.query(Cache)
-                .filter(Cache.chapter_url == chapter_url)
-                .first()
-            )
+            existing = db.query(Cache).filter(Cache.chapter_url == chapter_url).first()
 
             if existing:
                 # 更新现有缓存
@@ -867,13 +791,13 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
                     chapter_content=content,
                     chapter_index=0,  # 独立章节索引设为0
                     word_count=len(content),
-                    cached_at=datetime.now()
+                    cached_at=datetime.now(),
                 )
                 db.add(cached_chapter)
 
             db.commit()
 
-    except Exception as e:
+    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         # 缓存保存失败，记录日志但不影响主功能
         print(f"保存章节缓存失败: {e}")
 
@@ -925,13 +849,12 @@ def index():
             "POST /api/image-to-video/generate - 图生视频生成",
             "GET /api/image-to-video/has-video/{img_name} - 检查图片是否有视频",
             "GET /api/image-to-video/video/{img_name} - 获取视频文件",
-            "GET /api/image-to-video/status/{task_id} - 查询视频生成任务状态",
         ],
         "supported_sites": [
             "alice_sw - 轻小说文库",
             "shukuge - 书库",
             "xspsw - 小说网",
             "wdscw - 我的书城",
-            "wodeshucheng - 我的书城(wodeshucheng)"
-        ]
+            "wodeshucheng - 我的书城(wodeshucheng)",
+        ],
     }

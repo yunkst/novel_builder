@@ -344,10 +344,12 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'bookshelf_fab',
         onPressed: _showCreateNovelDialog,
         tooltip: '创建新小说',
         child: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startDocked,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _bookshelf.isEmpty

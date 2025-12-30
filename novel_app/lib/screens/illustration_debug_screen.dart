@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../models/illustration_debug_item.dart';
 import '../models/scene_illustration.dart';
 import '../widgets/illustration_request_dialog.dart';
-import '../widgets/scene_illustration_image_widget.dart';
+import '../widgets/illustration_action_dialog.dart';
+import '../widgets/scene_image_preview.dart';
+import '../widgets/video_input_dialog.dart';
+import '../widgets/generate_more_dialog.dart';
 import '../services/scene_illustration_service.dart';
 import '../services/database_service.dart';
+import '../services/api_service_wrapper.dart';
+import '../core/di/api_service_provider.dart';
+import '../utils/video_generation_state_manager.dart';
 import 'package:novel_api/novel_api.dart';
 
 class IllustrationDebugScreen extends StatefulWidget {
@@ -24,8 +29,10 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   int _currentPage = 0;
   bool _isLoading = false;
   bool _hasMore = true;
+  int _totalPages = 0; // 总页数
+  int _totalItems = 0; // 总条目数
   final ScrollController _scrollController = ScrollController();
-  static const int _pageSize = 20;
+  static const int _pageSize = 10; // 每页10条
 
   // 性能优化：防止重复请求
   DateTime _lastLoadTime = DateTime.now();
@@ -35,7 +42,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   void initState() {
     super.initState();
     _loadIllustrations();
-    _scrollController.addListener(_scrollListener);
   }
 
   @override
@@ -53,11 +59,19 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _refreshIllustrations,
-        child: _sceneIllustrations.isEmpty && !_isLoading
-            ? _buildEmptyState()
-            : _buildIllustrationList(),
+        child: Column(
+          children: [
+            Expanded(
+              child: _sceneIllustrations.isEmpty && !_isLoading
+                  ? _buildEmptyState()
+                  : _buildIllustrationList(),
+            ),
+            _buildPaginationControl(),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'illustration_debug_fab',
         onPressed: _showIllustrationRequestDialog,
         child: const Icon(Icons.add),
       ),
@@ -65,29 +79,53 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.image_outlined,
             size: 64,
             color: Colors.grey,
           ),
-          SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 16),
+          const Text(
             '暂无生成的图片',
             style: TextStyle(
               fontSize: 18,
               color: Colors.grey,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 8),
+          const Text(
             '点击右下角的 + 号开始生成',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // 添加刷新按钮
+          ElevatedButton.icon(
+            onPressed: _isLoading ? null : () => _refreshIllustrations(),
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(_isLoading ? '刷新中...' : '刷新列表'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ],
@@ -99,13 +137,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _sceneIllustrations.length + (_hasMore ? 1 : 0),
+      itemCount: _sceneIllustrations.length,
       itemBuilder: (context, index) {
-        if (index >= _sceneIllustrations.length) {
-          // 显示加载指示器
-          return _buildLoadingIndicator();
-        }
-
         final illustration = _sceneIllustrations[index];
         return _buildIllustrationCard(illustration, index);
       },
@@ -114,6 +147,71 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: false,
       addSemanticIndexes: false,
+    );
+  }
+
+  /// 构建底部页码控制组件
+  Widget _buildPaginationControl() {
+    if (_totalPages == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade300),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 页码信息
+          Text(
+            '第 ${_currentPage + 1}/$_totalPages 页',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          if (_totalItems > 0) ...[
+            const SizedBox(width: 8),
+            Text(
+              '（共 $_totalItems 条）',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+          const SizedBox(width: 16),
+          // 上一页按钮
+          ElevatedButton(
+            onPressed: _currentPage > 0 && !_isLoading
+                ? _goToPreviousPage
+                : null,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(80, 36),
+              disabledBackgroundColor: Colors.grey.shade300,
+            ),
+            child: const Text('上一页'),
+          ),
+          const SizedBox(width: 12),
+          // 下一页按钮
+          ElevatedButton(
+            onPressed: _currentPage < _totalPages - 1 && !_isLoading
+                ? _goToNextPage
+                : null,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(80, 36),
+              disabledBackgroundColor: Colors.grey.shade300,
+            ),
+            child: const Text('下一页'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -127,229 +225,20 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   }
 
   Widget _buildIllustrationCard(SceneIllustration illustration, int index) {
-    // 性能优化：使用ValueKey确保卡片正确重建
+    // 直接使用 SceneImagePreview 组件，复用阅读器的实现
     return Card(
       key: ValueKey('illustration_${illustration.id}_${illustration.status}'),
       margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 请求信息和状态
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '生成数量: ${illustration.imageCount}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        '创建时间: ${_formatDateTime(illustration.createdAt)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      if (illustration.taskId.isNotEmpty)
-                        Text(
-                          '任务ID: ${illustration.taskId}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                _buildStatusChip(illustration.status),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // 生成要求
-            if (illustration.content.isNotEmpty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  illustration.content,
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // 图片展示区域 - 复用SceneIllustrationImageWidget
-            if (illustration.images.isNotEmpty)
-              _buildImageGrid(illustration.images)
-            else if (illustration.status == 'pending' || illustration.status == 'processing')
-              _buildLoadingState()
-            else if (illustration.status == 'failed')
-              _buildErrorState(illustration),
-          ],
-        ),
-      ),
-    );
-  }
-
-  IllustrationStatus _mapStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return IllustrationStatus.pending;
-      case 'processing':
-        return IllustrationStatus.processing;
-      case 'completed':
-        return IllustrationStatus.completed;
-      case 'failed':
-        return IllustrationStatus.failed;
-      default:
-        return IllustrationStatus.pending;
-    }
-  }
-
-  Widget _buildStatusChip(String status) {
-    final illustrationStatus = _mapStatus(status);
-    Color backgroundColor;
-    String text;
-    IconData icon;
-
-    switch (illustrationStatus) {
-      case IllustrationStatus.pending:
-        backgroundColor = Colors.orange;
-        text = '等待中';
-        icon = Icons.schedule;
-        break;
-      case IllustrationStatus.processing:
-        backgroundColor = Colors.blue;
-        text = '生成中';
-        icon = Icons.autorenew;
-        break;
-      case IllustrationStatus.completed:
-        backgroundColor = Colors.green;
-        text = '已完成';
-        icon = Icons.check_circle;
-        break;
-      case IllustrationStatus.failed:
-        backgroundColor = Colors.red;
-        text = '失败';
-        icon = Icons.error;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: backgroundColor),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: backgroundColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImageGrid(List<String> imageUrls) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '生成的图片:',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 1.0,
-          ),
-          itemCount: imageUrls.length,
-          // 性能优化：禁用不必要的特性
-          addAutomaticKeepAlives: false,
-          addRepaintBoundaries: false,
-          addSemanticIndexes: false,
-          itemBuilder: (context, index) {
-            // 直接复用SceneIllustrationImageWidget组件
-            return SceneIllustrationImageWidget(
-              imageUrl: imageUrls[index],
-              fit: BoxFit.cover,
-              height: 200,
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 8),
-            Text('正在生成图片...'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(SceneIllustration illustration) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red[200]!),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.error, color: Colors.red[400]),
-          const SizedBox(height: 8),
-          Text(
-            '生成失败',
-            style: TextStyle(color: Colors.red[600]),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: () => _retryGeneration(illustration),
-            icon: const Icon(Icons.refresh),
-            label: const Text('重试'),
-          ),
-        ],
+      child: SceneImagePreview(
+        taskId: illustration.taskId,
+        onImageTap: (taskId, imageUrl, imageIndex) {
+          _handleImageTap(taskId, imageUrl, imageIndex);
+        },
+        onDelete: () => _deleteIllustration(illustration.id),
+        onImageDeleted: () {
+          // 删除成功后刷新列表
+          _refreshIllustrations();
+        },
       ),
     );
   }
@@ -370,6 +259,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     try {
       final prompt = requestData['prompt'] as String;
       final imageCount = requestData['imageCount'] as int;
+      final modelName = requestData['modelName'] as String?;
 
       // 创建空的角色列表，调试模式下不需要角色信息
       final List<RoleInfo> emptyRoles = [];
@@ -381,6 +271,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         paragraphText: prompt, // 使用prompt作为段落文本
         roles: emptyRoles, // 空角色列表
         imageCount: imageCount,
+        modelName: modelName, // 生图模型
         insertionPosition: 'after', // 插入位置
         paragraphIndex: 0, // 段落索引
       );
@@ -417,7 +308,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     });
 
     try {
-      final illustrations = await _databaseService.getSceneIllustrationsPaginated(
+      final result = await _databaseService.getSceneIllustrationsPaginated(
         page: _currentPage,
         limit: _pageSize,
       );
@@ -427,8 +318,10 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           if (isRefresh) {
             _sceneIllustrations.clear();
           }
-          _sceneIllustrations.addAll(illustrations);
-          _hasMore = illustrations.length == _pageSize;
+          _sceneIllustrations.addAll(result['items'] as List<SceneIllustration>);
+          _totalItems = result['total'] as int;
+          _totalPages = result['totalPages'] as int;
+          _hasMore = _currentPage < _totalPages - 1;
           _isLoading = false;
         });
       }
@@ -445,64 +338,37 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     }
   }
 
+  /// 刷新插图列表（公开方法，供外部调用）
+  Future<void> refreshData() async {
+    await _loadIllustrations(isRefresh: true);
+  }
+
   Future<void> _refreshIllustrations() async {
     await _loadIllustrations(isRefresh: true);
   }
 
-  void _scrollListener() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _loadMoreIllustrations();
-    }
-  }
-
-  Future<void> _loadMoreIllustrations() async {
-    if (!_hasMore || _isLoading) return;
+  /// 手动翻页方法
+  Future<void> _goToPage(int page) async {
+    if (page < 0 || page >= _totalPages) return;
+    if (_isLoading) return;
 
     setState(() {
-      _currentPage++;
+      _currentPage = page;
     });
 
     await _loadIllustrations();
   }
 
-  Future<void> _retryGeneration(SceneIllustration illustration) async {
-    try {
-      // 更新状态为处理中
-      final index = _sceneIllustrations.indexWhere((item) => item.id == illustration.id);
-      if (index != -1) {
-        final updatedIllustration = SceneIllustration(
-          id: illustration.id,
-          novelUrl: illustration.novelUrl,
-          chapterId: illustration.chapterId,
-          taskId: illustration.taskId,
-          content: illustration.content,
-          roles: illustration.roles,
-          imageCount: illustration.imageCount,
-          status: 'processing',
-          images: illustration.images,
-          prompts: illustration.prompts,
-          createdAt: illustration.createdAt,
-          completedAt: null,
-        );
-
-        setState(() {
-          _sceneIllustrations[index] = updatedIllustration;
-        });
-
-        // 这里可以重新调用API重新生成，目前只是更新状态
-        _showErrorSnackBar('重试功能待实现');
-      }
-    } catch (e) {
-      debugPrint('重试生成失败: $e');
-      _showErrorSnackBar('重试失败: $e');
+  Future<void> _goToPreviousPage() async {
+    if (_currentPage > 0) {
+      await _goToPage(_currentPage - 1);
     }
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.hour.toString().padLeft(2, '0')}:'
-           '${dateTime.minute.toString().padLeft(2, '0')}:'
-           '${dateTime.second.toString().padLeft(2, '0')}';
+  Future<void> _goToNextPage() async {
+    if (_currentPage < _totalPages - 1) {
+      await _goToPage(_currentPage + 1);
+    }
   }
 
   void _showErrorSnackBar(String message, {bool isSuccess = false}) {
@@ -512,5 +378,244 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         backgroundColor: isSuccess ? Colors.green : Colors.red,
       ),
     );
+  }
+
+  /// 处理图片点击事件 - 显示功能选择对话框
+  Future<void> _handleImageTap(String taskId, String imageUrl, int imageIndex) async {
+    // 显示功能选择对话框
+    if (!mounted) return;
+    final action = await IllustrationActionDialog.show(context);
+
+    if (action == null || !mounted) {
+      return; // 用户取消或widget已销毁
+    }
+
+    if (action == 'regenerate') {
+      // 用户选择"再来几张"
+      await _regenerateMoreImages(taskId);
+    } else if (action == 'video') {
+      // 用户选择"生成视频"
+      await _generateVideoFromSpecificImage(taskId, imageUrl, imageIndex);
+    }
+  }
+
+  /// 再来几张 - 重新生成更多图片
+  Future<void> _regenerateMoreImages(String taskId) async {
+    debugPrint('=== IllustrationDebugScreen._regenerateMoreImages 开始 ===');
+    debugPrint('taskId: $taskId');
+
+    try {
+      // 显示数量选择对话框
+      if (!mounted) {
+        debugPrint('❌ widget已销毁，取消操作');
+        return;
+      }
+
+      debugPrint('🔄 显示 GenerateMoreDialog...');
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => GenerateMoreDialog(
+          apiType: 't2i', // 文生图模型
+          onConfirm: (count, modelName) {
+            debugPrint('GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            Navigator.of(context).pop({
+              'count': count,
+              'modelName': modelName,
+            });
+          },
+        ),
+      );
+
+      if (result == null || !mounted) {
+        debugPrint('用户取消或widget已销毁');
+        return;
+      }
+
+      final count = result['count'] as int;
+      final modelName = result['modelName'] as String?;
+      debugPrint('✅ 用户选择: count=$count, model=$modelName');
+
+      // 显示加载提示
+      if (mounted) {
+        debugPrint('📢 显示加载提示');
+        _showErrorSnackBar('正在生成 $count 张图片...', isSuccess: true);
+      }
+
+      // 调用 API 生成图片
+      debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
+      debugPrint('ApiServiceWrapper 初始化状态检查...');
+      final apiService = ApiServiceWrapper();
+      debugPrint('✅ ApiServiceWrapper 实例已创建');
+      debugPrint('初始化状态: ${apiService.getInitStatus()}');
+
+      debugPrint('🔄 开始API调用...');
+      final response = await apiService.regenerateSceneIllustrationImages(
+        taskId: taskId,
+        count: count,
+        modelName: modelName,
+      );
+
+      debugPrint('✅ API调用成功');
+      debugPrint('响应: $response');
+
+      // 显示成功提示（不刷新列表）
+      if (mounted) {
+        debugPrint('📢 显示成功提示');
+        _showErrorSnackBar('图片生成任务已创建，预计需要1-3分钟', isSuccess: true);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌❌❌ _regenerateMoreImages 异常 ❌❌❌');
+      debugPrint('异常类型: ${e.runtimeType}');
+      debugPrint('异常信息: $e');
+      debugPrint('堆栈跟踪:\n$stackTrace');
+
+      if (mounted) {
+        debugPrint('📢 显示错误提示');
+        _showErrorSnackBar('生成图片失败: $e');
+      }
+    }
+
+    debugPrint('=== _regenerateMoreImages 结束 ===');
+  }
+
+  /// 为特定图片生成视频
+  Future<void> _generateVideoFromSpecificImage(String taskId, String imageUrl, int imageIndex) async {
+    try {
+      // 检查图片是否正在生成视频
+      if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('该图片正在生成视频，请稍后再试'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 从imageUrl中提取文件名
+      final fileName = imageUrl.split('/').last;
+
+      // 显示视频输入对话框
+      if (!mounted) return;
+      final videoInput = await VideoInputDialog.show(context);
+      if (videoInput == null || !mounted) {
+        return; // 用户取消或widget已销毁
+      }
+
+      final userInput = videoInput['user_input'] ?? '';
+
+      if (userInput.isEmpty) {
+        return; // 未输入内容
+      }
+
+      // 设置生成状态
+      _setImageGeneratingStatus(imageUrl, true);
+
+      // 显示加载提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在为选中图片创建视频生成任务...'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+
+      // 获取 API 服务实例
+      final apiService = ApiServiceProvider.instance;
+
+      // 调用API生成视频
+      final response = await apiService.generateVideoFromImage(
+        imgName: fileName,
+        userInput: userInput,
+        modelName: '', // 使用空字符串
+      );
+
+      // 清除生成状态
+      _setImageGeneratingStatus(imageUrl, false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+    } catch (e) {
+      // 清除生成状态
+      _setImageGeneratingStatus(imageUrl, false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('生成视频失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 设置图片生成状态
+  void _setImageGeneratingStatus(String imageUrl, bool isGenerating) {
+    VideoGenerationStateManager.setImageGenerating(imageUrl, isGenerating);
+  }
+
+  /// 删除插图
+  Future<void> _deleteIllustration(int illustrationId) async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: const Text('确定要删除这个插图吗？此操作无法撤销。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        final success = await _sceneIllustrationService.deleteIllustration(illustrationId);
+        if (success) {
+          // 删除成功后刷新列表，让被删除的项立即消失
+          await _refreshIllustrations();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('插图已删除'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          debugPrint('删除插图失败: 服务返回false');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('删除插图失败'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除插图失败: $e')),
+        );
+      }
+    }
   }
 }

@@ -21,6 +21,8 @@ services:
       # 注意：ComfyUI工作流配置已迁移到 workflows.yaml 文件
       - DIFY_API_URL=${DIFY_API_URL:-http://host.docker.internal/v1/workflows/run}
       - DIFY_API_TOKEN=${DIFY_API_TOKEN}
+      # ComfyUI服务配置
+      - COMFYUI_API_URL=http://host.docker.internal:8188
     depends_on:
       postgres:
         condition: service_healthy

@@ -10,6 +10,8 @@ import urllib.parse
 from abc import ABC, abstractmethod
 from typing import Any
 
+import requests
+
 from .http_client import (
     RequestConfig,
     RequestStrategy,
@@ -23,7 +25,9 @@ from .http_client import (
 class BaseCrawler(ABC):
     """基础爬虫类"""
 
-    def __init__(self, base_url: str, strategy: RequestStrategy = RequestStrategy.HYBRID):
+    def __init__(
+        self, base_url: str, strategy: RequestStrategy = RequestStrategy.HYBRID
+    ):
         self.base_url = base_url
         self.strategy = strategy
         self.http_client = get_http_client(strategy)
@@ -45,25 +49,26 @@ class BaseCrawler(ABC):
 
     # ==================== 通用工具方法 ====================
 
-    async def get_page(self, url: str, timeout: int = 10,
-                      max_retries: int = 3, **kwargs) -> Response:
+    async def get_page(
+        self, url: str, timeout: int = 10, max_retries: int = 3, **kwargs
+    ) -> Response:
         """获取页面内容的通用方法"""
         config = RequestConfig(
-            timeout=timeout,
-            max_retries=max_retries,
-            strategy=self.strategy,
-            **kwargs
+            timeout=timeout, max_retries=max_retries, strategy=self.strategy, **kwargs
         )
         return await http_get(url, config)
 
-    async def post_form(self, url: str, data: dict[str, str],
-                       timeout: int = 10, max_retries: int = 3, **kwargs) -> Response:
+    async def post_form(
+        self,
+        url: str,
+        data: dict[str, str],
+        timeout: int = 10,
+        max_retries: int = 3,
+        **kwargs,
+    ) -> Response:
         """提交表单的通用方法"""
         config = RequestConfig(
-            timeout=timeout,
-            max_retries=max_retries,
-            strategy=self.strategy,
-            **kwargs
+            timeout=timeout, max_retries=max_retries, strategy=self.strategy, **kwargs
         )
         return await http_post(url, data, config)
 
@@ -73,8 +78,8 @@ class BaseCrawler(ABC):
             return ""
 
         # 移除多余空白
-        text = re.sub(r'\n\s*\n', '\n', text)
-        text = re.sub(r' +', ' ', text)
+        text = re.sub(r"\n\s*\n", "\n", text)
+        text = re.sub(r" +", " ", text)
         text = text.strip()
 
         return text
@@ -84,17 +89,15 @@ class BaseCrawler(ABC):
         novels = []
 
         # 查找所有可能包含小说信息的链接
-        links = soup.find_all('a', href=True)
+        links = soup.find_all("a", href=True)
 
         for link in links:
             try:
                 title = link.get_text().strip()
-                href = link.get('href', '')
+                href = link.get("href", "")
 
                 # 过滤条件
-                if (len(title) < 2 or
-                    not href or
-                    self._should_skip_link(title, href)):
+                if len(title) < 2 or not href or self._should_skip_link(title, href):
                     continue
 
                 # 构建完整URL
@@ -105,26 +108,26 @@ class BaseCrawler(ABC):
 
                 # 提取其他信息
                 novel_info = {
-                    'title': title,
-                    'author': author,
-                    'url': full_url,
-                    'cover_url': self._extract_cover_url(link),
-                    'description': self._extract_description(link),
-                    'status': self._extract_status(link),
-                    'category': self._extract_category(link),
-                    'last_updated': self._extract_last_updated(link)
+                    "title": title,
+                    "author": author,
+                    "url": full_url,
+                    "cover_url": self._extract_cover_url(link),
+                    "description": self._extract_description(link),
+                    "status": self._extract_status(link),
+                    "category": self._extract_category(link),
+                    "last_updated": self._extract_last_updated(link),
                 }
 
                 novels.append(novel_info)
 
-            except Exception:
+            except (AttributeError, KeyError, ValueError, TypeError):
                 continue
 
         # 去重
         seen = set()
         unique_novels = []
         for novel in novels:
-            key = (novel['title'], novel['url'])
+            key = (novel["title"], novel["url"])
             if key not in seen:
                 unique_novels.append(novel)
                 seen.add(key)
@@ -137,9 +140,14 @@ class BaseCrawler(ABC):
 
         # 常见的章节容器选择器
         container_selectors = [
-            '#list', '.listmain', 'dl',
-            '.book_list', '.chapterlist', '#readerlist',
-            'div[class*="list"]', 'div[class*="chapter"]'
+            "#list",
+            ".listmain",
+            "dl",
+            ".book_list",
+            ".chapterlist",
+            "#readerlist",
+            'div[class*="list"]',
+            'div[class*="chapter"]',
         ]
 
         container = None
@@ -150,26 +158,38 @@ class BaseCrawler(ABC):
 
         # 在容器内查找章节链接
         if container:
-            links = container.find_all('a', href=True)
+            links = container.find_all("a", href=True)
         else:
-            links = soup.find_all('a', href=True)
+            links = soup.find_all("a", href=True)
 
         # 需要跳过的关键词
         skip_words = [
-            '封面', '图片', '插图', '返回首页', '加入书架',
-            '发表评论', 'txt下载', '在线阅读', '立即下载',
-            '目录', '书架', '推荐', '排行'
+            "封面",
+            "图片",
+            "插图",
+            "返回首页",
+            "加入书架",
+            "发表评论",
+            "txt下载",
+            "在线阅读",
+            "立即下载",
+            "目录",
+            "书架",
+            "推荐",
+            "排行",
         ]
 
         for link in links:
             try:
                 title = link.get_text().strip()
-                href = link.get('href', '')
+                href = link.get("href", "")
 
                 # 过滤条件
-                if (len(title) < 2 or
-                    not href or
-                    any(word in title for word in skip_words)):
+                if (
+                    len(title) < 2
+                    or not href
+                    or any(word in title for word in skip_words)
+                ):
                     continue
 
                 # 检查是否像章节标题
@@ -178,21 +198,18 @@ class BaseCrawler(ABC):
 
                 full_url = urllib.parse.urljoin(base_url, href)
 
-                chapters.append({
-                    'title': title,
-                    'url': full_url
-                })
+                chapters.append({"title": title, "url": full_url})
 
-            except Exception:
+            except (AttributeError, KeyError, ValueError, TypeError):
                 continue
 
         # 去重保持顺序
         seen = set()
         unique_chapters = []
         for chapter in chapters:
-            if chapter['url'] not in seen:
+            if chapter["url"] not in seen:
                 unique_chapters.append(chapter)
-                seen.add(chapter['url'])
+                seen.add(chapter["url"])
 
         return unique_chapters
 
@@ -200,10 +217,16 @@ class BaseCrawler(ABC):
         """通用的章节内容提取方法"""
         # 常见的内容容器选择器
         content_selectors = [
-            '#content', '.content', '.readcontent',
-            '#chaptercontent', '.chapter-content', '.book_con',
-            '.showtxt', '.txt', 'div[class*="content"]',
-            'div[class*="txt"]'
+            "#content",
+            ".content",
+            ".readcontent",
+            "#chaptercontent",
+            ".chapter-content",
+            ".book_con",
+            ".showtxt",
+            ".txt",
+            'div[class*="content"]',
+            'div[class*="txt"]',
         ]
 
         content_elem = None
@@ -214,7 +237,7 @@ class BaseCrawler(ABC):
 
         # 如果没找到指定容器，尝试找最长的div
         if not content_elem:
-            divs = soup.find_all('div')
+            divs = soup.find_all("div")
             longest_div = None
             max_length = 0
 
@@ -231,7 +254,7 @@ class BaseCrawler(ABC):
             return ""
 
         # 移除脚本和样式
-        for elem in content_elem(['script', 'style', 'ins', 'iframe']):
+        for elem in content_elem(["script", "style", "ins", "iframe"]):
             elem.decompose()
 
         # 获取文本内容
@@ -247,13 +270,18 @@ class BaseCrawler(ABC):
     def _should_skip_link(self, title: str, href: str) -> bool:
         """判断是否应该跳过这个链接"""
         skip_patterns = [
-            r'javascript:', r'#', r'mailto:',
-            r'登录|注册|首页|书签|收藏',
-            r'上一页|下一页|更多|继续',
-            r'.css$', r'.js$', r'.jpg$', r'.png$'
+            r"javascript:",
+            r"#",
+            r"mailto:",
+            r"登录|注册|首页|书签|收藏",
+            r"上一页|下一页|更多|继续",
+            r".css$",
+            r".js$",
+            r".jpg$",
+            r".png$",
         ]
 
-        text = (title + ' ' + href).lower()
+        text = (title + " " + href).lower()
         return any(re.search(pattern, text) for pattern in skip_patterns)
 
     def _extract_author_from_context(self, link) -> str:
@@ -265,9 +293,9 @@ class BaseCrawler(ABC):
 
             # 常见的作者模式
             author_patterns = [
-                r'作者[：:]\s*([^\s\n<>/]+)',
-                r'文\s*/\s*([^\s\n]+)',
-                r'([^\s]+)\s*著'
+                r"作者[：:]\s*([^\s\n<>/]+)",
+                r"文\s*/\s*([^\s\n]+)",
+                r"([^\s]+)\s*著",
             ]
 
             for pattern in author_patterns:
@@ -279,9 +307,9 @@ class BaseCrawler(ABC):
 
     def _extract_cover_url(self, link) -> str:
         """提取封面URL"""
-        img = link.find('img')
+        img = link.find("img")
         if img:
-            src = img.get('src') or img.get('data-src')
+            src = img.get("src") or img.get("data-src")
             if src:
                 return urllib.parse.urljoin(self.base_url, src)
         return ""
@@ -290,7 +318,7 @@ class BaseCrawler(ABC):
         """提取简介信息"""
         # 尝试从相邻元素中提取简介
         next_sibling = link.next_sibling
-        if next_sibling and hasattr(next_sibling, 'get_text'):
+        if next_sibling and hasattr(next_sibling, "get_text"):
             desc = next_sibling.get_text().strip()
             if len(desc) > 10 and len(desc) < 200:
                 return desc
@@ -299,20 +327,30 @@ class BaseCrawler(ABC):
 
     def _extract_status(self, link) -> str:
         """提取连载状态"""
-        text = (link.get_text() + ' ' + str(link.parent)).lower()
+        text = (link.get_text() + " " + str(link.parent)).lower()
 
-        if '连载' in text:
+        if "连载" in text:
             return "连载"
-        elif any(word in text for word in ['完结', '完本', '结局']):
+        elif any(word in text for word in ["完结", "完本", "结局"]):
             return "完结"
 
         return "unknown"
 
     def _extract_category(self, link) -> str:
         """提取分类信息"""
-        text = (link.get_text() + ' ' + str(link.parent)).lower()
+        text = (link.get_text() + " " + str(link.parent)).lower()
 
-        categories = ['玄幻', '都市', '仙侠', '历史', '科幻', '游戏', '体育', '军事', '悬疑']
+        categories = [
+            "玄幻",
+            "都市",
+            "仙侠",
+            "历史",
+            "科幻",
+            "游戏",
+            "体育",
+            "军事",
+            "悬疑",
+        ]
         for category in categories:
             if category in text:
                 return category
@@ -325,10 +363,10 @@ class BaseCrawler(ABC):
 
         # 常见的时间模式
         time_patterns = [
-            r'(\d{4}-\d{2}-\d{2})',
-            r'(\d{2}-\d{2})',
-            r'(\d{4}/\d{2}/\d{2})',
-            r'(\d{2}月\d{2}日)'
+            r"(\d{4}-\d{2}-\d{2})",
+            r"(\d{2}-\d{2})",
+            r"(\d{4}/\d{2}/\d{2})",
+            r"(\d{2}月\d{2}日)",
         ]
 
         for pattern in time_patterns:
@@ -342,12 +380,12 @@ class BaseCrawler(ABC):
         """判断标题是否像章节"""
         # 章节标题的关键词模式
         chapter_patterns = [
-            r'第\s*\d+.*章',
-            r'第[一二三四五六七八九十百千万]+.*章',
-            r'.*章\s*\d+',
-            r'卷\s*\d+',
-            r'楔子|序章|终章|大结局',
-            r'\d+\.+.*'  # 数字开头的标题
+            r"第\s*\d+.*章",
+            r"第[一二三四五六七八九十百千万]+.*章",
+            r".*章\s*\d+",
+            r"卷\s*\d+",
+            r"楔子|序章|终章|大结局",
+            r"\d+\.+.*",  # 数字开头的标题
         ]
 
         title.lower()
@@ -357,15 +395,16 @@ class BaseCrawler(ABC):
             return True
 
         # 检查是否包含章节相关词汇
-        chapter_words = ['章', '节', '卷', '回', '楔子', '序', '结局']
+        chapter_words = ["章", "节", "卷", "回", "楔子", "序", "结局"]
         if any(word in title for word in chapter_words):
             return True
 
         # 检查是否以"第"开头
-        return bool(title.startswith('第'))
+        return bool(title.startswith("第"))
 
 
 # ==================== 使用示例 ====================
+
 
 class ExampleCrawler(BaseCrawler):
     """使用抽象网络层的爬虫示例"""
@@ -385,7 +424,7 @@ class ExampleCrawler(BaseCrawler):
 
             return novels[:20]  # 限制返回数量
 
-        except Exception as e:
+        except (requests.RequestException, AttributeError, ValueError) as e:
             print(f"搜索失败: {e}")
             return []
 
@@ -400,7 +439,7 @@ class ExampleCrawler(BaseCrawler):
 
             return chapters
 
-        except Exception as e:
+        except (requests.RequestException, AttributeError, ValueError) as e:
             print(f"获取章节列表失败: {e}")
             return []
 
@@ -414,7 +453,7 @@ class ExampleCrawler(BaseCrawler):
             soup = response.soup()
 
             # 获取标题
-            title_elem = soup.find('h1') or soup.find('title')
+            title_elem = soup.find("h1") or soup.find("title")
             title = title_elem.get_text().strip() if title_elem else "章节内容"
 
             # 获取内容
@@ -422,6 +461,6 @@ class ExampleCrawler(BaseCrawler):
 
             return {"title": title, "content": content}
 
-        except Exception as e:
+        except (requests.RequestException, AttributeError, ValueError) as e:
             print(f"获取章节内容失败: {e}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}

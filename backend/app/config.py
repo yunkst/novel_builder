@@ -6,8 +6,8 @@ This module contains application configuration using Pydantic BaseSettings
 for environment variable management.
 """
 
-import secrets
 import os
+import secrets
 
 from pydantic_settings import BaseSettings
 
@@ -32,8 +32,15 @@ class Settings(BaseSettings):
     # Database settings for caching functionality
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///novel_cache.db")
 
+    # ComfyUI服务配置
+    comfyui_api_url: str = os.getenv(
+        "COMFYUI_API_URL", "http://host.docker.internal:8188"
+    )
+
     # 图生视频相关配置
-    video_generation_timeout: int = int(os.getenv("VIDEO_GENERATION_TIMEOUT", "600"))  # 10分钟
+    video_generation_timeout: int = int(
+        os.getenv("VIDEO_GENERATION_TIMEOUT", "600")
+    )  # 10分钟
 
     # 安全配置
     cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:3154")

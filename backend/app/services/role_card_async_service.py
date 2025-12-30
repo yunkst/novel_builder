@@ -5,9 +5,11 @@
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 
+import requests
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -31,9 +33,7 @@ class RoleCardAsyncService:
         self.task_lock = asyncio.Lock()
 
     async def create_task(
-        self,
-        request: RoleCardGenerateRequest,
-        db: Session
+        self, request: RoleCardGenerateRequest, db: Session
     ) -> RoleCardTaskCreateResponse:
         """创建人物卡生成任务.
 
@@ -53,7 +53,7 @@ class RoleCardAsyncService:
                 user_input="生成人物卡",
                 model=request.model_name,  # 保存模型信息
                 total_prompts=0,
-                generated_images=0
+                generated_images=0,
             )
 
             db.add(task_record)
@@ -69,21 +69,19 @@ class RoleCardAsyncService:
                 task_id=task_record.id,
                 role_id=request.role_id,
                 status="pending",
-                message="任务创建成功，正在后台处理"
+                message="任务创建成功，正在后台处理",
             )
 
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"创建任务数据库操作失败: {e}")
             raise ValueError("创建任务失败")
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"创建任务失败: {e}")
             raise ValueError("创建任务失败")
 
     async def get_task_status(
-        self,
-        task_id: int,
-        db: Session
+        self, task_id: int, db: Session
     ) -> RoleCardTaskStatusResponse | None:
         """获取任务状态.
 
@@ -112,19 +110,18 @@ class RoleCardAsyncService:
                 error_message=task.error_message,
                 created_at=task.created_at.isoformat(),
                 started_at=task.started_at.isoformat() if task.started_at else None,
-                completed_at=task.completed_at.isoformat() if task.completed_at else None,
-                progress_percentage=progress_percentage
+                completed_at=task.completed_at.isoformat()
+                if task.completed_at
+                else None,
+                progress_percentage=progress_percentage,
             )
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"获取任务状态失败: {e}")
             return None
 
     async def _start_background_task(
-        self,
-        task_id: int,
-        request: RoleCardGenerateRequest,
-        db: Session
+        self, task_id: int, request: RoleCardGenerateRequest, db: Session
     ) -> None:
         """启动后台处理任务.
 
@@ -150,9 +147,7 @@ class RoleCardAsyncService:
             )
 
     async def _process_task_async(
-        self,
-        task_id: int,
-        request: RoleCardGenerateRequest
+        self, task_id: int, request: RoleCardGenerateRequest
     ) -> None:
         """异步处理任务的核心逻辑.
 
@@ -181,9 +176,11 @@ class RoleCardAsyncService:
 
             if not prompts:
                 await self._update_task_status(
-                    db, task_id, "failed",
+                    db,
+                    task_id,
+                    "failed",
                     error_message="未生成任何提示词，请检查角色信息和用户要求",
-                    completed_at=datetime.now()
+                    completed_at=datetime.now(),
                 )
                 return
 
@@ -206,35 +203,47 @@ class RoleCardAsyncService:
                 logger.info(f"任务 {task_id}: 使用指定模型 {model_name}")
                 comfyui_client = create_comfyui_client_for_model(model_name)
             else:
-                default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+                default_workflow = workflow_config_manager.get_default_workflow(
+                    WorkflowType.T2I
+                )
                 logger.info(f"任务 {task_id}: 使用默认模型 {default_workflow.title}")
                 comfyui_client = create_comfyui_client_for_model(default_workflow.title)
 
             # 逐个生成图片（ComfyUIClient只支持单张生成）
             image_filenames = []
             for i, prompt in enumerate(prompts):
-                logger.info(f"任务 {task_id}: 生成第 {i+1}/{len(prompts)} 张图片")
+                logger.info(f"任务 {task_id}: 生成第 {i + 1}/{len(prompts)} 张图片")
                 # 首先提交生成任务，获取ComfyUI任务ID
                 comfyui_task_id = await comfyui_client.generate_image(prompt)
                 if comfyui_task_id:
                     logger.info(f"任务 {task_id}: ComfyUI任务ID {comfyui_task_id}")
                     # 等待任务完成并获取实际图片文件名
-                    completed_filenames = await comfyui_client.wait_for_completion(comfyui_task_id)
+                    completed_filenames = await comfyui_client.wait_for_completion(
+                        comfyui_task_id
+                    )
                     if completed_filenames and len(completed_filenames) > 0:
                         media_file = completed_filenames[0]  # 使用第一个生成的媒体文件
                         filename = media_file.filename  # 获取文件名
                         image_filenames.append(filename)
-                        logger.info(f"任务 {task_id}: 第 {i+1} 张图片生成成功，文件名: {filename}")
+                        logger.info(
+                            f"任务 {task_id}: 第 {i + 1} 张图片生成成功，文件名: {filename}"
+                        )
                     else:
-                        logger.warning(f"任务 {task_id}: 第 {i+1} 张图片生成失败（未获取到文件名）")
+                        logger.warning(
+                            f"任务 {task_id}: 第 {i + 1} 张图片生成失败（未获取到文件名）"
+                        )
                 else:
-                    logger.warning(f"任务 {task_id}: 第 {i+1} 张图片生成失败（提交任务失败）")
+                    logger.warning(
+                        f"任务 {task_id}: 第 {i + 1} 张图片生成失败（提交任务失败）"
+                    )
 
             if not image_filenames:
                 await self._update_task_status(
-                    db, task_id, "failed",
+                    db,
+                    task_id,
+                    "failed",
                     error_message="图片生成失败",
-                    completed_at=datetime.now()
+                    completed_at=datetime.now(),
                 )
                 return
 
@@ -247,10 +256,14 @@ class RoleCardAsyncService:
                     prompt = prompts[i] if i < len(prompts) else "未知提示词"
 
                     # 检查是否已存在相同的图片
-                    existing_image = db.query(RoleImageGallery).filter(
-                        RoleImageGallery.role_id == request.role_id,
-                        RoleImageGallery.img_url == filename
-                    ).first()
+                    existing_image = (
+                        db.query(RoleImageGallery)
+                        .filter(
+                            RoleImageGallery.role_id == request.role_id,
+                            RoleImageGallery.img_url == filename,
+                        )
+                        .first()
+                    )
 
                     if existing_image:
                         logger.warning(f"图片 {filename} 已存在，跳过保存")
@@ -261,7 +274,7 @@ class RoleCardAsyncService:
                         role_id=request.role_id,
                         img_url=filename,
                         prompt=prompt,
-                        created_at=datetime.now()
+                        created_at=datetime.now(),
                     )
 
                     db.add(role_image)
@@ -269,9 +282,11 @@ class RoleCardAsyncService:
 
                     # 更新进度
                     int((i + 1) / len(image_filenames) * 100)
-                    await self._update_task_progress(db, task_id, generated_images=i + 1)
+                    await self._update_task_progress(
+                        db, task_id, generated_images=i + 1
+                    )
 
-                except Exception as e:
+                except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
                     logger.error(f"保存图片 {filename} 失败: {e}")
                     continue
 
@@ -280,30 +295,26 @@ class RoleCardAsyncService:
 
             # 4. 更新任务为完成状态
             await self._update_task_status(
-                db, task_id, "completed",
+                db,
+                task_id,
+                "completed",
                 generated_images=saved_count,
                 result_message=f"成功生成并保存 {saved_count} 张图片",
-                completed_at=datetime.now()
+                completed_at=datetime.now(),
             )
 
             logger.info(f"任务 {task_id}: 处理完成，生成 {saved_count} 张图片")
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"处理任务 {task_id} 失败: {e}")
             await self._update_task_status(
-                db, task_id, "failed",
-                error_message=str(e),
-                completed_at=datetime.now()
+                db, task_id, "failed", error_message=str(e), completed_at=datetime.now()
             )
         finally:
             db.close()
 
     async def _update_task_status(
-        self,
-        db: Session,
-        task_id: int,
-        status: str,
-        **kwargs
+        self, db: Session, task_id: int, status: str, **kwargs
     ) -> None:
         """更新任务状态.
 
@@ -321,15 +332,10 @@ class RoleCardAsyncService:
                     if hasattr(task, key):
                         setattr(task, key, value)
                 db.commit()
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"更新任务状态失败: {e}")
 
-    async def _update_task_progress(
-        self,
-        db: Session,
-        task_id: int,
-        **kwargs
-    ) -> None:
+    async def _update_task_progress(self, db: Session, task_id: int, **kwargs) -> None:
         """更新任务进度.
 
         Args:
@@ -344,7 +350,7 @@ class RoleCardAsyncService:
                     if hasattr(task, key):
                         setattr(task, key, value)
                 db.commit()
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"更新任务进度失败: {e}")
 
     def _calculate_progress(self, task: RoleCardTask) -> float:
@@ -368,7 +374,9 @@ class RoleCardAsyncService:
                 # 提示词生成完成，图片生成中
                 prompt_progress = 30.0  # 提示词阶段占30%
                 if task.generated_images and task.generated_images > 0:
-                    image_progress = (task.generated_images / max(task.total_prompts, 1)) * 70.0
+                    image_progress = (
+                        task.generated_images / max(task.total_prompts, 1)
+                    ) * 70.0
                     return min(prompt_progress + image_progress, 99.0)
                 else:
                     return prompt_progress

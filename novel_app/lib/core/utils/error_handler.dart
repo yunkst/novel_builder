@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../failures/database_failure.dart';
 import '../failures/network_failure.dart';
 import '../failures/cache_failure.dart';
-import '../failures/ai_service_failure.dart';
 import '../errors/failure.dart';
 
 /// 统一错误处理器
@@ -15,8 +14,6 @@ class ErrorHandler {
       return _getNetworkErrorMessage(failure);
     } else if (failure is CacheFailure) {
       return _getCacheErrorMessage(failure);
-    } else if (failure is AIServiceFailure) {
-      return _getAIServiceErrorMessage(failure);
     } else {
       return failure.message;
     }
@@ -85,24 +82,6 @@ class ErrorHandler {
         return '缓存未找到，将重新获取';
       default:
         return '缓存操作失败：${failure.message}';
-    }
-  }
-
-  /// 获取AI服务错误消息
-  static String _getAIServiceErrorMessage(AIServiceFailure failure) {
-    switch (failure.code) {
-      case 'service_unavailable':
-        return 'AI服务暂时不可用，请稍后重试';
-      case 'quota_exceeded':
-        return 'AI服务配额已用完，请稍后重试';
-      case 'invalid_request':
-        return '请求格式错误，请检查输入';
-      case 'timeout':
-        return 'AI服务响应超时，请重试';
-      case 'rate_limit':
-        return 'AI服务请求过快，请稍后重试';
-      default:
-        return 'AI服务错误：${failure.message}';
     }
   }
 

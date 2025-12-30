@@ -5,7 +5,9 @@ import '../models/character.dart';
 import '../services/database_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/character_avatar_service.dart';
+import '../services/dify_service.dart';
 import '../widgets/character_input_dialog.dart';
+import '../widgets/character_preview_dialog.dart';
 import 'character_edit_screen.dart';
 
 class CharacterManagementScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final CharacterImageCacheService _imageCacheService = CharacterImageCacheService.instance;
   final CharacterAvatarService _avatarService = CharacterAvatarService();
+  final DifyService _difyService = DifyService();
   List<Character> _characters = [];
   bool _isLoading = true;
 
@@ -129,58 +132,28 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       // 获取小说的背景设定
       final backgroundSetting = await _databaseService.getBackgroundSetting(widget.novel.url);
 
-      // 调用Dify工作流创建角色 - 暂时使用简单的实现
-      // final result = await _difyService.generateCharacter(
-      //   userInput,
-      //   backgroundSetting ?? '',
-      //   widget.novel.title,
-      // );
+      // 调用Dify工作流创建角色
+      final generatedCharacters = await _difyService.generateCharacters(
+        userInput: userInput,
+        novelUrl: widget.novel.url,
+        backgroundSetting: backgroundSetting ?? '',
+      );
 
       if (!mounted) return;
 
       // 关闭加载对话框
       Navigator.of(context).pop();
 
-      // 简单实现：直接创建角色
-      // final character = Character(
-      //   novelUrl: widget.novel.url,
-      //   name: userInput,
-      //   backgroundStory: backgroundSetting ?? '',
-      // );
-
-      // 显示确认对话框
-      final shouldSave = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认创建角色'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('角色名称: $userInput'),
-              if (backgroundSetting != null) ...[
-                const SizedBox(height: 8),
-                Text('背景设定: $backgroundSetting'),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('创建'),
-            ),
-          ],
-        ),
+      // 显示角色预览对话框，允许用户选择要保存的角色
+      await CharacterPreviewDialog.show(
+        context,
+        characters: generatedCharacters,
+        onConfirmed: (selectedCharacters) async {
+          if (selectedCharacters.isNotEmpty) {
+            await _saveSelectedCharacters(selectedCharacters);
+          }
+        },
       );
-
-      if (shouldSave == true) {
-        // 保存角色
-        await _parseAndSaveCharacter(userInput, backgroundSetting ?? '');
-      }
     } catch (e) {
       if (!mounted) return;
 
@@ -198,23 +171,53 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     }
   }
 
-  Future<void> _parseAndSaveCharacter(String name, String description) async {
-    // 这里简化处理，实际项目中可能需要更复杂的解析逻辑
-    final character = Character(
-      novelUrl: widget.novel.url,
-      name: name,
-      backgroundStory: description,
-    );
+  /// 保存用户选择的特定角色
+  Future<void> _saveSelectedCharacters(List<Character> selectedCharacters) async {
+    int successCount = 0;
+    int failCount = 0;
+    List<String> failedCharacters = [];
 
     try {
-      await _databaseService.createCharacter(character);
+      for (final character in selectedCharacters) {
+        try {
+          await _databaseService.createCharacter(character);
+          successCount++;
+        } catch (e) {
+          failCount++;
+          failedCharacters.add('${character.name}: $e');
+          debugPrint('保存角色失败 - ${character.name}: $e');
+        }
+      }
+
+      // 重新加载角色列表
       _loadCharacters();
 
+      // 显示结果
       if (mounted) {
+        String message;
+        Color backgroundColor;
+
+        if (failCount == 0) {
+          message = '成功保存选中的 $successCount 个角色';
+          backgroundColor = Colors.green;
+        } else if (successCount == 0) {
+          message = '保存失败，请检查配置或重试';
+          backgroundColor = Colors.red;
+        } else {
+          message = '成功保存 $successCount 个角色，$failCount 个失败';
+          backgroundColor = Colors.orange;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('角色创建成功'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+            action: failCount > 0 ? SnackBarAction(
+              label: '查看详情',
+              textColor: Colors.white,
+              onPressed: () => _showFailDetails(failedCharacters),
+            ) : null,
           ),
         );
       }
@@ -222,7 +225,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('保存角色失败: $e'),
+            content: Text('保存角色时发生错误: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -230,6 +233,37 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     }
   }
 
+  /// 显示失败详情
+  void _showFailDetails(List<String> failedCharacters) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('角色创建失败详情'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: failedCharacters.map((failure) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text('• $failure', style: const TextStyle(fontSize: 14)),
+              )).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  
   /// 显示删除确认对话框
   Future<bool> _showDeleteConfirmationDialog(Character character) async {
     final result = await showDialog<bool>(
@@ -322,6 +356,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
               ? _buildEmptyState()
               : _buildCharacterList(),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'character_management_fab',
         onPressed: () => _navigateToEdit(),
         tooltip: '添加人物',
         child: const Icon(Icons.add),

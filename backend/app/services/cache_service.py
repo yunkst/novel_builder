@@ -23,7 +23,7 @@ class CacheService:
             if domain.startswith("www."):
                 domain = domain[4:]
             return domain
-        except Exception:
+        except (ValueError, AttributeError):
             return "unknown"
 
     @staticmethod
@@ -49,7 +49,7 @@ class CacheService:
                 db.commit()
                 return cache.to_dict()
             return None
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             print(f"⚠️ 获取缓存失败: {e}")
             db.rollback()
             return None
@@ -98,7 +98,7 @@ class CacheService:
 
             db.commit()
             return True
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             print(f"⚠️ 设置缓存失败: {e}")
             db.rollback()
             return False
@@ -124,7 +124,7 @@ class CacheService:
                 db.commit()
                 return True
             return False
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             print(f"⚠️ 删除缓存失败: {e}")
             db.rollback()
             return False
@@ -175,7 +175,7 @@ class CacheService:
                     for ch in hot_chapters
                 ],
             }
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             return {"error": f"获取统计信息失败: {e}"}
 
     @staticmethod
@@ -203,7 +203,7 @@ class CacheService:
 
             db.commit()
             return result
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             print(f"⚠️ 清理缓存失败: {e}")
             db.rollback()
             return 0

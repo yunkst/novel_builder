@@ -28,6 +28,9 @@ class _SearchScreenState extends State<SearchScreen> {
   Set<String> _selectedSites = {};
   bool _showSiteFilter = false;
 
+  // 异步操作控制
+  bool _isSearchDisposed = false;
+
   @override
   void initState() {
     super.initState();
@@ -38,14 +41,18 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       await _api.init();
       await _loadSourceSites();
-      setState(() {
-        _isInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
     } catch (e) {
       // API初始化失败，可能是未配置后端地址
-      setState(() {
-        _isInitialized = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isInitialized = false;
+        });
+      }
     }
   }
 
@@ -53,11 +60,16 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _loadSourceSites() async {
     try {
       final sites = await _api.getSourceSites();
-      setState(() {
-        _sourceSites = sites;
-        // 默认选中所有站点 - 使用站点ID而不是站点名称
-        _selectedSites = sites.map((site) => site['id'] as String).toSet();
-      });
+      // 检查页面是否已被销毁
+      if (_isSearchDisposed || !mounted) return;
+
+      if (mounted) {
+        setState(() {
+          _sourceSites = sites;
+          // 默认选中所有站点 - 使用站点ID而不是站点名称
+          _selectedSites = sites.map((site) => site['id'] as String).toSet();
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +84,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    // 标记搜索已销毁，防止异步操作继续执行
+    _isSearchDisposed = true;
     _searchController.dispose();
     // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
     // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
@@ -96,25 +110,37 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _searchNovels() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) {
-      ToastUtils.showWarning(context, '请输入搜索关键词');
+      if (mounted) {
+        ToastUtils.showWarning(context, '请输入搜索关键词');
+      }
       return;
     }
 
     if (!_isInitialized) {
-      ToastUtils.showError(context, '请先配置后端服务地址');
+      if (mounted) {
+        ToastUtils.showError(context, '请先配置后端服务地址');
+      }
       return;
     }
 
     if (_selectedSites.isEmpty) {
-      ToastUtils.showWarning(context, '请至少选择一个搜索源站');
+      if (mounted) {
+        ToastUtils.showWarning(context, '请至少选择一个搜索源站');
+      }
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-      _searchResults = [];
-    });
+    // 检查页面是否已被销毁
+    if (_isSearchDisposed || !mounted) return;
+
+    // 设置加载状态
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '';
+        _searchResults = [];
+      });
+    }
 
     try {
       // 构建搜索信息
@@ -130,7 +156,9 @@ class _SearchScreenState extends State<SearchScreen> {
       }
 
       // 显示开始搜索的提示
-      ToastUtils.showLoading(context, searchInfo);
+      if (mounted) {
+        ToastUtils.showLoading(context, searchInfo);
+      }
 
       // 通过后端服务进行搜索，传递选中的站点
       final results = await _api.searchNovels(
@@ -138,13 +166,19 @@ class _SearchScreenState extends State<SearchScreen> {
         sites: _selectedSites.toList(),
       );
 
-      setState(() {
-        _isLoading = false;
-        _searchResults = results;
-        if (results.isEmpty) {
-          _errorMessage = '未找到相关小说，请尝试其他关键词或调整源站筛选';
-        }
-      });
+      // 再次检查页面状态，确保搜索结果回来时页面还存在
+      if (_isSearchDisposed || !mounted) return;
+
+      // 更新搜索结果
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _searchResults = results;
+          if (results.isEmpty) {
+            _errorMessage = '未找到相关小说，请尝试其他关键词或调整源站筛选';
+          }
+        });
+      }
 
       // 显示搜索结果提示
       if (mounted) {
@@ -155,10 +189,16 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      // 再次检查页面状态
+      if (_isSearchDisposed || !mounted) return;
+
+      // 更新错误状态
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
 
       if (mounted) {
         ToastUtils.showError(context, e.toString());
@@ -184,9 +224,11 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               tooltip: '源站筛选',
               onPressed: () {
-                setState(() {
-                  _showSiteFilter = !_showSiteFilter;
-                });
+                if (mounted) {
+                  setState(() {
+                    _showSiteFilter = !_showSiteFilter;
+                  });
+                }
               },
             ),
           FutureBuilder<bool>(
@@ -343,19 +385,23 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   TextButton(
                     onPressed: () {
-                      setState(() {
-                        _selectedSites = _sourceSites
-                            .map((site) => site['id'] as String)
-                            .toSet();
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _selectedSites = _sourceSites
+                              .map((site) => site['id'] as String)
+                              .toSet();
+                        });
+                      }
                     },
                     child: const Text('全选'),
                   ),
                   TextButton(
                     onPressed: () {
-                      setState(() {
-                        _selectedSites.clear();
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _selectedSites.clear();
+                        });
+                      }
                     },
                     child: const Text('清空'),
                   ),
@@ -378,13 +424,15 @@ class _SearchScreenState extends State<SearchScreen> {
                 label: Text(siteName),
                 selected: isSelected,
                 onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedSites.add(siteId);
-                    } else {
-                      _selectedSites.remove(siteId);
-                    }
-                  });
+                  if (mounted) {
+                    setState(() {
+                      if (selected) {
+                        _selectedSites.add(siteId);
+                      } else {
+                        _selectedSites.remove(siteId);
+                      }
+                    });
+                  }
                 },
                 tooltip: siteDescription,
                 backgroundColor: Theme.of(context).colorScheme.surface,

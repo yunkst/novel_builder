@@ -4,7 +4,6 @@
 本章包含用于角色卡图片生成和管理的数据库模型。
 """
 
-
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 
@@ -16,6 +15,7 @@ class RoleImageGallery(Base):
 
     用于存储人物卡生成的图片信息，每个图片都有对应的生成提示词。
     """
+
     __tablename__ = "role_image_gallery"
 
     id = Column(Integer, primary_key=True, index=True, comment="主键ID")
@@ -25,15 +25,11 @@ class RoleImageGallery(Base):
 
     # 时间戳
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        comment="创建时间"
+        DateTime(timezone=True), server_default=func.now(), comment="创建时间"
     )
 
     # 确保每个角色的图片URL唯一
-    __table_args__ = (
-        UniqueConstraint('role_id', 'img_url', name='unique_role_img'),
-    )
+    __table_args__ = (UniqueConstraint("role_id", "img_url", name="unique_role_img"),)
 
     def __repr__(self) -> str:
         """返回模型的字符串表示."""
@@ -54,7 +50,7 @@ class RoleCardTask(Base):
         String(20),
         nullable=False,
         default="pending",
-        comment="任务状态: pending/running/completed/failed"
+        comment="任务状态: pending/running/completed/failed",
     )
 
     # 输入参数
@@ -70,9 +66,7 @@ class RoleCardTask(Base):
 
     # 时间戳
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        comment="创建时间"
+        DateTime(timezone=True), server_default=func.now(), comment="创建时间"
     )
     started_at = Column(DateTime(timezone=True), comment="开始处理时间")
     completed_at = Column(DateTime(timezone=True), comment="完成时间")
@@ -96,7 +90,7 @@ class ImageToVideoTask(Base):
         String(20),
         nullable=False,
         default="pending",
-        comment="任务状态: pending/running/completed/failed"
+        comment="任务状态: pending/running/completed/failed",
     )
 
     # 输入参数
@@ -111,9 +105,7 @@ class ImageToVideoTask(Base):
 
     # 时间戳
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        comment="创建时间"
+        DateTime(timezone=True), server_default=func.now(), comment="创建时间"
     )
     started_at = Column(DateTime(timezone=True), comment="开始处理时间")
     completed_at = Column(DateTime(timezone=True), comment="完成时间")

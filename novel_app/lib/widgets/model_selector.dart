@@ -51,8 +51,14 @@ class _ModelSelectorState extends State<ModelSelector> {
 
   /// 从后端API加载模型列表
   Future<List<String>> _loadModels() async {
-    final apiService = ApiServiceWrapper();
-    return await apiService.getModelTitles(apiType: widget.apiType);
+    try {
+      final apiService = ApiServiceWrapper();
+      return await apiService.getModelTitles(apiType: widget.apiType);
+    } catch (e) {
+      debugPrint('加载模型列表失败: $e');
+      // 返回空列表，避免崩溃
+      return [];
+    }
   }
 
   @override
@@ -92,6 +98,22 @@ class _ModelSelectorState extends State<ModelSelector> {
         // 如果当前选择的模型不在列表中，清空选择
         if (_selectedModel != null && !models.contains(_selectedModel)) {
           _selectedModel = null;
+        }
+
+        // 如果模型列表为空，显示提示
+        if (models.isEmpty) {
+          return DropdownButtonFormField<String>(
+            initialValue: null,
+            decoration: InputDecoration(
+              hintText: '无可用模型',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.warning_amber),
+              helperText: '请检查后端连接',
+              helperStyle: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+            ),
+            items: const [],
+            onChanged: null,
+          );
         }
 
         return DropdownButtonFormField<String>(

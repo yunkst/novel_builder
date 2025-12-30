@@ -16,11 +16,11 @@ from .config import settings
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,  # 连接池预检，确保连接有效
-    pool_size=20,        # 增加连接池大小
-    max_overflow=30,     # 增加溢出连接数
-    pool_recycle=3600,   # 1小时回收连接，防止连接泄漏
-    pool_timeout=60,     # 增加获取连接的超时时间
-    echo=False
+    pool_size=20,  # 增加连接池大小
+    max_overflow=30,  # 增加溢出连接数
+    pool_recycle=3600,  # 1小时回收连接，防止连接泄漏
+    pool_timeout=60,  # 增加获取连接的超时时间
+    echo=False,
 )
 
 # 创建会话工厂 - 使用 UPPER_CASE 常量命名

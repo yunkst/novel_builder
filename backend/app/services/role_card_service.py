@@ -51,7 +51,9 @@ class RoleCardService:
             logger.error(f"ComfyUI客户端初始化失败: {e}")
             self.comfyui_client = None
 
-    async def generate_role_images(self, request: RoleCardGenerateRequest, db: Session, model: str | None = None) -> RoleGenerateResponse:
+    async def generate_role_images(
+        self, request: RoleCardGenerateRequest, db: Session, model: str | None = None
+    ) -> RoleGenerateResponse:
         """生成人物卡图片.
 
         Args:
@@ -68,9 +70,14 @@ class RoleCardService:
         try:
             # 获取可用模型列表和默认模型
             from ..workflow_config import WorkflowType
-            workflows_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+
+            workflows_response = workflow_config_manager.list_workflows(
+                WorkflowType.T2I
+            )
             available_models = [wf.title for wf in workflows_response.workflows]
-            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+            default_workflow = workflow_config_manager.get_default_workflow(
+                WorkflowType.T2I
+            )
 
             # 优先使用request.model_name，其次使用传入的model参数（向后兼容）
             selected_model = request.model_name or model
@@ -78,7 +85,9 @@ class RoleCardService:
             # 处理模型验证和默认值替换
             if selected_model:
                 if selected_model not in available_models:
-                    logger.warning(f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}")
+                    logger.warning(
+                        f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}"
+                    )
                     selected_model = default_workflow.title
                 else:
                     logger.info(f"使用指定模型生成图片: {selected_model}")
@@ -91,16 +100,14 @@ class RoleCardService:
 
             # 1. 调用Dify生成提示词
             logger.info(f"为角色 {request.role_id} 生成拍照提示词")
-            prompts = await self.dify_client.generate_photo_prompts(
-                roles=request.roles
-            )
+            prompts = await self.dify_client.generate_photo_prompts(roles=request.roles)
 
             if not prompts:
                 logger.warning("Dify未返回任何提示词")
                 return RoleGenerateResponse(
                     role_id=request.role_id,
                     total_prompts=0,
-                    message="未生成任何提示词，请检查角色信息和用户要求"
+                    message="未生成任何提示词，请检查角色信息和用户要求",
                 )
 
             logger.info(f"Dify返回 {len(prompts)} 个提示词")
@@ -114,7 +121,7 @@ class RoleCardService:
                 return RoleGenerateResponse(
                     role_id=request.role_id,
                     total_prompts=len(prompts),
-                    message="提示词生成成功，但图片生成失败"
+                    message="提示词生成成功，但图片生成失败",
                 )
 
             logger.info(f"ComfyUI成功生成 {len(image_filenames)} 张图片")
@@ -127,10 +134,14 @@ class RoleCardService:
                     prompt = prompts[i] if i < len(prompts) else "未知提示词"
 
                     # 检查是否已存在相同的图片
-                    existing_image = db.query(RoleImageGallery).filter(
-                        RoleImageGallery.role_id == request.role_id,
-                        RoleImageGallery.img_url == filename
-                    ).first()
+                    existing_image = (
+                        db.query(RoleImageGallery)
+                        .filter(
+                            RoleImageGallery.role_id == request.role_id,
+                            RoleImageGallery.img_url == filename,
+                        )
+                        .first()
+                    )
 
                     if existing_image:
                         logger.warning(f"图片 {filename} 已存在，跳过保存")
@@ -141,7 +152,7 @@ class RoleCardService:
                         role_id=request.role_id,
                         img_url=filename,
                         prompt=prompt,
-                        created_at=datetime.now()
+                        created_at=datetime.now(),
                     )
 
                     db.add(role_image)
@@ -161,22 +172,20 @@ class RoleCardService:
                 return RoleGenerateResponse(
                     role_id=request.role_id,
                     total_prompts=len(prompts),
-                    message="图片生成成功，但数据库保存失败"
+                    message="图片生成成功，但数据库保存失败",
                 )
 
             return RoleGenerateResponse(
                 role_id=request.role_id,
                 total_prompts=len(prompts),
-                message=f"成功生成并保存 {saved_count} 张图片"
+                message=f"成功生成并保存 {saved_count} 张图片",
             )
 
         except ValueError as e:
             # 处理模型不存在的错误
             logger.error(f"模型错误: {e}")
             return RoleGenerateResponse(
-                role_id=request.role_id,
-                total_prompts=0,
-                message=str(e)
+                role_id=request.role_id, total_prompts=0, message=str(e)
             )
         except Exception as e:
             logger.error(f"生成人物卡图片失败: {e}")
@@ -194,25 +203,27 @@ class RoleCardService:
         """
         try:
             # 查询角色的所有图片
-            images = db.query(RoleImageGallery).filter(
-                RoleImageGallery.role_id == role_id
-            ).order_by(RoleImageGallery.created_at.desc()).all()
+            images = (
+                db.query(RoleImageGallery)
+                .filter(RoleImageGallery.role_id == role_id)
+                .order_by(RoleImageGallery.created_at.desc())
+                .all()
+            )
 
             # 提取图片URL列表，直接使用 img_url（文件名）
             image_urls = [img.img_url for img in images]
 
             logger.info(f"角色 {role_id} 有 {len(image_urls)} 张图片")
 
-            return RoleGalleryResponse(
-                role_id=role_id,
-                images=image_urls
-            )
+            return RoleGalleryResponse(role_id=role_id, images=image_urls)
 
         except Exception as e:
             logger.error(f"获取角色图集失败: {e}")
             raise
 
-    async def delete_role_image(self, request: RoleImageDeleteRequest, db: Session) -> bool:
+    async def delete_role_image(
+        self, request: RoleImageDeleteRequest, db: Session
+    ) -> bool:
         """删除角色图片.
 
         Args:
@@ -224,13 +235,19 @@ class RoleCardService:
         """
         try:
             # 查找要删除的图片
-            image_to_delete = db.query(RoleImageGallery).filter(
-                RoleImageGallery.role_id == request.role_id,
-                RoleImageGallery.img_url == request.img_url
-            ).first()
+            image_to_delete = (
+                db.query(RoleImageGallery)
+                .filter(
+                    RoleImageGallery.role_id == request.role_id,
+                    RoleImageGallery.img_url == request.img_url,
+                )
+                .first()
+            )
 
             if not image_to_delete:
-                logger.warning(f"未找到要删除的图片: role_id={request.role_id}, img_url={request.img_url}")
+                logger.warning(
+                    f"未找到要删除的图片: role_id={request.role_id}, img_url={request.img_url}"
+                )
                 return False
 
             # 删除图片记录（注意：这里只删除数据库记录，实际的图片文件需要手动清理）
@@ -248,7 +265,9 @@ class RoleCardService:
             logger.error(f"删除图片失败: {e}")
             raise
 
-    async def regenerate_similar_images(self, request: RoleRegenerateRequest, db: Session, model: str | None = None) -> RoleGenerateResponse:
+    async def regenerate_similar_images(
+        self, request: RoleRegenerateRequest, db: Session, model: str | None = None
+    ) -> RoleGenerateResponse:
         """基于现有图片重新生成相似图片.
 
         Args:
@@ -262,9 +281,14 @@ class RoleCardService:
         try:
             # 获取可用模型列表和默认模型
             from ..workflow_config import WorkflowType
-            workflows_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
+
+            workflows_response = workflow_config_manager.list_workflows(
+                WorkflowType.T2I
+            )
             available_models = [wf.title for wf in workflows_response.workflows]
-            default_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+            default_workflow = workflow_config_manager.get_default_workflow(
+                WorkflowType.T2I
+            )
 
             # 优先使用request.model_name，其次使用传入的model参数（向后兼容）
             selected_model = request.model_name or model
@@ -272,7 +296,9 @@ class RoleCardService:
             # 处理模型验证和默认值替换
             if selected_model:
                 if selected_model not in available_models:
-                    logger.warning(f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}")
+                    logger.warning(
+                        f"指定的模型 '{selected_model}' 不在可用模型列表中，将使用默认模型: {default_workflow.title}"
+                    )
                     selected_model = default_workflow.title
                 else:
                     logger.info(f"使用指定模型重新生成图片: {selected_model}")
@@ -284,9 +310,11 @@ class RoleCardService:
             comfyui_client = create_comfyui_client_for_model(selected_model)
 
             # 1. 查询参考图片的生成提示词
-            reference_image = db.query(RoleImageGallery).filter(
-                RoleImageGallery.img_url == request.img_url
-            ).first()
+            reference_image = (
+                db.query(RoleImageGallery)
+                .filter(RoleImageGallery.img_url == request.img_url)
+                .first()
+            )
 
             if not reference_image:
                 logger.error(f"未找到参考图片: {request.img_url}")
@@ -295,7 +323,9 @@ class RoleCardService:
             original_prompt = reference_image.prompt
             role_id = reference_image.role_id
 
-            logger.info(f"基于图片 {request.img_url} 重新生成 {request.count} 张相似图片")
+            logger.info(
+                f"基于图片 {request.img_url} 重新生成 {request.count} 张相似图片"
+            )
             logger.info(f"原始提示词: {original_prompt}")
 
             # 2. 生成多个相似的提示词（简单重复使用原始提示词）
@@ -308,9 +338,7 @@ class RoleCardService:
             if not image_filenames:
                 logger.error("ComfyUI未生成任何图片")
                 return RoleGenerateResponse(
-                    role_id=role_id,
-                    total_prompts=len(prompts),
-                    message="图片生成失败"
+                    role_id=role_id, total_prompts=len(prompts), message="图片生成失败"
                 )
 
             logger.info(f"ComfyUI成功生成 {len(image_filenames)} 张相似图片")
@@ -320,10 +348,14 @@ class RoleCardService:
             for _i, filename in enumerate(image_filenames):
                 try:
                     # 检查是否已存在相同的图片
-                    existing_image = db.query(RoleImageGallery).filter(
-                        RoleImageGallery.role_id == role_id,
-                        RoleImageGallery.img_url == filename
-                    ).first()
+                    existing_image = (
+                        db.query(RoleImageGallery)
+                        .filter(
+                            RoleImageGallery.role_id == role_id,
+                            RoleImageGallery.img_url == filename,
+                        )
+                        .first()
+                    )
 
                     if existing_image:
                         logger.warning(f"图片 {filename} 已存在，跳过保存")
@@ -334,7 +366,7 @@ class RoleCardService:
                         role_id=role_id,
                         img_url=filename,
                         prompt=original_prompt,
-                        created_at=datetime.now()
+                        created_at=datetime.now(),
                     )
 
                     db.add(role_image)
@@ -354,13 +386,13 @@ class RoleCardService:
                 return RoleGenerateResponse(
                     role_id=role_id,
                     total_prompts=len(prompts),
-                    message="图片生成成功，但数据库保存失败"
+                    message="图片生成成功，但数据库保存失败",
                 )
 
             return RoleGenerateResponse(
                 role_id=role_id,
                 total_prompts=len(prompts),
-                message=f"成功生成并保存 {saved_count} 张相似图片"
+                message=f"成功生成并保存 {saved_count} 张相似图片",
             )
 
         except ValueError as e:
@@ -369,7 +401,7 @@ class RoleCardService:
             return RoleGenerateResponse(
                 role_id="",  # 这里role_id暂时为空，因为可能在查询参考图片前就出错
                 total_prompts=0,
-                message=str(e)
+                message=str(e),
             )
         except Exception as e:
             logger.error(f"重新生成相似图片失败: {e}")
@@ -381,11 +413,8 @@ class RoleCardService:
         Returns:
             各服务的健康状态
         """
-        health_status = {
-            "comfyui": False
-        }
+        health_status = {"comfyui": False}
 
-        
         # 检查ComfyUI服务
         if self.comfyui_client:
             try:

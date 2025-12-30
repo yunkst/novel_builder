@@ -25,7 +25,7 @@ class ComfyUIClientTitleBased:
             base_url: ComfyUI服务器基础URL
             workflow_path: 工作流JSON文件路径
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.workflow_path = workflow_path
         self.workflow_json = None
         self._load_workflow()
@@ -37,16 +37,18 @@ class ComfyUIClientTitleBased:
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {self.workflow_path}")
 
-            with open(workflow_file, encoding='utf-8') as f:
+            with open(workflow_file, encoding="utf-8") as f:
                 self.workflow_json = json.load(f)
 
             logger.info(f"成功加载ComfyUI工作流: {self.workflow_path}")
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
-    def find_nodes_by_title(self, target_titles: list[str]) -> dict[str, dict[str, Any]]:
+    def find_nodes_by_title(
+        self, target_titles: list[str]
+    ) -> dict[str, dict[str, Any]]:
         """根据节点标题查找节点.
 
         Args:
@@ -70,13 +72,15 @@ class ComfyUIClientTitleBased:
                     matching_nodes[node_id] = {
                         "title": title,
                         "class_type": node_data.get("class_type"),
-                        "inputs": node_data.get("inputs", {})
+                        "inputs": node_data.get("inputs", {}),
                     }
                     break
 
         return matching_nodes
 
-    def prepare_workflow_by_title(self, prompt: str, target_titles: list[str] | None = None) -> dict[str, Any]:
+    def prepare_workflow_by_title(
+        self, prompt: str, target_titles: list[str] | None = None
+    ) -> dict[str, Any]:
         """根据节点标题准备工作流.
 
         Args:
@@ -88,8 +92,14 @@ class ComfyUIClientTitleBased:
         """
         if target_titles is None:
             target_titles = [
-                "prompts", "提示词", "CLIP Text Encode", "prompt", "positive",
-                "text", "文本编码", "CLIP文本编码"
+                "prompts",
+                "提示词",
+                "CLIP Text Encode",
+                "prompt",
+                "positive",
+                "text",
+                "文本编码",
+                "CLIP文本编码",
             ]
 
         workflow_data = json.loads(json.dumps(self.workflow_json))
@@ -110,7 +120,9 @@ class ComfyUIClientTitleBased:
         logger.info(f"总共替换了 {replaced_count} 个节点的提示词")
         return workflow_data
 
-    async def generate_image_by_title(self, prompt: str, target_titles: list[str] | None = None) -> str | None:
+    async def generate_image_by_title(
+        self, prompt: str, target_titles: list[str] | None = None
+    ) -> str | None:
         """根据节点标题生成图片.
 
         Args:
@@ -130,9 +142,7 @@ class ComfyUIClientTitleBased:
 
             # 调用ComfyUI API
             response = requests.post(
-                f"{self.base_url}/prompt",
-                json={"prompt": workflow_data},
-                timeout=30
+                f"{self.base_url}/prompt", json={"prompt": workflow_data}, timeout=30
             )
 
             if response.status_code == 200:
@@ -145,7 +155,9 @@ class ComfyUIClientTitleBased:
                     logger.error("ComfyUI响应中未找到task_id")
                     return None
             else:
-                logger.error(f"ComfyUI API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
         except Timeout:
@@ -154,7 +166,7 @@ class ComfyUIClientTitleBased:
         except RequestException as e:
             logger.error(f"ComfyUI API请求异常: {e}")
             return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI图片生成失败: {e}")
             return None
 
@@ -162,20 +174,19 @@ class ComfyUIClientTitleBased:
     async def check_task_status(self, task_id: str) -> dict[str, Any]:
         """检查任务状态."""
         try:
-            response = requests.get(
-                f"{self.base_url}/history/{task_id}",
-                timeout=10
-            )
+            response = requests.get(f"{self.base_url}/history/{task_id}", timeout=10)
             if response.status_code == 200:
                 return response.json().get(task_id, {})
             else:
                 logger.error(f"查询任务状态失败: {response.status_code}")
                 return {}
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"查询任务状态异常: {e}")
             return {}
 
-    async def wait_for_completion(self, task_id: str, timeout: int = 300) -> list[str] | None:
+    async def wait_for_completion(
+        self, task_id: str, timeout: int = 300
+    ) -> list[str] | None:
         """等待任务完成并获取生成的图片文件名."""
         start_time = asyncio.get_event_loop().time()
 
@@ -214,16 +225,13 @@ class ComfyUIClientTitleBased:
     async def get_image_data(self, filename: str) -> bytes | None:
         """获取图片二进制数据."""
         try:
-            response = requests.get(
-                self.get_image_url(filename),
-                timeout=30
-            )
+            response = requests.get(self.get_image_url(filename), timeout=30)
             if response.status_code == 200:
                 return response.content
             else:
                 logger.error(f"获取图片失败: {response.status_code}")
                 return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"获取图片异常: {e}")
             return None
 
@@ -232,7 +240,7 @@ class ComfyUIClientTitleBased:
         try:
             response = requests.get(f"{self.base_url}/system_stats", timeout=5)
             return response.status_code == 200
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"ComfyUI健康检查失败: {e}")
             return False
 
@@ -245,7 +253,7 @@ class ComfyUIClientTitleBased:
             "total_nodes": 0,
             "nodes_with_titles": 0,
             "clip_text_nodes": 0,
-            "node_details": {}
+            "node_details": {},
         }
 
         for node_id, node_data in self.workflow_json.items():
@@ -268,8 +276,10 @@ class ComfyUIClientTitleBased:
                 "class_type": class_type,
                 "title": title,
                 "has_text_input": "text" in node_data.get("inputs", {}),
-                "is_target": any(keyword.lower() in title.lower()
-                             for keyword in ["prompts", "提示词", "text", "prompt"])
+                "is_target": any(
+                    keyword.lower() in title.lower()
+                    for keyword in ["prompts", "提示词", "text", "prompt"]
+                ),
             }
 
         return analysis
@@ -277,7 +287,12 @@ class ComfyUIClientTitleBased:
 
 def create_comfyui_client_title_based() -> ComfyUIClientTitleBased:
     """创建基于标题的ComfyUI客户端实例."""
-    base_url = os.getenv("COMFYUI_API_URL", "http://host.docker.internal:8000")
-    workflow_path = os.getenv("COMFYUI_WORKFLOW_PATH", "./comfyui_json/text2img/image_netayume_lumina_t2i.json")
+    from ..config import settings
+
+    base_url = settings.comfyui_api_url
+    workflow_path = os.getenv(
+        "COMFYUI_WORKFLOW_PATH",
+        "./comfyui_json/text2img/image_netayume_lumina_t2i.json",
+    )
 
     return ComfyUIClientTitleBased(base_url, workflow_path)

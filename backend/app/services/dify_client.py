@@ -27,15 +27,16 @@ class DifyClient:
             api_url: Dify API基础URL
             api_token: Dify API认证token
         """
-        self.api_url = api_url.rstrip('/')
+        self.api_url = api_url.rstrip("/")
         self.api_token = api_token
         self.headers = {
             "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
-    async def generate_prompts(self, novel_content: str, roles: dict[str, Any] | None = None,
-                             require: str = "") -> list[str]:
+    async def generate_prompts(
+        self, novel_content: str, roles: dict[str, Any] | None = None, require: str = ""
+    ) -> list[str]:
         """生成图片提示词.
 
         Args:
@@ -53,10 +54,10 @@ class DifyClient:
                     "chapters_content": novel_content,
                     "roles": json.dumps(roles) if roles else "{}",
                     "user_input": require,
-                    "cmd": "文生图"
+                    "cmd": "文生图",
                 },
                 "response_mode": "blocking",
-                "user": "text2img_user"
+                "user": "text2img_user",
             }
 
             logger.info(f"调用Dify工作流: {self.api_url}")
@@ -66,7 +67,7 @@ class DifyClient:
                 self.api_url,
                 headers=self.headers,
                 json=request_data,
-                timeout=60  # Dify工作流可能需要较长时间
+                timeout=60,  # Dify工作流可能需要较长时间
             )
 
             if response.status_code == 200:
@@ -77,7 +78,9 @@ class DifyClient:
                 return self._parse_dify_response(result)
 
             else:
-                logger.error(f"Dify API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Dify API请求失败: {response.status_code} - {response.text}"
+                )
                 return []
 
         except Timeout:
@@ -86,7 +89,7 @@ class DifyClient:
         except RequestException as e:
             logger.error(f"Dify API请求异常: {e}")
             return []
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"Dify工作流调用失败: {e}")
             return []
 
@@ -139,11 +142,10 @@ class DifyClient:
                 logger.error("Dify响应中未找到result字段")
                 return []
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"解析Dify响应失败: {e}")
             return []
 
-    
     async def generate_photo_prompts(self, roles: list[RoleInfo]) -> list[str]:
         """生成人物卡拍照提示词.
 
@@ -162,20 +164,17 @@ class DifyClient:
                 "inputs": {
                     "roles": formatted_roles,
                     "user_input": "生成人物卡",
-                    "cmd": "拍照"
+                    "cmd": "拍照",
                 },
                 "response_mode": "blocking",
-                "user": "role_card_user"
+                "user": "role_card_user",
             }
 
             logger.info(f"调用Dify拍照工作流: {self.api_url}")
 
             # 发送请求
             response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json=request_data,
-                timeout=60
+                self.api_url, headers=self.headers, json=request_data, timeout=60
             )
 
             if response.status_code == 200:
@@ -186,7 +185,9 @@ class DifyClient:
                 return self._parse_photo_response(result)
 
             else:
-                logger.error(f"Dify拍照API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Dify拍照API请求失败: {response.status_code} - {response.text}"
+                )
                 return []
 
         except Timeout:
@@ -195,7 +196,7 @@ class DifyClient:
         except RequestException as e:
             logger.error(f"Dify拍照API请求异常: {e}")
             return []
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"Dify拍照工作流调用失败: {e}")
             return []
 
@@ -260,11 +261,13 @@ class DifyClient:
                 logger.error("Dify拍照响应中未找到content字段")
                 return []
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"解析Dify拍照响应失败: {e}")
             return []
 
-    async def generate_scene_prompts(self, chapters_content: str, roles: str) -> str | None:
+    async def generate_scene_prompts(
+        self, chapters_content: str, roles: str
+    ) -> str | None:
         """生成场面绘制提示词.
 
         Args:
@@ -279,20 +282,17 @@ class DifyClient:
                 "inputs": {
                     "chapters_content": chapters_content,
                     "roles": roles,
-                    "cmd": "场面绘制"
+                    "cmd": "场面绘制",
                 },
                 "response_mode": "blocking",
-                "user": "scene_illustration_user"
+                "user": "scene_illustration_user",
             }
 
             logger.info(f"调用Dify场面绘制工作流: {self.api_url}")
 
             # 发送请求
             response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json=request_data,
-                timeout=60
+                self.api_url, headers=self.headers, json=request_data, timeout=60
             )
 
             if response.status_code == 200:
@@ -303,7 +303,9 @@ class DifyClient:
                 return self._parse_scene_response(result)
 
             else:
-                logger.error(f"Dify场面绘制API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Dify场面绘制API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
         except Timeout:
@@ -312,7 +314,7 @@ class DifyClient:
         except RequestException as e:
             logger.error(f"Dify场面绘制API请求异常: {e}")
             return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"Dify场面绘制工作流调用失败: {e}")
             return None
 
@@ -349,7 +351,9 @@ class DifyClient:
                         return str(prompts) if prompts else None
                 elif isinstance(content_data, str):
                     # 如果直接是字符串，返回该字符串
-                    logger.info(f"从Dify获取到场面绘制提示词(直接字符串): {content_data}")
+                    logger.info(
+                        f"从Dify获取到场面绘制提示词(直接字符串): {content_data}"
+                    )
                     return content_data
                 else:
                     logger.error(f"Dify场面绘制返回数据格式不符合预期: {content_data}")
@@ -358,7 +362,7 @@ class DifyClient:
                 logger.error("Dify场面绘制响应中未找到content字段")
                 return None
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"解析Dify场面绘制响应失败: {e}")
             return None
 
@@ -385,14 +389,20 @@ class DifyClient:
 
             # 验证列表中所有元素都是RoleInfo类型
             if not all(isinstance(role, RoleInfo) for role in roles):
-                invalid_types = [type(role).__name__ for role in roles if not isinstance(role, RoleInfo)]
-                raise ValueError(f"角色列表包含无效的对象类型: {', '.join(invalid_types)}")
+                invalid_types = [
+                    type(role).__name__
+                    for role in roles
+                    if not isinstance(role, RoleInfo)
+                ]
+                raise ValueError(
+                    f"角色列表包含无效的对象类型: {', '.join(invalid_types)}"
+                )
 
             role_description = "【出场人物】\n"
 
             for i, role in enumerate(roles, 1):
                 # 验证必需字段
-                if not hasattr(role, 'name') or not role.name:
+                if not hasattr(role, "name") or not role.name:
                     logger.warning(f"角色 {i} 缺少名称字段，跳过处理")
                     continue
 
@@ -400,11 +410,11 @@ class DifyClient:
 
                 # 基本信息 - 安全的空值检查
                 basic_info_parts = []
-                if hasattr(role, 'gender') and role.gender:
+                if hasattr(role, "gender") and role.gender:
                     basic_info_parts.append(str(role.gender))
-                if hasattr(role, 'age') and role.age is not None:
+                if hasattr(role, "age") and role.age is not None:
                     basic_info_parts.append(f"{role.age}岁")
-                if hasattr(role, 'occupation') and role.occupation:
+                if hasattr(role, "occupation") and role.occupation:
                     basic_info_parts.append(str(role.occupation))
 
                 if basic_info_parts:
@@ -412,11 +422,11 @@ class DifyClient:
 
                 # 其他字段的安全处理
                 field_mappings = [
-                    ('personality', '性格特点'),
-                    ('appearance_features', '外貌特征'),
-                    ('body_type', '身材体型'),
-                    ('clothing_style', '穿衣风格'),
-                    ('background_story', '背景经历'),
+                    ("personality", "性格特点"),
+                    ("appearance_features", "外貌特征"),
+                    ("body_type", "身材体型"),
+                    ("clothing_style", "穿衣风格"),
+                    ("background_story", "背景经历"),
                 ]
 
                 for field, label in field_mappings:
@@ -426,8 +436,8 @@ class DifyClient:
                             role_description += f"   {label}：{value}\n"
 
                 # AI绘图专用提示词
-                has_face_prompts = hasattr(role, 'face_prompts') and role.face_prompts
-                has_body_prompts = hasattr(role, 'body_prompts') and role.body_prompts
+                has_face_prompts = hasattr(role, "face_prompts") and role.face_prompts
+                has_body_prompts = hasattr(role, "body_prompts") and role.body_prompts
 
                 if has_face_prompts or has_body_prompts:
                     role_description += "   【AI绘图提示词】\n"
@@ -447,24 +457,27 @@ class DifyClient:
 
             # 预定义的字段映射
             field_mappings = {
-                'name': '姓名',
-                'age': '年龄',
-                'gender': '性别',
-                'occupation': '职业',
-                'personality': '性格特点',
-                'appearance_features': '外貌特征',
-                'body_type': '身材体型',
-                'clothing_style': '穿衣风格',
-                'face_prompts': '面部描述',
-                'body_prompts': '身材描述',
+                "name": "姓名",
+                "age": "年龄",
+                "gender": "性别",
+                "occupation": "职业",
+                "personality": "性格特点",
+                "appearance_features": "外貌特征",
+                "body_type": "身材体型",
+                "clothing_style": "穿衣风格",
+                "face_prompts": "面部描述",
+                "body_prompts": "身材描述",
             }
 
             for field, label in field_mappings.items():
                 if roles.get(field):
                     value = roles[field]
                     # 特殊处理AI绘图提示词
-                    if field in ['face_prompts', 'body_prompts']:
-                        if not any(keyword in role_description for keyword in ['【AI绘图提示词】']):
+                    if field in ["face_prompts", "body_prompts"]:
+                        if not any(
+                            keyword in role_description
+                            for keyword in ["【AI绘图提示词】"]
+                        ):
                             role_description += "\n【AI绘图提示词】\n"
                         role_description += f"{label}：{value}\n"
                     else:
@@ -473,8 +486,9 @@ class DifyClient:
             return role_description.strip()
 
         else:
-            raise TypeError(f"不支持的角色数据类型: {type(roles).__name__}，期望 List[RoleInfo] 或 Dict[str, Any]")
-
+            raise TypeError(
+                f"不支持的角色数据类型: {type(roles).__name__}，期望 List[RoleInfo] 或 Dict[str, Any]"
+            )
 
     async def generate_video_prompts(self, prompts: str, user_input: str) -> str | None:
         """生成图生视频提示词.
@@ -491,20 +505,17 @@ class DifyClient:
                 "inputs": {
                     "prompts": prompts,
                     "user_input": user_input,
-                    "cmd": "图生视频"
+                    "cmd": "图生视频",
                 },
                 "response_mode": "blocking",
-                "user": "image_to_video_user"
+                "user": "image_to_video_user",
             }
 
             logger.info(f"调用Dify图生视频工作流: {self.api_url}")
 
             # 发送请求
             response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json=request_data,
-                timeout=60
+                self.api_url, headers=self.headers, json=request_data, timeout=60
             )
 
             if response.status_code == 200:
@@ -515,7 +526,9 @@ class DifyClient:
                 return self._parse_video_response(result)
 
             else:
-                logger.error(f"Dify图生视频API请求失败: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Dify图生视频API请求失败: {response.status_code} - {response.text}"
+                )
                 return None
 
         except Timeout:
@@ -524,7 +537,7 @@ class DifyClient:
         except RequestException as e:
             logger.error(f"Dify图生视频API请求异常: {e}")
             return None
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"Dify图生视频工作流调用失败: {e}")
             return None
 
@@ -561,7 +574,9 @@ class DifyClient:
                         return str(prompts) if prompts else None
                 elif isinstance(content_data, str):
                     # 如果直接是字符串，返回该字符串
-                    logger.info(f"从Dify获取到图生视频提示词(直接字符串): {content_data}")
+                    logger.info(
+                        f"从Dify获取到图生视频提示词(直接字符串): {content_data}"
+                    )
                     return content_data
                 else:
                     logger.error(f"Dify图生视频返回数据格式不符合预期: {content_data}")
@@ -570,7 +585,7 @@ class DifyClient:
                 logger.error("Dify图生视频响应中未找到content字段")
                 return None
 
-        except Exception as e:
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
             logger.error(f"解析Dify图生视频响应失败: {e}")
             return None
 

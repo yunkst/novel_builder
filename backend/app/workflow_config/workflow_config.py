@@ -6,18 +6,18 @@ ComfyUI工作流配置管理器
 import logging
 import os
 from pathlib import Path
-from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
 
-from .models import WorkflowType, WorkflowResponse, WorkflowListResponse
+from .models import WorkflowListResponse, WorkflowResponse, WorkflowType
 
 logger = logging.getLogger(__name__)
 
 
 class WorkflowInfo(BaseModel):
     """工作流信息模型"""
+
     title: str = Field(..., description="工作流标题")
     path: str = Field(..., description="工作流文件路径")
     description: str | None = Field(None, description="工作流描述")
@@ -26,6 +26,7 @@ class WorkflowInfo(BaseModel):
 
 class WorkflowSettings(BaseModel):
     """全局工作流设置"""
+
     default_t2i_model: str = Field(..., description="默认t2i模型")
     api_timeout: int = Field(300, description="API超时时间（秒）")
     max_concurrent_tasks: int = Field(5, description="最大并发任务数")
@@ -33,8 +34,13 @@ class WorkflowSettings(BaseModel):
 
 class WorkflowConfig(BaseModel):
     """完整工作流配置模型"""
-    t2i: list[WorkflowInfo] = Field(default_factory=list, description="文生图工作流列表")
-    i2v: list[WorkflowInfo] = Field(default_factory=list, description="图生视频工作流列表")
+
+    t2i: list[WorkflowInfo] = Field(
+        default_factory=list, description="文生图工作流列表"
+    )
+    i2v: list[WorkflowInfo] = Field(
+        default_factory=list, description="图生视频工作流列表"
+    )
     settings: WorkflowSettings = Field(..., description="全局设置")
 
 
@@ -72,7 +78,7 @@ class WorkflowConfigManager:
             if not self.config_path.exists():
                 raise FileNotFoundError(f"工作流配置文件不存在: {self.config_path}")
 
-            with self.config_path.open(encoding='utf-8') as f:
+            with self.config_path.open(encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             if not config_data:
@@ -148,7 +154,7 @@ class WorkflowConfigManager:
             WorkflowResponse(
                 title=workflow.title,
                 description=workflow.description or "",
-                path=workflow.path
+                path=workflow.path,
             )
             for workflow in workflows
         ]
@@ -156,7 +162,7 @@ class WorkflowConfigManager:
         return WorkflowListResponse(
             workflows=workflow_responses,
             total_count=len(workflow_responses),
-            workflow_type=workflow_type
+            workflow_type=workflow_type,
         )
 
     def get_default_workflow(self, workflow_type: WorkflowType) -> WorkflowInfo:
@@ -184,7 +190,9 @@ class WorkflowConfigManager:
 
             # 如果指定的默认模型不存在，使用第一个可用的
             if config.t2i:
-                logger.warning(f"指定的默认模型 '{default_title}' 不存在，使用第一个可用模型")
+                logger.warning(
+                    f"指定的默认模型 '{default_title}' 不存在，使用第一个可用模型"
+                )
                 return config.t2i[0]
 
             raise ValueError("没有可用的t2i工作流配置")

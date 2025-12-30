@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import '../repositories/novel_repository.dart';
-import '../repositories/chapter_repository.dart';
 import '../cache/cache_manager.dart';
 import '../../services/database_service.dart';
 import '../../services/api_service_wrapper.dart';
 import '../../services/dify_service.dart';
 import '../../services/cache_manager.dart' as services;
-import '../../data/repositories/novel_repository_impl.dart';
-import '../../data/repositories/chapter_repository_impl.dart';
 import 'api_service_provider.dart';
 
 /// 全局服务定位器
@@ -24,21 +20,6 @@ Future<void> configureDependencies() async {
   getIt.registerSingleton<services.CacheManager>(services.CacheManager());
   getIt.registerSingleton<CacheManager>(CacheManager());
 
-  // Repository实现
-  getIt.registerLazySingleton<NovelRepository>(
-    () => NovelRepositoryImpl(
-      databaseService: getIt<DatabaseService>(),
-      apiService: getIt<ApiServiceWrapper>(),
-    ),
-  );
-
-  getIt.registerLazySingleton<ChapterRepository>(
-    () => ChapterRepositoryImpl(
-      databaseService: getIt<DatabaseService>(),
-      apiService: getIt<ApiServiceWrapper>(),
-    ),
-  );
-
   // 初始化API服务
   try {
     await ApiServiceProvider.initialize();
@@ -46,12 +27,6 @@ Future<void> configureDependencies() async {
     debugPrint('Failed to initialize API service: $e');
   }
 
-  // Use Cases - 将在后续阶段实现
-  // getIt.registerLazySingleton<LoadBookshelfUseCase>(
-  //   () => LoadBookshelfUseCase(getIt<NovelRepository>()),
-  // );
-
-  // 更多用例注册...
 }
 
 /// 清理依赖

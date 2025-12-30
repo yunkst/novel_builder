@@ -19,8 +19,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
     def __init__(self):
         # Shukuge使用HTTP，可以用简单策略
         super().__init__(
-            base_url="http://www.shukuge.com",
-            strategy=RequestStrategy.SIMPLE
+            base_url="http://www.shukuge.com", strategy=RequestStrategy.SIMPLE
         )
 
         # 自定义请求头
@@ -28,7 +27,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
         }
 
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
@@ -38,7 +37,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             search_urls = [
                 f"{self.base_url}/Search",
                 f"{self.base_url}/modules/article/search.php",
-                f"{self.base_url}/search.php"
+                f"{self.base_url}/search.php",
             ]
 
             for i, search_url in enumerate(search_urls):
@@ -47,7 +46,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                         timeout=10,
                         max_retries=2,
                         strategy=RequestStrategy.SIMPLE,
-                        custom_headers=self.custom_headers
+                        custom_headers=self.custom_headers,
                     )
 
                     if "search.php" in search_url:
@@ -62,13 +61,15 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                         response = await self.get_page(full_url, timeout=10)
 
                     # 提取搜索结果
-                    novels = self._extract_shukuge_search_results(response.soup(), keyword)
+                    novels = self._extract_shukuge_search_results(
+                        response.soup(), keyword
+                    )
 
                     if novels:
                         return novels[:20]
 
                 except Exception as e:
-                    print(f"搜索入口{i+1}失败: {e!s}")
+                    print(f"搜索入口{i + 1}失败: {e!s}")
                     continue
 
             return []
@@ -85,7 +86,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 timeout=10,
                 max_retries=3,
                 strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers
+                custom_headers=self.custom_headers,
             )
 
             # 1. 访问小说详情页
@@ -117,7 +118,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 max_retries=3,
                 retry_delay=0.8,  # Shukuge需要稍长的延迟
                 strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers
+                custom_headers=self.custom_headers,
             )
 
             # 获取章节页面
@@ -140,7 +141,9 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
     # ==================== Shukuge专用提取方法 ====================
 
-    def _extract_shukuge_search_results(self, soup, keyword: str) -> list[dict[str, Any]]:
+    def _extract_shukuge_search_results(
+        self, soup, keyword: str
+    ) -> list[dict[str, Any]]:
         """提取Shukuge搜索结果"""
         novels = []
 
@@ -153,9 +156,13 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 href = link.get("href", "")
 
                 # 过滤条件
-                if (keyword.lower() not in title.lower() or
-                    not any(ind in href for ind in ["/book/", "/read/", "/modules/article"]) or
-                    len(title) < 2):
+                if (
+                    keyword.lower() not in title.lower()
+                    or not any(
+                        ind in href for ind in ["/book/", "/read/", "/modules/article"]
+                    )
+                    or len(title) < 2
+                ):
                     continue
 
                 # 提取作者信息
@@ -164,12 +171,14 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 # 构建完整URL
                 novel_url = urllib.parse.urljoin(self.base_url, href)
 
-                novels.append({
-                    "title": title,
-                    "author": author,
-                    "url": novel_url,
-                    "source": "shukuge"
-                })
+                novels.append(
+                    {
+                        "title": title,
+                        "author": author,
+                        "url": novel_url,
+                        "source": "shukuge",
+                    }
+                )
 
             except Exception:
                 continue
@@ -198,7 +207,9 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
         return author
 
-    async def _try_special_chapter_page(self, novel_url: str, soup) -> list[dict[str, Any]]:
+    async def _try_special_chapter_page(
+        self, novel_url: str, soup
+    ) -> list[dict[str, Any]]:
         """尝试从专用章节页获取章节列表"""
         try:
             # 提取小说ID
@@ -230,7 +241,9 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             )
 
             if read_links:
-                read_url = urllib.parse.urljoin(novel_url, read_links[0].get("href", ""))
+                read_url = urllib.parse.urljoin(
+                    novel_url, read_links[0].get("href", "")
+                )
 
                 # 访问阅读页面
                 response = await self.get_page(read_url, timeout=10)
@@ -246,13 +259,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
     def _extract_chapter_title(self, soup) -> str:
         """提取章节标题"""
         # Shukuge特定的标题选择器
-        title_selectors = [
-            "h1",
-            "h2",
-            ".chapter-title",
-            ".title",
-            "title"
-        ]
+        title_selectors = ["h1", "h2", ".chapter-title", ".title", "title"]
 
         for selector in title_selectors:
             title_elem = soup.select_one(selector)
@@ -273,7 +280,7 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             "div#chaptercontent",
             "div.chapter-content",
             "div.book_con",
-            "div.showtxt"
+            "div.showtxt",
         ]
 
         content_elem = None

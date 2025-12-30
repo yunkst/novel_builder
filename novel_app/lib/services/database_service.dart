@@ -7,6 +7,7 @@ import '../models/search_result.dart';
 import '../models/character.dart';
 import '../models/scene_illustration.dart';
 import '../core/di/api_service_provider.dart';
+import 'invalid_markup_cleaner.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -410,6 +411,8 @@ class DatabaseService {
   }
 
   /// 获取缓存的章节内容
+  ///
+  /// 自动清理无效的媒体标记（插图、视频等）
   Future<String?> getCachedChapter(String chapterUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -419,7 +422,13 @@ class DatabaseService {
     );
 
     if (maps.isNotEmpty) {
-      return maps.first['content'] as String;
+      final content = maps.first['content'] as String;
+
+      // 自动清理无效的媒体标记
+      final cleanedContent = await InvalidMarkupCleaner()
+          .cleanAndUpdateChapter(chapterUrl, content);
+
+      return cleanedContent;
     }
     return null;
   }
@@ -1505,14 +1514,22 @@ class DatabaseService {
 
   // 删除了 getSceneIllustrationByParagraph 方法，不再使用 paragraph_index
 
-  /// 获取分页的场景插图列表
-  Future<List<SceneIllustration>> getSceneIllustrationsPaginated({
+  /// 获取分页的场景插图列表（带总数）
+  Future<Map<String, dynamic>> getSceneIllustrationsPaginated({
     required int page,
     required int limit,
   }) async {
     final db = await database;
-    final offset = (page - 1) * limit;
+    final offset = page * limit; // page从0开始
 
+    // 查询总数
+    final List<Map<String, dynamic>> countResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM scene_illustrations',
+    );
+    final int total = countResult.first['count'] as int;
+    final int totalPages = (total / limit).ceil();
+
+    // 查询当前页数据
     final List<Map<String, dynamic>> maps = await db.query(
       'scene_illustrations',
       orderBy: 'created_at DESC',
@@ -1520,9 +1537,15 @@ class DatabaseService {
       offset: offset,
     );
 
-    return List.generate(maps.length, (i) {
+    final List<SceneIllustration> items = List.generate(maps.length, (i) {
       return SceneIllustration.fromMap(maps[i]);
     });
+
+    return {
+      'items': items,
+      'total': total,
+      'totalPages': totalPages,
+    };
   }
 
   /// 删除场景插图记录
