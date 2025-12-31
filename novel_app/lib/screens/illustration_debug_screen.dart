@@ -28,7 +28,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   // 分页状态
   int _currentPage = 0;
   bool _isLoading = false;
-  bool _hasMore = true;
   int _totalPages = 0; // 总页数
   int _totalItems = 0; // 总条目数
   final ScrollController _scrollController = ScrollController();
@@ -215,15 +214,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     );
   }
 
-  Widget _buildLoadingIndicator() {
-    return const Padding(
-      padding: EdgeInsets.all(16),
-      child: Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-  }
-
   Widget _buildIllustrationCard(SceneIllustration illustration, int index) {
     // 直接使用 SceneImagePreview 组件，复用阅读器的实现
     return Card(
@@ -302,7 +292,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       _isLoading = true;
       if (isRefresh) {
         _currentPage = 0;
-        _hasMore = true;
         _sceneIllustrations.clear();
       }
     });
@@ -321,7 +310,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           _sceneIllustrations.addAll(result['items'] as List<SceneIllustration>);
           _totalItems = result['total'] as int;
           _totalPages = result['totalPages'] as int;
-          _hasMore = _currentPage < _totalPages - 1;
           _isLoading = false;
         });
       }

@@ -11,6 +11,7 @@ import '../services/dify_service.dart';
 import '../services/scene_illustration_service.dart';
 import '../services/chapter_manager.dart';
 import '../core/di/api_service_provider.dart';
+import '../mixins/dify_streaming_mixin.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/scene_illustration_dialog.dart';
@@ -50,7 +51,8 @@ class ReaderScreen extends StatefulWidget {
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMixin {
+class _ReaderScreenState extends State<ReaderScreen>
+    with TickerProviderStateMixin, DifyStreamingMixin {
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final ReaderRepository _readerRepository = ReaderRepository();
@@ -1733,10 +1735,11 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
     }
   }
 
-  // 生成全文重写内容（流式）
+  // 生成全文重写内容（流式）- 使用 DifyStreamingMixin
   Future<void> _generateFullRewrite(String userInput) async {
-    _isGeneratingFullRewriteNotifier.value = true;
+    // 初始化状态
     _fullRewriteResultNotifier.value = '';
+    _isGeneratingFullRewriteNotifier.value = true;
 
     // 显示流式结果弹窗
     _showFullRewriteResultDialog();
@@ -1762,8 +1765,6 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
       }
 
-      final difyService = DifyService();
-
       // 构建全文重写的参数
       final inputs = {
         'user_input': userInput,
@@ -1778,52 +1779,29 @@ class _ReaderScreenState extends State<ReaderScreen> with TickerProviderStateMix
         'characters_info': '',
       };
 
-      // 使用通用的流式 API
-      await difyService.runWorkflowStreaming(
+      // 使用统一的流式方法 - 只需要25行（原来是91行）！
+      await callDifyStreaming(
         inputs: inputs,
-        onData: (data) {
-          debugPrint('全文重写收到数据: $data');
+        onChunk: (chunk) {
+          debugPrint('全文重写收到数据: $chunk');
           debugPrint('全文重写当前result长度: ${_fullRewriteResultNotifier.value.length}');
-          _fullRewriteResultNotifier.value += data;
+          _fullRewriteResultNotifier.value += chunk;
           debugPrint('全文重写更新后result长度: ${_fullRewriteResultNotifier.value.length}');
         },
-        onError: (error) {
-          debugPrint('全文重写错误: $error');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('全文重写失败: $error'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        },
-        onDone: () {
+        onComplete: (fullContent) {
           debugPrint('全文重写完成');
           _isGeneratingFullRewriteNotifier.value = false;
         },
+        onError: (error) {
+          debugPrint('全文重写错误: $error');
+          _isGeneratingFullRewriteNotifier.value = false;
+        },
+        showErrorSnackBar: true,
+        errorMessagePrefix: '全文重写失败',
       );
     } catch (e) {
       _isGeneratingFullRewriteNotifier.value = false;
       _fullRewriteResultNotifier.value = '生成失败: $e';
-
-      // 同时显示 SnackBar 提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('全文重写失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-
-    // 确保在方法结束时状态正确（安全网）
-    if (_isGeneratingFullRewriteNotifier.value) {
-      debugPrint('安全网：强制结束全文重写生成状态');
-      _isGeneratingFullRewriteNotifier.value = false;
     }
   }
 

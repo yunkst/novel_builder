@@ -97,7 +97,8 @@ dev_dependencies:
   built_value_generator: ^8.9.0
 
   # 测试依赖
-  mocktail: ^1.0.0
+  mockito: ^5.4.0
+  coverage: ^1.6.0
   integration_test:
     sdk: flutter
 

@@ -22,11 +22,33 @@ class CacheProgressUpdate {
 class CacheManager {
   static final CacheManager _instance = CacheManager._internal();
   factory CacheManager() => _instance;
+
+  // 依赖注入支持（用于测试）
+  DatabaseService? _testDb;
+  ApiServiceWrapper? _testApi;
+  ChapterManager? _testChapterManager;
+
   CacheManager._internal();
 
-  final DatabaseService _db = DatabaseService();
-  final ApiServiceWrapper _api = ApiServiceProvider.instance;
-  final ChapterManager _chapterManager = ChapterManager();
+  /// 创建测试用实例（注入Mock依赖）
+  factory CacheManager.forTesting({
+    DatabaseService? testDb,
+    ApiServiceWrapper? testApi,
+    ChapterManager? testChapterManager,
+  }) {
+    final manager = CacheManager._internal();
+    manager._testDb = testDb;
+    manager._testApi = testApi;
+    manager._testChapterManager = testChapterManager;
+    return manager;
+  }
+
+  // 获取依赖实例（优先使用测试注入的实例）
+  DatabaseService get _db => _testDb ?? DatabaseService();
+  ApiServiceWrapper get _api => _testApi ?? ApiServiceProvider.instance;
+  ChapterManager get _chapterManager =>
+      _testChapterManager ?? ChapterManager();
+
   final Queue<String> _queue = Queue<String>();
   final StreamController<CacheProgressUpdate> _progressController =
       StreamController<CacheProgressUpdate>.broadcast();

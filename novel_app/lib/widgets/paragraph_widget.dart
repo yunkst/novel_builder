@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/media_markup_parser.dart';
 import 'scene_image_preview.dart';
 
-class ParagraphWidget extends StatelessWidget {
+class ParagraphWidget extends StatefulWidget {
   final String paragraph;
   final int index;
   final double fontSize;
@@ -36,13 +36,50 @@ class ParagraphWidget extends StatelessWidget {
   });
 
   @override
+  State<ParagraphWidget> createState() => _ParagraphWidgetState();
+}
+
+class _ParagraphWidgetState extends State<ParagraphWidget> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.paragraph);
+    // 监听文本变化，但不触发重建
+    _controller.addListener(() {
+      if (widget.onContentChanged != null) {
+        widget.onContentChanged!(_controller.text);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(ParagraphWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 只有在外部内容真正改变时才更新
+    if (oldWidget.paragraph != widget.paragraph) {
+      // 检查是否是用户编辑导致的更新（避免覆盖用户输入）
+      if (_controller.text != widget.paragraph) {
+        _controller.text = widget.paragraph;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // final editModeProvider = Provider.of<ReaderEditModeProvider>(context, listen: false); // 移除此行
     // final bool isEditMode = editModeProvider.isEditMode; // 移除此行
     
     // 检查是否为插图标记
-    if (MediaMarkupParser.isMediaMarkup(paragraph)) {
-      final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+    if (MediaMarkupParser.isMediaMarkup(widget.paragraph)) {
+      final markup = MediaMarkupParser.parseMediaMarkup(widget.paragraph).first;
 
       // 只处理插图类型
       if (markup.isIllustration) {
@@ -56,9 +93,9 @@ class ParagraphWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                 child: Text(
-                  '插图 ${index + 1}', // index + 1 is paragraph number
+                  '插图 ${widget.index + 1}', // index + 1 is paragraph number
                   style: TextStyle(
-                    fontSize: fontSize * 0.8,
+                    fontSize: widget.fontSize * 0.8,
                     color: Colors.grey[600],
                     fontWeight: FontWeight.w500,
                   ),
@@ -68,8 +105,8 @@ class ParagraphWidget extends StatelessWidget {
               // 插图内容
               SceneImagePreview(
                 taskId: markup.id,
-                onImageTap: onImageTap,
-                onDelete: onImageDelete,
+                onImageTap: widget.onImageTap,
+                onDelete: widget.onImageDelete,
                 onImageDeleted: () {
                   // 单张图片删除成功后的处理，可能需要刷新列表
                   debugPrint('单张图片删除成功: ${markup.id}');
@@ -77,7 +114,7 @@ class ParagraphWidget extends StatelessWidget {
               ),
 
               // 编辑模式下显示可编辑的标记文本
-              if (isEditMode) ...[
+              if (widget.isEditMode) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -89,7 +126,7 @@ class ParagraphWidget extends StatelessWidget {
                   child: Text(
                     MediaMarkupParser.createIllustrationMarkup(markup.id),
                     style: TextStyle(
-                      fontSize: fontSize * 0.9,
+                      fontSize: widget.fontSize * 0.9,
                       fontFamily: 'monospace',
                       color: Colors.grey[700],
                     ),
@@ -115,7 +152,7 @@ class ParagraphWidget extends StatelessWidget {
               Text(
                 '📎 ${markup.type}',
                 style: TextStyle(
-                  fontSize: fontSize * 0.9,
+                  fontSize: widget.fontSize * 0.9,
                   fontWeight: FontWeight.bold,
                   color: Colors.orange[700],
                 ),
@@ -124,7 +161,7 @@ class ParagraphWidget extends StatelessWidget {
               Text(
                 'ID: ${markup.id}',
                 style: TextStyle(
-                  fontSize: fontSize * 0.8,
+                  fontSize: widget.fontSize * 0.8,
                   color: Colors.grey[600],
                 ),
               ),
@@ -132,7 +169,7 @@ class ParagraphWidget extends StatelessWidget {
               Text(
                 '暂不支持此媒体类型的显示',
                 style: TextStyle(
-                  fontSize: fontSize * 0.9,
+                  fontSize: widget.fontSize * 0.9,
                   color: Colors.grey[700],
                 ),
               ),
@@ -144,7 +181,7 @@ class ParagraphWidget extends StatelessWidget {
 
     // 普通文本段落
     // 编辑模式使用TextField，阅读模式使用Text
-    if (isEditMode) {
+    if (widget.isEditMode) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
         decoration: BoxDecoration(
@@ -155,19 +192,19 @@ class ParagraphWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: TextField(
-          controller: TextEditingController(text: paragraph),
+          controller: _controller, // 使用 State 中的 controller
           decoration: const InputDecoration(
             border: InputBorder.none,
             contentPadding: EdgeInsets.zero,
           ),
           style: TextStyle(
-            fontSize: fontSize,
+            fontSize: widget.fontSize,
             height: 1.8,
             letterSpacing: 0.5,
             color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
           maxLines: null,
-          onChanged: onContentChanged, // 使用回调函数
+          // onChanged 已移除，改用 initState 中的 Listener
         ),
       );
     }
@@ -178,21 +215,21 @@ class ParagraphWidget extends StatelessWidget {
       children: [
         // 段落内容
         InkWell(
-          onTap: isCloseupMode && onTap != null
-              ? () => onTap!(index)
+          onTap: widget.isCloseupMode && widget.onTap != null
+              ? () => widget.onTap!(widget.index)
               : null,
-          onLongPress: onLongPress != null
-              ? () => onLongPress!(index)
+          onLongPress: widget.onLongPress != null
+              ? () => widget.onLongPress!(widget.index)
               : null,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
             decoration: BoxDecoration(
-              color: isSelected
+              color: widget.isSelected
                   ? Colors.blue.withValues(alpha: 0.2)
                   : null,
-              border: isSelected
+              border: widget.isSelected
                   ? Border.all(color: Colors.blue, width: 2)
-                  : isCloseupMode
+                  : widget.isCloseupMode
                       ? Border.all(
                           color: Colors.blue.withValues(alpha: 0.3),
                           width: 1)
@@ -200,9 +237,9 @@ class ParagraphWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              paragraph.trim(),
+              widget.paragraph.trim(),
               style: TextStyle(
-                fontSize: fontSize,
+                fontSize: widget.fontSize,
                 height: 1.8,
                 letterSpacing: 0.5,
               ),

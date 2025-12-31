@@ -6,6 +6,7 @@ import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../models/character.dart';
 import '../models/scene_illustration.dart';
+import '../models/outline.dart';
 import '../core/di/api_service_provider.dart';
 import 'invalid_markup_cleaner.dart';
 
@@ -37,7 +38,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -233,6 +234,20 @@ class DatabaseService {
 
         debugPrint('数据库升级：重新创建了 scene_illustrations 表，添加了 task_id 字段');
       }
+    }
+    if (oldVersion < 9) {
+      // 创建大纲表
+      await db.execute('''
+        CREATE TABLE outlines (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          novel_url TEXT NOT NULL UNIQUE,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      debugPrint('数据库升级：创建了 outlines 表');
     }
   }
 
@@ -1601,5 +1616,97 @@ class DatabaseService {
     }
 
     return count;
+  }
+
+  // ========== 大纲操作 ==========
+
+  /// 创建或更新大纲
+  /// 如果小说URL已存在大纲则更新，否则创建新的
+  Future<int> saveOutline(Outline outline) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // 检查是否已存在该小说的大纲
+    final existing = await getOutlineByNovelUrl(outline.novelUrl);
+
+    if (existing != null) {
+      // 更新现有大纲
+      return await db.update(
+        'outlines',
+        {
+          'title': outline.title,
+          'content': outline.content,
+          'updated_at': now,
+        },
+        where: 'novel_url = ?',
+        whereArgs: [outline.novelUrl],
+      );
+    } else {
+      // 创建新大纲
+      return await db.insert(
+        'outlines',
+        {
+          'novel_url': outline.novelUrl,
+          'title': outline.title,
+          'content': outline.content,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  /// 根据小说URL获取大纲
+  Future<Outline?> getOutlineByNovelUrl(String novelUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'outlines',
+      where: 'novel_url = ?',
+      whereArgs: [novelUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      return Outline.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  /// 获取所有大纲
+  Future<List<Outline>> getAllOutlines() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'outlines',
+      orderBy: 'updated_at DESC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Outline.fromMap(maps[i]);
+    });
+  }
+
+  /// 删除大纲
+  Future<int> deleteOutline(String novelUrl) async {
+    final db = await database;
+    return await db.delete(
+      'outlines',
+      where: 'novel_url = ?',
+      whereArgs: [novelUrl],
+    );
+  }
+
+  /// 更新大纲内容
+  Future<int> updateOutlineContent(String novelUrl, String title, String content) async {
+    final db = await database;
+    return await db.update(
+      'outlines',
+      {
+        'title': title,
+        'content': content,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'novel_url = ?',
+      whereArgs: [novelUrl],
+    );
   }
 }

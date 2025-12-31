@@ -121,6 +121,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.4"
+  cli_config:
+    dependency: transitive
+    description:
+      name: cli_config
+      sha256: ac20a183a07002b700f0c25e61b7ee46b23c309d76ab7b7640a028f18e4d99ec
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.2.0"
   clock:
     dependency: transitive
     description:
@@ -153,6 +161,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.1.2"
+  coverage:
+    dependency: "direct dev"
+    description:
+      name: coverage
+      sha256: "5da775aa218eaf2151c721b16c01c7676fbfdd99cebba2bf64e8b807a28ff94d"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.15.0"
   crypto:
     dependency: "direct main"
     description:
@@ -463,14 +479,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.0"
-  mocktail:
+  mockito:
     dependency: "direct dev"
     description:
-      name: mocktail
-      sha256: "890df3f9688106f25755f26b1c60589a92b3ab91a22b8b224947ad041bf172d8"
+      name: mockito
+      sha256: dac24d461418d363778d53198d9ac0510b9d073869f078450f195766ec48d05e
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.0.4"
+    version: "5.6.1"
   nested:
     dependency: transitive
     description:
@@ -723,6 +739,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.3.8"
+  source_maps:
+    dependency: transitive
+    description:
+      name: source_maps
+      sha256: "190222579a448b03896e0ca6eca5998fa810fda630c1d65e2f78b3f638f54812"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.10.13"
   source_span:
     dependency: transitive
     description:
