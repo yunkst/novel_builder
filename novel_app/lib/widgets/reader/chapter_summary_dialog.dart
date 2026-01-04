@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/api_service_wrapper.dart';
 import '../../services/database_service.dart';
+import '../../services/chapter_history_service.dart';
 import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
+import '../../widgets/streaming_status_indicator.dart';
+import '../../widgets/streaming_content_display.dart';
 
 /// 章节总结对话框
 ///
@@ -33,8 +35,10 @@ class ChapterSummaryDialog extends StatefulWidget {
 
 class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
     with DifyStreamingMixin {
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final DatabaseService _databaseService = DatabaseService();
+  final ChapterHistoryService _historyService = ChapterHistoryService(
+    databaseService: DatabaseService(),
+    apiService: ApiServiceProvider.instance,
+  );
 
   String _summaryResult = '';
   final bool _showConfirmDialog = true;
@@ -117,31 +121,19 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
   // 生成章节总结（流式）
   Future<void> _generateSummarize() async {
     try {
-      final List<String> historyChaptersContent = [];
-      final currentIndex =
-          widget.chapters.indexWhere((c) => c.url == widget.currentChapter.url);
-
-      // 获取历史章节内容（最多前2章）
-      if (currentIndex > 1) {
-        final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content =
-            await _databaseService.getCachedChapter(prevChapter2.url) ??
-                await _apiService.getChapterContent(prevChapter2.url);
-        historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
-      }
-      if (currentIndex > 0) {
-        final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content =
-            await _databaseService.getCachedChapter(prevChapter1.url) ??
-                await _apiService.getChapterContent(prevChapter1.url);
-        historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
-      }
+      // 使用 ChapterHistoryService 获取历史章节内容
+      final historyChaptersContent =
+          await _historyService.fetchHistoryChaptersContent(
+        chapters: widget.chapters,
+        currentChapter: widget.currentChapter,
+        maxHistoryCount: 2,
+      );
 
       // 构建总结的参数
       final inputs = {
         'user_input': '总结',
         'cmd': '总结',
-        'history_chapters_content': historyChaptersContent.join('\n\n'),
+        'history_chapters_content': historyChaptersContent,
         'current_chapter_content': widget.content,
         'choice_content': '',
         'ai_writer_setting': '',
@@ -231,119 +223,21 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 状态指示器
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isStreaming
-                              ? [Colors.orange.shade600, Colors.orange.shade800]
-                              : [Colors.green.shade600, Colors.green.shade800],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                isStreaming ? Icons.stream : Icons.check_circle,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isStreaming ? '实时生成中...' : '生成完成',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (isStreaming)
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white.withValues(alpha: 0.8)),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '已接收 ${_summaryResult.length} 字符',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                          ),
-                        ],
-                      ),
+                    // 状态指示器 - 使用公共组件
+                    StreamingStatusIndicator(
+                      isStreaming: isStreaming,
+                      characterCount: _summaryResult.length,
+                      streamingText: '实时生成中...',
+                      completedText: '生成完成',
                     ),
                     const SizedBox(height: 12),
-                    // 内容区域
-                    Container(
-                      constraints: const BoxConstraints(
-                        maxHeight: 350,
-                        minHeight: 100,
+                    // 内容区域 - 使用公共组件
+                    SizedBox(
+                      height: 350,
+                      child: StreamingContentDisplay(
+                        content: _summaryResult,
+                        isStreaming: isStreaming,
                       ),
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade900.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.grey.shade700.withValues(alpha: 0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: _summaryResult.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (isStreaming) ...[
-                                    SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.grey.shade400),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ],
-                                  Text(
-                                    isStreaming ? '等待AI生成总结...' : '暂无内容',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: SelectableText(
-                                  _summaryResult,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    height: 1.6,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
                     ),
                   ],
                 ),
