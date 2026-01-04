@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
-import '../models/character.dart';
 import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
-import '../services/dify_service.dart';
 import '../services/preload_service.dart';
+import '../services/character_card_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
@@ -21,7 +19,6 @@ import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
 import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
 
-import '../utils/character_matcher.dart';
 import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/paragraph_rewrite_controller.dart';
@@ -547,7 +544,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
-  // 更新角色卡功能
+  // 更新角色卡功能（使用 CharacterCardService）
   Future<void> _updateCharacterCards() async {
     if (_content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -563,46 +560,37 @@ class _ReaderScreenState extends State<ReaderScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Expanded(child: Text('正在分析章节内容并更新角色信息...')),
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: ValueListenableBuilder(
+              valueListenable: ValueNotifier(''),
+              builder: (context, message, child) {
+                return Text(message.isNotEmpty ? message : '正在更新角色卡...');
+              },
+            )),
           ],
         ),
       ),
     );
 
     try {
-      debugPrint('=== 开始更新角色卡 ===');
-      debugPrint('小说: ${widget.novel.title}');
-      debugPrint('章节: ${_currentChapter.title}');
-
-      // 准备Dify参数
-      final updateData = await CharacterMatcher.prepareUpdateData(
-        widget.novel.url,
-        _content,
+      // 使用 CharacterCardService 预览更新
+      final service = CharacterCardService();
+      final updatedCharacters = await service.previewCharacterUpdates(
+        novel: widget.novel,
+        chapterContent: _content,
+        onProgress: (message) {
+          debugPrint(message);
+        },
       );
-
-      debugPrint('章节内容长度: ${updateData['chapters_content']!.length}');
-      debugPrint('角色信息: ${updateData['roles']}');
 
       // 关闭加载对话框
       if (mounted) {
         Navigator.pop(context);
       }
-
-      // 调用Dify服务更新角色信息
-      final difyService = DifyService();
-      final updatedCharacters = await difyService.updateCharacterCards(
-        chaptersContent: updateData['chapters_content']!,
-        roles: updateData['roles']!,
-        novelUrl: widget.novel.url,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
-      );
-
-      debugPrint('=== Dify返回角色数量: ${updatedCharacters.length} ===');
 
       // 显示角色预览对话框
       if (mounted) {
@@ -610,8 +598,18 @@ class _ReaderScreenState extends State<ReaderScreen>
           context,
           characters: updatedCharacters,
           onConfirmed: (selectedCharacters) async {
-            debugPrint('=== 用户确认保存角色: ${selectedCharacters.map((c) => c.name).toList()} ===');
-            await _saveUpdatedCharacters(selectedCharacters);
+            // 保存用户确认的角色
+            final savedCharacters = await service.saveCharacters(selectedCharacters);
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('成功更新 ${savedCharacters.length} 个角色卡'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
           },
         );
       }
@@ -622,73 +620,10 @@ class _ReaderScreenState extends State<ReaderScreen>
         Navigator.pop(context);
       }
 
-      debugPrint('=== 更新角色卡失败: $e ===');
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('更新角色卡失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
-  }
-
-  // 保存更新后的角色
-  Future<void> _saveUpdatedCharacters(List<Character> selectedCharacters) async {
-    try {
-      debugPrint('=== 开始保存角色到数据库 ===');
-
-      // 显示保存进度对话框
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Expanded(child: Text('正在保存角色信息...')),
-            ],
-          ),
-        ),
-      );
-
-      // 使用批量更新方法保存角色
-      final databaseService = DatabaseService();
-      final savedCharacters = await databaseService.batchUpdateCharacters(selectedCharacters);
-
-      // 关闭保存进度对话框
-      if (mounted) {
-        Navigator.pop(context);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('成功更新 ${savedCharacters.length} 个角色卡'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-
-      debugPrint('=== 角色保存完成: ${savedCharacters.length} 个 ===');
-
-    } catch (e) {
-      // 关闭保存进度对话框
-      if (mounted) {
-        Navigator.pop(context);
-      }
-
-      debugPrint('=== 保存角色失败: $e ===');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存角色失败: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
