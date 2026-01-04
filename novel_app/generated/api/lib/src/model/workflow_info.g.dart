@@ -13,11 +13,23 @@ class _$WorkflowInfo extends WorkflowInfo {
   final String description;
   @override
   final String? path;
+  @override
+  final int? width;
+  @override
+  final int? height;
+  @override
+  final bool? isDefault;
 
   factory _$WorkflowInfo([void Function(WorkflowInfoBuilder)? updates]) =>
       (WorkflowInfoBuilder()..update(updates))._build();
 
-  _$WorkflowInfo._({required this.title, required this.description, this.path})
+  _$WorkflowInfo._(
+      {required this.title,
+      required this.description,
+      this.path,
+      this.width,
+      this.height,
+      this.isDefault})
       : super._();
   @override
   WorkflowInfo rebuild(void Function(WorkflowInfoBuilder) updates) =>
@@ -32,7 +44,10 @@ class _$WorkflowInfo extends WorkflowInfo {
     return other is WorkflowInfo &&
         title == other.title &&
         description == other.description &&
-        path == other.path;
+        path == other.path &&
+        width == other.width &&
+        height == other.height &&
+        isDefault == other.isDefault;
   }
 
   @override
@@ -41,6 +56,9 @@ class _$WorkflowInfo extends WorkflowInfo {
     _$hash = $jc(_$hash, title.hashCode);
     _$hash = $jc(_$hash, description.hashCode);
     _$hash = $jc(_$hash, path.hashCode);
+    _$hash = $jc(_$hash, width.hashCode);
+    _$hash = $jc(_$hash, height.hashCode);
+    _$hash = $jc(_$hash, isDefault.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -50,7 +68,10 @@ class _$WorkflowInfo extends WorkflowInfo {
     return (newBuiltValueToStringHelper(r'WorkflowInfo')
           ..add('title', title)
           ..add('description', description)
-          ..add('path', path))
+          ..add('path', path)
+          ..add('width', width)
+          ..add('height', height)
+          ..add('isDefault', isDefault))
         .toString();
   }
 }
@@ -71,6 +92,18 @@ class WorkflowInfoBuilder
   String? get path => _$this._path;
   set path(String? path) => _$this._path = path;
 
+  int? _width;
+  int? get width => _$this._width;
+  set width(int? width) => _$this._width = width;
+
+  int? _height;
+  int? get height => _$this._height;
+  set height(int? height) => _$this._height = height;
+
+  bool? _isDefault;
+  bool? get isDefault => _$this._isDefault;
+  set isDefault(bool? isDefault) => _$this._isDefault = isDefault;
+
   WorkflowInfoBuilder() {
     WorkflowInfo._defaults(this);
   }
@@ -81,6 +114,9 @@ class WorkflowInfoBuilder
       _title = $v.title;
       _description = $v.description;
       _path = $v.path;
+      _width = $v.width;
+      _height = $v.height;
+      _isDefault = $v.isDefault;
       _$v = null;
     }
     return this;
@@ -107,6 +143,9 @@ class WorkflowInfoBuilder
           description: BuiltValueNullFieldError.checkNotNull(
               description, r'WorkflowInfo', 'description'),
           path: path,
+          width: width,
+          height: height,
+          isDefault: isDefault,
         );
     replace(_$result);
     return _$result;

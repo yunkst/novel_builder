@@ -158,11 +158,14 @@ class CacheManager {
   /// 检查API是否可用
   Future<void> checkApiAvailability() async {
     try {
-      await _api.checkImageToVideoHealth();
-      _apiReady = true;
+      // 简单检查API是否已初始化
+      _apiReady = _api.isInitialized;
+      if (!_apiReady) {
+        debugPrint('CacheManager: API未初始化');
+      }
     } catch (e) {
       _apiReady = false;
-      debugPrint('CacheManager: API不可用: $e');
+      debugPrint('CacheManager: API检查失败: $e');
     }
   }
 

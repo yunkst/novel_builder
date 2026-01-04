@@ -2,9 +2,17 @@
 # 支持多种工作流类型：t2i(文生图), i2v(图生视频)
 
 t2i:
-  - title: "动漫风"
-    path: "./comfyui_json/text2img/t2i_704x1408.json"
+  - title: "动漫风768x1280"
+    path: "./comfyui_json/text2img/t2i_768x1280.json"
     description: "用于生成角色卡的标准文生图工作流"
+    width: 768
+    height: 1280
+
+  - title: "动漫风1280x720"
+    path: "./comfyui_json/text2img/t2i_1280x720.json"
+    description: "用于生成角色卡的标准文生图工作流"
+    width: 1280
+    height: 720
 
 i2v:
   - title: "视频生成"

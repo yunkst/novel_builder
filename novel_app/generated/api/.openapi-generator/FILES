@@ -9,7 +9,6 @@ doc/EnhancedSceneIllustrationRequest.md
 doc/HTTPValidationError.md
 doc/ImageToVideoRequest.md
 doc/ImageToVideoResponse.md
-doc/ImageToVideoTaskStatusResponse.md
 doc/ModelsResponse.md
 doc/Novel.md
 doc/RoleCardGenerateRequest.md
@@ -43,7 +42,6 @@ lib/src/model/enhanced_scene_illustration_request.dart
 lib/src/model/http_validation_error.dart
 lib/src/model/image_to_video_request.dart
 lib/src/model/image_to_video_response.dart
-lib/src/model/image_to_video_task_status_response.dart
 lib/src/model/models_response.dart
 lib/src/model/novel.dart
 lib/src/model/role_card_generate_request.dart
@@ -69,7 +67,6 @@ test/enhanced_scene_illustration_request_test.dart
 test/http_validation_error_test.dart
 test/image_to_video_request_test.dart
 test/image_to_video_response_test.dart
-test/image_to_video_task_status_response_test.dart
 test/models_response_test.dart
 test/novel_test.dart
 test/role_card_generate_request_test.dart

@@ -20,7 +20,6 @@ import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
 import 'package:novel_api/src/model/http_validation_error.dart';
 import 'package:novel_api/src/model/image_to_video_request.dart';
 import 'package:novel_api/src/model/image_to_video_response.dart';
-import 'package:novel_api/src/model/image_to_video_task_status_response.dart';
 import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
@@ -47,7 +46,6 @@ part 'serializers.g.dart';
   HTTPValidationError,
   ImageToVideoRequest,
   ImageToVideoResponse,
-  ImageToVideoTaskStatusResponse,
   ModelsResponse,
   Novel,
   RoleCardGenerateRequest,

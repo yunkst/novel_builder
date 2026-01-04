@@ -26,6 +26,7 @@ import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/paragraph_rewrite_controller.dart';
 import '../controllers/summarize_controller.dart';
+import '../controllers/reader_content_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import 'package:provider/provider.dart';
@@ -55,16 +56,21 @@ class _ReaderScreenState extends State<ReaderScreen>
   final ScrollController _scrollController = ScrollController();
   final ParagraphRewriteController _paragraphRewriteController = ParagraphRewriteController();
   final SummarizeController _summarizeController = SummarizeController();
-  // 注意：Controller 保留用于兼容旧代码
+
+  // ========== 新增：ReaderContentController ==========
+  late ReaderContentController _contentController;
+
+  // ========== 便捷访问器（向后兼容） ==========
+  String get _content => _contentController.content;
+  set _content(String value) => _contentController.content = value;
+  bool get _isLoading => _contentController.isLoading;
+  String get _errorMessage => _contentController.errorMessage;
 
   // 光标动画控制器
   late AnimationController _cursorController;
   late Animation<double> _cursorAnimation;
 
   late Chapter _currentChapter;
-  String _content = '';
-  bool _isLoading = true;
-  String _errorMessage = '';
   double _fontSize = 18.0;
 
   // 特写模式相关状态
@@ -94,6 +100,17 @@ class _ReaderScreenState extends State<ReaderScreen>
     super.initState();
     _currentChapter = widget.chapter;
 
+    // ========== 初始化 ReaderContentController ==========
+    _contentController = ReaderContentController(
+      onStateChanged: () {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+      apiService: _apiService,
+      databaseService: _databaseService,
+    );
+
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
 
@@ -112,9 +129,29 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     _cursorController.repeat(reverse: true);
 
-    _initApi();
+    _initApiAndLoadContent();
   }
 
+  /// 初始化API并加载内容
+  Future<void> _initApiAndLoadContent() async {
+    try {
+      await _contentController.initialize();
+      // 初始加载时不重置滚动位置，以保持搜索匹配跳转行为
+      _loadChapterContent(resetScrollPosition: false);
+      // 新系统不需要 _loadIllustrations()
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          // _contentController 会处理错误状态
+        });
+      }
+    }
+  }
+
+  // ========== 以下方法已迁移到 ReaderContentController ==========
+  // 旧代码已注释，将在测试通过后删除
+
+  /*
   Future<void> _initApi() async {
     try {
       await _apiService.init();
@@ -128,6 +165,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       });
     }
   }
+  */
 
   @override
   void dispose() {
@@ -142,57 +180,18 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   Future<void> _loadChapterContent({bool resetScrollPosition = true, bool forceRefresh = false}) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-      if (resetScrollPosition) {
-        _content = '';
-      }
-    });
+    await _contentController.loadChapter(
+      _currentChapter,
+      widget.novel,
+      forceRefresh: forceRefresh,
+      resetScrollPosition: resetScrollPosition,
+    );
 
-    try {
-      // 直接使用DatabaseService和ApiService，移除ReaderRepository中间层
-      String content;
+    // 处理滚动位置（保留在 reader_screen 中，因为这涉及到 ScrollController）
+    _handleScrollPosition(resetScrollPosition);
 
-      // 强制刷新时先删除缓存
-      if (forceRefresh) {
-        await _databaseService.deleteChapterCache(_currentChapter.url);
-      }
-
-      // 尝试从缓存获取
-      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
-      if (cachedContent != null && cachedContent.isNotEmpty) {
-        content = cachedContent;
-      } else {
-        // 缓存未命中，从API获取
-        content = await _apiService.getChapterContent(_currentChapter.url, forceRefresh: forceRefresh);
-
-        // 验证内容并缓存
-        if (content.isNotEmpty && content.length > 50) {
-          await _databaseService.cacheChapter(
-            widget.novel.url,
-            _currentChapter,
-            content,
-          );
-        } else {
-          throw Exception('获取到的章节内容为空或过短');
-        }
-      }
-
-      setState(() {
-        _content = content;
-        _isLoading = false;
-      });
-
-      _updateReadingProgress();
-      _handleScrollPosition(resetScrollPosition);
-      _startPreloadingChapters();
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '加载章节失败: ${_getErrorMessage(e)}';
-      });
-    }
+    // 启动预加载（保留在 reader_screen 中，因为这需要完整的章节列表）
+    await _startPreloadingChapters();
   }
 
   /// 启动预加载章节（使用新的PreloadService）
@@ -330,33 +329,6 @@ class _ReaderScreenState extends State<ReaderScreen>
         }
       });
     }
-  }
-
-  /// 根据异常类型返回用户友好的错误信息
-  String _getErrorMessage(dynamic error) {
-    final errorStr = error.toString();
-
-    if (errorStr.contains('请求过于频繁')) {
-      return '请求过于频繁，请稍后重试';
-    } else if (errorStr.contains('超时') || errorStr.contains('timeout')) {
-      return '网络连接超时，请检查网络后重试';
-    } else if (errorStr.contains('网络错误') ||
-        errorStr.contains('SocketException')) {
-      return '网络连接失败，请检查网络设置';
-    } else if (errorStr.contains('状态码')) {
-      return '服务器响应异常，请稍后重试';
-    } else if (errorStr.contains('未能提取到有效的章节内容')) {
-      return '无法解析章节内容，可能是网站结构变化';
-    } else {
-      return '获取章节内容失败，请稍后重试';
-    }
-  }
-
-  Future<void> _updateReadingProgress() async {
-    final chapterIndex = _currentChapter.chapterIndex ??
-        widget.chapters.indexOf(_currentChapter);
-    await _databaseService.updateLastReadChapter(
-        widget.novel.url, chapterIndex);
   }
 
   /// 滚动到搜索匹配位置

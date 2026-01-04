@@ -888,27 +888,6 @@ class ApiServiceWrapper {
     }
   }
 
-  /// 图生视频健康检查
-  Future<Map<String, dynamic>> checkImageToVideoHealth() async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-
-      final response = await _api.imageToVideoHealthCheckApiImageToVideoHealthGet(
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>? ?? {'status': 'unhealthy'};
-      } else {
-        throw Exception('图生视频健康检查失败：${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('图生视频健康检查异常: $e');
-      throw _handleError(e);
-    }
-  }
-
   /// 获取所有可用模型列表
   Future<ModelsResponse> getModels() async {
     _ensureInitialized();

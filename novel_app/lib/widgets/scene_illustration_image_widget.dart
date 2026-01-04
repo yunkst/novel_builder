@@ -15,6 +15,10 @@ class SceneIllustrationImageWidget extends StatefulWidget {
   final Function()? onRetry;
   final Duration? timeout;
   final SceneIllustrationCacheService? cacheService;
+  /// 图片实际宽度（用于计算宽高比）
+  final int? imageWidth;
+  /// 图片实际高度（用于计算宽高比）
+  final int? imageHeight;
 
   const SceneIllustrationImageWidget({
     super.key,
@@ -28,6 +32,8 @@ class SceneIllustrationImageWidget extends StatefulWidget {
     this.onRetry,
     this.timeout = const Duration(seconds: 30),
     this.cacheService,
+    this.imageWidth,
+    this.imageHeight,
   });
 
   @override
@@ -123,9 +129,12 @@ class _SceneIllustrationImageWidgetState extends State<SceneIllustrationImageWid
 
   @override
   Widget build(BuildContext context) {
+    // 计算显示高度
+    final displayHeight = _calculateHeight();
+
     return SizedBox(
       width: widget.width,
-      height: widget.height,
+      height: displayHeight,
       child: Stack(
         children: [
           // 主要图片组件
@@ -148,7 +157,7 @@ class _SceneIllustrationImageWidgetState extends State<SceneIllustrationImageWid
           if (_isLoading && widget.enableRetry)
             Container(
               width: widget.width,
-              height: widget.height,
+              height: displayHeight,
               color: Colors.black.withValues(alpha: 0.3),
               child: Center(
                 child: Column(
@@ -175,6 +184,27 @@ class _SceneIllustrationImageWidgetState extends State<SceneIllustrationImageWid
         ],
       ),
     );
+  }
+
+  /// 计算显示高度
+  double? _calculateHeight() {
+    // 优先使用显式设置的高度
+    if (widget.height != null) {
+      return widget.height;
+    }
+
+    // 如果有宽度且有图片尺寸信息，根据宽高比计算高度
+    if (widget.width != null &&
+        widget.imageWidth != null &&
+        widget.imageHeight != null &&
+        widget.imageWidth! > 0 &&
+        widget.imageHeight! > 0) {
+      final aspectRatio = widget.imageWidth! / widget.imageHeight!;
+      return widget.width! / aspectRatio;
+    }
+
+    // 没有足够信息，返回null让组件自适应
+    return null;
   }
 
   Widget _buildPlaceholder() {

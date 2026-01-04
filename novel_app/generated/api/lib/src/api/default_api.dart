@@ -18,7 +18,6 @@ import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
 import 'package:novel_api/src/model/http_validation_error.dart';
 import 'package:novel_api/src/model/image_to_video_request.dart';
 import 'package:novel_api/src/model/image_to_video_response.dart';
-import 'package:novel_api/src/model/image_to_video_task_status_response.dart';
 import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
@@ -722,7 +721,7 @@ class DefaultApi {
   }
 
   /// Generate Video From Image
-  /// 生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \&quot;pending\&quot;） - **message**: 任务创建的状态消息  **使用示例:** &#x60;&#x60;&#x60;json {     \&quot;task_id\&quot;: 123,     \&quot;img_name\&quot;: \&quot;example.jpg\&quot;,     \&quot;status\&quot;: \&quot;pending\&quot;,     \&quot;message\&quot;: \&quot;图生视频任务创建成功\&quot; } &#x60;&#x60;&#x60;  **后续操作:** 使用返回的 task_id 调用 &#x60;/api/image-to-video/status/{task_id}&#x60; 查询生成进度
+  /// 生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \&quot;pending\&quot;） - **message**: 任务创建的状态消息  **使用示例:** &#x60;&#x60;&#x60;json {     \&quot;task_id\&quot;: 123,     \&quot;img_name\&quot;: \&quot;example.jpg\&quot;,     \&quot;status\&quot;: \&quot;pending\&quot;,     \&quot;message\&quot;: \&quot;图生视频任务创建成功\&quot; } &#x60;&#x60;&#x60;  **后续操作:** 使用返回的 task_id 轮询 &#x60;/api/image-to-video/has-video/{img_name}&#x60; 查询视频是否生成完成
   ///
   /// Parameters:
   /// * [imageToVideoRequest] 
@@ -1376,90 +1375,6 @@ class DefaultApi {
     }
 
     return Response<Uint8List>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Get Video Task Status
-  /// 查询图生视频任务状态  获取指定任务的详细状态信息，包括生成进度和结果。  **路径参数:** - **task_id**: 图生视频任务的唯一标识符  **返回值:** - **task_id**: 任务ID - **img_name**: 处理的图片名称 - **status**: 任务状态（pending/running/completed/failed） - **model_name**: 使用的模型名称 - **user_input**: 用户输入要求 - **video_prompt**: 生成的视频提示词（如果有） - **video_filename**: 生成的视频文件名（完成时） - **result_message**: 结果描述信息 - **error_message**: 错误信息（失败时） - **created_at**: 任务创建时间 - **updated_at**: 任务更新时间
-  ///
-  /// Parameters:
-  /// * [taskId] 
-  /// * [X_API_TOKEN] 
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [ImageToVideoTaskStatusResponse] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImageToVideoTaskStatusResponse>> getVideoTaskStatusApiImageToVideoStatusTaskIdGet({ 
-    required int taskId,
-    String? X_API_TOKEN,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/image-to-video/status/{task_id}'.replaceAll('{' r'task_id' '}', encodeQueryParameter(_serializers, taskId, const FullType(int)).toString());
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{
-        r'X-API-TOKEN': X_API_TOKEN,
-        ...?headers,
-      },
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'HTTPBearer',
-          },
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    ImageToVideoTaskStatusResponse? _responseData;
-
-    try {
-      final rawResponse = _response.data;
-      _responseData = rawResponse == null ? null : _serializers.deserialize(
-        rawResponse,
-        specifiedType: const FullType(ImageToVideoTaskStatusResponse),
-      ) as ImageToVideoTaskStatusResponse;
-
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<ImageToVideoTaskStatusResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

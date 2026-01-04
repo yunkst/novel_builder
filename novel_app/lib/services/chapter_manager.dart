@@ -19,7 +19,7 @@ class ChapterManager {
     _initializeCleanupTimer();
   }
 
-  /// 待处理的网络请求 Map<chapterUrl, Future<String>>
+  /// 待处理的网络请求，key为章节URL，value为Future字符串
   final Map<String, Future<String>> _pendingRequests = <String, Future<String>>{};
 
   /// 请求时间戳，用于清理过期请求

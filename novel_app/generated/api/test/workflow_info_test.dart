@@ -24,5 +24,21 @@ void main() {
       // TODO
     });
 
+    // int width
+    test('to test the property `width`', () async {
+      // TODO
+    });
+
+    // int height
+    test('to test the property `height`', () async {
+      // TODO
+    });
+
+    // 是否为默认模型
+    // bool isDefault (default value: false)
+    test('to test the property `isDefault`', () async {
+      // TODO
+    });
+
   });
 }

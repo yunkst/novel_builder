@@ -27,6 +27,8 @@ class WorkflowResponse(BaseModel):
     title: str
     description: str
     path: str
+    width: int | None = None
+    height: int | None = None
 
     class Config:
         json_schema_extra = {
@@ -34,6 +36,8 @@ class WorkflowResponse(BaseModel):
                 "title": "动漫风",
                 "description": "用于生成角色卡的标准文生图工作流",
                 "path": "./comfyui_json/text2img/t2i_704x1408.json",
+                "width": 704,
+                "height": 1280,
             }
         }
 

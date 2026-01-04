@@ -22,6 +22,8 @@ class WorkflowInfo(BaseModel):
     path: str = Field(..., description="工作流文件路径")
     description: str | None = Field(None, description="工作流描述")
     model_type: str | None = Field(None, description="模型类型")
+    width: int | None = Field(None, description="图片宽度（仅T2I）")
+    height: int | None = Field(None, description="图片高度（仅T2I）")
 
 
 class WorkflowSettings(BaseModel):
@@ -155,6 +157,8 @@ class WorkflowConfigManager:
                 title=workflow.title,
                 description=workflow.description or "",
                 path=workflow.path,
+                width=workflow.width,
+                height=workflow.height,
             )
             for workflow in workflows
         ]

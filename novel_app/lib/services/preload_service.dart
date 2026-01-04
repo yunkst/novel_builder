@@ -34,7 +34,7 @@ class PreloadService {
   String? _lastActiveNovel; // 最后活跃的小说URL
 
   // 执行状态
-  bool _isProcessing = false;
+  Completer<void>? _processingCompleter; // 🔒 使用Completer防止并发
   int _totalProcessed = 0;
   int _totalFailed = 0;
 
@@ -135,13 +135,19 @@ class PreloadService {
   }
 
   /// 串行处理队列（全局唯一执行点，30秒速率限制）
+  ///
+  /// 🔒 并发安全: 使用 Completer 确保同一时间只有一个循环执行
   Future<void> _processQueue() async {
-    if (_isProcessing) {
+    // 🔒 原子检查: 如果已有Completer,说明正在处理
+    if (_processingCompleter != null) {
       debugPrint('⚠️ 队列处理中，跳过重复启动');
       return;
     }
 
-    _isProcessing = true;
+    // 🔒 创建新的Completer作为锁
+    final completer = Completer<void>();
+    _processingCompleter = completer;
+
     debugPrint('🚀 开始处理预加载队列');
 
     try {
@@ -180,8 +186,12 @@ class PreloadService {
       }
 
       debugPrint('✅ 队列处理完成 (已处理: $_totalProcessed, 失败: $_totalFailed)');
+      completer.complete(); // ✅ 标记完成
+    } catch (e) {
+      debugPrint('❌ 队列处理异常: $e');
+      completer.completeError(e); // ✅ 标记失败
     } finally {
-      _isProcessing = false; // 释放执行锁
+      _processingCompleter = null; // ✅ 释放锁
     }
   }
 
@@ -199,7 +209,7 @@ class PreloadService {
         debugPrint('   ... 还有 ${_queue.length - 5} 个任务');
         break;
       }
-      debugPrint('   ${count}. $task');
+      debugPrint('   $count. $task');
     }
   }
 
@@ -207,7 +217,7 @@ class PreloadService {
   Map<String, dynamic> getStatistics() {
     return {
       'queue_length': _queue.length,
-      'is_processing': _isProcessing,
+      'is_processing': isProcessing,
       'last_active_novel': _lastActiveNovel,
       'novel_states': _novelCurrentIndex,
       'total_processed': _totalProcessed,
@@ -230,7 +240,7 @@ class PreloadService {
 
   /// 暂停队列处理
   void pause() {
-    if (_isProcessing) {
+    if (isProcessing) {
       debugPrint('⏸️ 预加载已暂停（将在当前任务完成后停止）');
     }
   }
@@ -239,5 +249,5 @@ class PreloadService {
   int get queueLength => _queue.length;
 
   /// 是否正在处理队列
-  bool get isProcessing => _isProcessing;
+  bool get isProcessing => _processingCompleter != null;
 }

@@ -428,6 +428,9 @@ class WorkflowInfo(BaseModel):
     title: str = Field(..., description="工作流标题")
     description: str = Field(..., description="工作流描述")
     path: str | None = Field(None, description="工作流文件路径")
+    width: int | None = Field(None, description="图片宽度（仅T2I）")
+    height: int | None = Field(None, description="图片高度（仅T2I）")
+    is_default: bool = Field(False, description="是否为默认模型")
 
 
 class ModelsResponse(BaseModel):
