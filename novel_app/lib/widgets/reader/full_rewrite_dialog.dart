@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/api_service_wrapper.dart';
 import '../../services/database_service.dart';
+import '../../services/chapter_history_service.dart';
 import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
+import '../../widgets/streaming_status_indicator.dart';
+import '../../widgets/streaming_content_display.dart';
 
 /// 全文重写对话框
 ///
@@ -35,8 +37,10 @@ class FullRewriteDialog extends StatefulWidget {
 
 class _FullRewriteDialogState extends State<FullRewriteDialog>
     with DifyStreamingMixin {
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final DatabaseService _databaseService = DatabaseService();
+  final ChapterHistoryService _historyService = ChapterHistoryService(
+    databaseService: DatabaseService(),
+    apiService: ApiServiceProvider.instance,
+  );
 
   final ValueNotifier<String> _rewriteResultNotifier = ValueNotifier<String>('');
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
@@ -141,31 +145,19 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
     _isGeneratingNotifier.value = true;
 
     try {
-      final List<String> historyChaptersContent = [];
-      final currentIndex = widget.chapters
-          .indexWhere((c) => c.url == widget.currentChapter.url);
-
-      // 获取历史章节内容（最多前2章）
-      if (currentIndex > 1) {
-        final prevChapter2 = widget.chapters[currentIndex - 2];
-        final content =
-            await _databaseService.getCachedChapter(prevChapter2.url) ??
-                await _apiService.getChapterContent(prevChapter2.url);
-        historyChaptersContent.add('历史章节: ${prevChapter2.title}\n\n$content');
-      }
-      if (currentIndex > 0) {
-        final prevChapter1 = widget.chapters[currentIndex - 1];
-        final content =
-            await _databaseService.getCachedChapter(prevChapter1.url) ??
-                await _apiService.getChapterContent(prevChapter1.url);
-        historyChaptersContent.add('历史章节: ${prevChapter1.title}\n\n$content');
-      }
+      // 使用 ChapterHistoryService 获取历史章节内容
+      final historyChaptersContent =
+          await _historyService.fetchHistoryChaptersContent(
+        chapters: widget.chapters,
+        currentChapter: widget.currentChapter,
+        maxHistoryCount: 2,
+      );
 
       // 构建全文重写的参数
       final inputs = {
         'user_input': userInput,
         'cmd': '', // 空的cmd参数
-        'history_chapters_content': historyChaptersContent.join('\n\n'),
+        'history_chapters_content': historyChaptersContent,
         'current_chapter_content': widget.content,
         'choice_content': '', // 空的choice_content参数
         'ai_writer_setting': '',
@@ -220,43 +212,36 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 400),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    border: Border.all(color: Colors.grey[700]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: SingleChildScrollView(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _rewriteResultNotifier,
-                      builder: (context, resultValue, child) {
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: _isGeneratingNotifier,
-                          builder: (context, isGenerating, child) {
-                            String displayText;
-                            if (isGenerating && resultValue.isEmpty) {
-                              displayText = '正在生成中...';
-                            } else if (resultValue.isEmpty) {
-                              displayText = '等待生成...';
-                            } else {
-                              displayText = resultValue;
-                            }
-
-                            return SelectableText(
-                              displayText,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: Colors.white,
+                // 内容区域 - 使用公共组件
+                ValueListenableBuilder<String>(
+                  valueListenable: _rewriteResultNotifier,
+                  builder: (context, resultValue, child) {
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: _isGeneratingNotifier,
+                      builder: (context, isGenerating, child) {
+                        return Column(
+                          children: [
+                            // 状态指示器 - 使用公共组件
+                            StreamingStatusIndicator(
+                              isStreaming: isGenerating,
+                              characterCount: resultValue.length,
+                              streamingText: '实时生成中...',
+                              completedText: '生成完成',
+                            ),
+                            const SizedBox(height: 12),
+                            // 内容显示 - 使用公共组件
+                            SizedBox(
+                              height: 350,
+                              child: StreamingContentDisplay(
+                                content: resultValue,
+                                isStreaming: isGenerating,
                               ),
-                            );
-                          },
+                            ),
+                          ],
                         );
                       },
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 Row(
