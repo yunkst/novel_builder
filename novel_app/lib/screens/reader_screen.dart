@@ -53,8 +53,6 @@ class _ReaderScreenState extends State<ReaderScreen>
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
-  final ParagraphRewriteController _paragraphRewriteController = ParagraphRewriteController();
-  final SummarizeController _summarizeController = SummarizeController();
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -73,9 +71,14 @@ class _ReaderScreenState extends State<ReaderScreen>
   set _isCloseupMode(bool value) => _interactionController.setCloseupMode(value);
   List<int> get _selectedParagraphIndices => _interactionController.selectedParagraphIndices;
 
-  // 光标动画控制器
-  late AnimationController _cursorController;
-  late Animation<double> _cursorAnimation;
+  // ========== 计算属性 ==========
+  /// 段落列表（缓存分割结果，提升性能）
+  List<String> get _paragraphs =>
+      _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+
+  /// 当前章节索引（避免重复查找）
+  int get _currentChapterIndex =>
+      widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
 
   late Chapter _currentChapter;
   double _fontSize = 18.0;
@@ -117,21 +120,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
 
-    // 初始化光标动画
-    _cursorController = AnimationController(
-      duration: const Duration(milliseconds: 530),
-      vsync: this,
-    );
-    _cursorAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cursorController,
-      curve: Curves.easeInOut,
-    ));
-
-    _cursorController.repeat(reverse: true);
-
     _initApiAndLoadContent();
   }
 
@@ -152,31 +140,11 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   // ========== 以下方法已迁移到 ReaderContentController ==========
-  // 旧代码已注释，将在测试通过后删除
-
-  /*
-  Future<void> _initApi() async {
-    try {
-      await _apiService.init();
-      // 初始加载时不重置滚动位置，以保持搜索匹配跳转行为
-      _loadChapterContent(resetScrollPosition: false);
-      // 新系统不需要 _loadIllustrations()
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '初始化API失败: $e';
-      });
-    }
-  }
-  */
 
   @override
   void dispose() {
     disposeAutoScroll(); // 清理自动滚动资源（AutoScrollMixin）
-    _cursorController.dispose();
     _scrollController.dispose();
-    _paragraphRewriteController.dispose();
-    _summarizeController.dispose();
     super.dispose();
   }
 
@@ -223,7 +191,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   void _handleLongPress(int index) {
     if (!_interactionController.shouldHandleLongPress(_isCloseupMode)) return;
 
-    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs = _paragraphs;
 
     if (index >= 0 && index < paragraphs.length) {
       final paragraph = paragraphs[index].trim();
@@ -685,8 +653,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // 处理段落点击
   void _handleParagraphTap(int index) {
-    final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-    _interactionController.handleParagraphTap(index, paragraphs);
+    _interactionController.handleParagraphTap(index, _paragraphs);
   }
 
   // ========== 段落改写功能（使用 ParagraphRewriteDialog）==========
@@ -823,14 +790,12 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currentIndex =
-        widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+    final currentIndex = _currentChapterIndex;
     final hasPrevious = currentIndex > 0;
     final hasNext =
         currentIndex != -1 && currentIndex < widget.chapters.length - 1;
 
-    final paragraphs =
-        _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs = _paragraphs;
 
     // 使用 ChangeNotifierProvider 包装整个页面
     return ChangeNotifierProvider(
