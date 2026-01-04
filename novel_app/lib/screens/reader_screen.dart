@@ -27,6 +27,7 @@ import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/paragraph_rewrite_controller.dart';
 import '../controllers/summarize_controller.dart';
 import '../controllers/reader_content_controller.dart';
+import '../controllers/reader_interaction_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import 'package:provider/provider.dart';
@@ -60,11 +61,19 @@ class _ReaderScreenState extends State<ReaderScreen>
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
 
+  // ========== 新增：ReaderInteractionController ==========
+  late ReaderInteractionController _interactionController;
+
   // ========== 便捷访问器（向后兼容） ==========
   String get _content => _contentController.content;
   set _content(String value) => _contentController.content = value;
   bool get _isLoading => _contentController.isLoading;
   String get _errorMessage => _contentController.errorMessage;
+
+  // ========== 特写模式便捷访问器 ==========
+  bool get _isCloseupMode => _interactionController.isCloseupMode;
+  set _isCloseupMode(bool value) => _interactionController.setCloseupMode(value);
+  List<int> get _selectedParagraphIndices => _interactionController.selectedParagraphIndices;
 
   // 光标动画控制器
   late AnimationController _cursorController;
@@ -72,10 +81,6 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   late Chapter _currentChapter;
   double _fontSize = 18.0;
-
-  // 特写模式相关状态
-  bool _isCloseupMode = false;
-  List<int> _selectedParagraphIndices = [];
 
   // 全文重写相关状态
   final ValueNotifier<String> _fullRewriteResultNotifier =
@@ -109,6 +114,15 @@ class _ReaderScreenState extends State<ReaderScreen>
       },
       apiService: _apiService,
       databaseService: _databaseService,
+    );
+
+    // ========== 初始化 ReaderInteractionController ==========
+    _interactionController = ReaderInteractionController(
+      onStateChanged: () {
+        if (mounted) {
+          setState(() {});
+        }
+      },
     );
 
     // 初始化自动滚动控制器
@@ -220,7 +234,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // 处理段落长按 - 显示操作菜单
   void _handleLongPress(int index) {
-    if (_isCloseupMode) return; // 特写模式下不处理长按
+    if (!_interactionController.shouldHandleLongPress(_isCloseupMode)) return;
 
     final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
@@ -742,52 +756,13 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // 切换特写模式
   void _toggleCloseupMode() {
-    setState(() {
-      _isCloseupMode = !_isCloseupMode;
-      if (!_isCloseupMode) {
-        _selectedParagraphIndices.clear();
-      }
-    });
+    _interactionController.toggleCloseupMode();
   }
 
   // 处理段落点击
   void _handleParagraphTap(int index) {
-    if (!_isCloseupMode) return;
-
-    // 检查段落是否为媒体标记（插图、视频等），如果是则不允许选择
     final paragraphs = _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
-    if (index < paragraphs.length && MediaMarkupParser.isMediaMarkup(paragraphs[index])) {
-      // 媒体标记段落不允许在特写模式下选择
-      return;
-    }
-
-    setState(() {
-      if (_selectedParagraphIndices.contains(index)) {
-        _selectedParagraphIndices.remove(index);
-      } else {
-        _selectedParagraphIndices.add(index);
-      }
-
-      // 排序
-      _selectedParagraphIndices.sort();
-
-      // 检查是否连续
-      if (!_isConsecutive(_selectedParagraphIndices)) {
-        // 如果不连续，只保留当前点击的段落
-        _selectedParagraphIndices = [index];
-      }
-    });
-  }
-
-  // 检查数组是否连续
-  bool _isConsecutive(List<int> indices) {
-    if (indices.length <= 1) return true;
-    for (int i = 1; i < indices.length; i++) {
-      if (indices[i] != indices[i - 1] + 1) {
-        return false;
-      }
-    }
-    return true;
+    _interactionController.handleParagraphTap(index, paragraphs);
   }
 
   // ========== 段落改写功能（使用 ParagraphRewriteDialog）==========
@@ -815,7 +790,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         onReplace: (newContent) {
           setState(() {
             _content = newContent;
-            _selectedParagraphIndices.clear();
+            _interactionController.clearSelection();
             _isCloseupMode = false;
           });
         },
@@ -838,41 +813,14 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-  // ========== 以下为旧方法（已弃用，保留用于向后兼容）==========
-
-  // 获取选中的文本（支持插图段落）
-  String _getSelectedText(List<String> paragraphs) {
-    if (_selectedParagraphIndices.isEmpty) return '';
-
-    final selectedTexts = <String>[];
-
-    for (final index in _selectedParagraphIndices) {
-      if (index < 0 || index >= paragraphs.length) continue;
-
-      final paragraph = paragraphs[index];
-
-      // 如果是插图标记，转换为描述性文本
-      if (MediaMarkupParser.isMediaMarkup(paragraph)) {
-        final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
-        if (markup.isIllustration) {
-          selectedTexts.add('[插图：此处应显示图片内容，taskId: ${markup.id}]');
-        } else {
-          selectedTexts.add('[${markup.type}：${markup.id}]');
-        }
-      } else {
-        selectedTexts.add(paragraph.trim());
-      }
-    }
-
-    return selectedTexts.join('\n\n'); // 用双空行分隔，保持结构清晰
-  }
+  // ========== 改写功能 ==========
 
   // 改写要求的用户输入缓存
   String _lastRewriteInput = '';
 
   // 打开改写要求输入弹窗
   Future<void> _showRewriteRequirementDialog(List<String> paragraphs) async {
-    final selectedText = _getSelectedText(paragraphs);
+    final selectedText = _interactionController.getSelectedText(paragraphs);
     if (selectedText.isEmpty) return;
 
     final userInputController = TextEditingController(text: _lastRewriteInput);
@@ -1345,7 +1293,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     // 如果没有文本段落需要替换，直接返回
     if (textIndices.isEmpty) {
       setState(() {
-        _selectedParagraphIndices.clear();
+        _interactionController.clearSelection();
         _isCloseupMode = false;
       });
       return;
@@ -1362,7 +1310,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     setState(() {
       _content = newContent;
-      _selectedParagraphIndices.clear();
+      _interactionController.clearSelection();
       _isCloseupMode = false;
     });
 
@@ -1377,21 +1325,22 @@ class _ReaderScreenState extends State<ReaderScreen>
   /// 执行段落替换
   Future<void> _performReplacement(List<String> paragraphs) async {
     // 从后往前删除，避免索引错乱
-    for (int i = _selectedParagraphIndices.length - 1; i >= 0; i--) {
-      final index = _selectedParagraphIndices[i];
+    final indices = List.from(_selectedParagraphIndices); // 创建副本
+    for (int i = indices.length - 1; i >= 0; i--) {
+      final index = indices[i];
       if (index >= 0 && index < paragraphs.length) {
         paragraphs.removeAt(index);
       }
     }
 
     // 插入生成的内容
-    paragraphs.insert(_selectedParagraphIndices.first, _paragraphRewriteController.streamedContent);
+    paragraphs.insert(indices.first, _paragraphRewriteController.streamedContent);
 
     final newContent = paragraphs.join('\n');
 
     setState(() {
       _content = newContent;
-      _selectedParagraphIndices.clear();
+      _interactionController.clearSelection();
       _isCloseupMode = false;
     });
 
