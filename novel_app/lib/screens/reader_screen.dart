@@ -21,8 +21,6 @@ import '../widgets/paragraph_widget.dart'; // 新增导入
 
 import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
-import '../controllers/paragraph_rewrite_controller.dart';
-import '../controllers/summarize_controller.dart';
 import '../controllers/reader_content_controller.dart';
 import '../controllers/reader_interaction_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
@@ -416,9 +414,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       _loadChapterContent(resetScrollPosition: true);
       // 新系统不需要 _loadIllustrations()
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已经是第一章了')),
-      );
+      _showSnackBar(message: '已经是第一章了');
     }
   }
 
@@ -432,9 +428,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       _loadChapterContent(resetScrollPosition: true);
       // 新系统不需要 _loadIllustrations()
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已经是最后一章了')),
-      );
+      _showSnackBar(message: '已经是最后一章了');
     }
   }
 
@@ -500,14 +494,11 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     // 调用重构后的加载方法，并强制刷新
     await _loadChapterContent(resetScrollPosition: true, forceRefresh: true);
-    
+
     if (mounted && _errorMessage.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('章节已刷新到最新内容'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
+      _showSnackBar(
+        message: '章节已刷新到最新内容',
+        backgroundColor: Colors.green,
       );
     }
   }
@@ -515,11 +506,9 @@ class _ReaderScreenState extends State<ReaderScreen>
   // 更新角色卡功能（使用 CharacterCardService）
   Future<void> _updateCharacterCards() async {
     if (_content.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('章节内容为空，无法更新角色卡'),
-          backgroundColor: Colors.orange,
-        ),
+      _showSnackBar(
+        message: '章节内容为空，无法更新角色卡',
+        backgroundColor: Colors.orange,
       );
       return;
     }
@@ -570,12 +559,10 @@ class _ReaderScreenState extends State<ReaderScreen>
             final savedCharacters = await service.saveCharacters(selectedCharacters);
 
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('成功更新 ${savedCharacters.length} 个角色卡'),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 3),
-                ),
+              _showSnackBar(
+                message: '成功更新 ${savedCharacters.length} 个角色卡',
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
               );
             }
           },
@@ -589,12 +576,10 @@ class _ReaderScreenState extends State<ReaderScreen>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('更新角色卡失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
+        _showSnackBar(
+          message: '更新角色卡失败: $e',
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         );
       }
     }
@@ -646,6 +631,23 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // 已弃用：特写输入逻辑已迁移到改写弹窗流程
 
+  // ========== 辅助方法 ==========
+
+  /// 显示SnackBar提示
+  void _showSnackBar({
+    required String message,
+    Color backgroundColor = Colors.grey,
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: duration,
+      ),
+    );
+  }
+
   // 切换特写模式
   void _toggleCloseupMode() {
     _interactionController.toggleCloseupMode();
@@ -661,11 +663,9 @@ class _ReaderScreenState extends State<ReaderScreen>
   /// 显示段落改写对话框
   Future<void> _showParagraphRewriteDialog() async {
     if (_selectedParagraphIndices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请先选择要改写的段落'),
-          backgroundColor: Colors.orange,
-        ),
+      _showSnackBar(
+        message: '请先选择要改写的段落',
+        backgroundColor: Colors.orange,
       );
       return;
     }
@@ -734,22 +734,17 @@ class _ReaderScreenState extends State<ReaderScreen>
                 _currentChapter.url, newContent);
 
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('全文重写完成并已保存'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
+              _showSnackBar(
+                message: '全文重写完成并已保存',
+                backgroundColor: Colors.green,
               );
             }
           } catch (e) {
             debugPrint('保存章节内容失败: $e');
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('保存失败: $e'),
-                  backgroundColor: Colors.red,
-                ),
+              _showSnackBar(
+                message: '保存失败: $e',
+                backgroundColor: Colors.red,
               );
             }
           }
@@ -766,23 +761,18 @@ class _ReaderScreenState extends State<ReaderScreen>
           _currentChapter.url, _content);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('章节内容已保存'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
+        _showSnackBar(
+          message: '章节内容已保存',
+          backgroundColor: Colors.green,
         );
       }
     } catch (e) {
       debugPrint('保存编辑内容失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存失败: $e'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
+        _showSnackBar(
+          message: '保存失败: $e',
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         );
       }
     }
