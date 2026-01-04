@@ -36,6 +36,10 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   bool _isCancelled = false;
   String _fullContent = '';
 
+  // 调试统计（可选）
+  DateTime? _startTime;
+  int _charCount = 0;
+
   /// 是否正在流式输出
   bool get isStreaming => _isStreaming;
 
@@ -58,6 +62,7 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   /// [startMessage] 开始时的提示信息（可选）
   /// [completeMessage] 完成时的提示信息（可选）
   /// [errorMessagePrefix] 错误消息前缀（默认"操作失败"）
+  /// [enableDebugLog] 是否启用详细调试日志（默认false）
   Future<void> callDifyStreaming({
     required Map<String, dynamic> inputs,
     required void Function(String chunk) onChunk,
@@ -68,6 +73,7 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     String? startMessage,
     String? completeMessage,
     String? errorMessagePrefix,
+    bool enableDebugLog = false,
   }) async {
     if (_isStreaming) {
       debugPrint('⚠️ 已有流式请求在进行中');
@@ -81,6 +87,15 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
       _fullContent = '';
     });
 
+    // 初始化调试统计
+    if (enableDebugLog) {
+      _startTime = DateTime.now();
+      _charCount = 0;
+      debugPrint('🚀 [DifyStreamingMixin] 开始流式交互');
+      debugPrint('命令: ${inputs['cmd']}');
+      debugPrint('输入参数: ${inputs.keys.join(', ')}');
+    }
+
     if (startMessage != null && mounted) {
       showStreamingProgress(message: startMessage);
     }
@@ -91,12 +106,19 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
       // 调用DifyService的流式方法
       await difyService.runWorkflowStreaming(
         inputs: inputs,
+        enableDebugLog: enableDebugLog,  // 传递给 Service 层
         onData: (chunk) {
           if (!mounted || _isCancelled) return;
 
           setState(() {
             _fullContent += chunk;
           });
+
+          // 调试统计
+          if (enableDebugLog) {
+            _charCount += chunk.length;
+            debugPrint('📝 [DifyStreamingMixin] 收到数据块: ${chunk.length}字符 (累计: $_charCount字符)');
+          }
 
           // 回调UI层
           onChunk(chunk);
@@ -109,6 +131,14 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           });
 
           hideStreamingProgress();
+
+          // 调试统计
+          if (enableDebugLog && _startTime != null) {
+            final duration = DateTime.now().difference(_startTime!);
+            debugPrint('✅ [DifyStreamingMixin] 流式交互完成');
+            debugPrint('总字符数: $_charCount');
+            debugPrint('耗时: ${duration.inMilliseconds}ms (${duration.inSeconds}s)');
+          }
 
           if (completeMessage != null && showErrorSnackBar && mounted) {
             _showSnackBar(completeMessage, Colors.green);
@@ -124,6 +154,14 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           });
 
           hideStreamingProgress();
+
+          // 调试统计
+          if (enableDebugLog && _startTime != null) {
+            final duration = DateTime.now().difference(_startTime!);
+            debugPrint('❌ [DifyStreamingMixin] 流式交互失败');
+            debugPrint('已接收字符数: $_charCount');
+            debugPrint('失败前耗时: ${duration.inMilliseconds}ms');
+          }
 
           final errorMsg = '${errorMessagePrefix ?? "操作失败"}: $error';
           if (showErrorSnackBar) {
@@ -143,6 +181,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
       hideStreamingProgress();
 
+      // 调试统计
+      if (enableDebugLog && _startTime != null) {
+        debugPrint('❌ [DifyStreamingMixin] 流式交互异常: $e');
+      }
+
       final errorMsg = '${errorMessagePrefix ?? "操作异常"}: $e';
       if (showErrorSnackBar) {
         _showSnackBar(errorMsg, Colors.red);
@@ -150,6 +193,33 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
       onError?.call(errorMsg);
     }
+  }
+
+  /// 处理特殊标记的数据块（性能优化）
+  ///
+  /// [chunk] 原始数据块
+  ///
+  /// 返回：处理后的内容
+  ///
+  /// 用途：处理特殊标记（如 &lt;&lt;COMPLETE_CONTENT&gt;&gt;），避免UI逐字渲染长文本导致的性能问题
+  ///
+  /// 示例：
+  /// ```dart
+  /// onChunk: (chunk) {
+  ///   final processed = handleSpecialChunk(chunk);
+  ///   setState(() {
+  ///     _content += processed;
+  ///   });
+  /// }
+  /// ```
+  String handleSpecialChunk(String chunk) {
+    const completeContentMarker = '<<COMPLETE_CONTENT>>';
+    if (chunk.startsWith(completeContentMarker)) {
+      // 返回完整内容（去除标记）
+      return chunk.substring(completeContentMarker.length);
+    }
+    // 返回原始内容
+    return chunk;
   }
 
   /// 取消流式输出

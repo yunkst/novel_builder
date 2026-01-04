@@ -1,0 +1,860 @@
+import 'package:flutter/material.dart';
+import '../models/novel.dart';
+import '../models/chapter.dart';
+import '../models/outline.dart';
+import '../widgets/character_selector.dart';
+import '../controllers/outline_draft_controller.dart';
+import '../services/outline_service.dart';
+import '../services/database_service.dart';
+import '../controllers/chapter_list/outline_integration_handler.dart';
+
+/// 插入模式枚举
+enum _InsertMode { manual, outline }
+
+/// 插入章节全屏页面
+/// 支持手动输入和按大纲生成两种模式
+class InsertChapterScreen extends StatefulWidget {
+  final Novel novel;
+  final int afterIndex;
+  final List<Chapter> chapters;
+  final String? prefillTitle;
+  final String? prefillContent;
+
+  const InsertChapterScreen({
+    required this.novel,
+    required this.afterIndex,
+    required this.chapters,
+    this.prefillTitle,
+    this.prefillContent,
+    super.key,
+  });
+
+  @override
+  State<InsertChapterScreen> createState() => _InsertChapterScreenState();
+}
+
+class _InsertChapterScreenState extends State<InsertChapterScreen> {
+  // 控制器和初始化
+  late final TextEditingController _titleController;
+  late final TextEditingController _userInputController;
+  late final TextEditingController _draftEditingController;
+  final OutlineDraftController _draftController = OutlineDraftController();
+  final OutlineService _outlineService = OutlineService();
+  final DatabaseService _databaseService = DatabaseService();
+
+  // 状态管理
+  _InsertMode _currentMode = _InsertMode.manual;
+  int _currentStep = 0;
+  List<int> _selectedCharacterIds = [];
+  Outline? _outline;
+  bool _isLoadingOutline = true;
+
+  // 前文内容缓存（避免重复获取）
+  List<String>? _cachedPreviousChapters;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.prefillTitle ?? '');
+    _userInputController = TextEditingController(text: widget.prefillContent ?? '');
+    _draftEditingController = TextEditingController();
+    // 设置TextField控制器到DraftController
+    _draftController.setTextController(_draftEditingController);
+    _loadOutline();
+  }
+
+  @override
+  void dispose() {
+    // 取消正在进行的生成任务，防止内存泄漏
+    _draftController.cancel();
+
+    _titleController.dispose();
+    _userInputController.dispose();
+    _draftEditingController.dispose();
+    _draftController.dispose();
+    super.dispose();
+  }
+
+  /// 加载大纲
+  Future<void> _loadOutline() async {
+    setState(() {
+      _isLoadingOutline = true;
+    });
+
+    try {
+      final outline = await _outlineService.getOutline(widget.novel.url);
+      setState(() {
+        _outline = outline;
+        _isLoadingOutline = false;
+        // 如果没有大纲，默认使用手动模式
+        if (outline == null) {
+          _currentMode = _InsertMode.manual;
+        }
+      });
+    } catch (e) {
+      // 加载大纲失败，默认使用手动模式
+      setState(() {
+        _outline = null;
+        _isLoadingOutline = false;
+        _currentMode = _InsertMode.manual;
+      });
+      debugPrint('加载大纲失败: $e');
+    }
+  }
+
+  /// 处理确认按钮点击
+  void _handleConfirm() {
+    // 大纲模式：生成细纲后进入下一步
+    if (_currentMode == _InsertMode.outline && _currentStep == 0) {
+      // 用户输入现在是可选的，不再进行必填验证
+      _generateOutlineDraft();
+      return;
+    }
+
+    // 最终确认：生成章节
+    if (_currentStep == 1) {
+      if (_titleController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请输入章节标题'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final content = _currentMode == _InsertMode.outline
+          ? _draftEditingController.text.trim()
+          : _userInputController.text.trim();
+
+      if (content.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请输入章节内容要求'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      Navigator.pop(context, {
+        'title': _titleController.text.trim(),
+        'content': content,
+        'characterIds': _selectedCharacterIds,
+      });
+    }
+
+    // 手动模式：直接确认
+    if (_currentMode == _InsertMode.manual) {
+      if (_titleController.text.trim().isEmpty ||
+          _userInputController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请填写完整的章节信息'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      Navigator.pop(context, {
+        'title': _titleController.text.trim(),
+        'content': _userInputController.text.trim(),
+        'characterIds': _selectedCharacterIds,
+      });
+    }
+  }
+
+  /// 生成大纲细纲
+  Future<void> _generateOutlineDraft() async {
+    if (_outline == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('未找到大纲，请先创建大纲'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 并发调用防护：如果正在生成，直接返回
+    if (_draftController.isLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('正在生成中，请稍候...'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // 获取前文内容（首次获取时缓存）
+      _cachedPreviousChapters ??= await _getPreviousChapters();
+
+      // 非阻塞调用：启动生成
+      _draftController.generateDraft(
+        outline: _outline!.content,
+        historyChaptersContent: _cachedPreviousChapters!,
+        userInput: _userInputController.text.trim(),
+      );
+
+      // 立即跳转到步骤1,在编辑框中流式显示生成内容
+      if (mounted) {
+        setState(() {
+          _currentStep = 1;
+          _draftEditingController.clear(); // 清空准备接收流式内容
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('生成细纲失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 获取前文内容（封装为独立方法，便于缓存）
+  Future<List<String>> _getPreviousChapters() async {
+    final handler = OutlineIntegrationHandler(
+      outlineService: _outlineService,
+      databaseService: _databaseService,
+    );
+
+    return await handler.getPreviousChaptersContent(
+      chapters: widget.chapters,
+      afterIndex: widget.afterIndex,
+    );
+  }
+
+  /// 重新生成细纲
+  Future<void> _regenerateDraft() async {
+    String? feedback;
+
+    try {
+      final feedbackController = TextEditingController();
+
+      feedback = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('重新生成细纲'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: feedbackController,
+                decoration: const InputDecoration(
+                  labelText: '修改意见',
+                  hintText: '请描述您希望如何调整细纲...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, feedbackController.text.trim());
+              },
+              child: const Text('确认'),
+            ),
+          ],
+        ),
+      );
+
+      feedbackController.dispose();
+    } catch (e) {
+      debugPrint('❌ 显示修改意见对话框失败: $e');
+      return;
+    }
+
+    if (feedback == null || feedback.isEmpty) return;
+
+    try {
+      // 调用控制器重新生成（使用缓存的前文）
+      await _draftController.generateDraft(
+        outline: _outline!.content,
+        historyChaptersContent: _cachedPreviousChapters ?? [],
+        userInput: feedback,
+        existingDraft: _draftEditingController.text,
+      );
+
+      // 更新编辑框内容
+      if (mounted && _draftController.error == null) {
+        setState(() {
+          _draftEditingController.text = _draftController.streamedContent;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('重新生成失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = widget.chapters.isEmpty;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Icon(Icons.add_circle, color: Colors.blue),
+            const SizedBox(width: 8),
+            Text(isEmpty ? '创建新章节' : '插入新章节'),
+          ],
+        ),
+      ),
+      body: _isLoadingOutline
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('正在加载大纲...'),
+                ],
+              ),
+            )
+          : _buildBody(),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  /// 构建模式选择卡片
+  Widget _buildModeSelector() {
+    // 如果没有大纲,不显示选择器(直接使用手动模式)
+    if (_outline == null) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SegmentedButton<_InsertMode>(
+          segments: const [
+            ButtonSegment(
+              value: _InsertMode.manual,
+              label: Row(
+                children: [
+                  Icon(Icons.edit, size: 18),
+                  SizedBox(width: 8),
+                  Text('手动输入'),
+                ],
+              ),
+            ),
+            ButtonSegment(
+              value: _InsertMode.outline,
+              label: Row(
+                children: [
+                  Icon(Icons.menu_book, size: 18),
+                  SizedBox(width: 8),
+                  Text('按大纲生成'),
+                ],
+              ),
+            ),
+          ],
+          selected: {_currentMode},
+          onSelectionChanged: (Set<_InsertMode> selection) {
+            setState(() {
+              _currentMode = selection.first;
+              _currentStep = 0; // 切换模式时重置步骤
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  /// 构建步骤指示器(仅大纲模式显示)
+  Widget _buildStepIndicator() {
+    // 仅在大纲模式显示
+    if (_currentMode != _InsertMode.outline) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildStepItem(0, '输入要求'),
+          const SizedBox(width: 32),
+          const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+          const SizedBox(width: 32),
+          _buildStepItem(1, '编辑细纲'),
+        ],
+      ),
+    );
+  }
+
+  /// 构建单个步骤指示项
+  Widget _buildStepItem(int step, String label) {
+    final isActive = _currentStep == step;
+
+    return Column(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive ? Colors.blue : Colors.grey.shade300,
+          ),
+          child: Center(
+            child: Text(
+              '${step + 1}',
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: isActive ? Colors.blue : Colors.grey.shade600,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 构建页面主体
+  Widget _buildBody() {
+    return ListView(
+      children: [
+        // 1. 模式选择卡片
+        _buildModeSelector(),
+
+        // 2. 步骤指示器(仅大纲模式)
+        _buildStepIndicator(),
+
+        // 3. 内容区域
+        ..._buildContentArea(),
+      ],
+    );
+  }
+
+  /// 构建内容区域(辅助方法,用于处理条件渲染)
+  List<Widget> _buildContentArea() {
+    if (_currentMode == _InsertMode.outline) {
+      // 大纲模式
+      if (_currentStep == 0) return [_buildStep0Content()];
+      if (_currentStep == 1) return [_buildStep1Content()];
+      return [];
+    } else {
+      // 手动模式
+      return [_buildManualModeContent()];
+    }
+  }
+
+  /// 构建手动模式内容
+  Widget _buildManualModeContent() {
+    final isEmpty = widget.chapters.isEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 提示信息
+          Card(
+            child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isEmpty
+                        ? '将为小说"${widget.novel.title}"创建第一章'
+                        : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // 章节标题输入
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: '章节标题',
+                hintText: isEmpty ? '例如：第一章 故事的开始' : '例如：第十五章 意外的相遇',
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // 章节内容要求输入
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _userInputController,
+              decoration: const InputDecoration(
+                labelText: '章节内容要求',
+                hintText: '描述你想要的故事情节、人物对话、场景描述等...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 8,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // 出场人物选择
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.people, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '出场人物（可选）',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                CharacterSelector(
+                  novelUrl: widget.novel.url,
+                  initialSelectedIds: _selectedCharacterIds,
+                  onSelectionChanged: (selectedIds) {
+                    setState(() {
+                      _selectedCharacterIds = selectedIds;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'AI将根据选中的角色特征来生成章节内容',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      ),
+    );
+  }
+
+  /// 构建步骤0内容：输入要求
+  Widget _buildStep0Content() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 大纲预览
+          Card(
+            color: Colors.blue.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.menu_book, size: 20, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        '大纲: ${_outline!.title}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _outline!.content.length > 300
+                        ? '${_outline!.content.substring(0, 300)}...'
+                        : _outline!.content,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 用户输入
+          TextField(
+            controller: _userInputController,
+            decoration: const InputDecoration(
+              labelText: '章节要求（可选）',
+            hintText: '描述您希望这一章包含的内容、情节、冲突等，留空则完全根据大纲生成...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 5,
+          autofocus: true,
+          enabled: !_draftController.isLoading, // 生成时禁用输入
+        ),
+
+        const SizedBox(height: 12),
+
+        Text(
+          'AI将根据大纲生成章节细纲，您可以提供额外要求来引导生成方向',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建步骤1内容：编辑细纲
+  Widget _buildStep1Content() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 章节标题输入
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: '章节标题',
+                  hintText: '例如：第十六章 转折点',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 细纲内容显示/编辑
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '章节细纲',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (_draftController.isLoading)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          tooltip: '重新生成',
+                          onPressed: _regenerateDraft,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _draftEditingController,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 10,
+                    enabled: !_draftController.isLoading,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 角色选择
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.people, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '出场人物（可选）',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CharacterSelector(
+                    novelUrl: widget.novel.url,
+                    initialSelectedIds: _selectedCharacterIds,
+                    onSelectionChanged: (selectedIds) {
+                      setState(() {
+                        _selectedCharacterIds = selectedIds;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建底部操作栏
+  Widget _buildBottomBar() {
+    // 手动模式
+    if (_currentMode == _InsertMode.manual) {
+      return _buildButtonBar(
+        leftChild: TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        rightChild: ElevatedButton(
+          onPressed: _handleConfirm,
+          child: const Text('生成'),
+        ),
+      );
+    }
+
+    // 大纲模式步骤0
+    if (_currentStep == 0) {
+      return _buildButtonBar(
+        leftChild: TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        rightChild: ElevatedButton.icon(
+          onPressed: _draftController.isLoading ? null : _handleConfirm,
+          icon: _draftController.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.auto_awesome),
+          label: Text(_draftController.isLoading ? '生成中...' : '生成细纲'),
+        ),
+      );
+    }
+
+    // 大纲模式步骤1
+    return _buildButtonBar(
+      leftChild: TextButton.icon(
+        onPressed: () {
+          setState(() {
+            _currentStep = 0;
+          });
+        },
+        icon: const Icon(Icons.arrow_back),
+        label: const Text('上一步'),
+      ),
+      rightChild: ElevatedButton(
+        onPressed: _handleConfirm,
+        child: const Text('确认生成'),
+      ),
+    );
+  }
+
+  /// 通用按钮栏构建器
+  Widget _buildButtonBar({required Widget leftChild, required Widget rightChild}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          leftChild,
+          const Spacer(),
+          rightChild,
+        ],
+      ),
+    );
+  }
+}

@@ -78,6 +78,20 @@ class StreamConfig {
     );
   }
 
+  /// 创建大纲细纲配置
+  factory StreamConfig.outlineDraft({
+    required Map<String, dynamic> inputs,
+    String? generatingHint,
+  }) {
+    return StreamConfig(
+      type: StreamType.outlineDraft,
+      inputs: inputs,
+      generatingHint: generatingHint ?? 'AI正在生成章节细纲，请稍候...',
+      maxLines: 15,
+      minLines: 6,
+    );
+  }
+
   /// 创建自定义配置
   factory StreamConfig.custom({
     required Map<String, dynamic> inputs,
@@ -178,6 +192,9 @@ enum StreamType {
 
   /// 场景描写生成
   sceneDescription,
+
+  /// 大纲细纲生成
+  outlineDraft,
 
   /// 自定义类型
   custom,

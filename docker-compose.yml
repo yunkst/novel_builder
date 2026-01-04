@@ -1,5 +1,6 @@
 services:
   backend:
+    restart: unless-stopped
     build:
       context: ./backend
       dockerfile: Dockerfile.debug
@@ -28,6 +29,7 @@ services:
         condition: service_healthy
 
   postgres:
+    restart: unless-stopped
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=novel_user

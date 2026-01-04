@@ -1498,6 +1498,7 @@ class MockDifyService extends _i1.Mock implements _i16.DifyService {
     required dynamic Function(String)? onData,
     dynamic Function(String)? onError,
     dynamic Function()? onDone,
+    bool? enableDebugLog = false,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1508,6 +1509,7 @@ class MockDifyService extends _i1.Mock implements _i16.DifyService {
             #onData: onData,
             #onError: onError,
             #onDone: onDone,
+            #enableDebugLog: enableDebugLog,
           },
         ),
         returnValue: _i7.Future<void>.value(),

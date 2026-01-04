@@ -250,6 +250,8 @@ class SceneIllustrationService:
             ValueError: 当任务不存在时
         """
         try:
+            logger.info(f"🔍 [DEBUG] 开始获取任务 {task_id} 的图片列表")
+
             # 1. 查找任务对应的所有 ComfyUI prompt_id
             mappings = (
                 db.query(SceneComfyUITask)
@@ -263,7 +265,7 @@ class SceneIllustrationService:
                 return await self._get_gallery_from_legacy_table(task_id, db)
 
             comfyui_prompt_ids = [m.comfyui_prompt_id for m in mappings]
-            logger.info(f"任务 {task_id}: 找到 {len(comfyui_prompt_ids)} 个ComfyUI任务")
+            logger.info(f"任务 {task_id}: 找到 {len(comfyui_prompt_ids)} 个ComfyUI任务: {comfyui_prompt_ids}")
 
             # 2. 批量查询所有 prompt_id 的图片记录（优化：一次查询）
             image_records = (
@@ -278,6 +280,8 @@ class SceneIllustrationService:
             # 3. 遍历处理每个 prompt_id
             all_images: list[str] = []
             for prompt_id in comfyui_prompt_ids:
+                logger.info(f"🔍 [DEBUG] 处理 prompt_id: {prompt_id}")
+
                 image_record = records_dict.get(prompt_id)
 
                 if not image_record:
@@ -291,18 +295,22 @@ class SceneIllustrationService:
                     # 更新字典
                     records_dict[prompt_id] = image_record
 
+                # 打印数据库状态
+                logger.info(f"  📊 [DEBUG] 数据库状态: status_fetched={image_record.status_fetched}, images_count={len(image_record.images) if image_record.images else 0}")
+
                 # 解析图片列表（从JSON字符串）
                 try:
                     images_str: str = cast("str", image_record.images) or "[]"
                     images_list = json.loads(images_str) if images_str else []
-                except json.JSONDecodeError:
-                    logger.error(f"ComfyUI任务 {prompt_id}: 图片数据格式错误")
+                    logger.info(f"  📷 [DEBUG] 数据库中的图片列表: {images_list}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"ComfyUI任务 {prompt_id}: 图片数据格式错误: {e}")
                     images_list = []
 
                 if images_list:
                     # 情况1：已有图片，直接使用
                     logger.info(
-                        f"ComfyUI任务 {prompt_id}: 从数据库获取 {len(images_list)} 张图片"
+                        f"  ✅ [DEBUG] 从数据库获取 {len(images_list)} 张图片，不需要重新获取"
                     )
                     all_images.extend(images_list)
                 elif not image_record.status_fetched or (
@@ -310,26 +318,33 @@ class SceneIllustrationService:
                 ):
                     # 情况2：无图片且未获取过，或已获取过但结果为空（可能ComfyUI还在处理）
                     # 允许重新获取，避免ComfyUI未完成时过早标记为已获取
+
+                    logger.info(f"  🔄 [DEBUG] 判断条件: not status_fetched={not image_record.status_fetched}")
+                    logger.info(f"  🔄 [DEBUG] 判断条件: status_fetched and not images_list={image_record.status_fetched and not images_list}")
+
                     if image_record.status_fetched and not images_list:
                         logger.warning(
                             f"ComfyUI任务 {prompt_id}: 之前获取时无图片，尝试重新获取"
                         )
 
-                    logger.info(f"ComfyUI任务 {prompt_id}: 从ComfyUI API获取图片")
+                    logger.info(f"  🌐 [DEBUG] 从ComfyUI API获取图片...")
                     prompt_id_str: str = cast("str", prompt_id)
                     images = await self._fetch_images_from_comfyui(prompt_id_str)
+                    logger.info(f"  📷 [DEBUG] ComfyUI API返回的图片列表: {images}")
 
                     # 更新数据库
                     image_record.images = json.dumps(images)  # type: ignore[assignment]
                     image_record.status_fetched = True  # type: ignore[assignment]
                     image_record.fetched_at = datetime.now()  # type: ignore[assignment]
                     db.commit()
+                    logger.info(f"  💾 [DEBUG] 已更新数据库: status_fetched=True, images_count={len(images)}")
 
                     all_images.extend(images)
                 else:
                     # 情况3：已获取过但无图片（ComfyUI 失败）
                     logger.warning(f"ComfyUI任务 {prompt_id}: 已获取过但无图片")
 
+            logger.info(f"🎯 [DEBUG] 最终返回 {len(all_images)} 张图片: {all_images}")
             return SceneGalleryResponse(task_id=task_id, images=all_images)
 
         except SQLAlchemyError as e:
@@ -448,6 +463,8 @@ class SceneIllustrationService:
             ValueError: 当参数无效时
         """
         try:
+            logger.info(f"🗑️ [DEBUG] 开始删除图片: task_id={request.task_id}, filename={request.filename}")
+
             # 检查任务是否存在
             task = (
                 db.query(SceneIllustrationTask)
@@ -469,10 +486,13 @@ class SceneIllustrationService:
                 raise ValueError("任务无相关图片记录")
 
             comfyui_prompt_ids = [m.comfyui_prompt_id for m in mappings]
+            logger.info(f"  📋 [DEBUG] 找到 {len(comfyui_prompt_ids)} 个ComfyUI任务: {comfyui_prompt_ids}")
             deleted = False
 
             # 在每个 ComfyUI 图片记录中查找并删除指定图片
             for prompt_id in comfyui_prompt_ids:
+                logger.info(f"  🔍 [DEBUG] 检查 prompt_id: {prompt_id}")
+
                 image_record = (
                     db.query(SceneComfyUIImages)
                     .filter(SceneComfyUIImages.comfyui_prompt_id == prompt_id)
@@ -485,17 +505,35 @@ class SceneIllustrationService:
                         images_str: str = cast("str", image_record.images) or "[]"
                         images_list = json.loads(images_str) if images_str else []
 
+                        logger.info(f"    📷 [DEBUG] 当前图片列表 ({len(images_list)}张): {images_list}")
+
                         # 检查图片是否在列表中
                         if request.filename in images_list:
-                            # 删除图片
-                            images_list.remove(request.filename)
-                            # 更新数据库
-                            image_record.images = json.dumps(images_list)  # type: ignore[assignment]
+                            # 删除整个记录（因为一个 ComfyUI 任务对应一张图）
+                            logger.info(f"    ❌ [DEBUG] 找到要删除的图片，删除整个任务记录: {prompt_id}")
+
+                            # 删除图片记录
+                            db.delete(image_record)
+
+                            # 删除映射关系
+                            mapping_to_delete = (
+                                db.query(SceneComfyUITask)
+                                .filter(
+                                    SceneComfyUITask.task_id == request.task_id,
+                                    SceneComfyUITask.comfyui_prompt_id == prompt_id
+                                )
+                                .first()
+                            )
+                            if mapping_to_delete:
+                                db.delete(mapping_to_delete)
+
                             db.commit()
                             deleted = True
                             logger.info(
-                                f"成功从 ComfyUI 任务 {prompt_id} 中删除图片: {request.filename}"
+                                f"成功删除 ComfyUI 任务 {prompt_id} 及其图片记录"
                             )
+                        else:
+                            logger.info(f"    ⏭️ [DEBUG] 图片不在此列表中，跳过")
                     except json.JSONDecodeError:
                         logger.error(f"ComfyUI任务 {prompt_id}: 图片数据格式错误")
                         continue
@@ -504,7 +542,7 @@ class SceneIllustrationService:
                 raise ValueError("图片不存在")
 
             db.commit()
-            logger.info(f"删除场面图片成功: {request.task_id}/{request.filename}")
+            logger.info(f"✅ [DEBUG] 删除场面图片成功: {request.task_id}/{request.filename}")
             return True
 
         except SQLAlchemyError as e:

@@ -15,13 +15,13 @@ import '../widgets/chapter_list/chapter_list_item.dart';
 import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
 import '../dialogs/chapter_list/delete_chapter_dialog.dart';
-import '../dialogs/chapter_list/insert_chapter_dialog.dart';
+import 'insert_chapter_screen.dart';
 import '../dialogs/chapter_list/chapter_generation_dialog.dart';
 import '../controllers/chapter_list/bookshelf_manager.dart';
 import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
 import '../controllers/chapter_list/chapter_reorder_controller.dart';
-import '../controllers/chapter_list/chapter_generator.dart';
+import '../services/chapter_service.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -44,7 +44,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   late final ChapterLoader _chapterLoader;
   late final ChapterActionHandler _chapterActionHandler;
   late final ChapterReorderController _reorderController;
-  late final ChapterGenerator _chapterGenerator;
+  late final ChapterService _chapterService;
 
   List<Chapter> _chapters = [];
   bool _isLoading = true;
@@ -79,9 +79,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     _reorderController = ChapterReorderController(
       databaseService: _databaseService,
     );
-    _chapterGenerator = ChapterGenerator(
+    _chapterService = ChapterService(
       databaseService: _databaseService,
-      difyService: _difyService,
     );
 
     _initApi();
@@ -322,19 +321,23 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-  // 显示插入章节的弹框
+  // 显示插入章节的页面
   Future<void> _showInsertChapterDialog(
     int afterIndex, {
     String? prefillTitle,
     String? prefillContent,
   }) async {
-    final result = await InsertChapterDialog.show(
-      context: context,
-      novel: widget.novel,
-      afterIndex: afterIndex,
-      chapters: _chapters,
-      prefillTitle: prefillTitle,
-      prefillContent: prefillContent,
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InsertChapterScreen(
+          novel: widget.novel,
+          afterIndex: afterIndex,
+          chapters: _chapters,
+          prefillTitle: prefillTitle,
+          prefillContent: prefillContent,
+        ),
+      ),
     );
 
     if (result != null && result.isNotEmpty) {
@@ -388,12 +391,18 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     _generatedContentNotifier.value = '';
 
     try {
-      await _chapterGenerator.generateChapter(
+      // 使用 ChapterService 构建完整的 inputs
+      final inputs = await _chapterService.buildChapterGenerationInputs(
         novel: widget.novel,
         chapters: _chapters,
         afterIndex: afterIndex,
         userInput: userInput,
         characterIds: characterIds,
+      );
+
+      // 直接调用 DifyService 进行流式生成
+      await _difyService.runWorkflowStreaming(
+        inputs: inputs,
         onData: (data) {
           if (mounted) {
             _generatedContentNotifier.value += data;
@@ -409,6 +418,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         onDone: () {
           _isGeneratingNotifier.value = false;
         },
+        enableDebugLog: false,
       );
     } catch (e) {
       _isGeneratingNotifier.value = false;
@@ -438,8 +448,23 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       await _loadChapters();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('章节插入成功')),
+        // 查找刚插入的章节
+        final insertedChapter = _chapters.firstWhere(
+          (c) => c.title == title,
+          orElse: () => _chapters.isNotEmpty ? _chapters[insertIndex] : _chapters.last,
+        );
+
+        // 跳转到阅读页面
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReaderScreen(
+              novel: widget.novel,
+              chapter: insertedChapter,
+              chapters: _chapters,
+            ),
+          ),
+          (route) => route.isFirst, // 保留首页
         );
       }
     } catch (e) {

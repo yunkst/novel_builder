@@ -20,6 +20,15 @@ class DatabaseService {
 
   DatabaseService._internal();
 
+  /// 内存状态跟踪：已确认缓存的章节URL
+  final Set<String> _cachedInMemory = <String>{};
+
+  /// 内存状态跟踪：正在预加载的章节URL
+  final Set<String> _preloading = <String>{};
+
+  /// 内存缓存最大容量（防止无限增长）
+  static const int _maxMemoryCacheSize = 1000;
+
   bool get isWebPlatform => kIsWeb;
 
   Future<Database> get database async {
@@ -383,11 +392,79 @@ class DatabaseService {
 
   // ========== 章节缓存操作 ==========
 
+  /// 添加到内存缓存（带容量限制）
+  void _addCachedInMemory(String chapterUrl) {
+    if (_cachedInMemory.length >= _maxMemoryCacheSize) {
+      // 简单策略：清空所有缓存
+      // 更好的策略是使用LRU，但这里为了简洁使用清空策略
+      _cachedInMemory.clear();
+      debugPrint('🧹 内存缓存已满，已清空 (${_maxMemoryCacheSize}条)');
+    }
+    _cachedInMemory.add(chapterUrl);
+  }
+
+  /// 检查章节是否已缓存（内存优先）
+  ///
+  /// 先检查内存状态，如果内存中没有则查询数据库
+  /// 查询成功后会更新内存状态以提高后续查询性能
+  Future<bool> isChapterCached(String chapterUrl) async {
+    // 先检查内存缓存
+    if (_cachedInMemory.contains(chapterUrl)) {
+      return true;
+    }
+
+    // 再检查数据库
+    final content = await getCachedChapter(chapterUrl);
+    if (content != null && content.isNotEmpty) {
+      _addCachedInMemory(chapterUrl);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// 批量检查缓存状态，返回未缓存的章节URL列表
+  ///
+  /// [chapterUrls] 章节URL列表
+  /// 返回未缓存的章节URL列表
+  Future<List<String>> filterUncachedChapters(List<String> chapterUrls) async {
+    final uncached = <String>[];
+
+    for (final url in chapterUrls) {
+      if (!await isChapterCached(url)) {
+        uncached.add(url);
+      }
+    }
+
+    return uncached;
+  }
+
+  /// 标记章节正在预加载
+  ///
+  /// 用于防止重复预加载同一章节
+  void markAsPreloading(String chapterUrl) {
+    _preloading.add(chapterUrl);
+  }
+
+  /// 检查章节是否正在预加载
+  bool isPreloading(String chapterUrl) {
+    return _preloading.contains(chapterUrl);
+  }
+
+  /// 清理内存状态
+  ///
+  /// App启动或需要重置状态时调用
+  void clearMemoryState() {
+    _cachedInMemory.clear();
+    _preloading.clear();
+    debugPrint('🧹 DatabaseService内存状态已清理');
+  }
+
   /// 缓存章节内容
   Future<int> cacheChapter(
       String novelUrl, Chapter chapter, String content) async {
     final db = await database;
-    return await db.insert(
+    final result = await db.insert(
       'chapter_cache',
       {
         'novelUrl': novelUrl,
@@ -399,6 +476,12 @@ class DatabaseService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // 更新内存状态
+    _addCachedInMemory(chapter.url);
+    _preloading.remove(chapter.url);
+
+    return result;
   }
 
   /// 更新章节内容
@@ -446,17 +529,6 @@ class DatabaseService {
       return cleanedContent;
     }
     return null;
-  }
-
-  /// 检查章节是否已缓存
-  Future<bool> isChapterCached(String chapterUrl) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'chapter_cache',
-      where: 'chapterUrl = ?',
-      whereArgs: [chapterUrl],
-    );
-    return maps.isNotEmpty;
   }
 
   /// 获取小说的所有缓存章节

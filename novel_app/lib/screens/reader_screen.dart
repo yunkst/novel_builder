@@ -8,29 +8,26 @@ import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/dify_service.dart';
-import '../services/scene_illustration_service.dart';
-import '../services/chapter_manager.dart';
+import '../services/preload_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../mixins/dify_streaming_mixin.dart';
+import '../mixins/reader/auto_scroll_mixin.dart';
+import '../mixins/reader/illustration_handler_mixin.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/scene_illustration_dialog.dart';
-import '../widgets/illustration_action_dialog.dart';
-import '../widgets/generate_more_dialog.dart';
-import '../widgets/video_input_dialog.dart';
 import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
 import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
 import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
-import '../services/auto_scroll_controller.dart'; // 新增导入
 
 import '../utils/character_matcher.dart';
 import '../utils/media_markup_parser.dart';
-import '../utils/video_generation_state_manager.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/paragraph_rewrite_controller.dart';
 import '../controllers/summarize_controller.dart';
-import '../data/repositories/reader_repository.dart';
+import '../widgets/reader/paragraph_rewrite_dialog.dart';
+import '../widgets/reader/chapter_summary_dialog.dart';
 import 'package:provider/provider.dart';
 
 class ReaderScreen extends StatefulWidget {
@@ -52,14 +49,13 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen>
-    with TickerProviderStateMixin, DifyStreamingMixin {
+    with TickerProviderStateMixin, DifyStreamingMixin, AutoScrollMixin, IllustrationHandlerMixin {
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
-  final ReaderRepository _readerRepository = ReaderRepository();
   final ScrollController _scrollController = ScrollController();
   final ParagraphRewriteController _paragraphRewriteController = ParagraphRewriteController();
   final SummarizeController _summarizeController = SummarizeController();
-  late final HighPerformanceAutoScrollController _autoScrollController; // 新增
+  // 注意：Controller 保留用于兼容旧代码
 
   // 光标动画控制器
   late AnimationController _cursorController;
@@ -85,21 +81,13 @@ class _ReaderScreenState extends State<ReaderScreen>
   String _lastFullRewriteInput = '';
 
   // 预加载相关状态
-  final ChapterManager _chapterManager = ChapterManager();
+  final PreloadService _preloadService = PreloadService();
 
-  // 自动滚动相关状态
-  bool _isAutoScrolling = false;      // 实际是否正在滚动
-  bool _shouldAutoScroll = false;     // 是否应该自动滚动（意图标记，用于恢复判断）
-  bool _isUserScrolling = false;      // 标记用户是否正在滚动
-  DateTime? _autoScrollStartTime;     // 自动滚动启动时间（用于保护期）
-  static const Duration _startupProtectionDuration = Duration(milliseconds: 500);  // 启动保护期：500ms
-  // _wasAutoScrollingBeforeTouch 和 _isUserTouching 已移除 - 不再需要触摸暂停功能
-  // _autoScrollTimer 已移除 - 使用 HighPerformanceAutoScrollController 替代
+  // 注意：自动滚动相关的字段和方法已提取到 AutoScrollMixin
+  // 注意：插图处理相关的方法已提取到 IllustrationHandlerMixin
 
-  // 场景插图相关服务
-  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
+  // 保留滚动速度配置（供 AutoScrollMixin 使用）
   double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
-  static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
 
   @override
   void initState() {
@@ -107,9 +95,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     _currentChapter = widget.chapter;
 
     // 初始化自动滚动控制器
-    _autoScrollController = HighPerformanceAutoScrollController(
-      scrollController: _scrollController,
-    );
+    initAutoScroll(scrollController: _scrollController);
 
     // 初始化光标动画
     _cursorController = AnimationController(
@@ -145,7 +131,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   void dispose() {
-    _autoScrollController.dispose(); // 清理自动滚动控制器
+    disposeAutoScroll(); // 清理自动滚动资源（AutoScrollMixin）
     _cursorController.dispose();
     _scrollController.dispose();
     _fullRewriteResultNotifier.dispose();
@@ -165,11 +151,33 @@ class _ReaderScreenState extends State<ReaderScreen>
     });
 
     try {
-      final content = await _readerRepository.getChapterContent(
-        widget.novel.url,
-        _currentChapter,
-        forceRefresh: forceRefresh,
-      );
+      // 直接使用DatabaseService和ApiService，移除ReaderRepository中间层
+      String content;
+
+      // 强制刷新时先删除缓存
+      if (forceRefresh) {
+        await _databaseService.deleteChapterCache(_currentChapter.url);
+      }
+
+      // 尝试从缓存获取
+      final cachedContent = await _databaseService.getCachedChapter(_currentChapter.url);
+      if (cachedContent != null && cachedContent.isNotEmpty) {
+        content = cachedContent;
+      } else {
+        // 缓存未命中，从API获取
+        content = await _apiService.getChapterContent(_currentChapter.url, forceRefresh: forceRefresh);
+
+        // 验证内容并缓存
+        if (content.isNotEmpty && content.length > 50) {
+          await _databaseService.cacheChapter(
+            widget.novel.url,
+            _currentChapter,
+            content,
+          );
+        } else {
+          throw Exception('获取到的章节内容为空或过短');
+        }
+      }
 
       setState(() {
         _content = content;
@@ -184,6 +192,30 @@ class _ReaderScreenState extends State<ReaderScreen>
         _isLoading = false;
         _errorMessage = '加载章节失败: ${_getErrorMessage(e)}';
       });
+    }
+  }
+
+  /// 启动预加载章节（使用新的PreloadService）
+  Future<void> _startPreloadingChapters() async {
+    try {
+      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      if (currentIndex == -1) return;
+
+      final chapterUrls = widget.chapters.map((c) => c.url).toList();
+
+      debugPrint('=== 触发预加载 (PreloadService) ===');
+      debugPrint('当前章节: ${_currentChapter.title}');
+      debugPrint('总章节数: ${widget.chapters.length}');
+
+      // 使用PreloadService进行预加载
+      await _preloadService.enqueueTasks(
+        novelUrl: widget.novel.url,
+        novelTitle: widget.novel.title,
+        chapterUrls: chapterUrls,
+        currentIndex: currentIndex,
+      );
+    } catch (e) {
+      debugPrint('❌ 预加载启动失败: $e');
     }
   }
 
@@ -252,7 +284,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       Navigator.pop(context);
                       final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
                       if (markup.isIllustration) {
-                        _generateVideoFromIllustration(markup.id);
+                        generateVideoFromIllustration(markup.id); // Mixin方法
                       }
                     },
                   ),
@@ -433,47 +465,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-  /// 开始预加载章节
-  /// 优先加载后续章节，然后是前面的章节
-  /// 现在使用ChapterManager单例管理预加载状态
-  Future<void> _startPreloadingChapters() async {
-    try {
-      final currentIndex =
-          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
-      if (currentIndex == -1) return;
-
-      // 构建预加载列表：优先后续章节
-      final List<String> chapterUrlsToPreload = [];
-
-      // 添加后续章节（优先）
-      for (int i = currentIndex + 1; i < widget.chapters.length; i++) {
-        chapterUrlsToPreload.add(widget.chapters[i].url);
-      }
-
-      // 添加前面的章节
-      for (int i = currentIndex - 1; i >= 0; i--) {
-        chapterUrlsToPreload.add(widget.chapters[i].url);
-      }
-
-      debugPrint('=== 开始预加载章节（使用ChapterManager）===');
-      debugPrint('当前章节: ${_currentChapter.title}');
-      debugPrint('总章节数: ${widget.chapters.length}');
-      debugPrint('预加载章节数: ${chapterUrlsToPreload.length}');
-
-      // 使用ChapterManager进行批量预加载
-      unawaited(_chapterManager.preloadChapters(
-        chapterUrlsToPreload,
-        fetchFunction: (chapterUrl) => _apiService.getChapterContent(chapterUrl),
-        onProgress: (message, current, total) {
-          debugPrint('预加载进度: $message ($current/$total)');
-        },
-        maxConcurrent: 2, // 控制并发数，避免过多请求
-      ));
-    } catch (e) {
-      debugPrint('预加载启动失败: $e');
-    }
-  }
-
   void _goToPreviousChapter() {
     final currentIndex =
         widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
@@ -521,75 +512,9 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-  // 开始自动滚动
-  void _startAutoScroll() {
-    debugPrint('🚀 [_startAutoScroll] 方法被调用，_isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
-
-    if (_isAutoScrolling) {
-      debugPrint('⚠️ [_startAutoScroll] 已在滚动中，直接返回（保护逻辑触发）');
-      return;
-    }
-
-    final pixelsPerSecond = _baseScrollSpeed * _scrollSpeed;
-    _autoScrollController.startAutoScroll(
-      pixelsPerSecond,
-      onScrollComplete: () {
-        debugPrint('🏁 [_startAutoScroll] 滚动到底部回调触发');
-        setState(() {
-          _isAutoScrolling = false;
-          _shouldAutoScroll = false;  // 到底部后清除意图
-          _autoScrollStartTime = null;  // 清除启动时间
-        });
-      },
-    );
-
-    setState(() {
-      _isAutoScrolling = true;
-      _shouldAutoScroll = true;  // ← 设置意图标记
-      _autoScrollStartTime = DateTime.now();  // ← 记录启动时间
-    });
-
-    debugPrint('✅ [_startAutoScroll] 自动滚动已启动，_isAutoScrolling=true, _shouldAutoScroll=true, 保护期=${_startupProtectionDuration.inMilliseconds}ms');
-  }
-
-  // 暂停自动滚动（临时暂停，保持意图，用于用户滑动场景）
-  void _pauseAutoScroll() {
-    debugPrint('⏸️ [_pauseAutoScroll] 方法被调用，临时暂停自动滚动');
-    _autoScrollController.stopAutoScroll();
-    setState(() {
-      _isAutoScrolling = false;
-      // _shouldAutoScroll 保持 true，不清除意图！
-      _autoScrollStartTime = null;  // 清除启动时间
-    });
-    debugPrint('✅ [_pauseAutoScroll] 已暂停，_isAutoScrolling=false, _shouldAutoScroll=$_shouldAutoScroll（保持不变）');
-  }
-
-  // 停止自动滚动（完全停止，清除意图）
-  void _stopAutoScroll() {
-    debugPrint('🛑 [_stopAutoScroll] 方法被调用，完全停止自动滚动');
-    _autoScrollController.stopAutoScroll();
-    setState(() {
-      _isAutoScrolling = false;
-      _shouldAutoScroll = false;  // ← 清除意图标记
-      _autoScrollStartTime = null;  // ← 清除启动时间
-    });
-    debugPrint('✅ [_stopAutoScroll] 已停止，_isAutoScrolling=false, _shouldAutoScroll=false');
-  }
-
-  // 切换自动滚动状态
-  void _toggleAutoScroll() {
-    debugPrint('🔄 [_toggleAutoScroll] 切换自动滚动状态，当前 _isAutoScrolling=$_isAutoScrolling');
-
-    if (_isAutoScrolling) {
-      debugPrint('⬇️ [_toggleAutoScroll] 停止自动滚动');
-      _stopAutoScroll();
-    } else {
-      debugPrint('⬆️ [_toggleAutoScroll] 启动自动滚动');
-      _startAutoScroll();
-    }
-  }
-
   // 刷新当前章节 - 删除本地缓存并重新获取最新内容
+  // 注意：自动滚动相关方法已提取到 AutoScrollMixin
+  // 注意：使用 startAutoScroll(), pauseAutoScroll(), stopAutoScroll(), toggleAutoScroll()
   // _handleTouchStart 和 _handleTouchEnd 已删除 - 不再需要触摸暂停功能
   Future<void> _refreshChapter() async {
     // 先显示确认对话框
@@ -807,7 +732,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         _showFontSizeDialog();
         break;
       case 'summarize':
-        _showSummarizeDialog();
+        _showChapterSummaryDialog(); // 使用新的 Dialog Widget
         break;
       case 'full_rewrite':
         _showFullRewriteRequirementDialog();
@@ -835,7 +760,7 @@ class _ReaderScreenState extends State<ReaderScreen>
           setState(() {
             _scrollSpeed = newSpeed;
           });
-          _startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度
+          startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
         },
       ),
     );
@@ -892,6 +817,56 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
     return true;
   }
+
+  // ========== 段落改写功能（使用 ParagraphRewriteDialog）==========
+
+  /// 显示段落改写对话框
+  Future<void> _showParagraphRewriteDialog() async {
+    if (_selectedParagraphIndices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请先选择要改写的段落'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (_) => ParagraphRewriteDialog(
+        novel: widget.novel,
+        chapters: widget.chapters,
+        currentChapter: _currentChapter,
+        content: _content,
+        selectedParagraphIndices: _selectedParagraphIndices,
+        onReplace: (newContent) {
+          setState(() {
+            _content = newContent;
+            _selectedParagraphIndices.clear();
+            _isCloseupMode = false;
+          });
+        },
+      ),
+    );
+  }
+
+  // ========== 章节总结功能（使用 ChapterSummaryDialog）==========
+
+  /// 显示章节总结对话框
+  Future<void> _showChapterSummaryDialog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => ChapterSummaryDialog(
+        novel: widget.novel,
+        chapters: widget.chapters,
+        currentChapter: _currentChapter,
+        content: _content,
+      ),
+    );
+  }
+
+  // ========== 以下为旧方法（已弃用，保留用于向后兼容）==========
 
   // 获取选中的文本（支持插图段落）
   String _getSelectedText(List<String> paragraphs) {
@@ -2159,52 +2134,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                     // 主要内容区域
                     NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        // ✅ 只响应真正的用户滚动通知
-                        if (notification is UserScrollNotification) {
-                          // 已移除：每帧打印太频繁
-                          // debugPrint('👤 用户滚动: ${notification.direction}, _isAutoScrolling=$_isAutoScrolling');
-
-                          // 用户开始主动滚动（检查 direction 是否不是 idle）
-                          if (notification.direction.toString() != 'ScrollDirection.idle' && !_isUserScrolling) {
-                            setState(() {
-                              _isUserScrolling = true;
-                            });
-
-                            if (_isAutoScrolling) {
-                              // ✅ 检查是否在保护期内
-                              if (_autoScrollStartTime != null) {
-                                final timeSinceStart = DateTime.now().difference(_autoScrollStartTime!);
-                                if (timeSinceStart < _startupProtectionDuration) {
-                                  debugPrint('🛡️ 在启动保护期内（${timeSinceStart.inMilliseconds}ms < ${_startupProtectionDuration.inMilliseconds}ms），忽略用户手势');
-                                  return false;  // 忽略这次手势
-                                }
-                              }
-
-                              _pauseAutoScroll();  // ← 改为调用暂停方法，保持意图标记
-                              debugPrint('⏸️ 检测到用户手势，暂停自动滚动');
-                            }
-                          }
-                        } else if (notification is ScrollEndNotification) {
-                          // 用户滚动结束 - 恢复自动滚动
-                          // 已移除：每帧打印太频繁
-                          // debugPrint('▶️ 用户滚动结束，_isUserScrolling=$_isUserScrolling, _isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
-
-                          if (_isUserScrolling) {
-                            setState(() {
-                              _isUserScrolling = false;
-                            });
-
-                            // ✅ 修改：检查意图标记 _shouldAutoScroll
-                            if (_shouldAutoScroll) {
-                              debugPrint('🔄 恢复自动滚动（_shouldAutoScroll=true）');
-                              _startAutoScroll();
-                            } else {
-                            // 已移除：不必要的日志
-                            // debugPrint('⏭️ 不恢复自动滚动（_shouldAutoScroll=false，用户可能手动停止了）');
-                          }
-                          }
-                        }
-                        return false; // 不阻止通知继续传递
+                        // 使用 AutoScrollMixin 的滚动通知处理方法
+                        return handleScrollNotification(notification);
                       },
                       child: ListView.builder(
                         controller: _scrollController,
@@ -2238,9 +2169,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 _content = updatedParagraphs.join('\n');
                               });
                             },
-                            onImageTap: (taskId, imageUrl, imageIndex) => _handleImageTap(taskId, imageUrl, imageIndex),
-                            onImageDelete: () => _deleteIllustrationByTaskId, // Pass taskId as needed
-                            generateVideoFromIllustration: _generateVideoFromIllustration, // Pass callback
+                            onImageTap: (taskId, imageUrl, imageIndex) => handleImageTap(taskId, imageUrl, imageIndex), // Mixin方法
+                            onImageDelete: () => deleteIllustrationByTaskId, // Mixin方法
+                            generateVideoFromIllustration: generateVideoFromIllustration, // Mixin方法
                           );
                         },
                       ),
@@ -2301,16 +2232,12 @@ class _ReaderScreenState extends State<ReaderScreen>
           : ReaderActionButtons(
               isCloseupMode: _isCloseupMode,
               hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
-              isAutoScrolling: _isAutoScrolling,
+              isAutoScrolling: isAutoScrolling, // Mixin getter
               onRewritePressed: () {
-                final paragraphs = _content
-                    .split('\n')
-                    .where((p) => p.trim().isNotEmpty)
-                    .toList();
-                _showRewriteRequirementDialog(paragraphs);
+                _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
               },
               onToggleCloseupMode: _toggleCloseupMode,
-              onToggleAutoScroll: _toggleAutoScroll,
+              onToggleAutoScroll: toggleAutoScroll, // Mixin method
             ),
     );
         },
@@ -2318,351 +2245,29 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
+  // 注意：插图处理相关方法已提取到 IllustrationHandlerMixin
+  // 包括：generateVideoFromIllustration, handleImageTap, regenerateMoreImages,
+  //       generateVideoFromSpecificImage, deleteIllustrationByTaskId
 
+  // ========== AutoScrollMixin 抽象字段实现 ==========
 
-  /// 通过 taskId 直接生成视频
-  Future<void> _generateVideoFromIllustration(String taskId) async {
-    try {
-      // 根据 taskId 获取插图信息
-      final illustrations = await _databaseService.getSceneIllustrationsByChapter(
-        widget.novel.url,
-        _currentChapter.url
-      );
+  @override
+  ScrollController get scrollController => _scrollController;
 
-      final illustration = illustrations.firstWhere(
-        (ill) => ill.taskId == taskId,
-        orElse: () => throw Exception('插图不存在'),
-      );
+  @override
+  double get scrollSpeed => _scrollSpeed;
 
-      if (illustration.images.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('图片正在生成中，请稍后查看')),
-          );
-        }
-        return;
-      }
+  // ========== IllustrationHandlerMixin 抽象字段实现 ==========
 
-      // 获取第一张图片的文件名
-      final firstImageUrl = illustration.images.first;
-      final fileName = firstImageUrl.split('/').last;
+  @override
+  Novel get novel => widget.novel;
 
-      // 显示视频输入对话框
-      if (!mounted) return;
-      final videoInput = await VideoInputDialog.show(context);
-      if (videoInput == null || !mounted) {
-        return; // 用户取消或widget已销毁
-      }
+  @override
+  Chapter get currentChapter => _currentChapter;
 
-      final userInput = videoInput['user_input'] ?? '';
-      final modelName = videoInput['model_name'];
+  @override
+  DatabaseService get databaseService => _databaseService;
 
-      if (userInput.isEmpty) {
-        return; // 未输入内容
-      }
-
-      // 显示加载提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在创建视频生成任务...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-
-      // 调用API生成视频
-      final response = await _apiService.generateVideoFromImage(
-        imgName: fileName,
-        userInput: userInput,
-        modelName: modelName,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成视频失败: $e')),
-        );
-      }
-    }
-  }
-
-  /// 处理图片点击事件 - 显示功能选择对话框
-  Future<void> _handleImageTap(String taskId, String imageUrl, int imageIndex) async {
-    // 显示功能选择对话框
-    if (!mounted) return;
-    final action = await IllustrationActionDialog.show(context);
-
-    if (action == null || !mounted) {
-      return; // 用户取消或widget已销毁
-    }
-
-    if (action == 'regenerate') {
-      // 用户选择"再来几张"
-      await _regenerateMoreImages(taskId);
-    } else if (action == 'video') {
-      // 用户选择"生成视频"
-      await _generateVideoFromSpecificImage(taskId, imageUrl, imageIndex);
-    }
-  }
-
-  /// 再来几张 - 重新生成更多图片
-  Future<void> _regenerateMoreImages(String taskId) async {
-    debugPrint('=== ReaderScreen._regenerateMoreImages 开始 ===');
-    debugPrint('taskId: $taskId');
-
-    try {
-      // 显示数量选择对话框
-      if (!mounted) {
-        debugPrint('❌ widget已销毁，取消操作');
-        return;
-      }
-
-      debugPrint('🔄 显示 GenerateMoreDialog...');
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) => GenerateMoreDialog(
-          apiType: 't2i', // 文生图模型
-          onConfirm: (count, modelName) {
-            debugPrint('GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
-            Navigator.of(context).pop({
-              'count': count,
-              'modelName': modelName,
-            });
-          },
-        ),
-      );
-
-      if (result == null || !mounted) {
-        debugPrint('用户取消或widget已销毁');
-        return;
-      }
-
-      final count = result['count'] as int;
-      final modelName = result['modelName'] as String?;
-      debugPrint('✅ 用户选择: count=$count, model=$modelName');
-
-      // 显示加载提示
-      if (mounted) {
-        debugPrint('📢 显示加载提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('正在生成 $count 张图片...'),
-            backgroundColor: Colors.blue,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // 调用 API 生成图片
-      debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
-      debugPrint('ApiServiceWrapper 初始化状态检查...');
-      final apiService = ApiServiceWrapper();
-      debugPrint('✅ ApiServiceWrapper 实例已创建');
-      debugPrint('初始化状态: ${apiService.getInitStatus()}');
-
-      debugPrint('🔄 开始API调用...');
-      final response = await apiService.regenerateSceneIllustrationImages(
-        taskId: taskId,
-        count: count,
-        modelName: modelName,
-      );
-
-      debugPrint('✅ API调用成功');
-      debugPrint('响应: $response');
-
-      // 显示成功提示（不刷新列表，按需求）
-      if (mounted) {
-        debugPrint('📢 显示成功提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('图片生成任务已创建，预计需要1-3分钟'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e, stackTrace) {
-      debugPrint('❌❌❌ _regenerateMoreImages 异常 ❌❌❌');
-      debugPrint('异常类型: ${e.runtimeType}');
-      debugPrint('异常信息: $e');
-      debugPrint('堆栈跟踪:\n$stackTrace');
-
-      if (mounted) {
-        debugPrint('📢 显示错误提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成图片失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-
-    debugPrint('=== _regenerateMoreImages 结束 ===');
-  }
-
-  /// 为特定图片生成视频
-  Future<void> _generateVideoFromSpecificImage(String taskId, String imageUrl, int imageIndex) async {
-    try {
-      // 检查图片是否正在生成视频
-      if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('该图片正在生成视频，请稍后再试'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
-      // 从imageUrl中提取文件名
-      final fileName = imageUrl.split('/').last;
-
-      // 显示视频输入对话框
-      if (!mounted) return;
-      final videoInput = await VideoInputDialog.show(context);
-      if (videoInput == null || !mounted) {
-        return; // 用户取消或widget已销毁
-      }
-
-      final userInput = videoInput['user_input'] ?? '';
-
-      if (userInput.isEmpty) {
-        return; // 未输入内容
-      }
-
-      // 设置生成状态
-      _setImageGeneratingStatus(imageUrl, true);
-
-      // 显示加载提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在为选中图片创建视频生成任务...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-
-      // 调用API生成视频
-      final response = await _apiService.generateVideoFromImage(
-        imgName: fileName,
-        userInput: userInput,
-        modelName: '', // 使用空字符串
-      );
-
-      // 清除生成状态
-      _setImageGeneratingStatus(imageUrl, false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-
-    } catch (e) {
-      // 清除生成状态
-      _setImageGeneratingStatus(imageUrl, false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成视频失败: $e')),
-        );
-      }
-    }
-  }
-
-  /// 设置图片生成状态 - 通过状态管理器设置全局状态
-  void _setImageGeneratingStatus(String imageUrl, bool isGenerating) {
-    // 通过视频生成状态管理器设置全局状态
-    VideoGenerationStateManager.setImageGenerating(imageUrl, isGenerating);
-  }
-
-
-  /// 通过 taskId 删除插图
-  Future<void> _deleteIllustrationByTaskId(String taskId) async {
-    try {
-      // 根据 taskId 获取插图信息
-      final illustrations = await _databaseService.getSceneIllustrationsByChapter(
-        widget.novel.url,
-        _currentChapter.url
-      );
-
-      final illustration = illustrations.firstWhere(
-        (ill) => ill.taskId == taskId,
-        orElse: () => throw Exception('插图不存在'),
-      );
-
-      final confirmed = mounted ? await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认删除'),
-          content: const Text('确定要删除这个插图吗？此操作无法撤销。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('删除'),
-            ),
-          ],
-        ),
-      ) : false;
-
-      if (confirmed == true) {
-        final success = await _sceneIllustrationService.deleteIllustration(illustration.id);
-        if (success) {
-          // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('插图已删除'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } else {
-          debugPrint('删除插图失败: 服务返回false');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('删除插图失败'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除插图失败: $e')),
-        );
-      }
-    }
-  }
+  @override
+  ApiServiceWrapper get apiService => _apiService;
 }

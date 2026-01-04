@@ -4,9 +4,8 @@ import '../models/character.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/model_selector.dart';
 import '../services/database_service.dart';
-import '../services/unified_stream_manager.dart';
 import '../services/scene_illustration_service.dart';
-import '../models/stream_config.dart';
+import '../mixins/dify_streaming_mixin.dart';
 
 class SceneIllustrationDialog extends StatefulWidget {
   final String paragraphText;
@@ -28,7 +27,8 @@ class SceneIllustrationDialog extends StatefulWidget {
   State<SceneIllustrationDialog> createState() => _SceneIllustrationDialogState();
 }
 
-class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
+class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
+    with DifyStreamingMixin {
   final _contentController = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
@@ -40,7 +40,6 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
   int _imageCount = 1;
   String? _selectedModel;
   bool _isGenerating = false;
-  bool _isSceneGenerating = false;
   String? _sceneGenerationError;
 
   /// 滚动到文本末尾
@@ -160,19 +159,16 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
   /// 开始场景描写流式生成
   Future<void> _startSceneDescriptionGeneration() async {
     // 防止重复调用
-    if (_isSceneGenerating) {
+    if (isStreaming) {
       debugPrint('AI生成正在进行中，忽略重复调用');
       return;
     }
 
     debugPrint('🚀 === 开始场景描写生成 ===');
 
-    // 重置状态并清空现有内容
-    setState(() {
-      _contentController.text = '';
-      _isSceneGenerating = true;
-      _sceneGenerationError = null;
-    });
+    // 清空现有内容
+    _contentController.clear();
+    _sceneGenerationError = null;
 
     // 检查Dify配置
     final prefs = await SharedPreferences.getInstance();
@@ -180,7 +176,6 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     if (difyUrl == null || difyUrl.isEmpty) {
       debugPrint('Dify未配置，跳过场景描写生成');
       setState(() {
-        _isSceneGenerating = false;
         _sceneGenerationError = 'Dify服务未配置，请在设置中配置Dify URL';
       });
       return;
@@ -191,7 +186,6 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     if (chapterContent == null || chapterContent.isEmpty) {
       debugPrint('章节内容为空，跳过场景描写生成');
       setState(() {
-        _isSceneGenerating = false;
         _sceneGenerationError = '章节内容为空，无法生成场景描写';
       });
       return;
@@ -205,76 +199,31 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
     final appearingCharacters = _findAppearingCharacters(fullContext, allCharacters);
     final selectedCharacters = allCharacters.where((c) => appearingCharacters.contains(c.id)).toList();
 
-    // 状态已在函数开始时设置，这里无需重复设置
+    // 构建输入参数
+    final inputs = {
+      'current_chapter_content': fullContext,
+      'roles': Character.formatForAI(selectedCharacters),
+      'cmd': '场景描写',
+    };
 
-    try {
-      // 使用统一流式管理器
-      final streamManager = UnifiedStreamManager();
-
-      // 创建场景描写配置
-      final config = StreamConfig.sceneDescription(
-        inputs: {
-          'current_chapter_content': fullContext,
-          'roles': Character.formatForAI(selectedCharacters),
-          'cmd': '场景描写',
-        },
-        generatingHint: 'AI正在生成场景描写，请稍候...',
-      );
-
-      await streamManager.executeStream(
-        config: config,
-        onChunk: (textChunk) {
-          debugPrint('🔥 收到场景描写文本块: "$textChunk"');
-
-          // 检查是否是完整内容的特殊标记
-          final bool isCompleteContent = textChunk.startsWith('<<COMPLETE_CONTENT>>');
-
-          if (isCompleteContent) {
-            debugPrint('🎯 检测到完整内容标记，直接替换');
-            // 提取实际内容（移除特殊标记）
-            final completeContent = textChunk.substring('<<COMPLETE_CONTENT>>'.length);
-
-            if (mounted) {
-              setState(() {
-                _contentController.text = completeContent;
-                _isSceneGenerating = false;
-              });
-              debugPrint('✅ 完整内容替换完成，长度: ${completeContent.length}');
-            }
-          } else {
-            // 流式模式：追加内容
-            if (mounted) {
-              setState(() {
-                _contentController.text += textChunk; // 实时追加文本块
-              });
-              // 自动滚动到文本末尾
-              _scrollToBottom();
-            }
-          }
-        },
-        onComplete: (fullContent) {
-          debugPrint('✅ 场景描写生成完成: "$fullContent"');
-          // onComplete通常由特殊标记触发，这里可以不做处理
-        },
-        onError: (error) {
-          debugPrint('❌ 场景描写生成错误: $error');
-          if (mounted) {
-            setState(() {
-              _isSceneGenerating = false;
-              _sceneGenerationError = error;
-            });
-          }
-        },
-      );
-    } catch (e) {
-      debugPrint('❌ 场景描写生成异常: $e');
-      if (mounted) {
-        setState(() {
-          _isSceneGenerating = false;
-          _sceneGenerationError = e.toString();
-        });
-      }
-    }
+    // 调用统一的流式方法 - 只需要10行代码！
+    await callDifyStreaming(
+      inputs: inputs,
+      onChunk: (chunk) {
+        debugPrint('🔥 收到场景描写文本块: "$chunk"');
+        // 流式追加内容
+        _contentController.text += chunk;
+        // 自动滚动到文本末尾
+        _scrollToBottom();
+      },
+      onComplete: (fullContent) {
+        debugPrint('✅ 场景描写生成完成: "$fullContent"');
+        // 完成回调（fullContent 由 mixin 提供）
+      },
+      startMessage: 'AI正在生成场景描写...',
+      completeMessage: '场景描写生成完成',
+      errorMessagePrefix: '场景描写生成失败',
+    );
   }
 
   @override
@@ -459,7 +408,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
                 focusNode: _focusNode,
                 scrollController: _scrollController,
                 maxLines: 4,
-                enabled: !_isSceneGenerating, // 生成时禁用编辑
+                enabled: !isStreaming, // 生成时禁用编辑（使用 mixin 状态）
                 style: const TextStyle(color: Colors.white), // 始终白色文字
                 decoration: InputDecoration(
                   border: InputBorder.none,
@@ -475,15 +424,15 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog> {
             // AI生成画面按钮 - 替换原来的重新生成按钮
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: _isSceneGenerating ? null : _startSceneDescriptionGeneration,
-              icon: _isSceneGenerating
+              onPressed: isStreaming ? null : _startSceneDescriptionGeneration,
+              icon: isStreaming
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.auto_awesome),
-              label: Text(_isSceneGenerating ? 'AI生成中...' : 'AI生成画面'),
+              label: Text(isStreaming ? 'AI生成中...' : 'AI生成画面'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,

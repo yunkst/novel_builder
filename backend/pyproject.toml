@@ -37,6 +37,8 @@ dependencies = [
     "alembic>=1.12.0",
     # Playwright for advanced web scraping
     "playwright>=1.55.0",
+    # Traditional Chinese to Simplified Chinese conversion
+    "opencc>=1.1.2",
 ]
 
 [project.optional-dependencies]

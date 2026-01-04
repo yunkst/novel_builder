@@ -27,9 +27,9 @@ class ChapterLoader {
     String novelUrl, {
     bool forceRefresh = false,
   }) async {
-    // 对于本地创建的小说，直接返回空列表
+    // 对于本地创建的小说，直接从数据库加载用户创建的章节
     if (novelUrl.startsWith('custom://')) {
-      return [];
+      return await _databaseService.getCachedNovelChapters(novelUrl);
     }
 
     // 先尝试从缓存加载
@@ -54,9 +54,9 @@ class ChapterLoader {
   /// [novelUrl] 小说URL
   /// 返回刷新后的章节列表
   Future<List<Chapter>> refreshFromBackend(String novelUrl) async {
-    // 对于本地创建的小说，不需要从后端获取
+    // 对于本地创建的小说，直接从数据库获取用户创建的章节
     if (novelUrl.startsWith('custom://')) {
-      return [];
+      return await _databaseService.getCachedNovelChapters(novelUrl);
     }
 
     // 从后端获取最新章节列表

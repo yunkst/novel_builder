@@ -69,10 +69,13 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'illustration_debug_fab',
-        onPressed: _showIllustrationRequestDialog,
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80), // 向上移动，避免遮挡翻页按钮
+        child: FloatingActionButton(
+          heroTag: 'illustration_debug_fab',
+          onPressed: _showIllustrationRequestDialog,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

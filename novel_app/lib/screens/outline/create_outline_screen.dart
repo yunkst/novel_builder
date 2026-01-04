@@ -96,10 +96,49 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
 
   /// 重新生成大纲（使用Dify流式API + DifyStreamingMixin）
   Future<void> _regenerateOutline() async {
-    if (_requirementController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先输入修改意见')),
-      );
+    // 弹出对话框获取修改意见
+    final feedbackController = TextEditingController();
+    final feedback = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('修改大纲需求'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: feedbackController,
+              decoration: const InputDecoration(
+                hintText: '请输入您的修改意见，例如：增加更多悬念、调整节奏...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, feedbackController.text),
+            child: const Text('确认修改'),
+          ),
+        ],
+      ),
+    );
+
+    // 验证用户输入
+    if (feedback == null || feedback.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已取消修改'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
       return;
     }
 
@@ -110,7 +149,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
     // 构建Dify输入参数
     final inputs = {
       'cmd': '生成大纲',
-      'user_input': _requirementController.text.trim(),
+      'user_input': feedback.trim(),
       'background_setting': widget.backgroundSetting ?? '',
       'outline': widget.existingOutline?.content ?? _generatedOutline,
     };

@@ -13,10 +13,12 @@ from typing import Any
 import requests
 
 from .http_client import (
+    HybridHttpClient,
+    PlaywrightClient,
+    RequestsClient,
     RequestConfig,
     RequestStrategy,
     Response,
-    get_http_client,
     http_get,
     http_post,
 )
@@ -30,7 +32,15 @@ class BaseCrawler(ABC):
     ):
         self.base_url = base_url
         self.strategy = strategy
-        self.http_client = get_http_client(strategy)
+        # 根据策略创建专用的HTTP客户端实例
+        if strategy == RequestStrategy.BROWSER:
+            self.http_client = PlaywrightClient()
+        elif strategy == RequestStrategy.STEALTH:
+            self.http_client = PlaywrightClient()
+        elif strategy == RequestStrategy.HYBRID:
+            self.http_client = HybridHttpClient()
+        else:  # SIMPLE
+            self.http_client = RequestsClient()
 
     @abstractmethod
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:

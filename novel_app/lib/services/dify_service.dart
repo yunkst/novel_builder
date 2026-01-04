@@ -36,7 +36,31 @@ class DifyService {
     return token;
   }
   
-  // 流式生成特写内容 - 使用新的SSE解析器
+  /// @deprecated 请使用 [runWorkflowStreaming] 代替
+  ///
+  /// 此方法将在未来版本中移除。
+  /// 迁移示例：
+  /// ```dart
+  /// // 旧方式
+  /// await difyService.generateCloseUpStreaming(
+  ///   selectedParagraph: '...',
+  ///   userInput: '...',
+  ///   onChunk: (chunk) { ... },
+  /// );
+  ///
+  /// // 新方式
+  /// await difyService.runWorkflowStreaming(
+  ///   inputs: {
+  ///     'cmd': '特写',
+  ///     'choice_content': '...',
+  ///     'user_input': '...',
+  ///     // ...
+  ///   },
+  ///   onData: (chunk) { ... },
+  ///   enableDebugLog: true,  // 可选：启用详细日志
+  /// );
+  /// ```
+  @Deprecated('Use runWorkflowStreaming() instead. See documentation for migration guide.')
   Future<void> generateCloseUpStreaming({
     required String selectedParagraph,
     required String userInput,
@@ -237,7 +261,40 @@ class DifyService {
   
   
   // 通用的流式工作流执行方法
+  ///
+  /// [inputs] Dify工作流输入参数
+  /// [onData] 文本块回调
+  /// [onError] 错误回调
+  /// [onDone] 完成回调
+  /// [enableDebugLog] 是否启用详细调试日志（使用StreamStateManager，默认false）
   Future<void> runWorkflowStreaming({
+    required Map<String, dynamic> inputs,
+    required Function(String data) onData,
+    Function(String error)? onError,
+    Function()? onDone,
+    bool enableDebugLog = false,
+  }) async {
+    // 如果启用调试日志，使用 StreamStateManager
+    if (enableDebugLog) {
+      await _runWorkflowStreamingWithManager(
+        inputs: inputs,
+        onData: onData,
+        onError: onError,
+        onDone: onDone,
+      );
+    } else {
+      // 使用简单实现（默认）
+      await _runWorkflowStreamingSimple(
+        inputs: inputs,
+        onData: onData,
+        onError: onError,
+        onDone: onDone,
+      );
+    }
+  }
+
+  // 简单实现（默认）
+  Future<void> _runWorkflowStreamingSimple({
     required Map<String, dynamic> inputs,
     required Function(String data) onData,
     Function(String error)? onError,
@@ -382,6 +439,105 @@ class DifyService {
       } else {
         rethrow;
       }
+    }
+  }
+
+  // 使用 StreamStateManager 的实现（调试模式）
+  Future<void> _runWorkflowStreamingWithManager({
+    required Map<String, dynamic> inputs,
+    required Function(String data) onData,
+    Function(String error)? onError,
+    Function()? onDone,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final difyUrl = prefs.getString('dify_url');
+    final difyToken = await _getFlowToken();
+
+    if (difyUrl == null || difyUrl.isEmpty) {
+      throw Exception('请先在设置中配置 Dify URL');
+    }
+
+    final url = Uri.parse('$difyUrl/workflows/run');
+    final requestBody = {
+      'inputs': inputs,
+      'response_mode': 'streaming',
+      'user': 'novel-builder-app',
+    };
+
+    // 创建状态管理器
+    late final StreamStateManager stateManager;
+    stateManager = StreamStateManager(
+      onTextChunk: (text) {
+        onData(text); // 转发给外部回调
+      },
+      onCompleted: (String completeContent) {
+        debugPrint('✅ === 流式交互完成（StreamStateManager） ===');
+        debugPrint('完整内容长度: ${completeContent.length}');
+        onDone?.call();
+        stateManager.dispose();
+      },
+      onError: (error) {
+        debugPrint('❌ === 流式交互错误（StreamStateManager） ===');
+        debugPrint('错误: $error');
+        stateManager.dispose();
+        onError?.call(error);
+      },
+    );
+
+    try {
+      stateManager.startStreaming();
+
+      debugPrint('🚀 === Dify API 请求信息（启用详细日志） ===');
+      debugPrint('URL: $url');
+      debugPrint('Request Body: ${jsonEncode(requestBody)}');
+      debugPrint('==========================================');
+
+      final request = http.Request('POST', url);
+      request.headers.addAll({
+        'Authorization': 'Bearer $difyToken',
+        'Content-Type': 'application/json',
+      });
+      request.body = jsonEncode(requestBody);
+
+      final streamedResponse = await request.send();
+
+      debugPrint('📡 === 响应状态码: ${streamedResponse.statusCode} ===');
+
+      if (streamedResponse.statusCode == 200) {
+        stateManager.startReceiving();
+
+        await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
+          final lines = chunk.split('\n');
+          for (var line in lines) {
+            if (line.startsWith('data: ')) {
+              final dataStr = line.substring(6);
+              if (dataStr.trim().isEmpty) continue;
+
+              try {
+                final data = jsonDecode(dataStr);
+                if (data['event'] == 'text_chunk' && data['data'] != null) {
+                  final text = data['data']['text'];
+                  if (text != null && text.isNotEmpty) {
+                    stateManager.handleTextChunk(text);
+                  }
+                } else if (data['event'] == 'workflow_finished') {
+                  stateManager.complete();
+                } else if (data['event'] == 'workflow_error') {
+                  final errorMsg = data['data']?['message'] ?? '工作流错误';
+                  stateManager.handleError(errorMsg);
+                }
+              } catch (e) {
+                debugPrint('解析错误: $e');
+              }
+            }
+          }
+        }
+      } else {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        stateManager.handleError('API请求失败 (${streamedResponse.statusCode}): $errorBody');
+      }
+    } catch (e) {
+      stateManager.handleError('网络或解析异常: $e');
     }
   }
 
@@ -679,7 +835,30 @@ class DifyService {
   }
 
   
-  /// 场景描写流式生成
+  /// @deprecated 请使用 [runWorkflowStreaming] 代替
+  ///
+  /// 此方法将在未来版本中移除。
+  /// 迁移示例：
+  /// ```dart
+  /// // 旧方式
+  /// await difyService.generateSceneDescriptionStream(
+  ///   chapterContent: '...',
+  ///   characters: [...],
+  ///   onChunk: (chunk) { ... },
+  /// );
+  ///
+  /// // 新方式
+  /// await difyService.runWorkflowStreaming(
+  ///   inputs: {
+  ///     'cmd': '场景描写',
+  ///     'chapter_content': '...',
+  ///     // ...
+  ///   },
+  ///   onData: (chunk) { ... },
+  ///   enableDebugLog: true,  // 可选：启用详细日志
+  /// );
+  /// ```
+  @Deprecated('Use runWorkflowStreaming() instead. See documentation for migration guide.')
   Future<void> generateSceneDescriptionStream({
     required String chapterContent,
     required List<Character> characters,

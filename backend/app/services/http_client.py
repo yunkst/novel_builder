@@ -310,6 +310,7 @@ class PlaywrightClient(IHttpClient):
                     "--disable-gpu",
                     "--disable-web-security",
                     "--disable-features=VizDisplayCompositor",
+                    "--disable-blink-features=AutomationControlled",  # 隐藏自动化特征
                 ]
 
                 # 合并自定义参数
@@ -317,14 +318,24 @@ class PlaywrightClient(IHttpClient):
                 if config and config.browser_args:
                     browser_args = default_args + config.browser_args
 
+                # 启动浏览器
                 self.browser = await playwright.chromium.launch(
-                    headless=True, args=browser_args
+                    headless=True,
+                    args=browser_args
                 )
 
                 # 设置上下文
                 context_options = {
-                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
                 }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                import os
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
 
                 # 添加自定义请求头
                 if config and config.custom_headers:
@@ -353,8 +364,8 @@ class PlaywrightClient(IHttpClient):
         try:
             start_time = time.time()
 
-            # 设置超时
-            await self.page.set_default_timeout(config.timeout * 1000)
+            # 设置超时 (set_default_timeout 不是异步方法)
+            self.page.set_default_timeout(config.timeout * 1000)
 
             # 发起请求
             response = await self.page.goto(url)

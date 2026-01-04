@@ -8,6 +8,7 @@ from .base_crawler import BaseCrawler
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
 from .smxku_crawler import SmxkuCrawler
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
+from .wfxs_crawler import WfxsCrawler
 from .wodeshucheng_crawler import WodeshuchengCrawler
 from .xspsw_crawler_refactored import XspswCrawlerRefactored
 
@@ -18,6 +19,7 @@ XspswCrawler = XspswCrawlerRefactored
 WdscwCrawler = WdscwCrawlerRefactored
 WodeshuchengCrawler = WodeshuchengCrawler
 SmxkuCrawler = SmxkuCrawler
+WfxsCrawler = WfxsCrawler
 
 # 源站元数据配置
 SOURCE_SITES_METADATA = {
@@ -63,6 +65,13 @@ SOURCE_SITES_METADATA = {
         "search_enabled": True,
         "crawler_class": SmxkuCrawler,
     },
+    "wfxs": {
+        "name": "微风小说网",
+        "base_url": "https://m.wfxs.tw",
+        "description": "繁体中文小说网站，支持玄幻、都市、言情等多种类型，自动转换为简体",
+        "search_enabled": True,
+        "crawler_class": WfxsCrawler,
+    },
 }
 
 
@@ -88,6 +97,8 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
         crawlers["wodeshucheng"] = WodeshuchengCrawler()
     if not enabled or "smxku" in enabled:
         crawlers["smxku"] = SmxkuCrawler()
+    if not enabled or "wfxs" in enabled:
+        crawlers["wfxs"] = WfxsCrawler()
     return crawlers
 
 
@@ -105,6 +116,8 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
         return WodeshuchengCrawler()
     if "smxku.com" in url:
         return SmxkuCrawler()
+    if "wfxs.tw" in url:
+        return WfxsCrawler()
     # 兜底：尝试匹配 base_url
     for crawler in get_enabled_crawlers().values():
         if hasattr(crawler, "base_url") and crawler.base_url in url:
