@@ -24,7 +24,6 @@ Method | HTTP request | Description
 [**getSceneGalleryApiSceneIllustrationGalleryTaskIdGet**](DefaultApi.md#getscenegalleryapisceneillustrationgallerytaskidget) | **GET** /api/scene-illustration/gallery/{task_id} | Get Scene Gallery
 [**getSourceSitesSourceSitesGet**](DefaultApi.md#getsourcesitessourcesitesget) | **GET** /source-sites | Get Source Sites
 [**getVideoFileApiImageToVideoVideoImgNameGet**](DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
-[**getVideoTaskStatusApiImageToVideoStatusTaskIdGet**](DefaultApi.md#getvideotaskstatusapiimagetovideostatustaskidget) | **GET** /api/image-to-video/status/{task_id} | Get Video Task Status
 [**healthCheckHealthGet**](DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
 [**imageToVideoHealthCheckApiImageToVideoHealthGet**](DefaultApi.md#imagetovideohealthcheckapiimagetovideohealthget) | **GET** /api/image-to-video/health | Image To Video Health Check
 [**indexGet**](DefaultApi.md#indexget) | **GET** / | Index
@@ -356,7 +355,7 @@ Name | Type | Description  | Notes
 
 Generate Video From Image
 
-生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
+生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 轮询 `/api/image-to-video/has-video/{img_name}` 查询视频是否生成完成
 
 ### Example
 ```dart
@@ -700,51 +699,6 @@ No authorization required
 
  - **Content-Type**: Not defined
  - **Accept**: video/mp4, application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **getVideoTaskStatusApiImageToVideoStatusTaskIdGet**
-> ImageToVideoTaskStatusResponse getVideoTaskStatusApiImageToVideoStatusTaskIdGet(taskId, X_API_TOKEN)
-
-Get Video Task Status
-
-查询图生视频任务状态  获取指定任务的详细状态信息，包括生成进度和结果。  **路径参数:** - **task_id**: 图生视频任务的唯一标识符  **返回值:** - **task_id**: 任务ID - **img_name**: 处理的图片名称 - **status**: 任务状态（pending/running/completed/failed） - **model_name**: 使用的模型名称 - **user_input**: 用户输入要求 - **video_prompt**: 生成的视频提示词（如果有） - **video_filename**: 生成的视频文件名（完成时） - **result_message**: 结果描述信息 - **error_message**: 错误信息（失败时） - **created_at**: 任务创建时间 - **updated_at**: 任务更新时间
-
-### Example
-```dart
-import 'package:novel_api/api.dart';
-
-final api = NovelApi().getDefaultApi();
-final int taskId = 56; // int | 
-final String X_API_TOKEN = X_API_TOKEN_example; // String | 
-
-try {
-    final response = api.getVideoTaskStatusApiImageToVideoStatusTaskIdGet(taskId, X_API_TOKEN);
-    print(response);
-} catch on DioException (e) {
-    print('Exception when calling DefaultApi->getVideoTaskStatusApiImageToVideoStatusTaskIdGet: $e\n');
-}
-```
-
-### Parameters
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **taskId** | **int**|  | 
- **X_API_TOKEN** | **String**|  | [optional] 
-
-### Return type
-
-[**ImageToVideoTaskStatusResponse**](ImageToVideoTaskStatusResponse.md)
-
-### Authorization
-
-[HTTPBearer](../README.md#HTTPBearer)
-
-### HTTP request headers
-
- - **Content-Type**: Not defined
- - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

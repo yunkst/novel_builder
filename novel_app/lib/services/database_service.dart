@@ -398,7 +398,7 @@ class DatabaseService {
       // 简单策略：清空所有缓存
       // 更好的策略是使用LRU，但这里为了简洁使用清空策略
       _cachedInMemory.clear();
-      debugPrint('🧹 内存缓存已满，已清空 (${_maxMemoryCacheSize}条)');
+      debugPrint('🧹 内存缓存已满，已清空 ($_maxMemoryCacheSize条)');
     }
     _cachedInMemory.add(chapterUrl);
   }

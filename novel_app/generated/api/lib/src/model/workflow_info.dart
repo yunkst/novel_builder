@@ -14,6 +14,9 @@ part 'workflow_info.g.dart';
 /// * [title] - 工作流标题
 /// * [description] - 工作流描述
 /// * [path] 
+/// * [width] 
+/// * [height] 
+/// * [isDefault] - 是否为默认模型
 @BuiltValue()
 abstract class WorkflowInfo implements Built<WorkflowInfo, WorkflowInfoBuilder> {
   /// 工作流标题
@@ -27,12 +30,23 @@ abstract class WorkflowInfo implements Built<WorkflowInfo, WorkflowInfoBuilder> 
   @BuiltValueField(wireName: r'path')
   String? get path;
 
+  @BuiltValueField(wireName: r'width')
+  int? get width;
+
+  @BuiltValueField(wireName: r'height')
+  int? get height;
+
+  /// 是否为默认模型
+  @BuiltValueField(wireName: r'is_default')
+  bool? get isDefault;
+
   WorkflowInfo._();
 
   factory WorkflowInfo([void updates(WorkflowInfoBuilder b)]) = _$WorkflowInfo;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(WorkflowInfoBuilder b) => b;
+  static void _defaults(WorkflowInfoBuilder b) => b
+      ..isDefault = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<WorkflowInfo> get serializer => _$WorkflowInfoSerializer();
@@ -65,6 +79,27 @@ class _$WorkflowInfoSerializer implements PrimitiveSerializer<WorkflowInfo> {
       yield serializers.serialize(
         object.path,
         specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.width != null) {
+      yield r'width';
+      yield serializers.serialize(
+        object.width,
+        specifiedType: const FullType.nullable(int),
+      );
+    }
+    if (object.height != null) {
+      yield r'height';
+      yield serializers.serialize(
+        object.height,
+        specifiedType: const FullType.nullable(int),
+      );
+    }
+    if (object.isDefault != null) {
+      yield r'is_default';
+      yield serializers.serialize(
+        object.isDefault,
+        specifiedType: const FullType(bool),
       );
     }
   }
@@ -111,6 +146,29 @@ class _$WorkflowInfoSerializer implements PrimitiveSerializer<WorkflowInfo> {
           ) as String?;
           if (valueDes == null) continue;
           result.path = valueDes;
+          break;
+        case r'width':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.width = valueDes;
+          break;
+        case r'height':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.height = valueDes;
+          break;
+        case r'is_default':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.isDefault = valueDes;
           break;
         default:
           unhandled.add(key);

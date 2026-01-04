@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:built_collection/built_collection.dart';
+import 'package:novel_api/novel_api.dart';
 import '../services/api_service_wrapper.dart';
 
 /// 统一的模型选择组件
@@ -29,7 +31,7 @@ class ModelSelector extends StatefulWidget {
 }
 
 class _ModelSelectorState extends State<ModelSelector> {
-  late Future<List<String>> _modelsFuture;
+  late Future<List<WorkflowInfo>> _modelsFuture;
   String? _selectedModel;
 
   @override
@@ -50,10 +52,30 @@ class _ModelSelectorState extends State<ModelSelector> {
   }
 
   /// 从后端API加载模型列表
-  Future<List<String>> _loadModels() async {
+  Future<List<WorkflowInfo>> _loadModels() async {
     try {
       final apiService = ApiServiceWrapper();
-      return await apiService.getModelTitles(apiType: widget.apiType);
+      final models = await apiService.getModels();
+
+      // 根据 apiType 返回对应的模型列表
+      switch (widget.apiType) {
+        case 'i2v':
+          final img2videoModels = models.img2video ?? BuiltList<WorkflowInfo>();
+          return img2videoModels.toList();
+        case 't2i':
+          final text2imgModels = models.text2img ?? BuiltList<WorkflowInfo>();
+          return text2imgModels.toList();
+        default:
+          // 如果没有指定类型，返回所有模型
+          final allModels = <WorkflowInfo>[];
+          if (models.text2img != null) {
+            allModels.addAll(models.text2img!.toList());
+          }
+          if (models.img2video != null) {
+            allModels.addAll(models.img2video!.toList());
+          }
+          return allModels;
+      }
     } catch (e) {
       debugPrint('加载模型列表失败: $e');
       // 返回空列表，避免崩溃
@@ -63,7 +85,7 @@ class _ModelSelectorState extends State<ModelSelector> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<String>>(
+    return FutureBuilder<List<WorkflowInfo>>(
       future: _modelsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -96,7 +118,7 @@ class _ModelSelectorState extends State<ModelSelector> {
         final models = snapshot.data ?? [];
 
         // 如果当前选择的模型不在列表中，清空选择
-        if (_selectedModel != null && !models.contains(_selectedModel)) {
+        if (_selectedModel != null && !models.any((m) => m.title == _selectedModel)) {
           _selectedModel = null;
         }
 
@@ -116,6 +138,19 @@ class _ModelSelectorState extends State<ModelSelector> {
           );
         }
 
+        // 如果没有选中模型，自动选中默认模型
+        if (_selectedModel == null && models.isNotEmpty) {
+          final defaultModel = models.firstWhere(
+            (m) => m.isDefault ?? false,
+            orElse: () => models.first,
+          );
+          _selectedModel = defaultModel.title;
+          // 通知父组件
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onModelChanged(_selectedModel);
+          });
+        }
+
         return DropdownButtonFormField<String>(
           initialValue: _selectedModel,
           decoration: InputDecoration(
@@ -127,10 +162,47 @@ class _ModelSelectorState extends State<ModelSelector> {
           ),
           items: models.map((model) {
             return DropdownMenuItem<String>(
-              value: model,
-              child: Text(
-                model,
-                style: const TextStyle(fontSize: 14),
+              value: model.title,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        model.title,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      if (model.isDefault ?? false) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.blue.shade200, width: 1),
+                          ),
+                          child: Text(
+                            '默认',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (model.width != null && model.height != null)
+                    Text(
+                      '${model.width!} × ${model.height!}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
               ),
             );
           }).toList(),

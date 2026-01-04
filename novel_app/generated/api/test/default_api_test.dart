@@ -70,7 +70,7 @@ void main() {
 
     // Generate Video From Image
     //
-    // 生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 调用 `/api/image-to-video/status/{task_id}` 查询生成进度
+    // 生成图生视频  创建一个图生视频任务，将指定的图片转换为动态视频。  **请求参数:** - **img_name**: 要处理的图片文件名称 - **user_input**: 用户对视频生成的要求描述 - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）  **返回值:** - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询 - **img_name**: 处理的图片名称 - **status**: 任务初始状态（通常为 \"pending\"） - **message**: 任务创建的状态消息  **使用示例:** ```json {     \"task_id\": 123,     \"img_name\": \"example.jpg\",     \"status\": \"pending\",     \"message\": \"图生视频任务创建成功\" } ```  **后续操作:** 使用返回的 task_id 轮询 `/api/image-to-video/has-video/{img_name}` 查询视频是否生成完成
     //
     //Future<ImageToVideoResponse> generateVideoFromImageApiImageToVideoGeneratePost(ImageToVideoRequest imageToVideoRequest, { String X_API_TOKEN }) async
     test('test generateVideoFromImageApiImageToVideoGeneratePost', () async {
@@ -137,15 +137,6 @@ void main() {
     //
     //Future<Uint8List> getVideoFileApiImageToVideoVideoImgNameGet(String imgName) async
     test('test getVideoFileApiImageToVideoVideoImgNameGet', () async {
-      // TODO
-    });
-
-    // Get Video Task Status
-    //
-    // 查询图生视频任务状态  获取指定任务的详细状态信息，包括生成进度和结果。  **路径参数:** - **task_id**: 图生视频任务的唯一标识符  **返回值:** - **task_id**: 任务ID - **img_name**: 处理的图片名称 - **status**: 任务状态（pending/running/completed/failed） - **model_name**: 使用的模型名称 - **user_input**: 用户输入要求 - **video_prompt**: 生成的视频提示词（如果有） - **video_filename**: 生成的视频文件名（完成时） - **result_message**: 结果描述信息 - **error_message**: 错误信息（失败时） - **created_at**: 任务创建时间 - **updated_at**: 任务更新时间
-    //
-    //Future<ImageToVideoTaskStatusResponse> getVideoTaskStatusApiImageToVideoStatusTaskIdGet(int taskId, { String X_API_TOKEN }) async
-    test('test getVideoTaskStatusApiImageToVideoStatusTaskIdGet', () async {
       // TODO
     });
 

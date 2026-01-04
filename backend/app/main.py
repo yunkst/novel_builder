@@ -479,6 +479,10 @@ async def get_models() -> ModelsResponse:
     try:
         from app.workflow_config import WorkflowType, workflow_config_manager
 
+        # 获取默认T2I模型
+        default_t2i_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+        default_t2i_title = default_t2i_workflow.title
+
         # 获取文生图工作流
         t2i_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
         text2img_models = [
@@ -486,6 +490,9 @@ async def get_models() -> ModelsResponse:
                 title=workflow.title,
                 description=workflow.description,
                 path=workflow.path,
+                width=workflow.width,
+                height=workflow.height,
+                is_default=(workflow.title == default_t2i_title),
             )
             for workflow in t2i_response.workflows
         ]
@@ -739,17 +746,6 @@ async def get_video_file(img_name: str, db: Session = Depends(get_db)):
     except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
         logger.error(f"获取视频文件失败: {e}")
         raise HTTPException(status_code=500, detail="获取视频文件失败")
-
-
-@app.get("/api/image-to-video/health", dependencies=[Depends(verify_token)])
-async def image_to_video_health_check():
-    """检查图生视频服务健康状态"""
-    try:
-        health_status = await image_to_video_service.health_check()
-        return health_status
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"图生视频健康检查失败: {e}")
-        return {"status": "error", "message": str(e), "services": {}}
 
 
 # ================= 缓存管理 API =================

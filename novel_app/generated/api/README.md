@@ -82,7 +82,6 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**getSceneGalleryApiSceneIllustrationGalleryTaskIdGet**](doc/DefaultApi.md#getscenegalleryapisceneillustrationgallerytaskidget) | **GET** /api/scene-illustration/gallery/{task_id} | Get Scene Gallery
 [*DefaultApi*](doc/DefaultApi.md) | [**getSourceSitesSourceSitesGet**](doc/DefaultApi.md#getsourcesitessourcesitesget) | **GET** /source-sites | Get Source Sites
 [*DefaultApi*](doc/DefaultApi.md) | [**getVideoFileApiImageToVideoVideoImgNameGet**](doc/DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
-[*DefaultApi*](doc/DefaultApi.md) | [**getVideoTaskStatusApiImageToVideoStatusTaskIdGet**](doc/DefaultApi.md#getvideotaskstatusapiimagetovideostatustaskidget) | **GET** /api/image-to-video/status/{task_id} | Get Video Task Status
 [*DefaultApi*](doc/DefaultApi.md) | [**healthCheckHealthGet**](doc/DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**imageToVideoHealthCheckApiImageToVideoHealthGet**](doc/DefaultApi.md#imagetovideohealthcheckapiimagetovideohealthget) | **GET** /api/image-to-video/health | Image To Video Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**indexGet**](doc/DefaultApi.md#indexget) | **GET** / | Index
@@ -102,7 +101,6 @@ Class | Method | HTTP request | Description
  - [HTTPValidationError](doc/HTTPValidationError.md)
  - [ImageToVideoRequest](doc/ImageToVideoRequest.md)
  - [ImageToVideoResponse](doc/ImageToVideoResponse.md)
- - [ImageToVideoTaskStatusResponse](doc/ImageToVideoTaskStatusResponse.md)
  - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
  - [RoleCardGenerateRequest](doc/RoleCardGenerateRequest.md)
