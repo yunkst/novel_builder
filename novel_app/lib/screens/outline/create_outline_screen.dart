@@ -79,7 +79,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
     await callDifyStreaming(
       inputs: inputs,
       onChunk: (chunk) {
-        _contentController.text += chunk;
+        _contentController.text += chunk; // Mixin已自动处理特殊标记
         _generatedOutline = _contentController.text;
       },
       onComplete: (fullContent) {
@@ -122,7 +122,8 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
             child: const Text('取消'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, feedbackController.text),
+            onPressed: () =>
+                Navigator.pop(dialogContext, feedbackController.text),
             child: const Text('确认修改'),
           ),
         ],
@@ -158,7 +159,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
     await callDifyStreaming(
       inputs: inputs,
       onChunk: (chunk) {
-        _contentController.text += chunk;
+        _contentController.text += chunk; // Mixin已自动处理特殊标记
         _generatedOutline = _contentController.text;
       },
       onComplete: (fullContent) {
@@ -369,7 +370,8 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                    Icon(Icons.info_outline,
+                        color: Colors.blue.shade700, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

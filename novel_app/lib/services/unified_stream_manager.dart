@@ -11,7 +11,8 @@ import 'dify_sse_parser.dart';
 /// 封装所有Dify流式API调用，提供标准化的流式内容处理接口
 /// 实现Flutter最佳实践的内存管理和生命周期控制
 class UnifiedStreamManager {
-  static final UnifiedStreamManager _instance = UnifiedStreamManager._internal();
+  static final UnifiedStreamManager _instance =
+      UnifiedStreamManager._internal();
   factory UnifiedStreamManager() => _instance;
   UnifiedStreamManager._internal();
 
@@ -45,7 +46,8 @@ class UnifiedStreamManager {
     }
 
     // 生成唯一的流ID
-    final currentStreamId = streamId ?? 'stream_${++_streamCounter}_${DateTime.now().millisecondsSinceEpoch}';
+    final currentStreamId = streamId ??
+        'stream_${++_streamCounter}_${DateTime.now().millisecondsSinceEpoch}';
 
     // 取消现有的同名流
     await cancelStream(currentStreamId);
@@ -90,7 +92,8 @@ class UnifiedStreamManager {
         debugPrint('🎯 === 流式生成完成 ===');
         debugPrint('流ID: $currentStreamId');
         debugPrint('完整内容长度: ${completeContent.length}');
-        debugPrint('完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+        debugPrint(
+            '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
         if (completeContent.isNotEmpty) {
@@ -220,14 +223,13 @@ class UnifiedStreamManager {
 
         try {
           // 等待流处理完成
-          final isCompleted = await completer.future.timeout(
-            const Duration(minutes: 5), // 5分钟超时
-            onTimeout: () {
-              debugPrint('⏰ 统一流式流处理超时');
-              debugPrint('流ID: $currentStreamId');
-              return textStreamDone && !textStreamError;
-            }
-          );
+          final isCompleted = await completer.future
+              .timeout(const Duration(seconds: 15), // 15秒超时
+                  onTimeout: () {
+            debugPrint('⏰ 统一流式流处理超时');
+            debugPrint('流ID: $currentStreamId');
+            return textStreamDone && !textStreamError;
+          });
 
           debugPrint('🎯 === 统一流式流处理结果 ===');
           debugPrint('流ID: $currentStreamId');
@@ -266,7 +268,8 @@ class UnifiedStreamManager {
           errorMessage = errorBody;
         }
 
-        stateManager.handleError('统一流式API请求失败 (${streamedResponse.statusCode}): $errorMessage');
+        stateManager.handleError(
+            '统一流式API请求失败 (${streamedResponse.statusCode}): $errorMessage');
       }
     } catch (e, stackTrace) {
       debugPrint('❌ === 统一流式生成异常 ===');

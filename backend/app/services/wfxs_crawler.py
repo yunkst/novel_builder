@@ -7,28 +7,24 @@ https://m.wfxs.tw
 - 繁体中文内容
 - 需要转换为简体中文
 - 移动端优化
+- 使用独立的 Playwright 实例（不通过 BaseCrawler）
 """
 
 import asyncio
 import re
 import urllib.parse
+from abc import ABC, abstractmethod
 from typing import Any
 
 import opencc
 from bs4 import BeautifulSoup
 
-from .base_crawler import BaseCrawler
-from .http_client import RequestStrategy, Response
 
-
-class WfxsCrawler(BaseCrawler):
-    """微风小说网爬虫"""
+class WfxsCrawler(ABC):
+    """微风小说网爬虫 - 直接继承 ABC，不使用 BaseCrawler 的 HTTP 客户端"""
 
     def __init__(self):
-        super().__init__(
-            base_url="https://m.wfxs.tw",
-            strategy=RequestStrategy.BROWSER  # 使用浏览器模式以绕过反爬虫机制
-        )
+        self.base_url = "https://m.wfxs.tw"
         # 初始化繁简转换器
         self.converter = opencc.OpenCC('t2s')  # 繁体转简体
 
@@ -247,6 +243,7 @@ class WfxsCrawler(BaseCrawler):
         try:
             # 为每个请求创建新的Playwright实例,避免被检测
             from playwright.async_api import async_playwright
+            import os
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
@@ -254,11 +251,19 @@ class WfxsCrawler(BaseCrawler):
                     args=["--no-sandbox", "--disable-dev-shm-usage"]
                 )
 
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="zh-TW",
-                )
+                # 配置浏览器上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
+                }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
+
+                context = await browser.new_context(**context_options)
 
                 page = await context.new_page()
                 response = await page.goto(page_url, timeout=15000)
@@ -348,6 +353,7 @@ class WfxsCrawler(BaseCrawler):
         """
         # 为每个请求创建独立的Playwright实例,避免被检测
         from playwright.async_api import async_playwright
+        import os
 
         try:
             async with async_playwright() as p:
@@ -360,11 +366,19 @@ class WfxsCrawler(BaseCrawler):
                     ]
                 )
 
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="zh-TW",
-                )
+                # 配置浏览器上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
+                }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
+
+                context = await browser.new_context(**context_options)
 
                 page = await context.new_page()
                 page.set_default_timeout(15000)
@@ -458,6 +472,7 @@ class WfxsCrawler(BaseCrawler):
     async def _get_next_page_content_with_playwright(self, page_url: str) -> str:
         """使用独立Playwright实例获取下一页内容"""
         from playwright.async_api import async_playwright
+        import os
 
         try:
             async with async_playwright() as p:
@@ -470,11 +485,19 @@ class WfxsCrawler(BaseCrawler):
                     ]
                 )
 
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="zh-TW",
-                )
+                # 配置浏览器上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
+                }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
+
+                context = await browser.new_context(**context_options)
 
                 page = await context.new_page()
                 page.set_default_timeout(15000)

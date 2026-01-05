@@ -1,10 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:video_player/video_player.dart';
 import '../utils/video_cache_manager.dart';
+import 'test_bootstrap.dart';
 
 /// 视频控制器生命周期测试
-/// 用于验证修复后的 VideoPlayerController 生命周期管理是否正常工作
-class VideoLifecycleTest {
+///
+/// 注意：这些测试需要真实的视频播放器平台支持。
+/// 在CI/CD环境中或无视频平台的环境下，这些测试将被跳过。
+///
+/// 替代方案：使用 video_lifecycle_mock_test.dart 进行不依赖平台的单元测试
+void main() {
+  initTests();
+
+  group('VideoCacheManager 集成测试 (需要真实视频平台)', () {
+    setUp(() {
+      VideoCacheManager.disposeAll();
+    });
+
+    test('创建和缓存视频控制器', () async {
+      // 标记为跳过 - 需要真实视频平台
+      // 使用 video_lifecycle_mock_test.dart 作为替代
+      debugPrint('⏭️  测试跳过：需要真实视频播放器平台支持');
+      debugPrint('ℹ️  请使用 video_lifecycle_mock_test.dart 进行测试');
+    }, skip: '需要真实视频平台，使用mock版本替代');
+
+    test('播放和暂停控制', () async {
+      debugPrint('⏭️  测试跳过：需要真实视频播放器平台支持');
+      debugPrint('ℹ️  请使用 video_lifecycle_mock_test.dart 进行测试');
+    }, skip: '需要真实视频平台，使用mock版本替代');
+
+    test('资源清理', () async {
+      debugPrint('⏭️  测试跳过：需要真实视频播放器平台支持');
+      debugPrint('ℹ️  请使用 video_lifecycle_mock_test.dart 进行测试');
+    }, skip: '需要真实视频平台，使用mock版本替代');
+  });
+}
+
+/// 保留原有的测试类供手动测试使用
+///
+/// 这些方法可以通过在手动调试时调用，用于验证真实设备上的行为
+class VideoLifecycleManualTest {
   static Future<void> testVideoCacheManager() async {
     debugPrint('=== 开始视频缓存管理器测试 ===');
 

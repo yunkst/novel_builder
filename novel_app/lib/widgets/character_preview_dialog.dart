@@ -44,7 +44,8 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
   void _toggleSelectAll() {
     setState(() {
       _selectAll = !_selectAll;
-      _selectedCharacters = List<bool>.filled(widget.characters.length, _selectAll);
+      _selectedCharacters =
+          List<bool>.filled(widget.characters.length, _selectAll);
     });
   }
 
@@ -67,7 +68,8 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCount = _selectedCharacters.where((selected) => selected).length;
+    final selectedCount =
+        _selectedCharacters.where((selected) => selected).length;
 
     return Dialog(
       child: Container(
@@ -86,8 +88,8 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
                   child: Text(
                     'AI生成的角色预览',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ),
                 IconButton(
@@ -219,15 +221,17 @@ class CharacterPreviewCard extends StatelessWidget {
                       children: [
                         Text(
                           character.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.blue : null,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected ? Colors.blue : null,
+                                  ),
                         ),
                         const SizedBox(width: 8),
                         if (character.gender != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.grey[200],
                               borderRadius: BorderRadius.circular(4),
@@ -240,7 +244,8 @@ class CharacterPreviewCard extends StatelessWidget {
                         if (character.age != null)
                           Container(
                             margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.orange[100],
                               borderRadius: BorderRadius.circular(4),
@@ -259,30 +264,40 @@ class CharacterPreviewCard extends StatelessWidget {
                       Text(
                         character.occupation!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                              color: Colors.grey[600],
+                            ),
                       ),
 
                     const SizedBox(height: 8),
 
                     // 详细信息
-                    _buildInfoSection('外貌特征', [
-                      if (character.bodyType != null) character.bodyType!,
-                      if (character.appearanceFeatures != null) character.appearanceFeatures!,
-                      if (character.clothingStyle != null) character.clothingStyle!,
-                    ].where((text) => text.isNotEmpty).toList()),
+                    _buildInfoSection(
+                        '外貌特征',
+                        [
+                          if (character.bodyType != null) character.bodyType!,
+                          if (character.appearanceFeatures != null)
+                            character.appearanceFeatures!,
+                          if (character.clothingStyle != null)
+                            character.clothingStyle!,
+                        ].where((text) => text.isNotEmpty).toList()),
 
                     const SizedBox(height: 4),
 
-                    _buildInfoSection('性格特点', [
-                      if (character.personality != null) character.personality!,
-                    ].where((text) => text.isNotEmpty).toList()),
+                    _buildInfoSection(
+                        '性格特点',
+                        [
+                          if (character.personality != null)
+                            character.personality!,
+                        ].where((text) => text.isNotEmpty).toList()),
 
                     const SizedBox(height: 4),
 
-                    _buildInfoSection('背景故事', [
-                      if (character.backgroundStory != null) character.backgroundStory!,
-                    ].where((text) => text.isNotEmpty).toList()),
+                    _buildInfoSection(
+                        '背景故事',
+                        [
+                          if (character.backgroundStory != null)
+                            character.backgroundStory!,
+                        ].where((text) => text.isNotEmpty).toList()),
                   ],
                 ),
               ),
@@ -309,12 +324,12 @@ class CharacterPreviewCard extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 2),
-          child: Text(
-            item,
-            style: const TextStyle(fontSize: 13),
-          ),
-        )),
+              padding: const EdgeInsets.only(left: 8, bottom: 2),
+              child: Text(
+                item,
+                style: const TextStyle(fontSize: 13),
+              ),
+            )),
       ],
     );
   }

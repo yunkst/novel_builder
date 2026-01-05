@@ -9,7 +9,8 @@ import '../utils/media_markup_parser.dart';
 /// 2. 自动清理无效标记
 /// 3. 验证标记在数据库中是否存在
 class InvalidMarkupCleaner {
-  static final InvalidMarkupCleaner _instance = InvalidMarkupCleaner._internal();
+  static final InvalidMarkupCleaner _instance =
+      InvalidMarkupCleaner._internal();
 
   factory InvalidMarkupCleaner() {
     return _instance;
@@ -101,12 +102,14 @@ class InvalidMarkupCleaner {
       String cleanedContent = chapterContent;
       for (final invalidMarkup in invalidMarkups) {
         // 使用 replaceAll 移除所有匹配的标记
-        cleanedContent = cleanedContent.replaceAll(invalidMarkup.fullMarkup, '');
+        cleanedContent =
+            cleanedContent.replaceAll(invalidMarkup.fullMarkup, '');
         debugPrint('  ✅ 已清理: ${invalidMarkup.fullMarkup}');
       }
 
       // 4. 清理多余的空行（连续的空行合并为一行）
-      cleanedContent = cleanedContent.replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n');
+      cleanedContent =
+          cleanedContent.replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n');
 
       debugPrint('✅ 清理完成，移除了 ${invalidMarkups.length} 个无效标记');
 

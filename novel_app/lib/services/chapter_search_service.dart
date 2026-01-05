@@ -76,12 +76,11 @@ class ChapterSearchService {
   /// 这个方法可以扩展为基于用户搜索历史的建议
   /// 目前返回空列表，可以在未来实现
   Future<List<String>> getSearchSuggestions() async {
-    // TODO: 实现搜索建议功能
-    // 可以基于用户的搜索历史记录提供建议
+    // 未来可以基于用户的搜索历史记录提供建议
     return [];
   }
 
-  /// 保存搜索关键词到历史记录
+  /// 保存搜索关键词到历史记录（预留接口）
   ///
   /// [keyword] 搜索关键词
   Future<void> saveSearchHistory(String keyword) async {
@@ -90,8 +89,7 @@ class ChapterSearchService {
     }
 
     try {
-      // TODO: 实现搜索历史记录功能
-      // 可以将搜索历史保存到本地数据库或 SharedPreferences
+      // 未来可以将搜索历史保存到本地数据库或 SharedPreferences
       // 用于后续的搜索建议功能
     } catch (e) {
       // 搜索历史保存失败不应该影响搜索功能
@@ -99,8 +97,8 @@ class ChapterSearchService {
     }
   }
 
-  /// 清除搜索历史记录
+  /// 清除搜索历史记录（预留接口）
   Future<void> clearSearchHistory() async {
-    // TODO: 实现清除搜索历史功能
+    // 未来可以实现清除搜索历史的功能
   }
 }

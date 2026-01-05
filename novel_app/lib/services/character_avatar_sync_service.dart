@@ -9,12 +9,15 @@ import '../core/di/api_service_provider.dart';
 /// 角色头像同步服务
 /// 负责将图集图片同步为角色头像
 class CharacterAvatarSyncService {
-  static final CharacterAvatarSyncService _instance = CharacterAvatarSyncService._internal();
+  static final CharacterAvatarSyncService _instance =
+      CharacterAvatarSyncService._internal();
   factory CharacterAvatarSyncService() => _instance;
   CharacterAvatarSyncService._internal();
 
-  final RoleGalleryCacheService _galleryCacheService = RoleGalleryCacheService();
-  final CharacterImageCacheService _avatarCacheService = CharacterImageCacheService.instance;
+  final RoleGalleryCacheService _galleryCacheService =
+      RoleGalleryCacheService();
+  final CharacterImageCacheService _avatarCacheService =
+      CharacterImageCacheService.instance;
   final DatabaseService _databaseService = DatabaseService();
 
   /// 初始化服务
@@ -40,7 +43,8 @@ class CharacterAvatarSyncService {
       debugPrint('🔄 开始同步图片到角色头像: $targetFilename (角色ID: $characterId)');
 
       // 获取图片字节数据
-      final imageBytes = await _galleryCacheService.getImageBytes(targetFilename);
+      final imageBytes =
+          await _galleryCacheService.getImageBytes(targetFilename);
       if (imageBytes == null) {
         debugPrint('❌ 无法获取图片字节数据: $targetFilename');
         return null;
@@ -85,7 +89,8 @@ class CharacterAvatarSyncService {
 
       // 获取角色图集
       final apiService = ApiServiceProvider.instance;
-      final galleryData = await apiService.getRoleGallery(characterId.toString());
+      final galleryData =
+          await apiService.getRoleGallery(characterId.toString());
       final gallery = RoleGallery.fromJson(galleryData);
 
       // 获取第一张图片（优先取置顶图片）
@@ -109,7 +114,8 @@ class CharacterAvatarSyncService {
   /// [cachedImageUrl] 当前缓存的图片URL
   ///
   /// 返回是否已有有效的头像缓存
-  Future<bool> hasValidAvatarCache(int characterId, String? cachedImageUrl) async {
+  Future<bool> hasValidAvatarCache(
+      int characterId, String? cachedImageUrl) async {
     if (cachedImageUrl == null || cachedImageUrl.isEmpty) {
       return false;
     }
@@ -148,7 +154,8 @@ class CharacterAvatarSyncService {
   /// [characterIds] 角色ID列表
   ///
   /// 返回同步结果映射表
-  Future<Map<int, String?>> batchSyncCharacterAvatars(List<int> characterIds) async {
+  Future<Map<int, String?>> batchSyncCharacterAvatars(
+      List<int> characterIds) async {
     final results = <int, String?>{};
 
     for (final characterId in characterIds) {

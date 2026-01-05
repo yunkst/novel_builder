@@ -39,7 +39,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final RoleGalleryCacheService _cacheService = RoleGalleryCacheService();
-  final CharacterAvatarSyncService _avatarSyncService = CharacterAvatarSyncService();
+  final CharacterAvatarSyncService _avatarSyncService =
+      CharacterAvatarSyncService();
   final CharacterAvatarService _avatarService = CharacterAvatarService();
 
   @override
@@ -175,7 +176,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
           _sortedImages = _gallery!.sortedImages;
 
           // 调整页面索引
-          if (_currentIndex >= _sortedImages.length && _sortedImages.isNotEmpty) {
+          if (_currentIndex >= _sortedImages.length &&
+              _sortedImages.isNotEmpty) {
             _currentIndex = _sortedImages.length - 1;
             _pageController.animateToPage(
               _currentIndex,
@@ -210,7 +212,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   Future<void> _onGenerateMoreImages(int count) async {
     try {
       // 获取当前显示的图片作为参考图片
-      final currentImage = _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
+      final currentImage =
+          _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
       final referenceImageUrl = currentImage?.filename;
 
       debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl');
@@ -222,10 +225,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
       );
 
       if (mounted) {
-        final isRegenerate = referenceImageUrl != null && referenceImageUrl.isNotEmpty;
+        final isRegenerate =
+            referenceImageUrl != null && referenceImageUrl.isNotEmpty;
         final message = isRegenerate
-          ? '已提交 $count 张相似图片的生成请求，请等待1-3分钟'
-          : '已提交 $count 张新图片的生成请求，请等待1-3分钟';
+            ? '已提交 $count 张相似图片的生成请求，请等待1-3分钟'
+            : '已提交 $count 张新图片的生成请求，请等待1-3分钟';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -292,7 +296,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
       try {
         tempDir = await Directory.systemTemp.createTemp();
-        final tempImagePath = '${tempDir.path}/temp_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final tempImagePath =
+            '${tempDir.path}/temp_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
         tempFile = File(tempImagePath);
 
         // 写入图片数据
@@ -306,7 +311,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
         // 执行图片裁剪
         croppedFile = await ImageCropService.cropImageForAvatar(tempFile);
-
       } catch (e) {
         debugPrint('❌ 图片准备阶段失败: $e');
         if (mounted) {
@@ -382,7 +386,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   /// 清理临时文件的辅助方法
-  Future<void> _cleanupTempFiles(Directory? tempDir, File? tempFile, File? additionalFile) async {
+  Future<void> _cleanupTempFiles(
+      Directory? tempDir, File? tempFile, File? additionalFile) async {
     try {
       if (tempFile != null && await tempFile.exists()) {
         await tempFile.delete();
@@ -416,7 +421,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
     );
   }
 
-  
   void _showGeneratingDialog() {
     showDialog(
       context: context,
@@ -438,7 +442,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 16),
-
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -481,7 +484,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               ),
             ),
             const SizedBox(height: 16),
-
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -634,7 +636,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -686,7 +689,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
           child: Row(
             children: [
               IconButton(
-                onPressed: () => Navigator.of(context).pop(true), // 总是返回true以触发数据刷新
+                onPressed: () =>
+                    Navigator.of(context).pop(true), // 总是返回true以触发数据刷新
                 icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
               ),
               Expanded(
@@ -820,7 +824,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
       // 重新加载图集
       await _loadGallery();
-
     } catch (e) {
       debugPrint('❌ 重新加载图集失败: $e');
       if (mounted) {
@@ -835,7 +838,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   /// 删除确认对话框已移除
-/// 现在点击删除按钮后直接调用删除接口，无需额外确认
+  /// 现在点击删除按钮后直接调用删除接口，无需额外确认
 
   /// 操作按钮组件（简化版）
   Widget _actionButton({

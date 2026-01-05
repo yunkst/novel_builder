@@ -24,7 +24,8 @@ class SceneIllustrationDialog extends StatefulWidget {
   });
 
   @override
-  State<SceneIllustrationDialog> createState() => _SceneIllustrationDialogState();
+  State<SceneIllustrationDialog> createState() =>
+      _SceneIllustrationDialogState();
 }
 
 class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
@@ -34,7 +35,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
   final _scrollController = ScrollController();
 
   final DatabaseService _databaseService = DatabaseService();
-  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
+  final SceneIllustrationService _sceneIllustrationService =
+      SceneIllustrationService();
   List<int> _selectedCharacterIds = [];
   List<Character> _characters = [];
   int _imageCount = 1;
@@ -90,10 +92,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     if (chapterContent.isEmpty) return '';
 
     // 分割章节内容为段落
-    final paragraphs = chapterContent
-        .split('\n')
-        .where((p) => p.trim().isNotEmpty)
-        .toList();
+    final paragraphs =
+        chapterContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
     if (paragraphs.isEmpty) return '';
 
@@ -106,7 +106,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
   }
 
   /// 在章节内容中查找出现的角色
-  List<int> _findAppearingCharacters(String content, List<Character> characters) {
+  List<int> _findAppearingCharacters(
+      String content, List<Character> characters) {
     if (content.isEmpty || characters.isEmpty) {
       return [];
     }
@@ -130,17 +131,20 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
   Future<void> _preselectAppearingCharacters() async {
     try {
       // 获取当前章节内容
-      final chapterContent = await _databaseService.getCachedChapter(widget.chapterId);
+      final chapterContent =
+          await _databaseService.getCachedChapter(widget.chapterId);
       if (chapterContent == null || chapterContent.isEmpty) {
         debugPrint('章节内容为空，跳过角色预选');
         return;
       }
 
       // 获取可匹配的内容范围
-      final matchableContent = _getMatchableContent(chapterContent, widget.paragraphIndex);
+      final matchableContent =
+          _getMatchableContent(chapterContent, widget.paragraphIndex);
 
       // 查找出现的角色
-      final appearingIds = _findAppearingCharacters(matchableContent, _characters);
+      final appearingIds =
+          _findAppearingCharacters(matchableContent, _characters);
 
       if (appearingIds.isNotEmpty) {
         if (mounted) {
@@ -148,7 +152,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
             _selectedCharacterIds = appearingIds;
           });
         }
-        debugPrint('预选了 ${appearingIds.length} 个角色: ${appearingIds.join(', ')}');
+        debugPrint(
+            '预选了 ${appearingIds.length} 个角色: ${appearingIds.join(', ')}');
       }
     } catch (e) {
       debugPrint('预选角色失败: $e');
@@ -182,7 +187,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     }
 
     // 获取章节内容
-    final chapterContent = await _databaseService.getCachedChapter(widget.chapterId);
+    final chapterContent =
+        await _databaseService.getCachedChapter(widget.chapterId);
     if (chapterContent == null || chapterContent.isEmpty) {
       debugPrint('章节内容为空，跳过场景描写生成');
       setState(() {
@@ -192,12 +198,15 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     }
 
     // 获取当前段落及之前的内容作为AI上下文
-    final fullContext = _getMatchableContent(chapterContent, widget.paragraphIndex);
+    final fullContext =
+        _getMatchableContent(chapterContent, widget.paragraphIndex);
 
     // 重新筛选在fullContext中出现的角色
     final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
-    final appearingCharacters = _findAppearingCharacters(fullContext, allCharacters);
-    final selectedCharacters = allCharacters.where((c) => appearingCharacters.contains(c.id)).toList();
+    final appearingCharacters =
+        _findAppearingCharacters(fullContext, allCharacters);
+    final selectedCharacters =
+        allCharacters.where((c) => appearingCharacters.contains(c.id)).toList();
 
     // 构建输入参数
     final inputs = {
@@ -251,7 +260,9 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
 
     try {
       // 获取选中的角色
-      final selectedCharacters = _characters.where((c) => _selectedCharacterIds.contains(c.id)).toList();
+      final selectedCharacters = _characters
+          .where((c) => _selectedCharacterIds.contains(c.id))
+          .toList();
 
       // 创建角色信息列表（使用新的RoleInfo格式）
       final rolesList = Character.toRoleInfoList(selectedCharacters);
@@ -259,7 +270,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
       debugPrint('开始创建插图，段落索引: ${widget.paragraphIndex}');
 
       // 使用SceneIllustrationService创建插图（自动插入标记）
-      final illustrationId = await _sceneIllustrationService.createSceneIllustrationWithMarkup(
+      final illustrationId =
+          await _sceneIllustrationService.createSceneIllustrationWithMarkup(
         novelUrl: widget.novelUrl,
         chapterId: widget.chapterId,
         paragraphText: _contentController.text.trim(),
@@ -358,14 +370,19 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                   child: Padding(
                     padding: EdgeInsets.only(right: count < 4 ? 8.0 : 0),
                     child: ElevatedButton(
-                      onPressed: _isGenerating ? null : () {
-                        setState(() {
-                          _imageCount = count;
-                        });
-                      },
+                      onPressed: _isGenerating
+                          ? null
+                          : () {
+                              setState(() {
+                                _imageCount = count;
+                              });
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _imageCount == count ? Colors.blue : Colors.grey[300],
-                        foregroundColor: _imageCount == count ? Colors.white : Colors.black,
+                        backgroundColor: _imageCount == count
+                            ? Colors.blue
+                            : Colors.grey[300],
+                        foregroundColor:
+                            _imageCount == count ? Colors.white : Colors.black,
                       ),
                       child: Text('$count'),
                     ),
@@ -429,7 +446,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.auto_awesome),
               label: Text(isStreaming ? 'AI生成中...' : 'AI生成画面'),
@@ -452,12 +470,14 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, size: 16, color: Colors.red.shade600),
+                    Icon(Icons.error_outline,
+                        size: 16, color: Colors.red.shade600),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _sceneGenerationError!,
-                        style: TextStyle(color: Colors.red.shade600, fontSize: 14),
+                        style:
+                            TextStyle(color: Colors.red.shade600, fontSize: 14),
                       ),
                     ),
                   ],
@@ -469,9 +489,11 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
       ),
       actions: [
         TextButton(
-          onPressed: _isGenerating ? null : () {
-            Navigator.of(context).pop();
-          },
+          onPressed: _isGenerating
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                },
           child: const Text('取消'),
         ),
         ElevatedButton(
@@ -484,7 +506,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
               : const Text('生成插图'),
         ),

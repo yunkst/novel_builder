@@ -140,8 +140,10 @@ class StreamConfig {
       showRealTime: showRealTime ?? this.showRealTime,
       autoScroll: autoScroll ?? this.autoScroll,
       scrollDuration: scrollDuration ?? this.scrollDuration,
-      disableEditWhileGenerating: disableEditWhileGenerating ?? this.disableEditWhileGenerating,
-      generatingBackgroundColor: generatingBackgroundColor ?? this.generatingBackgroundColor,
+      disableEditWhileGenerating:
+          disableEditWhileGenerating ?? this.disableEditWhileGenerating,
+      generatingBackgroundColor:
+          generatingBackgroundColor ?? this.generatingBackgroundColor,
       generatingTextColor: generatingTextColor ?? this.generatingTextColor,
       generatingHint: generatingHint ?? this.generatingHint,
       maxLines: maxLines ?? this.maxLines,
@@ -220,8 +222,8 @@ enum StreamStatus {
 
 /// 场景描写流式生成状态
 enum SceneDescriptionState {
-  idle,        // 空闲状态
-  generating,  // 生成中
-  completed,   // 已完成
-  error        // 生成错误
+  idle, // 空闲状态
+  generating, // 生成中
+  completed, // 已完成
+  error // 生成错误
 }

@@ -33,7 +33,8 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
   DateTime? _autoScrollStartTime; // 自动滚动启动时间（用于保护期）
 
   // 常量配置
-  static const Duration _startupProtectionDuration = Duration(milliseconds: 500); // 启动保护期：500ms
+  static const Duration _startupProtectionDuration =
+      Duration(milliseconds: 500); // 启动保护期：500ms
   static const double _baseScrollSpeed = 50.0; // 基础滚动速度（像素/秒）
 
   // ========== 抽象访问器（子类必须实现）==========
@@ -57,7 +58,8 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
 
   /// 开始自动滚动
   void startAutoScroll() {
-    debugPrint('🚀 [AutoScrollMixin] startAutoScroll 被调用，_isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
+    debugPrint(
+        '🚀 [AutoScrollMixin] startAutoScroll 被调用，_isAutoScrolling=$_isAutoScrolling, _shouldAutoScroll=$_shouldAutoScroll');
 
     if (_isAutoScrolling) {
       debugPrint('⚠️ [AutoScrollMixin] 已在滚动中，直接返回（保护逻辑触发）');
@@ -83,7 +85,8 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
       _autoScrollStartTime = DateTime.now(); // ← 记录启动时间
     });
 
-    debugPrint('✅ [AutoScrollMixin] 自动滚动已启动，_isAutoScrolling=true, _shouldAutoScroll=true, 保护期=${_startupProtectionDuration.inMilliseconds}ms');
+    debugPrint(
+        '✅ [AutoScrollMixin] 自动滚动已启动，_isAutoScrolling=true, _shouldAutoScroll=true, 保护期=${_startupProtectionDuration.inMilliseconds}ms');
   }
 
   /// 暂停自动滚动（临时暂停，保持意图，用于用户滑动场景）
@@ -95,7 +98,8 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
       // _shouldAutoScroll 保持 true，不清除意图！
       _autoScrollStartTime = null; // 清除启动时间
     });
-    debugPrint('✅ [AutoScrollMixin] 已暂停，_isAutoScrolling=false, _shouldAutoScroll=$_shouldAutoScroll（保持不变）');
+    debugPrint(
+        '✅ [AutoScrollMixin] 已暂停，_isAutoScrolling=false, _shouldAutoScroll=$_shouldAutoScroll（保持不变）');
   }
 
   /// 停止自动滚动（完全停止，清除意图）
@@ -107,12 +111,14 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
       _shouldAutoScroll = false; // ← 清除意图标记
       _autoScrollStartTime = null; // ← 清除启动时间
     });
-    debugPrint('✅ [AutoScrollMixin] 已停止，_isAutoScrolling=false, _shouldAutoScroll=false');
+    debugPrint(
+        '✅ [AutoScrollMixin] 已停止，_isAutoScrolling=false, _shouldAutoScroll=false');
   }
 
   /// 切换自动滚动状态
   void toggleAutoScroll() {
-    debugPrint('🔄 [AutoScrollMixin] toggleAutoScroll 切换自动滚动状态，当前 _isAutoScrolling=$_isAutoScrolling');
+    debugPrint(
+        '🔄 [AutoScrollMixin] toggleAutoScroll 切换自动滚动状态，当前 _isAutoScrolling=$_isAutoScrolling');
 
     if (_isAutoScrolling) {
       debugPrint('⬇️ [AutoScrollMixin] 停止自动滚动');
@@ -130,7 +136,8 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
     // 只响应真正的用户滚动通知
     if (notification is UserScrollNotification) {
       // 用户开始主动滚动（检查 direction 是否不是 idle）
-      if (notification.direction.toString() != 'ScrollDirection.idle' && !_isUserScrolling) {
+      if (notification.direction.toString() != 'ScrollDirection.idle' &&
+          !_isUserScrolling) {
         setState(() {
           _isUserScrolling = true;
         });
@@ -138,9 +145,11 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
         if (_isAutoScrolling) {
           // 检查是否在保护期内
           if (_autoScrollStartTime != null) {
-            final timeSinceStart = DateTime.now().difference(_autoScrollStartTime!);
+            final timeSinceStart =
+                DateTime.now().difference(_autoScrollStartTime!);
             if (timeSinceStart < _startupProtectionDuration) {
-              debugPrint('🛡️ [AutoScrollMixin] 在启动保护期内（${timeSinceStart.inMilliseconds}ms < ${_startupProtectionDuration.inMilliseconds}ms），忽略用户手势');
+              debugPrint(
+                  '🛡️ [AutoScrollMixin] 在启动保护期内（${timeSinceStart.inMilliseconds}ms < ${_startupProtectionDuration.inMilliseconds}ms），忽略用户手势');
               return false; // 忽略这次手势
             }
           }

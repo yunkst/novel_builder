@@ -68,7 +68,8 @@ class PreloadService {
     debugPrint('📚 小说活跃: $novelTitle (第${currentIndex + 1}章)');
 
     // 使用DatabaseService的批量检查方法
-    final uncachedUrls = await _databaseService.filterUncachedChapters(chapterUrls);
+    final uncachedUrls =
+        await _databaseService.filterUncachedChapters(chapterUrls);
 
     if (uncachedUrls.isEmpty) {
       debugPrint('✅ "$novelTitle" 所有章节已缓存');
@@ -78,7 +79,8 @@ class PreloadService {
     debugPrint('📋 待缓存章节数: ${uncachedUrls.length}');
 
     // 创建任务列表（后续章节优先）
-    final tasks = _createTasks(novelUrl, novelTitle, uncachedUrls, currentIndex);
+    final tasks =
+        _createTasks(novelUrl, novelTitle, uncachedUrls, currentIndex);
 
     // 去重并入队
     int addedCount = 0;

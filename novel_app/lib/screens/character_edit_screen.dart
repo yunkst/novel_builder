@@ -53,7 +53,13 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 
   final List<String> _genderOptions = ['男', '女', '其他'];
   final List<String> _commonBodyTypes = [
-    '瘦弱', '标准', '健壮', '肥胖', '苗条', '高大', '矮小'
+    '瘦弱',
+    '标准',
+    '健壮',
+    '肥胖',
+    '苗条',
+    '高大',
+    '矮小'
   ];
 
   @override
@@ -157,7 +163,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         id: widget.character?.id,
         novelUrl: widget.novel.url,
         name: _nameController.text.trim(),
-        age: _ageController.text.isNotEmpty ? int.tryParse(_ageController.text) : null,
+        age: _ageController.text.isNotEmpty
+            ? int.tryParse(_ageController.text)
+            : null,
         gender: _selectedGender,
         occupation: _occupationController.text.trim().isNotEmpty
             ? _occupationController.text.trim()
@@ -239,7 +247,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       return;
     }
 
-    
     setState(() {
       _isGeneratingRoleCard = true;
     });
@@ -288,7 +295,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       }
 
       // 使用角色ID或临时ID
-      final String roleId = widget.character?.id?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final String roleId = widget.character?.id?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString();
 
       // 使用ApiServiceWrapper确保正确的token认证
       final apiService = ApiServiceProvider.instance;
@@ -309,7 +317,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       }
 
       debugPrint('角色卡生成响应: $response');
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -356,7 +363,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 身材体型：${_bodyTypeController.text.isNotEmpty ? _bodyTypeController.text : '待补充'}
 性格特点：${_personalityController.text.isNotEmpty ? _personalityController.text : '待补充'}
 背景经历：${_backgroundController.text.isNotEmpty ? _backgroundController.text : '待补充'}
-      '''.trim();
+      '''
+          .trim();
 
       final difyService = DifyService();
       final prompts = await difyService.generateCharacterPrompts(
@@ -521,95 +529,96 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-            // 添加间距分隔头像和表单字段
-            if (widget.character != null) const SizedBox(height: 20),
-            // 姓名
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '姓名 *',
-                hintText: '请输入人物姓名',
-                border: OutlineInputBorder(),
+        // 添加间距分隔头像和表单字段
+        if (widget.character != null) const SizedBox(height: 20),
+        // 姓名
+        TextFormField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: '姓名 *',
+            hintText: '请输入人物姓名',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return '请输入人物姓名';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // 性别和年龄
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedGender,
+                decoration: const InputDecoration(
+                  labelText: '性别',
+                  border: OutlineInputBorder(),
+                ),
+                items: _genderOptions.map((gender) {
+                  return DropdownMenuItem(
+                    value: gender,
+                    child: Text(gender),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedGender = value;
+                  });
+                },
               ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return '请输入人物姓名';
-                }
-                return null;
-              },
             ),
-            const SizedBox(height: 16),
-
-            // 性别和年龄
-            Row(
-              children: [
-                Expanded(
-                  flex: 1,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedGender,
-                    decoration: const InputDecoration(
-                      labelText: '性别',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _genderOptions.map((gender) {
-                      return DropdownMenuItem(
-                        value: gender,
-                        child: Text(gender),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGender = value;
-                      });
-                    },
-                  ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: TextFormField(
+                controller: _ageController,
+                decoration: const InputDecoration(
+                  labelText: '年龄',
+                  hintText: '如：25',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    controller: _ageController,
-                    decoration: const InputDecoration(
-                      labelText: '年龄',
-                      hintText: '如：25',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value != null && value.isNotEmpty) {
-                        final age = int.tryParse(value);
-                        if (age == null || age < 0 || age > 999) {
-                          return '请输入有效年龄';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 职业
-            TextFormField(
-              controller: _occupationController,
-              decoration: const InputDecoration(
-                labelText: '职业',
-                hintText: '如：学生、医生、教师等',
-                border: OutlineInputBorder(),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final age = int.tryParse(value);
+                    if (age == null || age < 0 || age > 999) {
+                      return '请输入有效年龄';
+                    }
+                  }
+                  return null;
+                },
               ),
             ),
           ],
-        );
+        ),
+        const SizedBox(height: 16),
+
+        // 职业
+        TextFormField(
+          controller: _occupationController,
+          decoration: const InputDecoration(
+            labelText: '职业',
+            hintText: '如：学生、医生、教师等',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
   }
 
-  
   /// 构建角色头像（编辑页面使用，80px）
   Widget _buildCharacterAvatar() {
     return GestureDetector(
       onTap: _openGallery,
       child: FutureBuilder<String?>(
-        future: widget.character?.id != null ? _avatarService.getCharacterAvatarPath(widget.character!.id!) : Future.value(null),
+        future: widget.character?.id != null
+            ? _avatarService.getCharacterAvatarPath(widget.character!.id!)
+            : Future.value(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildLoadingAvatar(80);
@@ -684,7 +693,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   /// 构建备用头像（首字母）
   Widget _buildFallbackAvatar(double size) {
     final characterName = widget.character?.name ?? '';
-    final initial = characterName.isNotEmpty ? characterName[0].toUpperCase() : '?';
+    final initial =
+        characterName.isNotEmpty ? characterName[0].toUpperCase() : '?';
 
     return Container(
       width: size,
@@ -729,9 +739,11 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               onSelected: (String selection) {
                 _bodyTypeController.text = selection;
               },
-              fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+              fieldViewBuilder:
+                  (context, controller, focusNode, onEditingComplete) {
                 // 初始化controller的值
-                if (controller.text.isEmpty && _bodyTypeController.text.isNotEmpty) {
+                if (controller.text.isEmpty &&
+                    _bodyTypeController.text.isNotEmpty) {
                   controller.text = _bodyTypeController.text;
                 }
                 return TextFormField(
@@ -793,7 +805,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 // 生成提示词按钮
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isGeneratingPrompts ? null : _generateCharacterPrompts,
+                    onPressed:
+                        _isGeneratingPrompts ? null : _generateCharacterPrompts,
                     icon: _isGeneratingPrompts
                         ? const SizedBox(
                             width: 16,
@@ -816,7 +829,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 // 生成人物卡按钮
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: (_nameController.text.trim().isEmpty || _isGeneratingRoleCard)
+                    onPressed: (_nameController.text.trim().isEmpty ||
+                            _isGeneratingRoleCard)
                         ? null
                         : _generateRoleCardImages,
                     icon: _isGeneratingRoleCard

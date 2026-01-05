@@ -44,6 +44,7 @@ class ApiServiceWrapper {
     _ensureInitialized();
     return _api;
   }
+
   DateTime? _lastInitTime;
   int _lastErrorCount = 0;
   DateTime? _lastErrorTime;
@@ -363,12 +364,14 @@ class ApiServiceWrapper {
     return _chapterManager.getChapterContent(
       chapterUrl,
       forceRefresh: forceRefresh,
-      fetchFunction: () => _fetchChapterContentFromNetwork(chapterUrl, forceRefresh: forceRefresh),
+      fetchFunction: () => _fetchChapterContentFromNetwork(chapterUrl,
+          forceRefresh: forceRefresh),
     );
   }
 
   /// 从网络获取章节内容的实际实现
-  Future<String> _fetchChapterContentFromNetwork(String chapterUrl, {bool forceRefresh = false}) async {
+  Future<String> _fetchChapterContentFromNetwork(String chapterUrl,
+      {bool forceRefresh = false}) async {
     return _withRetry<String>(() async {
       final token = await getToken();
       final response = await _api.chapterContentChapterContentGet(
@@ -408,7 +411,6 @@ class ApiServiceWrapper {
     // 不再关闭Dio连接，保持单例连接可用
     // _dio.close(); // 已注释，避免关闭共享连接
   }
-
 
   /// 生成人物卡图片
   Future<Map<String, dynamic>> generateRoleCardImages({
@@ -684,7 +686,8 @@ class ApiServiceWrapper {
         ..count = count
         ..model = model);
 
-      final response = await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
+      final response =
+          await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
         sceneRegenerateRequest: request,
         X_API_TOKEN: token,
       );
@@ -775,7 +778,8 @@ class ApiServiceWrapper {
     try {
       final token = await getToken();
 
-      final response = await _api.generateVideoFromImageApiImageToVideoGeneratePost(
+      final response =
+          await _api.generateVideoFromImageApiImageToVideoGeneratePost(
         imageToVideoRequest: ImageToVideoRequest((b) => b
           ..imgName = imgName
           ..userInput = userInput
@@ -801,15 +805,17 @@ class ApiServiceWrapper {
     try {
       final token = await getToken();
 
-      final response = await _api.checkVideoStatusApiImageToVideoHasVideoImgNameGet(
+      final response =
+          await _api.checkVideoStatusApiImageToVideoHasVideoImgNameGet(
         imgName: imgName,
         X_API_TOKEN: token,
       );
 
       if (response.statusCode == 200) {
-        return response.data ?? VideoStatusResponse((b) => b
-          ..imgName = imgName
-          ..hasVideo = false);
+        return response.data ??
+            VideoStatusResponse((b) => b
+              ..imgName = imgName
+              ..hasVideo = false);
       } else {
         throw Exception('检查视频状态失败：${response.statusCode}');
       }
@@ -856,10 +862,12 @@ class ApiServiceWrapper {
         ..taskId = taskId
         ..count = count
         ..model = modelName ?? '');
-      debugPrint('请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}');
+      debugPrint(
+          '请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}');
 
       debugPrint('🔄 发起API请求...');
-      final response = await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
+      final response =
+          await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
         sceneRegenerateRequest: request,
         X_API_TOKEN: token,
       );
@@ -871,7 +879,8 @@ class ApiServiceWrapper {
       if (response.statusCode == 200) {
         debugPrint('✅ 请求成功');
         debugPrint('响应数据: ${response.data}');
-        final result = response.data as Map<String, dynamic>? ?? {'status': 'failed'};
+        final result =
+            response.data as Map<String, dynamic>? ?? {'status': 'failed'};
         debugPrint('返回结果: $result');
         return result;
       } else {

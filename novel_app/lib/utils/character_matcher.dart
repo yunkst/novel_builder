@@ -72,9 +72,8 @@ class CharacterMatcher {
     );
 
     // 如果章节中没有出现任何角色，包含所有角色作为参考
-    final rolesToInclude = chapterCharacters.isNotEmpty
-        ? chapterCharacters
-        : existingCharacters;
+    final rolesToInclude =
+        chapterCharacters.isNotEmpty ? chapterCharacters : existingCharacters;
 
     return {
       'chapters_content': chapterContent,
@@ -131,11 +130,45 @@ class CharacterMatcher {
   static bool _isLikelyCharacterName(String name) {
     // 排除一些常见的非人名词汇
     final excludeWords = {
-      '这个', '那个', '什么', '没有', '可以', '应该', '已经', '还是',
-      '因为', '所以', '但是', '然后', '不过', '如果', '虽然', '即使',
-      '时候', '地方', '东西', '问题', '办法', '情况', '样子', '感觉',
-      '先生', '小姐', '女士', '老板', '经理', '主任', '同学', '朋友',
-      '老师', '学生', '医生', '护士', '警察', '司机', '服务员',
+      '这个',
+      '那个',
+      '什么',
+      '没有',
+      '可以',
+      '应该',
+      '已经',
+      '还是',
+      '因为',
+      '所以',
+      '但是',
+      '然后',
+      '不过',
+      '如果',
+      '虽然',
+      '即使',
+      '时候',
+      '地方',
+      '东西',
+      '问题',
+      '办法',
+      '情况',
+      '样子',
+      '感觉',
+      '先生',
+      '小姐',
+      '女士',
+      '老板',
+      '经理',
+      '主任',
+      '同学',
+      '朋友',
+      '老师',
+      '学生',
+      '医生',
+      '护士',
+      '警察',
+      '司机',
+      '服务员',
     };
 
     // 如果是排除词汇，不是角色名称
@@ -150,10 +183,46 @@ class CharacterMatcher {
 
     // 常见的姓氏
     final commonSurnames = {
-      '王', '李', '张', '刘', '陈', '杨', '赵', '黄', '周', '吴',
-      '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗',
-      '梁', '宋', '郑', '谢', '韩', '唐', '冯', '于', '董', '萧',
-      '程', '曹', '袁', '邓', '许', '傅', '沈', '曾', '彭', '吕',
+      '王',
+      '李',
+      '张',
+      '刘',
+      '陈',
+      '杨',
+      '赵',
+      '黄',
+      '周',
+      '吴',
+      '徐',
+      '孙',
+      '胡',
+      '朱',
+      '高',
+      '林',
+      '何',
+      '郭',
+      '马',
+      '罗',
+      '梁',
+      '宋',
+      '郑',
+      '谢',
+      '韩',
+      '唐',
+      '冯',
+      '于',
+      '董',
+      '萧',
+      '程',
+      '曹',
+      '袁',
+      '邓',
+      '许',
+      '傅',
+      '沈',
+      '曾',
+      '彭',
+      '吕',
     };
 
     // 如果第一个字是常见姓氏，更可能是角色名称
@@ -182,8 +251,10 @@ class CharacterMatcher {
       personality: newCharacter.personality ?? oldCharacter.personality,
       bodyType: newCharacter.bodyType ?? oldCharacter.bodyType,
       clothingStyle: newCharacter.clothingStyle ?? oldCharacter.clothingStyle,
-      appearanceFeatures: newCharacter.appearanceFeatures ?? oldCharacter.appearanceFeatures,
-      backgroundStory: newCharacter.backgroundStory ?? oldCharacter.backgroundStory,
+      appearanceFeatures:
+          newCharacter.appearanceFeatures ?? oldCharacter.appearanceFeatures,
+      backgroundStory:
+          newCharacter.backgroundStory ?? oldCharacter.backgroundStory,
       updatedAt: DateTime.now(),
     );
   }
@@ -194,7 +265,8 @@ class CharacterMatcher {
   /// [chapterContent] 章节内容
   ///
   /// 返回角色在章节中出现的次数
-  static int countCharacterOccurrences(Character character, String chapterContent) {
+  static int countCharacterOccurrences(
+      Character character, String chapterContent) {
     final pattern = RegExp(RegExp.escape(character.name));
     return pattern.allMatches(chapterContent).length;
   }

@@ -77,7 +77,8 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
     }
 
     try {
-      final imageBytes = await _cacheService.getImageBytes(widget.imageUrl)
+      final imageBytes = await _cacheService
+          .getImageBytes(widget.imageUrl)
           .timeout(widget.timeout ?? const Duration(seconds: 30));
 
       if (imageBytes != null) {
@@ -228,7 +229,8 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 minimumSize: const Size(80, 32),
               ),
             ),

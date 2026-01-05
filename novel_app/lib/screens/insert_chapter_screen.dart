@@ -3,9 +3,9 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
 import '../widgets/character_selector.dart';
+import '../widgets/streaming_status_indicator.dart';
 import '../controllers/outline_draft_controller.dart';
 import '../services/outline_service.dart';
-import '../services/database_service.dart';
 import '../controllers/chapter_list/outline_integration_handler.dart';
 
 /// 插入模式枚举
@@ -40,7 +40,6 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
   late final TextEditingController _draftEditingController;
   final OutlineDraftController _draftController = OutlineDraftController();
   final OutlineService _outlineService = OutlineService();
-  final DatabaseService _databaseService = DatabaseService();
 
   // 状态管理
   _InsertMode _currentMode = _InsertMode.manual;
@@ -56,7 +55,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.prefillTitle ?? '');
-    _userInputController = TextEditingController(text: widget.prefillContent ?? '');
+    _userInputController =
+        TextEditingController(text: widget.prefillContent ?? '');
     _draftEditingController = TextEditingController();
     // 设置TextField控制器到DraftController
     _draftController.setTextController(_draftEditingController);
@@ -222,7 +222,6 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
   Future<List<String>> _getPreviousChapters() async {
     final handler = OutlineIntegrationHandler(
       outlineService: _outlineService,
-      databaseService: _databaseService,
     );
 
     return await handler.getPreviousChaptersContent(
@@ -481,109 +480,109 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
           // 提示信息
           Card(
             child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade700),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    isEmpty
-                        ? '将为小说"${widget.novel.title}"创建第一章'
-                        : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // 章节标题输入
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: '章节标题',
-                hintText: isEmpty ? '例如：第一章 故事的开始' : '例如：第十五章 意外的相遇',
-                border: const OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // 章节内容要求输入
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _userInputController,
-              decoration: const InputDecoration(
-                labelText: '章节内容要求',
-                hintText: '描述你想要的故事情节、人物对话、场景描述等...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 8,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // 出场人物选择
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.people, size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '出场人物（可选）',
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isEmpty
+                          ? '将为小说"${widget.novel.title}"创建第一章'
+                          : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                CharacterSelector(
-                  novelUrl: widget.novel.url,
-                  initialSelectedIds: _selectedCharacterIds,
-                  onSelectionChanged: (selectedIds) {
-                    setState(() {
-                      _selectedCharacterIds = selectedIds;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'AI将根据选中的角色特征来生成章节内容',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue.shade600,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+
+          const SizedBox(height: 16),
+
+          // 章节标题输入
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: '章节标题',
+                  hintText: isEmpty ? '例如：第一章 故事的开始' : '例如：第十五章 意外的相遇',
+                  border: const OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 章节内容要求输入
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _userInputController,
+                decoration: const InputDecoration(
+                  labelText: '章节内容要求',
+                  hintText: '描述你想要的故事情节、人物对话、场景描述等...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 8,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 出场人物选择
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.people, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '出场人物（可选）',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CharacterSelector(
+                    novelUrl: widget.novel.url,
+                    initialSelectedIds: _selectedCharacterIds,
+                    onSelectionChanged: (selectedIds) {
+                      setState(() {
+                        _selectedCharacterIds = selectedIds;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'AI将根据选中的角色特征来生成章节内容',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -606,7 +605,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.menu_book, size: 20, color: Colors.blue.shade700),
+                      Icon(Icons.menu_book,
+                          size: 20, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Text(
                         '大纲: ${_outline!.title}',
@@ -641,23 +641,23 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
             controller: _userInputController,
             decoration: const InputDecoration(
               labelText: '章节要求（可选）',
-            hintText: '描述您希望这一章包含的内容、情节、冲突等，留空则完全根据大纲生成...',
-            border: OutlineInputBorder(),
+              hintText: '描述您希望这一章包含的内容、情节、冲突等，留空则完全根据大纲生成...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 5,
+            autofocus: true,
+            enabled: !_draftController.isLoading, // 生成时禁用输入
           ),
-          maxLines: 5,
-          autofocus: true,
-          enabled: !_draftController.isLoading, // 生成时禁用输入
-        ),
 
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-        Text(
-          'AI将根据大纲生成章节细纲，您可以提供额外要求来引导生成方向',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
+          Text(
+            'AI将根据大纲生成章节细纲，您可以提供额外要求来引导生成方向',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
           ),
-        ),
         ],
       ),
     );
@@ -721,13 +721,43 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _draftEditingController,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                  // 使用StreamingContentDisplay组件，提供统一的滚动体验
+                  SizedBox(
+                    height: 250,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 状态指示器
+                        if (_draftController.streamedContent.isNotEmpty ||
+                            _draftController.isLoading)
+                          StreamingStatusIndicator(
+                            isStreaming: _draftController.isLoading,
+                            characterCount:
+                                _draftController.streamedContent.length,
+                            streamingText: '实时生成中...',
+                            completedText: '生成完成',
+                          ),
+                        if (_draftController.streamedContent.isNotEmpty ||
+                            _draftController.isLoading)
+                          const SizedBox(height: 12),
+                        // 内容显示区域
+                        if (_draftController.streamedContent.isEmpty &&
+                            !_draftController.isLoading)
+                          const Expanded(
+                            child: Center(
+                              child: Text(
+                                '等待生成细纲内容...',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          )
+                        else
+                          Expanded(
+                            child: _buildDraftContentDisplay(),
+                          ),
+                      ],
                     ),
-                    maxLines: 10,
-                    enabled: !_draftController.isLoading,
                   ),
                 ],
               ),
@@ -834,8 +864,38 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
     );
   }
 
+  /// 构建细纲内容显示
+  Widget _buildDraftContentDisplay() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 250),
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        border: Border.all(color: Colors.grey[700]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: TextField(
+          controller: _draftEditingController,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+          ),
+          maxLines: null,
+          enabled: !_draftController.isLoading,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.6,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 通用按钮栏构建器
-  Widget _buildButtonBar({required Widget leftChild, required Widget rightChild}) {
+  Widget _buildButtonBar(
+      {required Widget leftChild, required Widget rightChild}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

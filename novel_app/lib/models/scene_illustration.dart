@@ -50,10 +50,14 @@ class SceneIllustration {
       roles: map['roles'] as String,
       imageCount: map['image_count'] as int,
       status: map['status'] as String,
-      images: map['images'] != null ? List<String>.from(map['images'].split(',')) : [],
+      images: map['images'] != null
+          ? List<String>.from(map['images'].split(','))
+          : [],
       prompts: map['prompts'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
-      completedAt: map['completed_at'] != null ? DateTime.parse(map['completed_at'] as String) : null,
+      completedAt: map['completed_at'] != null
+          ? DateTime.parse(map['completed_at'] as String)
+          : null,
     );
   }
 
@@ -123,6 +127,7 @@ class SceneIllustration {
     );
   }
 
-  factory SceneIllustration.fromJson(Map<String, dynamic> json) => _$SceneIllustrationFromJson(json);
+  factory SceneIllustration.fromJson(Map<String, dynamic> json) =>
+      _$SceneIllustrationFromJson(json);
   Map<String, dynamic> toJson() => _$SceneIllustrationToJson(this);
 }

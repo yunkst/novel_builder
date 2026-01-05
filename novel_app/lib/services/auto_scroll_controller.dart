@@ -110,8 +110,7 @@ class HighPerformanceAutoScrollController {
     }
 
     // 计算时间差（秒）
-    final deltaTime =
-        now.difference(_lastFrameTime!).inMicroseconds / 1000000;
+    final deltaTime = now.difference(_lastFrameTime!).inMicroseconds / 1000000;
     _lastFrameTime = now;
 
     // 检查滚动控制器状态

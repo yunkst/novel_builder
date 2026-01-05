@@ -17,7 +17,10 @@ class ParagraphWidget extends StatefulWidget {
   final ValueChanged<String>? onContentChanged;
   final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
   final VoidCallback? onImageDelete;
-  final Function(String taskId)? generateVideoFromIllustration; // For generating video from image preview
+  final Function(String taskId)?
+      generateVideoFromIllustration; // For generating video from image preview
+  final int? modelWidth; // 新增：模型宽度
+  final int? modelHeight; // 新增：模型高度
 
   const ParagraphWidget({
     super.key,
@@ -33,6 +36,8 @@ class ParagraphWidget extends StatefulWidget {
     this.onImageTap,
     this.onImageDelete,
     this.generateVideoFromIllustration,
+    this.modelWidth,
+    this.modelHeight,
   });
 
   @override
@@ -76,7 +81,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   Widget build(BuildContext context) {
     // final editModeProvider = Provider.of<ReaderEditModeProvider>(context, listen: false); // 移除此行
     // final bool isEditMode = editModeProvider.isEditMode; // 移除此行
-    
+
     // 检查是否为插图标记
     if (MediaMarkupParser.isMediaMarkup(widget.paragraph)) {
       final markup = MediaMarkupParser.parseMediaMarkup(widget.paragraph).first;
@@ -91,7 +96,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
             children: [
               // 插图标题
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                 child: Text(
                   '插图 ${widget.index + 1}', // index + 1 is paragraph number
                   style: TextStyle(
@@ -111,6 +117,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
                   // 单张图片删除成功后的处理，可能需要刷新列表
                   debugPrint('单张图片删除成功: ${markup.id}');
                 },
+                modelWidth: widget.modelWidth,
+                modelHeight: widget.modelHeight,
               ),
 
               // 编辑模式下显示可编辑的标记文本
@@ -120,7 +128,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   decoration: BoxDecoration(
                     color: Colors.grey.withValues(alpha: 0.1),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -186,9 +195,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
         padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
         decoration: BoxDecoration(
           color: Colors.grey.withValues(alpha: 0.1),
-          border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.3),
-              width: 1),
+          border:
+              Border.all(color: Colors.grey.withValues(alpha: 0.3), width: 1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: TextField(
@@ -224,15 +232,13 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
             decoration: BoxDecoration(
-              color: widget.isSelected
-                  ? Colors.blue.withValues(alpha: 0.2)
-                  : null,
+              color:
+                  widget.isSelected ? Colors.blue.withValues(alpha: 0.2) : null,
               border: widget.isSelected
                   ? Border.all(color: Colors.blue, width: 2)
                   : widget.isCloseupMode
                       ? Border.all(
-                          color: Colors.blue.withValues(alpha: 0.3),
-                          width: 1)
+                          color: Colors.blue.withValues(alpha: 0.3), width: 1)
                       : null,
               borderRadius: BorderRadius.circular(8),
             ),

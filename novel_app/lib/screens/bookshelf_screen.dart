@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/database_service.dart';
-import '../services/cache_manager.dart';
 import 'chapter_list_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
@@ -14,7 +13,6 @@ class BookshelfScreen extends StatefulWidget {
 
 class _BookshelfScreenState extends State<BookshelfScreen> {
   final DatabaseService _databaseService = DatabaseService();
-  final CacheManager _cacheManager = CacheManager();
   List<Novel> _bookshelf = [];
   bool _isLoading = true;
   final Map<String, Map<String, int>> _progress = {}; // novelUrl -> stats
@@ -23,14 +21,6 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   void initState() {
     super.initState();
     _loadBookshelf();
-    _cacheManager.progressStream.listen((update) {
-      setState(() {
-        _progress[update.novelUrl] = {
-          'cachedChapters': update.cachedChapters,
-          'totalChapters': update.totalChapters,
-        };
-      });
-    });
   }
 
   Future<void> _loadBookshelf() async {

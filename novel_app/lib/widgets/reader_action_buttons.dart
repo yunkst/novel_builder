@@ -44,7 +44,8 @@ class ReaderActionButtons extends StatelessWidget {
             tooltip: isCloseupMode ? '关闭特写模式' : '开启特写模式',
             heroTag: 'closeup_mode',
             backgroundColor: isCloseupMode ? Colors.blue : null,
-            child: Icon(isCloseupMode ? Icons.visibility : Icons.visibility_off),
+            child:
+                Icon(isCloseupMode ? Icons.visibility : Icons.visibility_off),
           ),
           const SizedBox(height: 16), // 按钮间距
           // 自动滚屏按钮（下方）

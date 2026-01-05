@@ -249,7 +249,8 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                         SizedBox(height: 8),
                         Text(

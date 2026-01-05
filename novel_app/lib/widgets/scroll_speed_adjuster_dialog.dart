@@ -11,7 +11,8 @@ class ScrollSpeedAdjusterDialog extends StatefulWidget {
   });
 
   @override
-  State<ScrollSpeedAdjusterDialog> createState() => _ScrollSpeedAdjusterDialogState();
+  State<ScrollSpeedAdjusterDialog> createState() =>
+      _ScrollSpeedAdjusterDialogState();
 }
 
 class _ScrollSpeedAdjusterDialogState extends State<ScrollSpeedAdjusterDialog> {
@@ -32,8 +33,7 @@ class _ScrollSpeedAdjusterDialogState extends State<ScrollSpeedAdjusterDialog> {
         children: [
           Text(
             '当前速度: ${_currentScrollSpeed.toStringAsFixed(1)}x',
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Slider(
@@ -53,11 +53,9 @@ class _ScrollSpeedAdjusterDialogState extends State<ScrollSpeedAdjusterDialog> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('慢 (0.1x)',
-                  style:
-                      TextStyle(color: Colors.grey, fontSize: 12)),
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
               Text('快 (5.0x)',
-                  style:
-                      TextStyle(color: Colors.grey, fontSize: 12)),
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
             ],
           ),
         ],

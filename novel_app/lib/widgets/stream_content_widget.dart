@@ -151,7 +151,8 @@ class _StreamContentWidgetState extends State<StreamContentWidget> {
 
     if (isCompleteContent) {
       // 提取实际内容（移除特殊标记）
-      final completeContent = textChunk.substring('<<COMPLETE_CONTENT>>'.length);
+      final completeContent =
+          textChunk.substring('<<COMPLETE_CONTENT>>'.length);
       _handleGenerationComplete(completeContent);
     } else {
       // 流式模式：追加内容
@@ -288,7 +289,8 @@ class _StreamContentWidgetState extends State<StreamContentWidget> {
         hintText: widget.config.generatingHint ?? 'AI正在生成，请稍候...',
         hintStyle: effectiveDecoration.hintStyle?.copyWith(
           color: widget.config.generatingTextColor != null
-              ? _parseColor(widget.config.generatingTextColor!).withValues(alpha: 0.7)
+              ? _parseColor(widget.config.generatingTextColor!)
+                  .withValues(alpha: 0.7)
               : null,
         ),
         filled: true,
@@ -365,7 +367,8 @@ class _StreamContentWidgetState extends State<StreamContentWidget> {
     try {
       // 支持 #RRGGBB 格式
       if (colorString.startsWith('#')) {
-        return Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
+        return Color(
+            int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
       }
       // 支持颜色名称
       switch (colorString.toLowerCase()) {

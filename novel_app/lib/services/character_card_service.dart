@@ -80,14 +80,15 @@ class CharacterCardService {
 
       // 自动保存所有角色（不显示预览对话框，让UI层决定是否需要预览）
       onProgress?.call('正在保存角色信息...');
-      final savedCharacters = await _databaseService.batchUpdateCharacters(updatedCharacters);
+      final savedCharacters =
+          await _databaseService.batchUpdateCharacters(updatedCharacters);
 
       onProgress?.call('成功更新 ${savedCharacters.length} 个角色卡');
       onSuccess?.call(savedCharacters);
 
-      debugPrint('=== CharacterCardService: 角色更新完成: ${savedCharacters.length} 个 ===');
+      debugPrint(
+          '=== CharacterCardService: 角色更新完成: ${savedCharacters.length} 个 ===');
       return savedCharacters;
-
     } catch (e) {
       debugPrint('=== CharacterCardService: 更新角色卡失败: $e ===');
       onProgress?.call('更新角色卡失败: $e');
@@ -119,9 +120,9 @@ class CharacterCardService {
         backgroundSetting: novel.backgroundSetting ?? '',
       );
 
-      debugPrint('=== CharacterCardService: 预览完成，角色数量: ${updatedCharacters.length} ===');
+      debugPrint(
+          '=== CharacterCardService: 预览完成，角色数量: ${updatedCharacters.length} ===');
       return updatedCharacters;
-
     } catch (e) {
       debugPrint('=== CharacterCardService: 预览失败: $e ===');
       rethrow;
@@ -134,7 +135,8 @@ class CharacterCardService {
   Future<List<Character>> saveCharacters(List<Character> characters) async {
     try {
       debugPrint('=== CharacterCardService: 开始保存 ${characters.length} 个角色 ===');
-      final savedCharacters = await _databaseService.batchUpdateCharacters(characters);
+      final savedCharacters =
+          await _databaseService.batchUpdateCharacters(characters);
       debugPrint('=== CharacterCardService: 保存完成 ===');
       return savedCharacters;
     } catch (e) {

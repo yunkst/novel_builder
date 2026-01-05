@@ -3,11 +3,10 @@ import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/controllers/chapter_list/bookshelf_manager.dart';
 import 'package:novel_app/services/database_service.dart';
-import 'package:novel_app/services/cache_manager.dart';
 import 'package:novel_app/models/novel.dart';
 import '../../test_helpers/mock_data.dart';
 
-@GenerateMocks([DatabaseService, CacheManager])
+@GenerateMocks([DatabaseService])
 import 'bookshelf_manager_test.mocks.dart';
 
 /// BookshelfManager 单元测试
@@ -15,14 +14,11 @@ void main() {
   group('BookshelfManager', () {
     late BookshelfManager manager;
     late MockDatabaseService mockDb;
-    late MockCacheManager mockCacheManager;
 
     setUp(() {
       mockDb = MockDatabaseService();
-      mockCacheManager = MockCacheManager();
       manager = BookshelfManager(
         databaseService: mockDb,
-        cacheManager: mockCacheManager,
       );
     });
 
@@ -58,15 +54,6 @@ void main() {
       await manager.clearNovelCache('test-url');
 
       verify(mockDb.clearNovelCache('test-url')).called(1);
-    });
-
-    test('enqueueNovelForCaching should call cacheManager', () async {
-      // CacheManager的enqueueNovelForCaching是void方法，不需要when
-      manager.enqueueNovelForCaching('test-url');
-
-      // 验证方法被调用
-      // 注意：void方法不能用verify验证，这里只测试不抛异常
-      expect(() => manager.enqueueNovelForCaching('test-url'), returnsNormally);
     });
   });
 }

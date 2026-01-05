@@ -68,7 +68,7 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     required void Function(String chunk) onChunk,
     void Function(String fullContent)? onComplete,
     void Function(String error)? onError,
-    Duration timeout = const Duration(minutes: 5),
+    Duration timeout = const Duration(seconds: 15),
     bool showErrorSnackBar = true,
     String? startMessage,
     String? completeMessage,
@@ -106,22 +106,37 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
       // 调用DifyService的流式方法
       await difyService.runWorkflowStreaming(
         inputs: inputs,
-        enableDebugLog: enableDebugLog,  // 传递给 Service 层
+        enableDebugLog: enableDebugLog, // 传递给 Service 层
         onData: (chunk) {
           if (!mounted || _isCancelled) return;
 
-          setState(() {
-            _fullContent += chunk;
-          });
+          // 处理特殊标记（确保最后一部分内容不丢失）
+          const completeContentMarker = '<<COMPLETE_CONTENT>>';
+          String processedChunk;
+
+          if (chunk.startsWith(completeContentMarker)) {
+            // 一次性设置完整内容
+            processedChunk = chunk.substring(completeContentMarker.length);
+            setState(() {
+              _fullContent = processedChunk;
+            });
+          } else {
+            // 正常累积内容
+            processedChunk = chunk;
+            setState(() {
+              _fullContent += chunk;
+            });
+          }
 
           // 调试统计
           if (enableDebugLog) {
-            _charCount += chunk.length;
-            debugPrint('📝 [DifyStreamingMixin] 收到数据块: ${chunk.length}字符 (累计: $_charCount字符)');
+            _charCount += processedChunk.length;
+            debugPrint(
+                '📝 [DifyStreamingMixin] 收到数据块: ${processedChunk.length}字符 (累计: $_charCount字符)');
           }
 
-          // 回调UI层
-          onChunk(chunk);
+          // 回调UI层（传递处理后的内容）
+          onChunk(processedChunk);
         },
         onDone: () {
           if (!mounted || _isCancelled) return;
@@ -137,7 +152,8 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
             final duration = DateTime.now().difference(_startTime!);
             debugPrint('✅ [DifyStreamingMixin] 流式交互完成');
             debugPrint('总字符数: $_charCount');
-            debugPrint('耗时: ${duration.inMilliseconds}ms (${duration.inSeconds}s)');
+            debugPrint(
+                '耗时: ${duration.inMilliseconds}ms (${duration.inSeconds}s)');
           }
 
           if (completeMessage != null && showErrorSnackBar && mounted) {
@@ -171,7 +187,6 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           onError?.call(errorMsg);
         },
       );
-
     } catch (e) {
       if (!mounted) return;
 

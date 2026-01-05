@@ -114,7 +114,6 @@ class CharacterImageCacheService {
       // 这里只返回URL，实际下载需要在UI层处理
       debugPrint('准备缓存角色图片: $imageUrl -> $filePath');
       return imageUrl;
-
     } catch (e) {
       debugPrint('缓存角色图片URL失败: $e');
       return null;
@@ -305,7 +304,8 @@ class CharacterImageCacheService {
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

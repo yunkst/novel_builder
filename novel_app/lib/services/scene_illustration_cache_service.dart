@@ -10,7 +10,8 @@ import 'api_service_wrapper.dart';
 /// 场景插图缓存服务
 /// 参考RoleGalleryCacheService的实现模式
 class SceneIllustrationCacheService {
-  static final SceneIllustrationCacheService _instance = SceneIllustrationCacheService._internal();
+  static final SceneIllustrationCacheService _instance =
+      SceneIllustrationCacheService._internal();
   factory SceneIllustrationCacheService() => _instance;
   SceneIllustrationCacheService._internal();
 
@@ -115,7 +116,8 @@ class SceneIllustrationCacheService {
       throw Exception('后端HOST未配置');
     }
 
-    final baseUrl = host.endsWith('/') ? host.substring(0, host.length - 1) : host;
+    final baseUrl =
+        host.endsWith('/') ? host.substring(0, host.length - 1) : host;
     return '$baseUrl/static/illustrations/$filename';
   }
 
@@ -297,7 +299,8 @@ class SceneIllustrationCacheService {
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

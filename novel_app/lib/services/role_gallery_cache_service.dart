@@ -7,7 +7,8 @@ import '../core/di/api_service_provider.dart';
 
 /// 角色图集缓存服务
 class RoleGalleryCacheService {
-  static final RoleGalleryCacheService _instance = RoleGalleryCacheService._internal();
+  static final RoleGalleryCacheService _instance =
+      RoleGalleryCacheService._internal();
   factory RoleGalleryCacheService() => _instance;
   RoleGalleryCacheService._internal();
 
@@ -239,7 +240,8 @@ class RoleGalleryCacheService {
       final currentSize = await getCacheSize();
 
       if (currentSize > _maxDiskCacheSizeMB) {
-        debugPrint('⚠️  缓存大小超限 (${currentSize.toStringAsFixed(2)}MB > $_maxDiskCacheSizeMB MB)，开始清理');
+        debugPrint(
+            '⚠️  缓存大小超限 (${currentSize.toStringAsFixed(2)}MB > $_maxDiskCacheSizeMB MB)，开始清理');
 
         final files = await _cacheDir!.list().toList();
         List<File> fileStats = [];
@@ -278,7 +280,8 @@ class RoleGalleryCacheService {
 
   /// 预加载图片
   Future<void> preloadImages(List<String> filenames) async {
-    for (final filename in filenames.take(3)) { // 最多预加载3张
+    for (final filename in filenames.take(3)) {
+      // 最多预加载3张
       try {
         await cacheImage(filename);
       } catch (e) {
@@ -292,7 +295,8 @@ class RoleGalleryCacheService {
     return {
       'size': _memoryCache.length,
       'maxSize': _maxMemoryCacheSize,
-      'usage': '${(_memoryCache.length / _maxMemoryCacheSize * 100).toStringAsFixed(1)}%',
+      'usage':
+          '${(_memoryCache.length / _maxMemoryCacheSize * 100).toStringAsFixed(1)}%',
     };
   }
 
@@ -314,28 +318,43 @@ class RoleGalleryCacheService {
 
     // PNG: 89 50 4E 47 0D 0A 1A 0A
     if (bytes.length >= 8 &&
-        bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
-        bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A) {
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A) {
       return true;
     }
 
     // GIF: GIF87a 或 GIF89a
     if (bytes.length >= 6 &&
-        bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 &&
-        bytes[3] == 0x38 && ((bytes[4] == 0x37 && bytes[5] == 0x61) || (bytes[4] == 0x39 && bytes[5] == 0x61))) {
+        bytes[0] == 0x47 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x38 &&
+        ((bytes[4] == 0x37 && bytes[5] == 0x61) ||
+            (bytes[4] == 0x39 && bytes[5] == 0x61))) {
       return true;
     }
 
     // WebP: RIFF....WEBP
     if (bytes.length >= 12 &&
-        bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
-        bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
       return true;
     }
 
     // BMP: BM
-    if (bytes.length >= 2 &&
-        bytes[0] == 0x42 && bytes[1] == 0x4D) {
+    if (bytes.length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D) {
       return true;
     }
 

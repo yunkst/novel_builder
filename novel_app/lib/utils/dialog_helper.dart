@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 /// 弹窗辅助工具类 - 统一管理弹窗行为，确保所有弹窗禁用空白区域点击关闭
 class DialogHelper {
-
   /// 显示确认对话框
   ///
   /// [context] BuildContext上下文
@@ -142,7 +141,9 @@ class DialogHelper {
                 return ListTile(
                   title: itemBuilder(item),
                   leading: Icon(
-                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
                     color: Theme.of(context).primaryColor,
                   ),
                   onTap: () {
@@ -150,7 +151,9 @@ class DialogHelper {
                       selected = item;
                     });
                   },
-                  tileColor: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.1) : null,
+                  tileColor: isSelected
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                      : null,
                 );
               },
             ),
@@ -221,9 +224,7 @@ class DialogHelper {
       barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
         title: title,
-        content: scrollable
-            ? SingleChildScrollView(child: content)
-            : content,
+        content: scrollable ? SingleChildScrollView(child: content) : content,
         actions: actions,
       ),
     );

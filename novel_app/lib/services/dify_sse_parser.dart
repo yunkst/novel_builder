@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 
 /// Dify SSE事件类型
 enum DifyEventType {
-  textChunk,      // 文本块事件
+  textChunk, // 文本块事件
   workflowFinished, // 工作流完成
-  workflowError,   // 工作流错误
-  unknown          // 未知事件
+  workflowError, // 工作流错误
+  unknown // 未知事件
 }
 
 /// Dify SSE事件数据
@@ -78,7 +78,8 @@ class DifySSEParser {
   /// 从SSE流中提取文本内容（使用广播流）
   static Stream<String> extractTextStream(Stream<DifyEvent> eventStream) {
     return eventStream
-        .where((event) => event.type == DifyEventType.textChunk && event.text != null)
+        .where((event) =>
+            event.type == DifyEventType.textChunk && event.text != null)
         .map((event) => event.text!);
   }
 
@@ -125,7 +126,8 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
         handleData: (chunk, sink) {
           debugPrint('📦 === 收到数据块 ===');
           debugPrint('数据块长度: ${chunk.length}');
-          debugPrint('数据块内容: "${chunk.substring(0, chunk.length > 100 ? 100 : chunk.length)}..."');
+          debugPrint(
+              '数据块内容: "${chunk.substring(0, chunk.length > 100 ? 100 : chunk.length)}..."');
 
           buffer += chunk;
           debugPrint('当前缓冲区长度: ${buffer.length}');
@@ -141,7 +143,8 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
           for (int i = 0; i < events.length - 1; i++) {
             final event = events[i].trim();
             if (event.isNotEmpty) {
-              debugPrint('📤 输出事件 ${i + 1}: "${event.substring(0, event.length > 50 ? 50 : event.length)}..."');
+              debugPrint(
+                  '📤 输出事件 ${i + 1}: "${event.substring(0, event.length > 50 ? 50 : event.length)}..."');
               sink.add(event);
             }
           }
@@ -156,7 +159,8 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
             // 尝试修复不完整的事件
             final processedBuffer = _fixIncompleteEvent(buffer.trim());
             if (processedBuffer.isNotEmpty) {
-              debugPrint('📤 输出最后的事件: "${processedBuffer.substring(0, processedBuffer.length > 50 ? 50 : processedBuffer.length)}..."');
+              debugPrint(
+                  '📤 输出最后的事件: "${processedBuffer.substring(0, processedBuffer.length > 50 ? 50 : processedBuffer.length)}..."');
               sink.add(processedBuffer);
             }
           }

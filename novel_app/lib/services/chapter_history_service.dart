@@ -70,7 +70,8 @@ class ChapterHistoryService {
 
           // 如果缓存未命中，从API获取
           if (content == null || content.isEmpty) {
-            debugPrint('🌐 ChapterHistoryService: 缓存未命中，从API获取 - ${chapter.title}');
+            debugPrint(
+                '🌐 ChapterHistoryService: 缓存未命中，从API获取 - ${chapter.title}');
             content = await _apiService.getChapterContent(chapter.url);
           } else {
             debugPrint('💾 ChapterHistoryService: 从缓存加载 - ${chapter.title}');
@@ -78,17 +79,19 @@ class ChapterHistoryService {
 
           // 格式化为历史章节内容
           historyContents.add('历史章节: ${chapter.title}\n\n$content');
-          debugPrint('✅ ChapterHistoryService: 已加载历史章节 - ${chapter.title} (${content.length}字符)');
-
+          debugPrint(
+              '✅ ChapterHistoryService: 已加载历史章节 - ${chapter.title} (${content.length}字符)');
         } catch (e) {
-          debugPrint('❌ ChapterHistoryService: 加载历史章节失败 - ${chapter.title}, 错误: $e');
+          debugPrint(
+              '❌ ChapterHistoryService: 加载历史章节失败 - ${chapter.title}, 错误: $e');
           // 继续加载其他章节，不中断
         }
       }
     }
 
     final result = historyContents.join('\n\n');
-    debugPrint('📊 ChapterHistoryService: 历史章节加载完成，共${historyContents.length}章，总计${result.length}字符');
+    debugPrint(
+        '📊 ChapterHistoryService: 历史章节加载完成，共${historyContents.length}章，总计${result.length}字符');
 
     return result;
   }
@@ -120,7 +123,8 @@ class ChapterHistoryService {
 
           historyContents.add(content);
         } catch (e) {
-          debugPrint('❌ ChapterHistoryService: 加载失败 - ${chapter.title}, 错误: $e');
+          debugPrint(
+              '❌ ChapterHistoryService: 加载失败 - ${chapter.title}, 错误: $e');
         }
       }
     }

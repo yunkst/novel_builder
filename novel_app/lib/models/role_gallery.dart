@@ -15,7 +15,8 @@ class RoleImage {
       filename: json['url'] ?? json['filename'] ?? '', // 支持两种字段名
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
-          : DateTime.fromMillisecondsSinceEpoch(1640000000000), // 如果没有时间信息，使用固定基准时间
+          : DateTime.fromMillisecondsSinceEpoch(
+              1640000000000), // 如果没有时间信息，使用固定基准时间
       thumbnailUrl: json['thumbnail_url'],
     );
   }
@@ -91,7 +92,6 @@ class RoleGallery {
     );
   }
 
-  
   Map<String, dynamic> toJson() {
     return {
       'role_id': roleId,
@@ -131,7 +131,6 @@ class RoleGallery {
     );
   }
 
-  
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

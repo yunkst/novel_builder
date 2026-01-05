@@ -8,12 +8,16 @@ import '../services/api_service_wrapper.dart';
 class ModelSelector extends StatefulWidget {
   /// 当前选中的模型
   final String? selectedModel;
+
   /// 模型选择变化回调
   final ValueChanged<String?> onModelChanged;
+
   /// API类型：'t2i' 表示文生图模型，'i2v' 表示图生视频模型
   final String? apiType;
+
   /// 是否启用
   final bool enabled;
+
   /// 提示文本
   final String? hintText;
 
@@ -118,7 +122,8 @@ class _ModelSelectorState extends State<ModelSelector> {
         final models = snapshot.data ?? [];
 
         // 如果当前选择的模型不在列表中，清空选择
-        if (_selectedModel != null && !models.any((m) => m.title == _selectedModel)) {
+        if (_selectedModel != null &&
+            !models.any((m) => m.title == _selectedModel)) {
           _selectedModel = null;
         }
 
@@ -131,7 +136,8 @@ class _ModelSelectorState extends State<ModelSelector> {
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.warning_amber),
               helperText: '请检查后端连接',
-              helperStyle: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+              helperStyle:
+                  TextStyle(color: Colors.orange.shade700, fontSize: 12),
             ),
             items: const [],
             onChanged: null,
@@ -176,11 +182,13 @@ class _ModelSelectorState extends State<ModelSelector> {
                       if (model.isDefault ?? false) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.blue.shade200, width: 1),
+                            border: Border.all(
+                                color: Colors.blue.shade200, width: 1),
                           ),
                           child: Text(
                             '默认',
@@ -206,12 +214,14 @@ class _ModelSelectorState extends State<ModelSelector> {
               ),
             );
           }).toList(),
-          onChanged: widget.enabled ? (value) {
-            setState(() {
-              _selectedModel = value;
-            });
-            widget.onModelChanged(value);
-          } : null,
+          onChanged: widget.enabled
+              ? (value) {
+                  setState(() {
+                    _selectedModel = value;
+                  });
+                  widget.onModelChanged(value);
+                }
+              : null,
           isExpanded: true,
           icon: const Icon(Icons.arrow_drop_down),
         );
@@ -224,8 +234,10 @@ class _ModelSelectorState extends State<ModelSelector> {
 class SimpleModelSelector extends StatelessWidget {
   /// 当前选中的模型
   final String? selectedModel;
+
   /// 模型选择变化回调
   final ValueChanged<String?> onModelChanged;
+
   /// API类型
   final String? apiType;
 

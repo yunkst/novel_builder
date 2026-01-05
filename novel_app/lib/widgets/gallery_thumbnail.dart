@@ -286,8 +286,8 @@ class GalleryPreviewCard extends StatelessWidget {
                     Text(
                       title ?? '角色图集',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -295,8 +295,8 @@ class GalleryPreviewCard extends StatelessWidget {
                     Text(
                       '点击查看完整图集',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                            color: Colors.grey[600],
+                          ),
                     ),
                   ],
                 ),

@@ -85,8 +85,10 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('dify_url', _difyUrlController.text.trim());
-      await prefs.setString('dify_flow_token', _flowTokenController.text.trim());
-      await prefs.setString('dify_struct_token', _structTokenController.text.trim());
+      await prefs.setString(
+          'dify_flow_token', _flowTokenController.text.trim());
+      await prefs.setString(
+          'dify_struct_token', _structTokenController.text.trim());
       await prefs.setString(
           'ai_writer_prompt', _aiWriterPromptController.text.trim());
       await prefs.setInt('max_history_length',

@@ -18,7 +18,8 @@ class OutlineManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<OutlineManagementScreen> createState() => _OutlineManagementScreenState();
+  State<OutlineManagementScreen> createState() =>
+      _OutlineManagementScreenState();
 }
 
 class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
@@ -256,7 +257,8 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
             Icon(
               Icons.menu_book_outlined,
               size: 100,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(

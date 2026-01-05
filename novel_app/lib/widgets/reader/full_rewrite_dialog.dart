@@ -42,7 +42,8 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
     apiService: ApiServiceProvider.instance,
   );
 
-  final ValueNotifier<String> _rewriteResultNotifier = ValueNotifier<String>('');
+  final ValueNotifier<String> _rewriteResultNotifier =
+      ValueNotifier<String>('');
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
   String _lastUserInput = '';
 
@@ -174,7 +175,7 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
       await callDifyStreaming(
         inputs: inputs,
         onChunk: (chunk) {
-          _rewriteResultNotifier.value += chunk;
+          _rewriteResultNotifier.value += chunk; // Mixin已自动处理特殊标记
         },
         onComplete: (fullContent) {
           _isGeneratingNotifier.value = false;
@@ -277,17 +278,22 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
             ),
             ValueListenableBuilder<bool>(
               valueListenable: _isGeneratingNotifier,
-              builder: (context, isGenerating, child) {
+              builder: (ctx, isGenerating, child) {
                 return ValueListenableBuilder<String>(
                   valueListenable: _rewriteResultNotifier,
-                  builder: (context, value, child) {
+                  builder: (ctx, value, child) {
                     return ElevatedButton.icon(
                       onPressed: (isGenerating || value.isEmpty)
                           ? null
                           : () async {
+                              // 先关闭结果dialog
+                              Navigator.pop(dialogContext);
+
+                              // 执行异步操作
                               await widget.onContentReplace(value);
+
+                              // async后使用State的context（已检查mounted）
                               if (mounted) {
-                                Navigator.pop(dialogContext);
                                 Navigator.pop(context); // 关闭主Dialog
                               }
                             },

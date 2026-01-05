@@ -29,7 +29,6 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
     super.dispose();
   }
 
-  
   @override
   Widget build(BuildContext context) {
     return AlertDialog(

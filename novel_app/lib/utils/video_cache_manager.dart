@@ -13,7 +13,7 @@ class VideoCacheManager {
   static bool _isControllerValid(VideoPlayerController controller) {
     try {
       return controller.value.isInitialized &&
-             (_disposedFlags[controller.dataSource] ?? false) == false;
+          (_disposedFlags[controller.dataSource] ?? false) == false;
     } catch (e) {
       // 如果访问控制器属性时抛出异常，说明控制器已被释放
       debugPrint('控制器状态检查失败，可能已被释放: $e');

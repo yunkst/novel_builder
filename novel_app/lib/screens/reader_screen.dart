@@ -47,7 +47,11 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen>
-    with TickerProviderStateMixin, DifyStreamingMixin, AutoScrollMixin, IllustrationHandlerMixin {
+    with
+        TickerProviderStateMixin,
+        DifyStreamingMixin,
+        AutoScrollMixin,
+        IllustrationHandlerMixin {
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
@@ -66,8 +70,10 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // ========== 特写模式便捷访问器 ==========
   bool get _isCloseupMode => _interactionController.isCloseupMode;
-  set _isCloseupMode(bool value) => _interactionController.setCloseupMode(value);
-  List<int> get _selectedParagraphIndices => _interactionController.selectedParagraphIndices;
+  set _isCloseupMode(bool value) =>
+      _interactionController.setCloseupMode(value);
+  List<int> get _selectedParagraphIndices =>
+      _interactionController.selectedParagraphIndices;
 
   // ========== 计算属性 ==========
   /// 段落列表（缓存分割结果，提升性能）
@@ -80,6 +86,10 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   late Chapter _currentChapter;
   double _fontSize = 18.0;
+
+  // 模型尺寸（用于插图显示）
+  int? _defaultModelWidth;
+  int? _defaultModelHeight;
 
   // 预加载相关状态
   final PreloadService _preloadService = PreloadService();
@@ -118,6 +128,9 @@ class _ReaderScreenState extends State<ReaderScreen>
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
 
+    // 加载默认模型尺寸
+    _loadDefaultModelSize();
+
     _initApiAndLoadContent();
   }
 
@@ -137,6 +150,38 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
+  /// 加载默认T2I模型的尺寸
+  Future<void> _loadDefaultModelSize() async {
+    try {
+      final models = await _apiService.getModels();
+      final t2iModels = models.text2img?.toList() ?? [];
+
+      if (t2iModels.isNotEmpty) {
+        // 找到默认模型
+        final defaultModel = t2iModels.firstWhere(
+          (m) => m.isDefault ?? false,
+          orElse: () => t2iModels.first,
+        );
+
+        if (defaultModel.width != null && defaultModel.height != null) {
+          setState(() {
+            _defaultModelWidth = defaultModel.width;
+            _defaultModelHeight = defaultModel.height;
+          });
+          debugPrint(
+              '✅ 默认模型尺寸已加载: ${defaultModel.width} × ${defaultModel.height}');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ 加载默认模型尺寸失败: $e');
+      // 使用默认值 704×1280
+      setState(() {
+        _defaultModelWidth = 704;
+        _defaultModelHeight = 1280;
+      });
+    }
+  }
+
   // ========== 以下方法已迁移到 ReaderContentController ==========
 
   @override
@@ -146,7 +191,8 @@ class _ReaderScreenState extends State<ReaderScreen>
     super.dispose();
   }
 
-  Future<void> _loadChapterContent({bool resetScrollPosition = true, bool forceRefresh = false}) async {
+  Future<void> _loadChapterContent(
+      {bool resetScrollPosition = true, bool forceRefresh = false}) async {
     await _contentController.loadChapter(
       _currentChapter,
       widget.novel,
@@ -164,7 +210,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   /// 启动预加载章节（使用新的PreloadService）
   Future<void> _startPreloadingChapters() async {
     try {
-      final currentIndex = widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
+      final currentIndex =
+          widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
       if (currentIndex == -1) return;
 
       final chapterUrls = widget.chapters.map((c) => c.url).toList();
@@ -222,7 +269,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                     border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: Text(
-                    paragraph.length > 100 ? '${paragraph.substring(0, 100)}...' : paragraph,
+                    paragraph.length > 100
+                        ? '${paragraph.substring(0, 100)}...'
+                        : paragraph,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade700,
@@ -248,7 +297,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                     subtitle: Text('查看插图详情'),
                     onTap: () {
                       Navigator.pop(context);
-                      final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+                      final markup =
+                          MediaMarkupParser.parseMediaMarkup(paragraph).first;
                       if (markup.isIllustration) {
                         generateVideoFromIllustration(markup.id); // Mixin方法
                       }
@@ -522,7 +572,8 @@ class _ReaderScreenState extends State<ReaderScreen>
           children: [
             const CircularProgressIndicator(),
             const SizedBox(width: 16),
-            Expanded(child: ValueListenableBuilder(
+            Expanded(
+                child: ValueListenableBuilder(
               valueListenable: ValueNotifier(''),
               builder: (context, message, child) {
                 return Text(message.isNotEmpty ? message : '正在更新角色卡...');
@@ -556,7 +607,8 @@ class _ReaderScreenState extends State<ReaderScreen>
           characters: updatedCharacters,
           onConfirmed: (selectedCharacters) async {
             // 保存用户确认的角色
-            final savedCharacters = await service.saveCharacters(selectedCharacters);
+            final savedCharacters =
+                await service.saveCharacters(selectedCharacters);
 
             if (mounted) {
               _showSnackBar(
@@ -568,7 +620,6 @@ class _ReaderScreenState extends State<ReaderScreen>
           },
         );
       }
-
     } catch (e) {
       // 关闭加载对话框
       if (mounted) {
@@ -753,7 +804,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-
   // 保存编辑后的章节内容
   Future<void> _saveEditedContent() async {
     try {
@@ -792,257 +842,275 @@ class _ReaderScreenState extends State<ReaderScreen>
       create: (_) => ReaderEditModeProvider(),
       child: Consumer<ReaderEditModeProvider>(
         builder: (context, editModeProvider, child) {
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                _currentChapter.title,
-                style: const TextStyle(fontSize: 18),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-            ),
-            // 编辑模式状态指示器
-            if (editModeProvider.isEditMode)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.edit, size: 14, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text('编辑模式', style: TextStyle(fontSize: 12, color: Colors.white)),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          // 编辑模式切换按钮
-          if (!editModeProvider.isEditMode)
-            IconButton(
-              onPressed: editModeProvider.toggleEditMode,
-              tooltip: '进入编辑模式',
-              icon: const Icon(Icons.edit_outlined),
-            ),
-          // 编辑完成按钮
-          if (editModeProvider.isEditMode)
-            IconButton(
-              onPressed: () async {
-                // 保存编辑内容并退出编辑模式
-                await _saveEditedContent();
-                editModeProvider.toggleEditMode();
-              },
-              tooltip: '完成编辑并保存',
-              icon: const Icon(Icons.check, color: Colors.green),
-            ),
-          // 更多功能菜单
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: '更多功能',
-            onSelected: _handleMenuAction,
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'refresh',
-                child: Row(
-                  children: [
-                    Icon(Icons.refresh, size: 18, color: Colors.blue),
-                    SizedBox(width: 12),
-                    Text('刷新章节'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'scroll_speed',
-                child: Row(
-                  children: [
-                    Icon(Icons.speed, size: 18),
-                    SizedBox(width: 12),
-                    Text('滚动速度'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'font_size',
-                child: Row(
-                  children: [
-                    Icon(Icons.text_fields, size: 18),
-                    SizedBox(width: 12),
-                    Text('字体大小'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'summarize',
-                child: Row(
-                  children: [
-                    Icon(Icons.summarize, size: 18, color: Colors.orange),
-                    SizedBox(width: 12),
-                    Text('总结'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'full_rewrite',
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_stories, size: 18, color: Colors.green),
-                    SizedBox(width: 12),
-                    Text('全文重写'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'update_character_cards',
-                child: Row(
-                  children: [
-                    Icon(Icons.person_search, size: 18, color: Colors.purple),
-                    SizedBox(width: 12),
-                    Text('更新角色卡'),
-                  ],
-                ),
-              ),
-              ],
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _errorMessage,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => _loadChapterContent(resetScrollPosition: false),
-                        child: const Text('重试'),
-                      ),
-                    ],
+          return Scaffold(
+            appBar: AppBar(
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _currentChapter.title,
+                      style: const TextStyle(fontSize: 18),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
                   ),
-                )
-              : Stack(
-                  children: [
-                    // 主要内容区域
-                    NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        // 使用 AutoScrollMixin 的滚动通知处理方法
-                        return handleScrollNotification(notification);
-                      },
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: paragraphs.length + 1, // +1 为了添加底部空白
-                        itemBuilder: (context, index) {
-                          // 最后一个位置添加空白
-                          if (index == paragraphs.length) {
-                            return SizedBox(
-                              height: 160, // 底部留白高度，避免被按钮遮挡
-                              child: Container(), // 空容器只占位
-                            );
-                          }
-
-                          final paragraph = paragraphs[index];
-                          final isSelected = _selectedParagraphIndices.contains(index);
-
-                          return ParagraphWidget(
-                            paragraph: paragraph,
-                            index: index,
-                            fontSize: _fontSize,
-                            isCloseupMode: _isCloseupMode,
-                            isEditMode: editModeProvider.isEditMode, // From Consumer
-                            isSelected: isSelected,
-                            onTap: _handleParagraphTap,
-                            onLongPress: (idx) => _handleLongPress(idx), // _handleLongPress now accepts index
-                            onContentChanged: (newContent) {
-                              final updatedParagraphs = List<String>.from(paragraphs);
-                              updatedParagraphs[index] = newContent;
-                              setState(() {
-                                _content = updatedParagraphs.join('\n');
-                              });
-                            },
-                            onImageTap: (taskId, imageUrl, imageIndex) => handleImageTap(taskId, imageUrl, imageIndex), // Mixin方法
-                            onImageDelete: () => deleteIllustrationByTaskId, // Mixin方法
-                            generateVideoFromIllustration: generateVideoFromIllustration, // Mixin方法
-                          );
-                        },
+                  // 编辑模式状态指示器
+                  if (editModeProvider.isEditMode)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ), // NotificationListener 闭合
-                    // 固定在底部的章节切换按钮
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, -2),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit, size: 14, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text('编辑模式',
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                // 编辑模式切换按钮
+                if (!editModeProvider.isEditMode)
+                  IconButton(
+                    onPressed: editModeProvider.toggleEditMode,
+                    tooltip: '进入编辑模式',
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                // 编辑完成按钮
+                if (editModeProvider.isEditMode)
+                  IconButton(
+                    onPressed: () async {
+                      // 保存编辑内容并退出编辑模式
+                      await _saveEditedContent();
+                      editModeProvider.toggleEditMode();
+                    },
+                    tooltip: '完成编辑并保存',
+                    icon: const Icon(Icons.check, color: Colors.green),
+                  ),
+                // 更多功能菜单
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: '更多功能',
+                  onSelected: _handleMenuAction,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, size: 18, color: Colors.blue),
+                          SizedBox(width: 12),
+                          Text('刷新章节'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'scroll_speed',
+                      child: Row(
+                        children: [
+                          Icon(Icons.speed, size: 18),
+                          SizedBox(width: 12),
+                          Text('滚动速度'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'font_size',
+                      child: Row(
+                        children: [
+                          Icon(Icons.text_fields, size: 18),
+                          SizedBox(width: 12),
+                          Text('字体大小'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'summarize',
+                      child: Row(
+                        children: [
+                          Icon(Icons.summarize, size: 18, color: Colors.orange),
+                          SizedBox(width: 12),
+                          Text('总结'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'full_rewrite',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_stories,
+                              size: 18, color: Colors.green),
+                          SizedBox(width: 12),
+                          Text('全文重写'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'update_character_cards',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_search,
+                              size: 18, color: Colors.purple),
+                          SizedBox(width: 12),
+                          Text('更新角色卡'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            body: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _errorMessage,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => _loadChapterContent(
+                                  resetScrollPosition: false),
+                              child: const Text('重试'),
                             ),
                           ],
                         ),
-                        child: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
+                      )
+                    : Stack(
+                        children: [
+                          // 主要内容区域
+                          NotificationListener<ScrollNotification>(
+                            onNotification: (notification) {
+                              // 使用 AutoScrollMixin 的滚动通知处理方法
+                              return handleScrollNotification(notification);
+                            },
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(16.0),
+                              itemCount: paragraphs.length + 1, // +1 为了添加底部空白
+                              itemBuilder: (context, index) {
+                                // 最后一个位置添加空白
+                                if (index == paragraphs.length) {
+                                  return SizedBox(
+                                    height: 160, // 底部留白高度，避免被按钮遮挡
+                                    child: Container(), // 空容器只占位
+                                  );
+                                }
+
+                                final paragraph = paragraphs[index];
+                                final isSelected =
+                                    _selectedParagraphIndices.contains(index);
+
+                                return ParagraphWidget(
+                                  paragraph: paragraph,
+                                  index: index,
+                                  fontSize: _fontSize,
+                                  isCloseupMode: _isCloseupMode,
+                                  isEditMode: editModeProvider
+                                      .isEditMode, // From Consumer
+                                  isSelected: isSelected,
+                                  onTap: _handleParagraphTap,
+                                  onLongPress: (idx) => _handleLongPress(
+                                      idx), // _handleLongPress now accepts index
+                                  onContentChanged: (newContent) {
+                                    final updatedParagraphs =
+                                        List<String>.from(paragraphs);
+                                    updatedParagraphs[index] = newContent;
+                                    setState(() {
+                                      _content = updatedParagraphs.join('\n');
+                                    });
+                                  },
+                                  onImageTap: (taskId, imageUrl, imageIndex) =>
+                                      handleImageTap(taskId, imageUrl,
+                                          imageIndex), // Mixin方法
+                                  onImageDelete: () =>
+                                      deleteIllustrationByTaskId, // Mixin方法
+                                  generateVideoFromIllustration:
+                                      generateVideoFromIllustration, // Mixin方法
+                                  modelWidth: _defaultModelWidth, // 传递模型宽度
+                                  modelHeight: _defaultModelHeight, // 传递模型高度
+                                );
+                              },
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed:
-                                      hasPrevious ? _goToPreviousChapter : null,
-                                  icon: const Icon(Icons.arrow_back),
-                                  label: const Text('上一章'),
-                                ),
-                                Text(
-                                  '${currentIndex + 1}/${widget.chapters.length}',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: hasNext ? _goToNextChapter : null,
-                                  icon: const Icon(Icons.arrow_forward),
-                                  label: const Text('下一章'),
-                                  style: ElevatedButton.styleFrom(
-                                    iconAlignment: IconAlignment.end,
+                          ), // NotificationListener 闭合
+                          // 固定在底部的章节切换按钮
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, -2),
+                                  ),
+                                ],
+                              ),
+                              child: SafeArea(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16.0,
+                                    vertical: 8.0,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed: hasPrevious
+                                            ? _goToPreviousChapter
+                                            : null,
+                                        icon: const Icon(Icons.arrow_back),
+                                        label: const Text('上一章'),
+                                      ),
+                                      Text(
+                                        '${currentIndex + 1}/${widget.chapters.length}',
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                      ElevatedButton.icon(
+                                        onPressed:
+                                            hasNext ? _goToNextChapter : null,
+                                        icon: const Icon(Icons.arrow_forward),
+                                        label: const Text('下一章'),
+                                        style: ElevatedButton.styleFrom(
+                                          iconAlignment: IconAlignment.end,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-              ],
-            ),
-      floatingActionButton: _content.isEmpty
-          ? null
-          : ReaderActionButtons(
-              isCloseupMode: _isCloseupMode,
-              hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
-              isAutoScrolling: isAutoScrolling, // Mixin getter
-              onRewritePressed: () {
-                _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
-              },
-              onToggleCloseupMode: _toggleCloseupMode,
-              onToggleAutoScroll: toggleAutoScroll, // Mixin method
-            ),
-    );
+            floatingActionButton: _content.isEmpty
+                ? null
+                : ReaderActionButtons(
+                    isCloseupMode: _isCloseupMode,
+                    hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
+                    isAutoScrolling: isAutoScrolling, // Mixin getter
+                    onRewritePressed: () {
+                      _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
+                    },
+                    onToggleCloseupMode: _toggleCloseupMode,
+                    onToggleAutoScroll: toggleAutoScroll, // Mixin method
+                  ),
+          );
         },
       ),
     );

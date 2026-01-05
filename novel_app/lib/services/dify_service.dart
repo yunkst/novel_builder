@@ -7,7 +7,6 @@ import '../models/character.dart';
 import 'dify_sse_parser.dart';
 import 'stream_state_manager.dart';
 
-
 class DifyService {
   // 获取流式响应token
   Future<String> _getFlowToken() async {
@@ -20,7 +19,7 @@ class DifyService {
   }
 
   // 获取结构化响应token
-  // TODO: 为未来功能预留，当前未使用
+  // 用于 runWorkflowBlocking 方法
   Future<String> _getStructToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('dify_struct_token');
@@ -35,7 +34,7 @@ class DifyService {
     }
     return token;
   }
-  
+
   /// @deprecated 请使用 [runWorkflowStreaming] 代替
   ///
   /// 此方法将在未来版本中移除。
@@ -60,7 +59,8 @@ class DifyService {
   ///   enableDebugLog: true,  // 可选：启用详细日志
   /// );
   /// ```
-  @Deprecated('Use runWorkflowStreaming() instead. See documentation for migration guide.')
+  @Deprecated(
+      'Use runWorkflowStreaming() instead. See documentation for migration guide.')
   Future<void> generateCloseUpStreaming({
     required String selectedParagraph,
     required String userInput,
@@ -80,14 +80,15 @@ class DifyService {
       throw Exception('请先在设置中配置 Dify URL');
     }
 
-      // 创建状态管理器
+    // 创建状态管理器
     late final StreamStateManager stateManager;
     stateManager = StreamStateManager(
       onTextChunk: onChunk,
       onCompleted: (String completeContent) {
         debugPrint('🎯 === 特写生成完成 ===');
         debugPrint('完整内容长度: ${completeContent.length}');
-        debugPrint('完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+        debugPrint(
+            '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
         if (completeContent.isNotEmpty) {
@@ -208,13 +209,12 @@ class DifyService {
 
         try {
           // 等待流处理完成
-          final isCompleted = await completer.future.timeout(
-            const Duration(minutes: 10), // 10分钟超时
-            onTimeout: () {
-              debugPrint('⏰ 流处理超时');
-              return textStreamDone && !textStreamError;
-            }
-          );
+          final isCompleted = await completer.future
+              .timeout(const Duration(minutes: 10), // 10分钟超时
+                  onTimeout: () {
+            debugPrint('⏰ 流处理超时');
+            return textStreamDone && !textStreamError;
+          });
 
           debugPrint('🎯 === 流处理最终结果 ===');
           debugPrint('完成状态: $isCompleted');
@@ -249,7 +249,8 @@ class DifyService {
           errorMessage = errorBody;
         }
 
-        stateManager.handleError('API请求失败 (${streamedResponse.statusCode}): $errorMessage');
+        stateManager.handleError(
+            'API请求失败 (${streamedResponse.statusCode}): $errorMessage');
       }
     } catch (e) {
       debugPrint('❌ === 特写生成异常 ===');
@@ -258,8 +259,6 @@ class DifyService {
     }
   }
 
-  
-  
   // 通用的流式工作流执行方法
   ///
   /// [inputs] Dify工作流输入参数
@@ -506,7 +505,8 @@ class DifyService {
       if (streamedResponse.statusCode == 200) {
         stateManager.startReceiving();
 
-        await for (var chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        await for (var chunk
+            in streamedResponse.stream.transform(utf8.decoder)) {
           final lines = chunk.split('\n');
           for (var line in lines) {
             if (line.startsWith('data: ')) {
@@ -534,7 +534,8 @@ class DifyService {
         }
       } else {
         final errorBody = await streamedResponse.stream.bytesToString();
-        stateManager.handleError('API请求失败 (${streamedResponse.statusCode}): $errorBody');
+        stateManager.handleError(
+            'API请求失败 (${streamedResponse.statusCode}): $errorBody');
       }
     } catch (e) {
       stateManager.handleError('网络或解析异常: $e');
@@ -681,7 +682,79 @@ class DifyService {
 
       debugPrint('成功解析 ${characters.length} 个角色');
       return characters;
+    } catch (e) {
+      debugPrint('解析角色列表失败: $e, 原始数据: $content');
+      throw Exception('角色数据解析失败: $e');
+    }
+  }
 
+  /// 从大纲生成角色
+  Future<List<Character>> generateCharactersFromOutline({
+    required String outline,
+    required String userInput,
+    required String novelUrl,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+
+    final inputs = {
+      'outline': outline,
+      'user_input': userInput,
+      'cmd': '大纲生成角色',
+      'ai_writer_setting': aiWriterSetting,
+    };
+
+    debugPrint('=== 开始从大纲生成角色 ===');
+    debugPrint('用户输入: $userInput');
+    debugPrint('大纲长度: ${outline.length}');
+    debugPrint('作家设定: $aiWriterSetting');
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('AI生成失败：未收到有效响应');
+    }
+
+    // 获取content字段
+    final content = outputs['content'];
+
+    try {
+      // 解析JSON数据
+      debugPrint('=== JSON解析成功 ===');
+
+      // 获取roles数组
+      final List<dynamic> charactersData = content['roles'] ?? [];
+      debugPrint('=== 角色数组长度: ${charactersData.length} ===');
+      final List<Character> characters = [];
+
+      for (var characterData in charactersData) {
+        try {
+          final character = Character(
+            novelUrl: novelUrl,
+            name: characterData['name']?.toString() ?? '未知角色',
+            gender: characterData['gender']?.toString(),
+            age: characterData['age'] is String
+                ? int.tryParse(characterData['age']) ?? 0
+                : characterData['age']?.toInt(),
+            occupation: characterData['occupation']?.toString(),
+            personality: characterData['personality']?.toString(),
+            bodyType: characterData['bodyType']?.toString(),
+            clothingStyle: characterData['clothingStyle']?.toString(),
+            appearanceFeatures: characterData['appearanceFeatures']?.toString(),
+            backgroundStory: characterData['backgroundStory']?.toString(),
+          );
+          characters.add(character);
+        } catch (e) {
+          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          // 跳过无效的角色数据，继续处理其他角色
+          continue;
+        }
+      }
+
+      debugPrint('成功解析 ${characters.length} 个角色');
+      return characters;
     } catch (e) {
       debugPrint('解析角色列表失败: $e, 原始数据: $content');
       throw Exception('角色数据解析失败: $e');
@@ -759,7 +832,6 @@ class DifyService {
 
       debugPrint('成功更新 ${characters.length} 个角色');
       return characters;
-
     } catch (e) {
       debugPrint('解析更新角色列表失败: $e, 原始数据: $content');
       throw Exception('角色更新数据解析失败: $e');
@@ -805,7 +877,6 @@ class DifyService {
         'face_prompts': facePrompts,
         'body_prompts': bodyPrompts,
       };
-
     } catch (e) {
       debugPrint('解析角色卡提示词失败: $e, 原始数据: $outputs');
       throw Exception('角色卡提示词解析失败: $e');
@@ -834,7 +905,6 @@ class DifyService {
     return inputs;
   }
 
-  
   /// @deprecated 请使用 [runWorkflowStreaming] 代替
   ///
   /// 此方法将在未来版本中移除。
@@ -858,13 +928,14 @@ class DifyService {
   ///   enableDebugLog: true,  // 可选：启用详细日志
   /// );
   /// ```
-  @Deprecated('Use runWorkflowStreaming() instead. See documentation for migration guide.')
+  @Deprecated(
+      'Use runWorkflowStreaming() instead. See documentation for migration guide.')
   Future<void> generateSceneDescriptionStream({
     required String chapterContent,
     required List<Character> characters,
-    required Function(String) onChunk,        // 文本块回调
-    required Function(String) onCompleted,    // 完成回调，传递完整内容
-    required Function(String) onError,        // 错误回调
+    required Function(String) onChunk, // 文本块回调
+    required Function(String) onCompleted, // 完成回调，传递完整内容
+    required Function(String) onError, // 错误回调
   }) async {
     // 格式化输入参数
     final inputs = _formatSceneDescriptionInput(
@@ -884,7 +955,8 @@ class DifyService {
       onCompleted: (String completeContent) {
         debugPrint('🎯 === 场景描写生成完成 ===');
         debugPrint('完整内容长度: ${completeContent.length}');
-        debugPrint('完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+        debugPrint(
+            '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
         if (completeContent.isNotEmpty) {
@@ -1000,13 +1072,12 @@ class DifyService {
 
         try {
           // 等待流处理完成
-          final isCompleted = await completer.future.timeout(
-            const Duration(minutes: 5), // 5分钟超时
-            onTimeout: () {
-              debugPrint('⏰ 场景描写流处理超时');
-              return textStreamDone && !textStreamError;
-            }
-          );
+          final isCompleted = await completer.future
+              .timeout(const Duration(seconds: 15), // 15秒超时
+                  onTimeout: () {
+            debugPrint('⏰ 场景描写流处理超时');
+            return textStreamDone && !textStreamError;
+          });
 
           debugPrint('🎯 === 场景描写流处理结果 ===');
           debugPrint('完成状态: $isCompleted');
@@ -1040,7 +1111,8 @@ class DifyService {
           errorMessage = errorBody;
         }
 
-        stateManager.handleError('场景描写API请求失败 (${streamedResponse.statusCode}): $errorMessage');
+        stateManager.handleError(
+            '场景描写API请求失败 (${streamedResponse.statusCode}): $errorMessage');
       }
     } catch (e) {
       debugPrint('❌ === 场景描写生成异常 ===');

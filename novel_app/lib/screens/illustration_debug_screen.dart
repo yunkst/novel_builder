@@ -17,12 +17,14 @@ class IllustrationDebugScreen extends StatefulWidget {
   const IllustrationDebugScreen({super.key});
 
   @override
-  State<IllustrationDebugScreen> createState() => _IllustrationDebugScreenState();
+  State<IllustrationDebugScreen> createState() =>
+      _IllustrationDebugScreenState();
 }
 
 class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   final List<SceneIllustration> _sceneIllustrations = [];
-  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
+  final SceneIllustrationService _sceneIllustrationService =
+      SceneIllustrationService();
   final DatabaseService _databaseService = DatabaseService();
 
   // 分页状态
@@ -191,9 +193,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           const SizedBox(width: 16),
           // 上一页按钮
           ElevatedButton(
-            onPressed: _currentPage > 0 && !_isLoading
-                ? _goToPreviousPage
-                : null,
+            onPressed:
+                _currentPage > 0 && !_isLoading ? _goToPreviousPage : null,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(80, 36),
               disabledBackgroundColor: Colors.grey.shade300,
@@ -248,7 +249,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     }
   }
 
-  Future<void> _createDebugIllustration(Map<String, dynamic> requestData) async {
+  Future<void> _createDebugIllustration(
+      Map<String, dynamic> requestData) async {
     try {
       final prompt = requestData['prompt'] as String;
       final imageCount = requestData['imageCount'] as int;
@@ -273,20 +275,18 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       await _refreshIllustrations();
 
       _showErrorSnackBar('调试任务已创建', isSuccess: true);
-
     } catch (e) {
       debugPrint('创建调试生图请求失败: $e');
       _showErrorSnackBar('创建生图请求失败: $e');
     }
   }
 
-  
-  
   // 分页加载核心方法
   Future<void> _loadIllustrations({bool isRefresh = false}) async {
     // 性能优化：防止重复请求
     final now = DateTime.now();
-    if (_isLoading || !isRefresh && now.difference(_lastLoadTime) < _minLoadInterval) {
+    if (_isLoading ||
+        !isRefresh && now.difference(_lastLoadTime) < _minLoadInterval) {
       return;
     }
     _lastLoadTime = now;
@@ -310,7 +310,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           if (isRefresh) {
             _sceneIllustrations.clear();
           }
-          _sceneIllustrations.addAll(result['items'] as List<SceneIllustration>);
+          _sceneIllustrations
+              .addAll(result['items'] as List<SceneIllustration>);
           _totalItems = result['total'] as int;
           _totalPages = result['totalPages'] as int;
           _isLoading = false;
@@ -372,7 +373,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   }
 
   /// 处理图片点击事件 - 显示功能选择对话框
-  Future<void> _handleImageTap(String taskId, String imageUrl, int imageIndex) async {
+  Future<void> _handleImageTap(
+      String taskId, String imageUrl, int imageIndex) async {
     // 显示功能选择对话框
     if (!mounted) return;
     final action = await IllustrationActionDialog.show(context);
@@ -408,7 +410,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         builder: (context) => GenerateMoreDialog(
           apiType: 't2i', // 文生图模型
           onConfirm: (count, modelName) {
-            debugPrint('GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            debugPrint(
+                'GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
             Navigator.of(context).pop({
               'count': count,
               'modelName': modelName,
@@ -470,7 +473,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   }
 
   /// 为特定图片生成视频
-  Future<void> _generateVideoFromSpecificImage(String taskId, String imageUrl, int imageIndex) async {
+  Future<void> _generateVideoFromSpecificImage(
+      String taskId, String imageUrl, int imageIndex) async {
     try {
       // 检查图片是否正在生成视频
       if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
@@ -536,7 +540,6 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           ),
         );
       }
-
     } catch (e) {
       // 清除生成状态
       _setImageGeneratingStatus(imageUrl, false);
@@ -576,7 +579,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       );
 
       if (confirmed == true) {
-        final success = await _sceneIllustrationService.deleteIllustration(illustrationId);
+        final success =
+            await _sceneIllustrationService.deleteIllustration(illustrationId);
         if (success) {
           // 删除成功后刷新列表，让被删除的项立即消失
           await _refreshIllustrations();

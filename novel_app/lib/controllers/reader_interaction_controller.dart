@@ -42,7 +42,8 @@ class ReaderInteractionController {
     if (!_isCloseupMode) return;
 
     // 检查段落是否为媒体标记（插图、视频等），如果是则不允许选择
-    if (index < paragraphs.length && MediaMarkupParser.isMediaMarkup(paragraphs[index])) {
+    if (index < paragraphs.length &&
+        MediaMarkupParser.isMediaMarkup(paragraphs[index])) {
       // 媒体标记段落不允许在特写模式下选择
       debugPrint('⚠️ ReaderInteractionController: 媒体标记段落不允许选择 - index:$index');
       return;
@@ -62,7 +63,8 @@ class ReaderInteractionController {
     // 检查是否连续
     if (!isConsecutive(_selectedParagraphIndices)) {
       // 如果不连续，只保留当前点击的段落
-      debugPrint('⚠️ ReaderInteractionController: 段落不连续，只保留当前点击 - index:$index');
+      debugPrint(
+          '⚠️ ReaderInteractionController: 段落不连续，只保留当前点击 - index:$index');
       _selectedParagraphIndices = [index];
     }
 
@@ -123,7 +125,8 @@ class ReaderInteractionController {
 
     for (final index in _selectedParagraphIndices) {
       if (index < 0 || index >= paragraphs.length) {
-        debugPrint('⚠️ ReaderInteractionController: 索引越界 - index:$index, length:${paragraphs.length}');
+        debugPrint(
+            '⚠️ ReaderInteractionController: 索引越界 - index:$index, length:${paragraphs.length}');
         continue;
       }
 
@@ -169,7 +172,8 @@ class ReaderInteractionController {
   bool get isCloseupMode => _isCloseupMode;
 
   /// 选中的段落索引列表
-  List<int> get selectedParagraphIndices => List.unmodifiable(_selectedParagraphIndices);
+  List<int> get selectedParagraphIndices =>
+      List.unmodifiable(_selectedParagraphIndices);
 
   /// 是否有选中段落
   bool get hasSelection => _selectedParagraphIndices.isNotEmpty;

@@ -122,7 +122,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
   // 打开改写要求输入弹窗
   Future<void> _showRewriteRequirementDialog() async {
-    final paragraphs = widget.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs =
+        widget.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
     final selectedText = _getSelectedText(paragraphs);
     if (selectedText.isEmpty) {
       Navigator.pop(context);
@@ -219,14 +220,13 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
         inputs: inputs,
         onChunk: (chunk) {
           setState(() {
-            _rewriteResult += chunk;
+            _rewriteResult += chunk; // Mixin已自动处理特殊标记
           });
         },
         startMessage: 'AI正在改写内容...',
         completeMessage: '改写完成',
         errorMessagePrefix: '改写失败',
       );
-
     } catch (e) {
       debugPrint('❌ 准备改写内容时发生异常: $e');
       if (mounted) {
@@ -261,72 +261,129 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     );
   }
 
-  // 替换选中的段落
+  // 替换选中的段落（新逻辑：删除选中段落 + 插入AI生成内容）
   void _replaceSelectedParagraphs() {
     final paragraphs = widget.content.split('\n');
     final rewrittenParagraphs = _rewriteResult.split('\n');
 
-    if (widget.selectedParagraphIndices.length != rewrittenParagraphs.length) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('警告：段落数量不匹配，请手动调整'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      // 继续执行，让用户手动调整
+    // 显示操作信息（可选）
+    if (rewrittenParagraphs.isNotEmpty) {
+      debugPrint(
+          '📝 准备替换: 删除 ${widget.selectedParagraphIndices.length} 段，插入 ${rewrittenParagraphs.length} 段');
     }
 
-    // 执行替换
-    int rewriteIndex = 0;
     final updatedParagraphs = List<String>.from(paragraphs);
 
-    for (final index in widget.selectedParagraphIndices) {
-      if (index >= 0 && index < updatedParagraphs.length && rewriteIndex < rewrittenParagraphs.length) {
-        final originalParagraph = updatedParagraphs[index];
+    // 检查选中段落中是否包含插图标记
+    bool hasIllustration = false;
 
-        // 检查是否是插图标记
-        if (MediaMarkupParser.isMediaMarkup(originalParagraph)) {
-          final markup = MediaMarkupParser.parseMediaMarkup(originalParagraph).first;
+    for (final index in widget.selectedParagraphIndices) {
+      if (index >= 0 && index < updatedParagraphs.length) {
+        final paragraph = updatedParagraphs[index];
+        if (MediaMarkupParser.isMediaMarkup(paragraph)) {
+          final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
           if (markup.isIllustration) {
-            // 保留插图标记，询问用户是否替换
-            _showIllustrationReplaceDialog(
-              index: index,
-              originalMarkup: originalParagraph,
-              newContent: rewrittenParagraphs[rewriteIndex],
-              updatedParagraphs: updatedParagraphs,
-              rewriteIndex: rewriteIndex,
-            );
-            return; // 暂停替换，等待用户选择
+            hasIllustration = true;
+            break;
           }
         }
-
-        // 普通文本，直接替换
-        updatedParagraphs[index] = rewrittenParagraphs[rewriteIndex];
       }
-      rewriteIndex++;
     }
+
+    // 如果包含插图，询问用户如何处理
+    if (hasIllustration) {
+      _showIllustrationReplaceDialog(
+        updatedParagraphs: updatedParagraphs,
+        rewrittenParagraphs: rewrittenParagraphs,
+      );
+      return; // 等待用户选择
+    }
+
+    // 无插图，直接执行删除+插入
+    _executeDeleteAndInsert(updatedParagraphs, widget.selectedParagraphIndices,
+        rewrittenParagraphs);
+  }
+
+  // 执行删除和插入操作
+  void _executeDeleteAndInsert(
+    List<String> updatedParagraphs,
+    List<int> indicesToDelete,
+    List<String> contentToInsert,
+  ) {
+    if (indicesToDelete.isEmpty) {
+      debugPrint('⚠️ 没有要删除的段落');
+      return;
+    }
+
+    // 过滤有效索引（防止越界）
+    final validIndices = indicesToDelete
+        .where((index) => index >= 0 && index < updatedParagraphs.length)
+        .toList();
+
+    if (validIndices.isEmpty) {
+      debugPrint('⚠️ 所有索引都无效');
+      return;
+    }
+
+    // 排序并确定插入位置（第一个有效索引）
+    validIndices.sort();
+    final insertPosition = validIndices.first;
+
+    // 删除选中的段落
+    // 注意：由于removeAt会改变索引，需要从后往前删除
+    for (int i = validIndices.length - 1; i >= 0; i--) {
+      final index = validIndices[i];
+      if (index < updatedParagraphs.length) {
+        final removedContent = updatedParagraphs.removeAt(index);
+        debugPrint('🗑️ 删除段落 $index: "$removedContent"');
+      }
+    }
+
+    // 插入AI生成的内容
+    updatedParagraphs.insertAll(insertPosition, contentToInsert);
+    debugPrint('✅ 在位置 $insertPosition 插入 ${contentToInsert.length} 段内容');
 
     // 完成替换
     final newContent = updatedParagraphs.join('\n');
+    final originalLength = widget.content.split('\n').length;
+    final newLength = updatedParagraphs.length;
+
     widget.onReplace(newContent);
     Navigator.pop(context); // 关闭改写对话框
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('段落已替换'),
+      SnackBar(
+        content: Text(
+            '已删除 ${validIndices.length} 段，插入 ${contentToInsert.length} 段（章节长度: $originalLength → $newLength）'),
         backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  // 显示插图替换确认对话框
+  // 显示插图替换确认对话框（适配新逻辑：删除+插入）
   void _showIllustrationReplaceDialog({
-    required int index,
-    required String originalMarkup,
-    required String newContent,
     required List<String> updatedParagraphs,
-    required int rewriteIndex,
+    required List<String> rewrittenParagraphs,
   }) {
+    // 查找所有插图索引
+    final illustrationIndices = <int>[];
+    final illustrationMarkups = <String>[];
+
+    for (final index in widget.selectedParagraphIndices) {
+      if (index >= 0 && index < updatedParagraphs.length) {
+        final paragraph = updatedParagraphs[index];
+        if (MediaMarkupParser.isMediaMarkup(paragraph)) {
+          final markup = MediaMarkupParser.parseMediaMarkup(paragraph).first;
+          if (markup.isIllustration) {
+            illustrationIndices.add(index);
+            illustrationMarkups.add(paragraph);
+          }
+        }
+      }
+    }
+
+    // 显示对话框
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -335,8 +392,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('检测到选中的段落包含插图标记：'),
-            const SizedBox(height: 8),
+            Text('检测到选中的区域中包含 ${illustrationIndices.length} 个插图标记'),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -344,13 +401,22 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
                 border: Border.all(color: Colors.orange.shade300),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(
-                originalMarkup,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: illustrationMarkups
+                    .map((markup) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Text(
+                            markup,
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 12),
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
             const SizedBox(height: 12),
-            const Text('是否替换为新的改写内容？'),
+            const Text('是否继续删除并替换？'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
@@ -360,9 +426,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                newContent,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                '将删除 ${widget.selectedParagraphIndices.length} 段（包含插图），插入 ${rewrittenParagraphs.length} 段AI生成内容',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -372,78 +436,44 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext); // 关闭确认对话框
-              // 继续处理剩余段落
-              _continueReplacement(
-                updatedParagraphs: updatedParagraphs,
-                startIndex: index + 1,
-                rewriteIndex: rewriteIndex + 1,
-                skipIllustration: true,
-              );
+
+              // 保留插图：从选中索引中移除插图索引
+              final nonIllustrationIndices = widget.selectedParagraphIndices
+                  .where((index) => !illustrationIndices.contains(index))
+                  .toList();
+
+              if (nonIllustrationIndices.isEmpty) {
+                // 如果全部都是插图，提示用户
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('所有选中的段落都是插图，已取消操作'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+
+              // 只删除非插图段落
+              _executeDeleteAndInsert(updatedParagraphs, nonIllustrationIndices,
+                  rewrittenParagraphs);
             },
-            child: const Text('保留插图'),
+            child: const Text('保留插图并跳过'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogContext); // 关闭确认对话框
-              // 替换插图并继续
-              updatedParagraphs[index] = newContent;
-              _continueReplacement(
-                updatedParagraphs: updatedParagraphs,
-                startIndex: index + 1,
-                rewriteIndex: rewriteIndex + 1,
-                skipIllustration: false,
-              );
+
+              // 删除所有选中段落（包含插图）
+              _executeDeleteAndInsert(updatedParagraphs,
+                  widget.selectedParagraphIndices, rewrittenParagraphs);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
             ),
-            child: const Text('替换为文本'),
+            child: const Text('删除插图并替换'),
           ),
         ],
-      ),
-    );
-  }
-
-  // 继续替换剩余段落
-  void _continueReplacement({
-    required List<String> updatedParagraphs,
-    required int startIndex,
-    required int rewriteIndex,
-    required bool skipIllustration,
-  }) {
-    final rewrittenParagraphs = _rewriteResult.split('\n');
-    int currentRewriteIndex = rewriteIndex;
-
-    for (int i = startIndex; i < widget.selectedParagraphIndices.length && currentRewriteIndex < rewrittenParagraphs.length; i++) {
-      final index = widget.selectedParagraphIndices[i];
-      if (index >= 0 && index < updatedParagraphs.length) {
-        final originalParagraph = updatedParagraphs[index];
-
-        // 检查是否是插图标记
-        if (MediaMarkupParser.isMediaMarkup(originalParagraph)) {
-          final markup = MediaMarkupParser.parseMediaMarkup(originalParagraph).first;
-          if (markup.isIllustration && !skipIllustration) {
-            // 跳过插图标记
-            continue;
-          }
-        }
-
-        // 替换段落
-        updatedParagraphs[index] = rewrittenParagraphs[currentRewriteIndex];
-      }
-      currentRewriteIndex++;
-    }
-
-    // 完成替换
-    final newContent = updatedParagraphs.join('\n');
-    widget.onReplace(newContent);
-    Navigator.pop(context); // 关闭改写对话框
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('段落已替换'),
-        backgroundColor: Colors.green,
       ),
     );
   }

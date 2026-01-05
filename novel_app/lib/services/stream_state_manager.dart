@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 
 /// 流式交互状态
 enum StreamStatus {
-  idle,       // 空闲
+  idle, // 空闲
   connecting, // 连接中
-  streaming,  // 流式传输中
-  completed,  // 完成
-  error,      // 错误
+  streaming, // 流式传输中
+  completed, // 完成
+  error, // 错误
 }
 
 /// 流式状态数据
@@ -67,10 +67,10 @@ class StreamStateManager {
     required void Function(String) onTextChunk,
     required void Function(String) onCompleted, // 修改：传递完整内容
     required void Function(String) onError,
-  }) : _stateNotifier = ValueNotifier(StreamState(status: StreamStatus.idle)),
-       _onTextChunk = onTextChunk,
-       _onCompleted = onCompleted, // 修改：传递完整内容
-       _onError = onError;
+  })  : _stateNotifier = ValueNotifier(StreamState(status: StreamStatus.idle)),
+        _onTextChunk = onTextChunk,
+        _onCompleted = onCompleted, // 修改：传递完整内容
+        _onError = onError;
 
   /// 获取当前状态
   StreamState get currentState => _stateNotifier.value;
@@ -139,7 +139,8 @@ class StreamStateManager {
     debugPrint('总字符数: ${currentState.characterCount}');
     final startTime = currentState.startTime;
     if (startTime != null) {
-      debugPrint('耗时: ${DateTime.now().difference(startTime).inMilliseconds}ms');
+      debugPrint(
+          '耗时: ${DateTime.now().difference(startTime).inMilliseconds}ms');
     }
 
     final completeContent = currentState.content;

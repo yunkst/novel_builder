@@ -4,7 +4,6 @@ import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
-import 'services/cache_manager.dart';
 import 'core/di/api_service_provider.dart';
 import 'utils/video_cache_manager.dart';
 
@@ -59,7 +58,6 @@ void main() async {
     debugPrint('Error: $error');
     debugPrint('Stack trace: $stackTrace');
     debugPrint('==============================');
-
   });
 }
 
@@ -127,7 +125,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
-  final CacheManager _cacheManager = CacheManager();
 
   // 为生图调试页面创建 GlobalKey，用于调用刷新方法
   final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
@@ -165,19 +162,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 标记应用活跃
-    _cacheManager.setAppActive(true);
-
-    // 应用启动时检查API可用性（异步执行，不阻塞UI）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _cacheManager.checkApiAvailability();
-    });
+    // 应用生命周期标记不再需要（CacheManager已删除）
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cacheManager.setAppActive(false);
     // 应用退出时清理所有视频控制器
     VideoCacheManager.disposeAll();
     debugPrint('HomePage: 移除生命周期监听器并清理资源');

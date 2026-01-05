@@ -91,11 +91,11 @@ class MediaMarkupParser {
 
 /// 媒体标记数据模型
 class MediaMarkup {
-  final String type;      // 媒体类型：插图、视频、音频等
-  final String id;        // 媒体ID：taskId、videoId等
+  final String type; // 媒体类型：插图、视频、音频等
+  final String id; // 媒体ID：taskId、videoId等
   final String fullMarkup; // 完整标记文本
-  final int start;        // 在原文中的起始位置
-  final int end;          // 在原文中的结束位置
+  final int start; // 在原文中的起始位置
+  final int end; // 在原文中的结束位置
 
   const MediaMarkup({
     required this.type,

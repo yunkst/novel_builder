@@ -57,7 +57,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
         _errorMessage = null;
       });
 
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      _controller =
+          VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
 
       // 添加监听器
       _controller!.addListener(_videoListener);
@@ -175,7 +176,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
@@ -337,10 +339,12 @@ class LiveVideoPlayerWithThumbnail extends StatefulWidget {
   });
 
   @override
-  State<LiveVideoPlayerWithThumbnail> createState() => _LiveVideoPlayerWithThumbnailState();
+  State<LiveVideoPlayerWithThumbnail> createState() =>
+      _LiveVideoPlayerWithThumbnailState();
 }
 
-class _LiveVideoPlayerWithThumbnailState extends State<LiveVideoPlayerWithThumbnail> {
+class _LiveVideoPlayerWithThumbnailState
+    extends State<LiveVideoPlayerWithThumbnail> {
   bool _showVideo = false;
 
   @override

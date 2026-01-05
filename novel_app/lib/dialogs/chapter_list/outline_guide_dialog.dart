@@ -27,8 +27,7 @@ class OutlineGuideDialog {
             Text('暂无大纲'),
           ],
         ),
-        content: const Text(
-            '您还没有创建小说大纲，请先创建大纲后再按照大纲插入章节。'),
+        content: const Text('您还没有创建小说大纲，请先创建大纲后再按照大纲插入章节。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

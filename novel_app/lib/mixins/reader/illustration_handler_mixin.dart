@@ -33,7 +33,8 @@ import '../../utils/video_generation_state_manager.dart';
 mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   // ========== 字段 ==========
 
-  final SceneIllustrationService _sceneIllustrationService = SceneIllustrationService();
+  final SceneIllustrationService _sceneIllustrationService =
+      SceneIllustrationService();
 
   // ========== 抽象访问器（子类必须实现）==========
 
@@ -55,7 +56,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   Future<void> generateVideoFromIllustration(String taskId) async {
     try {
       // 根据 taskId 获取插图信息
-      final illustrations = await databaseService.getSceneIllustrationsByChapter(
+      final illustrations =
+          await databaseService.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -128,7 +130,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   }
 
   /// 处理图片点击事件 - 显示功能选择对话框
-  Future<void> handleImageTap(String taskId, String imageUrl, int imageIndex) async {
+  Future<void> handleImageTap(
+      String taskId, String imageUrl, int imageIndex) async {
     // 显示功能选择对话框
     if (!mounted) return;
     final action = await IllustrationActionDialog.show(context);
@@ -164,7 +167,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
         builder: (context) => GenerateMoreDialog(
           apiType: 't2i', // 文生图模型
           onConfirm: (count, modelName) {
-            debugPrint('GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            debugPrint(
+                'GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
             Navigator.of(context).pop({
               'count': count,
               'modelName': modelName,
@@ -244,7 +248,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   }
 
   /// 为特定图片生成视频
-  Future<void> generateVideoFromSpecificImage(String taskId, String imageUrl, int imageIndex) async {
+  Future<void> generateVideoFromSpecificImage(
+      String taskId, String imageUrl, int imageIndex) async {
     try {
       // 检查图片是否正在生成视频
       if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
@@ -329,7 +334,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   Future<void> deleteIllustrationByTaskId(String taskId) async {
     try {
       // 根据 taskId 获取插图信息
-      final illustrations = await databaseService.getSceneIllustrationsByChapter(
+      final illustrations =
+          await databaseService.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -364,7 +370,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
           : false;
 
       if (confirmed == true) {
-        final success = await _sceneIllustrationService.deleteIllustration(illustration.id);
+        final success =
+            await _sceneIllustrationService.deleteIllustration(illustration.id);
         if (success) {
           // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
           if (mounted) {

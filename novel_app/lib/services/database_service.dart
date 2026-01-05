@@ -212,7 +212,8 @@ class DatabaseService {
     }
     if (oldVersion < 8) {
       // 检查是否已经有旧版本的 scene_illustrations 表（没有 task_id 字段）
-      final tableInfo = await db.rawQuery("PRAGMA table_info(scene_illustrations)");
+      final tableInfo =
+          await db.rawQuery("PRAGMA table_info(scene_illustrations)");
       final hasTaskId = tableInfo.any((column) => column['name'] == 'task_id');
 
       if (!hasTaskId) {
@@ -720,7 +721,8 @@ class DatabaseService {
     final batch = db.batch();
 
     // 生成唯一的章节URL，统一使用 custom:// 格式
-    final chapterUrl = 'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
+    final chapterUrl =
+        'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // 将插入位置之后的章节索引都加1
@@ -768,7 +770,7 @@ class DatabaseService {
   /// 判断是否为本地章节
   static bool isLocalChapter(String chapterUrl) {
     return chapterUrl.startsWith('custom://') ||
-           chapterUrl.startsWith('user_chapter_');
+        chapterUrl.startsWith('user_chapter_');
   }
 
   /// 创建用户自定义空小说
@@ -849,7 +851,8 @@ class DatabaseService {
   }
 
   /// 更新章节顺序
-  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters) async {
+  Future<void> updateChaptersOrder(
+      String novelUrl, List<Chapter> chapters) async {
     final db = await database;
     final batch = db.batch();
 
@@ -967,12 +970,13 @@ class DatabaseService {
         novelAuthor: '未知作者', // 数据库中没有作者信息，需要从书架表获取
         chapterUrl: maps[i]['chapterUrl']?.toString() ?? '',
         chapterTitle: title,
-        chapterIndex: int.tryParse(maps[i]['chapterIndex']?.toString() ?? '0') ?? 0,
+        chapterIndex:
+            int.tryParse(maps[i]['chapterIndex']?.toString() ?? '0') ?? 0,
         content: content,
         searchKeywords: [keyword],
         matchPositions: matchPositions,
-        cachedAt:
-            DateTime.tryParse(maps[i]['cachedAt']?.toString() ?? '') ?? DateTime.now(),
+        cachedAt: DateTime.tryParse(maps[i]['cachedAt']?.toString() ?? '') ??
+            DateTime.now(),
       ));
     }
 
@@ -1148,7 +1152,8 @@ class DatabaseService {
   }
 
   /// 更新阅读进度
-  Future<void> updateReadingProgress(String novelUrl, int chapterIndex, double progress) async {
+  Future<void> updateReadingProgress(
+      String novelUrl, int chapterIndex, double progress) async {
     final db = await database;
     await db.update(
       'bookshelf',
@@ -1294,7 +1299,8 @@ class DatabaseService {
 
   /// 批量更新角色
   /// 接受新角色列表，对每个角色执行去重更新逻辑
-  Future<List<Character>> batchUpdateCharacters(List<Character> newCharacters) async {
+  Future<List<Character>> batchUpdateCharacters(
+      List<Character> newCharacters) async {
     final updatedCharacters = <Character>[];
 
     for (final character in newCharacters) {
@@ -1308,7 +1314,8 @@ class DatabaseService {
       }
     }
 
-    debugPrint('批量更新完成，成功更新 ${updatedCharacters.length}/${newCharacters.length} 个角色');
+    debugPrint(
+        '批量更新完成，成功更新 ${updatedCharacters.length}/${newCharacters.length} 个角色');
     return updatedCharacters;
   }
 
@@ -1369,7 +1376,8 @@ class DatabaseService {
   // ========== 角色图集缓存管理功能 ==========
 
   /// 更新角色的缓存图片URL
-  Future<int> updateCharacterCachedImage(int characterId, String? imageUrl) async {
+  Future<int> updateCharacterCachedImage(
+      int characterId, String? imageUrl) async {
     final db = await database;
     return await db.update(
       'characters',
@@ -1545,11 +1553,13 @@ class DatabaseService {
   }
 
   /// 更新场景插图状态
-  Future<int> updateSceneIllustrationStatus(int id, String status, {List<String>? images, String? prompts}) async {
+  Future<int> updateSceneIllustrationStatus(int id, String status,
+      {List<String>? images, String? prompts}) async {
     final db = await database;
     final Map<String, dynamic> updateData = {
       'status': status,
-      'completed_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
+      'completed_at':
+          status == 'completed' ? DateTime.now().toIso8601String() : null,
     };
 
     if (images != null) {
@@ -1569,7 +1579,8 @@ class DatabaseService {
   }
 
   /// 根据小说和章节获取场景插图列表（新版本推荐）
-  Future<List<SceneIllustration>> getSceneIllustrationsByChapter(String novelUrl, String chapterId) async {
+  Future<List<SceneIllustration>> getSceneIllustrationsByChapter(
+      String novelUrl, String chapterId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'scene_illustrations',
@@ -1646,7 +1657,8 @@ class DatabaseService {
   }
 
   /// 删除章节的所有场景插图
-  Future<int> deleteSceneIllustrationsByChapter(String novelUrl, String chapterId) async {
+  Future<int> deleteSceneIllustrationsByChapter(
+      String novelUrl, String chapterId) async {
     final db = await database;
     return await db.delete(
       'scene_illustrations',
@@ -1671,7 +1683,8 @@ class DatabaseService {
   }
 
   /// 批量更新场景插图状态
-  Future<int> batchUpdateSceneIllustrations(List<int> ids, String status) async {
+  Future<int> batchUpdateSceneIllustrations(
+      List<int> ids, String status) async {
     final db = await database;
     int count = 0;
 
@@ -1680,7 +1693,8 @@ class DatabaseService {
         'scene_illustrations',
         {
           'status': status,
-          'completed_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
+          'completed_at':
+              status == 'completed' ? DateTime.now().toIso8601String() : null,
         },
         where: 'id = ?',
         whereArgs: [id],
@@ -1768,7 +1782,8 @@ class DatabaseService {
   }
 
   /// 更新大纲内容
-  Future<int> updateOutlineContent(String novelUrl, String title, String content) async {
+  Future<int> updateOutlineContent(
+      String novelUrl, String title, String content) async {
     final db = await database;
     return await db.update(
       'outlines',

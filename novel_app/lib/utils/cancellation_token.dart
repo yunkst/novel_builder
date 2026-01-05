@@ -138,9 +138,9 @@ class OperationCancelledException implements Exception {
   final String message;
   final DateTime cancelledAt;
 
-  OperationCancelledException(this.message)
-      : cancelledAt = DateTime.now();
+  OperationCancelledException(this.message) : cancelledAt = DateTime.now();
 
   @override
-  String toString() => 'OperationCancelledException: $message (取消时间: $cancelledAt)';
+  String toString() =>
+      'OperationCancelledException: $message (取消时间: $cancelledAt)';
 }

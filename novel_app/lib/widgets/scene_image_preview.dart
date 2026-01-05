@@ -12,6 +12,8 @@ class SceneImagePreview extends StatefulWidget {
   final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
   final VoidCallback? onDelete;
   final VoidCallback? onImageDeleted; // 单张图片删除成功回调
+  final int? modelWidth; // 新增：模型宽度
+  final int? modelHeight; // 新增：模型高度
 
   const SceneImagePreview({
     super.key,
@@ -20,10 +22,12 @@ class SceneImagePreview extends StatefulWidget {
     this.onImageTap,
     this.onDelete,
     this.onImageDeleted,
+    this.modelWidth,
+    this.modelHeight,
   }) : assert(
-        illustration != null || taskId != null,
-        '必须提供 illustration 或 taskId',
-      );
+          illustration != null || taskId != null,
+          '必须提供 illustration 或 taskId',
+        );
 
   @override
   State<SceneImagePreview> createState() => _SceneImagePreviewState();
@@ -44,6 +48,20 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   /// 检查图片是否正在生成视频
   bool isImageGenerating(String imageUrl) {
     return VideoGenerationStateManager.isImageGenerating(imageUrl);
+  }
+
+  /// 计算宽高比
+  double _calculateAspectRatio() {
+    // 如果提供了模型尺寸，使用模型宽高比
+    if (widget.modelWidth != null &&
+        widget.modelHeight != null &&
+        widget.modelWidth! > 0 &&
+        widget.modelHeight! > 0) {
+      return widget.modelWidth! / widget.modelHeight!;
+    }
+
+    // fallback: 使用默认2:1比例 (宽是高的2倍)
+    return 2.0;
   }
 
   @override
@@ -83,7 +101,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
 
     try {
       final apiService = ApiServiceWrapper();
-      final galleryData = await apiService.getSceneIllustrationGallery(widget.taskId!);
+      final galleryData =
+          await apiService.getSceneIllustrationGallery(widget.taskId!);
 
       if (mounted) {
         setState(() {
@@ -137,13 +156,12 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     return _buildErrorWidget(message: '缺少插图标识信息');
   }
 
-
   /// 构建加载状态
   Widget _buildLoadingWidget() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double containerWidth = constraints.maxWidth;
-        final double containerHeight = containerWidth * 2.0; // 高度为宽度的2倍
+        final double containerHeight = containerWidth / _calculateAspectRatio();
 
         return Container(
           height: containerHeight,
@@ -216,7 +234,9 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double containerWidth = constraints.maxWidth;
-        final double containerHeight = (containerWidth * 2.0).clamp(120.0, 200.0); // 错误状态限制最小最大高度
+        final double containerHeight =
+            (containerWidth / _calculateAspectRatio())
+                .clamp(120.0, 200.0); // 错误状态限制最小最大高度
 
         return Container(
           height: containerHeight,
@@ -283,13 +303,12 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     );
   }
 
-
   /// 构建等待中状态（服务端优先）
   Widget _buildPendingWidget() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double containerWidth = constraints.maxWidth;
-        final double containerHeight = containerWidth * 2.0; // 高度为宽度的2倍
+        final double containerHeight = containerWidth / _calculateAspectRatio();
 
         return Container(
           height: containerHeight,
@@ -346,7 +365,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                       ),
                     ),
                   ],
@@ -391,16 +411,20 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           ),
           child: GestureDetector(
             onTap: () {
-              if (widget.onImageTap != null && widget.taskId != null && _images.isNotEmpty) {
+              if (widget.onImageTap != null &&
+                  widget.taskId != null &&
+                  _images.isNotEmpty) {
                 // 传递当前显示图片的信息
                 final currentImageUrl = _images[_currentIndex];
-                widget.onImageTap!(widget.taskId!, currentImageUrl, _currentIndex);
+                widget.onImageTap!(
+                    widget.taskId!, currentImageUrl, _currentIndex);
               } else if (widget.onImageTap == null) {
                 _showGenerateMoreDialog();
               }
             },
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(8)),
               child: _buildImagePageView(images),
             ),
           ),
@@ -437,14 +461,12 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     );
   }
 
-
-
   /// 构建图片滑动视图（自适应高度）
   Widget _buildImagePageView(List<String> images) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double containerWidth = constraints.maxWidth;
-        final double containerHeight = containerWidth * 2.0; // 高度为宽度的2倍
+        final double containerHeight = containerWidth / _calculateAspectRatio();
 
         if (images.isEmpty) {
           return SizedBox(
@@ -666,7 +688,6 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     return _buildImageGalleryFromBackend(illustration.images);
   }
 
-  
   /// 生成更多图片
   Future<void> _generateMoreImages(int count, String? modelName) async {
     if (widget.taskId == null) return;

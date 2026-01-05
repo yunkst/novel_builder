@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/chapter.dart';
+import 'chapter_title.dart';
+import 'chapter_badge.dart';
 
 /// 章节列表项组件（正常模式）
 /// 显示章节标题、缓存状态、插入和删除操作按钮
@@ -42,36 +44,13 @@ class ChapterListItem extends StatelessWidget {
         title: Row(
           children: [
             Expanded(
-              child: Text(
-                chapter.title,
-                style: TextStyle(
-                  fontWeight: isLastRead ? FontWeight.bold : FontWeight.normal,
-                  color: isLastRead ? Colors.red : null,
-                  fontStyle:
-                      isUserChapter ? FontStyle.italic : FontStyle.normal,
-                ),
+              child: ChapterTitle(
+                title: chapter.title,
+                isLastRead: isLastRead,
+                isUserChapter: isUserChapter,
               ),
             ),
-            if (isUserChapter)
-              Container(
-                margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '用户',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.blue[700],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            if (isUserChapter) const ChapterBadge(),
           ],
         ),
         trailing: Row(

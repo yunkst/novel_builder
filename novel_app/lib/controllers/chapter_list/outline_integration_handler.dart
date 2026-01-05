@@ -1,19 +1,19 @@
 import '../../models/outline.dart';
 import '../../models/chapter.dart';
 import '../../services/outline_service.dart';
-import '../../services/database_service.dart';
+import '../../services/chapter_service.dart';
 
 /// 大纲集成处理器
 /// 负责大纲相关的业务逻辑
 class OutlineIntegrationHandler {
   final OutlineService _outlineService;
-  final DatabaseService _databaseService;
+  final ChapterService _chapterService;
 
   OutlineIntegrationHandler({
     required OutlineService outlineService,
-    required DatabaseService databaseService,
+    ChapterService? chapterService,
   })  : _outlineService = outlineService,
-        _databaseService = databaseService;
+        _chapterService = chapterService ?? ChapterService();
 
   /// 检查大纲是否存在
   Future<Outline?> getOutline(String novelUrl) async {
@@ -61,25 +61,15 @@ class OutlineIntegrationHandler {
   }
 
   /// 获取前文章节内容（用于上下文）
+  ///
+  /// 委托给 [ChapterService.getPreviousChaptersContent] 处理
   Future<List<String>> getPreviousChaptersContent({
     required List<Chapter> chapters,
     required int afterIndex,
   }) async {
-    final List<String> previousChapters = [];
-
-    // 获取前5章的内容
-    final startIndex = (afterIndex - 5).clamp(0, afterIndex);
-    for (int i = startIndex; i <= afterIndex && i < chapters.length; i++) {
-      final chapter = chapters[i];
-      // 优先从缓存获取
-      final content = await _databaseService.getCachedChapter(chapter.url);
-      if (content != null && content.isNotEmpty) {
-        previousChapters.add('第${i + 1}章 ${chapter.title}\n$content');
-      } else {
-        previousChapters.add('第${i + 1}章 ${chapter.title}\n（内容未缓存）');
-      }
-    }
-
-    return previousChapters;
+    return await _chapterService.getPreviousChaptersContent(
+      chapters: chapters,
+      afterIndex: afterIndex,
+    );
   }
 }

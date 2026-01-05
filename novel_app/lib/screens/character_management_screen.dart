@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
+import '../models/outline.dart';
 import '../services/database_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/character_avatar_service.dart';
@@ -19,16 +20,22 @@ class CharacterManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<CharacterManagementScreen> createState() => _CharacterManagementScreenState();
+  State<CharacterManagementScreen> createState() =>
+      _CharacterManagementScreenState();
 }
 
 class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   final DatabaseService _databaseService = DatabaseService();
-  final CharacterImageCacheService _imageCacheService = CharacterImageCacheService.instance;
+  final CharacterImageCacheService _imageCacheService =
+      CharacterImageCacheService.instance;
   final CharacterAvatarService _avatarService = CharacterAvatarService();
   final DifyService _difyService = DifyService();
   List<Character> _characters = [];
   bool _isLoading = true;
+
+  // 大纲状态
+  Outline? _outline;
+  bool _hasOutline = false;
 
   // 常量定义
   static const double _avatarBorderRadius = 8.0;
@@ -49,6 +56,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     super.initState();
     _initializeServices();
     _loadCharacters();
+    _loadOutline();
   }
 
   /// 初始化服务
@@ -57,6 +65,24 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       await _imageCacheService.init();
     } catch (e) {
       debugPrint('初始化图片缓存服务失败: $e');
+    }
+  }
+
+  /// 加载大纲状态
+  Future<void> _loadOutline() async {
+    try {
+      final outline =
+          await _databaseService.getOutlineByNovelUrl(widget.novel.url);
+      setState(() {
+        _outline = outline;
+        _hasOutline = outline != null;
+      });
+      debugPrint('大纲加载状态: $_hasOutline');
+    } catch (e) {
+      debugPrint('加载大纲失败: $e');
+      setState(() {
+        _hasOutline = false;
+      });
     }
   }
 
@@ -130,7 +156,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
     try {
       // 获取小说的背景设定
-      final backgroundSetting = await _databaseService.getBackgroundSetting(widget.novel.url);
+      final backgroundSetting =
+          await _databaseService.getBackgroundSetting(widget.novel.url);
 
       // 调用Dify工作流创建角色
       final generatedCharacters = await _difyService.generateCharacters(
@@ -171,8 +198,86 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     }
   }
 
+  Future<void> _aiCreateCharacterFromOutline() async {
+    if (_outline == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('未找到大纲，无法生成角色'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 显示输入对话框
+    final userInput = await CharacterInputDialog.show(context);
+    if (userInput == null || userInput.trim().isEmpty) {
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('正在从大纲生成角色...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // 调用Dify工作流创建角色
+      final generatedCharacters =
+          await _difyService.generateCharactersFromOutline(
+        outline: _outline!.content,
+        userInput: userInput,
+        novelUrl: widget.novel.url,
+      );
+
+      if (!mounted) return;
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      // 显示角色预览对话框，允许用户选择要保存的角色
+      await CharacterPreviewDialog.show(
+        context,
+        characters: generatedCharacters,
+        onConfirmed: (selectedCharacters) async {
+          if (selectedCharacters.isNotEmpty) {
+            await _saveSelectedCharacters(selectedCharacters);
+          }
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('从大纲生成角色失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   /// 保存用户选择的特定角色
-  Future<void> _saveSelectedCharacters(List<Character> selectedCharacters) async {
+  Future<void> _saveSelectedCharacters(
+      List<Character> selectedCharacters) async {
     int successCount = 0;
     int failCount = 0;
     List<String> failedCharacters = [];
@@ -213,11 +318,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             content: Text(message),
             backgroundColor: backgroundColor,
             duration: const Duration(seconds: 4),
-            action: failCount > 0 ? SnackBarAction(
-              label: '查看详情',
-              textColor: Colors.white,
-              onPressed: () => _showFailDetails(failedCharacters),
-            ) : null,
+            action: failCount > 0
+                ? SnackBarAction(
+                    label: '查看详情',
+                    textColor: Colors.white,
+                    onPressed: () => _showFailDetails(failedCharacters),
+                  )
+                : null,
           ),
         );
       }
@@ -246,10 +353,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
-              children: failedCharacters.map((failure) => Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Text('• $failure', style: const TextStyle(fontSize: 14)),
-              )).toList(),
+              children: failedCharacters
+                  .map((failure) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text('• $failure',
+                            style: const TextStyle(fontSize: 14)),
+                      ))
+                  .toList(),
             ),
           ),
         ),
@@ -263,7 +373,6 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
   }
 
-  
   /// 显示删除确认对话框
   Future<bool> _showDeleteConfirmationDialog(Character character) async {
     final result = await showDialog<bool>(
@@ -348,6 +457,12 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             icon: const Icon(Icons.auto_awesome),
             tooltip: 'AI创建角色',
           ),
+          if (_hasOutline)
+            IconButton(
+              onPressed: _aiCreateCharacterFromOutline,
+              icon: const Icon(Icons.menu_book),
+              tooltip: '从大纲生成角色',
+            ),
         ],
       ),
       body: _isLoading
@@ -523,7 +638,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                   flex: 2, // 减少flex比例，让下半部分更紧凑
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // 减少padding
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8), // 减少padding
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -531,12 +647,17 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                         Expanded(
                           flex: 3,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // 减少padding
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4), // 减少padding
                             decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                              color: Theme.of(context)
+                                  .primaryColor
+                                  .withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(12), // 稍微减小圆角
                               border: Border.all(
-                                color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                                color: Theme.of(context)
+                                    .primaryColor
+                                    .withValues(alpha: 0.3),
                                 width: 1,
                               ),
                             ),
@@ -588,10 +709,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   /// 构建角色头像
   Widget _buildCharacterAvatar(Character character) {
     // 使用cachedImageUrl的变化来触发FutureBuilder重建
-    final avatarKey = ValueKey('avatar_${character.id}_${character.cachedImageUrl}');
+    final avatarKey =
+        ValueKey('avatar_${character.id}_${character.cachedImageUrl}');
     return FutureBuilder<String?>(
       key: avatarKey,
-      future: character.id != null ? _avatarService.getCharacterAvatarPath(character.id!) : Future.value(null),
+      future: character.id != null
+          ? _avatarService.getCharacterAvatarPath(character.id!)
+          : Future.value(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingAvatar();

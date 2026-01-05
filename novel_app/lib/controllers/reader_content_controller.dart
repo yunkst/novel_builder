@@ -105,10 +105,12 @@ class ReaderContentController {
       }
 
       // 尝试从缓存获取
-      final cachedContent = await _databaseService.getCachedChapter(chapter.url);
+      final cachedContent =
+          await _databaseService.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
-        debugPrint('💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
+        debugPrint(
+            '💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
       } else {
         // 缓存未命中，从API获取
         debugPrint('🌐 ReaderContentController: 缓存未命中，从API获取');
@@ -215,7 +217,9 @@ class ReaderContentController {
       return '请求过于频繁，请稍后再试';
     } else if (errorStr.contains('404')) {
       return '章节不存在';
-    } else if (errorStr.contains('500') || errorStr.contains('502') || errorStr.contains('503')) {
+    } else if (errorStr.contains('500') ||
+        errorStr.contains('502') ||
+        errorStr.contains('503')) {
       return '服务器暂时不可用，请稍后重试';
     } else {
       return '加载失败: $errorStr';

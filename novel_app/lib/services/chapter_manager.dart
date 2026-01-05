@@ -20,7 +20,8 @@ class ChapterManager {
   }
 
   /// 待处理的网络请求，key为章节URL，value为Future字符串
-  final Map<String, Future<String>> _pendingRequests = <String, Future<String>>{};
+  final Map<String, Future<String>> _pendingRequests =
+      <String, Future<String>>{};
 
   /// 请求时间戳，用于清理过期请求
   final Map<String, DateTime> _requestTimestamps = <String, DateTime>{};
@@ -130,7 +131,8 @@ class ChapterManager {
   }
 
   /// 创建网络请求
-  Future<String> _createRequest(String chapterUrl, Future<String> Function() fetchFunction) async {
+  Future<String> _createRequest(
+      String chapterUrl, Future<String> Function() fetchFunction) async {
     try {
       return await fetchFunction();
     } catch (e) {

@@ -148,14 +148,13 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
         inputs: inputs,
         onChunk: (chunk) {
           setState(() {
-            _summaryResult += chunk;
+            _summaryResult += chunk; // Mixin已自动处理特殊标记
           });
         },
         startMessage: 'AI正在总结章节...',
         completeMessage: '总结完成',
         errorMessagePrefix: '总结失败',
       );
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

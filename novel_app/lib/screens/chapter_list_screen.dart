@@ -5,7 +5,6 @@ import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
-import '../services/cache_manager.dart';
 import 'reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
@@ -36,7 +35,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final DifyService _difyService = DifyService();
-  final CacheManager _cacheManager = CacheManager();
   final ScrollController _scrollController = ScrollController();
 
   // 控制器
@@ -67,7 +65,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     // 初始化控制器
     _bookshelfManager = BookshelfManager(
       databaseService: _databaseService,
-      cacheManager: _cacheManager,
     );
     _chapterLoader = ChapterLoader(
       api: _api,
@@ -350,7 +347,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-
   // 生成新章节内容
   Future<void> _generateNewChapter(int afterIndex, String title,
       String userInput, List<int> characterIds) async {
@@ -451,7 +447,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         // 查找刚插入的章节
         final insertedChapter = _chapters.firstWhere(
           (c) => c.title == title,
-          orElse: () => _chapters.isNotEmpty ? _chapters[insertIndex] : _chapters.last,
+          orElse: () =>
+              _chapters.isNotEmpty ? _chapters[insertIndex] : _chapters.last,
         );
 
         // 跳转到阅读页面
@@ -680,9 +677,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           case 'toggle_bookmark':
             _toggleBookshelf();
             break;
-          case 'cache_all':
-            _enqueueCacheWholeNovel();
-            break;
           case 'clear_cache':
             _showClearCacheDialog();
             break;
@@ -704,17 +698,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               ],
             ),
           ),
-          if (!isCustomNovel)
-            const PopupMenuItem(
-              value: 'cache_all',
-              child: Row(
-                children: [
-                  Icon(Icons.download),
-                  SizedBox(width: 8),
-                  Text('缓存全书'),
-                ],
-              ),
-            ),
           const PopupMenuItem(
             value: 'clear_cache',
             child: Row(
@@ -739,16 +722,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         ];
       },
     );
-  }
-
-  void _enqueueCacheWholeNovel() {
-    // 将小说加入后台缓存队列
-    _bookshelfManager.enqueueNovelForCaching(widget.novel.url);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已开始后台缓存全书')),
-      );
-    }
   }
 
   // 构建正常的章节列表（支持长按进入重排模式）

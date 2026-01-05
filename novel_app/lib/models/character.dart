@@ -12,8 +12,8 @@ class Character {
   final String? clothingStyle;
   final String? appearanceFeatures;
   final String? backgroundStory;
-  final String? facePrompts;    // 面部提示词
-  final String? bodyPrompts;    // 身材提示词
+  final String? facePrompts; // 面部提示词
+  final String? bodyPrompts; // 身材提示词
   final String? cachedImageUrl; // 缓存的图集第一张图片路径
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -30,8 +30,8 @@ class Character {
     this.clothingStyle,
     this.appearanceFeatures,
     this.backgroundStory,
-    this.facePrompts,    // 面部提示词
-    this.bodyPrompts,    // 身材提示词
+    this.facePrompts, // 面部提示词
+    this.bodyPrompts, // 身材提示词
     this.cachedImageUrl, // 缓存的图集第一张图片路径
     DateTime? createdAt,
     this.updatedAt,
@@ -159,7 +159,7 @@ ${i + 1}. ${char.name}
 
     return characters.map((char) {
       return RoleInfo((b) => b
-        ..id = char.id ?? 0  // 使用0作为默认值，实际应该确保id不为空
+        ..id = char.id ?? 0 // 使用0作为默认值，实际应该确保id不为空
         ..name = char.name
         ..gender = char.gender
         ..age = char.age

@@ -62,7 +62,8 @@ class SceneIllustrationService {
         modelName: modelName,
       );
 
-      if (response['status'] == 'pending' || response['status'] == 'processing') {
+      if (response['status'] == 'pending' ||
+          response['status'] == 'processing') {
         debugPrint('场景插图任务创建成功: $taskId');
       } else {
         debugPrint('场景插图任务创建失败: $response');
@@ -146,9 +147,8 @@ class SceneIllustrationService {
       }
 
       // 分割为段落
-      final paragraphs = currentContent.split('\n')
-          .where((p) => p.trim().isNotEmpty)
-          .toList();
+      final paragraphs =
+          currentContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
       // 验证段落索引的有效性
       if (paragraphIndex < 0) {
@@ -158,7 +158,8 @@ class SceneIllustrationService {
 
       if (paragraphIndex >= paragraphs.length) {
         debugPrint('错误：段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}');
-        throw ArgumentError('段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}');
+        throw ArgumentError(
+            '段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}');
       }
 
       // 直接使用传入的段落索引，无需文本匹配
@@ -166,7 +167,8 @@ class SceneIllustrationService {
       debugPrint('使用段落索引定位: $targetIndex，段落数量: ${paragraphs.length}');
 
       // 创建插图标记
-      final illustrationMarkup = MediaMarkupParser.createIllustrationMarkup(taskId);
+      final illustrationMarkup =
+          MediaMarkupParser.createIllustrationMarkup(taskId);
 
       // 根据插入位置修改内容
       switch (insertionPosition) {
@@ -196,9 +198,10 @@ class SceneIllustrationService {
 
   /// 根据章节获取所有场景插图
   Future<List<SceneIllustration>> getIllustrationsByChapter(
-    String novelUrl, String chapterId) async {
+      String novelUrl, String chapterId) async {
     try {
-      final illustrations = await _databaseService.getSceneIllustrationsByChapter(novelUrl, chapterId);
+      final illustrations = await _databaseService
+          .getSceneIllustrationsByChapter(novelUrl, chapterId);
       return illustrations;
     } catch (e) {
       debugPrint('获取场景插图失败: $e');
@@ -208,7 +211,6 @@ class SceneIllustrationService {
 
   // 删除了 getIllustrationByParagraph 方法，新系统不使用段落索引
 
-  
   /// 删除场景插图
   Future<bool> deleteIllustration(int illustrationId) async {
     try {
@@ -335,10 +337,12 @@ class SceneIllustrationService {
   }
 
   /// 刷新章节所有插图状态
-  Future<void> refreshChapterIllustrations(String novelUrl, String chapterId) async {
+  Future<void> refreshChapterIllustrations(
+      String novelUrl, String chapterId) async {
     try {
       // 仅刷新本地数据，不同步后端状态
-      await _databaseService.getSceneIllustrationsByChapter(novelUrl, chapterId);
+      await _databaseService.getSceneIllustrationsByChapter(
+          novelUrl, chapterId);
     } catch (e) {
       debugPrint('刷新章节插图状态失败: $e');
     }
@@ -347,7 +351,8 @@ class SceneIllustrationService {
   /// 获取所有待处理的插图
   Future<List<SceneIllustration>> getPendingIllustrations() async {
     try {
-      final illustrations = await _databaseService.getPendingSceneIllustrations();
+      final illustrations =
+          await _databaseService.getPendingSceneIllustrations();
       return illustrations;
     } catch (e) {
       debugPrint('获取待处理插图失败: $e');

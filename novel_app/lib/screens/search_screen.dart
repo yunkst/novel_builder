@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/api_service_wrapper.dart';
-import '../services/database_service.dart';
 import 'chapter_list_screen.dart';
-import 'cache_search_screen.dart';
 import '../utils/toast_utils.dart';
 import '../core/di/api_service_provider.dart';
 
@@ -17,7 +15,6 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ApiServiceWrapper _api = ApiServiceProvider.instance;
-  final DatabaseService _databaseService = DatabaseService();
   List<Novel> _searchResults = [];
   bool _isLoading = false;
   String _errorMessage = '';
@@ -90,21 +87,6 @@ class _SearchScreenState extends State<SearchScreen> {
     // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
     // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     super.dispose();
-  }
-
-  /// 检查是否有缓存内容
-  Future<bool> _checkHasCachedContent() async {
-    try {
-      // 简单查询数据库是否有相关章节缓存
-      final results = await _databaseService.searchInCachedContent(
-        _searchController.text.trim(),
-        novelUrl: null, // 查询所有缓存内容，不限制小说URL
-      );
-
-      return results.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
   }
 
   Future<void> _searchNovels() async {
@@ -231,35 +213,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 }
               },
             ),
-          FutureBuilder<bool>(
-            future: _checkHasCachedContent(),
-            builder: (context, snapshot) {
-              final hasCachedContent = snapshot.data ?? false;
-              if (!hasCachedContent) {
-                return const SizedBox.shrink();
-              }
-
-              return Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade50,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.storage),
-                  tooltip: '搜索本地已缓存章节内容（可能包含多个小说）',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CacheSearchScreen(),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
           const SizedBox(width: 8),
         ],
       ),

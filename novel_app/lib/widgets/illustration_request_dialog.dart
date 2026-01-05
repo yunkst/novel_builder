@@ -5,7 +5,8 @@ class IllustrationRequestDialog extends StatefulWidget {
   const IllustrationRequestDialog({super.key});
 
   @override
-  State<IllustrationRequestDialog> createState() => _IllustrationRequestDialogState();
+  State<IllustrationRequestDialog> createState() =>
+      _IllustrationRequestDialogState();
 }
 
 class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
@@ -111,7 +112,8 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
                     value: _selectedImageCount,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     isExpanded: true,
                     items: _imageCountOptions.map((count) {
                       return DropdownMenuItem<int>(
@@ -165,7 +167,8 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                     ),
                     child: const Text(
                       '取消',
@@ -179,7 +182,8 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

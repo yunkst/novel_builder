@@ -59,8 +59,14 @@ class _CharacterSelectorState extends State<CharacterSelector> {
       } else {
         _filteredCharacters = _characters.where((character) {
           return character.name.toLowerCase().contains(query.toLowerCase()) ||
-              (character.occupation?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
-              (character.personality?.toLowerCase().contains(query.toLowerCase()) ?? false);
+              (character.occupation
+                      ?.toLowerCase()
+                      .contains(query.toLowerCase()) ??
+                  false) ||
+              (character.personality
+                      ?.toLowerCase()
+                      .contains(query.toLowerCase()) ??
+                  false);
         }).toList();
       }
     });
@@ -78,9 +84,8 @@ class _CharacterSelectorState extends State<CharacterSelector> {
   }
 
   String _getSelectedNames() {
-    final selectedCharacters = _characters
-        .where((c) => _selectedIds.contains(c.id ?? 0))
-        .toList();
+    final selectedCharacters =
+        _characters.where((c) => _selectedIds.contains(c.id ?? 0)).toList();
 
     if (selectedCharacters.isEmpty) return '点击选择出场人物';
     return '已选择${selectedCharacters.length}人: ${selectedCharacters.map((c) => _getSafeCharacterName(c.name)).join(', ')}';
@@ -121,7 +126,9 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                   child: Text(
                     _getSelectedNames(),
                     style: TextStyle(
-                      color: _selectedIds.isEmpty ? Colors.grey.shade600 : Colors.black87,
+                      color: _selectedIds.isEmpty
+                          ? Colors.grey.shade600
+                          : Colors.black87,
                       fontSize: 14,
                     ),
                   ),
@@ -131,8 +138,7 @@ class _CharacterSelectorState extends State<CharacterSelector> {
             ),
           ),
         ),
-
-        ],
+      ],
     );
   }
 
@@ -176,7 +182,8 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                              Icon(Icons.search_off,
+                                  size: 48, color: Colors.grey.shade400),
                               const SizedBox(height: 8),
                               Text(
                                 _searchController.text.isNotEmpty
@@ -184,14 +191,15 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                     : '还没有创建人物',
                                 style: TextStyle(color: Colors.grey.shade600),
                               ),
-                              ],
+                            ],
                           ),
                         )
                       : ListView.builder(
                           itemCount: _filteredCharacters.length,
                           itemBuilder: (context, index) {
                             final character = _filteredCharacters[index];
-                            final isSelected = _selectedIds.contains(character.id ?? 0);
+                            final isSelected =
+                                _selectedIds.contains(character.id ?? 0);
 
                             return CheckboxListTile(
                               value: isSelected,
@@ -205,7 +213,8 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                               },
                               title: Text(
                                 character.name,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500),
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +237,8 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                             fontSize: 11,
                                           ),
                                         ),
-                                      if (character.age != null && character.gender != null)
+                                      if (character.age != null &&
+                                          character.gender != null)
                                         const SizedBox(width: 8),
                                       if (character.gender != null)
                                         Text(
@@ -244,7 +254,8 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                               ),
                               secondary: CircleAvatar(
                                 radius: 16,
-                                backgroundColor: _getGenderColor(character.gender),
+                                backgroundColor:
+                                    _getGenderColor(character.gender),
                                 child: Text(
                                   _getAvatarText(character.name),
                                   style: const TextStyle(
@@ -279,7 +290,6 @@ class _CharacterSelectorState extends State<CharacterSelector> {
     );
   }
 
-  
   Color _getGenderColor(String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':

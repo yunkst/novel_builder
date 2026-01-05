@@ -798,19 +798,6 @@ def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
         print(f"保存章节缓存失败: {e}")
 
 
-async def _save_chapter_to_cache_async(chapter_url: str, title: str, content: str):
-    """
-    异步保存章节到缓存（已弃用，保留用于向后兼容）
-
-    Args:
-        chapter_url: 章节URL
-        title: 章节标题
-        content: 章节内容
-    """
-    # 为了向后兼容，调用同步版本
-    _save_chapter_to_cache_sync(chapter_url, title, content)
-
-
 # 便于 Docker 容器启动时的提示
 @app.get("/")
 def index():

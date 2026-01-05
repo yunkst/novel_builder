@@ -7,12 +7,14 @@ import 'character_image_cache_service.dart';
 /// 角色头像管理服务
 /// 负责头像的设置、获取、缓存等操作
 class CharacterAvatarService {
-  static final CharacterAvatarService _instance = CharacterAvatarService._internal();
+  static final CharacterAvatarService _instance =
+      CharacterAvatarService._internal();
   factory CharacterAvatarService() => _instance;
   CharacterAvatarService._internal();
 
   final DatabaseService _databaseService = DatabaseService();
-  final CharacterImageCacheService _cacheService = CharacterImageCacheService.instance;
+  final CharacterImageCacheService _cacheService =
+      CharacterImageCacheService.instance;
 
   /// 设置角色头像
   /// [characterId] 角色ID
@@ -27,10 +29,12 @@ class CharacterAvatarService {
     String? originalImageUrl,
   }) async {
     try {
-      debugPrint('🎨 开始设置角色头像: characterId=$characterId, originalFilename=$originalFilename');
+      debugPrint(
+          '🎨 开始设置角色头像: characterId=$characterId, originalFilename=$originalFilename');
 
       // 生成唯一的头像文件名
-      final avatarFilename = 'avatar_${characterId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final avatarFilename =
+          'avatar_${characterId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       // 缓存头像图片
       final cachedPath = await _cacheService.cacheCharacterImage(
@@ -83,7 +87,8 @@ class CharacterAvatarService {
   /// 返回头像文件路径，如果没有设置则返回null
   Future<String?> getCharacterAvatarPath(int characterId) async {
     try {
-      final cachedUrl = await _databaseService.getCharacterCachedImage(characterId);
+      final cachedUrl =
+          await _databaseService.getCharacterCachedImage(characterId);
       return cachedUrl;
     } catch (e) {
       debugPrint('❌ 获取角色头像路径失败: $e');
@@ -97,12 +102,15 @@ class CharacterAvatarService {
   Future<Map<String, String>?> getCharacterAvatarInfo(int characterId) async {
     try {
       // 这里可以扩展数据库服务来获取更详细的头像信息
-      final cachedUrl = await _databaseService.getCharacterCachedImage(characterId);
+      final cachedUrl =
+          await _databaseService.getCharacterCachedImage(characterId);
 
       if (cachedUrl != null) {
         return {
           'cachedUrl': cachedUrl,
-          'originalFilename': path.basename(cachedUrl).replaceFirst('avatar_${characterId}_', ''),
+          'originalFilename': path
+              .basename(cachedUrl)
+              .replaceFirst('avatar_${characterId}_', ''),
         };
       }
 
