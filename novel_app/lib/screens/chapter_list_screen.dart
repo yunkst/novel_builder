@@ -5,6 +5,8 @@ import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
+import '../services/preload_service.dart';
+import '../services/preload_progress_update.dart';
 import 'reader_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
@@ -21,6 +23,7 @@ import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
 import '../controllers/chapter_list/chapter_reorder_controller.dart';
 import '../services/chapter_service.dart';
+import 'dart:async';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -35,7 +38,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   final ApiServiceWrapper _api = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final DifyService _difyService = DifyService();
+  final PreloadService _preloadService = PreloadService();
   final ScrollController _scrollController = ScrollController();
+
+  // 预加载监听
+  StreamSubscription<PreloadProgressUpdate>? _preloadSubscription;
 
   // 控制器
   late final BookshelfManager _bookshelfManager;
@@ -49,6 +56,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   bool _isInBookshelf = false;
   String _errorMessage = '';
   int _lastReadChapterIndex = 0;
+
+  // 章节缓存状态映射（chapterUrl -> isCached）
+  final Map<String, bool> _cachedStatus = {};
 
   // 重排相关状态
   bool _isReorderingMode = false;
@@ -83,6 +93,32 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     _initApi();
     _checkBookshelfStatus();
     _loadLastReadChapter();
+
+    // 监听预加载进度
+    _listenToPreloadProgress();
+  }
+
+  /// 监听预加载进度
+  void _listenToPreloadProgress() {
+    _preloadSubscription = _preloadService.progressStream
+        .where((update) => update.novelUrl == widget.novel.url) // 过滤当前小说
+        .listen((update) {
+      if (mounted) {
+        // 如果有具体的章节URL，只更新该章节的状态
+        if (update.chapterUrl != null) {
+          setState(() {
+            _cachedStatus[update.chapterUrl!] = true; // 标记为已缓存
+          });
+          debugPrint('✅ 章节缓存状态更新: ${update.chapterUrl} → 已缓存');
+        }
+        // 如果没有具体章节URL（队列开始/结束），则重建整个列表
+        else {
+          setState(() {
+            // 触发重建，使用已有的 _cachedStatus 数据
+          });
+        }
+      }
+    });
   }
 
   Future<void> _initApi() async {
@@ -105,6 +141,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   @override
   void dispose() {
+    _preloadSubscription?.cancel();
     _scrollController.dispose();
     _isGeneratingNotifier.dispose();
     _generatedContentNotifier.dispose();
@@ -129,6 +166,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _isLoading = false;
         });
         _scrollToLastReadChapter();
+        // 初始加载所有章节的缓存状态
+        _loadCachedStatus();
         return;
       }
 
@@ -181,6 +220,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         });
         _scrollToLastReadChapter();
 
+        // 初始加载所有章节的缓存状态
+        _loadCachedStatus();
+
         // 显示更新成功提示
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -207,6 +249,35 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _errorMessage = '加载章节列表失败: $e';
         });
       }
+    }
+  }
+
+  /// 加载所有章节的缓存状态
+  ///
+  /// 批量查询数据库，填充 _cachedStatus 映射
+  /// 避免每个章节都单独查询
+  Future<void> _loadCachedStatus() async {
+    if (_chapters.isEmpty) return;
+
+    try {
+      // 批量查询所有章节的缓存状态
+      final futures = _chapters
+          .map((chapter) => _chapterActionHandler.isChapterCached(chapter.url));
+
+      final results = await Future.wait(futures);
+
+      // 更新状态映射
+      if (mounted) {
+        setState(() {
+          for (int i = 0; i < _chapters.length; i++) {
+            _cachedStatus[_chapters[i].url] = results[i];
+          }
+        });
+      }
+
+      debugPrint('✅ 已加载 ${results.length} 个章节的缓存状态');
+    } catch (e) {
+      debugPrint('⚠️ 加载缓存状态失败: $e');
     }
   }
 
@@ -738,6 +809,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           chapter: chapter,
           isLastRead: isLastRead,
           isUserChapter: isUserChapter,
+          isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
           onTap: () {
             Navigator.push(
               context,
@@ -757,8 +829,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           onDelete: chapter.isUserInserted
               ? () => _showDeleteChapterDialog(chapter, index)
               : null,
-          isChapterCached: () =>
-              _chapterActionHandler.isChapterCached(chapter.url),
         );
       },
     );

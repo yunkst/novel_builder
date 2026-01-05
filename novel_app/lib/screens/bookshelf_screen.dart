@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/database_service.dart';
+import '../services/preload_service.dart';
+import '../services/preload_progress_update.dart';
 import 'chapter_list_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'dart:async';
 
 class BookshelfScreen extends StatefulWidget {
   const BookshelfScreen({super.key});
@@ -13,14 +16,30 @@ class BookshelfScreen extends StatefulWidget {
 
 class _BookshelfScreenState extends State<BookshelfScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  final PreloadService _preloadService = PreloadService();
   List<Novel> _bookshelf = [];
   bool _isLoading = true;
   final Map<String, Map<String, int>> _progress = {}; // novelUrl -> stats
+
+  // 预加载监听
+  StreamSubscription<PreloadProgressUpdate>? _preloadSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadBookshelf();
+
+    // 监听预加载进度
+    _preloadSubscription = _preloadService.progressStream.listen((update) {
+      if (mounted) {
+        setState(() {
+          _progress[update.novelUrl] = {
+            'cachedChapters': update.cachedChapters,
+            'totalChapters': update.totalChapters,
+          };
+        });
+      }
+    });
   }
 
   Future<void> _loadBookshelf() async {
@@ -73,6 +92,19 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _preloadSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// 判断小说是否正在预加载
+  bool _isPreloading(String novelUrl) {
+    final stats = _preloadService.getStatistics();
+    return stats['is_processing'] == true &&
+        stats['last_active_novel'] == novelUrl;
   }
 
   Future<void> _removeFromBookshelf(Novel novel) async {
@@ -396,22 +428,51 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
-                          leading: Container(
-                            width: 50,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: novel.coverUrl != null
-                                ? Image.network(
-                                    novel.coverUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(Icons.book);
-                                    },
-                                  )
-                                : const Icon(Icons.book),
+                          leading: Stack(
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 70,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: novel.coverUrl != null
+                                    ? Image.network(
+                                        novel.coverUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return const Icon(Icons.book);
+                                        },
+                                      )
+                                    : const Icon(Icons.book),
+                              ),
+                              // Loading 图标
+                              if (_isPreloading(novel.url))
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.blue),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           title: Text(
                             novel.title,

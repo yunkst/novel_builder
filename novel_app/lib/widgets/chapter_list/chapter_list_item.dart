@@ -9,21 +9,21 @@ class ChapterListItem extends StatelessWidget {
   final Chapter chapter;
   final bool isLastRead;
   final bool isUserChapter;
+  final bool isCached; // 改为直接接收状态
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onInsert;
   final VoidCallback? onDelete;
-  final Future<bool> Function() isChapterCached;
 
   const ChapterListItem({
     required this.chapter,
     required this.isLastRead,
     required this.isUserChapter,
+    required this.isCached,
     required this.onTap,
     required this.onLongPress,
     required this.onInsert,
     this.onDelete,
-    required this.isChapterCached,
     super.key,
   });
 
@@ -73,18 +73,12 @@ class ChapterListItem extends StatelessWidget {
               onPressed: onInsert,
               tooltip: '在此章节后插入新章节',
             ),
-            FutureBuilder<bool>(
-              future: isChapterCached(),
-              builder: (context, snapshot) {
-                if (snapshot.data == true) {
-                  return const Icon(
-                    Icons.download_done,
-                    color: Colors.green,
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+            // 直接显示缓存状态，不再使用 FutureBuilder
+            if (isCached)
+              const Icon(
+                Icons.download_done,
+                color: Colors.green,
+              ),
           ],
         ),
         onTap: onTap,
