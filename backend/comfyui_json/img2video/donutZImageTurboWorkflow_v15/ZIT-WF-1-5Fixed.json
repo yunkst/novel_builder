@@ -1,0 +1,4254 @@
+{
+  "id": "92112d97-bb64-4b44-86f2-ea5691ef8f6e",
+  "revision": 0,
+  "last_node_id": 275,
+  "last_link_id": 121006,
+  "nodes": [
+    {
+      "id": 133,
+      "type": "Reroute",
+      "pos": [
+        890,
+        100
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 18522
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "CONDITIONING",
+          "links": [
+            18537,
+            18583
+          ]
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [
+        820,
+        500
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 48,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 18584
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            371,
+            796,
+            16318,
+            27547,
+            27557,
+            27558
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "VAEDecode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 129,
+      "type": "Seed",
+      "pos": [
+        398.8300324952304,
+        113.92853321229404
+      ],
+      "size": [
+        210,
+        94.00000254313152
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "SEED",
+          "links": null
+        },
+        {
+          "name": "number",
+          "type": "NUMBER",
+          "links": [
+            16404
+          ]
+        },
+        {
+          "name": "float",
+          "type": "FLOAT",
+          "links": null
+        },
+        {
+          "name": "int",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "was-node-suite-comfyui",
+        "ver": "1.0.2",
+        "Node name for S&R": "Seed",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        663657737810776,
+        "randomize"
+      ]
+    },
+    {
+      "id": 50,
+      "type": "UltralyticsDetectorProvider",
+      "pos": [
+        -30,
+        -420
+      ],
+      "size": [
+        219.0666717529297,
+        54.000002543131515
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BBOX_DETECTOR",
+          "type": "BBOX_DETECTOR",
+          "slot_index": 0,
+          "links": [
+            75
+          ]
+        },
+        {
+          "name": "SEGM_DETECTOR",
+          "type": "SEGM_DETECTOR",
+          "slot_index": 1,
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-impact-subpack",
+        "ver": "74db20c95eca152a6d686c914edc0ef4e4762cb8",
+        "Node name for S&R": "UltralyticsDetectorProvider",
+        "aux_id": "ltdrdata/ComfyUI-Impact-Subpack",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "bbox/face_yolov8m.pt"
+      ]
+    },
+    {
+      "id": 52,
+      "type": "SAMLoader",
+      "pos": [
+        -10,
+        -370
+      ],
+      "size": [
+        210,
+        34.000002543131515
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAM_MODEL",
+          "type": "SAM_MODEL",
+          "slot_index": 0,
+          "links": [
+            94
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-impact-pack",
+        "ver": "0b1ac0f1c5a395e17065821e4fd47aba3bf23900",
+        "Node name for S&R": "SAMLoader",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "sam_vit_b_01ec64.pth",
+        "Prefer GPU"
+      ]
+    },
+    {
+      "id": 51,
+      "type": "Anything Everywhere",
+      "pos": [
+        0,
+        -310
+      ],
+      "size": [
+        181.36665954589844,
+        86
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "color_on": "",
+          "label": "BBOX_DETECTOR",
+          "name": "anything3",
+          "shape": 7,
+          "type": "BBOX_DETECTOR",
+          "link": 75
+        },
+        {
+          "color_on": "",
+          "label": "SAM_MODEL",
+          "name": "SAM_MODEL",
+          "shape": 7,
+          "type": "SAM_MODEL",
+          "link": 94
+        },
+        {
+          "label": "anything",
+          "name": "anything11",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "cg-use-everywhere",
+        "ver": "8017bc6b063f45db6b986d9fc8bb76bd3234b838",
+        "Node name for S&R": "Anything Everywhere3",
+        "ue_properties": {
+          "version": "7.5.1",
+          "group_restricted": 0,
+          "color_restricted": 0,
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "next_input_index": 11
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 272,
+      "type": "Wildcard Processor",
+      "pos": [
+        430,
+        330
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 39,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": 118969
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            118970
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "1.0.5",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "",
+        720663763087869,
+        "randomize"
+      ]
+    },
+    {
+      "id": 274,
+      "type": "Wildcard Processor",
+      "pos": [
+        430,
+        280
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 37,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": 118971
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            118969
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "1.0.5",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "",
+        663776821474063,
+        "randomize"
+      ]
+    },
+    {
+      "id": 275,
+      "type": "Wildcard Processor",
+      "pos": [
+        404.97475482800223,
+        377.8532056559453
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 41,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": 119042
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            119043
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "1.0.5",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "",
+        399711666814269,
+        "randomize"
+      ]
+    },
+    {
+      "id": 132,
+      "type": "Reroute",
+      "pos": [
+        467.26260965168063,
+        -122.01733836964306
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 43,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 18449
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "CONDITIONING",
+          "links": [
+            116542
+          ]
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 55,
+      "type": "CLIPTextEncode",
+      "pos": [
+        399.17255997102774,
+        10.882174832773433
+      ],
+      "size": [
+        274.34999694824216,
+        76
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 30,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 7297
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            116545
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode (Positive Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "CLIPTextEncode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 107,
+      "type": "CR Text Concatenate",
+      "pos": [
+        241.31997273609568,
+        32.90099650476435
+      ],
+      "size": [
+        210,
+        78
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text1",
+          "shape": 7,
+          "type": "STRING",
+          "link": 16421
+        },
+        {
+          "name": "text2",
+          "shape": 7,
+          "type": "STRING",
+          "link": 118975
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "*",
+          "links": [
+            7297,
+            7314
+          ]
+        },
+        {
+          "name": "show_help",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "ComfyUI_Comfyroll_CustomNodes",
+        "ver": "d78b780ae43fcf8c6b7c6505e6ffb4584281ceca",
+        "Node name for S&R": "CR Text Concatenate",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        ".png "
+      ]
+    },
+    {
+      "id": 108,
+      "type": "Number to Text",
+      "pos": [
+        239.92293391763056,
+        -34.500711756521376
+      ],
+      "size": [
+        187.5,
+        40
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "number",
+          "type": "NUMBER",
+          "link": 16404
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            16421
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "was-node-suite-comfyui",
+        "ver": "1.0.2",
+        "Node name for S&R": "Number to Text",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 273,
+      "type": "Wildcard Processor",
+      "pos": [
+        419.9719613369876,
+        354.39310638408773
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 40,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": 118970
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            119042
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "1.0.5",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "",
+        156872067730952,
+        "randomize"
+      ]
+    },
+    {
+      "id": 258,
+      "type": "RBG_Smart_Seed_Variance",
+      "pos": [
+        482.3079719000033,
+        -168.81816916565919
+      ],
+      "size": [
+        300,
+        79
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 44,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 116542
+        },
+        {
+          "name": "variance_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "variance_preset"
+          },
+          "link": 116714
+        }
+      ],
+      "outputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "links": [
+            116543,
+            116544,
+            116547
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "RamonGuthrie/ComfyUI-RBG-SmartSeedVariance",
+        "ver": "fbaa94d35324106c46d1a054e6a39a84782213f5",
+        "Node name for S&R": "RBG_Smart_Seed_Variance",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "🌿 Balanced",
+        50,
+        "⚡ Z-Image Turbo",
+        "Instant",
+        "Beginning Steps",
+        "🚫 None",
+        "🚫 None",
+        100,
+        "constant",
+        8,
+        20,
+        0,
+        901311180617793,
+        "randomize"
+      ]
+    },
+    {
+      "id": 259,
+      "type": "RBG_Smart_Seed_Variance",
+      "pos": [
+        500.11124047162514,
+        -220.87881478970903
+      ],
+      "size": [
+        300,
+        79
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 35,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 116545
+        },
+        {
+          "name": "variance_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "variance_preset"
+          },
+          "link": 116713
+        }
+      ],
+      "outputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "links": [
+            116546
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "RamonGuthrie/ComfyUI-RBG-SmartSeedVariance",
+        "ver": "fbaa94d35324106c46d1a054e6a39a84782213f5",
+        "Node name for S&R": "RBG_Smart_Seed_Variance",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "🌿 Balanced",
+        50,
+        "⚡ Z-Image Turbo",
+        "Instant",
+        "Beginning Steps",
+        "🚫 None",
+        "🚫 None",
+        100,
+        "constant",
+        8,
+        20,
+        0,
+        733585998825213,
+        "randomize"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        329.6339441080758,
+        550.2318803241895
+      ],
+      "size": [
+        281.4833282470703,
+        88
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 5670
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            18522,
+            27553,
+            113319
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode (Negative Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "CLIPTextEncode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        " "
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 54,
+      "type": "CR Text Concatenate",
+      "pos": [
+        448.9719658648983,
+        222.250804740627
+      ],
+      "size": [
+        210,
+        78
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text1",
+          "shape": 7,
+          "type": "STRING",
+          "link": 7314
+        },
+        {
+          "name": "text2",
+          "shape": 7,
+          "type": "STRING",
+          "link": 118968
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "*",
+          "links": [
+            67480,
+            118971
+          ]
+        },
+        {
+          "name": "show_help",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "ComfyUI_Comfyroll_CustomNodes",
+        "ver": "d78b780ae43fcf8c6b7c6505e6ffb4584281ceca",
+        "Node name for S&R": "CR Text Concatenate",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        374.1677136840782,
+        422.1070003602103
+      ],
+      "size": [
+        274.34999694824216,
+        76
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 42,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 119043
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            18449
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode (Positive Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "CLIPTextEncode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 196,
+      "type": "SeedGenerator",
+      "pos": [
+        820,
+        190
+      ],
+      "size": [
+        210,
+        101.99999491373698
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56826
+        }
+      ],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "seed+1",
+          "type": "INT",
+          "links": [
+            56827,
+            56828
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "RES4LYF",
+        "ver": "a3999a56a650da5cffe9e8f9f8b115f764603620",
+        "Node name for S&R": "SeedGenerator",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        77891986980747,
+        "randomize"
+      ]
+    },
+    {
+      "id": 197,
+      "type": "SeedGenerator",
+      "pos": [
+        1120,
+        -410
+      ],
+      "size": [
+        210,
+        101.99999491373698
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 27,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56828
+        }
+      ],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "seed+1",
+          "type": "INT",
+          "links": [
+            56829,
+            56830
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "RES4LYF",
+        "ver": "a3999a56a650da5cffe9e8f9f8b115f764603620",
+        "Node name for S&R": "SeedGenerator",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        872386425494423,
+        "randomize"
+      ]
+    },
+    {
+      "id": 198,
+      "type": "SeedGenerator",
+      "pos": [
+        1460,
+        -340
+      ],
+      "size": [
+        210,
+        101.99999491373698
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 33,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56830
+        }
+      ],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "seed+1",
+          "type": "INT",
+          "links": [
+            113327
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "RES4LYF",
+        "ver": "a3999a56a650da5cffe9e8f9f8b115f764603620",
+        "Node name for S&R": "SeedGenerator",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        264912984524020,
+        "randomize"
+      ]
+    },
+    {
+      "id": 195,
+      "type": "SeedGenerator",
+      "pos": [
+        361.69514262423917,
+        -10.721583103907044
+      ],
+      "size": [
+        268.2550597731115,
+        102
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "links": [
+            56809,
+            56810,
+            56811,
+            56812,
+            56826
+          ]
+        },
+        {
+          "name": "seed+1",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "RES4LYF",
+        "ver": "a3999a56a650da5cffe9e8f9f8b115f764603620",
+        "Node name for S&R": "SeedGenerator",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        643057379129325,
+        "randomize"
+      ]
+    },
+    {
+      "id": 28,
+      "type": "SDXL Empty Latent Image (rgthree)",
+      "pos": [
+        458.66213893088667,
+        -424.9805878830168
+      ],
+      "size": [
+        273.46666564941404,
+        146
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18301
+          ]
+        },
+        {
+          "name": "CLIP_WIDTH",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "CLIP_HEIGHT",
+          "type": "INT",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "1.0.2511111955",
+        "Node name for S&R": "SDXL Empty Latent Image (rgthree)",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        " 832 x 1216  (portrait)",
+        1,
+        1
+      ]
+    },
+    {
+      "id": 260,
+      "type": "PrimitiveNode",
+      "pos": [
+        212.48077876975566,
+        -392.58603058906766
+      ],
+      "size": [
+        210,
+        106
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "COMBO",
+          "type": "COMBO",
+          "widget": {
+            "name": "variance_preset"
+          },
+          "links": [
+            116713,
+            116714
+          ]
+        }
+      ],
+      "title": "Prompt Variance",
+      "properties": {
+        "Run widget replace on values": false,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "🌿 Balanced",
+        "fixed",
+        ""
+      ]
+    },
+    {
+      "id": 156,
+      "type": "DonutApplyLoRAStack",
+      "pos": [
+        522.9477684656769,
+        -46.23198686488069
+      ],
+      "size": [
+        189.91666259765626,
+        80
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 34,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 107226
+        },
+        {
+          "name": "lora_stack",
+          "type": "LORA_STACK",
+          "link": 58463
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            41205,
+            78877,
+            78878,
+            113317
+          ]
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            25471
+          ]
+        },
+        {
+          "name": "show_help",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "1.0.29",
+        "Node name for S&R": "DonutApplyLoRAStack",
+        "aux_id": "DonutsDelivery/ComfyUI-DonutNodes",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 66,
+      "type": "Anything Everywhere",
+      "pos": [
+        282.0547956123565,
+        -11.643943338801268
+      ],
+      "size": [
+        187.5,
+        100
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 38,
+      "mode": 0,
+      "inputs": [
+        {
+          "color_on": "#FF6E6E",
+          "label": "VAE",
+          "name": "anything",
+          "shape": 7,
+          "type": "VAE",
+          "link": 477
+        },
+        {
+          "color_on": "#FFD500",
+          "label": "CLIP",
+          "name": "anything11",
+          "type": "CLIP",
+          "link": 25471
+        },
+        {
+          "color_on": "#B39DDB",
+          "label": "MODEL",
+          "name": "anything14",
+          "type": "MODEL",
+          "link": 120806
+        },
+        {
+          "label": "anything",
+          "name": "anything15",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "cg-use-everywhere",
+        "ver": "7.5.1",
+        "Node name for S&R": "Anything Everywhere",
+        "ue_properties": {
+          "version": "7.5.1",
+          "group_restricted": 0,
+          "color_restricted": 0,
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "repeated_type_rule": 0,
+          "string_to_combo": 0,
+          "next_input_index": 15
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 17,
+      "type": "VAELoader",
+      "pos": [
+        207.7828880588826,
+        -502.19852652551106
+      ],
+      "size": [
+        210,
+        63.333333333333336
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            45,
+            477
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "VAELoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "ae.safetensors"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        488.8309230907027,
+        -526.2563396914048
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 28,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 116826
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            120806
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "ModelSamplingAuraFlow",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        1.73
+      ]
+    },
+    {
+      "id": 261,
+      "type": "Reroute",
+      "pos": [
+        70,
+        -510
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 119761
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "MODEL",
+          "links": [
+            116826
+          ]
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 242,
+      "type": "UNETLoader",
+      "pos": [
+        -456.00112139767896,
+        -320
+      ],
+      "size": [
+        306.63889567057294,
+        96.66666666666667
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            102957
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "UNETLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "bigLoveZ_zt1.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 241,
+      "type": "UNETLoader",
+      "pos": [
+        -459.5991109423762,
+        -159.02400929360215
+      ],
+      "size": [
+        306.63889567057294,
+        96.66666666666667
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            102958,
+            119761
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "UNETLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "z_image_turbo_bf16.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 225,
+      "type": "CLIPLoaderGGUF",
+      "pos": [
+        -411.02705537051924,
+        -610.281907343454
+      ],
+      "size": [
+        270,
+        96.66666666666667
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            107226
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-gguf",
+        "ver": "1.1.9",
+        "Node name for S&R": "CLIPLoaderGGUF",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "qwen_3_4b.safetensors",
+        "lumina2"
+      ]
+    },
+    {
+      "id": 253,
+      "type": "UNETLoader",
+      "pos": [
+        -444.35511326577654,
+        -459.5120046468013
+      ],
+      "size": [
+        306.63889567057294,
+        96.66666666666667
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "UNETLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "DonutZIT00_.safetensors",
+        "fp8_e4m3fn"
+      ]
+    },
+    {
+      "id": 56,
+      "type": "Wildcard Processor",
+      "pos": [
+        223.98964166104835,
+        187.6317821204541
+      ],
+      "size": [
+        491.24648497934214,
+        266.7183345813363
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56810
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": [
+            118968
+          ]
+        }
+      ],
+      "title": "Everything Else",
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "99dca30a008e6385218342369a9f15eb4636f26f",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {
+            "seed": true
+          },
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "Hyper-photorealistic rendering of World of Warcraft female {Warrior|Paladin|Rogue|Mage|Death Knight|Hunter|Warlock|Priest|Druid|Monk|Shaman}, Blizzard Entertainment design translated to cinematic realism, captured on {ARRI Alexa 65 with Zeiss Supreme Prime {35mm|50mm|85mm} lens|RED V-Raptor 8K with Sigma Cine {35mm|50mm} lens|Sony Venice 2 with Zeiss Supreme {50mm|85mm} lens}, {{warm golden|bright midday|soft diffused} sunlight|{ethereal silver|pale cold|bright full} moonlight|{dramatic orange|fiery red|soft pink} sunset|{candlelit warm|firelit flickering|torch-lit} glow|{stormy dramatic|overcast soft|misty diffused} light} creating {heroic|mysterious|ominous|ethereal|dramatic|intense|powerful|haunting|regal|commanding} atmosphere, {standing {in powerful battle-ready stance|with weight on one hip hand on waist|tall and proud shoulders back|at attention weapon ready|relaxed but alert}|seated {on ancient stone throne|on ornate chair|on edge of fountain|on wooden bench|sidesaddle on mount}|kneeling {with weapon drawn ready|in prayer or meditation|examining something on ground|tending to wounded ally}|{leaning|resting} against {stone pillar|tree trunk|doorframe|wall|railing} {arms crossed|one arm overhead|hip cocked|casually posed}|{walking|striding} {toward camera confidently|away looking over shoulder|through scenic environment|on patrol}|crouched {in predatory stalking pose|examining tracks|ready to spring|hiding in shadows}|{practicing|training} {combat moves|spellcasting|archery|swordplay}}, {{athletic|fit|toned} {muscular|defined|powerful} build with {strong|powerful|warrior} physique|{slender|slim|willowy} {lithe|graceful|elegant} build with {subtle|feminine|refined} curves|{curvy|shapely|full-figured} {hourglass|womanly|feminine} figure with {generous|ample|attractive} curves|{tall|leggy|statuesque} {Amazonian|imposing|regal} build with {long|powerful|elegant} legs|{petite|compact|small} {athletic|agile|nimble} build with {subtle|perky|youthful} curves}, {{modest|subtle|tasteful} cleavage visible above armor|{elegant|refined|noble} décolletage|{covered|modest|practical} chest armor with no visible cleavage|{warrior|practical|functional} breastplate design}, {{toned|flat|firm} {stomach|waist|midsection} {visible at armor gaps|implied under armor|cinched by belt}|{slim|narrow|fitted} {waist|midsection} {accentuated by belt|visible in armor design}}, {armor {pristine and polished|battle-worn with scratches|weathered but maintained|gleaming and new|decorated with trophies}|clothing {immaculate and pressed|travel-worn but clean|elegantly draped|practically arranged}}, {Massive {two-handed|runed|enchanted|legendary} {broadsword|greatsword|claymore|executioner blade}|elegant {curved|silver|moonlit|elven} {glaive|polearm|halberd}|twin {wicked|shadow|enchanted|elegant} {daggers|swords|blades}|{golden|crystal|arcane|ancient} {staff|rod|scepter} {crackling|glowing|pulsing|radiating} with {arcane|fire|frost|holy|nature} energy|{frost|death|runic|shadow} {greatsword|axe|mace|hammer} glowing {blue|purple|red|unholy}|{silver|ornate|elven|dwarven} {longbow|shortbow|crossbow|rifle} with {enchanted|quality|masterwork} craftsmanship|{massive|tower|kite|round} {shield|bulwark|aegis} with {faction|holy|runic|decorative} {emblems|designs|engravings}|{elegant|deadly|magical} {spear|lance|pike|trident}|no weapon visible hands free}.",
+        1065930540930550,
+        "randomize"
+      ],
+      "color": "#9551b0",
+      "bgcolor": "#813d9c"
+    },
+    {
+      "id": 134,
+      "type": "KSamplerAdvanced",
+      "pos": [
+        731.3474038336108,
+        128.5579006389351
+      ],
+      "size": [
+        252.38333129882812,
+        334
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 46,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 78878
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 116547
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 18583
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 18629
+        },
+        {
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": 56827
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": 22876
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": 18586
+        },
+        {
+          "name": "start_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "start_at_step"
+          },
+          "link": 18658
+        },
+        {
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": 22877
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18584
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "KSamplerAdvanced",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "enable",
+        509729123655832,
+        "randomize",
+        9,
+        12,
+        "dpmpp_2s_ancestral",
+        "bong_tangent",
+        5,
+        9,
+        "disable"
+      ]
+    },
+    {
+      "id": 124,
+      "type": "Image Comparer (rgthree)",
+      "pos": [
+        717.3998878602321,
+        507.0211057504164
+      ],
+      "size": [
+        257.49033479830763,
+        418.2483954623709
+      ],
+      "flags": {},
+      "order": 50,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 16318
+        },
+        {
+          "dir": 3,
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 18661
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "1.0.2511111955",
+        "comparer_mode": "Slide",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_pspyu_00515_.png&type=temp&subfolder=&rand=0.9508379116716152"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_pspyu_00516_.png&type=temp&subfolder=&rand=0.30828891813547477"
+          }
+        ]
+      ]
+    },
+    {
+      "id": 57,
+      "type": "Wildcard Processor",
+      "pos": [
+        225.28970923706873,
+        485.7939409296546
+      ],
+      "size": [
+        486.47400212638627,
+        154.74729169383204
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56811
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": [
+            5670
+          ]
+        }
+      ],
+      "title": "Negative",
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "99dca30a008e6385218342369a9f15eb4636f26f",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {
+            "seed": true
+          },
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "ugly, watermark, boring, uninteresting, fat, obese, old, elderly, ",
+        155667926043988,
+        "randomize"
+      ],
+      "color": "#d4303c",
+      "bgcolor": "#c01c28"
+    },
+    {
+      "id": 111,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        218.4384610650461,
+        688.6385979572383
+      ],
+      "size": [
+        492.1043615929957,
+        254.36573184145914
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 36,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "source",
+          "type": "*",
+          "link": 67480
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "1.0.2511111955",
+        "Node name for S&R": "Display Any (rgthree)",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "595020884140720.png Beautiful Night Elf female face with pale violet-blue complexion, luminous glowing silver-white eyes with no visible pupils, silver Kaldorei facial tattoos in slashes down eyes, soft lips in soft purple, soft feminine features, long dramatic upswept eyebrows, ritual scarification, expression of ethereal allure. Night Elf female with dusty silvery-purple skin and faint luminous quality, extremely long pointed ears sweeping back dramatically, short wild pure white hair, wearing nature-blessed druid bark attire with natural bark harness with leaf growths and natural coverage, bone shoulder pieces with leaves decorations, vine-bound leather vambraces with vine growths, woven cord with nature attachments, fitted cloth leggings with vine patterns, barefoot leather boots, feathered cloak with nature clasps, Darnassus moonwell terrace with purple blossoms.Hyper-photorealistic rendering of World of Warcraft female Shaman, Blizzard Entertainment design translated to cinematic realism, captured on Sony Venice 2 with Zeiss Supreme 85mm lens, torch-lit glow creating heroic atmosphere, crouched in predatory stalking pose, curvy feminine figure with ample curves, functional breastplate design, flat waist visible at armor gaps, clothing elegantly draped, Massive legendary broadsword."
+      ]
+    },
+    {
+      "id": 62,
+      "type": "ImageScaleBy",
+      "pos": [
+        721.5367948885188,
+        978.5579006389352
+      ],
+      "size": [
+        210,
+        34.000002543131515
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 49,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 371
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            372
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "ImageScaleBy",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "nearest-exact",
+        0.25
+      ]
+    },
+    {
+      "id": 63,
+      "type": "SaveImage",
+      "pos": [
+        914.7781092712083,
+        975.5790063893517
+      ],
+      "size": [
+        210,
+        34.000002543131515
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 54,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 372
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "ComfyUI"
+      ]
+    },
+    {
+      "id": 71,
+      "type": "Image Comparer (rgthree)",
+      "pos": [
+        985.1055287520819,
+        505.5790063893516
+      ],
+      "size": [
+        264.84324678591236,
+        415.8414326249228
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 27555
+        },
+        {
+          "dir": 3,
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 796
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "ab37a0bd377a4443d04896b34a9491ddb1cb014b",
+        "comparer_mode": "Slide",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_dxbqi_00357_.png&type=temp&subfolder=&rand=0.4168417805064"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_dxbqi_00358_.png&type=temp&subfolder=&rand=0.4789541905571749"
+          }
+        ]
+      ]
+    },
+    {
+      "id": 76,
+      "type": "GetImageSize+",
+      "pos": [
+        813.5687338635629,
+        -58.65259616638909
+      ],
+      "size": [
+        160.61666717529297,
+        66
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 27547
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "count",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui_essentials",
+        "ver": "9d9f4bedfc9f0321c19faf71855e228c93bd0dc9",
+        "Node name for S&R": "GetImageSize+",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 137,
+      "type": "VAEDecode",
+      "pos": [
+        817.8950319467576,
+        41.06331725124909
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 47,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 18660
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            18661
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "VAEDecode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 131,
+      "type": "KSamplerAdvanced",
+      "pos": [
+        740,
+        -290
+      ],
+      "size": [
+        252.38333129882812,
+        362.21049680532417
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 45,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 78877
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 116543
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 18537
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 18301
+        },
+        {
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": 56812
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": 22875
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": 18298
+        },
+        {
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": 18659
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18629,
+            18660
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "KSamplerAdvanced",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "enable",
+        599928854883100,
+        "randomize",
+        9,
+        8,
+        "dpmpp_2s_ancestral",
+        "bong_tangent",
+        0,
+        5,
+        "enable"
+      ]
+    },
+    {
+      "id": 136,
+      "type": "DF_Integer",
+      "pos": [
+        1015.2002242795356,
+        -322.8841987221297
+      ],
+      "size": [
+        270,
+        68.33333333333334
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            18658,
+            18659
+          ]
+        }
+      ],
+      "title": "transfer step",
+      "properties": {
+        "cnr_id": "derfuu_comfyui_moddednodes",
+        "ver": "1.0.1",
+        "Node name for S&R": "DF_Integer",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        9
+      ]
+    },
+    {
+      "id": 116,
+      "type": "DF_Float",
+      "pos": [
+        742.7895031946758,
+        -410
+      ],
+      "size": [
+        248.36850958402715,
+        66.89123397226851
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            18298,
+            18586,
+            30164,
+            113328
+          ]
+        }
+      ],
+      "title": "CFG",
+      "properties": {
+        "cnr_id": "derfuu_comfyui_moddednodes",
+        "ver": "1.0.1",
+        "Node name for S&R": "DF_Float",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        1
+      ]
+    },
+    {
+      "id": 138,
+      "type": "LayerUtility: PurgeVRAM",
+      "pos": [
+        1012.2213300299522,
+        -215.86309297171337
+      ],
+      "size": [
+        265.6661176226478,
+        82
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 53,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "anything",
+          "type": "*",
+          "link": 27558
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui_layerstyle",
+        "ver": "1.0.90",
+        "Node name for S&R": "LayerUtility: PurgeVRAM",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        true,
+        false
+      ],
+      "color": "rgba(38, 73, 116, 0.7)"
+    },
+    {
+      "id": 148,
+      "type": "DF_Integer",
+      "pos": [
+        1013.8528204459249,
+        -428.4632051114813
+      ],
+      "size": [
+        270,
+        68.33333333333334
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            22875,
+            22876,
+            22877
+          ]
+        }
+      ],
+      "title": "step count",
+      "properties": {
+        "cnr_id": "derfuu_comfyui_moddednodes",
+        "ver": "1.0.1",
+        "Node name for S&R": "DF_Integer",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        9
+      ]
+    },
+    {
+      "id": 172,
+      "type": "UpscaleModelLoader",
+      "pos": [
+        1012.3160255574059,
+        -98.9366827487509
+      ],
+      "size": [
+        270,
+        68.33333333333334
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "UPSCALE_MODEL",
+          "type": "UPSCALE_MODEL",
+          "links": [
+            27551
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.75",
+        "Node name for S&R": "UpscaleModelLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "4x_NickelbackFS_72000_G.pth"
+      ]
+    },
+    {
+      "id": 171,
+      "type": "DonutTiledUpscale",
+      "pos": [
+        1007.9897274742113,
+        18.27381405657333
+      ],
+      "size": [
+        268.8888804117839,
+        423.33333333333337
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 27557
+        },
+        {
+          "name": "upscale_model",
+          "type": "UPSCALE_MODEL",
+          "link": 27551
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 41205
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 116544
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 27553
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56829
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": 30164
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            27555,
+            113316,
+            118110
+          ]
+        },
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "f7fc0187e7b6d8a9e6e694e08c432f2948bbfd00",
+        "Node name for S&R": "DonutTiledUpscale",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        1093672322544119,
+        "randomize",
+        9,
+        2,
+        "dpmpp_2s_ancestral",
+        "bong_tangent",
+        0.41,
+        1.3,
+        "bilinear",
+        10,
+        false
+      ]
+    },
+    {
+      "id": 43,
+      "type": "Image Comparer (rgthree)",
+      "pos": [
+        1309.1477402529151,
+        537.1158012778704
+      ],
+      "size": [
+        260.3960949698018,
+        387.9215840898844
+      ],
+      "flags": {},
+      "order": 57,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 118109
+        },
+        {
+          "dir": 3,
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 118110
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "ab37a0bd377a4443d04896b34a9491ddb1cb014b",
+        "comparer_mode": "Slide",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_sphlx_00343_.png&type=temp&subfolder=&rand=0.8994924095686375"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_sphlx_00344_.png&type=temp&subfolder=&rand=0.438569662459122"
+          }
+        ]
+      ]
+    },
+    {
+      "id": 64,
+      "type": "Image Save",
+      "pos": [
+        1620.456214395544,
+        -400.8032423523453
+      ],
+      "size": [
+        552.2890993691435,
+        1342.5472226197662
+      ],
+      "flags": {},
+      "order": 60,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22078
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "files",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "was-node-suite-comfyui",
+        "ver": "1.0.2",
+        "Node name for S&R": "Image Save",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "Final",
+        "Final",
+        "_",
+        4,
+        "false",
+        "webp",
+        300,
+        100,
+        "true",
+        "false",
+        "false",
+        "false",
+        "true",
+        "false",
+        "true"
+      ]
+    },
+    {
+      "id": 255,
+      "type": "DonutFaceDetailer",
+      "pos": [
+        1290.684535141432,
+        -437.2104968053242
+      ],
+      "size": [
+        301.4000015258789,
+        936
+      ],
+      "flags": {},
+      "order": 56,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 113316
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 113317
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 116546
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 113319
+        },
+        {
+          "name": "bbox_detector",
+          "type": "BBOX_DETECTOR",
+          "link": null
+        },
+        {
+          "name": "sam_model_opt",
+          "shape": 7,
+          "type": "SAM_MODEL",
+          "link": null
+        },
+        {
+          "name": "segm_detector_opt",
+          "shape": 7,
+          "type": "SEGM_DETECTOR",
+          "link": null
+        },
+        {
+          "name": "detailer_hook",
+          "shape": 7,
+          "type": "DETAILER_HOOK",
+          "link": null
+        },
+        {
+          "name": "scheduler_func_opt",
+          "shape": 7,
+          "type": "SCHEDULER_FUNC",
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 113327
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": 113328
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            118109,
+            119862,
+            119863,
+            119864
+          ]
+        },
+        {
+          "name": "cropped_refined",
+          "shape": 6,
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "cropped_enhanced_alpha",
+          "shape": 6,
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "detailer_pipe",
+          "type": "DETAILER_PIPE",
+          "links": null
+        },
+        {
+          "name": "cnet_images",
+          "shape": 6,
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "24cc2bd10642f79c1735e50566b01ee184d715cf",
+        "Node name for S&R": "DonutFaceDetailer",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        false,
+        242002772143216,
+        "randomize",
+        9,
+        1,
+        "dpmpp_2s_ancestral",
+        "bong_tangent",
+        0.45,
+        10,
+        true,
+        false,
+        0.5,
+        11,
+        1.5,
+        "center-1",
+        0,
+        0.93,
+        0,
+        0.7,
+        "False",
+        10,
+        "",
+        1,
+        3,
+        false,
+        20
+      ]
+    },
+    {
+      "id": 128,
+      "type": "LayerUtility: PurgeVRAM",
+      "pos": [
+        1974.537355587358,
+        -538.747291693843
+      ],
+      "size": [
+        270,
+        96.66666666666667
+      ],
+      "flags": {},
+      "order": 58,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "anything",
+          "type": "*",
+          "link": 119862
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui_layerstyle",
+        "ver": "1.0.90",
+        "Node name for S&R": "LayerUtility: PurgeVRAM",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        true,
+        false
+      ],
+      "color": "rgba(38, 73, 116, 0.7)"
+    },
+    {
+      "id": 147,
+      "type": "Image Comparer (rgthree)",
+      "pos": [
+        2190.211057504163,
+        -390.28408658236185
+      ],
+      "size": [
+        337.70833333333337,
+        376.81943257649743
+      ],
+      "flags": {},
+      "order": 61,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 22529
+        },
+        {
+          "dir": 3,
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 119864
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "ab37a0bd377a4443d04896b34a9491ddb1cb014b",
+        "comparer_mode": "Slide",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_jgpuj_00343_.png&type=temp&subfolder=&rand=0.823127872849862"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_jgpuj_00344_.png&type=temp&subfolder=&rand=0.360725315180877"
+          }
+        ]
+      ]
+    },
+    {
+      "id": 145,
+      "type": "ImageCASharpening+",
+      "pos": [
+        1613.1899517537456,
+        -504.3262980831946
+      ],
+      "size": [
+        352.5138854980469,
+        68.33333333333334
+      ],
+      "flags": {},
+      "order": 59,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 119863
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22078,
+            22529
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui_essentials",
+        "ver": "1.1.0",
+        "Node name for S&R": "ImageCASharpening+",
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "amount": true
+          },
+          "version": "7.5.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        0.1
+      ]
+    },
+    {
+      "id": 243,
+      "type": "ModelMergeZIT",
+      "pos": [
+        -99.24182405798565,
+        -235.1287934256444
+      ],
+      "size": [
+        270,
+        174
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model1",
+          "type": "MODEL",
+          "link": 102957
+        },
+        {
+          "name": "model2",
+          "type": "MODEL",
+          "link": 102958
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "b9ff585c4bdbdb5e2423a7d8cccc0963495e7295",
+        "Node name for S&R": "ModelMergeZIT",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        0,
+        0,
+        0.25,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 160,
+      "type": "DonutLoRAStack",
+      "pos": [
+        -171.11970006689106,
+        18.500624860643626
+      ],
+      "size": [
+        383.8888804117839,
+        926.6666666666667
+      ],
+      "flags": {},
+      "order": 29,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LORA_STACK",
+          "link": 29146
+        }
+      ],
+      "outputs": [
+        {
+          "name": "lora_stack",
+          "type": "LORA_STACK",
+          "links": [
+            58463
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "8b470425be974eec6edbe711b49bbd78012dba5b",
+        "Node name for S&R": "DonutLoRAStack",
+        "aux_id": "DonutsDelivery/ComfyUI-DonutNodes",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "ZIT",
+        "Off",
+        "Off",
+        "zit/pussy_000009750.safetensors",
+        0.3,
+        0,
+        "ZIT-MID-LATE:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1",
+        "",
+        "On",
+        "zit/b3tternud3s_v2.safetensors",
+        0.5,
+        0,
+        "ZIT-CORE-WIDE:1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0",
+        "",
+        "On",
+        "zit/skindent_slider_high.safetensors",
+        1,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        ""
+      ]
+    },
+    {
+      "id": 180,
+      "type": "DonutLoRAStack",
+      "pos": [
+        -960,
+        10
+      ],
+      "size": [
+        377.55515055422586,
+        916
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LORA_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "lora_stack",
+          "type": "LORA_STACK",
+          "links": [
+            33826
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "dc2160e0867aa3489af4ad473c40fe8dd2516eda",
+        "Node name for S&R": "DonutLoRAStack",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "ZIT",
+        "Off",
+        "On",
+        "zit/zimage_sexyclothingslider.safetensors",
+        1.5,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "",
+        "On",
+        "zit/zimage_asianslider.safetensors",
+        1,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "",
+        "Off",
+        "zit/zimage_paletannedskin_000000100.safetensors",
+        0.3,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        ""
+      ]
+    },
+    {
+      "id": 53,
+      "type": "Wildcard Processor",
+      "pos": [
+        233.69939415497345,
+        -233.38441249884784
+      ],
+      "size": [
+        471.9042177820438,
+        380.8676173587884
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 56809
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": [
+            118975
+          ]
+        }
+      ],
+      "title": "Face related only",
+      "properties": {
+        "cnr_id": "mikey_nodes",
+        "ver": "99dca30a008e6385218342369a9f15eb4636f26f",
+        "Node name for S&R": "Wildcard Processor",
+        "ue_properties": {
+          "version": "7.5.1",
+          "widget_ue_connectable": {
+            "seed": true
+          },
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "{Beautiful human female face with {{dark {rich|deep} {ebony|chocolate|mahogany}|medium {warm|caramel|bronze}} complexion|{pale|fair} {{cool|rosy} {porcelain|ivory}|{warm|creamy} {fair|peach}} complexion {with|without} {freckles|beauty marks}|{warm|golden|olive|tan} {bronze|honey|sun-kissed} complexion}, {{bright|pale|striking} {blue|green|grey}|{warm|deep|rich} {brown|hazel|amber}|{vivid|unusual} {violet|heterochromia}} eyes, {{full|pouty|pillowy} lips in {{nude|natural|soft} {pink|rose|brown}|{deep|bright|dark} {red|berry|wine|coral}}|{thin|elegant} lips in {natural|soft} {pink|nude|rose}}, {{strong|defined|sharp} features with {high|prominent} cheekbones|{elegant|delicate} {angular|feminine} features with {soft|subtle} cheekbones|{soft|youthful} {rounded|feminine} features}, {{{long|dramatic} arched|{strong|bold} defined|{elegant|feminine} arched|{natural|soft} feathered} eyebrows}, {{scar {through|across} {eyebrow|lip|cheek|nose}|{faded|old} battle scars}|{beauty mark near {lips|eye}|freckles {across nose|on cheeks|scattered}}|{completely|perfectly} flawless skin}, expression of {{fierce|intense} {determination|focus}|{mysterious|seductive} allure|{playful|teasing} seduction|{confident|proud} strength|{warm|inviting} smile|{mischievous|knowing} smirk|{serene|calm} confidence|{innocent|curious} curiosity}. Human female with {{dark {rich|deep} {ebony|chocolate|mahogany|caramel}|medium {warm|golden} {brown|bronze|tawny}} skin|{pale|fair} {{cool|rosy} {porcelain|alabaster|ivory}|{warm|creamy} {ivory|fair}} skin {with|without} freckles|{warm|golden|olive|sun-kissed} tan skin}, {{long|very long|waist-length} {flowing|straight|wavy}|{shoulder-length|medium} {layered|wavy}|{short|pixie} {messy|sleek}|{ponytail|bun|updo} {high|low|messy}|{braided|cornrowed|loc'd}} {{{light|pale|platinum|golden|honey} blonde}|{{dark|rich|chocolate|chestnut|caramel} brown}|{jet|raven} black|{{fiery|copper|auburn|ginger} red}|{silver|grey|white}} hair, wearing {{{polished|gleaming|battle-worn} Stormwind {plate|knight|warrior} armor with {ornate|engraved|lion-embossed} {steel|silver|blue-steel} breastplate showing {modest|subtle|elegant} cleavage window, {massive|layered|spiked} {gold-trimmed|lion-head|royal} pauldrons on shoulders, {fitted|articulated|segmented} {steel|silver} arm guards from shoulder to {ornate|engraved|jeweled} bracers at wrists, {thick|wide|ornate} {leather|metal|chain} belt with {lion|Alliance|royal} {buckle|emblem|crest} at waist, {layered|segmented|articulated} {plate|mail|scale} leg guards over {fitted|tight|practical} {leather|cloth|mail} pants, {heavy|armored|steel} {boots|sabatons|greaves} with {gold|silver|bronze} trim, {flowing|dramatic|battle-worn} {blue|royal blue|navy} {cape|cloak|half-cape} with {gold|lion|Alliance} {embroidery|trim|clasp}}|{{heavy|reinforced|blackened} {warrior|gladiator|berserker} plate armor with {spiked|ridged|brutal} {dark steel|black iron|gunmetal} chestplate with {no|minimal|practical} cleavage, {massive|intimidating|spiked} {skull-adorned|chain-draped|battle-scarred} pauldrons, {thick|heavy|reinforced} {vambraces|arm plates|gauntlets} covering forearms with {spikes|studs|ridges}, {heavy|spiked|chain-hung} {belt|girdle|war belt} with {trophy|skull|weapon} attachments, {thick|heavy|layered} {plate|mail|scale} {leg armor|cuisses|greaves}, {heavy|spiked|armored} {boots|warboots|stompers}, {tattered|battle-worn|trophy-laden} {black|dark|crimson} {cloak|cape|half-cape}}|{{elegant|ornate|radiant} paladin {plate|holy|champion} armor with {gold-inlaid|holy symbol-embossed|radiant} {white|silver|gold} breastplate with {modest|elegant|holy} {neckline|cut|design}, {angelic|wing-shaped|ornate} {gold|silver|white} pauldrons with {holy|light|sacred} {engravings|gems|symbols}, {elegant|fitted|ornate} {gold-trimmed|jeweled|engraved} bracers and {articulated|armored|protective} {gauntlets|gloves|hand armor}, {ornate|jeweled|blessed} {belt|girdle|sash} with {libram|holy symbol|reliquary} attached, {elegant|flowing|fitted} {plate|mail|scale} {leg armor|skirt|tassets} over {white|gold|silver} {leggings|pants|greaves}, {polished|gleaming|ornate} {boots|sabatons|greaves} with {gold|holy|angelic} details, {pristine|flowing|radiant} {white|gold|cream} {cloak|cape|mantle} with {holy|light|church} {symbols|embroidery|trim}}|{{sleek|form-fitting|practical} {black|dark|shadowy} leather {rogue|assassin|thief} gear with {fitted|tight|practical} {leather|studded leather|reinforced} {vest|jerkin|chestpiece} showing {subtle|practical|minimal} cleavage, {small|sleek|practical} {leather|dark|black} {shoulder pads|pauldrons|spaulders} with {hidden|concealed|quick-release} {blade|dagger|tool} sheaths, {fitted|tight|wrapped} {leather|cloth|bandage} {bracers|arm wraps|vambraces} with {hidden|concealed|spring-loaded} {blade|tool|lockpick} compartments, {utility|tool-laden|pouch-covered} {leather|dark|black} {belt|sash|bandolier} with {pouches|vials|tools} and {sheathed|hidden|quick-draw} {daggers|knives|blades}, {fitted|tight|flexible} {leather|dark|black} {pants|leggings|breeches} with {reinforced|padded|armored} {knees|thighs|shins}, {soft|silent|padded} {leather|dark|black} {boots|footwear|shoes} for {stealth|silence|agility}, {hooded|dark|mysterious} {cloak|cape|cowl} in {black|dark grey|midnight blue}}|{{flowing|elegant|ornate} {arcane|mage|sorceress} {robes|gown|vestments} with {fitted|corseted|elegant} {silk|velvet|satin} {bodice|top|chest piece} in {deep purple|royal blue|crimson|gold} with {gold|silver|arcane} {embroidery|trim|runes} and {elegant|modest|refined} {neckline|décolletage|cut}, {ornate|jeweled|magical} {shoulder pieces|mantle|epaulettes} with {floating|glowing|arcane} {crystals|gems|runes}, {elegant|fitted|embroidered} {silk|velvet|satin} {sleeves|arm pieces} from shoulder to {ornate|jeweled|runed} {cuffs|bracers|wristbands}, {ornate|jeweled|arcane} {belt|sash|cord} with {spell component|crystal|tome} {pouches|holders|attachments}, {flowing|elegant|layered} {skirt|dress bottom|robes} with {thigh-high slit|elegant draping|magical shimmer}, {elegant|heeled|enchanted} {boots|shoes|footwear} in {matching|complementary|ornate} {leather|silk|velvet}, {flowing|dramatic|magical} {cape|cloak|mantle} with {arcane|magical|glowing} {symbols|trim|enchantments}}|{{practical|worn|homespun} {peasant|commoner|village} {dress|clothing|attire} with {simple|plain|modest} {linen|cotton|wool} {bodice|top|blouse} in {brown|cream|white} with {laced|buttoned|tied} front and {modest|covered|practical} neckline, {no|minimal|simple} shoulder coverage, {simple|rolled|practical} {sleeves|arm coverage} to {elbows|wrists|forearms}, {rope|cloth|leather} {belt|sash|tie} at waist with {pouch|purse|pocket}, {simple|practical|worn} {skirt|dress|apron} in {brown|grey|cream} to {knee|mid-calf|ankle} length, {simple|worn|practical} {leather|cloth|wooden} {shoes|boots|sandals}}|{{elegant|noble|aristocratic} {gown|dress|ballgown} with {corseted|fitted|boned} {silk|satin|velvet} {bodice|top|chest} in {royal blue|crimson|gold|purple} with {jeweled|embroidered|lace} {trim|accents|details} and {elegant|plunging|sweetheart} neckline showing {tasteful|elegant|refined} cleavage, {puffed|elegant|off-shoulder} {sleeves|shoulder treatment} with {lace|ribbon|jeweled} {details|trim|accents}, {fitted|cinched|corseted} waist with {jeweled|ribbon|sash} {belt|detail|accent}, {full|flowing|elegant} {skirt|ballgown bottom|dress} with {layers|ruffles|embroidery}, {elegant|heeled|dancing} {shoes|slippers|heels}}|{{practical|serving|working} {barmaid|tavern|inn} {outfit|attire|dress} with {fitted|laced|corseted} {bodice|top|blouse} in {white|cream|red} showing {working|practical|modest} cleavage, {puffed|short|practical} sleeves, {cinched|tied|belted} waist with {cloth|apron|serving} {apron|sash|belt}, {practical|knee-length|full} {skirt|dress bottom} in {brown|red|green}, {practical|sturdy|comfortable} {shoes|boots|footwear}}}, {Stormwind {gates|throne room|cathedral|keep|barracks|trade district|mage quarter|harbor} with {blue|gold} Alliance {banners|flags|tapestries}|Elwynn Forest {clearing|stream|cottage|bridge|road} with golden sunlight|Westfall {farmhouse|fields|lighthouse|coast|windmill} at {sunset|golden hour|dusk}|Goldshire inn {common room|tavern|fireplace|bar area} {candlelit|firelit|warmly lit}|Ironforge {great forge|throne room|tavern|halls|mystic ward} with {molten|orange|warm} glow|Stormwind {harbor|docks|ship deck|marketplace} with {ocean|sea|busy} backdrop|noble {manor|estate|ballroom|garden} with {luxury|opulence|fine furnishings}|Dalaran {street|spire|library|courtyard} with {magical|arcane|floating} atmosphere}.|Beautiful Night Elf female face with {pale|soft|dusty} {{pink|rose}-lavender|violet-blue|silvery-mauve|{dusty|muted} lilac} complexion, luminous glowing silver-white eyes with no visible pupils, {{purple|blue|teal|silver} Kaldorei facial tattoos in {{claw marks|slashes} down eyes|{leaf|vine} patterns on cheeks|crescent moon on forehead|elaborate full-face markings}|no visible tattoos}, {full|soft} lips in {pale|soft|deep} {purple|mauve|lavender}, {{elegant|refined} angular features with {high|sharp} cheekbones|{fierce|wild} sharp features|{soft|serene} feminine features}, {long dramatic upswept eyebrows}, {{ritual scarification|faded battle scars}|{completely|perfectly} flawless skin}, expression of {{serene|ancient} wisdom|{fierce|burning} determination|{mysterious|ethereal} allure|{haughty|proud} elven pride|{calm|meditative} focus|{confident|regal} grace}. Night Elf female with {pale|soft|dusty} {{pink|rose}-lavender|violet-blue|silvery-purple|dusty mauve} skin and faint luminous quality, extremely long pointed ears sweeping back dramatically, {{long|very long|waist-length} {flowing|wild|straight}|{elaborate|warrior} {braided|updo}|{short|asymmetric} {wild|sleek}} {{{dark|deep} {purple|violet|indigo}}|{{bright|pale} {blue|teal|cyan}}|{{forest|emerald} {green|teal}}|{{silver|pure} {white|lavender}}} hair, wearing {{{battle-ready|ornate|ancient} Sentinel {leather|mail|scale} armor with {fitted|molded|articulated} {purple|violet|silver} {leather|scale|mail} {breastplate|chestguard|cuirass} with {crescent moon|leaf|goddess} {embossing|engravings|inlays} and {modest|elegant|warrior} neckline, {curved|elegant|leaf-shaped} {silver|moonsilver|purple} pauldrons with {moonstone|amethyst|sapphire} {gems|crystals|inlays}, {fitted|wrapped|elegant} {leather|mail|cloth} {bracers|arm guards|vambraces} from elbow to wrist with {silver|moonsilver|nature} {filigree|engravings|inlays}, {ornate|leaf-shaped|crescent} {silver|moonsilver|leather} {belt|girdle|sash} with {moonstone|goddess|sentinel} {buckle|clasp|emblem}, {fitted|articulated|elegant} {leather|mail|scale} {leg guards|tassets|cuisses} over {fitted|tight|practical} {leather|cloth} {leggings|pants}, {elegant|silent|nature-crafted} {leather|mail|scale} {boots|footwear|greaves} with {leaf|vine|moonstone} {details|accents|inlays}, {flowing|elegant|hooded} {purple|silver|teal} {cloak|cape|mantle} with {moonstone|leaf|goddess} {clasp|brooch|pin}}|{{ornate|ceremonial|sacred} Temple of Elune {priestess|robes|vestments} with {elegant|flowing|fitted} {white|silver|pale purple} {silk|mooncloth|gossamer} {robe top|bodice|chest piece} with {moon|star|goddess} {embroidery|symbols|trim} and {elegant|modest|sacred} {neckline|cut|design}, {elegant|crescent-shaped|ornate} {silver|white|moonstone} {shoulder pieces|mantle|epaulettes} with {dangling|hanging|flowing} {moonstone|crystal|pearl} {chains|beads|ornaments}, {flowing|elegant|wide} {white|silver|pale} {sleeves|arm draping} with {silver|moonstone|embroidered} {cuffs|trim|details}, {ornate|sacred|blessed} {silver|moonstone|cloth} {belt|sash|cord} with {goddess|moon|star} {symbols|charms|relics}, {flowing|elegant|layered} {white|silver|pale purple} {skirt|robes|dress} to {ankle|floor|ground}, {elegant|simple|sacred} {silver|white|pale} {slippers|sandals|footwear}, {flowing|diaphanous|sacred} {white|silver|pale} {veil|cape|mantle} with {moonstone|star|goddess} {trim|embroidery|details}}|{{wild|primal|nature-blessed} druid {leather|hide|bark} {armor|gear|attire} with {fitted|natural|organic} {leather|bark|living wood} {chestpiece|vest|harness} with {vine|leaf|root} {patterns|growths|decorations} and {practical|natural|modest} coverage, {natural|antler|bone} {shoulder pieces|pauldrons|mantle} with {feathers|leaves|moss} {decorations|growths|attachments}, {wrapped|natural|vine-bound} {leather|cloth|bark} {arm wraps|bracers|vambraces} with {leaf|vine|thorn} {patterns|growths|details}, {natural|woven|leather} {belt|sash|cord} with {herb|totem|nature} {pouches|attachments|charms}, {fitted|natural|practical} {leather|hide|cloth} {pants|leggings|leg wraps} with {leaf|vine|natural} {patterns|details|growths}, {natural|silent|barefoot} {leather|hide} {boots|footwear|foot wraps}, {feathered|leafy|natural} {cloak|mantle|cape} with {antler|branch|nature} {ornaments|clasps|details}}|{{sleek|deadly|shadowy} {warden|rogue|nightblade} {leather|mail|scale} armor with {fitted|dark|reinforced} {black|dark purple|midnight} {leather|scale} {chestpiece|cuirass|vest} with {silver|moonsilver|dark} {trim|studs|reinforcements}, {sharp|bladed|intimidating} {dark|black|silver} {shoulder guards|pauldrons|spaulders}, {fitted|reinforced|weapon-concealing} {dark|black|wrapped} {bracers|arm guards|vambraces} with {hidden|sheathed|quick-release} {blade|dagger|tool} mounts, {utility|weapon-laden|practical} {dark|black|leather} {belt|bandolier|harness} with {multiple|various|concealed} {weapon|tool|equipment} attachments, {fitted|dark|silent} {leather|cloth|scale} {pants|leggings|leg armor} with {reinforced|padded|armored} sections, {silent|soft|dark} {leather|padded|enchanted} {boots|footwear}, {hooded|dark|flowing} {black|dark purple|midnight} {cloak|cape|cowl}}|{{simple|traditional|elegant} Kaldorei {dress|gown|attire} with {fitted|elegant|modest} {purple|silver|teal} {mooncloth|silk|linen} {bodice|top|chest} with {embroidered|woven|subtle} {moon|leaf|vine} patterns and {modest|elegant|traditional} neckline, {no|minimal|elegant} {shoulder pieces|coverage}, {flowing|elegant|fitted} {sleeves|arm coverage} to {wrists|elbows|forearms} with {silver|embroidered|moonstone} {cuffs|trim|details}, {cloth|silver|leather} {belt|sash|cord} with {moonstone|leaf|traditional} {buckle|clasp|ornament}, {flowing|elegant|traditional} {skirt|dress|gown bottom} in {purple|silver|teal} to {ankle|floor|calf}, {elegant|simple|traditional} {leather|cloth|silver} {sandals|slippers|boots}}}, {Darnassus {temple|temple gardens|moonwell terrace|warrior terrace|tradesmen terrace} with purple {canopy|leaves|blossoms|lanterns}|Darkshore {twilight|moonlit|misty} {beach|ruins|ancient temple|grove|road}|Teldrassil {sanctuary|home|grove|pathway|village} with {vines|roots|moonlight|wisps}|moonwell {glade|clearing|sacred pool|grove} with {glowing blue|ethereal|magical} water and {wisps|moonlight|mist}|Ashenvale {forest|river|outpost|ancient ruins|road} with {moonlight|mist|fireflies|ancient trees}|Feathermoon {stronghold|dock|island} with {ocean|moonlight|sentinel presence}|Mount Hyjal {slopes|world tree|sacred grounds} with {ancient|massive|world} trees}.|Beautiful Blood Elf female face with {{pale|pristine} {porcelain|alabaster|ivory}|{warm|rosy} {fair|cream|peach}} complexion, luminous glowing fel-green eyes with {intense|subtle|bright} inner light, {{full|pouty} lips in {pale|soft|deep} {pink|rose|coral|red}|{elegant|refined} lips in {soft|natural} {pink|rose}}, {{elegant|refined|aristocratic} angular features with {high|sharp|prominent} cheekbones|{delicate|feminine} features with {soft|subtle} cheekbones}, {{elegant|arched|refined} eyebrows}, {{beauty mark near {lips|eye}|small elegant scar}|{completely|perfectly} flawless skin}, expression of {{haughty|superior} aristocratic pride|{confident|mysterious} allure|{playful|knowing} amusement|{bored|aloof} indifference|{serene|composed} elegance|{smug|knowing} smirk}. Blood Elf female with {{flawless|pristine} {pale|porcelain|alabaster}|{warm|rosy} {fair|ivory|cream}} skin and elegant long pointed ears angled upward, {{long|very long|waist-length} {flowing|silky|straight}|{elegant|royal} {updo|braided}|{shoulder-length|medium} {layered|sleek}} {{{golden|honey|platinum|strawberry} blonde}|{jet|raven} black|{{fiery|auburn|copper} red}|{pure|silver} white} hair, wearing {{{ornate|elegant|regal} Silvermoon {plate|knight|champion} armor with {elegant|ornate|jeweled} {gold|red|crimson} and {gold|brass|bronze} {breastplate|cuirass|chestguard} with {phoenix|sunfire|arcane} {embossing|engravings|inlays} and {elegant|tasteful|refined} {neckline|cut|cleavage window}, {elegant|swept|phoenix-wing} {gold|red|ornate} pauldrons with {ruby|emerald|arcane} {gems|crystals|orbs} and {gold|brass|decorative} {filigree|chains|ornaments}, {elegant|fitted|articulated} {gold|red|ornate} {arm plates|vambraces|bracers} from shoulder to wrist with {jeweled|engraved|magical} details, {ornate|jeweled|wide} {gold|red|crimson} {belt|girdle|sash} with {phoenix|sun|arcane} {buckle|emblem|clasp} and {hanging|decorative|functional} {pouches|chains|ornaments}, {elegant|articulated|ornate} {plate|scale|mail} {leg armor|tassets|cuisses} in {gold|red|crimson} over {fitted|elegant|matching} {leggings|pants|under armor}, {elegant|ornate|heeled} {plate|armored|decorated} {boots|sabatons|footwear} with {gold|jeweled|phoenix} details, {flowing|elegant|dramatic} {red|crimson|gold} {cloak|cape|half-cape} with {phoenix|sunfire|royal} {embroidery|trim|clasp}}|{{ceremonial|royal|magisterial} Blood Knight {paladin|champion|holy} armor with {radiant|gleaming|ornate} {red|crimson|black} and {gold|silver|bronze} {breastplate|chestguard|cuirass} with {holy|blood knight|sun} {symbols|engravings|gems} and {elegant|proud|refined} design, {ornate|winged|dramatic} {gold|red|black} pauldrons with {ruby|gold|holy} {gems|ornamentation|symbols}, {elegant|ornate|blessed} {bracers|arm guards|vambraces} with {holy|arcane|blood} {runes|gems|engravings}, {ornate|ceremonial|blessed} {belt|girdle|sash} with {libram|holy symbol|blood knight emblem} attached, {elegant|ornate|fitted} {plate|mail|scale} {leg armor|tassets|skirt} with {gold|red|holy} details, {polished|ornate|elegant} {boots|sabatons|greaves} with {gold|ruby|holy} accents, {pristine|flowing|dramatic} {red|crimson|white} {cloak|cape|tabard} with {blood knight|holy|phoenix} {symbols|embroidery|trim}}|{{sleek|elegant|deadly} {rogue|assassin|spellbreaker} gear with {fitted|form-fitting|elegant} {black|dark red|burgundy} {leather|reinforced leather|light mail} {vest|jerkin|chestpiece} with {gold|silver|ruby} {trim|studs|accents} and {practical|elegant|refined} design, {small|sleek|elegant} {black|dark|gold-trimmed} {shoulder guards|pauldrons|spaulders}, {fitted|elegant|reinforced} {black|dark|wrapped} {bracers|vambraces|arm guards} with {gold|silver|jeweled} {buckles|trim|accents}, {utility|elegant|well-crafted} {black|dark|leather} {belt|sash|bandolier} with {gold|silver|jeweled} {buckle|ornaments|pouches}, {fitted|elegant|practical} {black|dark|leather} {pants|leggings|breeches} with {gold|silver|subtle} {trim|details|reinforcement}, {elegant|soft|quality} {black|dark|leather} {boots|footwear} with {gold|silver|subtle} accents, {elegant|hooded|flowing} {black|dark red|burgundy} {cloak|cape|cowl} with {gold|silver|jeweled} {clasp|trim|embroidery}}|{{flowing|elegant|ornate} {magister|mage|sorceress} {robes|gown|vestments} with {fitted|corseted|elegant} {silk|velvet|satin} {bodice|top|robe top} in {red|purple|gold|crimson} with {gold|arcane|magical} {embroidery|runes|trim} and {elegant|refined|tasteful} {neckline|décolletage|cut}, {ornate|jeweled|floating} {gold|red|arcane} {shoulder pieces|mantle|epaulettes} with {arcane|magical|glowing} {orbs|crystals|runes}, {elegant|flowing|fitted} {silk|velvet|satin} {sleeves|arm pieces} with {gold|arcane|jeweled} {cuffs|trim|details}, {ornate|jeweled|magical} {gold|red|arcane} {belt|sash|cord} with {spell focus|crystal|tome} {holder|attachment|pouch}, {flowing|elegant|layered} {skirt|dress|robes} in {red|purple|gold} with {gold|arcane|magical} {trim|embroidery|shimmer}, {elegant|heeled|enchanted} {boots|shoes|slippers} in {red|gold|purple}, {flowing|dramatic|enchanted} {cape|cloak|mantle} with {arcane|magical|glowing} {symbols|runes|trim}}|{{elegant|luxurious|fashionable} Silvermoon {noble|aristocrat|courtier} {gown|dress|attire} with {corseted|fitted|boned} {silk|satin|velvet} {bodice|top|chest} in {crimson|gold|purple|black} with {gold|jeweled|embroidered} {details|trim|accents} and {elegant|plunging|sweetheart} neckline showing {tasteful|elegant|refined} cleavage, {elegant|puffed|off-shoulder} {sleeves|shoulder treatment} with {lace|gold|jeweled} {details|trim|accents}, {jeweled|gold|elegant} {belt|sash|waist detail} with {ruby|emerald|diamond} {centerpiece|buckle|ornament}, {full|elegant|flowing} {skirt|gown bottom|dress} with {layers|embroidery|gold trim}, {elegant|heeled|strappy} {shoes|heels|sandals} in {gold|red|matching} color}|{{practical|quality|professional} {servant|attendant|handmaiden} {uniform|attire|dress} with {fitted|neat|proper} {bodice|top|blouse} in {black|white|crimson} with {gold|silver|subtle} {trim|buttons|details} and {proper|modest|professional} neckline, {neat|small|proper} {shoulder|sleeve} treatment, {fitted|proper|cinched} waist with {cloth|gold|matching} {belt|sash|apron tie}, {practical|knee-length|proper} {skirt|dress} in {black|crimson|matching} color, {practical|elegant|comfortable} {shoes|flats|low heels}}}, {Silvermoon {Court of the Sun|promenade|bazaar|walk of elders|royal exchange|farstriders square} with {crimson|red|gold} {banners|silk|tapestries|lanterns}|Eversong Woods with {autumn|golden|magical} {leaves|motes|sunlight|trees}|Sunstrider {palace|spire|chambers|balcony|throne room} with {golden|warm|magical|arcane} light|Silvermoon {parlor|sitting room|library|study} with {elegant|luxurious|refined} {furnishings|decor|atmosphere}|Murder Row with {mysterious|shadowy|intriguing} {atmosphere|lighting|clientele}|Ghostlands {ruins|tranquillien|scar|road} with {eerie|haunted|dangerous} atmosphere|Quel'Danas {sunwell|magisters terrace|island} with {holy|arcane|powerful} energy}.}",
+        34871679335084,
+        "randomize"
+      ],
+      "color": "#42d692",
+      "bgcolor": "#2ec27e"
+    },
+    {
+      "id": 176,
+      "type": "DonutLoRAStack",
+      "pos": [
+        -570,
+        10
+      ],
+      "size": [
+        383.09722900390625,
+        916.6666666666667
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LORA_STACK",
+          "link": 33826
+        }
+      ],
+      "outputs": [
+        {
+          "name": "lora_stack",
+          "type": "LORA_STACK",
+          "links": [
+            29146
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "donutnodes",
+        "ver": "717a4056af657e1e21f05a89c32eef8f0f97c0b7",
+        "Node name for S&R": "DonutLoRAStack",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.1"
+        }
+      },
+      "widgets_values": [
+        "ZIT",
+        "On",
+        "On",
+        "zit/sliders/zimage_ageslider.safetensors",
+        -1.5,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "",
+        "Off",
+        "zit/psxCheeks_v1_ZIT.safetensors",
+        0.4,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "",
+        "Off",
+        "zit/sliders/BreastSize_Slider_m2_to_p2.safetensors",
+        1,
+        0,
+        "ZIT-MID-ONLY:1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        "1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0",
+        ""
+      ]
+    }
+  ],
+  "links": [
+    [
+      45,
+      17,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      75,
+      50,
+      0,
+      51,
+      0,
+      "BBOX_DETECTOR"
+    ],
+    [
+      94,
+      52,
+      0,
+      51,
+      1,
+      "SAM_MODEL"
+    ],
+    [
+      371,
+      8,
+      0,
+      62,
+      0,
+      "IMAGE"
+    ],
+    [
+      372,
+      62,
+      0,
+      63,
+      0,
+      "IMAGE"
+    ],
+    [
+      477,
+      17,
+      0,
+      66,
+      0,
+      "VAE"
+    ],
+    [
+      796,
+      8,
+      0,
+      71,
+      1,
+      "IMAGE"
+    ],
+    [
+      5670,
+      57,
+      0,
+      7,
+      1,
+      "STRING"
+    ],
+    [
+      7297,
+      107,
+      0,
+      55,
+      1,
+      "STRING"
+    ],
+    [
+      7314,
+      107,
+      0,
+      54,
+      0,
+      "STRING"
+    ],
+    [
+      16318,
+      8,
+      0,
+      124,
+      0,
+      "IMAGE"
+    ],
+    [
+      16404,
+      129,
+      1,
+      108,
+      0,
+      "NUMBER"
+    ],
+    [
+      16421,
+      108,
+      0,
+      107,
+      0,
+      "STRING"
+    ],
+    [
+      18298,
+      116,
+      0,
+      131,
+      6,
+      "FLOAT"
+    ],
+    [
+      18301,
+      28,
+      0,
+      131,
+      3,
+      "LATENT"
+    ],
+    [
+      18449,
+      6,
+      0,
+      132,
+      0,
+      "*"
+    ],
+    [
+      18522,
+      7,
+      0,
+      133,
+      0,
+      "*"
+    ],
+    [
+      18537,
+      133,
+      0,
+      131,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      18583,
+      133,
+      0,
+      134,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      18584,
+      134,
+      0,
+      8,
+      0,
+      "LATENT"
+    ],
+    [
+      18586,
+      116,
+      0,
+      134,
+      6,
+      "FLOAT"
+    ],
+    [
+      18629,
+      131,
+      0,
+      134,
+      3,
+      "LATENT"
+    ],
+    [
+      18658,
+      136,
+      0,
+      134,
+      7,
+      "INT"
+    ],
+    [
+      18659,
+      136,
+      0,
+      131,
+      7,
+      "INT"
+    ],
+    [
+      18660,
+      131,
+      0,
+      137,
+      0,
+      "LATENT"
+    ],
+    [
+      18661,
+      137,
+      0,
+      124,
+      1,
+      "IMAGE"
+    ],
+    [
+      22078,
+      145,
+      0,
+      64,
+      0,
+      "IMAGE"
+    ],
+    [
+      22529,
+      145,
+      0,
+      147,
+      0,
+      "IMAGE"
+    ],
+    [
+      22875,
+      148,
+      0,
+      131,
+      5,
+      "INT"
+    ],
+    [
+      22876,
+      148,
+      0,
+      134,
+      5,
+      "INT"
+    ],
+    [
+      22877,
+      148,
+      0,
+      134,
+      8,
+      "INT"
+    ],
+    [
+      25471,
+      156,
+      1,
+      66,
+      1,
+      "CLIP"
+    ],
+    [
+      27547,
+      8,
+      0,
+      76,
+      0,
+      "IMAGE"
+    ],
+    [
+      27551,
+      172,
+      0,
+      171,
+      1,
+      "UPSCALE_MODEL"
+    ],
+    [
+      27553,
+      7,
+      0,
+      171,
+      4,
+      "CONDITIONING"
+    ],
+    [
+      27555,
+      171,
+      0,
+      71,
+      0,
+      "IMAGE"
+    ],
+    [
+      27557,
+      8,
+      0,
+      171,
+      0,
+      "IMAGE"
+    ],
+    [
+      27558,
+      8,
+      0,
+      138,
+      0,
+      "*"
+    ],
+    [
+      29146,
+      176,
+      0,
+      160,
+      0,
+      "LORA_STACK"
+    ],
+    [
+      30164,
+      116,
+      0,
+      171,
+      7,
+      "FLOAT"
+    ],
+    [
+      33826,
+      180,
+      0,
+      176,
+      0,
+      "LORA_STACK"
+    ],
+    [
+      41205,
+      156,
+      0,
+      171,
+      2,
+      "MODEL"
+    ],
+    [
+      56809,
+      195,
+      0,
+      53,
+      0,
+      "INT"
+    ],
+    [
+      56810,
+      195,
+      0,
+      56,
+      0,
+      "INT"
+    ],
+    [
+      56811,
+      195,
+      0,
+      57,
+      0,
+      "INT"
+    ],
+    [
+      56812,
+      195,
+      0,
+      131,
+      4,
+      "INT"
+    ],
+    [
+      56826,
+      195,
+      0,
+      196,
+      0,
+      "INT"
+    ],
+    [
+      56827,
+      196,
+      1,
+      134,
+      4,
+      "INT"
+    ],
+    [
+      56828,
+      196,
+      1,
+      197,
+      0,
+      "INT"
+    ],
+    [
+      56829,
+      197,
+      1,
+      171,
+      6,
+      "INT"
+    ],
+    [
+      56830,
+      197,
+      1,
+      198,
+      0,
+      "INT"
+    ],
+    [
+      58463,
+      160,
+      0,
+      156,
+      2,
+      "LORA_STACK"
+    ],
+    [
+      67480,
+      54,
+      0,
+      111,
+      0,
+      "*"
+    ],
+    [
+      78877,
+      156,
+      0,
+      131,
+      0,
+      "MODEL"
+    ],
+    [
+      78878,
+      156,
+      0,
+      134,
+      0,
+      "MODEL"
+    ],
+    [
+      102957,
+      242,
+      0,
+      243,
+      0,
+      "MODEL"
+    ],
+    [
+      102958,
+      241,
+      0,
+      243,
+      1,
+      "MODEL"
+    ],
+    [
+      107226,
+      225,
+      0,
+      156,
+      1,
+      "CLIP"
+    ],
+    [
+      113316,
+      171,
+      0,
+      255,
+      0,
+      "IMAGE"
+    ],
+    [
+      113317,
+      156,
+      0,
+      255,
+      1,
+      "MODEL"
+    ],
+    [
+      113319,
+      7,
+      0,
+      255,
+      5,
+      "CONDITIONING"
+    ],
+    [
+      113327,
+      198,
+      1,
+      255,
+      11,
+      "INT"
+    ],
+    [
+      113328,
+      116,
+      0,
+      255,
+      12,
+      "FLOAT"
+    ],
+    [
+      116542,
+      132,
+      0,
+      258,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      116543,
+      258,
+      0,
+      131,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      116544,
+      258,
+      0,
+      171,
+      3,
+      "CONDITIONING"
+    ],
+    [
+      116545,
+      55,
+      0,
+      259,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      116546,
+      259,
+      0,
+      255,
+      4,
+      "CONDITIONING"
+    ],
+    [
+      116547,
+      258,
+      0,
+      134,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      116713,
+      260,
+      0,
+      259,
+      1,
+      "COMBO"
+    ],
+    [
+      116714,
+      260,
+      0,
+      258,
+      1,
+      "COMBO"
+    ],
+    [
+      116826,
+      261,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      118109,
+      255,
+      0,
+      43,
+      0,
+      "IMAGE"
+    ],
+    [
+      118110,
+      171,
+      0,
+      43,
+      1,
+      "IMAGE"
+    ],
+    [
+      118968,
+      56,
+      0,
+      54,
+      1,
+      "STRING"
+    ],
+    [
+      118969,
+      274,
+      0,
+      272,
+      0,
+      "STRING"
+    ],
+    [
+      118970,
+      272,
+      0,
+      273,
+      0,
+      "STRING"
+    ],
+    [
+      118971,
+      54,
+      0,
+      274,
+      0,
+      "STRING"
+    ],
+    [
+      118975,
+      53,
+      0,
+      107,
+      1,
+      "STRING"
+    ],
+    [
+      119042,
+      273,
+      0,
+      275,
+      0,
+      "STRING"
+    ],
+    [
+      119043,
+      275,
+      0,
+      6,
+      1,
+      "STRING"
+    ],
+    [
+      119761,
+      241,
+      0,
+      261,
+      0,
+      "MODEL"
+    ],
+    [
+      119862,
+      255,
+      0,
+      128,
+      0,
+      "IMAGE"
+    ],
+    [
+      119863,
+      255,
+      0,
+      145,
+      0,
+      "IMAGE"
+    ],
+    [
+      119864,
+      255,
+      0,
+      147,
+      1,
+      "IMAGE"
+    ],
+    [
+      120806,
+      11,
+      0,
+      66,
+      2,
+      "MODEL"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7627768444385596,
+      "offset": [
+        1178.48287272879,
+        499.53973107387765
+      ]
+    },
+    "frontendVersion": "1.34.9",
+    "workflowRendererVersion": "LG",
+    "ue_links": [
+      {
+        "downstream": 55,
+        "downstream_slot": 0,
+        "upstream": "156",
+        "upstream_slot": 1,
+        "controller": 66,
+        "type": "CLIP"
+      },
+      {
+        "downstream": 7,
+        "downstream_slot": 0,
+        "upstream": "156",
+        "upstream_slot": 1,
+        "controller": 66,
+        "type": "CLIP"
+      },
+      {
+        "downstream": 6,
+        "downstream_slot": 0,
+        "upstream": "156",
+        "upstream_slot": 1,
+        "controller": 66,
+        "type": "CLIP"
+      },
+      {
+        "downstream": 156,
+        "downstream_slot": 0,
+        "upstream": "261",
+        "upstream_slot": 0,
+        "controller": 66,
+        "type": "MODEL"
+      },
+      {
+        "downstream": 137,
+        "downstream_slot": 1,
+        "upstream": "17",
+        "upstream_slot": 0,
+        "controller": 66,
+        "type": "VAE"
+      },
+      {
+        "downstream": 171,
+        "downstream_slot": 5,
+        "upstream": "17",
+        "upstream_slot": 0,
+        "controller": 66,
+        "type": "VAE"
+      },
+      {
+        "downstream": 255,
+        "downstream_slot": 2,
+        "upstream": "156",
+        "upstream_slot": 1,
+        "controller": 66,
+        "type": "CLIP"
+      },
+      {
+        "downstream": 255,
+        "downstream_slot": 3,
+        "upstream": "17",
+        "upstream_slot": 0,
+        "controller": 66,
+        "type": "VAE"
+      },
+      {
+        "downstream": 255,
+        "downstream_slot": 6,
+        "upstream": "50",
+        "upstream_slot": 0,
+        "controller": 51,
+        "type": "BBOX_DETECTOR"
+      },
+      {
+        "downstream": 255,
+        "downstream_slot": 7,
+        "upstream": "52",
+        "upstream_slot": 0,
+        "controller": 51,
+        "type": "SAM_MODEL"
+      }
+    ],
+    "links_added_by_ue": [
+      120997,
+      120998,
+      120999,
+      121000,
+      121001,
+      121002,
+      121003,
+      121004,
+      121005,
+      121006
+    ]
+  },
+  "version": 0.4
+}

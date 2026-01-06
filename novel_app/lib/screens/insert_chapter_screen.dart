@@ -4,9 +4,9 @@ import '../models/chapter.dart';
 import '../models/outline.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
-import '../controllers/outline_draft_controller.dart';
 import '../services/outline_service.dart';
 import '../controllers/chapter_list/outline_integration_handler.dart';
+import '../mixins/dify_streaming_mixin.dart';
 
 /// 插入模式枚举
 enum _InsertMode { manual, outline }
@@ -33,12 +33,12 @@ class InsertChapterScreen extends StatefulWidget {
   State<InsertChapterScreen> createState() => _InsertChapterScreenState();
 }
 
-class _InsertChapterScreenState extends State<InsertChapterScreen> {
+class _InsertChapterScreenState extends State<InsertChapterScreen>
+    with DifyStreamingMixin {
   // 控制器和初始化
   late final TextEditingController _titleController;
   late final TextEditingController _userInputController;
   late final TextEditingController _draftEditingController;
-  final OutlineDraftController _draftController = OutlineDraftController();
   final OutlineService _outlineService = OutlineService();
 
   // 状态管理
@@ -58,20 +58,14 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
     _userInputController =
         TextEditingController(text: widget.prefillContent ?? '');
     _draftEditingController = TextEditingController();
-    // 设置TextField控制器到DraftController
-    _draftController.setTextController(_draftEditingController);
     _loadOutline();
   }
 
   @override
   void dispose() {
-    // 取消正在进行的生成任务，防止内存泄漏
-    _draftController.cancel();
-
     _titleController.dispose();
     _userInputController.dispose();
     _draftEditingController.dispose();
-    _draftController.dispose();
     super.dispose();
   }
 
@@ -178,7 +172,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
     }
 
     // 并发调用防护：如果正在生成，直接返回
-    if (_draftController.isLoading) {
+    if (isStreaming) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('正在生成中，请稍候...'),
@@ -192,20 +186,39 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
       // 获取前文内容（首次获取时缓存）
       _cachedPreviousChapters ??= await _getPreviousChapters();
 
-      // 非阻塞调用：启动生成
-      _draftController.generateDraft(
-        outline: _outline!.content,
-        historyChaptersContent: _cachedPreviousChapters!,
-        userInput: _userInputController.text.trim(),
-      );
+      // 清空准备接收流式内容
+      _draftEditingController.clear();
 
-      // 立即跳转到步骤1,在编辑框中流式显示生成内容
-      if (mounted) {
-        setState(() {
-          _currentStep = 1;
-          _draftEditingController.clear(); // 清空准备接收流式内容
-        });
-      }
+      // 立即跳转到步骤1
+      setState(() {
+        _currentStep = 1;
+      });
+
+      // 构建Dify输入参数
+      final inputs = {
+        'cmd': '生成细纲',
+        'outline': _outline!.content,
+        'history_chapters_content': _cachedPreviousChapters!.join('\n\n'),
+        'outline_item': '',
+        'user_input': _userInputController.text.trim(),
+      };
+
+      // 使用 DifyStreamingMixin 进行流式生成
+      await callDifyStreaming(
+        inputs: inputs,
+        onChunk: (chunk) {
+          // 流式追加内容到 TextField
+          _draftEditingController.text += chunk;
+
+          // 移动光标到末尾，让用户看到最新内容
+          _draftEditingController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _draftEditingController.text.length),
+          );
+        },
+        startMessage: 'AI正在生成章节细纲...',
+        completeMessage: '细纲生成完成',
+        errorMessagePrefix: '细纲生成失败',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -280,20 +293,34 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
     if (feedback == null || feedback.isEmpty) return;
 
     try {
-      // 调用控制器重新生成（使用缓存的前文）
-      await _draftController.generateDraft(
-        outline: _outline!.content,
-        historyChaptersContent: _cachedPreviousChapters ?? [],
-        userInput: feedback,
-        existingDraft: _draftEditingController.text,
-      );
+      // 清空准备接收新内容
+      _draftEditingController.clear();
 
-      // 更新编辑框内容
-      if (mounted && _draftController.error == null) {
-        setState(() {
-          _draftEditingController.text = _draftController.streamedContent;
-        });
-      }
+      // 构建Dify输入参数
+      final inputs = {
+        'cmd': '生成细纲',
+        'outline': _outline!.content,
+        'history_chapters_content': (_cachedPreviousChapters ?? []).join('\n\n'),
+        'outline_item': _draftEditingController.text,
+        'user_input': feedback,
+      };
+
+      // 使用 DifyStreamingMixin 进行流式重新生成
+      await callDifyStreaming(
+        inputs: inputs,
+        onChunk: (chunk) {
+          // 流式追加内容到 TextField
+          _draftEditingController.text += chunk;
+
+          // 移动光标到末尾，让用户看到最新内容
+          _draftEditingController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _draftEditingController.text.length),
+          );
+        },
+        startMessage: 'AI正在重新生成细纲...',
+        completeMessage: '细纲重新生成完成',
+        errorMessagePrefix: '细纲重新生成失败',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -646,7 +673,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
             ),
             maxLines: 5,
             autofocus: true,
-            enabled: !_draftController.isLoading, // 生成时禁用输入
+            enabled: !isStreaming, // 生成时禁用输入
           ),
 
           const SizedBox(height: 12),
@@ -706,7 +733,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
                           ),
                         ),
                       ),
-                      if (_draftController.isLoading)
+                      if (isStreaming)
                         const SizedBox(
                           width: 16,
                           height: 16,
@@ -729,21 +756,17 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // 状态指示器
-                        if (_draftController.streamedContent.isNotEmpty ||
-                            _draftController.isLoading)
+                        if (_draftEditingController.text.isNotEmpty || isStreaming)
                           StreamingStatusIndicator(
-                            isStreaming: _draftController.isLoading,
-                            characterCount:
-                                _draftController.streamedContent.length,
+                            isStreaming: isStreaming,
+                            characterCount: _draftEditingController.text.length,
                             streamingText: '实时生成中...',
                             completedText: '生成完成',
                           ),
-                        if (_draftController.streamedContent.isNotEmpty ||
-                            _draftController.isLoading)
+                        if (_draftEditingController.text.isNotEmpty || isStreaming)
                           const SizedBox(height: 12),
                         // 内容显示区域
-                        if (_draftController.streamedContent.isEmpty &&
-                            !_draftController.isLoading)
+                        if (_draftEditingController.text.isEmpty && !isStreaming)
                           const Expanded(
                             child: Center(
                               child: Text(
@@ -830,8 +853,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
           child: const Text('取消'),
         ),
         rightChild: ElevatedButton.icon(
-          onPressed: _draftController.isLoading ? null : _handleConfirm,
-          icon: _draftController.isLoading
+          onPressed: isStreaming ? null : _handleConfirm,
+          icon: isStreaming
               ? const SizedBox(
                   width: 16,
                   height: 16,
@@ -841,7 +864,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
                   ),
                 )
               : const Icon(Icons.auto_awesome),
-          label: Text(_draftController.isLoading ? '生成中...' : '生成细纲'),
+          label: Text(isStreaming ? '生成中...' : '生成细纲'),
         ),
       );
     }
@@ -882,7 +905,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen> {
             contentPadding: EdgeInsets.zero,
           ),
           maxLines: null,
-          enabled: !_draftController.isLoading,
+          enabled: !isStreaming,
           style: const TextStyle(
             fontSize: 14,
             height: 1.6,
