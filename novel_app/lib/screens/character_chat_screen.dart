@@ -1,0 +1,669 @@
+import 'package:flutter/material.dart';
+import '../models/character.dart';
+import '../models/chat_message.dart';
+import '../services/dify_service.dart';
+import '../services/character_avatar_service.dart';
+import '../utils/chat_stream_parser.dart';
+import 'dart:io';
+
+/// 暗色主题颜色常量
+class _DarkThemeColors {
+  // 背景色
+  static const Color inputAreaBackground = Color(0xFF1E1E1E);
+
+  // 文字色
+  static const Color primaryText = Color(0xFFE3E3E3); // 87% 白色
+  static const Color secondaryText = Color(0xFFB0B0B0); // 70% 白色
+  static const Color hintText = Color(0xFF8E8E8E); // 60% 白色
+
+  // 角色对话（深蓝色系）
+  static const Color roleBubbleBackground = Color(0xFF1E3A5F);
+  static const Color roleBubbleBorder = Color(0xFF3D5A80);
+  static const Color roleAvatarBorder = Color(0xFF3D5A80);
+  static const Color roleAvatarBackground = Color(0xFF1E3A5F);
+
+  // 用户消息（深绿色系）
+  static const Color userBubbleBackground = Color(0xFF1F3D2F);
+  static const Color userBubbleBorder = Color(0xFF3A6B4A);
+
+  // 其他UI元素
+  static const Color divider = Color(0xFF3C3C3C);
+  static const Color buttonPrimary = Color(0xFF2196F3);
+  static const Color buttonDisabled = Color(0xFF3C3C3C);
+  static const Color errorBackground = Color(0xFFB71C1C);
+}
+
+/// 角色聊天屏幕
+class CharacterChatScreen extends StatefulWidget {
+  final Character character;
+  final String initialScene;
+
+  const CharacterChatScreen({
+    super.key,
+    required this.character,
+    required this.initialScene,
+  });
+
+  @override
+  State<CharacterChatScreen> createState() => _CharacterChatScreenState();
+}
+
+class _CharacterChatScreenState extends State<CharacterChatScreen> {
+  List<ChatMessage> _messages = [];
+  bool _isGenerating = false;
+  bool _inDialogue = false; // 解析状态：是否在对话中
+  final List<String> _chatHistory = []; // 聊天历史记录列表（维护时序）
+  String _currentAiResponse = ''; // 当前 AI 回复的累积内容
+  late String _scene;
+  final TextEditingController _actionController = TextEditingController();
+  final TextEditingController _speechController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final DifyService _difyService = DifyService();
+  final CharacterAvatarService _avatarService = CharacterAvatarService();
+
+  @override
+  void initState() {
+    super.initState();
+    _scene = widget.initialScene;
+    _startInitialChat();
+  }
+
+  @override
+  void dispose() {
+    _actionController.dispose();
+    _speechController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 开始初始聊天
+  Future<void> _startInitialChat() async {
+    setState(() {
+      _isGenerating = true;
+    });
+
+    try {
+      await _difyService.runWorkflowStreaming(
+        inputs: {
+          'cmd': '聊天',
+          'roles': ChatStreamParser.formatRoleInfo(widget.character),
+          'scene': _scene,
+          'user_input': '', // 初始聊天没有用户输入
+          'chat_history': '',
+        },
+        onData: (chunk) {
+          _handleStreamChunk(chunk);
+        },
+        onError: (error) {
+          setState(() {
+            _isGenerating = false;
+          });
+          _showErrorSnackBar(error);
+        },
+        onDone: () {
+          setState(() {
+            _isGenerating = false;
+
+            // 将 AI 回复添加到历史记录
+            if (_currentAiResponse.isNotEmpty) {
+              final aiHistory =
+                  '<${widget.character.name}>$_currentAiResponse</${widget.character.name}>';
+              _chatHistory.add(aiHistory);
+              _currentAiResponse = ''; // 清空累积内容
+            }
+          });
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isGenerating = false;
+      });
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  /// 处理流式文本块
+  void _handleStreamChunk(String chunk) {
+    // 累积 AI 回复内容（用于后续添加到历史记录）
+    _currentAiResponse += chunk;
+
+    // 调试：打印接收到的chunk
+    debugPrint('🔥 收到chunk: "$chunk"');
+    debugPrint('当前状态: _inDialogue=$_inDialogue');
+
+    final result = ChatStreamParser.parseChunk(
+      chunk,
+      _messages,
+      widget.character,
+      _inDialogue,
+    );
+
+    // 调试：打印更新后的消息列表
+    ChatStreamParser.debugPrintMessages(result.messages, '解析后消息');
+
+    setState(() {
+      // 更新消息列表和解析状态
+      _messages = result.messages.length > 100
+          ? result.messages.sublist(result.messages.length - 100)
+          : result.messages;
+      _inDialogue = result.inDialogue;
+    });
+
+    // 自动滚动到底部
+    _scrollToBottom();
+  }
+
+  /// 发送用户消息
+  Future<void> _sendMessage() async {
+    final action = _actionController.text.trim();
+    final speech = _speechController.text.trim();
+
+    if (action.isEmpty && speech.isEmpty) return;
+    if (_isGenerating) return;
+
+    // 保存用户输入
+    final userAction = action;
+    final userSpeech = speech;
+
+    // 清空输入框
+    _actionController.clear();
+    _speechController.clear();
+
+    // 调用Dify流式API（传递用户输入和历史记录）
+    await _callDifyStreaming(
+      userAction: userAction,
+      userSpeech: userSpeech,
+    );
+  }
+
+  /// 调用Dify流式API
+  Future<void> _callDifyStreaming({
+    String userAction = '',
+    String userSpeech = '',
+  }) async {
+    // 如果有用户输入，先显示用户消息
+    if (userAction.isNotEmpty || userSpeech.isNotEmpty) {
+      setState(() {
+        if (userAction.isNotEmpty) {
+          _messages.add(ChatMessage.userAction(userAction));
+        }
+        if (userSpeech.isNotEmpty) {
+          _messages.add(ChatMessage.userSpeech(userSpeech));
+        }
+        // 立即插入空白的旁白消息，为 AI 流式输出做准备
+        _messages.add(ChatMessage.narration(''));
+        _isGenerating = true;
+        _inDialogue = false; // 重置对话状态，让AI从旁白开始
+
+        // 将用户输入添加到历史记录
+        final userHistory = _formatUserHistory(userAction, userSpeech);
+        _chatHistory.add(userHistory);
+      });
+    } else {
+      setState(() {
+        _isGenerating = true;
+        _inDialogue = false; // 重置对话状态，让AI从旁白开始
+      });
+    }
+
+    // 格式化历史记录（直接用 \n 连接）
+    final chatHistory = ChatStreamParser.formatChatHistory(_chatHistory);
+
+    // 组合用户输入
+    final userInput = _formatUserInput(userAction, userSpeech);
+
+    try {
+      await _difyService.runWorkflowStreaming(
+        inputs: {
+          'cmd': '聊天',
+          'roles': ChatStreamParser.formatRoleInfo(widget.character),
+          'scene': _scene,
+          'user_input': userInput, // 新增：用户当前输入
+          'chat_history': chatHistory,
+        },
+        onData: (chunk) {
+          _handleStreamChunk(chunk);
+        },
+        onError: (error) {
+          setState(() {
+            _isGenerating = false;
+          });
+          _showErrorSnackBar(error);
+        },
+        onDone: () {
+          setState(() {
+            _isGenerating = false;
+
+            // 将 AI 回复添加到历史记录
+            if (_currentAiResponse.isNotEmpty) {
+              final aiHistory =
+                  '<${widget.character.name}>$_currentAiResponse</${widget.character.name}>';
+              _chatHistory.add(aiHistory);
+              _currentAiResponse = ''; // 清空累积内容
+            }
+          });
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isGenerating = false;
+      });
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  /// 格式化用户输入
+  String _formatUserInput(String action, String speech) {
+    final buffer = StringBuffer();
+
+    if (action.isNotEmpty) {
+      buffer.write('行为：$action');
+    }
+    if (speech.isNotEmpty) {
+      if (buffer.isNotEmpty) {
+        buffer.write('\n');
+      }
+      buffer.write('对话：$speech');
+    }
+
+    return buffer.toString();
+  }
+
+  /// 格式化用户输入为历史记录格式（带 XML 标签）
+  String _formatUserHistory(String action, String speech) {
+    final buffer = StringBuffer();
+
+    if (action.isNotEmpty) {
+      buffer.write('行为:$action');
+    }
+    if (speech.isNotEmpty) {
+      if (buffer.isNotEmpty) {
+        buffer.write('\n');
+      }
+      buffer.write('对话:$speech');
+    }
+
+    return '<用户>${buffer.toString()}</用户>';
+  }
+
+  /// 判断是否可以发送消息
+  bool _canSend() {
+    return (_actionController.text.trim().isNotEmpty ||
+            _speechController.text.trim().isNotEmpty) &&
+        !_isGenerating;
+  }
+
+  /// 滚动到底部
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  /// 显示错误提示
+  void _showErrorSnackBar(String error) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('生成失败: $error'),
+          backgroundColor: _DarkThemeColors.errorBackground,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('与 ${widget.character.name} 聊天'),
+            const SizedBox(height: 4),
+            Text(
+              '场景：$_scene',
+              style: const TextStyle(
+                fontSize: 12,
+                color: _DarkThemeColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _DarkThemeColors.inputAreaBackground,
+        foregroundColor: _DarkThemeColors.primaryText,
+      ),
+      body: Column(
+        children: [
+          // 聊天消息列表
+          Expanded(
+            child: _messages.isEmpty ? _buildEmptyState() : _buildMessageList(),
+          ),
+
+          // 用户输入区域
+          _buildInputArea(),
+        ],
+      ),
+    );
+  }
+
+  /// 构建空状态
+  Widget _buildEmptyState() {
+    return Center(
+      child: _isGenerating
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  '正在建立连接...',
+                  style: TextStyle(
+                    color: _DarkThemeColors.secondaryText,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              '开始你们的对话吧！',
+              style: TextStyle(
+                color: _DarkThemeColors.hintText,
+                fontSize: 18,
+              ),
+            ),
+    );
+  }
+
+  /// 构建消息列表
+  Widget _buildMessageList() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final message = _messages[index];
+        return _buildMessageBubble(message);
+      },
+    );
+  }
+
+  /// 构建消息气泡
+  Widget _buildMessageBubble(ChatMessage message) {
+    if (message.type == 'narration' || message.type == 'user_action') {
+      // 旁白和用户行为都显示为灰色斜体
+      return _buildNarrationBubble(message);
+    } else if (message.type == 'dialogue') {
+      return _buildDialogueBubble(message);
+    } else {
+      // 仅用户对话显示为绿色气泡
+      return _buildUserBubble(message);
+    }
+  }
+
+  /// 构建旁白气泡
+  Widget _buildNarrationBubble(ChatMessage message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      child: Text(
+        message.content,
+        style: TextStyle(
+          color: _DarkThemeColors.hintText,
+          fontStyle: FontStyle.italic,
+          fontSize: 14,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  /// 构建角色对话气泡
+  Widget _buildDialogueBubble(ChatMessage message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 角色头像
+          _buildCharacterAvatar(message.character!),
+          const SizedBox(width: 8),
+
+          // 对话气泡
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _DarkThemeColors.roleBubbleBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _DarkThemeColors.roleBubbleBorder,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      message.content,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: _DarkThemeColors.primaryText,
+                      ),
+                    ),
+                  ),
+                  // 流式输出指示器
+                  if (_isGenerating && message == _messages.last)
+                    _buildTypingIndicator(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建用户消息气泡
+  Widget _buildUserBubble(ChatMessage message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _DarkThemeColors.userBubbleBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _DarkThemeColors.userBubbleBorder,
+            ),
+          ),
+          child: Text(
+            message.content,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: _DarkThemeColors.primaryText,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建角色头像
+  Widget _buildCharacterAvatar(Character character) {
+    return FutureBuilder<String?>(
+      future: character.id != null
+          ? _avatarService.getCharacterAvatarPath(character.id!)
+          : Future.value(null),
+      builder: (context, snapshot) {
+        final avatarPath = snapshot.data;
+
+        if (avatarPath != null && File(avatarPath).existsSync()) {
+          return Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _DarkThemeColors.roleAvatarBorder,
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: Image.file(
+                File(avatarPath),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildFallbackAvatar(character);
+                },
+              ),
+            ),
+          );
+        }
+
+        return _buildFallbackAvatar(character);
+      },
+    );
+  }
+
+  /// 构建备用头像（首字母）
+  Widget _buildFallbackAvatar(Character character) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: _DarkThemeColors.roleAvatarBackground,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: _DarkThemeColors.roleAvatarBorder,
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          character.name.isNotEmpty ? character.name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: _DarkThemeColors.buttonPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建打字指示器（三个跳动的小圆点）
+  Widget _buildTypingIndicator() {
+    return const Padding(
+      padding: EdgeInsets.only(left: 8),
+      child: SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor:
+              AlwaysStoppedAnimation<Color>(_DarkThemeColors.buttonPrimary),
+        ),
+      ),
+    );
+  }
+
+  /// 构建输入区域
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _DarkThemeColors.inputAreaBackground,
+        border: Border(
+          top: BorderSide(color: _DarkThemeColors.divider),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 行为输入框
+          TextField(
+            controller: _actionController,
+            decoration: InputDecoration(
+              labelText: '行为（可选）',
+              hintText: '例如：举起酒杯，微笑着说',
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.buttonPrimary),
+              ),
+              labelStyle: TextStyle(color: _DarkThemeColors.secondaryText),
+              hintStyle: TextStyle(color: _DarkThemeColors.hintText),
+              contentPadding: EdgeInsets.all(12),
+            ),
+            style: TextStyle(color: _DarkThemeColors.primaryText),
+            maxLines: null,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}), // 触发重建更新按钮状态
+          ),
+          const SizedBox(height: 8),
+
+          // 对话输入框
+          TextField(
+            controller: _speechController,
+            decoration: InputDecoration(
+              labelText: '对话（可选）',
+              hintText: '例如：你好，最近怎么样？',
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _DarkThemeColors.buttonPrimary),
+              ),
+              labelStyle: TextStyle(color: _DarkThemeColors.secondaryText),
+              hintStyle: TextStyle(color: _DarkThemeColors.hintText),
+              contentPadding: EdgeInsets.all(12),
+            ),
+            style: TextStyle(color: _DarkThemeColors.primaryText),
+            maxLines: 3,
+            minLines: 1,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _canSend() ? _sendMessage() : null,
+            onChanged: (_) => setState(() {}), // 触发重建更新按钮状态
+          ),
+          const SizedBox(height: 8),
+
+          // 发送按钮
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _canSend() ? _sendMessage : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DarkThemeColors.buttonPrimary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _DarkThemeColors.buttonDisabled,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(_isGenerating ? '生成中...' : '发送'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
