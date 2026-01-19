@@ -14,6 +14,7 @@ import 'package:built_value/iso_8601_date_time_serializer.dart';
 import 'package:novel_api/src/date_serializer.dart';
 import 'package:novel_api/src/model/date.dart';
 
+import 'package:novel_api/src/model/app_version_response.dart';
 import 'package:novel_api/src/model/chapter.dart';
 import 'package:novel_api/src/model/chapter_content.dart';
 import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
@@ -40,6 +41,7 @@ import 'package:novel_api/src/model/workflow_info.dart';
 part 'serializers.g.dart';
 
 @SerializersFor([
+  AppVersionResponse,
   Chapter,
   ChapterContent,
   EnhancedSceneIllustrationRequest,

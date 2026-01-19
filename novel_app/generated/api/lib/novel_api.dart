@@ -12,6 +12,7 @@ export 'package:novel_api/src/model/date.dart';
 
 export 'package:novel_api/src/api/default_api.dart';
 
+export 'package:novel_api/src/model/app_version_response.dart';
 export 'package:novel_api/src/model/chapter.dart';
 export 'package:novel_api/src/model/chapter_content.dart';
 export 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';

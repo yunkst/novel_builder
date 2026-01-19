@@ -11,12 +11,23 @@ class _$SceneGalleryResponse extends SceneGalleryResponse {
   final String taskId;
   @override
   final BuiltList<String> images;
+  @override
+  final String? modelName;
+  @override
+  final int? modelWidth;
+  @override
+  final int? modelHeight;
 
   factory _$SceneGalleryResponse(
           [void Function(SceneGalleryResponseBuilder)? updates]) =>
       (SceneGalleryResponseBuilder()..update(updates))._build();
 
-  _$SceneGalleryResponse._({required this.taskId, required this.images})
+  _$SceneGalleryResponse._(
+      {required this.taskId,
+      required this.images,
+      this.modelName,
+      this.modelWidth,
+      this.modelHeight})
       : super._();
   @override
   SceneGalleryResponse rebuild(
@@ -32,7 +43,10 @@ class _$SceneGalleryResponse extends SceneGalleryResponse {
     if (identical(other, this)) return true;
     return other is SceneGalleryResponse &&
         taskId == other.taskId &&
-        images == other.images;
+        images == other.images &&
+        modelName == other.modelName &&
+        modelWidth == other.modelWidth &&
+        modelHeight == other.modelHeight;
   }
 
   @override
@@ -40,6 +54,9 @@ class _$SceneGalleryResponse extends SceneGalleryResponse {
     var _$hash = 0;
     _$hash = $jc(_$hash, taskId.hashCode);
     _$hash = $jc(_$hash, images.hashCode);
+    _$hash = $jc(_$hash, modelName.hashCode);
+    _$hash = $jc(_$hash, modelWidth.hashCode);
+    _$hash = $jc(_$hash, modelHeight.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -48,7 +65,10 @@ class _$SceneGalleryResponse extends SceneGalleryResponse {
   String toString() {
     return (newBuiltValueToStringHelper(r'SceneGalleryResponse')
           ..add('taskId', taskId)
-          ..add('images', images))
+          ..add('images', images)
+          ..add('modelName', modelName)
+          ..add('modelWidth', modelWidth)
+          ..add('modelHeight', modelHeight))
         .toString();
   }
 }
@@ -65,6 +85,18 @@ class SceneGalleryResponseBuilder
   ListBuilder<String> get images => _$this._images ??= ListBuilder<String>();
   set images(ListBuilder<String>? images) => _$this._images = images;
 
+  String? _modelName;
+  String? get modelName => _$this._modelName;
+  set modelName(String? modelName) => _$this._modelName = modelName;
+
+  int? _modelWidth;
+  int? get modelWidth => _$this._modelWidth;
+  set modelWidth(int? modelWidth) => _$this._modelWidth = modelWidth;
+
+  int? _modelHeight;
+  int? get modelHeight => _$this._modelHeight;
+  set modelHeight(int? modelHeight) => _$this._modelHeight = modelHeight;
+
   SceneGalleryResponseBuilder() {
     SceneGalleryResponse._defaults(this);
   }
@@ -74,6 +106,9 @@ class SceneGalleryResponseBuilder
     if ($v != null) {
       _taskId = $v.taskId;
       _images = $v.images.toBuilder();
+      _modelName = $v.modelName;
+      _modelWidth = $v.modelWidth;
+      _modelHeight = $v.modelHeight;
       _$v = null;
     }
     return this;
@@ -100,6 +135,9 @@ class SceneGalleryResponseBuilder
             taskId: BuiltValueNullFieldError.checkNotNull(
                 taskId, r'SceneGalleryResponse', 'taskId'),
             images: images.build(),
+            modelName: modelName,
+            modelWidth: modelWidth,
+            modelHeight: modelHeight,
           );
     } catch (_) {
       late String _$failedField;

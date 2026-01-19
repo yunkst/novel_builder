@@ -14,6 +14,9 @@ part 'scene_gallery_response.g.dart';
 /// Properties:
 /// * [taskId] - 场面绘制任务ID
 /// * [images] - 图片文件名列表
+/// * [modelName] 
+/// * [modelWidth] 
+/// * [modelHeight] 
 @BuiltValue()
 abstract class SceneGalleryResponse implements Built<SceneGalleryResponse, SceneGalleryResponseBuilder> {
   /// 场面绘制任务ID
@@ -23,6 +26,15 @@ abstract class SceneGalleryResponse implements Built<SceneGalleryResponse, Scene
   /// 图片文件名列表
   @BuiltValueField(wireName: r'images')
   BuiltList<String> get images;
+
+  @BuiltValueField(wireName: r'model_name')
+  String? get modelName;
+
+  @BuiltValueField(wireName: r'model_width')
+  int? get modelWidth;
+
+  @BuiltValueField(wireName: r'model_height')
+  int? get modelHeight;
 
   SceneGalleryResponse._();
 
@@ -57,6 +69,27 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
       object.images,
       specifiedType: const FullType(BuiltList, [FullType(String)]),
     );
+    if (object.modelName != null) {
+      yield r'model_name';
+      yield serializers.serialize(
+        object.modelName,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.modelWidth != null) {
+      yield r'model_width';
+      yield serializers.serialize(
+        object.modelWidth,
+        specifiedType: const FullType.nullable(int),
+      );
+    }
+    if (object.modelHeight != null) {
+      yield r'model_height';
+      yield serializers.serialize(
+        object.modelHeight,
+        specifiedType: const FullType.nullable(int),
+      );
+    }
   }
 
   @override
@@ -93,6 +126,30 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
             specifiedType: const FullType(BuiltList, [FullType(String)]),
           ) as BuiltList<String>;
           result.images.replace(valueDes);
+          break;
+        case r'model_name':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.modelName = valueDes;
+          break;
+        case r'model_width':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.modelWidth = valueDes;
+          break;
+        case r'model_height':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.modelHeight = valueDes;
           break;
         default:
           unhandled.add(key);

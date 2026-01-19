@@ -2,6 +2,7 @@
 .openapi-generator-ignore
 README.md
 analysis_options.yaml
+doc/AppVersionResponse.md
 doc/Chapter.md
 doc/ChapterContent.md
 doc/DefaultApi.md
@@ -35,6 +36,7 @@ lib/src/auth/basic_auth.dart
 lib/src/auth/bearer_auth.dart
 lib/src/auth/oauth.dart
 lib/src/date_serializer.dart
+lib/src/model/app_version_response.dart
 lib/src/model/chapter.dart
 lib/src/model/chapter_content.dart
 lib/src/model/date.dart
@@ -60,6 +62,7 @@ lib/src/model/video_status_response.dart
 lib/src/model/workflow_info.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/app_version_response_test.dart
 test/chapter_content_test.dart
 test/chapter_test.dart
 test/default_api_test.dart

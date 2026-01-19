@@ -42,7 +42,7 @@
     "_meta": {
       "title": "K采样器（高级）"
     }
-  },
+  },  
   "86": {
     "inputs": {
       "add_noise": "enable",

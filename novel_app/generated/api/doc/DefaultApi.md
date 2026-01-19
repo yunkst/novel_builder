@@ -14,10 +14,12 @@ Method | HTTP request | Description
 [**checkVideoStatusApiImageToVideoHasVideoImgNameGet**](DefaultApi.md#checkvideostatusapiimagetovideohasvideoimgnameget) | **GET** /api/image-to-video/has-video/{img_name} | Check Video Status
 [**deleteRoleCardImageApiRoleCardImageDelete**](DefaultApi.md#deleterolecardimageapirolecardimagedelete) | **DELETE** /api/role-card/image | Delete Role Card Image
 [**deleteSceneImageApiSceneIllustrationImageDelete**](DefaultApi.md#deletesceneimageapisceneillustrationimagedelete) | **DELETE** /api/scene-illustration/image | Delete Scene Image
+[**downloadAppVersionApiAppVersionDownloadVersionGet**](DefaultApi.md#downloadappversionapiappversiondownloadversionget) | **GET** /api/app-version/download/{version} | Download App Version
 [**generateRoleCardImagesApiRoleCardGeneratePost**](DefaultApi.md#generaterolecardimagesapirolecardgeneratepost) | **POST** /api/role-card/generate | Generate Role Card Images
 [**generateSceneImagesApiSceneIllustrationGeneratePost**](DefaultApi.md#generatesceneimagesapisceneillustrationgeneratepost) | **POST** /api/scene-illustration/generate | Generate Scene Images
 [**generateVideoFromImageApiImageToVideoGeneratePost**](DefaultApi.md#generatevideofromimageapiimagetovideogeneratepost) | **POST** /api/image-to-video/generate | Generate Video From Image
 [**getImageProxyText2imgImageFilenameGet**](DefaultApi.md#getimageproxytext2imgimagefilenameget) | **GET** /text2img/image/{filename} | Get Image Proxy
+[**getLatestAppVersionApiAppVersionLatestGet**](DefaultApi.md#getlatestappversionapiappversionlatestget) | **GET** /api/app-version/latest | Get Latest App Version
 [**getModelsApiModelsGet**](DefaultApi.md#getmodelsapimodelsget) | **GET** /api/models | Get Models
 [**getRoleCardGalleryApiRoleCardGalleryRoleIdGet**](DefaultApi.md#getrolecardgalleryapirolecardgalleryroleidget) | **GET** /api/role-card/gallery/{role_id} | Get Role Card Gallery
 [**getRoleCardTaskStatusApiRoleCardStatusTaskIdGet**](DefaultApi.md#getrolecardtaskstatusapirolecardstatustaskidget) | **GET** /api/role-card/status/{task_id} | Get Role Card Task Status
@@ -25,7 +27,6 @@ Method | HTTP request | Description
 [**getSourceSitesSourceSitesGet**](DefaultApi.md#getsourcesitessourcesitesget) | **GET** /source-sites | Get Source Sites
 [**getVideoFileApiImageToVideoVideoImgNameGet**](DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
 [**healthCheckHealthGet**](DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
-[**imageToVideoHealthCheckApiImageToVideoHealthGet**](DefaultApi.md#imagetovideohealthcheckapiimagetovideohealthget) | **GET** /api/image-to-video/health | Image To Video Health Check
 [**indexGet**](DefaultApi.md#indexget) | **GET** / | Index
 [**regenerateSceneImagesApiSceneIllustrationRegeneratePost**](DefaultApi.md#regeneratesceneimagesapisceneillustrationregeneratepost) | **POST** /api/scene-illustration/regenerate | Regenerate Scene Images
 [**regenerateSimilarImagesApiRoleCardRegeneratePost**](DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
@@ -33,6 +34,7 @@ Method | HTTP request | Description
 [**searchSearchGet**](DefaultApi.md#searchsearchget) | **GET** /search | Search
 [**securityCheckSecurityCheckGet**](DefaultApi.md#securitychecksecuritycheckget) | **GET** /security-check | Security Check
 [**text2imgHealthCheckText2imgHealthGet**](DefaultApi.md#text2imghealthchecktext2imghealthget) | **GET** /text2img/health | Text2Img Health Check
+[**uploadAppVersionApiAppVersionUploadPost**](DefaultApi.md#uploadappversionapiappversionuploadpost) | **POST** /api/app-version/upload | Upload App Version
 
 
 # **chapterContentChapterContentGet**
@@ -260,6 +262,49 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **downloadAppVersionApiAppVersionDownloadVersionGet**
+> Uint8List downloadAppVersionApiAppVersionDownloadVersionGet(version)
+
+Download App Version
+
+下载指定版本的APK文件  - **version**: 版本号（如 1.0.1）  返回APK文件
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+final String version = version_example; // String | 
+
+try {
+    final response = api.downloadAppVersionApiAppVersionDownloadVersionGet(version);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->downloadAppVersionApiAppVersionDownloadVersionGet: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **version** | **String**|  | 
+
+### Return type
+
+[**Uint8List**](Uint8List.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/vnd.android.package-archive, application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **generateRoleCardImagesApiRoleCardGeneratePost**
 > JsonObject generateRoleCardImagesApiRoleCardGeneratePost(roleCardGenerateRequest, X_API_TOKEN)
 
@@ -435,6 +480,49 @@ No authorization required
 
  - **Content-Type**: Not defined
  - **Accept**: image/png, application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getLatestAppVersionApiAppVersionLatestGet**
+> AppVersionResponse getLatestAppVersionApiAppVersionLatestGet(X_API_TOKEN)
+
+Get Latest App Version
+
+查询最新APP版本  返回最新版本信息，包括版本号、下载URL、更新日志等
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+final String X_API_TOKEN = X_API_TOKEN_example; // String | 
+
+try {
+    final response = api.getLatestAppVersionApiAppVersionLatestGet(X_API_TOKEN);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->getLatestAppVersionApiAppVersionLatestGet: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **X_API_TOKEN** | **String**|  | [optional] 
+
+### Return type
+
+[**AppVersionResponse**](AppVersionResponse.md)
+
+### Authorization
+
+[HTTPBearer](../README.md#HTTPBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -739,49 +827,6 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **imageToVideoHealthCheckApiImageToVideoHealthGet**
-> JsonObject imageToVideoHealthCheckApiImageToVideoHealthGet(X_API_TOKEN)
-
-Image To Video Health Check
-
-检查图生视频服务健康状态
-
-### Example
-```dart
-import 'package:novel_api/api.dart';
-
-final api = NovelApi().getDefaultApi();
-final String X_API_TOKEN = X_API_TOKEN_example; // String | 
-
-try {
-    final response = api.imageToVideoHealthCheckApiImageToVideoHealthGet(X_API_TOKEN);
-    print(response);
-} catch on DioException (e) {
-    print('Exception when calling DefaultApi->imageToVideoHealthCheckApiImageToVideoHealthGet: $e\n');
-}
-```
-
-### Parameters
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **X_API_TOKEN** | **String**|  | [optional] 
-
-### Return type
-
-[**JsonObject**](JsonObject.md)
-
-### Authorization
-
-[HTTPBearer](../README.md#HTTPBearer)
-
-### HTTP request headers
-
- - **Content-Type**: Not defined
- - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
 # **indexGet**
 > JsonObject indexGet()
 
@@ -1077,6 +1122,59 @@ Name | Type | Description  | Notes
 ### HTTP request headers
 
  - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **uploadAppVersionApiAppVersionUploadPost**
+> JsonObject uploadAppVersionApiAppVersionUploadPost(file, version, versionCode, X_API_TOKEN, changelog, forceUpdate)
+
+Upload App Version
+
+上传APP新版本  - **file**: APK文件 - **version**: 版本号（如 1.0.1） - **version_code**: 版本递增码 - **changelog**: 更新日志（可选） - **force_update**: 是否强制更新（默认false）  返回上传结果和下载URL
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+final MultipartFile file = BINARY_DATA_HERE; // MultipartFile | APK文件
+final String version = version_example; // String | 版本号 (如 1.0.1)
+final int versionCode = 56; // int | 版本递增码
+final String X_API_TOKEN = X_API_TOKEN_example; // String | 
+final String changelog = changelog_example; // String | 更新日志
+final bool forceUpdate = true; // bool | 是否强制更新
+
+try {
+    final response = api.uploadAppVersionApiAppVersionUploadPost(file, version, versionCode, X_API_TOKEN, changelog, forceUpdate);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->uploadAppVersionApiAppVersionUploadPost: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **file** | **MultipartFile**| APK文件 | 
+ **version** | **String**| 版本号 (如 1.0.1) | 
+ **versionCode** | **int**| 版本递增码 | 
+ **X_API_TOKEN** | **String**|  | [optional] 
+ **changelog** | **String**| 更新日志 | [optional] 
+ **forceUpdate** | **bool**| 是否强制更新 | [optional] [default to false]
+
+### Return type
+
+[**JsonObject**](JsonObject.md)
+
+### Authorization
+
+[HTTPBearer](../README.md#HTTPBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: multipart/form-data
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

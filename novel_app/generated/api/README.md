@@ -72,10 +72,12 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**checkVideoStatusApiImageToVideoHasVideoImgNameGet**](doc/DefaultApi.md#checkvideostatusapiimagetovideohasvideoimgnameget) | **GET** /api/image-to-video/has-video/{img_name} | Check Video Status
 [*DefaultApi*](doc/DefaultApi.md) | [**deleteRoleCardImageApiRoleCardImageDelete**](doc/DefaultApi.md#deleterolecardimageapirolecardimagedelete) | **DELETE** /api/role-card/image | Delete Role Card Image
 [*DefaultApi*](doc/DefaultApi.md) | [**deleteSceneImageApiSceneIllustrationImageDelete**](doc/DefaultApi.md#deletesceneimageapisceneillustrationimagedelete) | **DELETE** /api/scene-illustration/image | Delete Scene Image
+[*DefaultApi*](doc/DefaultApi.md) | [**downloadAppVersionApiAppVersionDownloadVersionGet**](doc/DefaultApi.md#downloadappversionapiappversiondownloadversionget) | **GET** /api/app-version/download/{version} | Download App Version
 [*DefaultApi*](doc/DefaultApi.md) | [**generateRoleCardImagesApiRoleCardGeneratePost**](doc/DefaultApi.md#generaterolecardimagesapirolecardgeneratepost) | **POST** /api/role-card/generate | Generate Role Card Images
 [*DefaultApi*](doc/DefaultApi.md) | [**generateSceneImagesApiSceneIllustrationGeneratePost**](doc/DefaultApi.md#generatesceneimagesapisceneillustrationgeneratepost) | **POST** /api/scene-illustration/generate | Generate Scene Images
 [*DefaultApi*](doc/DefaultApi.md) | [**generateVideoFromImageApiImageToVideoGeneratePost**](doc/DefaultApi.md#generatevideofromimageapiimagetovideogeneratepost) | **POST** /api/image-to-video/generate | Generate Video From Image
 [*DefaultApi*](doc/DefaultApi.md) | [**getImageProxyText2imgImageFilenameGet**](doc/DefaultApi.md#getimageproxytext2imgimagefilenameget) | **GET** /text2img/image/{filename} | Get Image Proxy
+[*DefaultApi*](doc/DefaultApi.md) | [**getLatestAppVersionApiAppVersionLatestGet**](doc/DefaultApi.md#getlatestappversionapiappversionlatestget) | **GET** /api/app-version/latest | Get Latest App Version
 [*DefaultApi*](doc/DefaultApi.md) | [**getModelsApiModelsGet**](doc/DefaultApi.md#getmodelsapimodelsget) | **GET** /api/models | Get Models
 [*DefaultApi*](doc/DefaultApi.md) | [**getRoleCardGalleryApiRoleCardGalleryRoleIdGet**](doc/DefaultApi.md#getrolecardgalleryapirolecardgalleryroleidget) | **GET** /api/role-card/gallery/{role_id} | Get Role Card Gallery
 [*DefaultApi*](doc/DefaultApi.md) | [**getRoleCardTaskStatusApiRoleCardStatusTaskIdGet**](doc/DefaultApi.md#getrolecardtaskstatusapirolecardstatustaskidget) | **GET** /api/role-card/status/{task_id} | Get Role Card Task Status
@@ -83,7 +85,6 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**getSourceSitesSourceSitesGet**](doc/DefaultApi.md#getsourcesitessourcesitesget) | **GET** /source-sites | Get Source Sites
 [*DefaultApi*](doc/DefaultApi.md) | [**getVideoFileApiImageToVideoVideoImgNameGet**](doc/DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
 [*DefaultApi*](doc/DefaultApi.md) | [**healthCheckHealthGet**](doc/DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
-[*DefaultApi*](doc/DefaultApi.md) | [**imageToVideoHealthCheckApiImageToVideoHealthGet**](doc/DefaultApi.md#imagetovideohealthcheckapiimagetovideohealthget) | **GET** /api/image-to-video/health | Image To Video Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**indexGet**](doc/DefaultApi.md#indexget) | **GET** / | Index
 [*DefaultApi*](doc/DefaultApi.md) | [**regenerateSceneImagesApiSceneIllustrationRegeneratePost**](doc/DefaultApi.md#regeneratesceneimagesapisceneillustrationregeneratepost) | **POST** /api/scene-illustration/regenerate | Regenerate Scene Images
 [*DefaultApi*](doc/DefaultApi.md) | [**regenerateSimilarImagesApiRoleCardRegeneratePost**](doc/DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
@@ -91,10 +92,12 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**searchSearchGet**](doc/DefaultApi.md#searchsearchget) | **GET** /search | Search
 [*DefaultApi*](doc/DefaultApi.md) | [**securityCheckSecurityCheckGet**](doc/DefaultApi.md#securitychecksecuritycheckget) | **GET** /security-check | Security Check
 [*DefaultApi*](doc/DefaultApi.md) | [**text2imgHealthCheckText2imgHealthGet**](doc/DefaultApi.md#text2imghealthchecktext2imghealthget) | **GET** /text2img/health | Text2Img Health Check
+[*DefaultApi*](doc/DefaultApi.md) | [**uploadAppVersionApiAppVersionUploadPost**](doc/DefaultApi.md#uploadappversionapiappversionuploadpost) | **POST** /api/app-version/upload | Upload App Version
 
 
 ## Documentation For Models
 
+ - [AppVersionResponse](doc/AppVersionResponse.md)
  - [Chapter](doc/Chapter.md)
  - [ChapterContent](doc/ChapterContent.md)
  - [EnhancedSceneIllustrationRequest](doc/EnhancedSceneIllustrationRequest.md)
