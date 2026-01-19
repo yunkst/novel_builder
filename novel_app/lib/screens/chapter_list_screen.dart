@@ -8,6 +8,7 @@ import '../services/dify_service.dart';
 import '../services/preload_service.dart';
 import '../services/preload_progress_update.dart';
 import 'reader_screen.dart';
+import 'chapter_generation_screen.dart';
 import '../screens/chapter_search_screen.dart';
 import '../screens/character_management_screen.dart';
 import 'outline/outline_management_screen.dart';
@@ -17,7 +18,6 @@ import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
 import '../dialogs/chapter_list/delete_chapter_dialog.dart';
 import 'insert_chapter_screen.dart';
-import '../dialogs/chapter_list/chapter_generation_dialog.dart';
 import '../controllers/chapter_list/bookshelf_manager.dart';
 import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
@@ -424,9 +424,10 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     // 在后台开始生成内容
     _callDifyToGenerateChapter(afterIndex, userInput, characterIds);
 
-    // 显示生成进度弹框并等待用户操作
-    final result = await ChapterGenerationDialog.show(
+    // 显示全屏生成页面并等待用户操作
+    final result = await ChapterGenerationScreen.show(
       context: context,
+      title: title,
       generatedContentNotifier: _generatedContentNotifier,
       isGeneratingNotifier: _isGeneratingNotifier,
     );
@@ -797,40 +798,43 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   // 构建正常的章节列表（支持长按进入重排模式）
   Widget _buildNormalChapterList() {
-    return ListView.builder(
+    return Scrollbar(
       controller: _scrollController,
-      itemCount: _chapters.length,
-      itemBuilder: (context, index) {
-        final chapter = _chapters[index];
-        final isLastRead = index == _lastReadChapterIndex;
-        final isUserChapter = chapter.isUserInserted;
+      child: ListView.builder(
+        controller: _scrollController,
+        itemCount: _chapters.length,
+        itemBuilder: (context, index) {
+          final chapter = _chapters[index];
+          final isLastRead = index == _lastReadChapterIndex;
+          final isUserChapter = chapter.isUserInserted;
 
-        return ChapterListItem(
-          chapter: chapter,
-          isLastRead: isLastRead,
-          isUserChapter: isUserChapter,
-          isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ReaderScreen(
-                  novel: widget.novel,
-                  chapter: chapter,
-                  chapters: _chapters,
+          return ChapterListItem(
+            chapter: chapter,
+            isLastRead: isLastRead,
+            isUserChapter: isUserChapter,
+            isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReaderScreen(
+                    novel: widget.novel,
+                    chapter: chapter,
+                    chapters: _chapters,
+                  ),
                 ),
-              ),
-            );
-          },
-          onLongPress: () {
-            _toggleReorderingMode();
-          },
-          onInsert: () => _showInsertChapterDialog(index),
-          onDelete: chapter.isUserInserted
-              ? () => _showDeleteChapterDialog(chapter, index)
-              : null,
-        );
-      },
+              );
+            },
+            onLongPress: () {
+              _toggleReorderingMode();
+            },
+            onInsert: () => _showInsertChapterDialog(index),
+            onDelete: chapter.isUserInserted
+                ? () => _showDeleteChapterDialog(chapter, index)
+                : null,
+          );
+        },
+      ),
     );
   }
 
