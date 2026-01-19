@@ -42,28 +42,31 @@ class HybridMediaWidget extends StatefulWidget {
   State<HybridMediaWidget> createState() => _HybridMediaWidgetState();
 }
 
-class _HybridMediaWidgetState extends State<HybridMediaWidget>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
+class _HybridMediaWidgetState extends State<HybridMediaWidget> {
   MediaType _mediaType = MediaType.loading;
   VideoPlayerController? _videoController;
   String? _videoUrl;
+  double _lastVisibleFraction = 0.0; // 用于 VisibilityDetector 去抖
 
   @override
   void initState() {
     super.initState();
+    debugPrint('✅ 创建 HybridMediaWidget: ${widget.imgName}');
     _checkVideoStatus();
   }
 
   @override
   void dispose() {
-    // 暂停当前组件的视频播放
+    debugPrint('❌ 销毁 HybridMediaWidget: ${widget.imgName}');
+    // 使用引用计数机制释放视频控制器
     if (_videoUrl != null) {
+      // 暂停当前组件的视频播放
       VideoCacheManager.pauseVideo(_videoUrl!);
+      // 减少引用计数，如果计数为0则自动释放控制器
+      VideoCacheManager.releaseController(_videoUrl!);
+      debugPrint('❌ 释放视频控制器引用: ${widget.imgName}, url: $_videoUrl');
     }
-    // 清理引用但不释放控制器，因为它由 VideoCacheManager 统一管理
+    // 清理本地引用
     _videoController = null;
     _videoUrl = null;
     super.dispose();
@@ -73,9 +76,11 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget>
   Future<void> _checkVideoStatus() async {
     if (!mounted) return;
 
+    debugPrint('🔍 检查视频状态: ${widget.imgName}');
     try {
       final apiService = ApiServiceWrapper();
       final videoStatus = await apiService.checkVideoStatus(widget.imgName);
+      debugPrint('📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
 
       if (videoStatus.hasVideo == true) {
         // 有视频，获取视频URL并准备播放
@@ -273,8 +278,6 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // 必须调用，用于 AutomaticKeepAliveClientMixin
-
     Widget content;
 
     switch (_mediaType) {
@@ -297,13 +300,24 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget>
       key: Key('media_${widget.imgName}'),
       onVisibilityChanged: (visibilityInfo) {
         if (_mediaType == MediaType.video && _videoUrl != null) {
-          if (visibilityInfo.visibleFraction > 0.5) {
-            // 可见时播放
-            VideoCacheManager.playVideo(_videoUrl!);
-          } else {
-            // 不可见时暂停
-            VideoCacheManager.pauseVideo(_videoUrl!);
+          final wasVisible = _lastVisibleFraction > 0.5;
+          final isVisible = visibilityInfo.visibleFraction > 0.5;
+
+          // 只在可见性状态真正改变时触发（去抖）
+          if (wasVisible != isVisible) {
+            if (isVisible) {
+              // 可见时播放
+              VideoCacheManager.playVideo(_videoUrl!);
+              debugPrint('视频开始播放: ${widget.imgName}');
+            } else {
+              // 不可见时暂停
+              VideoCacheManager.pauseVideo(_videoUrl!);
+              debugPrint('视频暂停播放: ${widget.imgName}');
+            }
           }
+
+          // 更新上次的可见性状态
+          _lastVisibleFraction = visibilityInfo.visibleFraction;
         }
       },
       child: Stack(

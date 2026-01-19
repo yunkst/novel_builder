@@ -10,7 +10,7 @@ class SceneImagePreview extends StatefulWidget {
   final SceneIllustration? illustration; // 可选，用于向后兼容
   final String? taskId; // 新版本：基于 taskId 查询
   final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
-  final VoidCallback? onDelete;
+  final Function(String taskId)? onDelete;
   final VoidCallback? onImageDeleted; // 单张图片删除成功回调
   final int? modelWidth; // 新增：模型宽度
   final int? modelHeight; // 新增：模型高度
@@ -45,6 +45,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   String? _deletingImage; // 正在删除的图片filename
   DateTime? _lastDeleteTime; // 最后删除时间，用于连击保护
 
+  // 模型宽高信息
+  int? _modelWidth;
+  int? _modelHeight;
+
   /// 检查图片是否正在生成视频
   bool isImageGenerating(String imageUrl) {
     return VideoGenerationStateManager.isImageGenerating(imageUrl);
@@ -52,7 +56,15 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
 
   /// 计算宽高比
   double _calculateAspectRatio() {
-    // 如果提供了模型尺寸，使用模型宽高比
+    // 优先使用从 API 获取的模型宽高
+    if (_modelWidth != null &&
+        _modelHeight != null &&
+        _modelWidth! > 0 &&
+        _modelHeight! > 0) {
+      return _modelWidth! / _modelHeight!;
+    }
+
+    // 其次使用 widget 参数提供的宽高（向后兼容）
     if (widget.modelWidth != null &&
         widget.modelHeight != null &&
         widget.modelWidth! > 0 &&
@@ -60,8 +72,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
       return widget.modelWidth! / widget.modelHeight!;
     }
 
-    // fallback: 使用默认2:1比例 (宽是高的2倍)
-    return 2.0;
+    // fallback: 使用默认1:2比例 (高是宽的2倍)
+    return 0.5;
   }
 
   @override
@@ -107,7 +119,12 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
       if (mounted) {
         setState(() {
           _images = List<String>.from(galleryData['images'] ?? []);
+          _modelWidth = galleryData['model_width'];
+          _modelHeight = galleryData['model_height'];
           _isLoading = false;
+
+          debugPrint(
+              '✅ 加载插图信息: ${_images.length} 张图片, 模型尺寸: ${_modelWidth}x$_modelHeight');
         });
       }
     } catch (e) {
@@ -202,7 +219,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                   children: [
                     if (widget.onDelete != null) ...[
                       OutlinedButton.icon(
-                        onPressed: widget.onDelete,
+                        onPressed: () => widget.onDelete!(widget.taskId!),
                         icon: const Icon(Icons.delete, size: 16),
                         label: const Text('删除'),
                         style: OutlinedButton.styleFrom(
@@ -276,7 +293,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                   children: [
                     if (widget.onDelete != null) ...[
                       OutlinedButton.icon(
-                        onPressed: widget.onDelete,
+                        onPressed: () => widget.onDelete!(widget.taskId!),
                         icon: const Icon(Icons.delete, size: 16),
                         label: const Text('删除'),
                         style: OutlinedButton.styleFrom(
@@ -349,7 +366,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                   children: [
                     if (widget.onDelete != null) ...[
                       OutlinedButton.icon(
-                        onPressed: widget.onDelete,
+                        onPressed: () => widget.onDelete!(widget.taskId!),
                         icon: const Icon(Icons.delete, size: 16),
                         label: const Text('删除'),
                         style: OutlinedButton.styleFrom(
@@ -436,7 +453,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             if (widget.onDelete != null)
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: widget.onDelete,
+                  onPressed: () => widget.onDelete!(widget.taskId!),
                   icon: const Icon(Icons.delete, size: 16),
                   label: const Text('删除'),
                   style: OutlinedButton.styleFrom(
@@ -490,6 +507,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
               ),
               child: PageView.builder(
                 itemCount: images.length,
+                // 启用平台特定的隐式滚动优化
+                allowImplicitScrolling: true,
                 onPageChanged: (index) {
                   if (mounted) {
                     setState(() {
@@ -498,7 +517,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                   }
                 },
                 itemBuilder: (context, index) {
-                  return _buildPageImage(images[index], containerHeight);
+                  // 使用 RepaintBoundary 隔离重绘，提升性能
+                  return RepaintBoundary(
+                    child: _buildPageImage(images[index], containerHeight),
+                  );
                 },
               ),
             ),
@@ -525,6 +547,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: HybridMediaWidget(
+              key: ValueKey(fileName), // 添加唯一 key，确保 Flutter 可以正确识别和复用
               imageUrl: imageUrl,
               imgName: fileName,
               height: containerHeight,

@@ -344,8 +344,10 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     if (page < 0 || page >= _totalPages) return;
     if (_isLoading) return;
 
+    // 翻页时先清空列表，避免数据累加
     setState(() {
       _currentPage = page;
+      _sceneIllustrations.clear();
     });
 
     await _loadIllustrations();
@@ -375,9 +377,25 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   /// 处理图片点击事件 - 显示功能选择对话框
   Future<void> _handleImageTap(
       String taskId, String imageUrl, int imageIndex) async {
-    // 显示功能选择对话框
+    // 从已有列表中查找插图信息（使用用户输入的场景描述）
+    String? prompts;
+    try {
+      final illustration = _sceneIllustrations.cast<SceneIllustration?>().firstWhere(
+        (ill) => ill?.taskId == taskId,
+        orElse: () => null,
+      );
+      prompts = illustration?.content;
+    } catch (e) {
+      debugPrint('获取插图信息失败: $e');
+      prompts = null;
+    }
+
+    // 显示功能选择对话框（传入 prompts）
     if (!mounted) return;
-    final action = await IllustrationActionDialog.show(context);
+    final action = await IllustrationActionDialog.show(
+      context,
+      prompts: prompts,
+    );
 
     if (action == null || !mounted) {
       return; // 用户取消或widget已销毁

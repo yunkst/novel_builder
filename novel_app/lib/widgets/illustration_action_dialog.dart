@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 插图功能选择对话框
 /// 让用户选择【再来几张】或【生成视频】
 class IllustrationActionDialog extends StatelessWidget {
-  const IllustrationActionDialog({super.key});
+  final String? prompts;
+
+  const IllustrationActionDialog({
+    super.key,
+    this.prompts,
+  });
 
   /// 显示对话框并返回用户选择的操作类型
   /// 返回值：
   /// - 'regenerate': 再来几张
   /// - 'video': 生成视频
   /// - null: 用户取消
-  static Future<String?> show(BuildContext context) async {
+  static Future<String?> show(
+    BuildContext context, {
+    String? prompts,
+  }) async {
     return await showDialog<String?>(
       context: context,
       barrierDismissible: true, // 允许点击空白区域关闭
-      builder: (context) => const IllustrationActionDialog(),
+      builder: (context) => IllustrationActionDialog(prompts: prompts),
     );
   }
 
@@ -50,6 +59,14 @@ class IllustrationActionDialog extends StatelessWidget {
             ),
 
             const SizedBox(height: 20),
+
+            // 提示词展示区域 (如果有)
+            if (prompts != null && prompts!.isNotEmpty)
+              _PromptsDisplayCard(prompts: prompts!),
+
+            // 如果没有提示词，添加间距，如果有则由_PromptsDisplayCard处理间距
+            if (prompts == null || prompts!.isEmpty)
+              const SizedBox(height: 20),
 
             // 功能选项
             Column(
@@ -183,5 +200,103 @@ class _ActionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// 提示词展示卡片
+class _PromptsDisplayCard extends StatelessWidget {
+  final String prompts;
+
+  const _PromptsDisplayCard({required this.prompts});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: 0.5),
+          width: 2.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题行
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb,
+                color: Colors.brown,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '原始提示词',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.brown,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 提示词内容
+          SelectableText(
+            prompts,
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[900],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 复制按钮
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _copyToClipboard(context, prompts),
+              icon: const Icon(Icons.copy, size: 18),
+              label: const Text('复制', style: TextStyle(fontSize: 14)),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.brown,
+                backgroundColor: Colors.amber.withValues(alpha: 0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 复制提示词到剪贴板
+  void _copyToClipboard(BuildContext context, String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('提示词已复制到剪贴板'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('复制失败: $e'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

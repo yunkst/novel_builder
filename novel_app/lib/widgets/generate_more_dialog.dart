@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'model_selector.dart';
 
 /// 生成更多图片数量选择对话框
 class GenerateMoreDialog extends StatefulWidget {
-  final Function(int, String?) onConfirm; // 修改回调以支持模型选择
-  final String? apiType; // 't2i' 或 'i2v'
-  final String? defaultModel; // 默认模型
+  final Function(int, String?) onConfirm; // 回调函数：(数量, 模型名称)，模型名称传null使用原图模型
+  final String? apiType; // 't2i' 或 'i2v'（保留用于未来扩展）
+  final String? defaultModel; // 默认模型（保留用于未来扩展）
 
   const GenerateMoreDialog({
     super.key,
@@ -22,7 +21,6 @@ class GenerateMoreDialog extends StatefulWidget {
 class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
   final TextEditingController _controller = TextEditingController(text: '3');
   final List<int> _quickOptions = [1, 3, 5, 10];
-  String? _selectedModel;
 
   @override
   void dispose() {
@@ -47,7 +45,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
     final count = int.tryParse(text);
 
     debugPrint('解析的数量: $count');
-    debugPrint('选中的模型: $_selectedModel');
+    debugPrint('使用原始任务的模型（自动）');
 
     if (count == null || count <= 0) {
       debugPrint('❌ 数量验证失败');
@@ -70,8 +68,9 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
 
       // 只调用回调，不要在这里调用 Navigator.pop
       // onConfirm 回调会负责关闭对话框并返回数据
-      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=$_selectedModel');
-      widget.onConfirm(count, _selectedModel);
+      // 传递 null 作为 modelName，后端会自动使用原始任务的模型
+      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=null (使用原图模型)');
+      widget.onConfirm(count, null);
       debugPrint('✅ onConfirm 回调调用完成');
     } catch (e, stackTrace) {
       debugPrint('❌❌❌ onConfirm 回调异常 ❌❌❌');
@@ -169,19 +168,6 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
                       Theme.of(context).colorScheme.surfaceContainerHighest,
                   suffix: const Text('张'),
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // 模型选择器
-              ModelSelector(
-                selectedModel: _selectedModel ?? widget.defaultModel,
-                onModelChanged: (value) {
-                  setState(() {
-                    _selectedModel = value;
-                  });
-                },
-                apiType: widget.apiType,
-                hintText: '选择生成模型',
               ),
               const SizedBox(height: 24),
 

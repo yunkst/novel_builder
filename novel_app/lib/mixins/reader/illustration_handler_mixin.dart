@@ -132,9 +132,29 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   /// 处理图片点击事件 - 显示功能选择对话框
   Future<void> handleImageTap(
       String taskId, String imageUrl, int imageIndex) async {
-    // 显示功能选择对话框
+    // 查询数据库获取插图信息（使用用户输入的场景描述）
+    String? prompts;
+    try {
+      final illustrations = await databaseService.getSceneIllustrationsByChapter(
+        novel.url,
+        currentChapter.url,
+      );
+      final illustration = illustrations.firstWhere(
+        (ill) => ill.taskId == taskId,
+        orElse: () => throw Exception('插图不存在'),
+      );
+      prompts = illustration.content;
+    } catch (e) {
+      debugPrint('获取插图信息失败: $e');
+      prompts = null;
+    }
+
+    // 显示功能选择对话框 (传入prompts)
     if (!mounted) return;
-    final action = await IllustrationActionDialog.show(context);
+    final action = await IllustrationActionDialog.show(
+      context,
+      prompts: prompts,
+    );
 
     if (action == null || !mounted) {
       return; // 用户取消或widget已销毁

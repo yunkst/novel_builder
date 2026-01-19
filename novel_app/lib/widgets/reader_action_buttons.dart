@@ -4,6 +4,7 @@ class ReaderActionButtons extends StatelessWidget {
   final bool isCloseupMode;
   final bool hasSelectedParagraphs;
   final bool isAutoScrolling;
+  final bool isAutoScrollPaused;
   final VoidCallback onRewritePressed;
   final VoidCallback onToggleCloseupMode;
   final VoidCallback onToggleAutoScroll;
@@ -13,6 +14,7 @@ class ReaderActionButtons extends StatelessWidget {
     required this.isCloseupMode,
     required this.hasSelectedParagraphs,
     required this.isAutoScrolling,
+    this.isAutoScrollPaused = false,
     required this.onRewritePressed,
     required this.onToggleCloseupMode,
     required this.onToggleAutoScroll,
@@ -26,7 +28,7 @@ class ReaderActionButtons extends StatelessWidget {
         onPressed: onRewritePressed,
         icon: const Icon(Icons.edit),
         label: const Text('改写'),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.transparent,
         heroTag: 'rewrite',
       );
     }
@@ -43,7 +45,7 @@ class ReaderActionButtons extends StatelessWidget {
             onPressed: onToggleCloseupMode,
             tooltip: isCloseupMode ? '关闭特写模式' : '开启特写模式',
             heroTag: 'closeup_mode',
-            backgroundColor: isCloseupMode ? Colors.blue : null,
+            backgroundColor: Colors.transparent,
             child:
                 Icon(isCloseupMode ? Icons.visibility : Icons.visibility_off),
           ),
@@ -51,10 +53,16 @@ class ReaderActionButtons extends StatelessWidget {
           // 自动滚屏按钮（下方）
           FloatingActionButton(
             onPressed: onToggleAutoScroll,
-            tooltip: isAutoScrolling ? '暂停自动滚动' : '开始自动滚动',
+            tooltip: isAutoScrolling
+                ? (isAutoScrollPaused ? '恢复自动滚动' : '暂停自动滚动')
+                : '开始自动滚动',
             heroTag: 'auto_scroll',
-            backgroundColor: isAutoScrolling ? Colors.red : null,
-            child: Icon(isAutoScrolling ? Icons.pause : Icons.play_arrow),
+            backgroundColor: Colors.transparent,
+            child: Icon(
+              isAutoScrolling
+                  ? (isAutoScrollPaused ? Icons.play_arrow : Icons.pause)
+                  : Icons.play_arrow
+            ),
           ),
         ],
       ),

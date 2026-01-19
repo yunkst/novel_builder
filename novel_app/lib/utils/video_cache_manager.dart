@@ -6,6 +6,8 @@ import 'package:video_player/video_player.dart';
 class VideoCacheManager {
   static final Map<String, VideoPlayerController> _controllers = {};
   static final Map<String, bool> _disposedFlags = {};
+  static final Map<String, bool> _creatingFlags = {}; // 创建锁，防止竞态条件
+  static final Map<String, int> _refCounts = {}; // 引用计数，跟踪控制器使用情况
   static String? _activeVideoUrl;
   static const int _maxCachedControllers = 10;
 
@@ -23,41 +25,70 @@ class VideoCacheManager {
 
   /// 获取视频控制器
   static Future<VideoPlayerController?> getController(String videoUrl) async {
-    // 检查缓存
-    if (_controllers.containsKey(videoUrl)) {
-      final controller = _controllers[videoUrl];
-      // 验证控制器是否仍然有效
-      if (controller != null && _isControllerValid(controller)) {
-        return controller;
-      } else {
-        // 控制器已失效，清理缓存
-        _removeController(videoUrl);
-        debugPrint('清理失效的视频控制器缓存: $videoUrl');
+    // 检查是否正在创建中（竞态条件防护）
+    if (_creatingFlags[videoUrl] == true) {
+      debugPrint('等待其他实例创建控制器: $videoUrl');
+      // 等待创建完成
+      while (_creatingFlags[videoUrl] == true) {
+        await Future.delayed(const Duration(milliseconds: 50));
       }
+      // 创建完成后，从缓存中获取
+      final controller = _controllers[videoUrl];
+      if (controller != null && _isControllerValid(controller)) {
+        // 增加引用计数
+        _refCounts[videoUrl] = (_refCounts[videoUrl] ?? 0) + 1;
+        debugPrint('获取到已创建的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}');
+        return controller;
+      }
+      return null;
     }
 
-    // 缓存数量限制
-    if (_controllers.length >= _maxCachedControllers) {
-      _disposeOldestController();
-    }
+    // 标记为正在创建
+    _creatingFlags[videoUrl] = true;
 
     try {
+      // 检查缓存
+      if (_controllers.containsKey(videoUrl)) {
+        final controller = _controllers[videoUrl];
+        // 验证控制器是否仍然有效
+        if (controller != null && _isControllerValid(controller)) {
+          // 增加引用计数
+          _refCounts[videoUrl] = (_refCounts[videoUrl] ?? 0) + 1;
+          debugPrint('获取缓存的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}');
+          return controller;
+        } else {
+          // 控制器已失效，清理缓存
+          _removeController(videoUrl);
+          debugPrint('清理失效的视频控制器缓存: $videoUrl');
+        }
+      }
+
+      // 缓存数量限制
+      if (_controllers.length >= _maxCachedControllers) {
+        _disposeOldestController();
+      }
+
       // 创建新的控制器
+      debugPrint('开始创建新的视频控制器: $videoUrl');
       final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
 
       // 初始化并设置为循环播放
       await controller.initialize();
       controller.setLooping(true);
 
-      // 缓存控制器并标记为未释放状态
+      // 缓存控制器并初始化引用计数
       _controllers[videoUrl] = controller;
       _disposedFlags[videoUrl] = false;
+      _refCounts[videoUrl] = 1; // 初始引用计数为1
 
-      debugPrint('视频控制器已创建和缓存: $videoUrl');
+      debugPrint('视频控制器已创建和缓存: $videoUrl, 引用计数: 1');
       return controller;
     } catch (e) {
       debugPrint('创建视频控制器失败: $videoUrl, 错误: $e');
       return null;
+    } finally {
+      // 释放创建锁
+      _creatingFlags[videoUrl] = false;
     }
   }
 
@@ -120,8 +151,24 @@ class VideoCacheManager {
       }
     }
     _disposedFlags[videoUrl] = true;
+    _refCounts.remove(videoUrl);
     if (_activeVideoUrl == videoUrl) {
       _activeVideoUrl = null;
+    }
+  }
+
+  /// 减少引用计数，如果计数为0则释放控制器
+  static void releaseController(String videoUrl) {
+    if (_refCounts.containsKey(videoUrl)) {
+      _refCounts[videoUrl] = _refCounts[videoUrl]! - 1;
+      debugPrint('减少引用计数: $videoUrl, 剩余引用: ${_refCounts[videoUrl]}');
+
+      if (_refCounts[videoUrl]! <= 0) {
+        debugPrint('引用计数为0，释放控制器: $videoUrl');
+        disposeController(videoUrl);
+      }
+    } else {
+      debugPrint('警告: 尝试释放不存在的控制器引用: $videoUrl');
     }
   }
 
@@ -154,6 +201,8 @@ class VideoCacheManager {
     }
     _controllers.clear();
     _disposedFlags.clear();
+    _creatingFlags.clear();
+    _refCounts.clear();
     _activeVideoUrl = null;
     debugPrint('所有视频控制器已释放');
   }
