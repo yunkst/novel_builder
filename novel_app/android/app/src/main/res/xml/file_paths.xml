@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 内部缓存目录 -->
+    <cache-path name="apk_cache" path="apk/" />
+
+    <!-- 内部文件目录 -->
+    <files-path name="apk_files" path="apk/" />
+
+    <!-- 外部存储目录 -->
+    <external-path name="apk_external" path="." />
+
+    <!-- 外部缓存目录 -->
+    <external-cache-path name="apk_external_cache" path="apk/" />
+
+    <!-- 根目录（用于访问下载目录） -->
+    <root-path name="root" path="." />
+</paths>
