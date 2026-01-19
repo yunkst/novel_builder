@@ -39,6 +39,9 @@ dependencies = [
     "playwright>=1.55.0",
     # Traditional Chinese to Simplified Chinese conversion
     "opencc>=1.1.2",
+    # App version management
+    "aiofiles>=23.0.0",
+    "packaging>=23.0.0",
 ]
 
 [project.optional-dependencies]
