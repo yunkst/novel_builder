@@ -7,6 +7,7 @@ import '../models/search_result.dart';
 import '../models/character.dart';
 import '../models/scene_illustration.dart';
 import '../models/outline.dart';
+import '../models/chat_scene.dart';
 import '../core/di/api_service_provider.dart';
 import 'invalid_markup_cleaner.dart';
 
@@ -47,7 +48,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -258,6 +259,23 @@ class DatabaseService {
         )
       ''');
       debugPrint('数据库升级：创建了 outlines 表');
+    }
+    if (oldVersion < 10) {
+      // 创建聊天场景表
+      await db.execute('''
+        CREATE TABLE chat_scenes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER
+        )
+      ''');
+      // 创建标题索引，便于搜索
+      await db.execute('''
+        CREATE INDEX idx_chat_scenes_title ON chat_scenes(title)
+      ''');
+      debugPrint('数据库升级：创建了 chat_scenes 表和索引');
     }
   }
 
@@ -1795,5 +1813,69 @@ class DatabaseService {
       where: 'novel_url = ?',
       whereArgs: [novelUrl],
     );
+  }
+
+  // ========== 聊天场景操作 ==========
+
+  /// 插入聊天场景
+  Future<int> insertChatScene(ChatScene scene) async {
+    final db = await database;
+    return await db.insert('chat_scenes', scene.toMap());
+  }
+
+  /// 更新聊天场景
+  Future<void> updateChatScene(ChatScene scene) async {
+    final db = await database;
+    await db.update(
+      'chat_scenes',
+      scene.toMap(),
+      where: 'id = ?',
+      whereArgs: [scene.id],
+    );
+  }
+
+  /// 删除聊天场景
+  Future<void> deleteChatScene(int id) async {
+    final db = await database;
+    await db.delete(
+      'chat_scenes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 获取所有聊天场景
+  Future<List<ChatScene>> getAllChatScenes() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chat_scenes',
+      orderBy: 'createdAt DESC',
+    );
+    return List.generate(maps.length, (i) => ChatScene.fromMap(maps[i]));
+  }
+
+  /// 根据ID获取聊天场景
+  Future<ChatScene?> getChatSceneById(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chat_scenes',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return ChatScene.fromMap(maps.first);
+  }
+
+  /// 搜索聊天场景（按标题）
+  Future<List<ChatScene>> searchChatScenes(String query) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chat_scenes',
+      where: 'title LIKE ?',
+      whereArgs: ['%$query%'],
+      orderBy: 'createdAt DESC',
+    );
+    return List.generate(maps.length, (i) => ChatScene.fromMap(maps[i]));
   }
 }

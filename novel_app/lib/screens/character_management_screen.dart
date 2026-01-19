@@ -37,6 +37,10 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   Outline? _outline;
   bool _hasOutline = false;
 
+  // 多选模式状态
+  bool _isMultiSelectMode = false;
+  final Set<int> _selectedCharacterIds = {};
+
   // 常量定义
   static const double _avatarBorderRadius = 8.0;
   static const double _nameBottomPadding = 8.0;
@@ -131,9 +135,20 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   }
 
   Future<void> _aiCreateCharacter() async {
-    // 显示输入对话框
-    final userInput = await CharacterInputDialog.show(context);
-    if (userInput == null || userInput.trim().isEmpty) {
+    // 显示输入对话框，传入大纲状态
+    final result = await CharacterInputDialog.show(
+      context,
+      hasOutline: _hasOutline,
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final userInput = result['userInput'] as String;
+    final useOutline = result['useOutline'] as bool;
+
+    if (userInput.trim().isEmpty) {
       return;
     }
 
@@ -143,28 +158,31 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('正在AI创建角色...'),
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Text(useOutline ? '正在从大纲生成角色...' : '正在AI创建角色...'),
           ],
         ),
       ),
     );
 
     try {
-      // 获取小说的背景设定
-      final backgroundSetting =
-          await _databaseService.getBackgroundSetting(widget.novel.url);
-
-      // 调用Dify工作流创建角色
-      final generatedCharacters = await _difyService.generateCharacters(
-        userInput: userInput,
-        novelUrl: widget.novel.url,
-        backgroundSetting: backgroundSetting ?? '',
-      );
+      final generatedCharacters = useOutline
+          ? await _difyService.generateCharactersFromOutline(
+              outline: _outline!.content,
+              userInput: userInput,
+              novelUrl: widget.novel.url,
+            )
+          : await _difyService.generateCharacters(
+              userInput: userInput,
+              novelUrl: widget.novel.url,
+              backgroundSetting: (await _databaseService
+                      .getBackgroundSetting(widget.novel.url)) ??
+                  '',
+            );
 
       if (!mounted) return;
 
@@ -191,83 +209,6 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('创建角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _aiCreateCharacterFromOutline() async {
-    if (_outline == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('未找到大纲，无法生成角色'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    // 显示输入对话框
-    final userInput = await CharacterInputDialog.show(context);
-    if (userInput == null || userInput.trim().isEmpty) {
-      return;
-    }
-
-    if (!mounted) return;
-
-    // 显示加载对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('正在从大纲生成角色...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      // 调用Dify工作流创建角色
-      final generatedCharacters =
-          await _difyService.generateCharactersFromOutline(
-        outline: _outline!.content,
-        userInput: userInput,
-        novelUrl: widget.novel.url,
-      );
-
-      if (!mounted) return;
-
-      // 关闭加载对话框
-      Navigator.of(context).pop();
-
-      // 显示角色预览对话框，允许用户选择要保存的角色
-      await CharacterPreviewDialog.show(
-        context,
-        characters: generatedCharacters,
-        onConfirmed: (selectedCharacters) async {
-          if (selectedCharacters.isNotEmpty) {
-            await _saveSelectedCharacters(selectedCharacters);
-          }
-        },
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      // 关闭加载对话框
-      Navigator.of(context).pop();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('从大纲生成角色失败: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -373,13 +314,53 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
   }
 
-  /// 显示删除确认对话框
-  Future<bool> _showDeleteConfirmationDialog(Character character) async {
+  /// 切换多选模式（长按触发）
+  void _toggleMultiSelectMode(Character character) {
+    setState(() {
+      _isMultiSelectMode = true;
+      if (character.id != null) {
+        _selectedCharacterIds.add(character.id!);
+      }
+    });
+  }
+
+  /// 切换角色选择状态（点击触发）
+  void _toggleCharacterSelection(int characterId) {
+    setState(() {
+      if (_selectedCharacterIds.contains(characterId)) {
+        _selectedCharacterIds.remove(characterId);
+      } else {
+        _selectedCharacterIds.add(characterId);
+      }
+    });
+  }
+
+  /// 退出多选模式
+  void _exitMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedCharacterIds.clear();
+    });
+  }
+
+  /// 处理卡片点击（编辑或选择）
+  void _handleCardTap(Character character) {
+    if (_isMultiSelectMode && character.id != null) {
+      _toggleCharacterSelection(character.id!);
+    } else {
+      _navigateToEdit(character: character);
+    }
+  }
+
+  /// 显示批量删除确认对话框
+  Future<bool> _showBatchDeleteConfirmationDialog() async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除角色'),
-        content: Text('确定要删除角色 "${character.name}" 吗？\n此操作无法撤销。'),
+        title: const Text('批量删除角色'),
+        content: Text(
+          '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -399,28 +380,37 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     return result ?? false;
   }
 
-  Future<void> _deleteCharacter(Character character) async {
-    final confirmed = await _showDeleteConfirmationDialog(character);
-    if (!confirmed || character.id == null) return;
+  /// 批量删除选中的角色
+  Future<void> _deleteSelectedCharacters() async {
+    if (_selectedCharacterIds.isEmpty) return;
+
+    final confirmed = await _showBatchDeleteConfirmationDialog();
+    if (!confirmed) return;
 
     try {
-      await _databaseService.deleteCharacter(character.id!);
-      // 删除缓存的图片
-      await _imageCacheService.deleteCharacterCachedImages(character.id!);
+      // 批量删除
+      for (final characterId in _selectedCharacterIds) {
+        await _databaseService.deleteCharacter(characterId);
+        await _imageCacheService.deleteCharacterCachedImages(characterId);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('人物删除成功'),
+          SnackBar(
+            content: Text('成功删除 ${_selectedCharacterIds.length} 个角色'),
             backgroundColor: Colors.green,
           ),
         );
       }
+
+      // 退出多选模式并重新加载
+      _exitMultiSelectMode();
       _loadCharacters();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('删除失败: $e'),
+            content: Text('批量删除失败: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -448,20 +438,22 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('人物管理'),
+        title: Text(_isMultiSelectMode
+            ? '已选 (${_selectedCharacterIds.length})'
+            : '人物管理'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            onPressed: _aiCreateCharacter,
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: 'AI创建角色',
-          ),
-          if (_hasOutline)
+          if (_isMultiSelectMode)
+            TextButton(
+              onPressed: _exitMultiSelectMode,
+              child: const Text('取消'),
+            )
+          else
             IconButton(
-              onPressed: _aiCreateCharacterFromOutline,
-              icon: const Icon(Icons.menu_book),
-              tooltip: '从大纲生成角色',
+              onPressed: _aiCreateCharacter,
+              icon: Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
+              tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
             ),
         ],
       ),
@@ -470,12 +462,22 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           : _characters.isEmpty
               ? _buildEmptyState()
               : _buildCharacterList(),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'character_management_fab',
-        onPressed: () => _navigateToEdit(),
-        tooltip: '添加人物',
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _isMultiSelectMode &&
+              _selectedCharacterIds.isNotEmpty
+          ? FloatingActionButton.extended(
+              heroTag: 'batch_delete_fab',
+              onPressed: _deleteSelectedCharacters,
+              icon: const Icon(Icons.delete),
+              label: Text('删除 (${_selectedCharacterIds.length})'),
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            )
+          : FloatingActionButton(
+              heroTag: 'character_management_fab',
+              onPressed: () => _navigateToEdit(),
+              tooltip: '添加人物',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -565,71 +567,81 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   }
 
   Widget _buildCharacterCard(Character character) {
-    return Card(
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Builder(
-        builder: (context) {
-          // 根据屏幕尺寸动态调整卡片高度
-          final screenHeight = MediaQuery.of(context).size.height;
-          final cardHeight = screenHeight < 700 ? 280.0 : 300.0;
+    final isSelected = _isMultiSelectMode &&
+        character.id != null &&
+        _selectedCharacterIds.contains(character.id!);
 
-          return SizedBox(
-            height: cardHeight,
-            child: Column(
-              children: [
-                // 头像区域 - 可点击编辑
+    return GestureDetector(
+      onLongPress: () => _toggleMultiSelectMode(character),
+      onTap: () => _handleCardTap(character),
+      child: Card(
+        elevation: isSelected ? 12 : 6,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: isSelected
+              ? BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 3,
+                )
+              : BorderSide.none,
+        ),
+        child: Builder(
+          builder: (context) {
+            // 根据屏幕尺寸动态调整卡片高度
+            final screenHeight = MediaQuery.of(context).size.height;
+            final cardHeight = screenHeight < 700 ? 280.0 : 300.0;
+
+            return SizedBox(
+              height: cardHeight,
+              child: Column(
+                children: [
+                // 头像区域
                 Expanded(
-                  flex: 3, // 调整flex比例适应新布局
-                  child: GestureDetector(
-                    onTap: () => _navigateToEdit(character: character),
-                    child: Stack(
-                      children: [
-                        // 方形头像背景
-                        _buildSquareAvatarBackground(character),
+                  flex: 3,
+                  child: Stack(
+                    children: [
+                      // 方形头像背景
+                      _buildSquareAvatarBackground(character),
 
-                        // 头像图片
-                        Positioned.fill(
-                          child: Hero(
-                            tag: 'character_${character.id ?? character.name}',
-                            child: _buildCharacterAvatar(character),
-                          ),
+                      // 头像图片
+                      Positioned.fill(
+                        child: Hero(
+                          tag: 'character_${character.id ?? character.name}',
+                          child: _buildCharacterAvatar(character),
                         ),
+                      ),
 
-                        // 底部浮动名字
-                        Positioned(
-                          bottom: _nameBottomPadding,
-                          left: _nameHorizontalPadding * 2, // 增加边距
-                          right: _nameHorizontalPadding * 2,
-                          child: Text(
-                            character.name,
-                            style: const TextStyle(
-                              fontSize: 14, // 缩小人名字号
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black87,
-                                  blurRadius: 3, // 增强阴影效果
-                                  offset: Offset(1, 1),
-                                ),
-                                Shadow(
-                                  color: Colors.black54,
-                                  blurRadius: 6, // 添加第二层阴影增强可读性
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      // 底部浮动名字
+                      Positioned(
+                        bottom: _nameBottomPadding,
+                        left: _nameHorizontalPadding * 2,
+                        right: _nameHorizontalPadding * 2,
+                        child: Text(
+                          character.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black87,
+                                blurRadius: 3,
+                                offset: Offset(1, 1),
+                              ),
+                              Shadow(
+                                color: Colors.black54,
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
 
@@ -674,26 +686,6 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                             ),
                           ),
                         ),
-
-                        const SizedBox(width: 8), // 减少间距
-
-                        // 删除按钮
-                        GestureDetector(
-                          onTap: () => _deleteCharacter(character),
-                          child: Container(
-                            width: 36, // 缩小尺寸
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10), // 稍微减小圆角
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                              size: 18, // 缩小图标尺寸
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -702,6 +694,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

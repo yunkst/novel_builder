@@ -2,23 +2,45 @@ import 'package:flutter/material.dart';
 
 /// 角色创建输入对话框
 class CharacterInputDialog extends StatefulWidget {
-  const CharacterInputDialog({super.key});
+  /// 是否有大纲可用于生成角色
+  final bool hasOutline;
+
+  const CharacterInputDialog({
+    super.key,
+    this.hasOutline = false,
+  });
 
   @override
   State<CharacterInputDialog> createState() => _CharacterInputDialogState();
 
-  /// 显示对话框并返回用户输入
-  static Future<String?> show(BuildContext context) async {
-    return await showDialog<String>(
+  /// 显示对话框并返回用户输入和开关状态
+  /// 返回格式: {'userInput': String, 'useOutline': bool}
+  static Future<Map<String, dynamic>?> show(
+    BuildContext context, {
+    bool hasOutline = false,
+  }) async {
+    return await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => const CharacterInputDialog(),
+      builder: (context) => CharacterInputDialog(
+        hasOutline: hasOutline,
+      ),
     );
   }
 }
 
 class _CharacterInputDialogState extends State<CharacterInputDialog> {
   final _controller = TextEditingController();
+  bool _useOutline = true; // 默认开启大纲生成
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果没有大纲，强制关闭开关
+    if (!widget.hasOutline) {
+      _useOutline = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -36,6 +58,32 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 从大纲生成开关（仅当有大纲时显示）
+            if (widget.hasOutline) ...[
+              SwitchListTile(
+                title: const Text(
+                  '从大纲生成角色',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  '利用已有大纲生成更符合故事设定的角色',
+                  style: TextStyle(fontSize: 12),
+                ),
+                value: _useOutline,
+                onChanged: (value) {
+                  setState(() {
+                    _useOutline = value;
+                  });
+                },
+                contentPadding: EdgeInsets.zero,
+                activeTrackColor: Colors.blue.withValues(alpha: 0.5),
+                activeThumbColor: Colors.blue,
+              ),
+              const SizedBox(height: 12),
+            ],
             const Text(
               '请描述您想要创建的角色：',
               style: TextStyle(
@@ -46,10 +94,12 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _controller,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '角色描述',
-                hintText: '例如：一个勇敢的骑士，忠诚而正直',
-                border: OutlineInputBorder(),
+                hintText: widget.hasOutline && _useOutline
+                    ? '例如：生成故事中的主要配角'
+                    : '例如：一个勇敢的骑士，忠诚而正直',
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
               maxLines: 4,
@@ -124,6 +174,10 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       return;
     }
 
-    Navigator.of(context).pop(input);
+    // 返回用户输入和开关状态
+    Navigator.of(context).pop({
+      'userInput': input,
+      'useOutline': _useOutline,
+    });
   }
 }

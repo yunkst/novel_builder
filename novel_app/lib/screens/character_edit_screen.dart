@@ -8,7 +8,9 @@ import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/character_avatar_service.dart';
 import '../screens/gallery_view_screen.dart';
+import '../screens/character_chat_screen.dart';
 import '../widgets/model_selector.dart';
+import '../widgets/chat_scene_input_dialog.dart';
 
 /// 使用方法：RoleGalleryCacheService用于检查角色图集是否为空，在头像点击时进行验证
 /// 调用方式：在_openGallery方法中调用_checkGalleryEmpty方法检查图集状态
@@ -305,6 +307,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       final response = await apiService.generateRoleCardImages(
         roleId: roleId,
         roles: roles,
+        modelName: _selectedModel, // 传递用户选择的模型
       );
 
       if (mounted) {
@@ -457,6 +460,13 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
           ),
         ),
       ),
+      floatingActionButton: isEditing && widget.character != null
+          ? FloatingActionButton(
+              onPressed: _startChat,
+              tooltip: '与TA聊天',
+              child: const Icon(Icons.chat_outlined),
+            )
+          : null,
     );
   }
 
@@ -1053,5 +1063,38 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         );
       }
     }
+  }
+
+  /// 开始聊天
+  Future<void> _startChat() async {
+    if (widget.character == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请先保存角色后再开始聊天'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 显示场景输入对话框
+    final scene = await ChatSceneInputDialog.show(context);
+
+    if (scene == null || scene.trim().isEmpty) return;
+
+    if (!mounted) return;
+
+    // 导航到聊天屏幕
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CharacterChatScreen(
+          character: widget.character!,
+          initialScene: scene,
+        ),
+      ),
+    );
   }
 }
