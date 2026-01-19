@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # APK上传配置
+    apk_upload_dir: str = os.getenv("APK_UPLOAD_DIR", "uploads/apk")
+    apk_max_size: int = int(os.getenv("APK_MAX_SIZE", "100"))  # MB
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 开发环境警告

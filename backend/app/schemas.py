@@ -350,6 +350,9 @@ class SceneGalleryResponse(BaseModel):
 
     task_id: str = Field(..., description="场面绘制任务ID")
     images: list[str] = Field(..., description="图片文件名列表")
+    model_name: str | None = Field(None, description="使用的模型名称")
+    model_width: int | None = Field(None, description="模型宽度")
+    model_height: int | None = Field(None, description="模型高度")
 
 
 class SceneImageDeleteRequest(BaseModel):
@@ -438,3 +441,29 @@ class ModelsResponse(BaseModel):
 
     text2img: list[WorkflowInfo] = Field(default=[], description="文生图模型列表")
     img2video: list[WorkflowInfo] = Field(default=[], description="图生视频模型列表")
+
+
+# ============================================================================
+# APP版本管理相关API模式
+# ============================================================================
+
+
+class AppVersionUploadRequest(BaseModel):
+    """APP版本上传请求模式."""
+
+    version: str = Field(..., min_length=1, max_length=20, description="版本号 (如 1.0.1)")
+    version_code: int = Field(..., ge=1, description="版本递增码")
+    changelog: str | None = Field(None, max_length=2000, description="更新日志")
+    force_update: bool = Field(False, description="是否强制更新")
+
+
+class AppVersionResponse(BaseModel):
+    """APP版本信息响应模式."""
+
+    version: str = Field(..., description="版本号")
+    version_code: int = Field(..., description="版本递增码")
+    download_url: str = Field(..., description="下载URL")
+    file_size: int = Field(..., description="文件大小(字节)")
+    changelog: str | None = Field(None, description="更新日志")
+    force_update: bool = Field(False, description="是否强制更新")
+    created_at: str = Field(..., description="发布时间")
