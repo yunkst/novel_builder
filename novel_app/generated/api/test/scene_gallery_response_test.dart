@@ -19,5 +19,20 @@ void main() {
       // TODO
     });
 
+    // String modelName
+    test('to test the property `modelName`', () async {
+      // TODO
+    });
+
+    // int modelWidth
+    test('to test the property `modelWidth`', () async {
+      // TODO
+    });
+
+    // int modelHeight
+    test('to test the property `modelHeight`', () async {
+      // TODO
+    });
+
   });
 }

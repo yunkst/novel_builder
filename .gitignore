@@ -157,7 +157,8 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
-
+*.apk
+*.cmake
 # Linux
 *~
 .fuse_hidden*

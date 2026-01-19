@@ -50,6 +50,15 @@ void main() {
       // TODO
     });
 
+    // Download App Version
+    //
+    // 下载指定版本的APK文件  - **version**: 版本号（如 1.0.1）  返回APK文件
+    //
+    //Future<Uint8List> downloadAppVersionApiAppVersionDownloadVersionGet(String version) async
+    test('test downloadAppVersionApiAppVersionDownloadVersionGet', () async {
+      // TODO
+    });
+
     // Generate Role Card Images
     //
     // 异步生成人物卡图片  - **role_id**: 人物卡ID - **roles**: 人物卡设定信息 - **model**: 使用的模型名称（可选）  返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度  注意：用户要求已固定为\"生成人物卡\"，无需手动输入
@@ -83,6 +92,15 @@ void main() {
     //
     //Future<Uint8List> getImageProxyText2imgImageFilenameGet(String filename) async
     test('test getImageProxyText2imgImageFilenameGet', () async {
+      // TODO
+    });
+
+    // Get Latest App Version
+    //
+    // 查询最新APP版本  返回最新版本信息，包括版本号、下载URL、更新日志等
+    //
+    //Future<AppVersionResponse> getLatestAppVersionApiAppVersionLatestGet({ String X_API_TOKEN }) async
+    test('test getLatestAppVersionApiAppVersionLatestGet', () async {
       // TODO
     });
 
@@ -147,15 +165,6 @@ void main() {
       // TODO
     });
 
-    // Image To Video Health Check
-    //
-    // 检查图生视频服务健康状态
-    //
-    //Future<JsonObject> imageToVideoHealthCheckApiImageToVideoHealthGet({ String X_API_TOKEN }) async
-    test('test imageToVideoHealthCheckApiImageToVideoHealthGet', () async {
-      // TODO
-    });
-
     // Index
     //
     //Future<JsonObject> indexGet() async
@@ -214,6 +223,15 @@ void main() {
     //
     //Future<JsonObject> text2imgHealthCheckText2imgHealthGet({ String X_API_TOKEN }) async
     test('test text2imgHealthCheckText2imgHealthGet', () async {
+      // TODO
+    });
+
+    // Upload App Version
+    //
+    // 上传APP新版本  - **file**: APK文件 - **version**: 版本号（如 1.0.1） - **version_code**: 版本递增码 - **changelog**: 更新日志（可选） - **force_update**: 是否强制更新（默认false）  返回上传结果和下载URL
+    //
+    //Future<JsonObject> uploadAppVersionApiAppVersionUploadPost(MultipartFile file, String version, int versionCode, { String X_API_TOKEN, String changelog, bool forceUpdate }) async
+    test('test uploadAppVersionApiAppVersionUploadPost', () async {
       // TODO
     });
 
