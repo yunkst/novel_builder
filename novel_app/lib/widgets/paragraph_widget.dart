@@ -16,7 +16,7 @@ class ParagraphWidget extends StatefulWidget {
   final ValueChanged<int>? onLongPress;
   final ValueChanged<String>? onContentChanged;
   final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
-  final VoidCallback? onImageDelete;
+  final Function(String taskId)? onImageDelete;
   final Function(String taskId)?
       generateVideoFromIllustration; // For generating video from image preview
   final int? modelWidth; // 新增：模型宽度
@@ -112,7 +112,9 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
               SceneImagePreview(
                 taskId: markup.id,
                 onImageTap: widget.onImageTap,
-                onDelete: widget.onImageDelete,
+                onDelete: widget.onImageDelete != null
+                    ? (taskId) => widget.onImageDelete!(taskId)
+                    : null,
                 onImageDeleted: () {
                   // 单张图片删除成功后的处理，可能需要刷新列表
                   debugPrint('单张图片删除成功: ${markup.id}');

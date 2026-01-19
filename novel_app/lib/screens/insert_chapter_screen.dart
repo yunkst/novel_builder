@@ -195,26 +195,14 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
       });
 
       // 构建Dify输入参数
-      final inputs = {
-        'cmd': '生成细纲',
-        'outline': _outline!.content,
-        'history_chapters_content': _cachedPreviousChapters!.join('\n\n'),
-        'outline_item': '',
-        'user_input': _userInputController.text.trim(),
-      };
+      final inputs = _buildDifyInputs(
+        userInput: _userInputController.text,
+      );
 
       // 使用 DifyStreamingMixin 进行流式生成
       await callDifyStreaming(
         inputs: inputs,
-        onChunk: (chunk) {
-          // 流式追加内容到 TextField
-          _draftEditingController.text += chunk;
-
-          // 移动光标到末尾，让用户看到最新内容
-          _draftEditingController.selection = TextSelection.fromPosition(
-            TextPosition(offset: _draftEditingController.text.length),
-          );
-        },
+        onChunk: _updateDraftTextField,
         startMessage: 'AI正在生成章节细纲...',
         completeMessage: '细纲生成完成',
         errorMessagePrefix: '细纲生成失败',
@@ -240,6 +228,30 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     return await handler.getPreviousChaptersContent(
       chapters: widget.chapters,
       afterIndex: widget.afterIndex,
+    );
+  }
+
+  /// 构建 Dify 输入参数
+  Map<String, dynamic> _buildDifyInputs({
+    required String userInput,
+    String? existingDraft,
+  }) {
+    final historyContent = (_cachedPreviousChapters ?? []).join('\n\n');
+
+    return {
+      'cmd': '生成细纲',
+      'outline': _outline!.content,
+      'history_chapters_content': historyContent,
+      'outline_item': existingDraft ?? '',
+      'user_input': userInput.trim(),
+    };
+  }
+
+  /// 更新细纲 TextField（自动追加内容并移动光标到末尾）
+  void _updateDraftTextField(String chunk) {
+    _draftEditingController.text += chunk;
+    _draftEditingController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _draftEditingController.text.length),
     );
   }
 
@@ -293,30 +305,20 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     if (feedback == null || feedback.isEmpty) return;
 
     try {
-      // 清空准备接收新内容
+      // 清空准备接收新内容（保存当前内容作为 existingDraft）
+      final currentDraft = _draftEditingController.text;
       _draftEditingController.clear();
 
       // 构建Dify输入参数
-      final inputs = {
-        'cmd': '生成细纲',
-        'outline': _outline!.content,
-        'history_chapters_content': (_cachedPreviousChapters ?? []).join('\n\n'),
-        'outline_item': _draftEditingController.text,
-        'user_input': feedback,
-      };
+      final inputs = _buildDifyInputs(
+        userInput: feedback,
+        existingDraft: currentDraft,
+      );
 
       // 使用 DifyStreamingMixin 进行流式重新生成
       await callDifyStreaming(
         inputs: inputs,
-        onChunk: (chunk) {
-          // 流式追加内容到 TextField
-          _draftEditingController.text += chunk;
-
-          // 移动光标到末尾，让用户看到最新内容
-          _draftEditingController.selection = TextSelection.fromPosition(
-            TextPosition(offset: _draftEditingController.text.length),
-          );
-        },
+        onChunk: _updateDraftTextField,
         startMessage: 'AI正在重新生成细纲...',
         completeMessage: '细纲重新生成完成',
         errorMessagePrefix: '细纲重新生成失败',

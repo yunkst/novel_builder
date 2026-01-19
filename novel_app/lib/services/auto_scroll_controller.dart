@@ -37,13 +37,19 @@ class HighPerformanceAutoScrollController {
   /// 滚动完成回调
   VoidCallback? _onScrollComplete;
 
+  /// 暂停标志
+  bool _isPaused = false;
+
   /// 构造函数
   HighPerformanceAutoScrollController({
     required this.scrollController,
   }) : _pixelsPerSecond = 0;
 
   /// 是否正在滚动
-  bool get isScrolling => _pixelsPerSecond > 0;
+  bool get isScrolling => _pixelsPerSecond > 0 && !_isPaused;
+
+  /// 是否已暂停
+  bool get isPaused => _isPaused;
 
   /// 启动自动滚动
   ///
@@ -67,6 +73,20 @@ class HighPerformanceAutoScrollController {
     _requestFrame();
   }
 
+  /// 暂停自动滚动（不重置内部状态）
+  void pauseAutoScroll() {
+    _isPaused = true;
+    debugPrint('⏸️ [pauseAutoScroll] 自动滚动已暂停');
+  }
+
+  /// 恢复自动滚动
+  void resumeAutoScroll() {
+    _isPaused = false;
+    _lastFrameTime = DateTime.now(); // 重置时间戳避免跳跃
+    _requestFrame();
+    debugPrint('▶️ [resumeAutoScroll] 自动滚动已恢复');
+  }
+
   /// 停止自动滚动
   void stopAutoScroll() {
     debugPrint('🛑 [HighPerformanceAutoScrollController.stopAutoScroll] 被调用');
@@ -75,6 +95,7 @@ class HighPerformanceAutoScrollController {
     _hasScheduledFrame = false;
     _lastFrameTime = null;
     _onScrollComplete = null;
+    _isPaused = false; // 重置暂停状态
 
     debugPrint('✅ [stopAutoScroll] 已重置所有状态');
     // 注意：Flutter 的 SchedulerBinding 不提供 cancelFrameCallback 方法
@@ -96,6 +117,11 @@ class HighPerformanceAutoScrollController {
   void _onFrame(Duration timestamp) {
     // 重置标志，允许下一次请求
     _hasScheduledFrame = false;
+
+    // 检查暂停状态
+    if (_isPaused) {
+      return; // 暂停时不执行滚动，但也不重置状态
+    }
 
     // 检查速度
     if (_pixelsPerSecond == 0) {
