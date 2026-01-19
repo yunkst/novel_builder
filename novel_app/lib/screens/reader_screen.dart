@@ -18,6 +18,9 @@ import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
 import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
 import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
+import '../widgets/immersive/immersive_setup_dialog.dart'; // 沉浸体验配置对话框
+import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始化页面
+import '../services/reader_settings_service.dart'; // 阅读器设置持久化
 
 import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
@@ -55,6 +58,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
+  final ReaderSettingsService _settingsService = ReaderSettingsService.instance;
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -85,7 +89,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
 
   late Chapter _currentChapter;
-  double _fontSize = 18.0;
+  double? _fontSize;
 
   // 模型尺寸（用于插图显示）
   int? _defaultModelWidth;
@@ -98,12 +102,15 @@ class _ReaderScreenState extends State<ReaderScreen>
   // 注意：插图处理相关的方法已提取到 IllustrationHandlerMixin
 
   // 保留滚动速度配置（供 AutoScrollMixin 使用）
-  double _scrollSpeed = 1.0; // 滚动速度倍数，1.0为默认速度
+  double? _scrollSpeed; // 滚动速度倍数，1.0为默认速度
 
   @override
   void initState() {
     super.initState();
     _currentChapter = widget.chapter;
+
+    // ========== 加载持久化设置 ==========
+    _loadSettings();
 
     // ========== 初始化 ReaderContentController ==========
     _contentController = ReaderContentController(
@@ -147,6 +154,18 @@ class _ReaderScreenState extends State<ReaderScreen>
           // _contentController 会处理错误状态
         });
       }
+    }
+  }
+
+  /// 加载阅读器设置
+  Future<void> _loadSettings() async {
+    final fontSize = await _settingsService.getFontSize();
+    final scrollSpeed = await _settingsService.getScrollSpeed();
+    if (mounted) {
+      setState(() {
+        _fontSize = fontSize;
+        _scrollSpeed = scrollSpeed;
+      });
     }
   }
 
@@ -487,11 +506,14 @@ class _ReaderScreenState extends State<ReaderScreen>
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => FontSizeAdjusterDialog(
-        initialFontSize: _fontSize,
-        onFontSizeChanged: (newSize) {
-          setState(() {
-            _fontSize = newSize;
-          });
+        initialFontSize: _fontSize ?? 18.0,
+        onFontSizeChanged: (newSize) async {
+          await _settingsService.setFontSize(newSize);
+          if (mounted) {
+            setState(() {
+              _fontSize = newSize;
+            });
+          }
         },
       ),
     );
@@ -669,12 +691,15 @@ class _ReaderScreenState extends State<ReaderScreen>
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => ScrollSpeedAdjusterDialog(
-        initialScrollSpeed: _scrollSpeed,
-        onScrollSpeedChanged: (newSpeed) {
-          setState(() {
-            _scrollSpeed = newSpeed;
-          });
-          startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
+        initialScrollSpeed: _scrollSpeed ?? 1.0,
+        onScrollSpeedChanged: (newSpeed) async {
+          await _settingsService.setScrollSpeed(newSpeed);
+          if (mounted) {
+            setState(() {
+              _scrollSpeed = newSpeed;
+            });
+            startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
+          }
         },
       ),
     );
@@ -895,6 +920,14 @@ class _ReaderScreenState extends State<ReaderScreen>
                     tooltip: '完成编辑并保存',
                     icon: const Icon(Icons.check, color: Colors.green),
                   ),
+                // 沉浸体验按钮
+                if (!editModeProvider.isEditMode)
+                  IconButton(
+                    onPressed: _showImmersiveSetup,
+                    tooltip: '沉浸体验',
+                    icon: const Icon(Icons.theater_comedy_outlined),
+                    color: Colors.purple,
+                  ),
                 // 更多功能菜单
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
@@ -990,16 +1023,27 @@ class _ReaderScreenState extends State<ReaderScreen>
                     : Stack(
                         children: [
                           // 主要内容区域
-                          NotificationListener<ScrollNotification>(
-                            onNotification: (notification) {
-                              // 使用 AutoScrollMixin 的滚动通知处理方法
-                              return handleScrollNotification(notification);
+                          Listener(
+                            behavior: HitTestBehavior.translucent, // 不阻止事件传递到下层
+                            onPointerDown: (_) {
+                              // 手指接触屏幕，暂停自动滚动
+                              if (isAutoScrolling) {
+                                handleTouch();
+                              }
                             },
-                            child: ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.all(16.0),
-                              itemCount: paragraphs.length + 1, // +1 为了添加底部空白
-                              itemBuilder: (context, index) {
+                            onPointerUp: (_) {
+                              // handleTouch() 已经设置了恢复定时器，所以这里不需要额外处理
+                            },
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                // 保留以兼容现有代码（不再处理用户滚动）
+                                return handleScrollNotification(notification);
+                              },
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(16.0),
+                                itemCount: paragraphs.length + 1, // +1 为了添加底部空白
+                                itemBuilder: (context, index) {
                                 // 最后一个位置添加空白
                                 if (index == paragraphs.length) {
                                   return SizedBox(
@@ -1015,7 +1059,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 return ParagraphWidget(
                                   paragraph: paragraph,
                                   index: index,
-                                  fontSize: _fontSize,
+                                  fontSize: _fontSize ?? 18.0,
                                   isCloseupMode: _isCloseupMode,
                                   isEditMode: editModeProvider
                                       .isEditMode, // From Consumer
@@ -1034,8 +1078,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                                   onImageTap: (taskId, imageUrl, imageIndex) =>
                                       handleImageTap(taskId, imageUrl,
                                           imageIndex), // Mixin方法
-                                  onImageDelete: () =>
-                                      deleteIllustrationByTaskId, // Mixin方法
+                                  onImageDelete: (taskId) =>
+                                      deleteIllustrationByTaskId(taskId), // Mixin方法
                                   generateVideoFromIllustration:
                                       generateVideoFromIllustration, // Mixin方法
                                   modelWidth: _defaultModelWidth, // 传递模型宽度
@@ -1043,8 +1087,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 );
                               },
                             ),
-                          ), // NotificationListener 闭合
-                          // 固定在底部的章节切换按钮
+                          ),
+                        ), // GestureDetector 和 NotificationListener 闭合
+                        // 固定在底部的章节切换按钮
                           Positioned(
                             left: 0,
                             right: 0,
@@ -1104,6 +1149,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                     isCloseupMode: _isCloseupMode,
                     hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
                     isAutoScrolling: isAutoScrolling, // Mixin getter
+                    isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
                     onRewritePressed: () {
                       _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
                     },
@@ -1126,7 +1172,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   ScrollController get scrollController => _scrollController;
 
   @override
-  double get scrollSpeed => _scrollSpeed;
+  double get scrollSpeed => _scrollSpeed ?? 1.0;
 
   // ========== IllustrationHandlerMixin 抽象字段实现 ==========
 
@@ -1141,4 +1187,49 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   ApiServiceWrapper get apiService => _apiService;
+
+  /// 显示沉浸体验配置对话框
+  Future<void> _showImmersiveSetup() async {
+    // 加载所有角色
+    try {
+      final allCharacters =
+          await _databaseService.getCharacters(widget.novel.url);
+
+      if (!mounted) return;
+
+      // 显示配置对话框
+      final config = await ImmersiveSetupDialog.show(
+        context,
+        chapterContent: _content,
+        allCharacters: allCharacters,
+      );
+
+      if (config == null) return; // 用户取消
+
+      // 导航到初始化页面
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImmersiveInitScreen(
+            novel: widget.novel,
+            chapter: _currentChapter,
+            chapterContent: _content,
+            config: config,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ 打开沉浸体验失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('打开沉浸体验失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }

@@ -416,6 +416,7 @@ class ApiServiceWrapper {
   Future<Map<String, dynamic>> generateRoleCardImages({
     required String roleId,
     required Map<String, dynamic> roles,
+    String? modelName, // 添加模型名称参数
   }) async {
     _ensureInitialized();
     try {
@@ -428,7 +429,8 @@ class ApiServiceWrapper {
       final response = await _api.generateRoleCardImagesApiRoleCardGeneratePost(
         roleCardGenerateRequest: RoleCardGenerateRequest((b) => b
           ..roleId = roleId
-          ..roles.replace(BuiltList<RoleInfo>(roleInfoList))),
+          ..roles.replace(BuiltList<RoleInfo>(roleInfoList))
+          ..model = modelName), // 传递模型名称参数
         X_API_TOKEN: token,
       );
 
@@ -706,6 +708,9 @@ class ApiServiceWrapper {
     return {
       'task_id': response.taskId,
       'images': response.images.toList(),
+      'model_name': response.modelName,
+      'model_width': response.modelWidth,
+      'model_height': response.modelHeight,
     };
   }
 
