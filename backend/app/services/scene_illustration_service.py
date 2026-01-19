@@ -23,6 +23,7 @@ from ..schemas import (
     SceneRegenerateRequest,
     SceneRegenerateResponse,
 )
+from ..workflow_config import WorkflowType
 from ..workflow_config.workflow_config import workflow_config_manager
 from .comfyui_client import create_comfyui_client_for_model
 from .dify_client import DifyClient
@@ -345,7 +346,43 @@ class SceneIllustrationService:
                     logger.warning(f"ComfyUI任务 {prompt_id}: 已获取过但无图片")
 
             logger.info(f"🎯 [DEBUG] 最终返回 {len(all_images)} 张图片: {all_images}")
-            return SceneGalleryResponse(task_id=task_id, images=all_images)
+
+            # 查询任务信息，获取模型名称和宽高
+            model_name = None
+            model_width = None
+            model_height = None
+
+            try:
+                task_record = (
+                    db.query(SceneIllustrationTask)
+                    .filter(SceneIllustrationTask.task_id == task_id)
+                    .first()
+                )
+
+                if task_record and task_record.model_name:
+                    model_name = task_record.model_name
+                    # 从工作流配置中获取模型的宽高信息
+                    workflow = workflow_config_manager.get_t2i_workflow_by_title(
+                        model_name
+                    )
+                    if workflow:
+                        model_width = workflow.width
+                        model_height = workflow.height
+                        logger.info(
+                            f"✅ 找到模型信息: {model_name}, 尺寸: {model_width}x{model_height}"
+                        )
+                    else:
+                        logger.warning(f"⚠️ 未找到模型配置: {model_name}")
+            except Exception as e:
+                logger.error(f"❌ 查询模型信息失败: {e}")
+
+            return SceneGalleryResponse(
+                task_id=task_id,
+                images=all_images,
+                model_name=model_name,
+                model_width=model_width,
+                model_height=model_height,
+            )
 
         except SQLAlchemyError as e:
             logger.error(f"获取图片列表数据库操作失败: {e}")
@@ -441,11 +478,49 @@ class SceneIllustrationService:
             image_list = [cast("str", img.img_url) for img in images]
             logger.info(f"任务 {task_id}: 从旧表获取 {len(image_list)} 张图片")
 
-            return SceneGalleryResponse(task_id=task_id, images=image_list)
+            # 旧表也可能有对应的任务记录，尝试获取模型信息
+            model_name = None
+            model_width = None
+            model_height = None
+
+            try:
+                task_record = (
+                    db.query(SceneIllustrationTask)
+                    .filter(SceneIllustrationTask.task_id == task_id)
+                    .first()
+                )
+
+                if task_record and task_record.model_name:
+                    model_name = task_record.model_name
+                    workflow = workflow_config_manager.get_t2i_workflow_by_title(
+                        model_name
+                    )
+                    if workflow:
+                        model_width = workflow.width
+                        model_height = workflow.height
+                        logger.info(
+                            f"✅ 旧表数据也找到模型信息: {model_name}, 尺寸: {model_width}x{model_height}"
+                        )
+            except Exception as e:
+                logger.error(f"❌ 查询旧表模型信息失败: {e}")
+
+            return SceneGalleryResponse(
+                task_id=task_id,
+                images=image_list,
+                model_name=model_name,
+                model_width=model_width,
+                model_height=model_height,
+            )
         except Exception as e:
             logger.error(f"从旧表获取图片失败: {e}")
             # 旧表查询失败，返回空列表而不是抛出异常
-            return SceneGalleryResponse(task_id=task_id, images=[])
+            return SceneGalleryResponse(
+                task_id=task_id,
+                images=[],
+                model_name=None,
+                model_width=None,
+                model_height=None,
+            )
 
     async def delete_scene_image(
         self, request: SceneImageDeleteRequest, db: Session
