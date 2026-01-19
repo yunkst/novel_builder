@@ -12,6 +12,7 @@ import 'package:mockito/src/dummies.dart' as _i10;
 import 'package:novel_api/novel_api.dart' as _i2;
 import 'package:novel_app/models/chapter.dart' as _i9;
 import 'package:novel_app/models/character.dart' as _i5;
+import 'package:novel_app/models/chat_scene.dart' as _i16;
 import 'package:novel_app/models/novel.dart' as _i8;
 import 'package:novel_app/models/outline.dart' as _i15;
 import 'package:novel_app/models/scene_illustration.dart' as _i14;
@@ -264,6 +265,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
   _i7.Future<Map<String, dynamic>> generateRoleCardImages({
     required String? roleId,
     required Map<String, dynamic>? roles,
+    String? modelName,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -272,6 +274,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           {
             #roleId: roleId,
             #roles: roles,
+            #modelName: modelName,
           },
         ),
         returnValue:
@@ -494,17 +497,6 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
       ) as _i7.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> checkImageToVideoHealth() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #checkImageToVideoHealth,
-          [],
-        ),
-        returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
-
-  @override
   _i7.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
         Invocation.method(
           #getModels,
@@ -642,6 +634,52 @@ class MockDatabaseService extends _i1.Mock implements _i12.DatabaseService {
       ) as _i7.Future<int>);
 
   @override
+  _i7.Future<bool> isChapterCached(String? chapterUrl) => (super.noSuchMethod(
+        Invocation.method(
+          #isChapterCached,
+          [chapterUrl],
+        ),
+        returnValue: _i7.Future<bool>.value(false),
+      ) as _i7.Future<bool>);
+
+  @override
+  _i7.Future<List<String>> filterUncachedChapters(List<String>? chapterUrls) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #filterUncachedChapters,
+          [chapterUrls],
+        ),
+        returnValue: _i7.Future<List<String>>.value(<String>[]),
+      ) as _i7.Future<List<String>>);
+
+  @override
+  void markAsPreloading(String? chapterUrl) => super.noSuchMethod(
+        Invocation.method(
+          #markAsPreloading,
+          [chapterUrl],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  bool isPreloading(String? chapterUrl) => (super.noSuchMethod(
+        Invocation.method(
+          #isPreloading,
+          [chapterUrl],
+        ),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  void clearMemoryState() => super.noSuchMethod(
+        Invocation.method(
+          #clearMemoryState,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   _i7.Future<int> cacheChapter(
     String? novelUrl,
     _i9.Chapter? chapter,
@@ -693,15 +731,6 @@ class MockDatabaseService extends _i1.Mock implements _i12.DatabaseService {
         ),
         returnValue: _i7.Future<String?>.value(),
       ) as _i7.Future<String?>);
-
-  @override
-  _i7.Future<bool> isChapterCached(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #isChapterCached,
-          [chapterUrl],
-        ),
-        returnValue: _i7.Future<bool>.value(false),
-      ) as _i7.Future<bool>);
 
   @override
   _i7.Future<List<_i9.Chapter>> getCachedChapters(String? novelUrl) =>
@@ -1450,4 +1479,62 @@ class MockDatabaseService extends _i1.Mock implements _i12.DatabaseService {
         ),
         returnValue: _i7.Future<int>.value(0),
       ) as _i7.Future<int>);
+
+  @override
+  _i7.Future<int> insertChatScene(_i16.ChatScene? scene) => (super.noSuchMethod(
+        Invocation.method(
+          #insertChatScene,
+          [scene],
+        ),
+        returnValue: _i7.Future<int>.value(0),
+      ) as _i7.Future<int>);
+
+  @override
+  _i7.Future<void> updateChatScene(_i16.ChatScene? scene) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateChatScene,
+          [scene],
+        ),
+        returnValue: _i7.Future<void>.value(),
+        returnValueForMissingStub: _i7.Future<void>.value(),
+      ) as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> deleteChatScene(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #deleteChatScene,
+          [id],
+        ),
+        returnValue: _i7.Future<void>.value(),
+        returnValueForMissingStub: _i7.Future<void>.value(),
+      ) as _i7.Future<void>);
+
+  @override
+  _i7.Future<List<_i16.ChatScene>> getAllChatScenes() => (super.noSuchMethod(
+        Invocation.method(
+          #getAllChatScenes,
+          [],
+        ),
+        returnValue: _i7.Future<List<_i16.ChatScene>>.value(<_i16.ChatScene>[]),
+      ) as _i7.Future<List<_i16.ChatScene>>);
+
+  @override
+  _i7.Future<_i16.ChatScene?> getChatSceneById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getChatSceneById,
+          [id],
+        ),
+        returnValue: _i7.Future<_i16.ChatScene?>.value(),
+      ) as _i7.Future<_i16.ChatScene?>);
+
+  @override
+  _i7.Future<List<_i16.ChatScene>> searchChatScenes(String? query) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #searchChatScenes,
+          [query],
+        ),
+        returnValue: _i7.Future<List<_i16.ChatScene>>.value(<_i16.ChatScene>[]),
+      ) as _i7.Future<List<_i16.ChatScene>>);
 }
