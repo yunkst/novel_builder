@@ -1120,4 +1120,63 @@ class DifyService {
       stateManager.handleError('场景描写网络或解析异常: $e');
     }
   }
+
+  /// 生成沉浸体验剧本
+  ///
+  /// [chapterContent] 章节内容
+  /// [characters] 角色对象列表（包含完整角色信息）
+  /// [userInput] 用户要求
+  /// [userChoiceRole] 用户选择的角色名
+  /// [existingPlay] 现有剧本（用于重新生成）
+  /// [existingRoleStrategy] 现有角色策略（用于重新生成，List&lt;Map&lt;String, dynamic&gt;&gt;类型）
+  Future<Map<String, dynamic>?> generateImmersiveScript({
+    required String chapterContent,
+    required List<Character> characters,
+    required String userInput,
+    required String userChoiceRole,
+    String? existingPlay,
+    List<Map<String, dynamic>>? existingRoleStrategy,
+  }) async {
+    // 使用 Character.formatForAI() 格式化角色信息
+    final formattedRoles = Character.formatForAI(characters);
+
+    final Map<String, dynamic> inputs = {
+      'cmd': '生成剧本',
+      'chapters_content': chapterContent,     // 参数名修改: chapter_content -> chapters_content
+      'roles': formattedRoles,                // 使用格式化后的完整信息
+      'user_input': userInput,
+      'user_choice_role': userChoiceRole,
+    };
+
+    // 如果是重新生成，添加现有数据
+    if (existingPlay != null) {
+      inputs['play'] = existingPlay;
+    }
+    if (existingRoleStrategy != null) {
+      inputs['role_strategy'] = existingRoleStrategy;
+    }
+
+    debugPrint('=== 开始生成沉浸体验剧本 ===');
+    debugPrint('章节内容长度: ${chapterContent.length} 字符');
+    debugPrint('参与角色数量: ${characters.length}');
+    debugPrint('格式化后角色信息:\n$formattedRoles');
+    debugPrint('用户要求: $userInput');
+    debugPrint('用户角色: $userChoiceRole');
+    if (existingPlay != null) {
+      debugPrint('现有剧本长度: ${existingPlay.length} 字符');
+    }
+    if (existingRoleStrategy != null) {
+      debugPrint('现有角色策略数量: ${existingRoleStrategy.length}');
+    }
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('AI生成失败：未收到有效响应');
+    }
+
+    return outputs;
+  }
 }
