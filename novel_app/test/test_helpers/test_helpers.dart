@@ -4,7 +4,6 @@ import 'package:mockito/mockito.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/services/api_service_wrapper.dart';
 import 'package:novel_app/services/dify_service.dart';
-import 'package:novel_app/services/cache_manager.dart';
 
 /// 测试辅助函数库
 ///
@@ -52,6 +51,5 @@ class TestHelpers {
   DatabaseService,
   ApiServiceWrapper,
   DifyService,
-  CacheManager,
 ])
 void main() {}
