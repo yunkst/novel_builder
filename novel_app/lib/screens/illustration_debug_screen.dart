@@ -228,7 +228,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         onImageTap: (taskId, imageUrl, imageIndex) {
           _handleImageTap(taskId, imageUrl, imageIndex);
         },
-        onDelete: () => _deleteIllustration(illustration.id),
+        onDelete: (taskId) => _deleteIllustration(illustration.id),
         onImageDeleted: () {
           // 删除成功后刷新列表
           _refreshIllustrations();

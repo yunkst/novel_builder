@@ -838,6 +838,73 @@ class DifyService {
     }
   }
 
+  /// 从章节内容提取角色
+  Future<List<Character>> extractCharacter({
+    required String chapterContent,
+    required String roles,
+    required String novelUrl,
+  }) async {
+    final inputs = {
+      'chapter_content': chapterContent,
+      'roles': roles,
+      'cmd': '提取角色',
+    };
+
+    debugPrint('=== 开始从章节提取角色 ===');
+    debugPrint('章节内容长度: ${chapterContent.length} 字符');
+    debugPrint('角色名: $roles');
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    debugPrint('=== Dify API 返回数据: $outputs ===');
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('角色提取失败：未收到有效响应');
+    }
+
+    // 获取content字段
+    final content = outputs['content'];
+
+    try {
+      // 解析JSON数据
+      debugPrint('=== JSON解析成功 ===');
+
+      // 获取roles数组
+      final List<dynamic> charactersData = content['roles'] ?? [];
+      debugPrint('=== 提取角色数组长度: ${charactersData.length} ===');
+      final List<Character> characters = [];
+
+      for (var characterData in charactersData) {
+        try {
+          final character = Character(
+            novelUrl: novelUrl,
+            name: characterData['name']?.toString() ?? '未知角色',
+            gender: characterData['gender']?.toString(),
+            age: characterData['age'] is String
+                ? int.tryParse(characterData['age']) ?? 0
+                : characterData['age']?.toInt(),
+            occupation: characterData['occupation']?.toString(),
+            personality: characterData['personality']?.toString(),
+            bodyType: characterData['bodyType']?.toString(),
+            clothingStyle: characterData['clothingStyle']?.toString(),
+            appearanceFeatures: characterData['appearanceFeatures']?.toString(),
+            backgroundStory: characterData['backgroundStory']?.toString(),
+          );
+          characters.add(character);
+        } catch (e) {
+          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          continue;
+        }
+      }
+
+      debugPrint('成功提取 ${characters.length} 个角色');
+      return characters;
+    } catch (e) {
+      debugPrint('解析提取角色列表失败: $e, 原始数据: $content');
+      throw Exception('角色提取数据解析失败: $e');
+    }
+  }
+
   /// 生成角色卡提示词
   Future<Map<String, String>> generateCharacterPrompts({
     required String characterDescription,

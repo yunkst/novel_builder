@@ -20,13 +20,39 @@ class CharacterMatcher {
     final foundCharacters = <Character>[];
 
     for (final character in existingCharacters) {
-      // 检查角色名称是否在章节内容中出现
-      if (chapterContent.contains(character.name)) {
+      // 检查角色名称或别名是否在章节内容中出现
+      if (_isCharacterOrAliasInChapter(character, chapterContent)) {
         foundCharacters.add(character);
       }
     }
 
     return foundCharacters;
+  }
+
+  /// 检查角色名称或别名是否在章节中出现
+  ///
+  /// [character] 角色
+  /// [chapterContent] 章节内容
+  ///
+  /// 返回是否匹配到角色
+  static bool _isCharacterOrAliasInChapter(
+    Character character,
+    String chapterContent,
+  ) {
+    // 检查正式名称
+    if (chapterContent.contains(character.name)) {
+      return true;
+    }
+
+    // 检查别名
+    final aliases = character.aliases ?? [];
+    for (final alias in aliases) {
+      if (chapterContent.contains(alias)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// 将角色列表格式化为Dify所需的格式
@@ -88,7 +114,7 @@ class CharacterMatcher {
   ///
   /// 返回角色是否在章节中出现
   static bool isCharacterInChapter(Character character, String chapterContent) {
-    return chapterContent.contains(character.name);
+    return _isCharacterOrAliasInChapter(character, chapterContent);
   }
 
   /// 获取章节中所有可能的角色名称（简单启发式方法）
@@ -264,10 +290,53 @@ class CharacterMatcher {
   /// [character] 角色
   /// [chapterContent] 章节内容
   ///
-  /// 返回角色在章节中出现的次数
+  /// 返回角色在章节中出现的次数（包括正式名称和所有别名）
   static int countCharacterOccurrences(
       Character character, String chapterContent) {
-    final pattern = RegExp(RegExp.escape(character.name));
-    return pattern.allMatches(chapterContent).length;
+    int count = 0;
+
+    // 统计正式名称出现次数
+    final namePattern = RegExp(RegExp.escape(character.name));
+    count += namePattern.allMatches(chapterContent).length;
+
+    // 统计所有别名出现次数
+    final aliases = character.aliases ?? [];
+    for (final alias in aliases) {
+      final aliasPattern = RegExp(RegExp.escape(alias));
+      count += aliasPattern.allMatches(chapterContent).length;
+    }
+
+    return count;
+  }
+
+  /// 检查别名冲突
+  ///
+  /// [newAlias] 要添加的新别名
+  /// [currentCharacter] 当前角色
+  /// [allCharacters] 同一小说的所有角色
+  ///
+  /// 返回冲突信息，如果没有冲突返回null
+  static String? checkAliasConflict(
+    String newAlias,
+    Character currentCharacter,
+    List<Character> allCharacters,
+  ) {
+    for (final character in allCharacters) {
+      // 跳过自己
+      if (character.id == currentCharacter.id) continue;
+
+      // 检查新别名是否与其他角色的正式名称冲突
+      if (character.name == newAlias) {
+        return '别名 "$newAlias" 与角色 "${character.name}" 的正式名称相同';
+      }
+
+      // 检查新别名是否与其他角色的别名冲突
+      final existingAliases = character.aliases ?? [];
+      if (existingAliases.contains(newAlias)) {
+        return '别名 "$newAlias" 与角色 "${character.name}" 的别名重复';
+      }
+    }
+
+    return null;
   }
 }

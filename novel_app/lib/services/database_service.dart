@@ -48,7 +48,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 12,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -112,6 +112,7 @@ class DatabaseService {
         clothingStyle TEXT,
         appearanceFeatures TEXT,
         backgroundStory TEXT,
+        aliases TEXT DEFAULT '[]',
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER,
         UNIQUE(novelUrl, name)
@@ -276,6 +277,20 @@ class DatabaseService {
         CREATE INDEX idx_chat_scenes_title ON chat_scenes(title)
       ''');
       debugPrint('数据库升级：创建了 chat_scenes 表和索引');
+    }
+    if (oldVersion < 11) {
+      // 添加章节已读时间戳字段
+      await db.execute('''
+        ALTER TABLE novel_chapters ADD COLUMN readAt INTEGER
+      ''');
+      debugPrint('数据库升级：添加了 novel_chapters.readAt 字段');
+    }
+    if (oldVersion < 12) {
+      // 添加角色别名字段
+      await db.execute('''
+        ALTER TABLE characters ADD COLUMN aliases TEXT DEFAULT '[]'
+      ''');
+      debugPrint('数据库升级：添加了 characters.aliases 字段');
     }
   }
 
@@ -649,34 +664,22 @@ class DatabaseService {
   // ========== 章节列表缓存操作 ==========
 
   /// 缓存小说章节列表
+  /// 使用 UPSERT 方式，保留已读状态（readAt）
   Future<void> cacheNovelChapters(
       String novelUrl, List<Chapter> chapters) async {
     final db = await database;
-    final batch = db.batch();
 
-    // 只删除非用户插入的章节
-    batch.delete(
-      'novel_chapters',
-      where: 'novelUrl = ? AND isUserInserted = 0',
-      whereArgs: [novelUrl],
-    );
-
-    // 插入新的章节列表
+    // 使用 UPSERT 保留已读状态
+    // ON CONFLICT DO UPDATE 只更新指定字段，保留 readAt
     for (var i = 0; i < chapters.length; i++) {
-      batch.insert(
-        'novel_chapters',
-        {
-          'novelUrl': novelUrl,
-          'chapterUrl': chapters[i].url,
-          'title': chapters[i].title,
-          'chapterIndex': i,
-          'isUserInserted': 0,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.rawInsert('''
+        INSERT INTO novel_chapters (novelUrl, chapterUrl, title, chapterIndex, isUserInserted)
+        VALUES (?, ?, ?, ?, 0)
+        ON CONFLICT(novelUrl, chapterUrl) DO UPDATE SET
+          title = excluded.title,
+          chapterIndex = excluded.chapterIndex
+      ''', [novelUrl, chapters[i].url, chapters[i].title, i]);
     }
-
-    await batch.commit(noResult: true);
 
     // 重新排序章节索引，将用户插入的章节保持在原位置
     await _reorderChapters(novelUrl);
@@ -690,7 +693,7 @@ class DatabaseService {
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT
         nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
-        nc.chapterIndex, nc.isUserInserted, nc.insertedAt,
+        nc.chapterIndex, nc.isUserInserted, nc.insertedAt, nc.readAt,
         cc.content
       FROM novel_chapters nc
       LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
@@ -706,6 +709,7 @@ class DatabaseService {
         isCached: maps[i]['content'] != null,
         chapterIndex: maps[i]['chapterIndex'],
         isUserInserted: maps[i]['isUserInserted'] == 1,
+        readAt: maps[i]['readAt'] as int?,
       );
     });
   }
@@ -1114,6 +1118,7 @@ class DatabaseService {
         url: map['chapterUrl'] as String,
         chapterIndex: map['chapterIndex'] as int?,
         isUserInserted: (map['isUserInserted'] as int?) == 1,
+        readAt: map['readAt'] as int?,
       );
     }
     return null;
@@ -1454,8 +1459,24 @@ class DatabaseService {
         title: maps[i]['title'] ?? '',
         url: maps[i]['chapterUrl'] ?? '',
         chapterIndex: maps[i]['chapterIndex'] ?? 0,
+        readAt: maps[i]['readAt'] as int?,
       );
     });
+  }
+
+  /// 标记章节为已读
+  Future<void> markChapterAsRead(String novelUrl, String chapterUrl) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.update(
+      'novel_chapters',
+      {'readAt': now},
+      where: 'novelUrl = ? AND chapterUrl = ?',
+      whereArgs: [novelUrl, chapterUrl],
+    );
+
+    debugPrint('✅ 章节已标记为已读: $chapterUrl');
   }
 
   /// 获取章节内容

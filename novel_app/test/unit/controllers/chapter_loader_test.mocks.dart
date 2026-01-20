@@ -1224,6 +1224,23 @@ class MockDatabaseService extends _i1.Mock implements _i12.DatabaseService {
       ) as _i7.Future<List<_i9.Chapter>>);
 
   @override
+  _i7.Future<void> markChapterAsRead(
+    String? novelUrl,
+    String? chapterUrl,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #markChapterAsRead,
+          [
+            novelUrl,
+            chapterUrl,
+          ],
+        ),
+        returnValue: _i7.Future<void>.value(),
+        returnValueForMissingStub: _i7.Future<void>.value(),
+      ) as _i7.Future<void>);
+
+  @override
   _i7.Future<String> getChapterContent(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(

@@ -7,6 +7,7 @@ import '../services/dify_service.dart';
 import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/character_avatar_service.dart';
+import '../utils/character_matcher.dart';
 import '../screens/gallery_view_screen.dart';
 import '../screens/character_chat_screen.dart';
 import '../widgets/model_selector.dart';
@@ -52,6 +53,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   bool _isLoading = false;
   bool _isGeneratingPrompts = false;
   bool _isGeneratingRoleCard = false;
+  List<String> _aliases = []; // 别名列表
+  final TextEditingController _aliasController = TextEditingController();
 
   final List<String> _genderOptions = ['男', '女', '其他'];
   final List<String> _commonBodyTypes = [
@@ -84,6 +87,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       _backgroundController.text = character.backgroundStory ?? '';
       _facePromptsController.text = character.facePrompts ?? '';
       _bodyPromptsController.text = character.bodyPrompts ?? '';
+      _aliases = List.from(character.aliases ?? []);
     }
 
     // 监听姓名变化
@@ -104,6 +108,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     _backgroundController.dispose();
     _facePromptsController.dispose();
     _bodyPromptsController.dispose();
+    _aliasController.dispose();
     super.dispose();
   }
 
@@ -131,6 +136,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       _backgroundController.text = updatedCharacter.backgroundStory ?? '';
       _facePromptsController.text = updatedCharacter.facePrompts ?? '';
       _bodyPromptsController.text = updatedCharacter.bodyPrompts ?? '';
+      _aliases = List.from(updatedCharacter.aliases ?? []);
 
       // 触发UI更新
       setState(() {
@@ -193,6 +199,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
             ? _bodyPromptsController.text.trim()
             : null,
+        aliases: _aliases.isEmpty ? null : List.from(_aliases),
       );
 
       if (widget.character == null) {
@@ -617,8 +624,206 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
             border: OutlineInputBorder(),
           ),
         ),
+        const SizedBox(height: 16),
+
+        // 别名编辑
+        _buildAliasesSection(),
       ],
     );
+  }
+
+  /// 构建别名编辑区域
+  Widget _buildAliasesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '别名',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${_aliases.length}/10',
+              style: TextStyle(
+                fontSize: 12,
+                color: _aliases.length >= 10 ? Colors.red : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // 别名标签列表
+        if (_aliases.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _aliases.map((alias) {
+              return Chip(
+                label: Text(alias),
+                deleteIcon: const Icon(Icons.close, size: 18),
+                onDeleted: () {
+                  setState(() {
+                    _aliases.remove(alias);
+                  });
+                },
+                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              );
+            }).toList(),
+          ),
+        if (_aliases.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              '暂无别名，可添加常用称呼',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        // 添加别名输入框
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _aliasController,
+                decoration: InputDecoration(
+                  labelText: '新别名',
+                  hintText: '输入别名后点击添加',
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _aliases.length >= 10
+                          ? Colors.grey
+                          : Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ),
+                enabled: _aliases.length < 10,
+                onFieldSubmitted: (_) => _addAlias(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: _aliases.length >= 10 ? null : _addAlias,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _aliases.length >= 10
+                    ? Colors.grey
+                    : Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+              ),
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 添加别名
+  Future<void> _addAlias() async {
+    final alias = _aliasController.text.trim();
+
+    // 验证别名不为空
+    if (alias.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请输入别名'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 验证别名不重复
+    if (_aliases.contains(alias)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('该别名已存在'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 检查冲突
+    final tempCharacter = Character(
+      id: widget.character?.id,
+      novelUrl: widget.novel.url,
+      name: _nameController.text.trim(),
+    );
+
+    final allCharacters = await _databaseService.getCharacters(widget.novel.url);
+    final conflict = CharacterMatcher.checkAliasConflict(
+      alias,
+      tempCharacter,
+      allCharacters,
+    );
+
+    if (conflict != null) {
+      // 显示冲突警告对话框
+      final shouldAdd = await _showAliasConflictDialog(conflict);
+      if (!shouldAdd) return;
+    }
+
+    // 添加别名
+    setState(() {
+      _aliases.add(alias);
+      _aliasController.clear();
+    });
+  }
+
+  /// 显示别名冲突对话框
+  ///
+  /// 返回 true 表示用户仍要添加，false 表示取消
+  Future<bool> _showAliasConflictDialog(String conflictMessage) async {
+    if (!mounted) return false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('检测到别名冲突'),
+          ],
+        ),
+        content: Text(
+          '$conflictMessage，\n可能导致角色匹配混乱。\n\n是否仍要添加？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('仍要添加'),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
   }
 
   /// 构建角色头像（编辑页面使用，80px）

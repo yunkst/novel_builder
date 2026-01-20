@@ -10,6 +10,7 @@ class ChapterListItem extends StatelessWidget {
   final bool isLastRead;
   final bool isUserChapter;
   final bool isCached; // 改为直接接收状态
+  final bool isRead; // 是否已读
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onInsert;
@@ -20,6 +21,7 @@ class ChapterListItem extends StatelessWidget {
     required this.isLastRead,
     required this.isUserChapter,
     required this.isCached,
+    this.isRead = false,
     required this.onTap,
     required this.onLongPress,
     required this.onInsert,
@@ -48,6 +50,7 @@ class ChapterListItem extends StatelessWidget {
                 title: chapter.title,
                 isLastRead: isLastRead,
                 isUserChapter: isUserChapter,
+                isRead: isRead,
               ),
             ),
             if (isUserChapter) const ChapterBadge(),

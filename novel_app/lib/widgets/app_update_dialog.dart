@@ -267,8 +267,8 @@ Future<void> showAppUpdateDialog(
   return showDialog(
     context: context,
     barrierDismissible: !version.forceUpdate,
-    builder: (context) => WillPopScope(
-      onWillPop: () async => !version.forceUpdate,
+    builder: (context) => PopScope(
+      canPop: !version.forceUpdate,
       child: AppUpdateDialog(
         version: version,
         updateService: updateService,

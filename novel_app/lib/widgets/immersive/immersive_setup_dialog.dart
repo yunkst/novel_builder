@@ -108,10 +108,22 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     }
   }
 
-  /// 检查角色是否在章节内容中出现
+  /// 检查角色是否在章节内容中出现（支持别名）
   bool _isRoleInChapter(Character role, String chapterContent) {
-    // 使用contains进行简单匹配
-    return chapterContent.contains(role.name);
+    // 检查正式名称
+    if (chapterContent.contains(role.name)) {
+      return true;
+    }
+
+    // 检查别名
+    final aliases = role.aliases ?? [];
+    for (final alias in aliases) {
+      if (alias.isNotEmpty && chapterContent.contains(alias)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// 显示角色选择器
