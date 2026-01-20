@@ -111,14 +111,21 @@ class AppVersionService:
                 details="版本号应遵循语义化版本规范，如 1.0.1",
             )
 
-        # 检查版本是否已存在
+        # 检查版本是否已存在，如果存在则删除旧版本（支持覆盖上传）
         if db:
             existing = db.query(AppVersion).filter(AppVersion.version == version_str).first()
             if existing:
-                raise AppVersionServiceError(
-                    message=f"版本 {version_str} 已存在",
-                    details="请使用不同的版本号",
-                )
+                # 删除旧版本的APK文件
+                try:
+                    old_file_path = Path(existing.file_path)
+                    if old_file_path.exists():
+                        old_file_path.unlink()
+                except OSError:
+                    pass  # 文件删除失败不影响继续上传
+
+                # 删除旧版本的数据库记录
+                db.delete(existing)
+                db.commit()
 
         # 生成文件路径
         file_path = self._generate_file_path(version_str, filename)
