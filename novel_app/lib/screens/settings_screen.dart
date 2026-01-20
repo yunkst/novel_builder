@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
+import 'log_viewer_screen.dart';
 import '../services/app_update_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../services/api_service_wrapper.dart';
@@ -49,12 +50,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
 
         if (latestVersion != null) {
+          // 比较当前版本和最新版本
+          final currentInfo = await PackageInfo.fromPlatform();
+          final isNewVersion = updateService.hasNewVersion(
+            currentInfo.version,
+            latestVersion.version,
+          );
+
           // 显示更新对话框
           if (context.mounted) {
             await showAppUpdateDialog(
               context,
               version: latestVersion,
               updateService: updateService,
+              isNewVersion: isNewVersion,
             );
           }
         } else {
@@ -142,6 +151,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const DifySettingsScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+
+          // 应用日志入口
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('应用日志'),
+            subtitle: const Text('查看、复制或清空应用日志'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LogViewerScreen(),
                 ),
               );
             },

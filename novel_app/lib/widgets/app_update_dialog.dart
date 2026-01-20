@@ -9,12 +9,14 @@ class AppUpdateDialog extends StatefulWidget {
   final AppVersion version;
   final AppUpdateService updateService;
   final VoidCallback? onUpdateComplete;
+  final bool isNewVersion; // 是否是新版本，false表示版本相同但用户选择重新下载
 
   const AppUpdateDialog({
     super.key,
     required this.version,
     required this.updateService,
     this.onUpdateComplete,
+    this.isNewVersion = true,
   });
 
   @override
@@ -43,7 +45,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
           ),
           const SizedBox(width: 8),
           Text(
-            widget.version.forceUpdate ? '强制更新' : '发现新版本',
+            widget.version.forceUpdate
+                ? '强制更新'
+                : (widget.isNewVersion ? '发现新版本' : '重新下载'),
             style: const TextStyle(fontSize: 18),
           ),
         ],
@@ -187,7 +191,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         ),
       ElevatedButton(
         onPressed: _startDownload,
-        child: const Text('立即更新'),
+        child: Text(widget.isNewVersion ? '立即更新' : '重新下载'),
       ),
     ];
   }
@@ -263,6 +267,7 @@ Future<void> showAppUpdateDialog(
   required AppVersion version,
   required AppUpdateService updateService,
   VoidCallback? onUpdateComplete,
+  bool isNewVersion = true,
 }) {
   return showDialog(
     context: context,
@@ -273,6 +278,7 @@ Future<void> showAppUpdateDialog(
         version: version,
         updateService: updateService,
         onUpdateComplete: onUpdateComplete,
+        isNewVersion: isNewVersion,
       ),
     ),
   );
