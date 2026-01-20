@@ -3,6 +3,7 @@ import '../models/scene_illustration.dart';
 import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import '../utils/video_generation_state_manager.dart';
+import '../utils/image_cache_manager.dart';
 import 'hybrid_media_widget.dart';
 import 'generate_more_dialog.dart';
 
@@ -117,8 +118,18 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           await apiService.getSceneIllustrationGallery(widget.taskId!);
 
       if (mounted) {
+        // 安全解析图片列表
+        final rawImages = galleryData['images'];
+        List<String> images = [];
+        if (rawImages is List) {
+          images = rawImages
+              .map((e) => e?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toList();
+        }
+
         setState(() {
-          _images = List<String>.from(galleryData['images'] ?? []);
+          _images = images;
           _modelWidth = galleryData['model_width'];
           _modelHeight = galleryData['model_height'];
           _isLoading = false;
@@ -785,6 +796,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         taskId: widget.taskId!,
         filename: imageUrl,
       );
+
+      // 删除成功后，清除图片缓存
+      ImageCacheManager.removeCache(imageUrl);
+      debugPrint('🗑️ 已删除图片缓存: $imageUrl');
 
       // 删除成功，更新图片列表
       if (mounted) {

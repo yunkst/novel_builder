@@ -1183,10 +1183,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       // 通过ApiServiceWrapper调用，token自动处理
       final galleryData = await _apiService.getRoleGallery(characterId);
 
-      if (galleryData['images'] != null) {
-        final images = galleryData['images'] as List;
-        debugPrint('角色图集检查: 找到 ${images.length} 张图片');
-        return images.isEmpty;
+      final rawImages = galleryData['images'];
+      if (rawImages is List && rawImages.isNotEmpty) {
+        debugPrint('角色图集检查: 找到 ${rawImages.length} 张图片');
+        return false;
       } else {
         debugPrint('角色图集检查: 图集数据为空');
         return true;
