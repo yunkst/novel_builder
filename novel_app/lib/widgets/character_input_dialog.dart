@@ -74,7 +74,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
 
   // 常量
   static const int _minContextLength = 100;
-  static const int _maxContextLength = 100000;
+  static const int _maxContextLength = 1000;
+  static const int _maxTotalContentLength = 100000; // 总内容长度上限10万字
 
   @override
   void initState() {
@@ -530,7 +531,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       useFullChapter: _extractFullChapter,
     );
 
-    final isOverLimit = estimated > _maxContextLength;
+    final isOverLimit = estimated > _maxTotalContentLength;
     final color = isOverLimit ? Colors.red : Colors.grey;
 
     return Container(

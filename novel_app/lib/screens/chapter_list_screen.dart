@@ -800,9 +800,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   // 构建正常的章节列表（支持长按进入重排模式）
   Widget _buildNormalChapterList() {
     return DraggableScrollbar.rrect(
+      key: const ValueKey('chapter_list_scrollbar'),
       controller: _scrollController,
       child: ListView.builder(
-        controller: _scrollController,
         itemCount: _chapters.length,
         itemBuilder: (context, index) {
           final chapter = _chapters[index];
