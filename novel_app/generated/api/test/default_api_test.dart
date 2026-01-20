@@ -176,7 +176,7 @@ void main() {
     //
     // 基于现有任务重新生成场面图片  - **task_id**: 原始任务ID - **count**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     //
-    //Future<JsonObject> regenerateSceneImagesApiSceneIllustrationRegeneratePost(SceneRegenerateRequest sceneRegenerateRequest, { String X_API_TOKEN }) async
+    //Future<SceneRegenerateResponse> regenerateSceneImagesApiSceneIllustrationRegeneratePost(SceneRegenerateRequest sceneRegenerateRequest, { String X_API_TOKEN }) async
     test('test regenerateSceneImagesApiSceneIllustrationRegeneratePost', () async {
       // TODO
     });

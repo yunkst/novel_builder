@@ -115,6 +115,7 @@ Class | Method | HTTP request | Description
  - [SceneGalleryResponse](doc/SceneGalleryResponse.md)
  - [SceneImageDeleteRequest](doc/SceneImageDeleteRequest.md)
  - [SceneRegenerateRequest](doc/SceneRegenerateRequest.md)
+ - [SceneRegenerateResponse](doc/SceneRegenerateResponse.md)
  - [SourceSite](doc/SourceSite.md)
  - [ValidationError](doc/ValidationError.md)
  - [ValidationErrorLocInner](doc/ValidationErrorLocInner.md)

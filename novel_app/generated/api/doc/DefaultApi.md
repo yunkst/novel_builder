@@ -865,7 +865,7 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **regenerateSceneImagesApiSceneIllustrationRegeneratePost**
-> JsonObject regenerateSceneImagesApiSceneIllustrationRegeneratePost(sceneRegenerateRequest, X_API_TOKEN)
+> SceneRegenerateResponse regenerateSceneImagesApiSceneIllustrationRegeneratePost(sceneRegenerateRequest, X_API_TOKEN)
 
 Regenerate Scene Images
 
@@ -896,7 +896,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+[**SceneRegenerateResponse**](SceneRegenerateResponse.md)
 
 ### Authorization
 

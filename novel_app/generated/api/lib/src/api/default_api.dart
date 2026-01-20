@@ -29,6 +29,7 @@ import 'package:novel_api/src/model/role_regenerate_request.dart';
 import 'package:novel_api/src/model/scene_gallery_response.dart';
 import 'package:novel_api/src/model/scene_image_delete_request.dart';
 import 'package:novel_api/src/model/scene_regenerate_request.dart';
+import 'package:novel_api/src/model/scene_regenerate_response.dart';
 import 'package:novel_api/src/model/source_site.dart';
 import 'package:novel_api/src/model/video_status_response.dart';
 
@@ -1701,9 +1702,9 @@ class DefaultApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [JsonObject] as data
+  /// Returns a [Future] containing a [Response] with a [SceneRegenerateResponse] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<JsonObject>> regenerateSceneImagesApiSceneIllustrationRegeneratePost({ 
+  Future<Response<SceneRegenerateResponse>> regenerateSceneImagesApiSceneIllustrationRegeneratePost({ 
     required SceneRegenerateRequest sceneRegenerateRequest,
     String? X_API_TOKEN,
     CancelToken? cancelToken,
@@ -1761,14 +1762,14 @@ class DefaultApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    JsonObject? _responseData;
+    SceneRegenerateResponse? _responseData;
 
     try {
       final rawResponse = _response.data;
       _responseData = rawResponse == null ? null : _serializers.deserialize(
         rawResponse,
-        specifiedType: const FullType(JsonObject),
-      ) as JsonObject;
+        specifiedType: const FullType(SceneRegenerateResponse),
+      ) as SceneRegenerateResponse;
 
     } catch (error, stackTrace) {
       throw DioException(
@@ -1780,7 +1781,7 @@ class DefaultApi {
       );
     }
 
-    return Response<JsonObject>(
+    return Response<SceneRegenerateResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

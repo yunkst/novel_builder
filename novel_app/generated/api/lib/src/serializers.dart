@@ -32,6 +32,7 @@ import 'package:novel_api/src/model/role_regenerate_request.dart';
 import 'package:novel_api/src/model/scene_gallery_response.dart';
 import 'package:novel_api/src/model/scene_image_delete_request.dart';
 import 'package:novel_api/src/model/scene_regenerate_request.dart';
+import 'package:novel_api/src/model/scene_regenerate_response.dart';
 import 'package:novel_api/src/model/source_site.dart';
 import 'package:novel_api/src/model/validation_error.dart';
 import 'package:novel_api/src/model/validation_error_loc_inner.dart';
@@ -59,6 +60,7 @@ part 'serializers.g.dart';
   SceneGalleryResponse,
   SceneImageDeleteRequest,
   SceneRegenerateRequest,
+  SceneRegenerateResponse,
   SourceSite,
   ValidationError,
   ValidationErrorLocInner,
