@@ -9,6 +9,7 @@ import '../services/character_image_cache_service.dart';
 import '../services/character_avatar_service.dart';
 import '../services/character_extraction_service.dart';
 import '../services/dify_service.dart';
+import '../services/logger_service.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
 import 'character_edit_screen.dart';
@@ -108,6 +109,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('❌ 加载角色失败: $e');
       setState(() {
         _isLoading = false;
       });
@@ -214,6 +216,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         },
       );
     } catch (e) {
+      LoggerService.instance.e('创建角色失败:' + e.toString());
+      debugPrint('❌ 创建角色失败: $e');
       if (!mounted) return;
 
       // 关闭加载对话框
@@ -275,14 +279,14 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       final allContexts = <String>[];
 
       for (final item in selectedChapters) {
-        final chapterMatch = item as Map;
-        final chapter = chapterMatch['chapter'] as Chapter;
+        final chapterMatch = item;
+        final chapter = chapterMatch.chapter;
         final content = chapter.content ?? '';
 
         if (extractFullChapter) {
           allContexts.add(content);
         } else {
-          final matchPositions = chapterMatch['matchPositions'] as List;
+          final matchPositions = chapterMatch.matchPositions;
           final contexts = extractionService.extractContextAroundMatches(
             content: content,
             matchPositions: matchPositions.toList().cast<int>(),
@@ -320,6 +324,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         },
       );
     } catch (e) {
+      LoggerService.instance.e('提取角色失败:' + e.toString());
+      debugPrint('❌ 提取角色失败: $e');
       if (!mounted) return;
 
       // 关闭加载对话框
@@ -390,6 +396,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         );
       }
     } catch (e) {
+      LoggerService.instance.e('保存角色时发生错误:' + e.toString());
+      debugPrint('❌ 保存角色时发生错误: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -527,6 +535,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       _exitMultiSelectMode();
       _loadCharacters();
     } catch (e) {
+      debugPrint('❌ 批量删除角色失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

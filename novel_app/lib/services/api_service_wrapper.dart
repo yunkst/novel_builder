@@ -695,7 +695,22 @@ class ApiServiceWrapper {
       );
 
       if (response.data != null) {
-        return response.data as Map<String, dynamic>;
+        final data = response.data;
+        if (data != null) {
+          // 安全地创建新Map
+          final result = <String, dynamic>{};
+          // 尝试将其作为Map处理
+          try {
+            final map = data as Map;
+            for (final entry in map.entries) {
+              result[entry.key.toString()] = entry.value;
+            }
+          } catch (e) {
+            throw Exception('重新生成场景插图图片失败：无法解析响应数据');
+          }
+          return result;
+        }
+        throw Exception('重新生成场景插图图片失败：响应格式错误');
       } else {
         throw Exception('重新生成场景插图图片失败：响应为空');
       }
@@ -883,11 +898,16 @@ class ApiServiceWrapper {
 
       if (response.statusCode == 200) {
         debugPrint('✅ 请求成功');
-        debugPrint('响应数据: ${response.data}');
-        final result =
-            response.data as Map<String, dynamic>? ?? {'status': 'failed'};
-        debugPrint('返回结果: $result');
-        return result;
+        // API返回的已经是 SceneRegenerateResponse 类型
+        final data = response.data;
+        if (data != null) {
+          return {
+            'task_id': data.taskId,
+            'total_prompts': data.totalPrompts,
+            'message': data.message,
+          };
+        }
+        throw Exception('重新生成场景插图失败：响应数据为空');
       } else {
         debugPrint('❌ 请求失败，状态码: ${response.statusCode}');
         throw Exception('重新生成场景插图失败：${response.statusCode}');

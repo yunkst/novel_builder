@@ -836,7 +836,9 @@ class DatabaseService {
       'SELECT MAX(chapterIndex) as maxIndex FROM novel_chapters WHERE novelUrl = ?',
       [novelUrl],
     );
-    final maxIndex = result.first['maxIndex'] as int? ?? 0;
+    final maxIndex = result.isNotEmpty
+        ? (result.first['maxIndex'] as int? ?? 0)
+        : 0;
 
     // 生成章节URL
     final chapterUrl =
@@ -1109,6 +1111,7 @@ class DatabaseService {
       'SELECT COUNT(*) as count FROM novel_chapters WHERE novelUrl = ?',
       [novelUrl],
     );
+    if (result.isEmpty) return 0;
     return result.first['count'] as int;
   }
 
