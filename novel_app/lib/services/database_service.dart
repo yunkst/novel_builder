@@ -961,20 +961,30 @@ class DatabaseService {
       {String? novelUrl}) async {
     final db = await database;
 
-    String whereClause = "(content LIKE ? OR title LIKE ?)";
+    // 使用 JOIN 查询从 novel_chapters 表获取正确的标题和索引
+    String sql = '''
+      SELECT
+        cc.novelUrl,
+        cc.chapterUrl,
+        nc.title,
+        cc.content,
+        nc.chapterIndex,
+        cc.cachedAt
+      FROM chapter_cache cc
+      INNER JOIN novel_chapters nc ON cc.chapterUrl = nc.chapterUrl
+      WHERE (cc.content LIKE ? OR nc.title LIKE ?)
+    ''';
+
     List<dynamic> whereArgs = ['%$keyword%', '%$keyword%'];
 
     if (novelUrl != null && novelUrl.isNotEmpty) {
-      whereClause += " AND novelUrl = ?";
+      sql += ' AND cc.novelUrl = ?';
       whereArgs.add(novelUrl);
     }
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'chapter_cache',
-      where: whereClause,
-      whereArgs: whereArgs,
-      orderBy: 'novelUrl, chapterIndex',
-    );
+    sql += ' ORDER BY cc.novelUrl, nc.chapterIndex';
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(sql, whereArgs);
 
     final List<ChapterSearchResult> results = [];
 
