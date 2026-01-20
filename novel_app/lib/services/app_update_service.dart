@@ -70,7 +70,8 @@ class AppUpdateService {
         final latestVersion = _convertToAppVersion(response.data!);
 
         // 比较版本号
-        if (_hasNewVersion(currentInfo.version, latestVersion.version)) {
+        // 强制检查时，即使版本相同也返回版本信息（允许用户重新下载安装）
+        if (forceCheck || hasNewVersion(currentInfo.version, latestVersion.version)) {
           return latestVersion;
         }
       }
@@ -98,7 +99,7 @@ class AppUpdateService {
   /// 比较版本号
   ///
   /// 返回true表示有新版本
-  bool _hasNewVersion(String current, String latest) {
+  bool hasNewVersion(String current, String latest) {
     try {
       final currentParts = current.split('.').map(int.parse).toList();
       final latestParts = latest.split('.').map(int.parse).toList();
