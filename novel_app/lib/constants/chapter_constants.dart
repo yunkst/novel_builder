@@ -31,4 +31,9 @@ class ChapterConstants {
   ///
   /// 用户插入的章节使用此URL前缀
   static const String userChapterUrlPrefix = 'user_chapter_';
+
+  /// 每页章节数量
+  ///
+  /// 章节列表分页显示时，每页显示的章节数量
+  static const int chaptersPerPage = 100;
 }
