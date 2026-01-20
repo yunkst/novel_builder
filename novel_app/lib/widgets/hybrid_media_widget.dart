@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/video_cache_manager.dart';
 import '../utils/video_generation_state_manager.dart';
+import '../utils/image_cache_manager.dart';
 
 /// 媒体类型枚举
 enum MediaType {
@@ -48,11 +49,16 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
   String? _videoUrl;
   double _lastVisibleFraction = 0.0; // 用于 VisibilityDetector 去抖
 
+  // 图片缓存相关状态
+  Uint8List? _imageData;
+  bool _imageLoadingError = false;
+
   @override
   void initState() {
     super.initState();
     debugPrint('✅ 创建 HybridMediaWidget: ${widget.imgName}');
     _checkVideoStatus();
+    _loadImageWithCache();
   }
 
   @override
@@ -70,6 +76,28 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
     _videoController = null;
     _videoUrl = null;
     super.dispose();
+  }
+
+  /// 使用缓存加载图片
+  Future<void> _loadImageWithCache() async {
+    try {
+      debugPrint('📥 使用缓存加载图片: ${widget.imgName}');
+      final data = await ImageCacheManager.getImage(widget.imageUrl);
+      if (mounted) {
+        setState(() {
+          _imageData = data;
+          _imageLoadingError = false;
+        });
+        debugPrint('✅ 图片加载成功: ${widget.imgName}, 大小: ${data.length} bytes');
+      }
+    } catch (e) {
+      debugPrint('❌ 图片加载失败: ${widget.imgName}, 错误: $e');
+      if (mounted) {
+        setState(() {
+          _imageLoadingError = true;
+        });
+      }
+    }
   }
 
   /// 检查视频状态
@@ -178,36 +206,33 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
 
   /// 构建图片组件
   Widget _buildImageWidget() {
-    // 这里使用现有的图片加载逻辑
-    return FutureBuilder<Uint8List>(
-      future: ApiServiceWrapper().getImageProxy(widget.imageUrl),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingWidget();
-        }
+    // 如果正在加载，显示加载状态
+    if (_imageData == null && !_imageLoadingError) {
+      return _buildLoadingWidget();
+    }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return _buildErrorWidget();
-        }
+    // 如果加载出错，显示错误状态
+    if (_imageLoadingError || _imageData == null) {
+      return _buildErrorWidget();
+    }
 
-        final imageBytes = snapshot.data!;
-        return Container(
-          height: widget.height,
-          width: widget.width,
-          decoration: BoxDecoration(
-            borderRadius: widget.borderRadius,
-          ),
-          child: ClipRRect(
-            borderRadius: widget.borderRadius,
-            child: Image.memory(
-              imageBytes,
-              fit: widget.fit,
-              width: double.infinity,
-              height: double.infinity,
-            ),
-          ),
-        );
-      },
+    // 显示已加载的图片（从缓存中）
+    return Container(
+      height: widget.height,
+      width: widget.width,
+      decoration: BoxDecoration(
+        borderRadius: widget.borderRadius,
+      ),
+      child: ClipRRect(
+        borderRadius: widget.borderRadius,
+        child: Image.memory(
+          _imageData!,
+          fit: widget.fit,
+          width: double.infinity,
+          height: double.infinity,
+          gaplessPlayback: true, // 防止图片切换时闪烁
+        ),
+      ),
     );
   }
 

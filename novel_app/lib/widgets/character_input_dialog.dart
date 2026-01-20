@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/chapter.dart';
 import '../services/character_extraction_service.dart';
+import '../services/logger_service.dart';
 
 /// 创建模式枚举
 enum CreateMode {
@@ -678,6 +679,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
         });
       }
     } catch (e) {
+      LoggerService.instance.e('搜索章节失败:' + e.toString());
+      debugPrint('❌ 搜索章节失败: $e');
       setState(() {
         _searchError = '搜索失败: $e';
       });
