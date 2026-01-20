@@ -6,20 +6,23 @@ import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'core/di/api_service_provider.dart';
 import 'utils/video_cache_manager.dart';
+import 'services/logger_service.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 初始化日志服务
+  await LoggerService.instance.init();
+
   // 启用详细的错误日志 - 全局错误处理器
   FlutterError.onError = (FlutterErrorDetails details) {
-    debugPrint('=== Flutter Error ===');
-    debugPrint('Exception: ${details.exception}');
-    debugPrint('Stack trace: ${details.stack}');
+    final stackTrace = details.stack?.toString() ?? '';
+    final error = 'Flutter Error: ${details.exception}';
+    LoggerService.instance.e(error, stackTrace: stackTrace);
+    debugPrint('=== $error ===');
+    debugPrint('Stack trace: $stackTrace');
     debugPrint('Library: ${details.library}');
-    debugPrint('Context: ${details.context}');
-    debugPrint('Information Collector: ${details.informationCollector}');
-    debugPrint('==================');
   };
 
   // 设置平台错误处理
@@ -44,6 +47,7 @@ void main() async {
     try {
       await ApiServiceProvider.initialize();
     } catch (e, stackTrace) {
+      LoggerService.instance.e('API Service Error: $e', stackTrace: stackTrace.toString());
       debugPrint('=== API Service Error ===');
       debugPrint('Exception: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -54,6 +58,7 @@ void main() async {
 
     runApp(const NovelReaderApp());
   }, (error, stackTrace) {
+    LoggerService.instance.e('Unhandled Async Error: $error', stackTrace: stackTrace.toString());
     debugPrint('=== Unhandled Async Error ===');
     debugPrint('Error: $error');
     debugPrint('Stack trace: $stackTrace');
@@ -84,9 +89,14 @@ class NovelReaderApp extends StatelessWidget {
       builder: (context, child) {
         // 捕获并记录所有Widget错误
         ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
+          final stackTrace = errorDetails.stack?.toString() ?? '';
+          LoggerService.instance.e(
+            'Widget Error: ${errorDetails.exception}',
+            stackTrace: stackTrace,
+          );
           debugPrint('=== Widget Error ===');
           debugPrint('Exception: ${errorDetails.exception}');
-          debugPrint('Stack: ${errorDetails.stack}');
+          debugPrint('Stack: $stackTrace');
           debugPrint('==================');
           return MaterialApp(
             home: Scaffold(

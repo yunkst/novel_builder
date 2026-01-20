@@ -23,9 +23,8 @@ import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
 import '../controllers/chapter_list/chapter_reorder_controller.dart';
 import '../services/chapter_service.dart';
+import '../constants/chapter_constants.dart';
 import 'dart:async';
-import 'package:draggable_scrollbar/draggable_scrollbar.dart';
-
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
 
@@ -57,6 +56,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   bool _isInBookshelf = false;
   String _errorMessage = '';
   int _lastReadChapterIndex = 0;
+
+  // 分页状态
+  int _currentPage = 1; // 当前页码（从1开始）
+  int _totalPages = 1; // 总页数
+
+  // 当前页章节缓存
+  List<Chapter> _currentPageChaptersCache = [];
+  int _currentPageCache = -1; // 缓存的页码
 
   // 章节缓存状态映射（chapterUrl -> isCached）
   final Map<String, bool> _cachedStatus = {};
@@ -133,6 +140,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       await _chapterLoader.initApi();
       _loadChapters();
     } catch (e) {
+      debugPrint('❌ 初始化API失败: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = '初始化API失败: $e';
@@ -166,6 +174,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _chapters = cachedChapters;
           _isLoading = false;
         });
+        _updateTotalPages();
         _scrollToLastReadChapter();
         // 初始加载所有章节的缓存状态
         _loadCachedStatus();
@@ -178,6 +187,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _chapters = cachedChapters;
           _isLoading = false;
         });
+        _updateTotalPages();
         _scrollToLastReadChapter();
 
         // 在后台更新章节列表
@@ -192,9 +202,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             _chapters = [];
             _isLoading = false;
           });
+          _updateTotalPages();
         }
       }
     } catch (e) {
+      debugPrint('❌ 加载章节列表失败: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = '加载章节列表失败: $e';
@@ -219,6 +231,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _chapters = updatedChapters;
           _isLoading = false;
         });
+        _updateTotalPages();
         _scrollToLastReadChapter();
 
         // 初始加载所有章节的缓存状态
@@ -237,6 +250,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         });
       }
     } catch (e) {
+      debugPrint('❌ 从后端刷新章节列表失败: $e');
       // 如果已经有缓存数据，不显示错误，只显示提示
       if (_chapters.isNotEmpty) {
         if (mounted) {
@@ -295,31 +309,150 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   void _scrollToLastReadChapter() {
-    if (_lastReadChapterIndex > 0 && _chapters.isNotEmpty) {
-      // 延迟执行滚动，确保ListView已经构建完成
+    if (_lastReadChapterIndex >= 0 && _chapters.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          final targetIndex =
-              _lastReadChapterIndex.clamp(0, _chapters.length - 1);
+        // 计算目标章节所在的页码
+        final targetPage =
+            (_lastReadChapterIndex / ChapterConstants.chaptersPerPage).floor() + 1;
 
-          // 使用简单的滚动方法，避免复杂计算导致的过头问题
-          // 计算目标位置：让目标章节显示在可视区域的上方1/4处
-          final itemHeight = 56.0; // ListTile默认高度
-          final targetOffset = targetIndex * itemHeight;
-
-          // 获取可视区域高度，让目标章节显示在上方1/4处
-          final viewportHeight = _scrollController.position.viewportDimension;
-          final adjustedOffset = (targetOffset - viewportHeight * 0.25)
-              .clamp(0.0, _scrollController.position.maxScrollExtent);
-
-          _scrollController.animateTo(
-            adjustedOffset,
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOutCubic,
-          );
+        // 跳转到目标页
+        if (targetPage != _currentPage) {
+          setState(() {
+            _currentPage = targetPage.clamp(1, _totalPages);
+          });
         }
+
+        // 延迟执行滚动，确保ListView已经重建完成
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            // 计算目标章节在当前页中的索引
+            final startIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage;
+            final indexInPage = _lastReadChapterIndex - startIndex;
+
+            // 使用简单的滚动方法，避免复杂计算导致的过头问题
+            // 计算目标位置：让目标章节显示在可视区域的上方1/4处
+            final itemHeight = ChapterConstants.listItemHeight;
+            final targetOffset = indexInPage * itemHeight;
+
+            // 获取可视区域高度，让目标章节显示在上方1/4处
+            final viewportHeight = _scrollController.position.viewportDimension;
+            final adjustedOffset = (targetOffset - viewportHeight * 0.25)
+                .clamp(0.0, _scrollController.position.maxScrollExtent);
+
+            _scrollController.animateTo(
+              adjustedOffset,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
       });
     }
+  }
+
+  /// 计算总页数
+  void _updateTotalPages() {
+    if (_chapters.isEmpty) {
+      _totalPages = 1;
+    } else {
+      _totalPages = (_chapters.length / ChapterConstants.chaptersPerPage).ceil();
+    }
+
+    // 清除缓存，因为章节数已变化
+    _currentPageCache = -1;
+  }
+
+  /// 获取当前页章节（带缓存）
+  List<Chapter> _getCurrentPageChapters() {
+    // 如果缓存命中且章节数未变化，直接返回缓存
+    if (_currentPage == _currentPageCache &&
+        _currentPageChaptersCache.isNotEmpty &&
+        _currentPageChaptersCache.length <= _chapters.length) {
+      return _currentPageChaptersCache;
+    }
+
+    // 否则重新加载并缓存
+    _currentPageChaptersCache = _loadCurrentPageChapters();
+    _currentPageCache = _currentPage;
+    return _currentPageChaptersCache;
+  }
+
+  /// 加载当前页章节
+  List<Chapter> _loadCurrentPageChapters() {
+    if (_chapters.isEmpty) return [];
+
+    final startIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage;
+    final endIndex =
+        (startIndex + ChapterConstants.chaptersPerPage).clamp(0, _chapters.length);
+
+    return _chapters.sublist(startIndex, endIndex);
+  }
+
+  /// 跳转到指定页码
+  void _goToPage(int page) {
+    if (page < 1 || page > _totalPages) return;
+
+    setState(() {
+      _currentPage = page;
+    });
+
+    // 滚动到列表顶部
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  /// 构建分页控制栏
+  Widget _buildPaginationControl() {
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 首页按钮
+          IconButton(
+            icon: const Icon(Icons.first_page),
+            onPressed: _currentPage > 1 ? () => _goToPage(1) : null,
+            tooltip: '首页',
+          ),
+          // 上一页按钮
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
+            tooltip: '上一页',
+          ),
+          // 页码显示
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text('第 $_currentPage / $_totalPages 页'),
+          ),
+          // 下一页按钮
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _currentPage < _totalPages
+                ? () => _goToPage(_currentPage + 1)
+                : null,
+            tooltip: '下一页',
+          ),
+          // 末页按钮
+          IconButton(
+            icon: const Icon(Icons.last_page),
+            onPressed: _currentPage < _totalPages ? () => _goToPage(_totalPages) : null,
+            tooltip: '末页',
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkBookshelfStatus() async {
@@ -382,6 +515,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         );
       }
     } catch (e) {
+      debugPrint('❌ 清除缓存失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('清除缓存失败: $e')),
@@ -490,6 +624,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         enableDebugLog: false,
       );
     } catch (e) {
+      debugPrint('❌ 调用Dify生成章节失败: $e');
       _isGeneratingNotifier.value = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -654,6 +789,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               ? _buildReorderableChapterList()
                               : _buildNormalChapterList(),
                     ),
+                    // 只在非重排模式、有章节且总页数大于1时显示分页控制栏
+                    if (!_isReorderingMode && _chapters.isNotEmpty && _totalPages > 1)
+                      _buildPaginationControl(),
                   ],
                 ),
     );
@@ -799,44 +937,54 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   // 构建正常的章节列表（支持长按进入重排模式）
   Widget _buildNormalChapterList() {
-    return DraggableScrollbar.rrect(
-      key: const ValueKey('chapter_list_scrollbar'),
-      controller: _scrollController,
-      child: ListView.builder(
-        itemCount: _chapters.length,
-        itemBuilder: (context, index) {
-          final chapter = _chapters[index];
-          final isLastRead = index == _lastReadChapterIndex;
-          final isUserChapter = chapter.isUserInserted;
+    final pageChapters = _getCurrentPageChapters();
 
-          return ChapterListItem(
-            chapter: chapter,
-            isLastRead: isLastRead,
-            isUserChapter: isUserChapter,
-            isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
-            isRead: chapter.isRead, // 传入已读状态
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReaderScreen(
-                    novel: widget.novel,
-                    chapter: chapter,
-                    chapters: _chapters,
-                  ),
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: pageChapters.length,
+      itemBuilder: (context, index) {
+        final chapter = pageChapters[index];
+        // 计算在全部章节中的实际索引
+        final globalIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage + index;
+        final isLastRead = globalIndex == _lastReadChapterIndex;
+        final isUserChapter = chapter.isUserInserted;
+
+        return ChapterListItem(
+          chapter: chapter,
+          isLastRead: isLastRead,
+          isUserChapter: isUserChapter,
+          isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
+          isRead: chapter.isRead, // 传入已读状态
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ReaderScreen(
+                  novel: widget.novel,
+                  chapter: chapter,
+                  chapters: _chapters,
                 ),
-              );
-            },
-            onLongPress: () {
-              _toggleReorderingMode();
-            },
-            onInsert: () => _showInsertChapterDialog(index),
-            onDelete: chapter.isUserInserted
-                ? () => _showDeleteChapterDialog(chapter, index)
-                : null,
-          );
-        },
-      ),
+              ),
+            ).then((_) {
+              // 返回时重新加载上次阅读位置并跳转
+              if (mounted) {
+                _loadLastReadChapter().then((_) {
+                  if (mounted) {
+                    _scrollToLastReadChapter();
+                  }
+                });
+              }
+            });
+          },
+          onLongPress: () {
+            _toggleReorderingMode();
+          },
+          onInsert: () => _showInsertChapterDialog(index),
+          onDelete: chapter.isUserInserted
+              ? () => _showDeleteChapterDialog(chapter, index)
+              : null,
+        );
+      },
     );
   }
 
