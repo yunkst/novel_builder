@@ -21,6 +21,7 @@ doc/RoleRegenerateRequest.md
 doc/SceneGalleryResponse.md
 doc/SceneImageDeleteRequest.md
 doc/SceneRegenerateRequest.md
+doc/SceneRegenerateResponse.md
 doc/SourceSite.md
 doc/ValidationError.md
 doc/ValidationErrorLocInner.md
@@ -55,6 +56,7 @@ lib/src/model/role_regenerate_request.dart
 lib/src/model/scene_gallery_response.dart
 lib/src/model/scene_image_delete_request.dart
 lib/src/model/scene_regenerate_request.dart
+lib/src/model/scene_regenerate_response.dart
 lib/src/model/source_site.dart
 lib/src/model/validation_error.dart
 lib/src/model/validation_error_loc_inner.dart
@@ -81,6 +83,7 @@ test/role_regenerate_request_test.dart
 test/scene_gallery_response_test.dart
 test/scene_image_delete_request_test.dart
 test/scene_regenerate_request_test.dart
+test/scene_regenerate_response_test.dart
 test/source_site_test.dart
 test/validation_error_loc_inner_test.dart
 test/validation_error_test.dart

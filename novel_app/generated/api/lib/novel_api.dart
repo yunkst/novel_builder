@@ -30,6 +30,7 @@ export 'package:novel_api/src/model/role_regenerate_request.dart';
 export 'package:novel_api/src/model/scene_gallery_response.dart';
 export 'package:novel_api/src/model/scene_image_delete_request.dart';
 export 'package:novel_api/src/model/scene_regenerate_request.dart';
+export 'package:novel_api/src/model/scene_regenerate_response.dart';
 export 'package:novel_api/src/model/source_site.dart';
 export 'package:novel_api/src/model/validation_error.dart';
 export 'package:novel_api/src/model/validation_error_loc_inner.dart';
