@@ -93,6 +93,38 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
     });
   }
 
+  /// 构建所有匹配项的高亮显示
+  List<Widget> _buildMatchHighlights(ChapterSearchResult result) {
+    if (!result.hasHighlight || result.matchPositions.isEmpty) {
+      return const [
+        SizedBox.shrink(),
+      ];
+    }
+
+    return result.matchPositions.map((position) {
+      // 提取匹配位置前后的上下文（前后20字）
+      final start = (position.start - 20).clamp(0, result.content.length);
+      final end = (position.end + 20).clamp(0, result.content.length);
+      var contextText = result.content.substring(start, end);
+
+      // 添加省略号
+      if (start > 0) contextText = '...$contextText';
+      if (end < result.content.length) contextText = '$contextText...';
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: _SingleMatchHighlight(
+          text: contextText,
+          keywords: result.searchKeywords,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   Chapter? _findChapterByUrl(String chapterUrl) {
     try {
       return _chapters.firstWhere((chapter) => chapter.url == chapterUrl);
@@ -251,94 +283,42 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           elevation: 2,
           child: ListTile(
-            title: result.hasHighlight
-                ? TitleHighlight(
-                    title: result.chapterTitle,
-                    keywords: result.searchKeywords,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  )
-                : Text(
-                    result.chapterTitle,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+            title: Row(
+              children: [
+                Expanded(
+                  child: result.hasHighlight
+                      ? TitleHighlight(
+                          title: result.chapterTitle,
+                          keywords: result.searchKeywords,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        )
+                      : Text(
+                          result.chapterTitle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                ),
+                if (result.matchCount > 0)
+                  Text(
+                    ' (${result.matchCount}处匹配)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
+              ],
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 章节索引和匹配信息
-                Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4, bottom: 8),
-                      child: Text(
-                        result.chapterIndexText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                    if (result.matchCount > 0) const SizedBox(width: 8),
-                    if (result.matchCount > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${result.matchCount} 处匹配',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-
-                // 匹配的文本片段（带高亮）
-                if (result.hasHighlight)
-                  SearchResultHighlight(
-                    originalText: result.content,
-                    keywords: result.searchKeywords,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                    maxLines: 3,
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Text(
-                      result.matchedText,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                // 匹配的文本片段列表（带高亮）
+                ..._buildMatchHighlights(result),
 
                 // 缓存时间
                 Padding(
@@ -377,5 +357,83 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
         );
       },
     );
+  }
+}
+
+/// 单个匹配高亮组件
+class _SingleMatchHighlight extends StatelessWidget {
+  final String text;
+  final List<String> keywords;
+  final TextStyle? style;
+
+  const _SingleMatchHighlight({
+    required this.text,
+    required this.keywords,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        style: style,
+        children: _buildHighlightedSpans(context),
+      ),
+    );
+  }
+
+  List<TextSpan> _buildHighlightedSpans(BuildContext context) {
+    final List<TextSpan> spans = [];
+    int currentIndex = 0;
+
+    // 查找所有关键词的匹配位置
+    final List<MatchPosition> allMatches = [];
+    for (final keyword in keywords) {
+      if (keyword.isEmpty) continue;
+      final pattern = RegExp(RegExp.escape(keyword), caseSensitive: false);
+      for (final match in pattern.allMatches(text)) {
+        allMatches.add(MatchPosition(
+          start: match.start,
+          end: match.end,
+          matchedText: match.group(0) ?? '',
+        ));
+      }
+    }
+
+    // 按位置排序
+    allMatches.sort((a, b) => a.start.compareTo(b.start));
+
+    // 构建高亮的文本片段
+    for (final match in allMatches) {
+      // 添加匹配前的普通文本
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(
+          text: text.substring(currentIndex, match.start),
+        ));
+      }
+
+      // 添加高亮的匹配文本
+      spans.add(TextSpan(
+        text: text.substring(match.start, match.end),
+        style: TextStyle(
+          backgroundColor: Theme.of(context)
+              .colorScheme
+              .primary
+              .withValues(alpha: 0.3),
+          fontWeight: FontWeight.bold,
+        ),
+      ));
+
+      currentIndex = match.end;
+    }
+
+    // 添加剩余的普通文本
+    if (currentIndex < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(currentIndex),
+      ));
+    }
+
+    return spans;
   }
 }

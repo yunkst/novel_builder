@@ -7,11 +7,13 @@ class ChapterTitle extends StatelessWidget {
   final String title;
   final bool isLastRead;
   final bool isUserChapter;
+  final bool isRead;
 
   const ChapterTitle({
     required this.title,
     required this.isLastRead,
     required this.isUserChapter,
+    this.isRead = false,
     super.key,
   });
 
@@ -21,9 +23,21 @@ class ChapterTitle extends StatelessWidget {
       title,
       style: TextStyle(
         fontWeight: isLastRead ? FontWeight.bold : FontWeight.normal,
-        color: isLastRead ? Colors.red : null,
+        color: _getTextColor(context),
         fontStyle: isUserChapter ? FontStyle.italic : FontStyle.normal,
       ),
     );
+  }
+
+  /// 获取标题颜色
+  /// 优先级：最后阅读 > 已读 > 默认
+  Color? _getTextColor(BuildContext context) {
+    if (isLastRead) {
+      return Colors.red;
+    }
+    if (isRead) {
+      return Colors.grey;
+    }
+    return null;
   }
 }

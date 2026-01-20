@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:novel_api/novel_api.dart';
 
 class Character {
@@ -15,6 +16,7 @@ class Character {
   final String? facePrompts; // 面部提示词
   final String? bodyPrompts; // 身材提示词
   final String? cachedImageUrl; // 缓存的图集第一张图片路径
+  final List<String>? aliases; // 别名列表，上限10个
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -33,6 +35,7 @@ class Character {
     this.facePrompts, // 面部提示词
     this.bodyPrompts, // 身材提示词
     this.cachedImageUrl, // 缓存的图集第一张图片路径
+    this.aliases, // 别名列表
     DateTime? createdAt,
     this.updatedAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -53,12 +56,23 @@ class Character {
       'facePrompts': facePrompts,
       'bodyPrompts': bodyPrompts,
       'cachedImageUrl': cachedImageUrl,
+      'aliases': aliases?.isEmpty ?? true ? null : jsonEncode(aliases),
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt?.millisecondsSinceEpoch,
     };
   }
 
   factory Character.fromMap(Map<String, dynamic> map) {
+    List<String>? parseAliases(String? aliasesJson) {
+      if (aliasesJson == null || aliasesJson.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(aliasesJson) as List;
+        return decoded.map((e) => e.toString()).toList();
+      } catch (_) {
+        return null;
+      }
+    }
+
     return Character(
       id: map['id']?.toInt(),
       novelUrl: map['novelUrl'] as String,
@@ -74,6 +88,7 @@ class Character {
       facePrompts: map['facePrompts'] as String?,
       bodyPrompts: map['bodyPrompts'] as String?,
       cachedImageUrl: map['cachedImageUrl'] as String?,
+      aliases: parseAliases(map['aliases'] as String?),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
       updatedAt: map['updatedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'])
@@ -96,6 +111,7 @@ class Character {
     String? facePrompts,
     String? bodyPrompts,
     String? cachedImageUrl,
+    List<String>? aliases,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -114,6 +130,7 @@ class Character {
       facePrompts: facePrompts ?? this.facePrompts,
       bodyPrompts: bodyPrompts ?? this.bodyPrompts,
       cachedImageUrl: cachedImageUrl ?? this.cachedImageUrl,
+      aliases: aliases ?? this.aliases,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
     );

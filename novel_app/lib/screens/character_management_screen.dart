@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/outline.dart';
+import '../models/chapter.dart';
 import '../services/database_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/character_avatar_service.dart';
+import '../services/character_extraction_service.dart';
 import '../services/dify_service.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
@@ -135,24 +137,36 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   }
 
   Future<void> _aiCreateCharacter() async {
-    // 显示输入对话框，传入大纲状态
+    // 显示输入对话框，传入大纲状态和小说URL
     final result = await CharacterInputDialog.show(
       context,
       hasOutline: _hasOutline,
+      novelUrl: widget.novel.url,
     );
 
     if (result == null) {
       return;
     }
 
+    final mode = result['mode'] as String;
+
+    if (!mounted) return;
+
+    if (mode == 'extract') {
+      await _extractCharacter(result);
+    } else {
+      await _generateCharacter(result);
+    }
+  }
+
+  /// AI生成角色（描述模式或大纲模式）
+  Future<void> _generateCharacter(Map<String, dynamic> result) async {
     final userInput = result['userInput'] as String;
     final useOutline = result['useOutline'] as bool;
 
     if (userInput.trim().isEmpty) {
       return;
     }
-
-    if (!mounted) return;
 
     // 显示加载对话框
     showDialog(
@@ -189,7 +203,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       // 关闭加载对话框
       Navigator.of(context).pop();
 
-      // 显示角色预览对话框，允许用户选择要保存的角色
+      // 显示角色预览对话框
       await CharacterPreviewDialog.show(
         context,
         characters: generatedCharacters,
@@ -209,6 +223,112 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('创建角色失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 提取角色
+  Future<void> _extractCharacter(Map<String, dynamic> result) async {
+    final name = result['name'] as String;
+    final aliases = result['aliases'] as List<String>;
+    final contextLength = result['contextLength'] as int;
+    final extractFullChapter = result['extractFullChapter'] as bool;
+    final selectedChapters = result['selectedChapters'] as List;
+
+    if (selectedChapters.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请至少选择一个章节'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('正在提取角色信息...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // 构建角色名字符串
+      final rolesList = <String>[name, ...aliases];
+      final rolesString = rolesList.join('、');
+
+      // 提取并合并上下文
+      final extractionService = CharacterExtractionService();
+      final allContexts = <String>[];
+
+      for (final item in selectedChapters) {
+        final chapterMatch = item as Map;
+        final chapter = chapterMatch['chapter'] as Chapter;
+        final content = chapter.content ?? '';
+
+        if (extractFullChapter) {
+          allContexts.add(content);
+        } else {
+          final matchPositions = chapterMatch['matchPositions'] as List;
+          final contexts = extractionService.extractContextAroundMatches(
+            content: content,
+            matchPositions: matchPositions.toList().cast<int>(),
+            contextLength: contextLength,
+            useFullChapter: false,
+          );
+          allContexts.addAll(contexts);
+        }
+      }
+
+      // 合并去重
+      final mergedContent =
+          extractionService.mergeAndDeduplicateContexts(allContexts);
+
+      // 调用 Dify 提取角色
+      final extractedCharacters = await _difyService.extractCharacter(
+        chapterContent: mergedContent,
+        roles: rolesString,
+        novelUrl: widget.novel.url,
+      );
+
+      if (!mounted) return;
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      // 显示角色预览对话框
+      await CharacterPreviewDialog.show(
+        context,
+        characters: extractedCharacters,
+        onConfirmed: (selectedCharacters) async {
+          if (selectedCharacters.isNotEmpty) {
+            await _saveSelectedCharacters(selectedCharacters);
+          }
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('提取角色失败: $e'),
             backgroundColor: Colors.red,
           ),
         );

@@ -1,5 +1,7 @@
 import 'dart:io';
-import 'package:background_downloader/background_downloader.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,6 +17,7 @@ import 'api_service_wrapper.dart';
 class AppUpdateService {
   static const String _lastCheckKey = 'app_update_last_check';
   static const String _ignoreVersionKey = 'app_update_ignore_version';
+  static const _platformChannel = MethodChannel('com.example.novel_app/app_install');
 
   final ApiServiceWrapper _apiWrapper;
 
@@ -74,7 +77,7 @@ class AppUpdateService {
 
       return null;
     } catch (e) {
-      print('检查更新失败: $e');
+      debugPrint('检查更新失败: $e');
       return null;
     }
   }
@@ -101,8 +104,12 @@ class AppUpdateService {
       final latestParts = latest.split('.').map(int.parse).toList();
 
       // 补齐版本号位数
-      while (currentParts.length < 3) currentParts.add(0);
-      while (latestParts.length < 3) latestParts.add(0);
+      while (currentParts.length < 3) {
+        currentParts.add(0);
+      }
+      while (latestParts.length < 3) {
+        latestParts.add(0);
+      }
 
       // 比较主版本号
       if (latestParts[0] > currentParts[0]) return true;
@@ -117,7 +124,7 @@ class AppUpdateService {
 
       return false;
     } catch (e) {
-      print('版本号比较失败: $e');
+      debugPrint('版本号比较失败: $e');
       return false;
     }
   }
@@ -141,120 +148,133 @@ class AppUpdateService {
     void Function(double progress)? onProgress,
     void Function(String status)? onStatus,
   }) async {
+    Dio? dio;
     try {
+      debugPrint('🔄 [APP更新] 开始下载流程');
       onStatus?.call('准备下载...');
 
       // 请求存储权限
+      debugPrint('🔍 [APP更新] 检查存储权限');
       final storageStatus = await Permission.storage.request();
-      if (!storageStatus.isGranted &&
-          !await Permission.manageExternalStorage.request().isGranted) {
-        onStatus?.call('需要存储权限');
-        return false;
+      debugPrint('🔍 [APP更新] storage权限: $storageStatus');
+      if (!storageStatus.isGranted) {
+        final manageStatus = await Permission.manageExternalStorage.request();
+        debugPrint('🔍 [APP更新] manageExternalStorage权限: $manageStatus');
+        if (!manageStatus.isGranted) {
+          debugPrint('❌ [APP更新] 存储权限被拒绝');
+          onStatus?.call('需要存储权限');
+          return false;
+        }
       }
 
       // 获取下载目录
-      final directory = await getExternalStorageDirectory();
-      if (directory == null) {
-        onStatus?.call('无法访问存储目录');
-        return false;
+      debugPrint('🔍 [APP更新] 获取下载目录');
+      final directory = await getApplicationDocumentsDirectory();
+      debugPrint('🔍 [APP更新] 下载目录: ${directory.path}');
+
+      // 确保 updates 目录存在
+      final updatesDir = Directory('${directory.path}/updates');
+      if (!await updatesDir.exists()) {
+        await updatesDir.create(recursive: true);
+        debugPrint('🔍 [APP更新] 创建 updates 目录');
       }
 
       final fileName = 'novel_app_v${version.version}.apk';
-      final savePath = '${directory.path}/$fileName';
+      final filePath = '${updatesDir.path}/$fileName';
+      debugPrint('🔍 [APP更新] 文件路径: $filePath');
 
       // 构建完整的下载URL
+      debugPrint('🔍 [APP更新] 获取API配置');
       final baseUrl = await _apiWrapper.getHost();
-      final token = await _apiWrapper.getToken();
+      debugPrint('🔍 [APP更新] baseUrl: $baseUrl');
+      debugPrint('🔍 [APP更新] version.downloadUrl: ${version.downloadUrl}');
 
-      if (baseUrl == null || baseUrl.isEmpty || token == null || token.isEmpty) {
+      if (baseUrl == null || baseUrl.isEmpty) {
+        debugPrint('❌ [APP更新] baseUrl 配置不完整');
         onStatus?.call('API配置不完整');
         return false;
       }
 
       final downloadUrl = '$baseUrl${version.downloadUrl}';
+      debugPrint('🔍 [APP更新] 完整下载URL: $downloadUrl');
 
       onStatus?.call('开始下载...');
 
-      // 创建下载任务
-      final task = DownloadTask(
-        url: downloadUrl,
-        filename: fileName,
-        directory: directory.path,
-        baseDirectory: BaseDirectory.root,
-        updates: Updates.statusAndProgress,
-        headers: {'X-API-TOKEN': token},
-        allowPause: false,
-      );
+      // 使用 Dio 下载文件
+      debugPrint('🚀 [APP更新] 开始执行下载');
+      dio = Dio();
 
-      // 执行下载
-      final result = await FileDownloader().download(
-        task,
-        onProgress: (progress) {
-          onProgress?.call(progress);
-        },
-        onStatus: (status) {
-          switch (status) {
-            case TaskStatus.complete:
-              onStatus?.call('下载完成');
-              break;
-            case TaskStatus.canceled:
-              onStatus?.call('下载已取消');
-              break;
-            case TaskStatus.failed:
-              onStatus?.call('下载失败');
-              break;
-            case TaskStatus.paused:
-              onStatus?.call('下载已暂停');
-              break;
-            default:
-              onStatus?.call('下载中...');
+      await dio.download(
+        downloadUrl,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total > 0) {
+            final progress = received / total;
+            debugPrint('📥 [APP更新] 下载进度: ${(progress * 100).toStringAsFixed(0)}%');
+            onProgress?.call(progress);
           }
         },
       );
 
-      final success = result.status == TaskStatus.complete;
-      onStatus?.call(success ? '下载完成' : '下载失败');
+      debugPrint('✅ [APP更新] 下载完成');
+      onStatus?.call('下载完成');
+      onProgress?.call(1.0);
 
-      return success;
-    } catch (e) {
-      print('下载更新失败: $e');
+      return true;
+    } on DioException catch (e) {
+      debugPrint('❌ [APP更新] 下载失败: ${e.message}');
+      debugPrint('❌ [APP更新] 响应状态: ${e.response?.statusCode}');
+      onStatus?.call('下载失败: ${e.message}');
+      return false;
+    } catch (e, stackTrace) {
+      debugPrint('❌ [APP更新] 下载异常: $e');
+      debugPrint('❌ [APP更新] 堆栈: $stackTrace');
       onStatus?.call('下载出错: $e');
       return false;
+    } finally {
+      dio?.close();
     }
   }
 
   /// 安装APK
   Future<bool> installUpdate(String version) async {
     try {
+      debugPrint('🔧 [APP更新] 开始安装APK');
       // 检查安装权限
       final hasPermission = await requestInstallPermission();
       if (!hasPermission) {
-        print('没有安装权限');
-        return false;
-      }
-
-      // 获取下载目录
-      final directory = await getExternalStorageDirectory();
-      if (directory == null) {
+        debugPrint('❌ [APP更新] 没有安装权限');
         return false;
       }
 
       final fileName = 'novel_app_v$version.apk';
-      final filePath = '${directory.path}/$fileName';
+
+      // 获取应用文档目录
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/updates/$fileName';
+      debugPrint('🔍 [APP更新] APK文件路径: $filePath');
 
       // 检查文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
-        print('APK文件不存在: $filePath');
+        debugPrint('❌ [APP更新] APK文件不存在: $filePath');
         return false;
       }
 
-      // 使用FileDownloader打开文件（会触发安装）
-      await FileDownloader().openFile(filePath: filePath);
+      // 使用 MethodChannel 调用原生安装方法
+      debugPrint('🚀 [APP更新] 调用原生安装方法');
+      final result = await _platformChannel.invokeMethod('installApk', {
+        'filePath': filePath,
+      });
 
-      return true;
-    } catch (e) {
-      print('安装APK失败: $e');
+      return result == true;
+    } on PlatformException catch (e) {
+      debugPrint('❌ [APP更新] 安装失败: ${e.message}');
+      debugPrint('❌ [APP更新] 错误码: ${e.code}');
+      return false;
+    } catch (e, stackTrace) {
+      debugPrint('❌ [APP更新] 安装APK失败: $e');
+      debugPrint('❌ [APP更新] 堆栈: $stackTrace');
       return false;
     }
   }

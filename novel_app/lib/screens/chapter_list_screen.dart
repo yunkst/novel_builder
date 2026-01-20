@@ -24,6 +24,7 @@ import '../controllers/chapter_list/chapter_action_handler.dart';
 import '../controllers/chapter_list/chapter_reorder_controller.dart';
 import '../services/chapter_service.dart';
 import 'dart:async';
+import 'package:draggable_scrollbar/draggable_scrollbar.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -798,7 +799,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   // 构建正常的章节列表（支持长按进入重排模式）
   Widget _buildNormalChapterList() {
-    return Scrollbar(
+    return DraggableScrollbar.rrect(
       controller: _scrollController,
       child: ListView.builder(
         controller: _scrollController,
@@ -813,6 +814,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             isLastRead: isLastRead,
             isUserChapter: isUserChapter,
             isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
+            isRead: chapter.isRead, // 传入已读状态
             onTap: () {
               Navigator.push(
                 context,

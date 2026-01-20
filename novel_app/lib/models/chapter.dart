@@ -5,6 +5,7 @@ class Chapter {
   final bool isCached;
   final int? chapterIndex;
   final bool isUserInserted;
+  final int? readAt;
 
   Chapter({
     required this.title,
@@ -13,7 +14,11 @@ class Chapter {
     this.isCached = false,
     this.chapterIndex,
     this.isUserInserted = false,
+    this.readAt,
   });
+
+  /// 是否已读（readAt 不为 null 即表示已读）
+  bool get isRead => readAt != null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -23,6 +28,7 @@ class Chapter {
       'isCached': isCached ? 1 : 0,
       'chapterIndex': chapterIndex,
       'isUserInserted': isUserInserted ? 1 : 0,
+      'readAt': readAt,
     };
   }
 
@@ -34,6 +40,7 @@ class Chapter {
       isCached: (map['isCached'] as int) == 1,
       chapterIndex: map['chapterIndex'] as int?,
       isUserInserted: (map['isUserInserted'] as int?) == 1,
+      readAt: map['readAt'] as int?,
     );
   }
 
@@ -44,6 +51,7 @@ class Chapter {
     bool? isCached,
     int? chapterIndex,
     bool? isUserInserted,
+    int? readAt,
   }) {
     return Chapter(
       title: title ?? this.title,
@@ -52,6 +60,7 @@ class Chapter {
       isCached: isCached ?? this.isCached,
       chapterIndex: chapterIndex ?? this.chapterIndex,
       isUserInserted: isUserInserted ?? this.isUserInserted,
+      readAt: readAt ?? this.readAt,
     );
   }
 }

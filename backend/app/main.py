@@ -129,11 +129,36 @@ async def novel_builder_exception_handler(request: Request, exc: NovelBuilderExc
 
 
 @app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
+async def general_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
     """处理未预期的异常"""
     novel_exc = handle_exception(exc, logger)
     logger.error(f"未处理异常: {novel_exc.message}")
     return JSONResponse(status_code=500, content=novel_exc.to_dict())
+
+
+def handle_service_exception(
+    exc: Exception, logger: logging.Logger, operation_name: str
+) -> HTTPException:
+    """
+    统一的服务层异常处理函数
+
+    Args:
+        exc: 捕获的异常
+        logger: 日志记录器
+        operation_name: 操作名称（用于日志）
+
+    Returns:
+        HTTPException: 格式化的HTTP异常
+    """
+    expected_types = (ValueError, SQLAlchemyError)
+    if isinstance(exc, expected_types):
+        logger.warning(f"{operation_name}参数错误: {exc}")
+        return HTTPException(status_code=400, detail=str(exc))
+
+    logger.error(f"{operation_name}失败: {exc}")
+    return HTTPException(status_code=500, detail=f"{operation_name}失败")
 
 
 @app.get("/health")
@@ -382,18 +407,9 @@ async def generate_role_card_images(
     注意：用户要求已固定为"生成人物卡"，无需手动输入
     """
     try:
-        result = await role_card_async_service.create_task(request, db)
-        return result
-    except ValueError as e:
-        logger.warning(f"创建人物卡生成任务参数错误: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        novel_exc = handle_exception(e, logger)
-        logger.error(f"创建人物卡生成任务失败: {novel_exc.message}")
-        raise HTTPException(
-            status_code=500,
-            detail={"error": novel_exc.error_code, "message": novel_exc.message},
-        )
+        return await role_card_async_service.create_task(request, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "创建人物卡生成任务")
 
 
 @app.get(
@@ -401,7 +417,9 @@ async def generate_role_card_images(
     response_model=RoleCardTaskStatusResponse,
     dependencies=[Depends(verify_token)],
 )
-async def get_role_card_task_status(task_id: int, db: Session = Depends(get_db)):
+async def get_role_card_task_status(
+    task_id: int, db: Session = Depends(get_db)
+):
     """
     查询人物卡生成任务状态
 
@@ -412,9 +430,10 @@ async def get_role_card_task_status(task_id: int, db: Session = Depends(get_db))
         if not result:
             raise HTTPException(status_code=404, detail="任务不存在")
         return result
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"查询任务状态失败: {e}")
-        raise HTTPException(status_code=500, detail="查询任务状态失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "查询任务状态")
 
 
 @app.get(
@@ -422,18 +441,18 @@ async def get_role_card_task_status(task_id: int, db: Session = Depends(get_db))
     response_model=RoleGalleryResponse,
     dependencies=[Depends(verify_token)],
 )
-async def get_role_card_gallery(role_id: str, db: Session = Depends(get_db)):
+async def get_role_card_gallery(
+    role_id: str, db: Session = Depends(get_db)
+):
     """
     查看角色图集
 
     - **role_id**: 人物卡ID
     """
     try:
-        result = await role_card_service.get_role_gallery(role_id, db)
-        return result
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"获取角色图集失败: {e}")
-        raise HTTPException(status_code=500, detail="获取图集失败")
+        return await role_card_service.get_role_gallery(role_id, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取角色图集")
 
 
 @app.delete("/api/role-card/image", dependencies=[Depends(verify_token)])
@@ -448,13 +467,13 @@ async def delete_role_card_image(
     """
     try:
         success = await role_card_service.delete_role_image(request, db)
-        if success:
-            return {"message": "图片删除成功"}
-        else:
+        if not success:
             raise HTTPException(status_code=404, detail="图片不存在")
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"删除角色图片失败: {e}")
-        raise HTTPException(status_code=500, detail="删除图片失败")
+        return {"message": "图片删除成功"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "删除角色图片")
 
 
 @app.post("/api/role-card/regenerate", dependencies=[Depends(verify_token)])
@@ -469,15 +488,11 @@ async def regenerate_similar_images(
     - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     """
     try:
-        result = await role_card_service.regenerate_similar_images(
+        return await role_card_service.regenerate_similar_images(
             request, db, model=request.model
         )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"重新生成相似图片失败: {e}")
-        raise HTTPException(status_code=500, detail="重新生成图片失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "重新生成相似图片")
 
 
 @app.get("/api/models", dependencies=[Depends(verify_token)])
@@ -486,11 +501,11 @@ async def get_models() -> ModelsResponse:
     try:
         from app.workflow_config import WorkflowType, workflow_config_manager
 
-        # 获取默认T2I模型
-        default_t2i_workflow = workflow_config_manager.get_default_workflow(WorkflowType.T2I)
+        default_t2i_workflow = workflow_config_manager.get_default_workflow(
+            WorkflowType.T2I
+        )
         default_t2i_title = default_t2i_workflow.title
 
-        # 获取文生图工作流
         t2i_response = workflow_config_manager.list_workflows(WorkflowType.T2I)
         text2img_models = [
             WorkflowInfo(
@@ -504,7 +519,6 @@ async def get_models() -> ModelsResponse:
             for workflow in t2i_response.workflows
         ]
 
-        # 获取图生视频工作流
         i2v_response = workflow_config_manager.list_workflows(WorkflowType.I2V)
         img2video_models = [
             WorkflowInfo(
@@ -516,9 +530,8 @@ async def get_models() -> ModelsResponse:
         ]
 
         return ModelsResponse(text2img=text2img_models, img2video=img2video_models)
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"获取模型列表失败: {e}")
-        raise HTTPException(status_code=500, detail="获取模型列表失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取模型列表")
 
 
 @app.get("/api/role-card/health", dependencies=[Depends(verify_token)])
@@ -532,7 +545,7 @@ async def role_card_health_check():
             "status": "healthy" if overall_healthy else "unhealthy",
             "services": health_status,
         }
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
+    except Exception as e:
         logger.error(f"人物卡健康检查失败: {e}")
         return {"status": "error", "message": str(e), "services": {}}
 
@@ -556,13 +569,9 @@ async def generate_scene_images(
     返回任务ID，可通过后续接口查询和获取图片
     """
     try:
-        result = await scene_illustration_service.generate_scene_images(request, db)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"创建场面绘制任务失败: {e}")
-        raise HTTPException(status_code=500, detail="创建任务失败")
+        return await scene_illustration_service.generate_scene_images(request, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "创建场面绘制任务")
 
 
 @app.get(
@@ -570,20 +579,20 @@ async def generate_scene_images(
     response_model=SceneGalleryResponse,
     dependencies=[Depends(verify_token)],
 )
-async def get_scene_gallery(task_id: str, db: Session = Depends(get_db)):
+async def get_scene_gallery(
+    task_id: str, db: Session = Depends(get_db)
+):
     """
     查看场面绘制图片列表
 
     - **task_id**: 场面绘制任务ID
     """
     try:
-        result = await scene_illustration_service.get_scene_gallery(task_id, db)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"获取场面图集失败: {e}")
-        raise HTTPException(status_code=500, detail="获取图集失败")
+        return await scene_illustration_service.get_scene_gallery(task_id, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取场面图集")
 
 
 @app.delete("/api/scene-illustration/image", dependencies=[Depends(verify_token)])
@@ -598,15 +607,13 @@ async def delete_scene_image(
     """
     try:
         success = await scene_illustration_service.delete_scene_image(request, db)
-        if success:
-            return {"message": "图片删除成功"}
-        else:
+        if not success:
             raise HTTPException(status_code=404, detail="图片不存在")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"删除场面图片失败: {e}")
-        raise HTTPException(status_code=500, detail="删除图片失败")
+        return {"message": "图片删除成功"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "删除场面图片")
 
 
 @app.post("/api/scene-illustration/regenerate", dependencies=[Depends(verify_token)])
@@ -621,13 +628,9 @@ async def regenerate_scene_images(
     - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     """
     try:
-        result = await scene_illustration_service.regenerate_scene_images(request, db)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"重新生成场面图片失败: {e}")
-        raise HTTPException(status_code=500, detail="重新生成图片失败")
+        return await scene_illustration_service.regenerate_scene_images(request, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "重新生成场面图片")
 
 
 # ================= 图生视频 API =================
@@ -671,13 +674,9 @@ async def generate_video_from_image(
     使用返回的 task_id 轮询 `/api/image-to-video/has-video/{img_name}` 查询视频是否生成完成
     """
     try:
-        result = await image_to_video_service.create_video_generation_task(request, db)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"创建图生视频任务失败: {e}")
-        raise HTTPException(status_code=500, detail="创建任务失败")
+        return await image_to_video_service.create_video_generation_task(request, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "创建图生视频任务")
 
 
 @app.get(
@@ -685,7 +684,9 @@ async def generate_video_from_image(
     response_model=VideoStatusResponse,
     dependencies=[Depends(verify_token)],
 )
-async def check_video_status(img_name: str, db: Session = Depends(get_db)):
+async def check_video_status(
+    img_name: str, db: Session = Depends(get_db)
+):
     """
     检查图片是否有已生成的视频
 
@@ -705,11 +706,9 @@ async def check_video_status(img_name: str, db: Session = Depends(get_db)):
     - 避免重复创建已有视频的任务
     """
     try:
-        result = await image_to_video_service.get_video_status(img_name, db)
-        return result
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"检查视频状态失败: {e}")
-        raise HTTPException(status_code=500, detail="检查视频状态失败")
+        return await image_to_video_service.get_video_status(img_name, db)
+    except Exception as e:
+        raise handle_service_exception(e, logger, "检查视频状态")
 
 
 @app.get(
@@ -725,7 +724,9 @@ async def check_video_status(img_name: str, db: Session = Depends(get_db)):
         404: {"description": "视频文件不存在"},
     },
 )
-async def get_video_file(img_name: str, db: Session = Depends(get_db)):
+async def get_video_file(
+    img_name: str, db: Session = Depends(get_db)
+):
     """
     获取视频文件
 
@@ -736,23 +737,21 @@ async def get_video_file(img_name: str, db: Session = Depends(get_db)):
     """
     try:
         video_data = await image_to_video_service.get_video_file(img_name, db)
-        if video_data:
-            return Response(
-                content=video_data,
-                media_type="video/mp4",
-                headers={
-                    "Cache-Control": f"public, max-age={CACHE_ONE_HOUR}",  # 缓存1小时
-                    "X-Content-Type-Options": "nosniff",
-                },
-            )
-        else:
+        if not video_data:
             raise HTTPException(status_code=404, detail="视频文件不存在")
 
+        return Response(
+            content=video_data,
+            media_type="video/mp4",
+            headers={
+                "Cache-Control": f"public, max-age={CACHE_ONE_HOUR}",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
     except HTTPException:
         raise
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"获取视频文件失败: {e}")
-        raise HTTPException(status_code=500, detail="获取视频文件失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取视频文件")
 
 
 # ================= 缓存管理 API =================
@@ -821,9 +820,8 @@ async def upload_app_version(
     except AppVersionServiceError as e:
         logger.warning(f"APP版本上传失败: {e.message}")
         raise HTTPException(status_code=400, detail=e.to_dict())
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"APP版本上传失败: {e}")
-        raise HTTPException(status_code=500, detail="上传失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "APP版本上传")
 
 
 @app.get(
@@ -848,9 +846,8 @@ async def get_latest_app_version(db: Session = Depends(get_db)):
 
     except HTTPException:
         raise
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"查询最新版本失败: {e}")
-        raise HTTPException(status_code=500, detail="查询版本失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "查询最新版本")
 
 
 @app.get(
@@ -901,9 +898,8 @@ async def download_app_version(
 
     except HTTPException:
         raise
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        logger.error(f"下载APK失败: {e}")
-        raise HTTPException(status_code=500, detail="下载失败")
+    except Exception as e:
+        raise handle_service_exception(e, logger, "下载APK")
 
 
 # ================= 辅助函数 =================

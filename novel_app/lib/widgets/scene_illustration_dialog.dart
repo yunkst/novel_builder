@@ -105,7 +105,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     return matchableParagraphs.join('\n');
   }
 
-  /// 在章节内容中查找出现的角色
+  /// 在章节内容中查找出现的角色（支持别名）
   List<int> _findAppearingCharacters(
       String content, List<Character> characters) {
     if (content.isEmpty || characters.isEmpty) {
@@ -118,9 +118,22 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     for (final character in characters) {
       if (character.name.isEmpty) continue;
 
+      // 检查正式名称
       final lowerName = character.name.toLowerCase();
       if (lowerContent.contains(lowerName) && character.id != null) {
         appearingIds.add(character.id!);
+        continue;
+      }
+
+      // 检查别名
+      final aliases = character.aliases ?? [];
+      for (final alias in aliases) {
+        if (alias.isEmpty) continue;
+        final lowerAlias = alias.toLowerCase();
+        if (lowerContent.contains(lowerAlias) && character.id != null) {
+          appearingIds.add(character.id!);
+          break;
+        }
       }
     }
 

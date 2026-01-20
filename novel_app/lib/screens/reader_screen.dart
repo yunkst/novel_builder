@@ -219,6 +219,12 @@ class _ReaderScreenState extends State<ReaderScreen>
       resetScrollPosition: resetScrollPosition,
     );
 
+    // 标记章节为已读
+    await _databaseService.markChapterAsRead(
+      widget.novel.url,
+      _currentChapter.url,
+    );
+
     // 处理滚动位置（保留在 reader_screen 中，因为这涉及到 ScrollController）
     _handleScrollPosition(resetScrollPosition);
 
@@ -473,15 +479,38 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
+  /// 导航到指定章节（支持自动滚动状态保持）
+  ///
+  /// [targetChapter] 目标章节
+  Future<void> _navigateToChapter(Chapter targetChapter) async {
+    // 记录当前自动滚动状态
+    final wasAutoScrolling = shouldAutoScroll;
+
+    // 更新当前章节
+    setState(() {
+      _currentChapter = targetChapter;
+    });
+
+    // 加载新章节内容
+    await _loadChapterContent(resetScrollPosition: true);
+
+    // 如果之前处于自动滚动状态，则恢复自动滚动
+    if (wasAutoScrolling && mounted) {
+      // 延迟一帧确保UI已更新
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          startAutoScroll();
+          debugPrint('📖 _navigateToChapter: 翻页后恢复自动滚动');
+        }
+      });
+    }
+  }
+
   void _goToPreviousChapter() {
     final currentIndex =
         widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
     if (currentIndex > 0) {
-      setState(() {
-        _currentChapter = widget.chapters[currentIndex - 1];
-      });
-      _loadChapterContent(resetScrollPosition: true);
-      // 新系统不需要 _loadIllustrations()
+      _navigateToChapter(widget.chapters[currentIndex - 1]);
     } else {
       _showSnackBar(message: '已经是第一章了');
     }
@@ -491,11 +520,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     final currentIndex =
         widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
     if (currentIndex != -1 && currentIndex < widget.chapters.length - 1) {
-      setState(() {
-        _currentChapter = widget.chapters[currentIndex + 1];
-      });
-      _loadChapterContent(resetScrollPosition: true);
-      // 新系统不需要 _loadIllustrations()
+      _navigateToChapter(widget.chapters[currentIndex + 1]);
     } else {
       _showSnackBar(message: '已经是最后一章了');
     }

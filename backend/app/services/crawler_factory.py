@@ -2,6 +2,8 @@
 
 import os
 
+from ..config import settings
+
 # 导入爬虫
 from .alice_sw_crawler_refactored import AliceSWCrawlerRefactored
 from .base_crawler import BaseCrawler
@@ -83,7 +85,7 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
     Returns:
         Dict mapping site names to crawler instances
     """
-    enabled = os.getenv("NOVEL_ENABLED_SITES", "").lower()
+    enabled = settings.enabled_sites.lower()
     crawlers: dict[str, BaseCrawler] = {}
     if not enabled or "alice" in enabled or "alice_sw" in enabled:
         crawlers["alice_sw"] = AliceSWCrawler()
@@ -127,7 +129,7 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
 
 def get_source_sites_info() -> list[dict]:
     """获取所有源站信息，包括启用的和未启用的"""
-    enabled = os.getenv("NOVEL_ENABLED_SITES", "").lower()
+    enabled = settings.enabled_sites.lower()
 
     sites = []
     for site_id, metadata in SOURCE_SITES_METADATA.items():

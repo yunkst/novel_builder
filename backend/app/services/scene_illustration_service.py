@@ -60,44 +60,10 @@ class SceneIllustrationService:
 
             # 如果是列表格式（新版本存储）
             if isinstance(roles_data, list):
-                role_lines = []
-                for i, role_data in enumerate(roles_data):
-                    if isinstance(role_data, dict) and "name" in role_data:
-                        # 重建RoleInfo对象
-                        role_info = RoleInfo.from_dict(role_data)
-
-                        # 添加角色序号和名称
-                        role_lines.append(f"{i + 1}. {role_info.name}")
-
-                        # 添加面部描述（如果存在且非空）
-                        if (
-                            hasattr(role_info, "face_prompts")
-                            and role_info.face_prompts
-                        ):
-                            role_lines.append(f"   面部描述：{role_info.face_prompts}")
-
-                        # 添加身材描述（如果存在且非空）
-                        if (
-                            hasattr(role_info, "body_prompts")
-                            and role_info.body_prompts
-                        ):
-                            role_lines.append(f"   身材描述：{role_info.body_prompts}")
-
-                        # 如果角色有描述信息，添加空行分隔（最后一个角色除外）
-                        has_descriptions = (
-                            hasattr(role_info, "face_prompts")
-                            and role_info.face_prompts
-                        ) or (
-                            hasattr(role_info, "body_prompts")
-                            and role_info.body_prompts
-                        )
-                        if has_descriptions and i < len(roles_data) - 1:
-                            role_lines.append("")
-
-                return "\n".join(role_lines)
+                return self._format_roles_list(roles_data)
 
             # 如果已经是字典格式（旧版本兼容，直接返回空字符串）
-            elif isinstance(roles_data, dict):
+            if isinstance(roles_data, dict):
                 logger.warning("检测到旧版本角色数据格式，不支持转换为场景绘制格式")
                 return ""
 
@@ -106,6 +72,40 @@ class SceneIllustrationService:
         except (json.JSONDecodeError, TypeError, Exception) as e:
             logger.error(f"解析角色数据失败: {e}")
             return ""
+
+    def _format_roles_list(self, roles_data: list) -> str:
+        """格式化角色列表为场景绘制的文本格式
+
+        Args:
+            roles_data: 角色数据列表
+
+        Returns:
+            格式化的角色信息字符串
+        """
+        role_lines = []
+        for i, role_data in enumerate(roles_data):
+            if not isinstance(role_data, dict) or "name" not in role_data:
+                continue
+
+            role_info = RoleInfo.from_dict(role_data)
+
+            # 添加角色序号和名称
+            role_lines.append(f"{i + 1}. {role_info.name}")
+
+            # 添加面部描述（如果存在且非空）
+            if role_info.face_prompts:
+                role_lines.append(f"   面部描述：{role_info.face_prompts}")
+
+            # 添加身材描述（如果存在且非空）
+            if role_info.body_prompts:
+                role_lines.append(f"   身材描述：{role_info.body_prompts}")
+
+            # 如果角色有描述信息，添加空行分隔（最后一个角色除外）
+            has_descriptions = bool(role_info.face_prompts or role_info.body_prompts)
+            if has_descriptions and i < len(roles_data) - 1:
+                role_lines.append("")
+
+        return "\n".join(role_lines)
 
     async def generate_scene_images(
         self, request: EnhancedSceneIllustrationRequest, db: Session
@@ -123,104 +123,28 @@ class SceneIllustrationService:
             ValueError: 当请求参数无效时
         """
         try:
-            # 使用工具函数验证并获取有效的模型名称
             from ..utils.model_validation import validate_and_get_model
 
             model_name = validate_and_get_model(request.model_name, "T2I")
 
-            # 检查是否已存在相同task_id的任务
-            existing_task = (
-                db.query(SceneIllustrationTask)
-                .filter(SceneIllustrationTask.task_id == request.task_id)
-                .first()
+            # 删除已存在的任务
+            self._delete_existing_task(request.task_id, db)
+
+            # 生成提示词
+            prompts = await self._generate_prompts(request)
+
+            # 提交ComfyUI任务
+            comfyui_prompt_ids = await self._submit_comfyui_tasks(
+                request, model_name, prompts
             )
 
-            if existing_task:
-                # 删除旧的映射记录（如果存在）
-                db.query(SceneComfyUITask).filter(
-                    SceneComfyUITask.task_id == request.task_id
-                ).delete()
-                db.delete(existing_task)
-                db.commit()
-                logger.info(f"删除已存在的任务记录: {request.task_id}")
-
-            # 1. 生成提示词
-            logger.info(f"任务 {request.task_id}: 开始生成提示词")
-            roles_text = self._restore_roles_from_json(request.to_roles_json())
-            logger.info(f"任务 {request.task_id}: 格式化的角色信息:\n{roles_text}")
-
-            prompts = await self.dify_client.generate_scene_prompts(
-                chapters_content=request.chapters_content, roles=roles_text
-            )
-
-            if not prompts:
-                raise ValueError("未生成任何提示词，请检查章节内容和角色信息")
-
-            logger.info(f"任务 {request.task_id}: 生成提示词成功")
-
-            # 2. 创建ComfyUI客户端并提交任务
-            logger.info(f"任务 {request.task_id}: 开始提交ComfyUI任务")
-            comfyui_client = create_comfyui_client_for_model(model_name)
-
-            # 3. 提交多个生成任务到ComfyUI
-            comfyui_prompt_ids = []
-            for i in range(request.num):
-                logger.info(
-                    f"任务 {request.task_id}: 提交第 {i + 1}/{request.num} 个ComfyUI任务"
-                )
-
-                # 提交到ComfyUI，获取prompt_id
-                prompt_id = await comfyui_client.generate_image(prompts)
-                if prompt_id:
-                    comfyui_prompt_ids.append(prompt_id)
-                    logger.info(
-                        f"任务 {request.task_id}: 第 {i + 1} 个ComfyUI任务ID: {prompt_id}"
-                    )
-                else:
-                    logger.warning(
-                        f"任务 {request.task_id}: 第 {i + 1} 个ComfyUI任务提交失败"
-                    )
-
-            if not comfyui_prompt_ids:
-                raise ValueError("所有ComfyUI任务提交失败，请检查ComfyUI服务")
-
-            # 4. 创建任务记录（保留原表结构，但不使用status字段）
-            task_record = SceneIllustrationTask(
-                task_id=request.task_id,
-                status="submitted",  # 新状态：已提交
-                chapters_content=request.chapters_content,
-                roles=request.to_roles_json(),
-                num=request.num,
-                model_name=model_name,
-                prompts=prompts,
-                generated_images=0,
-            )
-
-            db.add(task_record)
-
-            # 5. 记录task_id到ComfyUI prompt_id的映射
-            for prompt_id in comfyui_prompt_ids:
-                task_mapping = SceneComfyUITask(
-                    task_id=request.task_id, comfyui_prompt_id=prompt_id
-                )
-                db.add(task_mapping)
-
-            # 6. 记录空的图片记录（标记为未获取）
-            for prompt_id in comfyui_prompt_ids:
-                image_record = SceneComfyUIImages(
-                    comfyui_prompt_id=prompt_id,
-                    images="[]",  # JSON字符串，空数组
-                    status_fetched=False,
-                )
-                db.add(image_record)
-
-            db.commit()
+            # 保存任务记录
+            self._save_task_records(request, model_name, prompts, comfyui_prompt_ids, db)
 
             logger.info(
                 f"任务 {request.task_id}: 成功提交 {len(comfyui_prompt_ids)} 个ComfyUI任务"
             )
 
-            # 7. 立即返回（不等待生成完成）
             return SceneIllustrationResponse(
                 task_id=request.task_id,
                 status="submitted",
@@ -234,6 +158,143 @@ class SceneIllustrationService:
         except Exception as e:
             logger.error(f"创建任务失败: {e}")
             raise ValueError(f"创建任务失败: {e!s}")
+
+    def _delete_existing_task(self, task_id: str, db: Session) -> None:
+        """删除已存在的任务记录
+
+        Args:
+            task_id: 任务ID
+            db: 数据库会话
+        """
+        existing_task = (
+            db.query(SceneIllustrationTask)
+            .filter(SceneIllustrationTask.task_id == task_id)
+            .first()
+        )
+
+        if existing_task:
+            db.query(SceneComfyUITask).filter(
+                SceneComfyUITask.task_id == task_id
+            ).delete()
+            db.delete(existing_task)
+            db.commit()
+            logger.info(f"删除已存在的任务记录: {task_id}")
+
+    async def _generate_prompts(
+        self, request: EnhancedSceneIllustrationRequest
+    ) -> str:
+        """生成场面提示词
+
+        Args:
+            request: 场面绘制请求
+
+        Returns:
+            生成的提示词
+
+        Raises:
+            ValueError: 当未生成任何提示词时
+        """
+        logger.info(f"任务 {request.task_id}: 开始生成提示词")
+        roles_text = self._restore_roles_from_json(request.to_roles_json())
+        logger.info(f"任务 {request.task_id}: 格式化的角色信息:\n{roles_text}")
+
+        prompts = await self.dify_client.generate_scene_prompts(
+            chapters_content=request.chapters_content, roles=roles_text
+        )
+
+        if not prompts:
+            raise ValueError("未生成任何提示词，请检查章节内容和角色信息")
+
+        logger.info(f"任务 {request.task_id}: 生成提示词成功")
+        return prompts
+
+    async def _submit_comfyui_tasks(
+        self, request: EnhancedSceneIllustrationRequest, model_name: str, prompts: str
+    ) -> list[str]:
+        """提交ComfyUI任务
+
+        Args:
+            request: 场面绘制请求
+            model_name: 模型名称
+            prompts: 提示词
+
+        Returns:
+            ComfyUI prompt_id列表
+
+        Raises:
+            ValueError: 当所有任务提交失败时
+        """
+        logger.info(f"任务 {request.task_id}: 开始提交ComfyUI任务")
+        comfyui_client = create_comfyui_client_for_model(model_name)
+
+        comfyui_prompt_ids = []
+        for i in range(request.num):
+            logger.info(
+                f"任务 {request.task_id}: 提交第 {i + 1}/{request.num} 个ComfyUI任务"
+            )
+
+            prompt_id = await comfyui_client.generate_image(prompts)
+            if prompt_id:
+                comfyui_prompt_ids.append(prompt_id)
+                logger.info(
+                    f"任务 {request.task_id}: 第 {i + 1} 个ComfyUI任务ID: {prompt_id}"
+                )
+            else:
+                logger.warning(
+                    f"任务 {request.task_id}: 第 {i + 1} 个ComfyUI任务提交失败"
+                )
+
+        if not comfyui_prompt_ids:
+            raise ValueError("所有ComfyUI任务提交失败，请检查ComfyUI服务")
+
+        return comfyui_prompt_ids
+
+    def _save_task_records(
+        self,
+        request: EnhancedSceneIllustrationRequest,
+        model_name: str,
+        prompts: str,
+        comfyui_prompt_ids: list[str],
+        db: Session,
+    ) -> None:
+        """保存任务记录到数据库
+
+        Args:
+            request: 场面绘制请求
+            model_name: 模型名称
+            prompts: 提示词
+            comfyui_prompt_ids: ComfyUI prompt_id列表
+            db: 数据库会话
+        """
+        # 创建任务记录
+        task_record = SceneIllustrationTask(
+            task_id=request.task_id,
+            status="submitted",
+            chapters_content=request.chapters_content,
+            roles=request.to_roles_json(),
+            num=request.num,
+            model_name=model_name,
+            prompts=prompts,
+            generated_images=0,
+        )
+        db.add(task_record)
+
+        # 记录task_id到ComfyUI prompt_id的映射
+        for prompt_id in comfyui_prompt_ids:
+            task_mapping = SceneComfyUITask(
+                task_id=request.task_id, comfyui_prompt_id=prompt_id
+            )
+            db.add(task_mapping)
+
+            # 记录空的图片记录（标记为未获取）
+            image_record = SceneComfyUIImages(
+                comfyui_prompt_id=prompt_id,
+                images="[]",
+                status_fetched=False,
+            )
+            db.add(image_record)
+
+        db.commit()
 
     async def get_scene_gallery(
         self, task_id: str, db: Session

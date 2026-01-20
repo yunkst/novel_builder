@@ -73,9 +73,7 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
       pixelsPerSecond,
       onScrollComplete: () {
         debugPrint('🏁 [AutoScrollMixin] 滚动到底部回调触发');
-        setState(() {
-          _shouldAutoScroll = false;
-        });
+        // 保持 _shouldAutoScroll 不变，以便章节切换时恢复滚动
       },
     );
 
