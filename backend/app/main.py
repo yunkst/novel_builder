@@ -54,6 +54,7 @@ from .schemas import (
     SceneGalleryResponse,
     SceneImageDeleteRequest,
     SceneRegenerateRequest,
+    SceneRegenerateResponse,
     SourceSite,
     VideoStatusResponse,
     WorkflowInfo,
@@ -616,7 +617,11 @@ async def delete_scene_image(
         raise handle_service_exception(e, logger, "删除场面图片")
 
 
-@app.post("/api/scene-illustration/regenerate", dependencies=[Depends(verify_token)])
+@app.post(
+    "/api/scene-illustration/regenerate",
+    response_model=SceneRegenerateResponse,
+    dependencies=[Depends(verify_token)],
+)
 async def regenerate_scene_images(
     request: SceneRegenerateRequest, db: Session = Depends(get_db)
 ):
