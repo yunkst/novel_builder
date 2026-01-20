@@ -1,0 +1,362 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// 日志级别
+enum LogLevel {
+  /// 调试信息
+  debug('DEBUG'),
+
+  /// 一般信息
+  info('INFO'),
+
+  /// 警告信息
+  warning('WARN'),
+
+  /// 错误信息
+  error('ERROR');
+
+  final String label;
+
+  const LogLevel(this.label);
+
+  /// 获取对应的图标
+  IconData get icon {
+    switch (this) {
+      case LogLevel.debug:
+        return Icons.bug_report_outlined;
+      case LogLevel.info:
+        return Icons.info_outline;
+      case LogLevel.warning:
+        return Icons.warning_outlined;
+      case LogLevel.error:
+        return Icons.error_outline;
+    }
+  }
+}
+
+/// 日志条目模型
+///
+/// 用于存储单条日志记录，包含时间戳、级别、消息和堆栈信息
+class LogEntry {
+  /// 时间戳
+  final DateTime timestamp;
+
+  /// 日志级别
+  final LogLevel level;
+
+  /// 日志消息内容
+  final String message;
+
+  /// 堆栈信息（可选）
+  final String? stackTrace;
+
+  const LogEntry({
+    required this.timestamp,
+    required this.level,
+    required this.message,
+    this.stackTrace,
+  });
+
+  /// 转换为Map用于序列化
+  Map<String, dynamic> toMap() {
+    return {
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'level': level.index,
+      'message': message,
+      'stackTrace': stackTrace,
+    };
+  }
+
+  /// 从Map反序列化创建LogEntry
+  factory LogEntry.fromMap(Map<String, dynamic> map) {
+    return LogEntry(
+      timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
+      level: LogLevel.values[map['level'] as int],
+      message: map['message'] as String,
+      stackTrace: map['stackTrace'] as String?,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'LogEntry(timestamp: $timestamp, level: ${level.label}, message: $message)';
+  }
+}
+
+/// 日志服务
+///
+/// 负责管理应用日志的收集、存储和持久化。
+/// 使用内存队列存储最新1000条日志，超过限制时自动清理旧日志。
+/// 所有日志会在添加时自动持久化到SharedPreferences，确保APP重启后不丢失。
+///
+/// 使用方式：
+/// ```dart
+/// // 初始化（在main.dart中调用一次）
+/// await LoggerService.instance.init();
+///
+/// // 记录日志
+/// LoggerService.instance.d('调试信息');
+/// LoggerService.instance.i('数据库升级完成');
+/// LoggerService.instance.w('警告信息');
+/// LoggerService.instance.e('错误信息', stackTrace);
+///
+/// // 获取所有日志
+/// final logs = LoggerService.instance.getLogs();
+///
+/// // 按级别过滤
+/// final errors = LoggerService.instance.getLogsByLevel(LogLevel.error);
+///
+/// // 清空日志
+/// await LoggerService.instance.clearLogs();
+///
+/// // 导出日志文件
+/// final file = await LoggerService.instance.exportToFile();
+/// ```
+class LoggerService {
+  // ========== 单例模式 ==========
+  static LoggerService? _instance;
+  static LoggerService get instance {
+    _instance ??= LoggerService._internal();
+    return _instance!;
+  }
+
+  LoggerService._internal();
+
+  // ========== 测试辅助方法 ==========
+  /// 重置单例（仅用于测试）
+  ///
+  /// WARNING: 此方法仅用于单元测试，生产代码不应调用。
+  static void resetForTesting() {
+    // 创建新的 ValueNotifier 以确保测试间状态隔离
+    _logChangeNotifier = ValueNotifier<int>(0);
+    _instance = null;
+  }
+
+  // ========== 常量定义 ==========
+  /// 最大日志条数
+  static const int _maxLogs = 1000;
+
+  /// SharedPreferences存储键
+  static const String _prefsKey = 'app_logs';
+
+  /// 导出文件名
+  static const String _exportFileName = 'app_logs.txt';
+
+  // ========== 状态管理 ==========
+  /// 内存日志队列
+  final List<LogEntry> _logs = [];
+
+  /// 是否已初始化
+  bool _initialized = false;
+
+  /// 持久化锁，防止并发写入
+  bool _isPersisting = false;
+
+  /// 待持久化标记
+  bool _pendingPersist = false;
+
+  /// 日志变化通知器
+  ///
+  /// 当日志被添加或清空时，会通知所有监听者。
+  /// LogViewerScreen 可以通过监听此 ValueNotifier 来自动更新UI。
+  static ValueNotifier<int> _logChangeNotifier = ValueNotifier<int>(0);
+
+  /// 获取日志变化通知器
+  static ValueNotifier<int> get logChangeNotifier => _logChangeNotifier;
+
+  // ========== 公开方法 ==========
+
+  /// 初始化日志服务
+  ///
+  /// 从SharedPreferences加载已保存的日志到内存队列。
+  /// 应在应用启动时调用一次（main.dart中）。
+  Future<void> init() async {
+    if (_initialized) return;
+
+    await _loadLogs();
+    _initialized = true;
+  }
+
+  /// 记录调试级别日志
+  void d(String message, {String? stackTrace}) {
+    _log(message, LogLevel.debug, stackTrace);
+  }
+
+  /// 记录信息级别日志
+  void i(String message, {String? stackTrace}) {
+    _log(message, LogLevel.info, stackTrace);
+  }
+
+  /// 记录警告级别日志
+  void w(String message, {String? stackTrace}) {
+    _log(message, LogLevel.warning, stackTrace);
+  }
+
+  /// 记录错误级别日志
+  void e(String message, {String? stackTrace}) {
+    _log(message, LogLevel.error, stackTrace);
+  }
+
+  /// 记录日志（内部方法）
+  ///
+  /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
+  /// 添加后会触发持久化和状态通知。
+  void _log(String message, LogLevel level, [String? stackTrace]) {
+    final entry = LogEntry(
+      timestamp: DateTime.now(),
+      level: level,
+      message: message,
+      stackTrace: stackTrace,
+    );
+
+    _logs.add(entry);
+
+    // FIFO：如果超过最大限制，删除最旧的日志
+    if (_logs.length > _maxLogs) {
+      _logs.removeAt(0);
+    }
+
+    // 通知监听器日志已更新
+    logChangeNotifier.value++;
+
+    // 触发持久化（使用锁机制防止并发）
+    _schedulePersist();
+  }
+
+  /// 调度持久化任务
+  void _schedulePersist() {
+    _pendingPersist = true;
+    _persist();
+  }
+
+  /// 持久化日志（带锁机制）
+  Future<void> _persist() async {
+    // 如果正在持久化，等待完成后再处理
+    if (_isPersisting) {
+      return;
+    }
+
+    if (!_pendingPersist) {
+      return;
+    }
+
+    _isPersisting = true;
+    _pendingPersist = false;
+
+    try {
+      await _persistLogs();
+    } finally {
+      _isPersisting = false;
+
+      // 如果在持久化过程中有新的日志，再次触发
+      if (_pendingPersist) {
+        await _persist();
+      }
+    }
+  }
+
+  /// 获取所有日志
+  ///
+  /// 返回内存队列中的所有日志条目列表。
+  /// 返回的是新列表，避免外部修改内部状态。
+  List<LogEntry> getLogs() {
+    return List.unmodifiable(_logs);
+  }
+
+  /// 按级别过滤获取日志
+  ///
+  /// 参数：
+  /// - [level] 日志级别，null表示返回所有级别
+  List<LogEntry> getLogsByLevel([LogLevel? level]) {
+    if (level == null) {
+      return getLogs();
+    }
+    return _logs.where((log) => log.level == level).toList();
+  }
+
+  /// 清空所有日志
+  ///
+  /// 清空内存队列和SharedPreferences中的所有日志。
+  /// 此操作不可撤销，请谨慎使用。
+  Future<void> clearLogs() async {
+    _logs.clear();
+    await _persistLogs();
+    // 通知监听器日志已清空
+    logChangeNotifier.value++;
+  }
+
+  /// 获取当前日志数量
+  ///
+  /// 返回内存队列中的日志条数。
+  int get logCount => _logs.length;
+
+  /// 导出日志到文件
+  ///
+  /// 将所有日志导出为文本文件保存到应用目录。
+  /// 返回导出的文件路径。
+  Future<File> exportToFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/$_exportFileName');
+
+    final content = _logs
+        .map((log) {
+          final timestamp = _formatTimestamp(log.timestamp);
+          final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+          return '[$timestamp] [${log.level.label}] ${log.message}$stackTrace';
+        })
+        .join('\n\n---\n\n');
+
+    await file.writeAsString(content, flush: true);
+    return file;
+  }
+
+  // ========== 私有方法 ==========
+
+  /// 从SharedPreferences加载已保存的日志
+  Future<void> _loadLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final logsJson = prefs.getString(_prefsKey);
+
+      if (logsJson != null && logsJson.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(logsJson) as List<dynamic>;
+        _logs.addAll(
+          decoded.map((e) => LogEntry.fromMap(e as Map<String, dynamic>)),
+        );
+      }
+    } catch (e) {
+      // 加载失败不影响应用运行，仅打印错误
+      _logs.clear();
+    }
+  }
+
+  /// 持久化日志到SharedPreferences
+  ///
+  /// 将当前内存队列中的所有日志序列化为JSON并保存到SharedPreferences。
+  Future<void> _persistLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final logsJson = jsonEncode(
+        _logs.map((e) => e.toMap()).toList(),
+      );
+      await prefs.setString(_prefsKey, logsJson);
+    } catch (e) {
+      // 持久化失败不影响应用运行
+      // 实际场景中可以添加错误计数，避免频繁重试
+    }
+  }
+
+  /// 格式化时间戳
+  String _formatTimestamp(DateTime dt) {
+    final year = dt.year;
+    final month = dt.month.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final second = dt.second.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute:$second';
+  }
+}
