@@ -845,7 +845,7 @@ class DifyService {
     required String novelUrl,
   }) async {
     final inputs = {
-      'chapter_content': chapterContent,
+      'chapters_content': chapterContent,
       'roles': roles,
       'cmd': '提取角色',
     };
