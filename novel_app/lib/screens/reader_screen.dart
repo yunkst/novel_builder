@@ -30,6 +30,7 @@ import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
 import 'package:provider/provider.dart';
+import 'tts_player_screen.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Novel novel;
@@ -695,6 +696,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       case 'summarize':
         _showChapterSummaryDialog(); // 使用新的 Dialog Widget
         break;
+      case 'tts_read':
+        _startTtsReading();
+        break;
       case 'full_rewrite':
         _showFullRewriteDialog(); // 使用新的 Dialog Widget
         break;
@@ -1000,6 +1004,16 @@ class _ReaderScreenState extends State<ReaderScreen>
                       ),
                     ),
                     const PopupMenuItem(
+                      value: 'tts_read',
+                      child: Row(
+                        children: [
+                          Icon(Icons.headphones, size: 18, color: Colors.deepPurple),
+                          SizedBox(width: 12),
+                          Text('朗读'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
                       value: 'full_rewrite',
                       child: Row(
                         children: [
@@ -1255,6 +1269,26 @@ class _ReaderScreenState extends State<ReaderScreen>
           ),
         );
       }
+    }
+  }
+
+  /// 启动TTS朗读
+  Future<void> _startTtsReading() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TtsPlayerScreen(
+          novel: widget.novel,
+          chapters: widget.chapters,
+          startChapter: _currentChapter,
+          startContent: _content,
+        ),
+      ),
+    );
+
+    // 返回后重新加载章节内容，因为可能被修改
+    if (mounted) {
+      _loadChapterContent(resetScrollPosition: false);
     }
   }
 }
