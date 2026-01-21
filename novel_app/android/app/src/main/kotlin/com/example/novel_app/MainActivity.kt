@@ -13,12 +13,15 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.novel_app/app_install"
+    private val APP_INSTALL_CHANNEL = "com.example.novel_app/app_install"
+    private val TTS_CHANNEL = "com.example.novel_app/tts"
+    private var ttsPlugin: TtsPlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        // App Install Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "installApk") {
                 val filePath = call.argument<String>("filePath")
                 if (filePath != null) {
@@ -34,6 +37,14 @@ class MainActivity : FlutterActivity() {
             } else {
                 result.notImplemented()
             }
+        }
+
+        // TTS Channel
+        ttsPlugin = TtsPlugin(this)
+        val ttsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TTS_CHANNEL)
+        ttsPlugin?.setMethodChannel(ttsChannel)
+        ttsChannel.setMethodCallHandler { call, result ->
+            ttsPlugin?.onMethodCall(call, result)
         }
     }
 
@@ -80,5 +91,10 @@ class MainActivity : FlutterActivity() {
             }
             notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        ttsPlugin?.dispose()
     }
 }

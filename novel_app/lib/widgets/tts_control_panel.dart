@@ -1,0 +1,197 @@
+import 'package:flutter/material.dart';
+import '../services/tts_player_service.dart';
+
+/// TTS控制面板组件
+class TtsControlPanel extends StatelessWidget {
+  final TtsPlayerState state;
+  final bool hasPrevious;
+  final bool hasNext;
+  final bool hasPreviousChapter;
+  final bool hasNextChapter;
+  final double speechRate;
+  final VoidCallback onPlay;
+  final VoidCallback onPause;
+  final VoidCallback onStop;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onPreviousChapter;
+  final VoidCallback onNextChapter;
+  final ValueChanged<double> onRateChanged;
+
+  const TtsControlPanel({
+    super.key,
+    required this.state,
+    required this.hasPrevious,
+    required this.hasNext,
+    required this.hasPreviousChapter,
+    required this.hasNextChapter,
+    required this.speechRate,
+    required this.onPlay,
+    required this.onPause,
+    required this.onStop,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onPreviousChapter,
+    required this.onNextChapter,
+    required this.onRateChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPlaying = state == TtsPlayerState.playing;
+    final isPaused = state == TtsPlayerState.paused;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 播放进度
+              if (isPlaying || isPaused)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.graphic_eq, size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: null, // 无限动画
+                          backgroundColor: Colors.grey.shade200,
+                          minHeight: 3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // 章节切换按钮
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: hasPreviousChapter ? onPreviousChapter : null,
+                    icon: const Icon(Icons.skip_previous),
+                    tooltip: '上一章',
+                  ),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // 上一段
+                        IconButton(
+                          onPressed: hasPrevious ? onPrevious : null,
+                          icon: const Icon(Icons.first_page),
+                          iconSize: 32,
+                          tooltip: '上一段',
+                        ),
+
+                        // 播放/暂停/停止
+                        _buildPlayButton(context),
+
+                        // 下一段
+                        IconButton(
+                          onPressed: hasNext ? onNext : null,
+                          icon: const Icon(Icons.last_page),
+                          iconSize: 32,
+                          tooltip: '下一段',
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: hasNextChapter ? onNextChapter : null,
+                    icon: const Icon(Icons.skip_next),
+                    tooltip: '下一章',
+                  ),
+                ],
+              ),
+
+              // 语速调节
+              Row(
+                children: [
+                  const Icon(Icons.speed, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Slider(
+                      value: speechRate,
+                      min: 0.5,
+                      max: 2.0,
+                      divisions: 15,
+                      label: '${speechRate.toStringAsFixed(1)}x',
+                      onChanged: onRateChanged,
+                    ),
+                  ),
+                  Text(
+                    '${speechRate.toStringAsFixed(1)}x',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayButton(BuildContext context) {
+    final isPlaying = state == TtsPlayerState.playing;
+    final isPaused = state == TtsPlayerState.paused;
+    final isIdle = state == TtsPlayerState.idle;
+
+    if (isPlaying) {
+      // 暂停按钮
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: onPause,
+            icon: const Icon(Icons.pause_circle_filled),
+            iconSize: 56,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          IconButton(
+            onPressed: onStop,
+            icon: const Icon(Icons.stop_circle),
+            iconSize: 40,
+            color: Colors.red,
+          ),
+        ],
+      );
+    } else if (isPaused || isIdle) {
+      // 播放按钮
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: onPlay,
+            icon: const Icon(Icons.play_circle_filled),
+            iconSize: 64,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          if (isPaused)
+            IconButton(
+              onPressed: onStop,
+              icon: const Icon(Icons.stop_circle),
+              iconSize: 40,
+              color: Colors.red,
+            ),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+}
