@@ -41,7 +41,7 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
   );
 
   String _summaryResult = '';
-  final bool _showConfirmDialog = true;
+  bool _showConfirmDialog = true;
 
   @override
   void initState() {
@@ -110,6 +110,9 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
     );
 
     if (confirmed == true) {
+      setState(() {
+        _showConfirmDialog = false;
+      });
       _generateSummarize();
     } else {
       if (mounted) {
@@ -175,23 +178,18 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
       return const SizedBox.shrink(); // 确认对话框通过 showDialog 显示
     }
 
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_summaryResult.isNotEmpty || isStreaming)
-              _buildSummaryResultView()
-            else
-              const Padding(
-                padding: EdgeInsets.all(20.0),
-                child: CircularProgressIndicator(),
-              ),
-          ],
+    // 用户确认后显示总结结果界面
+    // 如果正在生成，显示加载指示器
+    if (_summaryResult.isEmpty && !isStreaming) {
+      return const AlertDialog(
+        content: Center(
+          child: CircularProgressIndicator(),
         ),
-      ),
-    );
+      );
+    }
+
+    // 显示总结结果
+    return _buildSummaryResultView();
   }
 
   Widget _buildSummaryResultView() {

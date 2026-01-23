@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/tts_timer_config.dart';
 import '../services/tts_player_service.dart';
 import '../widgets/tts_control_panel.dart';
 import '../widgets/tts_content_display.dart';
 import '../widgets/tts_chapter_selector.dart';
+import '../widgets/tts_timer_settings_sheet.dart';
+import '../widgets/tts_timer_complete_dialog.dart';
 
 /// TTS播放器全屏页面
 class TtsPlayerScreen extends StatefulWidget {
@@ -28,6 +32,7 @@ class TtsPlayerScreen extends StatefulWidget {
 
 class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
   late TtsPlayerService _playerService;
+  StreamSubscription<TtsTimerConfig>? _timerCompleteSubscription;
 
   @override
   void initState() {
@@ -38,6 +43,13 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
     // 初始化播放器
     _initializePlayer();
+
+    // 监听定时完成事件
+    _timerCompleteSubscription = _playerService.onTimerComplete.listen((config) {
+      if (mounted) {
+        _showTimerCompleteDialog(config);
+      }
+    });
   }
 
   Future<void> _initializePlayer() async {
@@ -62,6 +74,7 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
   @override
   void dispose() {
+    _timerCompleteSubscription?.cancel();
     _playerService.dispose();
     super.dispose();
   }
@@ -107,6 +120,52 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
             },
           ),
           actions: [
+            // 定时按钮
+            Consumer<TtsPlayerService>(
+              builder: (context, player, child) {
+                final timerEnabled = player.timerConfig.enabled;
+                final timerCount = player.timerConfig.chapterCount;
+
+                return IconButton(
+                  onPressed: () => _showTimerSettings(player),
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        timerEnabled ? Icons.timer : Icons.timer_outlined,
+                        color: timerEnabled ? Colors.orange : null,
+                      ),
+                      if (timerEnabled)
+                        Positioned(
+                          right: -6,
+                          bottom: -6,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.orange,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              '$timerCount',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  tooltip: timerEnabled ? '定时$timerCount章' : '定时结束',
+                );
+              },
+            ),
             // 章节选择按钮
             Consumer<TtsPlayerService>(
               builder: (context, player, child) {
@@ -340,5 +399,56 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
         ),
       );
     }
+  }
+
+  /// 显示定时设置
+  void _showTimerSettings(TtsPlayerService player) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (bottomSheetContext) => TtsTimerSettingsSheet(
+        currentChapterIndex: player.currentChapterIndex,
+        totalChapters: player.allChapters.length,
+        initialChapterCount: player.timerConfig.enabled
+            ? player.timerConfig.chapterCount
+            : null,
+        onConfirm: (chapterCount) async {
+          await player.setTimer(chapterCount);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('已设置：朗读$chapterCount章后停止'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示定时完成对话框
+  void _showTimerCompleteDialog(TtsTimerConfig config) {
+    final completedChapters = config.getCompletedChapters(_playerService.currentChapterIndex);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TtsTimerCompleteDialog(
+        completedChapters: completedChapters,
+        currentChapterIndex: _playerService.currentChapterIndex,
+        onContinue: () {
+          Navigator.pop(context);
+          // 取消定时，继续播放
+          _playerService.cancelTimer();
+          _playerService.play();
+        },
+        onClose: () {
+          Navigator.pop(context);
+          Navigator.pop(context); // 关闭播放器
+        },
+      ),
+    );
   }
 }

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/reading_progress.dart';
+import '../models/tts_timer_config.dart';
 import 'tts_service.dart';
 import 'database_service.dart';
 import 'api_service_wrapper.dart';
@@ -83,6 +84,15 @@ class TtsPlayerService extends ChangeNotifier {
     _autoPlayNext = value;
     notifyListeners();
   }
+
+  // 定时结束控制
+  TtsTimerConfig _timerConfig = TtsTimerConfig();
+  TtsTimerConfig get timerConfig => _timerConfig;
+
+  // 定时完成StreamController
+  final StreamController<TtsTimerConfig> _timerCompleteController =
+      StreamController<TtsTimerConfig>.broadcast();
+  Stream<TtsTimerConfig> get onTimerComplete => _timerCompleteController.stream;
 
   TtsPlayerService() {
     _initTtsListeners();
@@ -364,6 +374,17 @@ class TtsPlayerService extends ChangeNotifier {
   Future<void> _onChapterComplete() async {
     debugPrint('[TtsPlayerService] 章节完成: ${_currentChapter?.title}');
 
+    // 优先检查定时完成
+    if (_timerConfig.enabled) {
+      final completed = _timerConfig.getCompletedChapters(_currentChapterIndex);
+      debugPrint('[TtsPlayerService] ⏰ 定时检查: 已完成$completed章/${_timerConfig.chapterCount}章');
+
+      if (completed >= _timerConfig.chapterCount) {
+        await _onTimerComplete();
+        return;
+      }
+    }
+
     // 检查是否还有下一章
     if (_currentChapterIndex < _allChapters.length - 1) {
       if (_autoPlayNext) {
@@ -549,11 +570,57 @@ class TtsPlayerService extends ChangeNotifier {
     return (completedChapters + chapterProgress) / _allChapters.length;
   }
 
+  /// 设置定时
+  ///
+  /// [chapterCount] 读多少章后停止（1-99）
+  Future<void> setTimer(int chapterCount) async {
+    if (chapterCount < 1 || chapterCount > 99) {
+      debugPrint('[TtsPlayerService] ⚠️ 无效的章节数: $chapterCount');
+      return;
+    }
+
+    _timerConfig = TtsTimerConfig(
+      enabled: true,
+      chapterCount: chapterCount,
+      startChapterIndex: _currentChapterIndex,
+    );
+
+    notifyListeners();
+    debugPrint('[TtsPlayerService] ⏰ 已设置定时: 从第${_currentChapterIndex + 1}章开始，读$chapterCount章后停止');
+  }
+
+  /// 取消定时
+  Future<void> cancelTimer() async {
+    if (!_timerConfig.enabled) {
+      debugPrint('[TtsPlayerService] 定时未启用，无需取消');
+      return;
+    }
+
+    _timerConfig.reset();
+    notifyListeners();
+    debugPrint('[TtsPlayerService] ⏰ 已取消定时');
+  }
+
+  /// 定时完成处理
+  Future<void> _onTimerComplete() async {
+    final completed = _timerConfig.getCompletedChapters(_currentChapterIndex);
+    debugPrint('[TtsPlayerService] ⏰ 定时完成: 已完成$completed章');
+
+    // 暂停播放
+    await pause();
+
+    // 触发定时完成事件（通过Stream通知UI）
+    if (!_timerCompleteController.isClosed) {
+      _timerCompleteController.add(_timerConfig);
+    }
+  }
+
   @override
   void dispose() {
     _speakingSubscription?.cancel();
     _completeSubscription?.cancel();
     _errorSubscription?.cancel();
+    _timerCompleteController.close();
     _tts.dispose();
     super.dispose();
   }
