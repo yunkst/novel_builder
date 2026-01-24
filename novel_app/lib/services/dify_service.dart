@@ -1244,6 +1244,77 @@ class DifyService {
       throw Exception('AI生成失败：未收到有效响应');
     }
 
-    return outputs;
+    // 检查是否有 content 字段包裹（Dify 返回的嵌套结构）
+    final content = outputs['content'] as Map<String, dynamic>?;
+    if (content != null) {
+      // Dify 返回的是 {content: {play, role_strategy}} 格式
+      final play = content['play'] as String?;
+      final roleStrategyRaw = content['role_strategy'];
+
+      if (play == null || roleStrategyRaw == null) {
+        debugPrint('❌ content字段解析失败: play=$play, role_strategy=$roleStrategyRaw');
+        debugPrint('完整content数据: $content');
+        throw Exception('返回数据格式错误：content字段缺少play或role_strategy');
+      }
+
+      // 解析 role_strategy（支持字符串和数组两种格式）
+      final roleStrategy = _parseRoleStrategy(roleStrategyRaw);
+
+      // 返回扁平化的数据结构，与现有代码兼容
+      return {
+        'play': play,
+        'role_strategy': roleStrategy,
+      };
+    }
+
+    // 兼容非嵌套结构（直接返回 play 和 role_strategy）
+    final play = outputs['play'] as String?;
+    final roleStrategyRaw = outputs['role_strategy'];
+
+    if (play == null || roleStrategyRaw == null) {
+      debugPrint('❌ 扁平结构解析失败: play=$play, role_strategy=$roleStrategyRaw');
+      debugPrint('完整outputs数据: $outputs');
+      throw Exception('返回数据格式错误：缺少play或role_strategy字段');
+    }
+
+    // 解析 role_strategy（支持字符串和数组两种格式）
+    final roleStrategy = _parseRoleStrategy(roleStrategyRaw);
+
+    return {
+      'play': play,
+      'role_strategy': roleStrategy,
+    };
+  }
+
+  /// 解析 role_strategy（支持字符串和数组两种格式）
+  ///
+  /// Dify可能返回：
+  /// 1. 字符串格式: "[{\"name\": \"...\", \"strategy\": \"...\"}]"
+  /// 2. 数组格式: [{"name": "...", "strategy": "..."}]
+  List<dynamic> _parseRoleStrategy(dynamic roleStrategyRaw) {
+    if (roleStrategyRaw is List) {
+      // 已经是数组，直接返回
+      return roleStrategyRaw;
+    }
+
+    if (roleStrategyRaw is String) {
+      // 是字符串，需要解析JSON
+      try {
+        final decoded = jsonDecode(roleStrategyRaw);
+        if (decoded is List) {
+          return decoded;
+        } else {
+          debugPrint('❌ role_strategy字符串解析后不是数组: $decoded');
+          throw Exception('role_strategy格式错误：解析后不是数组');
+        }
+      } catch (e) {
+        debugPrint('❌ role_strategy字符串解析失败: $e');
+        debugPrint('原始字符串: $roleStrategyRaw');
+        throw Exception('role_strategy字符串解析失败: $e');
+      }
+    }
+
+    debugPrint('❌ role_strategy类型错误: ${roleStrategyRaw.runtimeType}');
+    throw Exception('role_strategy格式错误：不支持的类型 ${roleStrategyRaw.runtimeType}');
   }
 }
