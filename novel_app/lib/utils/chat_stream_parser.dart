@@ -137,4 +137,149 @@ class ChatStreamParser {
 
     return buffer.toString().trim();
   }
+
+  /// 解析多角色流式文本
+  ///
+  /// 支持格式：
+  /// - 纯文本 → 旁白
+  /// - <角色名>内容</角色名> → 角色对话
+  ///
+  /// 参数：
+  /// - [chunk] 新接收的文本块
+  /// - [currentMessages] 当前消息列表
+  /// - [allCharacters] 所有角色列表
+  /// - [inDialogue] 当前是否在对话模式中
+  ///
+  /// 返回：更新后的消息列表和新的对话状态
+  static ParseResult parseChunkForMultiRole(
+    String chunk,
+    List<ChatMessage> currentMessages,
+    List<Character> allCharacters,
+    bool inDialogue,
+  ) {
+    List<ChatMessage> messages = List.from(currentMessages);
+    Character? currentCharacter;
+
+    // 如果已经在对话中，找到当前角色
+    if (inDialogue && messages.isNotEmpty && messages.last.type == 'dialogue') {
+      currentCharacter = messages.last.character;
+    }
+
+    // 逐字符解析
+    for (int i = 0; i < chunk.length; i++) {
+      final char = chunk[i];
+
+      if (char == '<') {
+        // 检测标签
+        final tagContent = _extractTag(chunk, i);
+        if (tagContent != null) {
+          final tagLength = tagContent.length + 2; // 包括 < 和 >
+          i += tagLength - 1; // 跳过标签（循环会+1）
+
+          if (tagContent.startsWith('/')) {
+            // 闭合标签 </角色名>
+            final tagName = tagContent.substring(1);
+            if (currentCharacter?.name == tagName) {
+              // 移除最后的空对话消息（如果有）
+              if (messages.isNotEmpty &&
+                  messages.last.type == 'dialogue' &&
+                  messages.last.content.isEmpty) {
+                messages.removeLast();
+              }
+              currentCharacter = null; // 结束对话
+            } else {
+              // 标签不匹配，作为普通文本追加到当前消息
+              if (currentCharacter != null) {
+                _appendToDialogue(messages, '</$tagName>', currentCharacter);
+              } else {
+                _appendToNarration(messages, '</$tagName>');
+              }
+            }
+          } else {
+            // 开放标签 <角色名>
+            final character = _findCharacter(tagContent, allCharacters);
+            if (character != null) {
+              currentCharacter = character;
+              messages.add(ChatMessage.dialogue('', character));
+            } else {
+              // 未知角色，作为普通文本处理
+              _appendToNarration(messages, '<$tagContent>');
+            }
+          }
+          continue;
+        }
+      }
+
+      // 处理普通字符
+      if (currentCharacter != null) {
+        // 角色对话模式
+        _appendToDialogue(messages, char, currentCharacter);
+      } else {
+        // 旁白模式
+        _appendToNarration(messages, char);
+      }
+    }
+
+    return ParseResult(
+      messages: messages,
+      inDialogue: currentCharacter != null,
+    );
+  }
+
+  /// 提取标签内容
+  /// 返回: 标签名（不包含 < 和 >），如果不是有效标签返回 null
+  static String? _extractTag(String chunk, int startIndex) {
+    if (startIndex >= chunk.length || chunk[startIndex] != '<') return null;
+
+    final endIndex = chunk.indexOf('>', startIndex);
+    if (endIndex == -1) return null;
+
+    return chunk.substring(startIndex + 1, endIndex);
+  }
+
+  /// 查找角色
+  static Character? _findCharacter(String name, List<Character> characters) {
+    try {
+      return characters.firstWhere((c) => c.name == name);
+    } catch (e) {
+      debugPrint('⚠️ 未找到角色: $name');
+      return null;
+    }
+  }
+
+  /// 追加到对话
+  static void _appendToDialogue(
+    List<ChatMessage> messages,
+    String char,
+    Character character,
+  ) {
+    if (messages.isEmpty ||
+        messages.last.type != 'dialogue' ||
+        messages.last.character != character) {
+      messages.add(ChatMessage.dialogue(char, character));
+    } else {
+      final lastMessage = messages.last;
+      messages[lastMessageIndex(messages)] = ChatMessage.dialogue(
+        lastMessage.content + char,
+        character,
+      );
+    }
+  }
+
+  /// 追加到旁白
+  static void _appendToNarration(List<ChatMessage> messages, String char) {
+    if (messages.isEmpty || messages.last.type != 'narration') {
+      messages.add(ChatMessage.narration(char));
+    } else {
+      final lastMessage = messages.last;
+      // 检查最后一条消息是否为空（避免累积空消息）
+      if (lastMessage.content.isEmpty) {
+        messages[lastMessageIndex(messages)] = ChatMessage.narration(char);
+      } else {
+        messages[lastMessageIndex(messages)] = ChatMessage.narration(
+          lastMessage.content + char,
+        );
+      }
+    }
+  }
 }
