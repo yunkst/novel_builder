@@ -11,13 +11,13 @@ import sys
 API_URL = "http://localhost:3800/api/app-version/upload"
 API_TOKEN = "test_token_123"
 APK_PATH = "novel_app/build/app/outputs/flutter-apk/app-release.apk"
-VERSION = "1.3.0"
-VERSION_CODE = 18
-CHANGELOG = """沉浸体验功能增强：
-- 实现多人对话互动功能
-- 修复Dify返回数据解析（支持字符串和数组格式）
-- 优化角色策略展示
-- 改进剧本生成和重新生成流程"""
+VERSION = "1.3.1"
+VERSION_CODE = 19
+CHANGELOG = """沉浸体验交互优化：
+- 优化角色选择方式，改用FilterChip点击切换
+- 移除删除按钮，防止用户误删
+- 改进视觉反馈，选中状态更清晰
+- 显示所有可用角色，方便用户选择"""
 
 def upload_apk():
     """上传APK到后端"""
