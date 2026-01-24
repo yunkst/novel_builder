@@ -6,6 +6,7 @@ import '../../models/chapter.dart';
 import '../../models/character.dart';
 import '../../services/dify_service.dart';
 import 'immersive_setup_dialog.dart';
+import '../../screens/multi_role_chat_screen.dart';
 
 /// 沉浸体验状态枚举
 enum ImmersiveStatus {
@@ -332,23 +333,18 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
     );
   }
 
-  /// 确认剧本（后续聊天室功能的预留接口）
+  /// 确认剧本（启动多人对话）
   void _confirmScript() {
-    // TODO: 后续实现聊天室功能
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('剧本已确认，聊天室功能即将推出'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MultiRoleChatScreen(
+          characters: widget.config.characters,
+          play: _play!,
+          roleStrategy: _roleStrategy!,
+        ),
       ),
     );
-
-    // 延迟返回
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pop(context);
-      }
-    });
   }
 
   @override
