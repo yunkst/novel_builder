@@ -149,13 +149,19 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     }
   }
 
-  /// 移除角色
-  void _removeRole(Character role) {
+  /// 切换角色选中状态
+  void _toggleRole(Character role) {
     setState(() {
-      _selectedRoles.remove(role);
-      // 如果移除的是用户角色，清空用户角色
-      if (_userRole == role.name) {
-        _userRole = null;
+      if (_selectedRoles.contains(role)) {
+        // 取消选中
+        _selectedRoles.remove(role);
+        // 如果取消的是用户角色，清空用户角色
+        if (_userRole == role.name) {
+          _userRole = null;
+        }
+      } else {
+        // 选中角色
+        _selectedRoles.add(role);
       }
     });
   }
@@ -298,16 +304,25 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _selectedRoles.map((role) {
-                    return Chip(
+                  children: widget.allCharacters.map((role) {
+                    final isSelected = _selectedRoles.contains(role);
+                    return FilterChip(
                       label: Text(role.name),
-                      onDeleted: () => _removeRole(role),
+                      selected: isSelected,
+                      onSelected: (_) => _toggleRole(role),
                       avatar: _userRole == role.name
                           ? const Icon(Icons.person, size: 16)
                           : null,
-                      backgroundColor: _userRole == role.name
-                          ? Colors.purple.withValues(alpha: 0.1)
-                          : null,
+                      selectedColor: Colors.purple.withValues(alpha: 0.2),
+                      backgroundColor: Colors.grey.shade200,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.purple
+                            : Colors.grey.shade700,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
                     );
                   }).toList(),
                 ),
