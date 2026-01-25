@@ -69,6 +69,30 @@ enum LogCategory {
   const LogCategory(this.key, this.label);
 }
 
+/// 日志统计数据
+class LogStatistics {
+  /// 总日志数
+  final int total;
+
+  /// 各级别日志数量
+  final Map<LogLevel, int> byLevel;
+
+  /// 各分类日志数量
+  final Map<LogCategory, int> byCategory;
+
+  /// 各级别占比
+  Map<LogLevel, double> get levelPercentage {
+    if (total == 0) return {};
+    return byLevel.map((level, count) => MapEntry(level, count / total));
+  }
+
+  const LogStatistics({
+    required this.total,
+    required this.byLevel,
+    required this.byCategory,
+  });
+}
+
 /// 日志条目模型
 ///
 /// 用于存储单条日志记录，包含时间戳、级别、消息和堆栈信息
@@ -167,6 +191,11 @@ class LogEntry {
 ///
 /// // 按标签获取
 /// final apiLogs = LoggerService.instance.getLogsByTag('api');
+///
+/// // 获取统计信息
+/// final stats = LoggerService.instance.getStatistics();
+/// print('总日志: ${stats.total}');
+/// print('错误占比: ${stats.levelPercentage[LogLevel.error]}');
 ///
 /// // 清空日志
 /// await LoggerService.instance.clearLogs();
@@ -414,6 +443,32 @@ class LoggerService {
   ///
   /// 返回内存队列中的日志条数。
   int get logCount => _logs.length;
+
+  /// 获取日志统计信息
+  LogStatistics getStatistics() {
+    final byLevel = <LogLevel, int>{};
+    final byCategory = <LogCategory, int>{};
+
+    // 初始化计数器
+    for (final level in LogLevel.values) {
+      byLevel[level] = 0;
+    }
+    for (final category in LogCategory.values) {
+      byCategory[category] = 0;
+    }
+
+    // 统计
+    for (final log in _logs) {
+      byLevel[log.level] = byLevel[log.level]! + 1;
+      byCategory[log.category] = byCategory[log.category]! + 1;
+    }
+
+    return LogStatistics(
+      total: _logs.length,
+      byLevel: byLevel,
+      byCategory: byCategory,
+    );
+  }
 
   /// 导出日志到文件
   ///
