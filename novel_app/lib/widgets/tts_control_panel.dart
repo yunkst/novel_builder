@@ -4,16 +4,12 @@ import '../services/tts_player_service.dart';
 /// TTS控制面板组件
 class TtsControlPanel extends StatelessWidget {
   final TtsPlayerState state;
-  final bool hasPrevious;
-  final bool hasNext;
   final bool hasPreviousChapter;
   final bool hasNextChapter;
   final double speechRate;
   final VoidCallback onPlay;
   final VoidCallback onPause;
   final VoidCallback onStop;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
   final VoidCallback onPreviousChapter;
   final VoidCallback onNextChapter;
   final ValueChanged<double> onRateChanged;
@@ -21,16 +17,12 @@ class TtsControlPanel extends StatelessWidget {
   const TtsControlPanel({
     super.key,
     required this.state,
-    required this.hasPrevious,
-    required this.hasNext,
     required this.hasPreviousChapter,
     required this.hasNextChapter,
     required this.speechRate,
     required this.onPlay,
     required this.onPause,
     required this.onStop,
-    required this.onPrevious,
-    required this.onNext,
     required this.onPreviousChapter,
     required this.onNextChapter,
     required this.onRateChanged,
@@ -89,24 +81,8 @@ class TtsControlPanel extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        // 上一段
-                        IconButton(
-                          onPressed: hasPrevious ? onPrevious : null,
-                          icon: const Icon(Icons.first_page),
-                          iconSize: 32,
-                          tooltip: '上一段',
-                        ),
-
                         // 播放/暂停/停止
                         _buildPlayButton(context),
-
-                        // 下一段
-                        IconButton(
-                          onPressed: hasNext ? onNext : null,
-                          icon: const Icon(Icons.last_page),
-                          iconSize: 32,
-                          tooltip: '下一段',
-                        ),
                       ],
                     ),
                   ),

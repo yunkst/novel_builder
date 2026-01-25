@@ -122,6 +122,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
 
   /// 生成剧本
   Future<void> _generateScript() async {
+    if (!mounted) return;
+
     setState(() {
       _status = ImmersiveStatus.loading;
     });
@@ -150,35 +152,44 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
           .toList();
 
+      // 停止动画和提示轮播
+      _tipTimer?.cancel();
+      _animationController.stop();
+
+      if (!mounted) return;
+
       setState(() {
         _play = play;
         _roleStrategy = roleStrategyList;
         _status = ImmersiveStatus.success;
       });
 
-      // 停止动画和提示轮播
-      _tipTimer?.cancel();
-      _animationController.stop();
-
       debugPrint('✅ 剧本生成成功');
       debugPrint('剧本长度: ${play.length} 字符');
       debugPrint('角色策略数量: ${roleStrategyList.length}');
     } catch (e) {
+      // 停止动画和提示轮播
+      _tipTimer?.cancel();
+      _animationController.stop();
+
+      if (!mounted) return;
+
       setState(() {
         _status = ImmersiveStatus.error;
         _errorMessage = e.toString();
       });
 
-      _tipTimer?.cancel();
-      _animationController.stop();
-
       debugPrint('❌ 剧本生成失败: $e');
-      _showErrorDialog(e.toString());
+      if (mounted) {
+        _showErrorDialog(e.toString());
+      }
     }
   }
 
   /// 重新生成（带修改意见）
   Future<void> _regenerateWithFeedback(String feedback) async {
+    if (!mounted) return;
+
     setState(() {
       _status = ImmersiveStatus.loading;
       _currentTipIndex = 0;
@@ -213,14 +224,16 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
           .toList();
 
+      _tipTimer?.cancel();
+      _animationController.stop();
+
+      if (!mounted) return;
+
       setState(() {
         _play = play;
         _roleStrategy = roleStrategyList;
         _status = ImmersiveStatus.success;
       });
-
-      _tipTimer?.cancel();
-      _animationController.stop();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -231,15 +244,19 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
         );
       }
     } catch (e) {
+      _tipTimer?.cancel();
+      _animationController.stop();
+
+      if (!mounted) return;
+
       setState(() {
         _status = ImmersiveStatus.error;
         _errorMessage = e.toString();
       });
 
-      _tipTimer?.cancel();
-      _animationController.stop();
-
-      _showErrorDialog(e.toString());
+      if (mounted) {
+        _showErrorDialog(e.toString());
+      }
     }
   }
 
@@ -342,6 +359,7 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           characters: widget.config.characters,
           play: _play!,
           roleStrategy: _roleStrategy!,
+          userRole: widget.config.userRole, // 传递用户选择的角色名
         ),
       ),
     );

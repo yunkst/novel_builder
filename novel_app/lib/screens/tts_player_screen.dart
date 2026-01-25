@@ -17,6 +17,7 @@ class TtsPlayerScreen extends StatefulWidget {
   final List<Chapter> chapters;
   final Chapter startChapter;
   final String? startContent;
+  final int startParagraphIndex;
 
   const TtsPlayerScreen({
     super.key,
@@ -24,6 +25,7 @@ class TtsPlayerScreen extends StatefulWidget {
     required this.chapters,
     required this.startChapter,
     this.startContent,
+    this.startParagraphIndex = 0,
   });
 
   @override
@@ -58,6 +60,7 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
       chapters: widget.chapters,
       startChapter: widget.startChapter,
       startContent: widget.startContent,
+      startParagraphIndex: widget.startParagraphIndex,
     );
 
     if (!success && mounted) {
@@ -250,22 +253,21 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
                       child: TtsContentDisplay(
                         paragraphs: player.paragraphs,
                         currentIndex: player.currentParagraphIndex,
+                        onParagraphTap: (index) {
+                          player.jumpToParagraph(index);
+                        },
                       ),
                     ),
 
                     // 控制面板
                     TtsControlPanel(
                       state: player.state,
-                      hasPrevious: player.currentParagraphIndex > 0,
-                      hasNext: player.currentParagraphIndex < player.paragraphs.length - 1,
                       hasPreviousChapter: player.hasPreviousChapter,
                       hasNextChapter: player.hasNextChapter,
                       speechRate: player.speechRate,
                       onPlay: () => player.play(),
                       onPause: () => player.pause(),
                       onStop: () => player.stop(),
-                      onPrevious: () => player.previousParagraph(),
-                      onNext: () => player.nextParagraph(),
                       onPreviousChapter: () => _previousChapter(player),
                       onNextChapter: () => _nextChapter(player),
                       onRateChanged: (rate) => player.setSpeechRate(rate),
