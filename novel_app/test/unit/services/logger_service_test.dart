@@ -685,5 +685,57 @@ void main() {
         expect(results, isEmpty);
       });
     });
+
+    group('LoggerService 统计功能', () {
+      setUp(() async {
+        await LoggerService.instance.init();
+
+        // 准备测试数据
+        LoggerService.instance.d('调试1', category: LogCategory.database);
+        LoggerService.instance.d('调试2', category: LogCategory.network);
+        LoggerService.instance.i('信息1', category: LogCategory.database);
+        LoggerService.instance.w('警告1', category: LogCategory.ai);
+        LoggerService.instance.e('错误1', category: LogCategory.network);
+        LoggerService.instance.e('错误2', category: LogCategory.network);
+      });
+
+      tearDown(() async {
+        await LoggerService.instance.clearLogs();
+        LoggerService.resetForTesting();
+      });
+
+      test('应正确统计总日志数', () {
+        final stats = LoggerService.instance.getStatistics();
+        expect(stats.total, 6);
+      });
+
+      test('应正确统计各级别日志数', () {
+        final stats = LoggerService.instance.getStatistics();
+        expect(stats.byLevel[LogLevel.debug], 2);
+        expect(stats.byLevel[LogLevel.info], 1);
+        expect(stats.byLevel[LogLevel.warning], 1);
+        expect(stats.byLevel[LogLevel.error], 2);
+      });
+
+      test('应正确统计各分类日志数', () {
+        final stats = LoggerService.instance.getStatistics();
+        expect(stats.byCategory[LogCategory.database], 2);
+        expect(stats.byCategory[LogCategory.network], 3);
+        expect(stats.byCategory[LogCategory.ai], 1);
+      });
+
+      test('应正确计算级别占比', () {
+        final stats = LoggerService.instance.getStatistics();
+        expect(stats.levelPercentage[LogLevel.debug], closeTo(0.333, 0.01));
+        expect(stats.levelPercentage[LogLevel.error], closeTo(0.333, 0.01));
+      });
+
+      test('空日志应返回零统计', () async {
+        await LoggerService.instance.clearLogs();
+        final stats = LoggerService.instance.getStatistics();
+        expect(stats.total, 0);
+        expect(stats.levelPercentage, isEmpty);
+      });
+    });
   });
 }
