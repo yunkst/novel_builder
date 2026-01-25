@@ -52,7 +52,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 14,
+      version: 15,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -362,6 +362,17 @@ class DatabaseService {
           category: LogCategory.database,
           tags: ['migration', 'schema', 'ai_accompaniment'],
         );
+    }
+    if (oldVersion < 15) {
+      // 添加章节伴读标记字段
+      await db.execute('''
+        ALTER TABLE chapter_cache ADD COLUMN ai_accompanied INTEGER DEFAULT 0
+      ''');
+      LoggerService.instance.i(
+          '数据库升级：添加了 chapter_cache.ai_accompanied 字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompanied'],
+      );
     }
   }
 
@@ -715,6 +726,54 @@ class DatabaseService {
       'chapter_cache',
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
+    );
+  }
+
+  /// 检查章节是否已伴读
+  Future<bool> isChapterAccompanied(String novelUrl, String chapterUrl) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chapter_cache',
+      columns: ['ai_accompanied'],
+      where: 'novelUrl = ? AND chapterUrl = ?',
+      whereArgs: [novelUrl, chapterUrl],
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first['ai_accompanied'] == 1;
+    }
+    return false;
+  }
+
+  /// 标记章节为已伴读
+  Future<void> markChapterAsAccompanied(String novelUrl, String chapterUrl) async {
+    final db = await database;
+    await db.update(
+      'chapter_cache',
+      {'ai_accompanied': 1},
+      where: 'novelUrl = ? AND chapterUrl = ?',
+      whereArgs: [novelUrl, chapterUrl],
+    );
+    LoggerService.instance.i(
+      '章节已标记为伴读: $chapterUrl',
+      category: LogCategory.database,
+      tags: ['ai_accompaniment', 'mark'],
+    );
+  }
+
+  /// 重置章节伴读标记（用于强制刷新）
+  Future<void> resetChapterAccompaniedFlag(String novelUrl, String chapterUrl) async {
+    final db = await database;
+    await db.update(
+      'chapter_cache',
+      {'ai_accompanied': 0},
+      where: 'novelUrl = ? AND chapterUrl = ?',
+      whereArgs: [novelUrl, chapterUrl],
+    );
+    LoggerService.instance.i(
+      '章节伴读标记已重置: $chapterUrl',
+      category: LogCategory.database,
+      tags: ['ai_accompaniment', 'reset'],
     );
   }
 

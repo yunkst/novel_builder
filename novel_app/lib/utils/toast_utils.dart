@@ -1,55 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 /// Toast提示工具类
 class ToastUtils {
   /// 显示成功提示
   static void showSuccess(BuildContext context, String message) {
     _showToast(
-      context,
       message,
       backgroundColor: Colors.green,
-      icon: Icons.check_circle,
     );
   }
 
   /// 显示错误提示
   static void showError(BuildContext context, String message) {
     _showToast(
-      context,
       message,
       backgroundColor: Colors.red,
-      icon: Icons.error,
     );
   }
 
   /// 显示警告提示
   static void showWarning(BuildContext context, String message) {
     _showToast(
-      context,
       message,
       backgroundColor: Colors.orange,
-      icon: Icons.warning,
     );
   }
 
   /// 显示信息提示
   static void showInfo(BuildContext context, String message) {
     _showToast(
-      context,
       message,
       backgroundColor: Colors.blue,
-      icon: Icons.info,
     );
   }
 
   /// 显示加载提示
   static void showLoading(BuildContext context, String message) {
     _showToast(
-      context,
       message,
       backgroundColor: Colors.grey[700]!,
-      icon: Icons.hourglass_empty,
-      duration: const Duration(seconds: 2),
     );
   }
 
@@ -91,43 +81,19 @@ class ToastUtils {
     }
   }
 
-  /// 私有方法：显示toast
+  /// 私有方法：显示toast（使用FlutterToast插件）
   static void _showToast(
-    BuildContext context,
     String message, {
     required Color backgroundColor,
-    required IconData icon,
-    Duration duration = const Duration(seconds: 3),
+    Toast toastLength = Toast.LENGTH_SHORT,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: backgroundColor,
-        duration: duration,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: toastLength,
+      gravity: ToastGravity.TOP,
+      backgroundColor: backgroundColor,
+      textColor: Colors.white,
+      fontSize: 16.0,
     );
   }
 }

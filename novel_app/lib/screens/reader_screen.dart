@@ -1,12 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
+import '../models/ai_companion_response.dart';
+import '../models/ai_accompaniment_settings.dart';
+import '../models/character.dart';
+import '../models/character_relationship.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/preload_service.dart';
 import '../services/character_card_service.dart';
+import '../services/dify_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
@@ -20,7 +26,9 @@ import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
 import '../widgets/immersive/immersive_setup_dialog.dart'; // 沉浸体验配置对话框
 import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始化页面
+import '../widgets/reader/ai_companion_confirm_dialog.dart';
 import '../services/reader_settings_service.dart'; // 阅读器设置持久化
+import '../utils/toast_utils.dart';
 
 import '../utils/media_markup_parser.dart';
 import '../providers/reader_edit_mode_provider.dart';
@@ -60,6 +68,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   final DatabaseService _databaseService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
   final ReaderSettingsService _settingsService = ReaderSettingsService.instance;
+  final DifyService _difyService = DifyService();
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -91,6 +100,13 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   late Chapter _currentChapter;
   double? _fontSize;
+
+  // ========== 角色卡更新状态 ==========
+  bool _isUpdatingRoleCards = false;
+
+  // ========== AI伴读自动触发防抖标志 ==========
+  bool _hasAutoTriggered = false;
+  bool _isAutoCompanionRunning = false;
 
   // 模型尺寸（用于插图显示）
   int? _defaultModelWidth;
@@ -183,7 +199,7 @@ class _ReaderScreenState extends State<ReaderScreen>
           orElse: () => t2iModels.first,
         );
 
-        if (defaultModel.width != null && defaultModel.height != null) {
+        if (defaultModel.width != null && defaultModel.height != null && mounted) {
           setState(() {
             _defaultModelWidth = defaultModel.width;
             _defaultModelHeight = defaultModel.height;
@@ -195,10 +211,12 @@ class _ReaderScreenState extends State<ReaderScreen>
     } catch (e) {
       debugPrint('⚠️ 加载默认模型尺寸失败: $e');
       // 使用默认值 704×1280
-      setState(() {
-        _defaultModelWidth = 704;
-        _defaultModelHeight = 1280;
-      });
+      if (mounted) {
+        setState(() {
+          _defaultModelWidth = 704;
+          _defaultModelHeight = 1280;
+        });
+      }
     }
   }
 
@@ -213,6 +231,14 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   Future<void> _loadChapterContent(
       {bool resetScrollPosition = true, bool forceRefresh = false}) async {
+    // 如果是强制刷新，重置伴读标记
+    if (forceRefresh) {
+      await _databaseService.resetChapterAccompaniedFlag(
+        widget.novel.url,
+        _currentChapter.url,
+      );
+    }
+
     await _contentController.loadChapter(
       _currentChapter,
       widget.novel,
@@ -231,6 +257,12 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     // 启动预加载（保留在 reader_screen 中，因为这需要完整的章节列表）
     await _startPreloadingChapters();
+
+    // 重置防抖标志（章节切换时）
+    _hasAutoTriggered = false;
+
+    // 自动触发AI伴读
+    await _checkAndAutoTriggerAICompanion();
   }
 
   /// 启动预加载章节（使用新的PreloadService）
@@ -487,10 +519,17 @@ class _ReaderScreenState extends State<ReaderScreen>
     // 记录当前自动滚动状态
     final wasAutoScrolling = shouldAutoScroll;
 
-    // 更新当前章节
-    setState(() {
-      _currentChapter = targetChapter;
+    // 更新当前章节 - 使用 addPostFrameCallback 避免在构建阶段调用 setState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _currentChapter = targetChapter;
+        });
+      }
     });
+
+    // 等待一帧确保状态更新已生效
+    await Future.delayed(const Duration(milliseconds: 50));
 
     // 加载新章节内容
     await _loadChapterContent(resetScrollPosition: true);
@@ -603,6 +642,15 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // 更新角色卡功能（使用 CharacterCardService）
   Future<void> _updateCharacterCards() async {
+    // 防重复点击检查
+    if (_isUpdatingRoleCards) {
+      _showSnackBar(
+        message: '角色卡正在更新中,请稍候...',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
     if (_content.isEmpty) {
       _showSnackBar(
         message: '章节内容为空，无法更新角色卡',
@@ -611,27 +659,12 @@ class _ReaderScreenState extends State<ReaderScreen>
       return;
     }
 
-    // 显示加载对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Row(
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 16),
-            Expanded(
-                child: ValueListenableBuilder(
-              valueListenable: ValueNotifier(''),
-              builder: (context, message, child) {
-                return Text(message.isNotEmpty ? message : '正在更新角色卡...');
-              },
-            )),
-          ],
-        ),
-      ),
-    );
+    // 设置loading状态
+    setState(() {
+      _isUpdatingRoleCards = true;
+    });
 
+    // 开始后台处理（无loading阻塞，允许用户继续阅读）
     try {
       // 使用 CharacterCardService 预览更新
       final service = CharacterCardService();
@@ -639,20 +672,15 @@ class _ReaderScreenState extends State<ReaderScreen>
         novel: widget.novel,
         chapterContent: _content,
         onProgress: (message) {
-          debugPrint(message);
+          debugPrint(message); // 保留日志输出便于调试
         },
       );
-
-      // 关闭加载对话框
-      if (mounted) {
-        Navigator.pop(context);
-      }
 
       // 显示角色预览对话框
       if (mounted) {
         await CharacterPreviewDialog.show(
           context,
-          characters: updatedCharacters,
+          characterUpdates: updatedCharacters,
           onConfirmed: (selectedCharacters) async {
             // 保存用户确认的角色
             final savedCharacters =
@@ -669,11 +697,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         );
       }
     } catch (e) {
-      // 关闭加载对话框
-      if (mounted) {
-        Navigator.pop(context);
-      }
-
+      // 静默处理错误，仅显示提示
       if (mounted) {
         _showSnackBar(
           message: '更新角色卡失败: $e',
@@ -681,7 +705,395 @@ class _ReaderScreenState extends State<ReaderScreen>
           duration: const Duration(seconds: 4),
         );
       }
+    } finally {
+      // 无论成功或失败都重置状态
+      if (mounted) {
+        setState(() {
+          _isUpdatingRoleCards = false;
+        });
+      }
     }
+  }
+
+  /// 检查并自动触发AI伴读
+  Future<void> _checkAndAutoTriggerAICompanion() async {
+    // 防抖检查
+    if (_hasAutoTriggered || _isAutoCompanionRunning) {
+      debugPrint('AI伴读已触发或正在运行，跳过');
+      return;
+    }
+
+    // 检查是否已伴读
+    final hasAccompanied = await _databaseService.isChapterAccompanied(
+      widget.novel.url,
+      _currentChapter.url,
+    );
+
+    if (hasAccompanied) {
+      debugPrint('章节已伴读，跳过自动触发');
+      return;
+    }
+
+    // 获取AI伴读设置
+    final settings = await _databaseService.getAiAccompanimentSettings(
+      widget.novel.url,
+    );
+
+    if (!settings.autoEnabled) {
+      debugPrint('自动伴读未启用');
+      return;
+    }
+
+    // 检查章节内容
+    if (_content.isEmpty) {
+      debugPrint('章节内容为空，跳过AI伴读');
+      return;
+    }
+
+    // 开始自动伴读
+    _hasAutoTriggered = true;
+    _isAutoCompanionRunning = true;
+
+    debugPrint('=== 自动触发AI伴读 ===');
+
+    try {
+      await _handleAICompanionSilent(settings);
+    } catch (e) {
+      debugPrint('❌ 自动AI伴读失败: $e');
+    } finally {
+      _isAutoCompanionRunning = false;
+    }
+  }
+
+  // AI伴读功能
+  Future<void> _handleAICompanion() async {
+    if (_content.isEmpty) {
+      _showSnackBar(
+        message: '章节内容为空，无法进行AI伴读',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    // 显示loading提示
+    _showSnackBar(
+      message: 'AI正在分析章节...',
+      backgroundColor: Colors.blue,
+      duration: const Duration(minutes: 5),
+    );
+
+    try {
+      // 获取本书的所有角色
+      final allCharacters = await _databaseService.getCharacters(widget.novel.url);
+
+      // 筛选当前章节出现的角色
+      final chapterCharacters = await _filterCharactersInChapter(
+        allCharacters,
+        _content,
+      );
+
+      // 获取这些角色的关系
+      final chapterRelationships = await _getRelationshipsForCharacters(
+        widget.novel.url,
+        chapterCharacters,
+      );
+
+      debugPrint('=== AI伴读分析开始 ===');
+      debugPrint('小说总角色数: ${allCharacters.length}');
+      debugPrint('本章出现角色数: ${chapterCharacters.length}');
+      debugPrint('相关关系数: ${chapterRelationships.length}');
+
+      // 调用DifyService
+      final response = await _difyService.generateAICompanion(
+        chaptersContent: _content,
+        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        characters: chapterCharacters,
+        relationships: chapterRelationships,
+      );
+
+      if (response == null) {
+        throw Exception('AI伴读返回数据为空');
+      }
+
+      debugPrint('=== AI伴读分析完成 ===');
+      debugPrint('角色更新: ${response.roles.length}');
+      debugPrint('关系更新: ${response.relations.length}');
+      debugPrint('背景设定新增: ${response.background.length} 字符');
+      debugPrint('本章总结: ${response.summery.length} 字符');
+
+      // 关闭loading
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+
+      // 显示确认对话框
+      if (mounted) {
+        final confirmed = await showAICompanionConfirmDialog(
+          context,
+          response,
+        );
+
+        if (confirmed) {
+          // 用户确认，执行数据更新
+          await _performAICompanionUpdates(response);
+
+          // 标记章节为已伴读
+          await _databaseService.markChapterAsAccompanied(
+            widget.novel.url,
+            _currentChapter.url,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ AI伴读失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        _showSnackBar(
+          message: 'AI伴读失败: $e',
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
+  }
+
+  /// 静默模式AI伴读（不显示确认对话框）
+  Future<void> _handleAICompanionSilent(AiAccompanimentSettings settings) async {
+    try {
+      // 获取本书的所有角色
+      final allCharacters = await _databaseService.getCharacters(
+        widget.novel.url,
+      );
+
+      // 筛选当前章节出现的角色
+      final chapterCharacters = await _filterCharactersInChapter(
+        allCharacters,
+        _content,
+      );
+
+      // 获取这些角色的关系
+      final chapterRelationships = await _getRelationshipsForCharacters(
+        widget.novel.url,
+        chapterCharacters,
+      );
+
+      debugPrint('=== AI伴读分析开始（静默模式）===');
+      debugPrint('小说总角色数: ${allCharacters.length}');
+      debugPrint('本章出现角色数: ${chapterCharacters.length}');
+      debugPrint('相关关系数: ${chapterRelationships.length}');
+
+      // 调用DifyService
+      final response = await _difyService.generateAICompanion(
+        chaptersContent: _content,
+        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        characters: chapterCharacters,
+        relationships: chapterRelationships,
+      );
+
+      if (response == null) {
+        throw Exception('AI伴读返回数据为空');
+      }
+
+      debugPrint('=== AI伴读分析完成 ===');
+      debugPrint('角色更新: ${response.roles.length}');
+      debugPrint('关系更新: ${response.relations.length}');
+      debugPrint('背景设定新增: ${response.background.length} 字符');
+      debugPrint('本章总结: ${response.summery.length} 字符');
+
+      // 直接执行数据更新（不显示确认对话框）
+      await _performAICompanionUpdates(response, isSilent: true);
+
+      // 标记章节为已伴读
+      await _databaseService.markChapterAsAccompanied(
+        widget.novel.url,
+        _currentChapter.url,
+      );
+
+      // 显示Toast提示（根据设置）
+      if (settings.infoNotificationEnabled && mounted) {
+        final messages = <String>[];
+        if (response.roles.isNotEmpty) messages.add('角色');
+        if (response.relations.isNotEmpty) messages.add('关系');
+        if (response.background.isNotEmpty) messages.add('背景');
+
+        final message = messages.isEmpty
+            ? 'AI伴读内容已更新'
+            : 'AI伴读已完成: 更新${messages.join('、')}';
+
+        ToastUtils.showSuccess(context, message);
+      }
+    } catch (e) {
+      debugPrint('❌ 静默AI伴读失败: $e');
+      // 静默失败，不打扰用户
+      rethrow; // 抛出异常供上层记录日志
+    }
+  }
+
+  /// 执行AI伴读的数据更新
+  Future<void> _performAICompanionUpdates(
+    AICompanionResponse response, {
+    bool isSilent = false,
+  }) async {
+    try {
+      // 仅在非静默模式下显示更新进度
+      if (!isSilent) {
+        _showSnackBar(
+          message: '正在更新数据...',
+          backgroundColor: Colors.blue,
+          duration: const Duration(minutes: 5),
+        );
+      }
+
+      // 1. 追加背景设定
+      if (response.background.isNotEmpty) {
+        await _databaseService.appendBackgroundSetting(
+          widget.novel.url,
+          response.background,
+        );
+        debugPrint('✅ 背景设定追加成功');
+      }
+
+      // 2. 批量更新或插入角色
+      int updatedRoles = 0;
+      if (response.roles.isNotEmpty) {
+        updatedRoles = await _databaseService.batchUpdateOrInsertCharacters(
+          widget.novel.url,
+          response.roles,
+        );
+        debugPrint('✅ 角色更新成功: $updatedRoles');
+      }
+
+      // 3. 批量更新或插入关系
+      int updatedRelations = 0;
+      if (response.relations.isNotEmpty) {
+        updatedRelations = await _databaseService.batchUpdateOrInsertRelationships(
+          widget.novel.url,
+          response.relations,
+        );
+        debugPrint('✅ 关系更新成功: $updatedRelations');
+      }
+
+      // 关闭进度提示
+      if (mounted) {
+        if (!isSilent) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+          // 仅在非静默模式下显示成功提示
+          String successMessage = 'AI伴读更新完成';
+          final List<String> updates = [];
+          if (response.background.isNotEmpty) {
+            updates.add('背景设定');
+          }
+          if (response.roles.isNotEmpty) {
+            updates.add('$updatedRoles 个角色');
+          }
+          if (response.relations.isNotEmpty) {
+            updates.add('$updatedRelations 个关系');
+          }
+          if (updates.isNotEmpty) {
+            successMessage += ' (${updates.join('、')})';
+          }
+
+          _showSnackBar(
+            message: successMessage,
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ AI伴读数据更新失败: $e');
+      if (mounted && !isSilent) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        _showSnackBar(
+          message: '数据更新失败: $e',
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
+  }
+
+  /// 筛选当前章节中出现的角色
+  ///
+  /// [allCharacters] 小说的所有角色
+  /// [chapterContent] 章节内容
+  /// 返回本章出现的角色列表
+  Future<List<Character>> _filterCharactersInChapter(
+    List<Character> allCharacters,
+    String chapterContent,
+  ) async {
+    if (allCharacters.isEmpty) {
+      return [];
+    }
+
+    // 包含角色别名的集合（用于匹配）
+    final Map<String, Character> nameToCharacter = {};
+
+    for (final character in allCharacters) {
+      if (character.name.isEmpty) continue;
+
+      nameToCharacter[character.name] = character;
+
+      // 添加别名
+      if (character.aliases != null && character.aliases!.isNotEmpty) {
+        for (final alias in character.aliases!) {
+          if (alias.isNotEmpty) {
+            nameToCharacter[alias] = character;
+          }
+        }
+      }
+    }
+
+    // 查找本章出现的角色名
+    final foundCharacters = <Character>[];
+    final addedIds = <int>{};
+
+    for (final entry in nameToCharacter.entries) {
+      final name = entry.key;
+      if (chapterContent.contains(name)) {
+        final character = entry.value;
+        // 避免重复添加同一个角色（通过ID判断）
+        if (character.id != null && !addedIds.contains(character.id!)) {
+          foundCharacters.add(character);
+          addedIds.add(character.id!);
+        }
+      }
+    }
+
+    debugPrint('✅ 章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}');
+    return foundCharacters;
+  }
+
+  /// 获取指定角色列表的关系
+  ///
+  /// [novelUrl] 小说URL
+  /// [characters] 角色列表
+  /// 返回这些角色之间的关系
+  Future<List<CharacterRelationship>> _getRelationshipsForCharacters(
+    String novelUrl,
+    List<Character> characters,
+  ) async {
+    if (characters.isEmpty) {
+      return [];
+    }
+
+    // 获取角色ID集合
+    final characterIds = characters
+        .map((c) => c.id)
+        .whereType<int>()
+        .toSet();
+
+    final allRelationships = await _databaseService.getAllRelationships(novelUrl);
+
+    // 筛选出涉及这些角色的关系
+    final filteredRelationships = allRelationships.where((rel) {
+      return characterIds.contains(rel.sourceCharacterId) ||
+          characterIds.contains(rel.targetCharacterId);
+    }).toList();
+
+    debugPrint('✅ 关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}');
+    return filteredRelationships;
   }
 
   // 处理菜单动作
@@ -704,6 +1116,9 @@ class _ReaderScreenState extends State<ReaderScreen>
         break;
       case 'update_character_cards':
         _updateCharacterCards();
+        break;
+      case 'ai_companion':
+        _handleAICompanion();
         break;
       case 'refresh':
         _refreshChapter();
@@ -744,12 +1159,14 @@ class _ReaderScreenState extends State<ReaderScreen>
     Color backgroundColor = Colors.grey,
     Duration duration = const Duration(seconds: 2),
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
-        duration: duration,
-      ),
+    // 使用FlutterToast替代SnackBar，显示在顶部
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: duration.inSeconds >= 3 ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT,
+      gravity: ToastGravity.TOP,
+      backgroundColor: backgroundColor,
+      textColor: Colors.white,
+      fontSize: 16.0,
     );
   }
 
@@ -1026,12 +1443,34 @@ class _ReaderScreenState extends State<ReaderScreen>
                     ),
                     PopupMenuItem(
                       value: 'update_character_cards',
+                      enabled: !_isUpdatingRoleCards,
                       child: Row(
                         children: [
-                          Icon(Icons.person_search,
-                              size: 18, color: Colors.purple),
+                          _isUpdatingRoleCards
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                            Colors.purple),
+                                  ),
+                                )
+                              : const Icon(Icons.person_search,
+                                  size: 18, color: Colors.purple),
+                          const SizedBox(width: 12),
+                          Text(_isUpdatingRoleCards ? '更新中...' : '更新角色卡'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'ai_companion',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_stories, size: 18, color: Colors.orange),
                           SizedBox(width: 12),
-                          Text('更新角色卡'),
+                          Text('AI伴读'),
                         ],
                       ),
                     ),
@@ -1110,8 +1549,13 @@ class _ReaderScreenState extends State<ReaderScreen>
                                     final updatedParagraphs =
                                         List<String>.from(paragraphs);
                                     updatedParagraphs[index] = newContent;
-                                    setState(() {
-                                      _content = updatedParagraphs.join('\n');
+                                    // 使用 addPostFrameCallback 避免在构建阶段调用 setState
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (mounted) {
+                                        setState(() {
+                                          _content = updatedParagraphs.join('\n');
+                                        });
+                                      }
                                     });
                                   },
                                   onImageTap: (taskId, imageUrl, imageIndex) =>
@@ -1272,8 +1716,32 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
+  /// 获取当前可见区域的第一段索引（基于滚动位置估算）
+  int _getFirstVisibleParagraphIndex() {
+    if (!_scrollController.hasClients) return 0;
+
+    final position = _scrollController.position;
+
+    // 内容未超过一屏，返回0
+    if (position.maxScrollExtent <= 0) {
+      return 0;
+    }
+
+    // 空列表保护
+    if (_paragraphs.isEmpty) return 0;
+
+    // 计算滚动进度比例
+    final scrollRatio = position.pixels / position.maxScrollExtent;
+    final estimatedIndex = (scrollRatio * _paragraphs.length).floor();
+
+    // 边界保护
+    return estimatedIndex.clamp(0, _paragraphs.length - 1);
+  }
+
   /// 启动TTS朗读
   Future<void> _startTtsReading() async {
+    final startParagraphIndex = _getFirstVisibleParagraphIndex();
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1282,6 +1750,7 @@ class _ReaderScreenState extends State<ReaderScreen>
           chapters: widget.chapters,
           startChapter: _currentChapter,
           startContent: _content,
+          startParagraphIndex: startParagraphIndex,
         ),
       ),
     );
