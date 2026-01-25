@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:io';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
@@ -13,6 +12,7 @@ import '../extensions/api_novel_extension.dart';
 import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
 import 'chapter_manager.dart';
+import 'logger_service.dart';
 
 /// API 服务封装层
 ///
@@ -55,8 +55,16 @@ class ApiServiceWrapper {
   Future<void> init() async {
     final host = await getHost();
 
-    debugPrint('=== ApiServiceWrapper 初始化 ===');
-    debugPrint('Host: $host');
+    LoggerService.instance.d(
+      '=== ApiServiceWrapper 初始化 ===',
+      category: LogCategory.network,
+      tags: ['debug', 'lifecycle'],
+    );
+    LoggerService.instance.i(
+      'Host: $host',
+      category: LogCategory.network,
+      tags: ['api'],
+    );
 
     if (host == null || host.isEmpty) {
       throw Exception('后端 HOST 未配置');
@@ -93,13 +101,21 @@ class ApiServiceWrapper {
       },
     );
 
-    debugPrint('✅ Dio连接池配置已优化: 20个并发连接/主机，60秒空闲超时');
+    LoggerService.instance.i(
+      '✅ Dio连接池配置已优化: 20个并发连接/主机，60秒空闲超时',
+      category: LogCategory.network,
+      tags: ['success', 'api'],
+    );
 
     // 添加日志拦截器（仅在调试模式）
     _dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: false, // 减少日志输出
-      logPrint: (obj) => debugPrint('[API] $obj'),
+      logPrint: (obj) => LoggerService.instance.d(
+        '[API] $obj',
+        category: LogCategory.network,
+        tags: ['interceptor'],
+      ),
     ));
 
     // 初始化生成的 API 客户端
@@ -110,7 +126,11 @@ class ApiServiceWrapper {
     _lastInitTime = DateTime.now();
     _lastErrorCount = 0;
     _lastErrorTime = null;
-    debugPrint('✓ ApiServiceWrapper 初始化完成');
+    LoggerService.instance.d(
+      '✓ ApiServiceWrapper 初始化完成',
+      category: LogCategory.network,
+      tags: ['debug', 'lifecycle'],
+    );
   }
 
   /// 确保已初始化
@@ -141,7 +161,11 @@ class ApiServiceWrapper {
     if (_lastInitTime != null) {
       final age = DateTime.now().difference(_lastInitTime!);
       if (age.inMinutes > 30) {
-        debugPrint('⚠️ 连接过期，需要重新初始化 (${age.inMinutes}分钟)');
+        LoggerService.instance.w(
+          '⚠️ 连接过期，需要重新初始化 (${age.inMinutes}分钟)',
+          category: LogCategory.network,
+          tags: ['warning', 'api'],
+        );
         return false;
       }
     }
@@ -150,7 +174,11 @@ class ApiServiceWrapper {
     if (_lastErrorTime != null) {
       final timeSinceLastError = DateTime.now().difference(_lastErrorTime!);
       if (timeSinceLastError.inMinutes < 2 && _lastErrorCount >= 3) {
-        debugPrint('⚠️ 最近错误频繁，连接可能不稳定');
+        LoggerService.instance.e(
+          '⚠️ 最近错误频繁，连接可能不稳定',
+          category: LogCategory.network,
+          tags: ['error', 'api'],
+        );
         return false;
       }
     }
@@ -161,7 +189,11 @@ class ApiServiceWrapper {
   /// 确保连接健康，必要时重新初始化
   Future<void> _ensureHealthyConnection() async {
     if (!_isConnectionHealthy()) {
-      debugPrint('🔄 检测到连接不健康，正在重新初始化...');
+      LoggerService.instance.i(
+        '🔄 检测到连接不健康，正在重新初始化...',
+        category: LogCategory.network,
+        tags: ['retry', 'reinit'],
+      );
       await _reinitializeConnection();
     }
   }
@@ -169,21 +201,37 @@ class ApiServiceWrapper {
   /// 重新初始化连接
   Future<void> _reinitializeConnection() async {
     try {
-      debugPrint('🔧 重新初始化API连接...');
+      LoggerService.instance.i(
+        '🔧 重新初始化API连接...',
+        category: LogCategory.network,
+        tags: ['retry', 'reinit'],
+      );
 
       // 强制关闭旧连接（如果存在）
       try {
         _dio.close(force: true);
       } catch (e) {
-        debugPrint('关闭旧连接时出错: $e');
+        LoggerService.instance.i(
+          '关闭旧连接时出错: $e',
+          category: LogCategory.network,
+          tags: ['api'],
+        );
       }
 
       // 重新初始化
       await init();
 
-      debugPrint('✅ API连接重新初始化成功');
+      LoggerService.instance.i(
+        '✅ API连接重新初始化成功',
+        category: LogCategory.network,
+        tags: ['success', 'api'],
+      );
     } catch (e) {
-      debugPrint('❌ API连接重新初始化失败: $e');
+      LoggerService.instance.e(
+        '❌ API连接重新初始化失败: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw Exception('连接重新初始化失败: $e');
     }
   }
@@ -205,13 +253,25 @@ class ApiServiceWrapper {
     _lastErrorTime = DateTime.now();
     _lastErrorCount++;
 
-    debugPrint('🔌 记录连接错误 #$_lastErrorCount: $error');
+    LoggerService.instance.e(
+      '🔌 记录连接错误 #$_lastErrorCount: $error',
+      category: LogCategory.network,
+      tags: ['error', 'api'],
+    );
 
     // 如果错误过多，尝试自动重新初始化
     if (_lastErrorCount >= 3) {
-      debugPrint('🔄 错误次数过多，尝试自动恢复连接...');
+      LoggerService.instance.e(
+        '🔄 错误次数过多，尝试自动恢复连接...',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       _reinitializeConnection().catchError((e) {
-        debugPrint('❌ 自动恢复连接失败: $e');
+        LoggerService.instance.e(
+          '❌ 自动恢复连接失败: $e',
+          category: LogCategory.network,
+          tags: ['error', 'api'],
+        );
       });
     }
   }
@@ -258,7 +318,11 @@ class ApiServiceWrapper {
 
         // 成功时重置错误计数
         if (_lastErrorCount > 0) {
-          debugPrint('✅ 请求成功，重置错误计数 (之前: $_lastErrorCount)');
+          LoggerService.instance.e(
+            '✅ 请求成功，重置错误计数 (之前: $_lastErrorCount)',
+            category: LogCategory.network,
+            tags: ['error', 'api'],
+          );
           _lastErrorCount = 0;
           _lastErrorTime = null;
         }
@@ -271,13 +335,21 @@ class ApiServiceWrapper {
         _recordConnectionError(e);
 
         if (retryCount > maxRetries) {
-          debugPrint('❌ $operationName 最终失败: $e');
+          LoggerService.instance.e(
+            '❌ $operationName 最终失败: $e',
+            category: LogCategory.network,
+            tags: ['error', 'api'],
+          );
           throw _handleError(e);
         }
 
         // 如果是连接错误，尝试重新初始化并重试
         if (_isConnectionError(e)) {
-          debugPrint('🔄 检测到连接错误，重新初始化并重试 ($retryCount/$maxRetries)');
+          LoggerService.instance.e(
+            '🔄 检测到连接错误，重新初始化并重试 ($retryCount/$maxRetries)',
+            category: LogCategory.network,
+            tags: ['error', 'api'],
+          );
           await _reinitializeConnection();
           await Future.delayed(
               Duration(milliseconds: 1000 * retryCount)); // 指数退避
@@ -285,7 +357,11 @@ class ApiServiceWrapper {
         }
 
         // 其他错误也重试，但延迟更短
-        debugPrint('⚠️ $operationName 失败，重试中 ($retryCount/$maxRetries): $e');
+        LoggerService.instance.e(
+          '⚠️ $operationName 失败，重试中 ($retryCount/$maxRetries): $e',
+          category: LogCategory.network,
+          tags: ['error', 'api'],
+        );
         await Future.delayed(Duration(milliseconds: 500 * retryCount));
       }
     }
@@ -406,8 +482,11 @@ class ApiServiceWrapper {
   /// 注意：由于ApiServiceWrapper使用单例模式，不应关闭共享的Dio实例
   /// 所以此方法改为空操作，避免连接被过早关闭导致后续请求失败
   void dispose() {
-    debugPrint(
-        'ApiServiceWrapper.dispose() called (no-op to maintain connection)');
+    LoggerService.instance.i(
+      'ApiServiceWrapper.dispose() called (no-op to maintain connection)',
+      category: LogCategory.network,
+      tags: ['lifecycle', 'dispose'],
+    );
     // 不再关闭Dio连接，保持单例连接可用
     // _dio.close(); // 已注释，避免关闭共享连接
   }
@@ -436,7 +515,11 @@ class ApiServiceWrapper {
 
       if (response.statusCode == 200) {
         // 对于 JsonObject 响应，简单地返回成功状态
-        debugPrint('角色卡生成请求成功: ${response.data}');
+        LoggerService.instance.i(
+          '角色卡生成请求成功: ${response.data}',
+          category: LogCategory.network,
+          tags: ['success', 'api'],
+        );
         return {'message': '图片生成中，请耐心等待', 'status': 'success'};
       } else {
         throw Exception('生成人物卡失败：${response.statusCode}');
@@ -459,18 +542,34 @@ class ApiServiceWrapper {
 
       if (response.statusCode == 200) {
         final responseData = response.data;
-        debugPrint('图集API响应数据类型: ${responseData.runtimeType}'); // 调试日志
-        debugPrint('图集API响应数据: $responseData');
+        LoggerService.instance.i(
+          '图集API响应数据类型: ${responseData.runtimeType}',
+          category: LogCategory.network,
+          tags: ['api', 'response'],
+        );
+        LoggerService.instance.i(
+          '图集API响应数据: $responseData',
+          category: LogCategory.network,
+          tags: ['api', 'response'],
+        );
 
         if (responseData != null) {
           try {
-            debugPrint('开始解析RoleGalleryResponse对象');
+            LoggerService.instance.d(
+              '开始解析RoleGalleryResponse对象',
+              category: LogCategory.network,
+              tags: ['data', 'parse'],
+            );
 
             // 直接处理RoleGalleryResponse对象
             final apiImages = responseData.images; // BuiltList<String>
             final imageList = apiImages.toList();
 
-            debugPrint('直接解析到的图片列表: $imageList');
+            LoggerService.instance.i(
+              '直接解析到的图片列表: $imageList',
+              category: LogCategory.network,
+              tags: ['image', 'generation'],
+            );
 
             return {
               'role_id': responseData.roleId,
@@ -478,7 +577,11 @@ class ApiServiceWrapper {
               'message': '图集获取成功'
             };
           } catch (e) {
-            debugPrint('解析图集数据失败: $e');
+            LoggerService.instance.e(
+              '解析图集数据失败: $e',
+              category: LogCategory.network,
+              tags: ['error', 'api'],
+            );
             return {'role_id': roleId, 'images': [], 'message': '图集数据解析失败'};
           }
         }
@@ -511,7 +614,11 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('角色图片删除成功: $imageUrl');
+        LoggerService.instance.i(
+          '角色图片删除成功: $imageUrl',
+          category: LogCategory.network,
+          tags: ['success', 'api'],
+        );
         return true;
       } else {
         throw Exception('删除图片失败：${response.statusCode}');
@@ -530,7 +637,11 @@ class ApiServiceWrapper {
     _ensureInitialized();
     try {
       final token = await getToken();
-      debugPrint('生成图片请求，角色ID: $roleId, 数量: $count');
+      LoggerService.instance.i(
+        '生成图片请求，角色ID: $roleId, 数量: $count',
+        category: LogCategory.network,
+        tags: ['api', 'request'],
+      );
 
       if (referenceImageUrl != null && referenceImageUrl.isNotEmpty) {
         // 使用参考图片生成相似图片
@@ -578,7 +689,11 @@ class ApiServiceWrapper {
         }
       }
     } catch (e) {
-      debugPrint('❌ 生成图片失败: $e');
+      LoggerService.instance.e(
+        '❌ 生成图片失败: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw _handleError(e);
     }
   }
@@ -720,10 +835,18 @@ class ApiServiceWrapper {
   /// 将 SceneGalleryResponse 转换为 Map
   Map<String, dynamic> _sceneGalleryResponseToMap(
       SceneGalleryResponse response) {
+    // 转换 images: list<ImageWithModel> -> list<Map>
+    final imagesList = response.images.map((img) {
+      return {
+        'url': img.url,
+        'model_name': img.modelName,
+      };
+    }).toList();
+
     return {
       'task_id': response.taskId,
-      'images': response.images.toList(),
-      'model_name': response.modelName,
+      'images': imagesList,  // 改为对象列表
+      'model_name': response.modelName,  // 保留用于兼容
       'model_width': response.modelWidth,
       'model_height': response.modelHeight,
     };
@@ -808,13 +931,21 @@ class ApiServiceWrapper {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('图生视频生成请求成功: ${response.data}');
+        LoggerService.instance.i(
+          '图生视频生成请求成功: ${response.data}',
+          category: LogCategory.network,
+          tags: ['success', 'api'],
+        );
         return response.data!;
       } else {
         throw Exception('生成图生视频失败：${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('生成图生视频异常: $e');
+      LoggerService.instance.e(
+        '生成图生视频异常: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw _handleError(e);
     }
   }
@@ -840,7 +971,11 @@ class ApiServiceWrapper {
         throw Exception('检查视频状态失败：${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('检查视频状态异常: $e');
+      LoggerService.instance.e(
+        '检查视频状态异常: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw _handleError(e);
     }
   }
@@ -866,38 +1001,85 @@ class ApiServiceWrapper {
     required int count,
     String? modelName,
   }) async {
-    debugPrint('=== ApiServiceWrapper.regenerateSceneIllustrationImages ===');
-    debugPrint('参数: taskId=$taskId, count=$count, modelName=$modelName');
+    LoggerService.instance.d(
+      '=== ApiServiceWrapper.regenerateSceneIllustrationImages ===',
+      category: LogCategory.network,
+      tags: ['debug', 'lifecycle'],
+    );
+    LoggerService.instance.i(
+      '参数: taskId=$taskId, count=$count, modelName=$modelName',
+      category: LogCategory.network,
+      tags: ['api'],
+    );
 
     _ensureInitialized();
-    debugPrint('✅ 初始化检查通过');
+    LoggerService.instance.i(
+      '✅ 初始化检查通过',
+      category: LogCategory.network,
+      tags: ['success', 'api'],
+    );
 
     try {
-      debugPrint('🔄 获取 token...');
+      LoggerService.instance.i(
+        '🔄 获取 token...',
+        category: LogCategory.network,
+        tags: ['retry', 'reinit'],
+      );
       final token = await getToken();
-      debugPrint('✅ token获取成功: ${token?.substring(0, 10)}...');
+      LoggerService.instance.i(
+        '✅ token获取成功: ${token?.substring(0, 10)}...',
+        category: LogCategory.network,
+        tags: ['success', 'api'],
+      );
 
-      debugPrint('🔄 构建请求参数...');
+      LoggerService.instance.i(
+        '🔄 构建请求参数...',
+        category: LogCategory.network,
+        tags: ['retry', 'reinit'],
+      );
       final request = SceneRegenerateRequest((b) => b
         ..taskId = taskId
         ..count = count
         ..model = modelName ?? '');
-      debugPrint(
-          '请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}');
+      LoggerService.instance.d(
+        '请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}',
+        category: LogCategory.network,
+        tags: ['api', 'request', 'debug'],
+      );
 
-      debugPrint('🔄 发起API请求...');
+      LoggerService.instance.i(
+        '🔄 发起API请求...',
+        category: LogCategory.network,
+        tags: ['retry', 'reinit'],
+      );
       final response =
           await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
         sceneRegenerateRequest: request,
         X_API_TOKEN: token,
       );
 
-      debugPrint('✅ API响应收到');
-      debugPrint('状态码: ${response.statusCode}');
-      debugPrint('响应类型: ${response.data.runtimeType}');
+      LoggerService.instance.i(
+        '✅ API响应收到',
+        category: LogCategory.network,
+        tags: ['success', 'api'],
+      );
+      LoggerService.instance.i(
+        '状态码: ${response.statusCode}',
+        category: LogCategory.network,
+        tags: ['api', 'response'],
+      );
+      LoggerService.instance.i(
+        '响应类型: ${response.data.runtimeType}',
+        category: LogCategory.network,
+        tags: ['api', 'response'],
+      );
 
       if (response.statusCode == 200) {
-        debugPrint('✅ 请求成功');
+        LoggerService.instance.i(
+          '✅ 请求成功',
+          category: LogCategory.network,
+          tags: ['success', 'api'],
+        );
         // API返回的已经是 SceneRegenerateResponse 类型
         final data = response.data;
         if (data != null) {
@@ -909,15 +1091,39 @@ class ApiServiceWrapper {
         }
         throw Exception('重新生成场景插图失败：响应数据为空');
       } else {
-        debugPrint('❌ 请求失败，状态码: ${response.statusCode}');
+        LoggerService.instance.e(
+          '❌ 请求失败，状态码: ${response.statusCode}',
+          category: LogCategory.network,
+          tags: ['error', 'api'],
+        );
         throw Exception('重新生成场景插图失败：${response.statusCode}');
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ API调用异常');
-      debugPrint('异常类型: ${e.runtimeType}');
-      debugPrint('异常信息: $e');
-      debugPrint('堆栈跟踪:\n$stackTrace');
-      debugPrint('====================================');
+      LoggerService.instance.e(
+        '❌ API调用异常',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
+      LoggerService.instance.e(
+        '异常类型: ${e.runtimeType}',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
+      LoggerService.instance.e(
+        '异常信息: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
+      LoggerService.instance.i(
+        '堆栈跟踪:\n$stackTrace',
+        category: LogCategory.network,
+        tags: ['api'],
+      );
+      LoggerService.instance.d(
+        '====================================',
+        category: LogCategory.network,
+        tags: ['debug', 'lifecycle'],
+      );
       rethrow;
     }
   }
@@ -938,7 +1144,11 @@ class ApiServiceWrapper {
         throw Exception('获取模型列表失败：${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('获取模型列表异常: $e');
+      LoggerService.instance.e(
+        '获取模型列表异常: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw _handleError(e);
     }
   }
@@ -966,7 +1176,11 @@ class ApiServiceWrapper {
           return allModels;
       }
     } catch (e) {
-      debugPrint('获取模型标题列表异常: $e');
+      LoggerService.instance.e(
+        '获取模型标题列表异常: $e',
+        category: LogCategory.network,
+        tags: ['error', 'api'],
+      );
       throw _handleError(e);
     }
   }
