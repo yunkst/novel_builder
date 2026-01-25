@@ -165,6 +165,7 @@ class LogEntry {
 /// 负责管理应用日志的收集、存储和持久化。
 /// 使用内存队列存储最新1000条日志，超过限制时自动清理旧日志。
 /// 所有日志会在添加时自动持久化到SharedPreferences，确保APP重启后不丢失。
+/// 使用批量写入优化，减少频繁IO操作。
 ///
 /// 使用方式：
 /// ```dart
@@ -176,6 +177,10 @@ class LogEntry {
 /// LoggerService.instance.i('数据库升级完成');
 /// LoggerService.instance.w('警告信息');
 /// LoggerService.instance.e('错误信息', stackTrace);
+///
+/// // 重要日志后强制刷新
+/// LoggerService.instance.e('严重错误', stackTrace: stackTrace);
+/// await LoggerService.instance.flush();
 ///
 /// // 获取所有日志
 /// final logs = LoggerService.instance.getLogs();
@@ -246,6 +251,12 @@ class LoggerService {
   /// 待持久化标记
   bool _pendingPersist = false;
 
+  /// 批量写入间隔（毫秒）
+  static const int _flushIntervalMs = 1000;
+
+  /// 上次持久化时间
+  DateTime? _lastPersistTime;
+
   /// 日志变化通知器
   ///
   /// 当日志被添加或清空时，会通知所有监听者。
@@ -288,6 +299,19 @@ class LoggerService {
     _log(message, LogLevel.error, stackTrace, category, tags);
   }
 
+  /// 强制刷新到持久化存储
+  ///
+  /// 用于确保重要日志立即写入，而非等待批量写入。
+  /// 使用场景：
+  /// - 记录错误日志后
+  /// - 应用即将进入后台时
+  /// - 应用即将退出时
+  Future<void> flush() async {
+    if (_pendingPersist) {
+      await _persist();
+    }
+  }
+
   /// 记录日志（内部方法）
   ///
   /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
@@ -319,7 +343,13 @@ class LoggerService {
   /// 调度持久化任务
   void _schedulePersist() {
     _pendingPersist = true;
-    _persist();
+
+    // 批量写入优化：距离上次写入超过指定间隔才执行
+    final now = DateTime.now();
+    if (_lastPersistTime == null ||
+        now.difference(_lastPersistTime!).inMilliseconds >= _flushIntervalMs) {
+      _persist();
+    }
   }
 
   /// 持久化日志（带锁机制）
@@ -335,6 +365,7 @@ class LoggerService {
 
     _isPersisting = true;
     _pendingPersist = false;
+    _lastPersistTime = DateTime.now();  // 新增：更新时间戳
 
     try {
       await _persistLogs();
