@@ -2,6 +2,7 @@ import '../models/chapter.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../constants/chapter_constants.dart';
+import 'logger_service.dart';
 import 'database_service.dart';
 
 /// 章节生成相关的业务逻辑服务
