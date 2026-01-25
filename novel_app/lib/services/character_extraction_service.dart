@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import '../models/chapter.dart';
+import 'logger_service.dart';
 import 'database_service.dart';
 
 /// 章节匹配结果
@@ -12,6 +12,21 @@ class ChapterMatch {
     required this.chapter,
     required this.matchCount,
     required this.matchPositions,
+  });
+}
+
+/// 辅助类：带来源信息的段落
+class _ParagraphInfo {
+  final String content;
+  final int contextIndex;
+  final bool isFirst;
+  final bool isLast;
+
+  _ParagraphInfo({
+    required this.content,
+    required this.contextIndex,
+    required this.isFirst,
+    required this.isLast,
   });
 }
 
@@ -85,7 +100,11 @@ class CharacterExtractionService {
 
       return matches;
     } catch (e) {
-      debugPrint('❌ 搜索章节失败: $e');
+      LoggerService.instance.e(
+        '搜索章节失败',
+        category: LogCategory.character,
+        tags: ['search', 'error'],
+      );
       return [];
     }
   }
@@ -126,66 +145,59 @@ class CharacterExtractionService {
   /// 合并并去重上下文片段
   ///
   /// [contexts] 上下文片段列表（按位置排序）
-  /// [minGap] 最小间隔，小于此间隔则合并（默认100字）
   ///
-  /// 返回合并后的内容
-  String mergeAndDeduplicateContexts(
-    List<String> contexts, {
-    int minGap = 100,
-  }) {
+  /// 返回合并后的内容（去重后的所有内容，无字数限制）
+  /// 注意：会丢弃每个片段的第一段和最后一段（因为它们可能被截断）
+  String mergeAndDeduplicateContexts(List<String> contexts) {
     if (contexts.isEmpty) return '';
     if (contexts.length == 1) return contexts[0];
 
-    // 简化处理：直接用分隔符连接
-    // 更复杂的去重需要记录每个片段的原始位置
-    // 这里使用简单的策略：如果两个片段重叠很多，只保留一个
-    final merged = <String>[];
-    String? lastContext;
+    // 按段落分割所有内容
+    final allParagraphs = <_ParagraphInfo>[];
+    int contextIndex = 0;
 
     for (final context in contexts) {
-      if (lastContext == null) {
-        lastContext = context;
-        continue;
+      // 按换行符分割段落，去除空白段落
+      final paragraphs = context.split('\n')
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
+
+      // 为每个段落标记来源片段索引和位置
+      for (int i = 0; i < paragraphs.length; i++) {
+        allParagraphs.add(_ParagraphInfo(
+          content: paragraphs[i],
+          contextIndex: contextIndex,
+          isFirst: i == 0,
+          isLast: i == paragraphs.length - 1,
+        ));
       }
 
-      // 检查是否与上一个片段重叠较多
-      final overlap = _calculateOverlap(lastContext, context);
-      if (overlap > minGap) {
-        // 合并：保留较长的片段
-        if (context.length > lastContext.length) {
-          lastContext = context;
-        }
-      } else {
-        // 不重叠，添加上一个并开始新的
-        merged.add(lastContext);
-        lastContext = context;
-      }
+      contextIndex++;
     }
 
-    if (lastContext != null) {
-      merged.add(lastContext);
-    }
+    if (allParagraphs.isEmpty) return '';
 
-    return merged.join('\n\n...\n\n');
-  }
+    // 过滤掉每个片段的第一段和最后一段（它们可能被截断）
+    final filteredParagraphs = allParagraphs.where((p) {
+      return !p.isFirst && !p.isLast;
+    }).map((p) => p.content).toList();
 
-  /// 计算两个字符串的重叠字符数
-  int _calculateOverlap(String str1, String str2) {
-    // 简单的重叠检测：检查 str1 的后缀是否与 str2 的前缀匹配
-    int maxOverlap = 0;
-    final maxPossible = str1.length < str2.length ? str1.length : str2.length;
+    if (filteredParagraphs.isEmpty) return '';
 
-    for (int i = 1; i <= maxPossible; i++) {
-      if (str1.length >= i && str2.length >= i) {
-        final suffix = str1.substring(str1.length - i);
-        final prefix = str2.substring(0, i);
-        if (suffix == prefix) {
-          maxOverlap = i;
-        }
+    // 使用 Set 去重（保持顺序）
+    final seen = <String>{};
+    final uniqueParagraphs = <String>[];
+
+    for (final paragraph in filteredParagraphs) {
+      if (!seen.contains(paragraph)) {
+        seen.add(paragraph);
+        uniqueParagraphs.add(paragraph);
       }
     }
 
-    return maxOverlap;
+    // 用换行符连接所有段落（无字数限制）
+    return uniqueParagraphs.join('\n');
   }
 
   /// 计算选中章节的总内容长度

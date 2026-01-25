@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'logger_service.dart';
 
 /// Dify SSE事件类型
 enum DifyEventType {
@@ -124,47 +124,82 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
     return stream.transform(
       StreamTransformer<String, String>.fromHandlers(
         handleData: (chunk, sink) {
-          debugPrint('📦 === 收到数据块 ===');
-          debugPrint('数据块长度: ${chunk.length}');
-          debugPrint(
-              '数据块内容: "${chunk.substring(0, chunk.length > 100 ? 100 : chunk.length)}..."');
+          LoggerService.instance.d(
+            '收到数据块，长度: ${chunk.length}',
+            category: LogCategory.ai,
+            tags: ['sse', 'chunk', 'receive'],
+          );
+          LoggerService.instance.d(
+            '数据块内容: "${chunk.substring(0, chunk.length > 100 ? 100 : chunk.length)}..."',
+            category: LogCategory.ai,
+            tags: ['sse', 'chunk', 'content'],
+          );
 
           buffer += chunk;
-          debugPrint('当前缓冲区长度: ${buffer.length}');
+          LoggerService.instance.d(
+            '当前缓冲区长度: ${buffer.length}',
+            category: LogCategory.ai,
+            tags: ['sse', 'buffer'],
+          );
 
           // 按照SSE格式，事件以 \n\n 分隔
           final events = buffer.split('\n\n');
           buffer = events.last; // 保留最后一个可能不完整的事件
 
-          debugPrint('分割出 ${events.length - 1} 个完整事件');
-          debugPrint('剩余缓冲区长度: ${buffer.length}');
+          LoggerService.instance.d(
+            '分割出 ${events.length - 1} 个完整事件',
+            category: LogCategory.ai,
+            tags: ['sse', 'parse'],
+          );
+          LoggerService.instance.d(
+            '剩余缓冲区长度: ${buffer.length}',
+            category: LogCategory.ai,
+            tags: ['sse', 'buffer'],
+          );
 
           // 输出完整的事件
           for (int i = 0; i < events.length - 1; i++) {
             final event = events[i].trim();
             if (event.isNotEmpty) {
-              debugPrint(
-                  '📤 输出事件 ${i + 1}: "${event.substring(0, event.length > 50 ? 50 : event.length)}..."');
+              LoggerService.instance.d(
+                '输出事件 ${i + 1}: "${event.substring(0, event.length > 50 ? 50 : event.length)}..."',
+                category: LogCategory.ai,
+                tags: ['sse', 'event', 'output'],
+              );
               sink.add(event);
             }
           }
-          debugPrint('========================');
         },
         handleDone: (sink) {
-          debugPrint('🏁 === 流结束，处理剩余缓冲区 ===');
-          debugPrint('剩余缓冲区长度: ${buffer.length}');
+          LoggerService.instance.i(
+            '流结束，处理剩余缓冲区',
+            category: LogCategory.ai,
+            tags: ['sse', 'stream', 'done'],
+          );
+          LoggerService.instance.d(
+            '剩余缓冲区长度: ${buffer.length}',
+            category: LogCategory.ai,
+            tags: ['sse', 'buffer'],
+          );
 
           // 处理剩余的缓冲区内容，包括可能的不完整事件
           if (buffer.trim().isNotEmpty) {
             // 尝试修复不完整的事件
             final processedBuffer = _fixIncompleteEvent(buffer.trim());
             if (processedBuffer.isNotEmpty) {
-              debugPrint(
-                  '📤 输出最后的事件: "${processedBuffer.substring(0, processedBuffer.length > 50 ? 50 : processedBuffer.length)}..."');
+              LoggerService.instance.d(
+                '输出最后的事件: "${processedBuffer.substring(0, processedBuffer.length > 50 ? 50 : processedBuffer.length)}..."',
+                category: LogCategory.ai,
+                tags: ['sse', 'event', 'final'],
+              );
               sink.add(processedBuffer);
             }
           }
-          debugPrint('缓冲区处理完成');
+          LoggerService.instance.d(
+            '缓冲区处理完成',
+            category: LogCategory.ai,
+            tags: ['sse', 'buffer'],
+          );
           sink.close();
         },
       ),
@@ -173,8 +208,16 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
 
   /// 修复不完整的事件
   String _fixIncompleteEvent(String event) {
-    debugPrint('🔧 === 修复不完整事件 ===');
-    debugPrint('原始事件: "$event"');
+    LoggerService.instance.d(
+      '修复不完整事件',
+      category: LogCategory.ai,
+      tags: ['sse', 'fix', 'event'],
+    );
+    LoggerService.instance.d(
+      '原始事件: "$event"',
+      category: LogCategory.ai,
+      tags: ['sse', 'fix', 'raw'],
+    );
 
     // 如果事件缺少 data: 前缀，尝试添加
     if (!event.startsWith('data:') && event.trim().isNotEmpty) {
@@ -184,15 +227,27 @@ class _SSEEventSplitter extends StreamTransformerBase<String, String> {
         final trimmed = event.trim();
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
           final fixed = 'data: $trimmed';
-          debugPrint('✅ 修复后事件: "$fixed"');
+          LoggerService.instance.d(
+            '修复后事件: "$fixed"',
+            category: LogCategory.ai,
+            tags: ['sse', 'fix', 'success'],
+          );
           return fixed;
         }
       } catch (e) {
-        debugPrint('❌ 修复失败: $e');
+        LoggerService.instance.e(
+          '修复失败',
+          category: LogCategory.ai,
+          tags: ['sse', 'fix', 'error'],
+        );
       }
     }
 
-    debugPrint('📝 返回原始事件');
+    LoggerService.instance.d(
+      '返回原始事件',
+      category: LogCategory.ai,
+      tags: ['sse', 'fix', 'original'],
+    );
     return event;
   }
 }
@@ -204,30 +259,61 @@ class _SSEEventParser extends StreamTransformerBase<String, DifyEvent> {
     return stream.transform(
       StreamTransformer<String, DifyEvent>.fromHandlers(
         handleData: (eventStr, sink) {
-          debugPrint('🔥 === 解析SSE事件 ===');
-          debugPrint('事件字符串: "$eventStr"');
-          debugPrint('====================');
+          LoggerService.instance.d(
+            '解析SSE事件',
+            category: LogCategory.ai,
+            tags: ['sse', 'parse', 'event'],
+          );
+          LoggerService.instance.d(
+            '事件字符串: "$eventStr"',
+            category: LogCategory.ai,
+            tags: ['sse', 'parse', 'raw'],
+          );
 
           try {
             final event = _parseEvent(eventStr);
             if (event != null) {
-              debugPrint('✅ 解析成功: $event');
+              LoggerService.instance.d(
+                '解析成功: $event',
+                category: LogCategory.ai,
+                tags: ['sse', 'parse', 'success'],
+              );
               sink.add(event);
             } else {
-              debugPrint('⚠️ 跳过空事件');
+              LoggerService.instance.w(
+                '跳过空事件',
+                category: LogCategory.ai,
+                tags: ['sse', 'parse', 'skip'],
+              );
             }
           } catch (e) {
-            debugPrint('❌ 解析失败: $e');
-            debugPrint('原始事件: "$eventStr"');
+            LoggerService.instance.e(
+              '解析失败',
+              category: LogCategory.ai,
+              tags: ['sse', 'parse', 'error'],
+            );
+            LoggerService.instance.d(
+              '原始事件: "$eventStr"',
+              category: LogCategory.ai,
+              tags: ['sse', 'parse', 'raw'],
+            );
             // 不抛出异常，继续处理下一个事件
           }
         },
         handleError: (error, stackTrace, sink) {
-          debugPrint('❌ SSE流错误: $error');
+          LoggerService.instance.e(
+            'SSE流错误',
+            category: LogCategory.ai,
+            tags: ['sse', 'stream', 'error'],
+          );
           sink.addError(error, stackTrace);
         },
         handleDone: (sink) {
-          debugPrint('🏁 SSE流结束');
+          LoggerService.instance.i(
+            'SSE流结束',
+            category: LogCategory.ai,
+            tags: ['sse', 'stream', 'done'],
+          );
           sink.close();
         },
       ),
@@ -250,7 +336,11 @@ class _SSEEventParser extends StreamTransformerBase<String, DifyEvent> {
     }
 
     if (eventData == null) {
-      debugPrint('⚠️ 没有找到有效的data字段');
+      LoggerService.instance.w(
+        '没有找到有效的data字段',
+        category: LogCategory.ai,
+        tags: ['sse', 'parse', 'nodata'],
+      );
       return null;
     }
 
@@ -258,8 +348,16 @@ class _SSEEventParser extends StreamTransformerBase<String, DifyEvent> {
       final json = jsonDecode(eventData) as Map<String, dynamic>;
       return DifyEvent.fromJson(json, eventData);
     } catch (e) {
-      debugPrint('❌ JSON解析失败: $e');
-      debugPrint('原始数据: "$eventData"');
+      LoggerService.instance.e(
+        'JSON解析失败',
+        category: LogCategory.ai,
+        tags: ['sse', 'parse', 'json'],
+      );
+      LoggerService.instance.d(
+        '原始数据: "$eventData"',
+        category: LogCategory.ai,
+        tags: ['sse', 'parse', 'raw'],
+      );
       return null;
     }
   }
