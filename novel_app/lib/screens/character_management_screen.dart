@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
+import '../models/character_update.dart';
 import '../models/outline.dart';
-import '../models/chapter.dart';
 import '../services/database_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/character_avatar_service.dart';
@@ -13,6 +13,7 @@ import '../services/logger_service.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
 import 'character_edit_screen.dart';
+import 'character_relationship_screen.dart';
 
 class CharacterManagementScreen extends StatefulWidget {
   final Novel novel;
@@ -35,6 +36,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   final DifyService _difyService = DifyService();
   List<Character> _characters = [];
   bool _isLoading = true;
+
+  // 关系数量缓存
+  final Map<int, int> _relationshipCountCache = {};
 
   // 大纲状态
   Outline? _outline;
@@ -104,6 +108,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       // 检查并清理无效的头像缓存
       await _checkAndCleanAvatarCache(characters);
 
+      // 加载每个角色的关系数量
+      await _loadRelationshipCounts(characters);
+
       setState(() {
         _characters = characters;
         _isLoading = false;
@@ -120,6 +127,21 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  /// 加载角色关系数量
+  Future<void> _loadRelationshipCounts(List<Character> characters) async {
+    for (final character in characters) {
+      if (character.id == null) continue;
+
+      try {
+        final count = await _databaseService.getRelationshipCount(character.id!);
+        _relationshipCountCache[character.id!] = count;
+      } catch (e) {
+        debugPrint('❌ 加载关系数量失败 - ${character.name}: $e');
+        _relationshipCountCache[character.id!] = 0;
       }
     }
   }
@@ -205,10 +227,15 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       // 关闭加载对话框
       Navigator.of(context).pop();
 
+      // 转换为CharacterUpdate列表
+      final characterUpdates = generatedCharacters
+          .map((c) => CharacterUpdate(newCharacter: c))
+          .toList();
+
       // 显示角色预览对话框
       await CharacterPreviewDialog.show(
         context,
-        characters: generatedCharacters,
+        characterUpdates: characterUpdates,
         onConfirmed: (selectedCharacters) async {
           if (selectedCharacters.isNotEmpty) {
             await _saveSelectedCharacters(selectedCharacters);
@@ -216,7 +243,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         },
       );
     } catch (e) {
-      LoggerService.instance.e('创建角色失败:' + e.toString());
+      LoggerService.instance.e('创建角色失败: ${e.toString()}');
       debugPrint('❌ 创建角色失败: $e');
       if (!mounted) return;
 
@@ -298,8 +325,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       // 合并去重
-      final mergedContent =
-          extractionService.mergeAndDeduplicateContexts(allContexts);
+      final mergedContent = extractionService.mergeAndDeduplicateContexts(allContexts);
 
       // 调用 Dify 提取角色
       final extractedCharacters = await _difyService.extractCharacter(
@@ -313,10 +339,15 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       // 关闭加载对话框
       Navigator.of(context).pop();
 
+      // 转换为CharacterUpdate列表
+      final characterUpdates = extractedCharacters
+          .map((c) => CharacterUpdate(newCharacter: c))
+          .toList();
+
       // 显示角色预览对话框
       await CharacterPreviewDialog.show(
         context,
-        characters: extractedCharacters,
+        characterUpdates: characterUpdates,
         onConfirmed: (selectedCharacters) async {
           if (selectedCharacters.isNotEmpty) {
             await _saveSelectedCharacters(selectedCharacters);
@@ -324,7 +355,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         },
       );
     } catch (e) {
-      LoggerService.instance.e('提取角色失败:' + e.toString());
+      LoggerService.instance.e('提取角色失败: ${e.toString()}');
       debugPrint('❌ 提取角色失败: $e');
       if (!mounted) return;
 
@@ -396,7 +427,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         );
       }
     } catch (e) {
-      LoggerService.instance.e('保存角色时发生错误:' + e.toString());
+      LoggerService.instance.e('保存角色时发生错误: ${e.toString()}');
       debugPrint('❌ 保存角色时发生错误: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -476,8 +507,62 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     if (_isMultiSelectMode && character.id != null) {
       _toggleCharacterSelection(character.id!);
     } else {
-      _navigateToEdit(character: character);
+      _showCharacterOptions(character);
     }
+  }
+
+  /// 显示角色选项菜单
+  void _showCharacterOptions(Character character) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('编辑角色'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToEdit(character: character);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('查看关系'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _navigateToRelationships(character);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('删除角色', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                // 可以在这里添加删除逻辑
+                debugPrint('删除角色: ${character.name}');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 导航到关系页面
+  Future<void> _navigateToRelationships(Character character) async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CharacterRelationshipScreen(
+          character: character,
+        ),
+      ),
+    );
+
+    // 刷新列表（更新关系数量）
+    _loadCharacters();
   }
 
   /// 显示批量删除确认对话框
@@ -770,6 +855,38 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+
+                      // 关系数量徽章
+                      if (character.id != null &&
+                          _relationshipCountCache[character.id] != null &&
+                          _relationshipCountCache[character.id]! > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Material(
+                            elevation: 4,
+                            shape: const CircleBorder(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${_relationshipCountCache[character.id]}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

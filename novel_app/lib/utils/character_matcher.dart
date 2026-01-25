@@ -55,15 +55,6 @@ class CharacterMatcher {
     return false;
   }
 
-  /// 将角色列表格式化为Dify所需的格式
-  ///
-  /// [characters] 角色列表
-  ///
-  /// 返回AI友好的角色信息字符串
-  static String formatRolesForDify(List<Character> characters) {
-    return Character.formatForAI(characters);
-  }
-
   /// 查找指定小说的所有现有角色
   ///
   /// [novelUrl] 小说URL
@@ -103,7 +94,7 @@ class CharacterMatcher {
 
     return {
       'chapters_content': chapterContent,
-      'roles': formatRolesForDify(rolesToInclude),
+      'roles': Character.toJsonArray(rolesToInclude), // 使用Character类的JSON格式化方法
     };
   }
 

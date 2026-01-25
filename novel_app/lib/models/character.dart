@@ -158,6 +158,38 @@ ${i + 1}. ${char.name}
     return rolesInfo;
   }
 
+  /// 将角色列表转换为JSON数组字符串
+  ///
+  /// 用于传递给Dify等服务，提供结构化的角色数据。
+  /// 返回标准JSON数组格式的字符串，包含角色的完整信息。
+  ///
+  /// [characters] 要转换的Character对象列表
+  ///
+  /// 返回JSON数组字符串，例如：[{"name":"张三","age":25,"gender":"男"}]
+  ///
+  /// 注意：
+  /// - 空列表返回 "[]"
+  /// - 包含所有角色字段，null值会被保留为JSON null
+  /// - aliases列表直接包含在JSON中（非字符串）
+  static String toJsonArray(List<Character> characters) {
+    if (characters.isEmpty) return '[]';
+
+    final jsonList = characters.map((c) => {
+      'name': c.name,
+      'gender': c.gender,
+      'age': c.age,
+      'occupation': c.occupation,
+      'personality': c.personality,
+      'bodyType': c.bodyType,
+      'clothingStyle': c.clothingStyle,
+      'appearanceFeatures': c.appearanceFeatures,
+      'backgroundStory': c.backgroundStory,
+      'aliases': c.aliases,
+    }).toList();
+
+    return jsonEncode(jsonList);
+  }
+
   /// 转换为API客户端的RoleInfo列表
   ///
   /// 将Character对象列表转换为RoleInfo对象列表，用于API调用。
