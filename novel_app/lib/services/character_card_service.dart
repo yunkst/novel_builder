@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
+import '../models/character_update.dart';
 import '../services/dify_service.dart';
 import '../services/database_service.dart';
 import '../utils/character_matcher.dart';
+import '../core/logging/logger_service.dart';
+import '../core/logging/log_categories.dart';
 
 /// CharacterCardService
 ///
@@ -45,9 +48,16 @@ class CharacterCardService {
   }) async {
     try {
       onProgress?.call('开始更新角色卡...');
-      debugPrint('=== CharacterCardService: 开始更新角色卡 ===');
-      debugPrint('小说: ${novel.title}');
-      debugPrint('章节内容长度: ${chapterContent.length}');
+      LoggerService.instance.i(
+        '开始更新角色卡',
+        category: LogCategory.character,
+        tags: ['card', 'update', 'start'],
+      );
+      LoggerService.instance.d(
+        '小说: ${novel.title}, 章节内容长度: ${chapterContent.length}',
+        category: LogCategory.character,
+        tags: ['card', 'update', 'info'],
+      );
 
       // 验证章节内容
       if (chapterContent.isEmpty) {
@@ -64,8 +74,11 @@ class CharacterCardService {
         chapterContent,
       );
 
-      debugPrint('章节内容长度: ${updateData['chapters_content']!.length}');
-      debugPrint('角色信息: ${updateData['roles']}');
+      LoggerService.instance.d(
+        '章节内容长度: ${updateData['chapters_content']!.length}, 角色信息: ${updateData['roles']}',
+        category: LogCategory.character,
+        tags: ['card', 'update', 'prepare'],
+      );
 
       // 调用AI服务更新角色信息
       onProgress?.call('正在调用AI服务更新角色信息...');
@@ -76,7 +89,11 @@ class CharacterCardService {
         backgroundSetting: novel.backgroundSetting ?? '',
       );
 
-      debugPrint('=== Dify返回角色数量: ${updatedCharacters.length} ===');
+      LoggerService.instance.i(
+        'Dify返回角色数量: ${updatedCharacters.length}',
+        category: LogCategory.character,
+        tags: ['card', 'update', 'ai_response'],
+      );
 
       // 自动保存所有角色（不显示预览对话框，让UI层决定是否需要预览）
       onProgress?.call('正在保存角色信息...');
@@ -86,11 +103,19 @@ class CharacterCardService {
       onProgress?.call('成功更新 ${savedCharacters.length} 个角色卡');
       onSuccess?.call(savedCharacters);
 
-      debugPrint(
-          '=== CharacterCardService: 角色更新完成: ${savedCharacters.length} 个 ===');
+      LoggerService.instance.i(
+        '角色更新完成: ${savedCharacters.length} 个',
+        category: LogCategory.character,
+        tags: ['card', 'update', 'success'],
+      );
       return savedCharacters;
-    } catch (e) {
-      debugPrint('=== CharacterCardService: 更新角色卡失败: $e ===');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新角色卡失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['card', 'update', 'error'],
+      );
       onProgress?.call('更新角色卡失败: $e');
       onError?.call(e);
       rethrow;
@@ -100,13 +125,18 @@ class CharacterCardService {
   /// 仅更新角色信息，不保存到数据库
   ///
   /// 用于需要预览的场景
-  Future<List<Character>> previewCharacterUpdates({
+  /// 返回 CharacterUpdate 列表,包含新旧角色对比信息
+  Future<List<CharacterUpdate>> previewCharacterUpdates({
     required Novel novel,
     required String chapterContent,
     void Function(String message)? onProgress,
   }) async {
     try {
       onProgress?.call('正在分析章节内容...');
+
+      // 获取现有角色用于对比
+      final existingCharacters = await _databaseService.getCharacters(novel.url);
+
       final updateData = await CharacterMatcher.prepareUpdateData(
         novel.url,
         chapterContent,
@@ -120,13 +150,77 @@ class CharacterCardService {
         backgroundSetting: novel.backgroundSetting ?? '',
       );
 
-      debugPrint(
-          '=== CharacterCardService: 预览完成，角色数量: ${updatedCharacters.length} ===');
-      return updatedCharacters;
-    } catch (e) {
-      debugPrint('=== CharacterCardService: 预览失败: $e ===');
+      LoggerService.instance.i(
+        '预览完成，角色数量: ${updatedCharacters.length}',
+        category: LogCategory.character,
+        tags: ['card', 'preview', 'complete'],
+      );
+
+      // 包装为 CharacterUpdate 列表
+      final characterUpdates = updatedCharacters.map((newChar) {
+        final oldChar = _findBestMatch(newChar, existingCharacters);
+        return CharacterUpdate(
+          newCharacter: newChar,
+          oldCharacter: oldChar,
+        );
+      }).toList();
+
+      final newCount = characterUpdates.where((u) => u.isNew).length;
+      final updateCount = characterUpdates.where((u) => u.isUpdate).length;
+      LoggerService.instance.i(
+        '新增: $newCount, 更新: $updateCount',
+        category: LogCategory.character,
+        tags: ['card', 'preview', 'stats'],
+      );
+
+      return characterUpdates;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '预览失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['card', 'preview', 'error'],
+      );
       rethrow;
     }
+  }
+
+  /// 查找最佳匹配的角色
+  ///
+  /// 支持精确匹配和包含匹配,提升AI返回名称的容错性
+  Character? _findBestMatch(Character newChar, List<Character> existingChars) {
+    if (existingChars.isEmpty) return null;
+
+    // 1. 精确匹配
+    for (final char in existingChars) {
+      if (char.name == newChar.name) {
+        LoggerService.instance.d(
+          '角色匹配: 精确匹配 "${newChar.name}"',
+          category: LogCategory.character,
+          tags: ['card', 'match', 'exact'],
+        );
+        return char;
+      }
+    }
+
+    // 2. 包含匹配(如"张三"匹配"张三丰")
+    for (final char in existingChars) {
+      if (char.name.contains(newChar.name) || newChar.name.contains(char.name)) {
+        LoggerService.instance.d(
+          '角色匹配: 包含匹配 "${newChar.name}" -> "${char.name}"',
+          category: LogCategory.character,
+          tags: ['card', 'match', 'partial'],
+        );
+        return char;
+      }
+    }
+
+    LoggerService.instance.d(
+      '角色匹配: 未找到匹配 "${newChar.name}"视为新增',
+      category: LogCategory.character,
+      tags: ['card', 'match', 'new'],
+    );
+    return null; // 无法匹配,视为新增
   }
 
   /// 保存角色到数据库
@@ -134,13 +228,26 @@ class CharacterCardService {
   /// 用于用户确认预览后保存
   Future<List<Character>> saveCharacters(List<Character> characters) async {
     try {
-      debugPrint('=== CharacterCardService: 开始保存 ${characters.length} 个角色 ===');
+      LoggerService.instance.i(
+        '开始保存 ${characters.length} 个角色',
+        category: LogCategory.character,
+        tags: ['card', 'save', 'start'],
+      );
       final savedCharacters =
           await _databaseService.batchUpdateCharacters(characters);
-      debugPrint('=== CharacterCardService: 保存完成 ===');
+      LoggerService.instance.i(
+        '保存完成',
+        category: LogCategory.character,
+        tags: ['card', 'save', 'success'],
+      );
       return savedCharacters;
-    } catch (e) {
-      debugPrint('=== CharacterCardService: 保存失败: $e ===');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '保存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['card', 'save', 'error'],
+      );
       rethrow;
     }
   }
