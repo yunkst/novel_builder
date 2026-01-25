@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart';
 import '../models/character.dart';
+import '../models/character_relationship.dart';
+import '../models/ai_companion_response.dart';
 import 'dify_sse_parser.dart';
 import 'stream_state_manager.dart';
+import 'logger_service.dart';
 
 class DifyService {
   // 获取流式响应token
@@ -27,7 +29,11 @@ class DifyService {
       // 如果struct_token不存在，尝试使用flow_token作为降级
       final flowToken = prefs.getString('dify_flow_token');
       if (flowToken != null && flowToken.isNotEmpty) {
-        debugPrint('⚠️ Struct Token未配置，使用Flow Token作为降级');
+        LoggerService.instance.w(
+          '⚠️ Struct Token未配置，使用Flow Token作为降级',
+          category: LogCategory.ai,
+          tags: ['warning', 'dify'],
+        );
         return flowToken;
       }
       throw Exception('请先在设置中配置 Struct Token (结构化响应)');
@@ -85,10 +91,21 @@ class DifyService {
     stateManager = StreamStateManager(
       onTextChunk: onChunk,
       onCompleted: (String completeContent) {
-        debugPrint('🎯 === 特写生成完成 ===');
-        debugPrint('完整内容长度: ${completeContent.length}');
-        debugPrint(
-            '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+        LoggerService.instance.i(
+          '🎯 === 特写生成完成 ===',
+          category: LogCategory.ai,
+          tags: ['success', 'dify'],
+        );
+        LoggerService.instance.d(
+          '完整内容长度: ${completeContent.length}',
+          category: LogCategory.ai,
+          tags: ['stats', 'dify'],
+        );
+        LoggerService.instance.d(
+          '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."',
+          category: LogCategory.ai,
+          tags: ['stats', 'preview', 'dify'],
+        );
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
         if (completeContent.isNotEmpty) {
@@ -99,8 +116,16 @@ class DifyService {
         stateManager.dispose();
       },
       onError: (error) {
-        debugPrint('❌ === 特写生成错误 ===');
-        debugPrint('错误: $error');
+        LoggerService.instance.e(
+          '❌ === 特写生成错误 ===',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.e(
+          '错误: $error',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
         stateManager.dispose();
         throw Exception('特写生成失败: $error');
       },
@@ -125,10 +150,26 @@ class DifyService {
         'user': 'novel-builder-app',
       };
 
-      debugPrint('🚀 === Dify 特写 API 请求 ===');
-      debugPrint('URL: $url');
-      debugPrint('Request Body: ${jsonEncode(requestBody)}');
-      debugPrint('==========================');
+      LoggerService.instance.i(
+        '🚀 === Dify 特写 API 请求 ===',
+        category: LogCategory.ai,
+        tags: ['api', 'request', 'dify'],
+      );
+      LoggerService.instance.d(
+        'URL: $url',
+        category: LogCategory.ai,
+        tags: ['network', 'dify'],
+      );
+      LoggerService.instance.i(
+        'Request Body: ${jsonEncode(requestBody)}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.d(
+        '==========================',
+        category: LogCategory.ai,
+        tags: ['debug', 'separator', 'dify'],
+      );
 
       final request = http.Request('POST', url);
       request.headers.addAll({
@@ -139,7 +180,11 @@ class DifyService {
 
       final streamedResponse = await request.send();
 
-      debugPrint('📡 === 响应状态码: ${streamedResponse.statusCode} ===');
+      LoggerService.instance.i(
+        '📡 === 响应状态码: ${streamedResponse.statusCode} ===',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
 
       if (streamedResponse.statusCode == 200) {
         stateManager.startReceiving();
@@ -157,28 +202,60 @@ class DifyService {
         // 监听文本流
         final textSubscription = textStream.listen(
           (textChunk) {
-            debugPrint('🔥 === onChunk回调 ===');
-            debugPrint('文本块: "$textChunk"');
-            debugPrint('当前状态: ${stateManager.currentState}');
+            LoggerService.instance.d(
+              '🔥 === onChunk回调 ===',
+              category: LogCategory.ai,
+              tags: ['stream', 'chunk', 'dify'],
+            );
+            LoggerService.instance.d(
+              '文本块: "$textChunk"',
+              category: LogCategory.ai,
+              tags: ['stream', 'chunk', 'dify'],
+            );
+            LoggerService.instance.i(
+              '当前状态: ${stateManager.currentState}',
+              category: LogCategory.ai,
+              tags: ['info', 'dify'],
+            );
             stateManager.handleTextChunk(textChunk);
-            debugPrint('✅ stateManager.handleTextChunk 完成');
-            debugPrint('========================');
+            LoggerService.instance.i(
+              '✅ stateManager.handleTextChunk 完成',
+              category: LogCategory.ai,
+              tags: ['success', 'dify'],
+            );
+            LoggerService.instance.d(
+              '========================',
+              category: LogCategory.ai,
+              tags: ['debug', 'separator', 'dify'],
+            );
           },
           onDone: () {
-            debugPrint('📝 文本流结束');
+            LoggerService.instance.i(
+              '📝 文本流结束',
+              category: LogCategory.ai,
+              tags: ['stream', 'end', 'dify'],
+            );
             textStreamDone = true;
 
             // 添加短暂延迟，确保最后的文本块被处理
             Future.delayed(const Duration(milliseconds: 100), () {
               if (completer.isCompleted) return;
-              debugPrint('⏰ 文本流结束后的延迟检查');
+              LoggerService.instance.i(
+                '⏰ 文本流结束后的延迟检查',
+                category: LogCategory.ai,
+                tags: ['stream', 'end', 'dify'],
+              );
               if (!textStreamError) {
                 completer.complete(true);
               }
             });
           },
           onError: (error) {
-            debugPrint('❌ 文本流错误: $error');
+            LoggerService.instance.e(
+              '❌ 文本流错误: $error',
+              category: LogCategory.ai,
+              tags: ['error', 'dify'],
+            );
             textStreamError = true;
             if (!completer.isCompleted) {
               completer.completeError(error);
@@ -188,8 +265,16 @@ class DifyService {
 
         // 监听工作流完成事件，作为备用完成机制
         DifySSEParser.waitForCompletion(eventStream).then((workflowCompleted) {
-          debugPrint('✅ 工作流完成事件: $workflowCompleted');
-          debugPrint('📊 完成时总字符数: ${stateManager.currentState.characterCount}');
+          LoggerService.instance.i(
+            '✅ 工作流完成事件: $workflowCompleted',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
+          LoggerService.instance.i(
+            '📊 完成时总字符数: ${stateManager.currentState.characterCount}',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
 
           // 如果文本流已经结束，不重复处理
           if (textStreamDone || completer.isCompleted) return;
@@ -197,11 +282,19 @@ class DifyService {
           // 工作流完成时，给文本流一些时间处理最后的数据
           Future.delayed(const Duration(milliseconds: 200), () {
             if (completer.isCompleted) return;
-            debugPrint('⏰ 工作流完成后的延迟检查');
+            LoggerService.instance.i(
+              '⏰ 工作流完成后的延迟检查',
+              category: LogCategory.ai,
+              tags: ['success', 'dify'],
+            );
             completer.complete(workflowCompleted);
           });
         }).catchError((error) {
-          debugPrint('❌ 等待工作流完成时出错: $error');
+          LoggerService.instance.e(
+            '❌ 等待工作流完成时出错: $error',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           if (!completer.isCompleted) {
             completer.completeError(error);
           }
@@ -212,13 +305,29 @@ class DifyService {
           final isCompleted = await completer.future
               .timeout(const Duration(minutes: 10), // 10分钟超时
                   onTimeout: () {
-            debugPrint('⏰ 流处理超时');
+            LoggerService.instance.w(
+              '⏰ 流处理超时',
+              category: LogCategory.ai,
+              tags: ['timeout', 'dify'],
+            );
             return textStreamDone && !textStreamError;
           });
 
-          debugPrint('🎯 === 流处理最终结果 ===');
-          debugPrint('完成状态: $isCompleted');
-          debugPrint('最终字符数: ${stateManager.currentState.characterCount}');
+          LoggerService.instance.i(
+            '🎯 === 流处理最终结果 ===',
+            category: LogCategory.ai,
+            tags: ['info', 'dify'],
+          );
+          LoggerService.instance.i(
+            '完成状态: $isCompleted',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
+          LoggerService.instance.i(
+            '最终字符数: ${stateManager.currentState.characterCount}',
+            category: LogCategory.ai,
+            tags: ['info', 'dify'],
+          );
 
           if (isCompleted) {
             stateManager.complete();
@@ -226,8 +335,16 @@ class DifyService {
             stateManager.handleError('流处理未正确完成');
           }
         } catch (e) {
-          debugPrint('❌ === 流处理异常 ===');
-          debugPrint('异常: $e');
+          LoggerService.instance.e(
+            '❌ === 流处理异常 ===',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
+          LoggerService.instance.e(
+            '异常: $e',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           stateManager.handleError('流处理异常: $e');
         } finally {
           // 确保取消订阅
@@ -235,9 +352,21 @@ class DifyService {
         }
       } else {
         final errorBody = await streamedResponse.stream.bytesToString();
-        debugPrint('❌ === API 错误响应 ===');
-        debugPrint('状态码: ${streamedResponse.statusCode}');
-        debugPrint('响应体: $errorBody');
+        LoggerService.instance.e(
+          '❌ === API 错误响应 ===',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.i(
+          '状态码: ${streamedResponse.statusCode}',
+          category: LogCategory.ai,
+          tags: ['api', 'response', 'dify'],
+        );
+        LoggerService.instance.i(
+          '响应体: $errorBody',
+          category: LogCategory.ai,
+          tags: ['api', 'response', 'dify'],
+        );
 
         String errorMessage = '未知错误';
         try {
@@ -253,8 +382,16 @@ class DifyService {
             'API请求失败 (${streamedResponse.statusCode}): $errorMessage');
       }
     } catch (e) {
-      debugPrint('❌ === 特写生成异常 ===');
-      debugPrint('异常: $e');
+      LoggerService.instance.e(
+        '❌ === 特写生成异常 ===',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      LoggerService.instance.e(
+        '异常: $e',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       stateManager.handleError('网络或解析异常: $e');
     }
   }
@@ -315,10 +452,26 @@ class DifyService {
       'user': 'novel-builder-app',
     };
 
-    debugPrint('=== Dify API 请求信息 ===');
-    debugPrint('URL: $url');
-    debugPrint('Request Body: ${jsonEncode(requestBody)}');
-    debugPrint('======================');
+    LoggerService.instance.i(
+      '=== Dify API 请求信息 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      'URL: $url',
+      category: LogCategory.ai,
+      tags: ['network', 'dify'],
+    );
+    LoggerService.instance.i(
+      'Request Body: ${jsonEncode(requestBody)}',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.d(
+      '======================',
+      category: LogCategory.ai,
+      tags: ['debug', 'separator', 'dify'],
+    );
 
     final body = jsonEncode(requestBody);
 
@@ -332,7 +485,11 @@ class DifyService {
     try {
       final streamedResponse = await request.send();
 
-      debugPrint('Response Status Code: ${streamedResponse.statusCode}');
+      LoggerService.instance.i(
+        'Response Status Code: ${streamedResponse.statusCode}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
 
       if (streamedResponse.statusCode == 200) {
         bool doneCalled = false;
@@ -340,12 +497,20 @@ class DifyService {
 
         await for (var chunk
             in streamedResponse.stream.transform(utf8.decoder)) {
-          debugPrint('收到流式数据块: $chunk');
+          LoggerService.instance.i(
+            '收到流式数据块: $chunk',
+            category: LogCategory.ai,
+            tags: ['info', 'dify'],
+          );
 
           // 解析 SSE 格式的数据
           final lines = chunk.split('\n');
           for (var line in lines) {
-            debugPrint('处理行: $line');
+            LoggerService.instance.i(
+              '处理行: $line',
+              category: LogCategory.ai,
+              tags: ['info', 'dify'],
+            );
 
             if (line.startsWith('data: ')) {
               final dataStr = line.substring(6);
@@ -353,44 +518,84 @@ class DifyService {
 
               try {
                 final data = jsonDecode(dataStr);
-                debugPrint('解析的数据: $data');
+                LoggerService.instance.i(
+                  '解析的数据: $data',
+                  category: LogCategory.ai,
+                  tags: ['info', 'dify'],
+                );
 
                 // 处理文本块事件
                 if (data['event'] == 'text_chunk' && data['data'] != null) {
                   final text = data['data']['text'];
-                  debugPrint('提取的文本: $text');
+                  LoggerService.instance.i(
+                    '提取的文本: $text',
+                    category: LogCategory.ai,
+                    tags: ['info', 'dify'],
+                  );
                   if (text != null && text.isNotEmpty) {
                     hasReceivedData = true;
-                    debugPrint('调用onData: "$text"');
+                    LoggerService.instance.i(
+                      '调用onData: "$text"',
+                      category: LogCategory.ai,
+                      tags: ['info', 'dify'],
+                    );
                     onData(text);
                   }
                 }
                 // 处理工作流完成事件
                 else if (data['event'] == 'workflow_finished') {
-                  debugPrint('工作流完成事件: ${data['data']}');
+                  LoggerService.instance.i(
+                    '工作流完成事件: ${data['data']}',
+                    category: LogCategory.ai,
+                    tags: ['success', 'dify'],
+                  );
                   // 调用完成回调
                   if (onDone != null && !doneCalled) {
                     doneCalled = true;
-                    debugPrint('调用onDone');
+                    LoggerService.instance.i(
+                      '调用onDone',
+                      category: LogCategory.ai,
+                      tags: ['info', 'dify'],
+                    );
                     onDone();
                   }
                 }
                 // 处理工作流错误事件
                 else if (data['event'] == 'workflow_error') {
-                  debugPrint('工作流错误事件: ${data['data']}');
+                  LoggerService.instance.e(
+                    '工作流错误事件: ${data['data']}',
+                    category: LogCategory.ai,
+                    tags: ['error', 'dify'],
+                  );
                   if (onDone != null && !doneCalled) {
                     doneCalled = true;
-                    debugPrint('错误时调用onDone');
+                    LoggerService.instance.e(
+                      '错误时调用onDone',
+                      category: LogCategory.ai,
+                      tags: ['error', 'dify'],
+                    );
                     onDone(); // 即使出错也要结束生成状态
                   }
                 }
                 // 处理其他事件类型，用于调试
                 else {
-                  debugPrint('未处理的事件类型: ${data['event']}');
-                  debugPrint('事件数据: ${data['data']}');
+                  LoggerService.instance.i(
+                    '未处理的事件类型: ${data['event']}',
+                    category: LogCategory.ai,
+                    tags: ['info', 'dify'],
+                  );
+                  LoggerService.instance.i(
+                    '事件数据: ${data['data']}',
+                    category: LogCategory.ai,
+                    tags: ['info', 'dify'],
+                  );
                 }
               } catch (e) {
-                debugPrint('解析错误: $e, 数据: $dataStr');
+                LoggerService.instance.e(
+                  '解析错误: $e, 数据: $dataStr',
+                  category: LogCategory.ai,
+                  tags: ['error', 'dify'],
+                );
                 // 忽略解析错误，继续处理下一行
                 continue;
               }
@@ -399,16 +604,28 @@ class DifyService {
         }
 
         // 流结束，如果还没有调用过 onDone，这里调用一次作为后备
-        debugPrint('流式传输结束，hasReceivedData: $hasReceivedData');
+        LoggerService.instance.i(
+          '流式传输结束，hasReceivedData: $hasReceivedData',
+          category: LogCategory.ai,
+          tags: ['info', 'dify'],
+        );
         if (onDone != null && !doneCalled) {
-          debugPrint('流结束后调用 onDone（后备方案）');
+          LoggerService.instance.i(
+            '流结束后调用 onDone（后备方案）',
+            category: LogCategory.ai,
+            tags: ['stream', 'end', 'dify'],
+          );
           doneCalled = true;
           onDone();
         }
       } else {
         // 读取错误响应内容
         final errorBody = await streamedResponse.stream.bytesToString();
-        debugPrint('Error Response Body: $errorBody');
+        LoggerService.instance.i(
+          'Error Response Body: $errorBody',
+          category: LogCategory.ai,
+          tags: ['info', 'dify'],
+        );
 
         try {
           final errorData = jsonDecode(errorBody);
@@ -470,14 +687,30 @@ class DifyService {
         onData(text); // 转发给外部回调
       },
       onCompleted: (String completeContent) {
-        debugPrint('✅ === 流式交互完成（StreamStateManager） ===');
-        debugPrint('完整内容长度: ${completeContent.length}');
+        LoggerService.instance.i(
+          '✅ === 流式交互完成（StreamStateManager） ===',
+          category: LogCategory.ai,
+          tags: ['success', 'dify'],
+        );
+        LoggerService.instance.d(
+          '完整内容长度: ${completeContent.length}',
+          category: LogCategory.ai,
+          tags: ['stats', 'dify'],
+        );
         onDone?.call();
         stateManager.dispose();
       },
       onError: (error) {
-        debugPrint('❌ === 流式交互错误（StreamStateManager） ===');
-        debugPrint('错误: $error');
+        LoggerService.instance.e(
+          '❌ === 流式交互错误（StreamStateManager） ===',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.e(
+          '错误: $error',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
         stateManager.dispose();
         onError?.call(error);
       },
@@ -486,10 +719,26 @@ class DifyService {
     try {
       stateManager.startStreaming();
 
-      debugPrint('🚀 === Dify API 请求信息（启用详细日志） ===');
-      debugPrint('URL: $url');
-      debugPrint('Request Body: ${jsonEncode(requestBody)}');
-      debugPrint('==========================================');
+      LoggerService.instance.i(
+        '🚀 === Dify API 请求信息（启用详细日志） ===',
+        category: LogCategory.ai,
+        tags: ['api', 'request', 'dify'],
+      );
+      LoggerService.instance.d(
+        'URL: $url',
+        category: LogCategory.ai,
+        tags: ['network', 'dify'],
+      );
+      LoggerService.instance.i(
+        'Request Body: ${jsonEncode(requestBody)}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.d(
+        '==========================================',
+        category: LogCategory.ai,
+        tags: ['debug', 'separator', 'dify'],
+      );
 
       final request = http.Request('POST', url);
       request.headers.addAll({
@@ -500,7 +749,11 @@ class DifyService {
 
       final streamedResponse = await request.send();
 
-      debugPrint('📡 === 响应状态码: ${streamedResponse.statusCode} ===');
+      LoggerService.instance.i(
+        '📡 === 响应状态码: ${streamedResponse.statusCode} ===',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
 
       if (streamedResponse.statusCode == 200) {
         stateManager.startReceiving();
@@ -527,7 +780,11 @@ class DifyService {
                   stateManager.handleError(errorMsg);
                 }
               } catch (e) {
-                debugPrint('解析错误: $e');
+                LoggerService.instance.e(
+                  '解析错误: $e',
+                  category: LogCategory.ai,
+                  tags: ['error', 'dify'],
+                );
               }
             }
           }
@@ -562,10 +819,26 @@ class DifyService {
       'user': 'novel-builder-app',
     };
 
-    debugPrint('=== Dify API 非流式请求 ===');
-    debugPrint('URL: $url');
-    debugPrint('Request Body: ${jsonEncode(requestBody)}');
-    debugPrint('========================');
+    LoggerService.instance.i(
+      '=== Dify API 非流式请求 ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.d(
+      'URL: $url',
+      category: LogCategory.ai,
+      tags: ['network', 'dify'],
+    );
+    LoggerService.instance.i(
+      'Request Body: ${jsonEncode(requestBody)}',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.d(
+      '========================',
+      category: LogCategory.ai,
+      tags: ['debug', 'separator', 'dify'],
+    );
 
     final body = jsonEncode(requestBody);
 
@@ -581,9 +854,21 @@ class DifyService {
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
 
-      debugPrint('=== Dify API 非流式响应 ===');
-      debugPrint('Response: $data');
-      debugPrint('==========================');
+      LoggerService.instance.i(
+        '=== Dify API 非流式响应 ===',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
+      LoggerService.instance.i(
+        'Response: $data',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.d(
+        '==========================',
+        category: LogCategory.ai,
+        tags: ['debug', 'separator', 'dify'],
+      );
 
       final workflowData = data['data'];
       if (workflowData != null && workflowData['status'] == 'succeeded') {
@@ -595,10 +880,26 @@ class DifyService {
       }
     } else {
       final errorBody = response.body;
-      debugPrint('=== Dify API 错误响应 ===');
-      debugPrint('状态码: ${response.statusCode}');
-      debugPrint('响应体: $errorBody');
-      debugPrint('========================');
+      LoggerService.instance.e(
+        '=== Dify API 错误响应 ===',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      LoggerService.instance.i(
+        '状态码: ${response.statusCode}',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
+      LoggerService.instance.i(
+        '响应体: $errorBody',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
+      LoggerService.instance.d(
+        '========================',
+        category: LogCategory.ai,
+        tags: ['debug', 'separator', 'dify'],
+      );
 
       String errorMessage = '未知错误';
       try {
@@ -630,14 +931,34 @@ class DifyService {
       'background_setting': backgroundSetting,
     };
 
-    debugPrint('=== 开始AI生成角色 ===');
-    debugPrint('用户输入: $userInput');
-    debugPrint('小说背景: $backgroundSetting');
-    debugPrint('作家设定: $aiWriterSetting');
+    LoggerService.instance.i(
+      '=== 开始AI生成角色 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.i(
+      '用户输入: $userInput',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '小说背景: $backgroundSetting',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '作家设定: $aiWriterSetting',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('AI生成失败：未收到有效响应');
@@ -649,11 +970,19 @@ class DifyService {
     try {
       // 解析JSON数据
 
-      debugPrint('=== JSON解析成功 ===');
+      LoggerService.instance.i(
+        '=== JSON解析成功 ===',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
 
       // 获取roles数组
       final List<dynamic> charactersData = content['roles'] ?? [];
-      debugPrint('=== 角色数组长度: ${charactersData.length} ===');
+      LoggerService.instance.d(
+        '=== 角色数组长度: ${charactersData.length} ===',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
       final List<Character> characters = [];
 
       for (var characterData in charactersData) {
@@ -674,16 +1003,28 @@ class DifyService {
           );
           characters.add(character);
         } catch (e) {
-          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          LoggerService.instance.e(
+            '解析角色数据失败: $e, 数据: $characterData',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           // 跳过无效的角色数据，继续处理其他角色
           continue;
         }
       }
 
-      debugPrint('成功解析 ${characters.length} 个角色');
+      LoggerService.instance.i(
+        '成功解析 ${characters.length} 个角色',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
       return characters;
     } catch (e) {
-      debugPrint('解析角色列表失败: $e, 原始数据: $content');
+      LoggerService.instance.e(
+        '解析角色列表失败: $e, 原始数据: $content',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       throw Exception('角色数据解析失败: $e');
     }
   }
@@ -704,14 +1045,34 @@ class DifyService {
       'ai_writer_setting': aiWriterSetting,
     };
 
-    debugPrint('=== 开始从大纲生成角色 ===');
-    debugPrint('用户输入: $userInput');
-    debugPrint('大纲长度: ${outline.length}');
-    debugPrint('作家设定: $aiWriterSetting');
+    LoggerService.instance.i(
+      '=== 开始从大纲生成角色 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.i(
+      '用户输入: $userInput',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.d(
+      '大纲长度: ${outline.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '作家设定: $aiWriterSetting',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('AI生成失败：未收到有效响应');
@@ -722,11 +1083,19 @@ class DifyService {
 
     try {
       // 解析JSON数据
-      debugPrint('=== JSON解析成功 ===');
+      LoggerService.instance.i(
+        '=== JSON解析成功 ===',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
 
       // 获取roles数组
       final List<dynamic> charactersData = content['roles'] ?? [];
-      debugPrint('=== 角色数组长度: ${charactersData.length} ===');
+      LoggerService.instance.d(
+        '=== 角色数组长度: ${charactersData.length} ===',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
       final List<Character> characters = [];
 
       for (var characterData in charactersData) {
@@ -747,16 +1116,28 @@ class DifyService {
           );
           characters.add(character);
         } catch (e) {
-          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          LoggerService.instance.e(
+            '解析角色数据失败: $e, 数据: $characterData',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           // 跳过无效的角色数据，继续处理其他角色
           continue;
         }
       }
 
-      debugPrint('成功解析 ${characters.length} 个角色');
+      LoggerService.instance.i(
+        '成功解析 ${characters.length} 个角色',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
       return characters;
     } catch (e) {
-      debugPrint('解析角色列表失败: $e, 原始数据: $content');
+      LoggerService.instance.e(
+        '解析角色列表失败: $e, 原始数据: $content',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       throw Exception('角色数据解析失败: $e');
     }
   }
@@ -779,15 +1160,39 @@ class DifyService {
       'background_setting': backgroundSetting,
     };
 
-    debugPrint('=== 开始AI更新角色卡 ===');
-    debugPrint('章节内容长度: ${chaptersContent.length} 字符');
-    debugPrint('现有角色信息: $roles');
-    debugPrint('小说背景: $backgroundSetting');
-    debugPrint('作家设定: $aiWriterSetting');
+    LoggerService.instance.i(
+      '=== 开始AI更新角色卡 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chaptersContent.length} 字符',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '现有角色信息: $roles',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '小说背景: $backgroundSetting',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '作家设定: $aiWriterSetting',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('角色更新失败：未收到有效响应');
@@ -798,11 +1203,19 @@ class DifyService {
 
     try {
       // 解析JSON数据
-      debugPrint('=== JSON解析成功 ===');
+      LoggerService.instance.i(
+        '=== JSON解析成功 ===',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
 
       // 获取roles数组
       final List<dynamic> charactersData = content['roles'] ?? [];
-      debugPrint('=== 更新后角色数组长度: ${charactersData.length} ===');
+      LoggerService.instance.d(
+        '=== 更新后角色数组长度: ${charactersData.length} ===',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
       final List<Character> characters = [];
 
       for (var characterData in charactersData) {
@@ -822,18 +1235,34 @@ class DifyService {
             backgroundStory: characterData['backgroundStory']?.toString(),
           );
           characters.add(character);
-          debugPrint('成功解析角色: ${character.name}');
+          LoggerService.instance.i(
+            '成功解析角色: ${character.name}',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
         } catch (e) {
-          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          LoggerService.instance.e(
+            '解析角色数据失败: $e, 数据: $characterData',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           // 跳过无效的角色数据，继续处理其他角色
           continue;
         }
       }
 
-      debugPrint('成功更新 ${characters.length} 个角色');
+      LoggerService.instance.i(
+        '成功更新 ${characters.length} 个角色',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
       return characters;
     } catch (e) {
-      debugPrint('解析更新角色列表失败: $e, 原始数据: $content');
+      LoggerService.instance.e(
+        '解析更新角色列表失败: $e, 原始数据: $content',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       throw Exception('角色更新数据解析失败: $e');
     }
   }
@@ -850,13 +1279,29 @@ class DifyService {
       'cmd': '提取角色',
     };
 
-    debugPrint('=== 开始从章节提取角色 ===');
-    debugPrint('章节内容长度: ${chapterContent.length} 字符');
-    debugPrint('角色名: $roles');
+    LoggerService.instance.i(
+      '=== 开始从章节提取角色 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chapterContent.length} 字符',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '角色名: $roles',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('角色提取失败：未收到有效响应');
@@ -867,11 +1312,19 @@ class DifyService {
 
     try {
       // 解析JSON数据
-      debugPrint('=== JSON解析成功 ===');
+      LoggerService.instance.i(
+        '=== JSON解析成功 ===',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
 
       // 获取roles数组
       final List<dynamic> charactersData = content['roles'] ?? [];
-      debugPrint('=== 提取角色数组长度: ${charactersData.length} ===');
+      LoggerService.instance.d(
+        '=== 提取角色数组长度: ${charactersData.length} ===',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
       final List<Character> characters = [];
 
       for (var characterData in charactersData) {
@@ -892,15 +1345,27 @@ class DifyService {
           );
           characters.add(character);
         } catch (e) {
-          debugPrint('解析角色数据失败: $e, 数据: $characterData');
+          LoggerService.instance.e(
+            '解析角色数据失败: $e, 数据: $characterData',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           continue;
         }
       }
 
-      debugPrint('成功提取 ${characters.length} 个角色');
+      LoggerService.instance.i(
+        '成功提取 ${characters.length} 个角色',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
       return characters;
     } catch (e) {
-      debugPrint('解析提取角色列表失败: $e, 原始数据: $content');
+      LoggerService.instance.e(
+        '解析提取角色列表失败: $e, 原始数据: $content',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       throw Exception('角色提取数据解析失败: $e');
     }
   }
@@ -914,12 +1379,24 @@ class DifyService {
       'cmd': '角色卡提示词描写',
     };
 
-    debugPrint('=== 开始AI生成角色卡提示词 ===');
-    debugPrint('角色描述: $characterDescription');
+    LoggerService.instance.i(
+      '=== 开始AI生成角色卡提示词 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.i(
+      '角色描述: $characterDescription',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('AI生成提示词失败：未收到有效响应');
@@ -937,15 +1414,27 @@ class DifyService {
       final facePrompts = content['face_prompts']?.toString() ?? '';
       final bodyPrompts = content['body_prompts']?.toString() ?? '';
 
-      debugPrint('=== 面部提示词: $facePrompts ===');
-      debugPrint('=== 身材提示词: $bodyPrompts ===');
+      LoggerService.instance.i(
+        '=== 面部提示词: $facePrompts ===',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.i(
+        '=== 身材提示词: $bodyPrompts ===',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
 
       return {
         'face_prompts': facePrompts,
         'body_prompts': bodyPrompts,
       };
     } catch (e) {
-      debugPrint('解析角色卡提示词失败: $e, 原始数据: $outputs');
+      LoggerService.instance.e(
+        '解析角色卡提示词失败: $e, 原始数据: $outputs',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       throw Exception('角色卡提示词解析失败: $e');
     }
   }
@@ -964,10 +1453,26 @@ class DifyService {
       'cmd': '场景描写',
     };
 
-    debugPrint('=== 格式化场景描写输入参数 ===');
-    debugPrint('章节内容长度: ${chapterContent.length} 字符');
-    debugPrint('角色数量: ${characters.length}');
-    debugPrint('角色信息格式化结果:\n$rolesText');
+    LoggerService.instance.i(
+      '=== 格式化场景描写输入参数 ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chapterContent.length} 字符',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '角色数量: ${characters.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '角色信息格式化结果:\n$rolesText',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     return inputs;
   }
@@ -1010,20 +1515,47 @@ class DifyService {
       characters: characters,
     );
 
-    debugPrint('🚀 === 开始场景描写流式生成 ===');
-    debugPrint('章节内容长度: ${chapterContent.length} 字符');
-    debugPrint('角色数量: ${characters.length}');
-    debugPrint('输入参数: ${jsonEncode(inputs)}');
+    LoggerService.instance.i(
+      '🚀 === 开始场景描写流式生成 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chapterContent.length} 字符',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '角色数量: ${characters.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '输入参数: ${jsonEncode(inputs)}',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     // 创建状态管理器
     late final StreamStateManager stateManager;
     stateManager = StreamStateManager(
       onTextChunk: onChunk,
       onCompleted: (String completeContent) {
-        debugPrint('🎯 === 场景描写生成完成 ===');
-        debugPrint('完整内容长度: ${completeContent.length}');
-        debugPrint(
-            '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."');
+        LoggerService.instance.i(
+          '🎯 === 场景描写生成完成 ===',
+          category: LogCategory.ai,
+          tags: ['success', 'dify'],
+        );
+        LoggerService.instance.d(
+          '完整内容长度: ${completeContent.length}',
+          category: LogCategory.ai,
+          tags: ['stats', 'dify'],
+        );
+        LoggerService.instance.d(
+          '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."',
+          category: LogCategory.ai,
+          tags: ['stats', 'preview', 'dify'],
+        );
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
         if (completeContent.isNotEmpty) {
@@ -1034,8 +1566,16 @@ class DifyService {
         stateManager.dispose();
       },
       onError: (error) {
-        debugPrint('❌ === 场景描写生成错误 ===');
-        debugPrint('错误: $error');
+        LoggerService.instance.e(
+          '❌ === 场景描写生成错误 ===',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.e(
+          '错误: $error',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
         stateManager.dispose();
         throw Exception('场景描写生成失败: $error');
       },
@@ -1060,10 +1600,26 @@ class DifyService {
         'user': 'novel-builder-app',
       };
 
-      debugPrint('🌐 === 场景描写 API 请求 ===');
-      debugPrint('URL: $url');
-      debugPrint('Request Body: ${jsonEncode(requestBody)}');
-      debugPrint('==========================');
+      LoggerService.instance.i(
+        '🌐 === 场景描写 API 请求 ===',
+        category: LogCategory.ai,
+        tags: ['api', 'request', 'dify'],
+      );
+      LoggerService.instance.d(
+        'URL: $url',
+        category: LogCategory.ai,
+        tags: ['network', 'dify'],
+      );
+      LoggerService.instance.i(
+        'Request Body: ${jsonEncode(requestBody)}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.d(
+        '==========================',
+        category: LogCategory.ai,
+        tags: ['debug', 'separator', 'dify'],
+      );
 
       final request = http.Request('POST', url);
       request.headers.addAll({
@@ -1074,7 +1630,11 @@ class DifyService {
 
       final streamedResponse = await request.send();
 
-      debugPrint('📡 === 响应状态码: ${streamedResponse.statusCode} ===');
+      LoggerService.instance.i(
+        '📡 === 响应状态码: ${streamedResponse.statusCode} ===',
+        category: LogCategory.ai,
+        tags: ['api', 'response', 'dify'],
+      );
 
       if (streamedResponse.statusCode == 200) {
         stateManager.startReceiving();
@@ -1092,13 +1652,29 @@ class DifyService {
         // 监听文本流
         final textSubscription = textStream.listen(
           (textChunk) {
-            debugPrint('🔥 === 场景描写文本块 ===');
-            debugPrint('内容: "$textChunk"');
+            LoggerService.instance.d(
+              '🔥 === 场景描写文本块 ===',
+              category: LogCategory.ai,
+              tags: ['stream', 'chunk', 'dify'],
+            );
+            LoggerService.instance.i(
+              '内容: "$textChunk"',
+              category: LogCategory.ai,
+              tags: ['info', 'dify'],
+            );
             stateManager.handleTextChunk(textChunk);
-            debugPrint('✅ 文本块处理完成');
+            LoggerService.instance.i(
+              '✅ 文本块处理完成',
+              category: LogCategory.ai,
+              tags: ['success', 'dify'],
+            );
           },
           onDone: () {
-            debugPrint('📝 场景描写文本流结束');
+            LoggerService.instance.i(
+              '📝 场景描写文本流结束',
+              category: LogCategory.ai,
+              tags: ['stream', 'end', 'dify'],
+            );
             textStreamDone = true;
 
             // 短暂延迟确保最后的文本块被处理
@@ -1110,7 +1686,11 @@ class DifyService {
             });
           },
           onError: (error) {
-            debugPrint('❌ 场景描写文本流错误: $error');
+            LoggerService.instance.e(
+              '❌ 场景描写文本流错误: $error',
+              category: LogCategory.ai,
+              tags: ['error', 'dify'],
+            );
             textStreamError = true;
             if (!completer.isCompleted) {
               completer.completeError(error);
@@ -1120,8 +1700,16 @@ class DifyService {
 
         // 监听工作流完成事件
         DifySSEParser.waitForCompletion(eventStream).then((workflowCompleted) {
-          debugPrint('✅ 场景描写工作流完成: $workflowCompleted');
-          debugPrint('📊 完成时总字符数: ${stateManager.currentState.characterCount}');
+          LoggerService.instance.i(
+            '✅ 场景描写工作流完成: $workflowCompleted',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
+          LoggerService.instance.i(
+            '📊 完成时总字符数: ${stateManager.currentState.characterCount}',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
 
           if (textStreamDone || completer.isCompleted) return;
 
@@ -1131,7 +1719,11 @@ class DifyService {
             completer.complete(workflowCompleted);
           });
         }).catchError((error) {
-          debugPrint('❌ 场景描写工作流完成错误: $error');
+          LoggerService.instance.e(
+            '❌ 场景描写工作流完成错误: $error',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           if (!completer.isCompleted) {
             completer.completeError(error);
           }
@@ -1142,13 +1734,29 @@ class DifyService {
           final isCompleted = await completer.future
               .timeout(const Duration(seconds: 15), // 15秒超时
                   onTimeout: () {
-            debugPrint('⏰ 场景描写流处理超时');
+            LoggerService.instance.w(
+              '⏰ 场景描写流处理超时',
+              category: LogCategory.ai,
+              tags: ['timeout', 'dify'],
+            );
             return textStreamDone && !textStreamError;
           });
 
-          debugPrint('🎯 === 场景描写流处理结果 ===');
-          debugPrint('完成状态: $isCompleted');
-          debugPrint('最终字符数: ${stateManager.currentState.characterCount}');
+          LoggerService.instance.i(
+            '🎯 === 场景描写流处理结果 ===',
+            category: LogCategory.ai,
+            tags: ['info', 'dify'],
+          );
+          LoggerService.instance.i(
+            '完成状态: $isCompleted',
+            category: LogCategory.ai,
+            tags: ['success', 'dify'],
+          );
+          LoggerService.instance.i(
+            '最终字符数: ${stateManager.currentState.characterCount}',
+            category: LogCategory.ai,
+            tags: ['info', 'dify'],
+          );
 
           if (isCompleted) {
             stateManager.complete();
@@ -1156,17 +1764,37 @@ class DifyService {
             stateManager.handleError('场景描写流处理未正确完成');
           }
         } catch (e) {
-          debugPrint('❌ === 场景描写流处理异常 ===');
-          debugPrint('异常: $e');
+          LoggerService.instance.e(
+            '❌ === 场景描写流处理异常 ===',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
+          LoggerService.instance.e(
+            '异常: $e',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           stateManager.handleError('场景描写流处理异常: $e');
         } finally {
           await textSubscription.cancel();
         }
       } else {
         final errorBody = await streamedResponse.stream.bytesToString();
-        debugPrint('❌ === 场景描写 API 错误 ===');
-        debugPrint('状态码: ${streamedResponse.statusCode}');
-        debugPrint('响应体: $errorBody');
+        LoggerService.instance.e(
+          '❌ === 场景描写 API 错误 ===',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.i(
+          '状态码: ${streamedResponse.statusCode}',
+          category: LogCategory.ai,
+          tags: ['api', 'response', 'dify'],
+        );
+        LoggerService.instance.i(
+          '响应体: $errorBody',
+          category: LogCategory.ai,
+          tags: ['api', 'response', 'dify'],
+        );
 
         String errorMessage = '未知错误';
         try {
@@ -1182,8 +1810,16 @@ class DifyService {
             '场景描写API请求失败 (${streamedResponse.statusCode}): $errorMessage');
       }
     } catch (e) {
-      debugPrint('❌ === 场景描写生成异常 ===');
-      debugPrint('异常: $e');
+      LoggerService.instance.e(
+        '❌ === 场景描写生成异常 ===',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      LoggerService.instance.e(
+        '异常: $e',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
       stateManager.handleError('场景描写网络或解析异常: $e');
     }
   }
@@ -1223,22 +1859,58 @@ class DifyService {
       inputs['role_strategy'] = existingRoleStrategy;
     }
 
-    debugPrint('=== 开始生成沉浸体验剧本 ===');
-    debugPrint('章节内容长度: ${chapterContent.length} 字符');
-    debugPrint('参与角色数量: ${characters.length}');
-    debugPrint('格式化后角色信息:\n$formattedRoles');
-    debugPrint('用户要求: $userInput');
-    debugPrint('用户角色: $userChoiceRole');
+    LoggerService.instance.i(
+      '=== 开始生成沉浸体验剧本 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chapterContent.length} 字符',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '参与角色数量: ${characters.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.i(
+      '格式化后角色信息:\n$formattedRoles',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '用户要求: $userInput',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+    LoggerService.instance.i(
+      '用户角色: $userChoiceRole',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
     if (existingPlay != null) {
-      debugPrint('现有剧本长度: ${existingPlay.length} 字符');
+      LoggerService.instance.d(
+        '现有剧本长度: ${existingPlay.length} 字符',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
     }
     if (existingRoleStrategy != null) {
-      debugPrint('现有角色策略数量: ${existingRoleStrategy.length}');
+      LoggerService.instance.d(
+        '现有角色策略数量: ${existingRoleStrategy.length}',
+        category: LogCategory.ai,
+        tags: ['stats', 'dify'],
+      );
     }
 
     final outputs = await runWorkflowBlocking(inputs: inputs);
 
-    debugPrint('=== Dify API 返回数据: $outputs ===');
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
 
     if (outputs == null || outputs.isEmpty) {
       throw Exception('AI生成失败：未收到有效响应');
@@ -1252,8 +1924,16 @@ class DifyService {
       final roleStrategyRaw = content['role_strategy'];
 
       if (play == null || roleStrategyRaw == null) {
-        debugPrint('❌ content字段解析失败: play=$play, role_strategy=$roleStrategyRaw');
-        debugPrint('完整content数据: $content');
+        LoggerService.instance.e(
+          '❌ content字段解析失败: play=$play, role_strategy=$roleStrategyRaw',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.i(
+          '完整content数据: $content',
+          category: LogCategory.ai,
+          tags: ['info', 'dify'],
+        );
         throw Exception('返回数据格式错误：content字段缺少play或role_strategy');
       }
 
@@ -1272,8 +1952,16 @@ class DifyService {
     final roleStrategyRaw = outputs['role_strategy'];
 
     if (play == null || roleStrategyRaw == null) {
-      debugPrint('❌ 扁平结构解析失败: play=$play, role_strategy=$roleStrategyRaw');
-      debugPrint('完整outputs数据: $outputs');
+      LoggerService.instance.e(
+        '❌ 扁平结构解析失败: play=$play, role_strategy=$roleStrategyRaw',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      LoggerService.instance.i(
+        '完整outputs数据: $outputs',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
       throw Exception('返回数据格式错误：缺少play或role_strategy字段');
     }
 
@@ -1304,17 +1992,199 @@ class DifyService {
         if (decoded is List) {
           return decoded;
         } else {
-          debugPrint('❌ role_strategy字符串解析后不是数组: $decoded');
+          LoggerService.instance.e(
+            '❌ role_strategy字符串解析后不是数组: $decoded',
+            category: LogCategory.ai,
+            tags: ['error', 'dify'],
+          );
           throw Exception('role_strategy格式错误：解析后不是数组');
         }
       } catch (e) {
-        debugPrint('❌ role_strategy字符串解析失败: $e');
-        debugPrint('原始字符串: $roleStrategyRaw');
+        LoggerService.instance.e(
+          '❌ role_strategy字符串解析失败: $e',
+          category: LogCategory.ai,
+          tags: ['error', 'dify'],
+        );
+        LoggerService.instance.i(
+          '原始字符串: $roleStrategyRaw',
+          category: LogCategory.ai,
+          tags: ['info', 'dify'],
+        );
         throw Exception('role_strategy字符串解析失败: $e');
       }
     }
 
-    debugPrint('❌ role_strategy类型错误: ${roleStrategyRaw.runtimeType}');
+    LoggerService.instance.e(
+      '❌ role_strategy类型错误: ${roleStrategyRaw.runtimeType}',
+      category: LogCategory.ai,
+      tags: ['error', 'dify'],
+    );
     throw Exception('role_strategy格式错误：不支持的类型 ${roleStrategyRaw.runtimeType}');
+  }
+
+  // ============================================================================
+  // AI伴读功能
+  // ============================================================================
+
+  /// AI伴读功能
+  ///
+  /// 分析章节内容，返回：
+  /// - 角色信息更新
+  /// - 背景设定追加
+  /// - 本章总结
+  /// - 人物关系更新
+  Future<AICompanionResponse?> generateAICompanion({
+    required String chaptersContent,
+    required String backgroundSetting,
+    required List<Character> characters,
+    required List<CharacterRelationship> relationships,
+  }) async {
+    // 格式化角色信息为JSON字符串
+    final rolesJson = _formatCharactersForAI(characters);
+
+    // 格式化关系信息为JSON字符串
+    final relationsJson = _formatRelationshipsForAI(relationships, characters);
+
+    final inputs = {
+      'cmd': 'AI伴读',
+      'chapters_content': chaptersContent,
+      'background_setting': backgroundSetting,
+      'roles': rolesJson,
+      'relations': relationsJson,
+    };
+
+    LoggerService.instance.i(
+      '=== 开始AI伴读分析 ===',
+      category: LogCategory.ai,
+      tags: ['api', 'request', 'dify'],
+    );
+    LoggerService.instance.d(
+      '章节内容长度: ${chaptersContent.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '背景设定长度: ${backgroundSetting.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '角色数量: ${characters.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+    LoggerService.instance.d(
+      '关系数量: ${relationships.length}',
+      category: LogCategory.ai,
+      tags: ['stats', 'dify'],
+    );
+
+    final outputs = await runWorkflowBlocking(inputs: inputs);
+
+    LoggerService.instance.i(
+      '=== Dify API 返回数据: $outputs ===',
+      category: LogCategory.ai,
+      tags: ['info', 'dify'],
+    );
+
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('AI伴读失败：未收到有效响应');
+    }
+
+    try {
+      // 使用AICompanionResponse解析
+      final response = AICompanionResponse.fromOutputs(outputs);
+
+      LoggerService.instance.i(
+        '=== AI伴读解析成功 ===',
+        category: LogCategory.ai,
+        tags: ['success', 'dify'],
+      );
+      LoggerService.instance.i(
+        '角色更新: ${response.roles.length}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.i(
+        '背景设定新增: ${response.background.length > 50 ? response.background.substring(0, 50) : response.background}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.i(
+        '本章总结: ${response.summery.length > 50 ? response.summery.substring(0, 50) : response.summery}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      LoggerService.instance.i(
+        '关系更新: ${response.relations.length}',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+
+      return response;
+    } catch (e) {
+      LoggerService.instance.e(
+        '❌ AI伴读数据解析失败: $e',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      LoggerService.instance.i(
+        '原始outputs: $outputs',
+        category: LogCategory.ai,
+        tags: ['info', 'dify'],
+      );
+      throw Exception('AI伴读数据解析失败: $e');
+    }
+  }
+
+  /// 格式化角色信息为AI友好的JSON字符串
+  String _formatCharactersForAI(List<Character> characters) {
+    if (characters.isEmpty) {
+      return jsonEncode([]);
+    }
+
+    final List<Map<String, dynamic>> charactersData = characters.map((c) {
+      return {
+        'name': c.name,
+        if (c.gender != null) 'gender': c.gender,
+        if (c.age != null) 'age': c.age,
+        if (c.occupation != null) 'occupation': c.occupation,
+        if (c.personality != null) 'personality': c.personality,
+        if (c.bodyType != null) 'bodyType': c.bodyType,
+        if (c.clothingStyle != null) 'clothingStyle': c.clothingStyle,
+        if (c.appearanceFeatures != null) 'appearanceFeatures': c.appearanceFeatures,
+        if (c.backgroundStory != null) 'backgroundStory': c.backgroundStory,
+      };
+    }).toList();
+
+    return jsonEncode(charactersData);
+  }
+
+  /// 格式化关系信息为AI友好的JSON字符串
+  String _formatRelationshipsForAI(
+    List<CharacterRelationship> relationships,
+    List<Character> characters,
+  ) {
+    if (relationships.isEmpty) {
+      return jsonEncode([]);
+    }
+
+    // 创建角色ID到名称的映射
+    final Map<int, String> characterIdToName = {
+      for (var c in characters) if (c.id != null) c.id!: c.name,
+    };
+
+    final List<Map<String, dynamic>> relationsData = relationships.map((r) {
+      final sourceName = characterIdToName[r.sourceCharacterId] ?? '未知角色';
+      final targetName = characterIdToName[r.targetCharacterId] ?? '未知角色';
+
+      return {
+        'source': sourceName,
+        'target': targetName,
+        'type': r.relationshipType,
+      };
+    }).toList();
+
+    return jsonEncode(relationsData);
   }
 }
