@@ -4,6 +4,8 @@ import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/media_markup_parser.dart';
+import '../core/logging/logger_service.dart';
+import '../core/logging/log_categories.dart';
 import 'package:novel_api/novel_api.dart';
 
 class SceneIllustrationService {
@@ -64,14 +66,27 @@ class SceneIllustrationService {
 
       if (response['status'] == 'pending' ||
           response['status'] == 'processing') {
-        debugPrint('场景插图任务创建成功: $taskId');
+        LoggerService.instance.i(
+          '场景插图任务创建成功: $taskId',
+          category: LogCategory.ai,
+          tags: ['illustration', 'create', 'success'],
+        );
       } else {
-        debugPrint('场景插图任务创建失败: $response');
+        LoggerService.instance.w(
+          '场景插图任务创建失败: $response',
+          category: LogCategory.ai,
+          tags: ['illustration', 'create', 'failed'],
+        );
       }
 
       return id;
-    } catch (e) {
-      debugPrint('创建场景插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '创建场景插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'create', 'error'],
+      );
       throw Exception('创建场景插图失败: $e');
     }
   }
@@ -123,8 +138,13 @@ class SceneIllustrationService {
       } else {
         throw Exception('插入场景插图记录失败');
       }
-    } catch (e) {
-      debugPrint('创建场景插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '创建场景插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'create', 'error'],
+      );
       throw Exception('创建场景插图失败: $e');
     }
   }
@@ -142,7 +162,11 @@ class SceneIllustrationService {
       // 获取当前章节内容
       final currentContent = await _databaseService.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
-        debugPrint('警告：章节内容为空，无法插入插图标记');
+        LoggerService.instance.w(
+          '章节内容为空，无法插入插图标记',
+          category: LogCategory.ai,
+          tags: ['illustration', 'markup', 'warning'],
+        );
         return;
       }
 
@@ -152,19 +176,31 @@ class SceneIllustrationService {
 
       // 验证段落索引的有效性
       if (paragraphIndex < 0) {
-        debugPrint('错误：段落索引不能为负数: $paragraphIndex');
+        LoggerService.instance.e(
+          '段落索引不能为负数: $paragraphIndex',
+          category: LogCategory.ai,
+          tags: ['illustration', 'markup', 'error'],
+        );
         throw ArgumentError('段落索引不能为负数: $paragraphIndex');
       }
 
       if (paragraphIndex >= paragraphs.length) {
-        debugPrint('错误：段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}');
+        LoggerService.instance.e(
+          '段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}',
+          category: LogCategory.ai,
+          tags: ['illustration', 'markup', 'error'],
+        );
         throw ArgumentError(
             '段落索引超出范围: $paragraphIndex，段落数量: ${paragraphs.length}');
       }
 
       // 直接使用传入的段落索引，无需文本匹配
       final targetIndex = paragraphIndex;
-      debugPrint('使用段落索引定位: $targetIndex，段落数量: ${paragraphs.length}');
+      LoggerService.instance.d(
+        '使用段落索引定位: $targetIndex，段落数量: ${paragraphs.length}',
+        category: LogCategory.ai,
+        tags: ['illustration', 'markup', 'index'],
+      );
 
       // 创建插图标记
       final illustrationMarkup =
@@ -189,9 +225,18 @@ class SceneIllustrationService {
       final newContent = paragraphs.join('\n');
       await _databaseService.updateChapterContent(chapterId, newContent);
 
-      debugPrint('插图标记已插入章节内容: $illustrationMarkup');
-    } catch (e) {
-      debugPrint('插入插图标记失败: $e');
+      LoggerService.instance.i(
+        '插图标记已插入章节内容: $illustrationMarkup',
+        category: LogCategory.ai,
+        tags: ['illustration', 'markup', 'success'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '插入插图标记失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'markup', 'error'],
+      );
       // 不抛出异常，避免影响插图创建流程
     }
   }
@@ -203,8 +248,13 @@ class SceneIllustrationService {
       final illustrations = await _databaseService
           .getSceneIllustrationsByChapter(novelUrl, chapterId);
       return illustrations;
-    } catch (e) {
-      debugPrint('获取场景插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取场景插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'get', 'error'],
+      );
       return [];
     }
   }
@@ -228,8 +278,13 @@ class SceneIllustrationService {
       // 2. 删除本地记录（移除后端API调用）
       await _databaseService.deleteSceneIllustration(illustrationId);
       return true;
-    } catch (e) {
-      debugPrint('删除场景插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除场景插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'delete', 'error'],
+      );
       return false;
     }
   }
@@ -243,7 +298,11 @@ class SceneIllustrationService {
       // 获取当前章节内容
       final currentContent = await _databaseService.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
-        debugPrint('警告：章节内容为空，无法移除插图标记');
+        LoggerService.instance.w(
+          '章节内容为空，无法移除插图标记',
+          category: LogCategory.ai,
+          tags: ['illustration', 'markup', 'warning'],
+        );
         return;
       }
 
@@ -256,9 +315,18 @@ class SceneIllustrationService {
       // 保存修改后的内容
       await _databaseService.updateChapterContent(chapterId, newContent);
 
-      debugPrint('插图标记已从章节内容中移除: $targetMarkup');
-    } catch (e) {
-      debugPrint('移除插图标记失败: $e');
+      LoggerService.instance.i(
+        '插图标记已从章节内容中移除: $targetMarkup',
+        category: LogCategory.ai,
+        tags: ['illustration', 'markup', 'remove'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '移除插图标记失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'markup', 'error'],
+      );
       // 不抛出异常，避免影响插图删除流程
     }
   }
@@ -283,7 +351,11 @@ class SceneIllustrationService {
       );
 
       if (response['message'] != null) {
-        debugPrint('重新生成图片任务提交成功: ${illustration.taskId}');
+        LoggerService.instance.i(
+          '重新生成图片任务提交成功: ${illustration.taskId}',
+          category: LogCategory.ai,
+          tags: ['illustration', 'regenerate', 'success'],
+        );
         // 更新本地状态为处理中
         await _databaseService.updateSceneIllustrationStatus(
           illustrationId,
@@ -291,11 +363,20 @@ class SceneIllustrationService {
         );
         return true;
       } else {
-        debugPrint('重新生成图片失败: $response');
+        LoggerService.instance.w(
+          '重新生成图片失败: $response',
+          category: LogCategory.ai,
+          tags: ['illustration', 'regenerate', 'failed'],
+        );
         return false;
       }
-    } catch (e) {
-      debugPrint('重新生成图片失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '重新生成图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'regenerate', 'error'],
+      );
       return false;
     }
   }
@@ -309,8 +390,13 @@ class SceneIllustrationService {
         prompts: newPrompts,
       );
       return true;
-    } catch (e) {
-      debugPrint('更新提示词失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新提示词失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'update', 'error'],
+      );
       return false;
     }
   }
@@ -330,8 +416,13 @@ class SceneIllustrationService {
         return SceneIllustration.fromMap(maps.first);
       }
       return null;
-    } catch (e) {
-      debugPrint('获取场景插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取场景插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'get', 'error'],
+      );
       return null;
     }
   }
@@ -343,8 +434,13 @@ class SceneIllustrationService {
       // 仅刷新本地数据，不同步后端状态
       await _databaseService.getSceneIllustrationsByChapter(
           novelUrl, chapterId);
-    } catch (e) {
-      debugPrint('刷新章节插图状态失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '刷新章节插图状态失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'refresh', 'error'],
+      );
     }
   }
 
@@ -354,8 +450,13 @@ class SceneIllustrationService {
       final illustrations =
           await _databaseService.getPendingSceneIllustrations();
       return illustrations;
-    } catch (e) {
-      debugPrint('获取待处理插图失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取待处理插图失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'pending', 'error'],
+      );
       return [];
     }
   }
