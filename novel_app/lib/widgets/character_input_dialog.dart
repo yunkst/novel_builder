@@ -14,11 +14,13 @@ enum CreateMode {
 class ChapterMatchItem {
   final Chapter chapter;
   final int matchCount;
+  final List<int> matchPositions; // 匹配位置索引
   bool isSelected;
 
   ChapterMatchItem({
     required this.chapter,
     required this.matchCount,
+    required this.matchPositions,
     this.isSelected = true,
   });
 }
@@ -373,33 +375,26 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
             ),
           ),
           const SizedBox(height: 8),
-          RadioListTile<bool>(
-            title: const Text('提取匹配位置上下文'),
-            value: false,
-            groupValue: _extractFullChapter,
-            onChanged: (bool? value) {
-              if (value != null) {
-                setState(() {
-                  _extractFullChapter = value;
-                });
-              }
+          // 使用 SegmentedButton 替代过时的 Radio
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(
+                value: false,
+                label: Text('提取匹配位置上下文'),
+                icon: Icon(Icons.filter_list),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                label: Text('提取整章内容'),
+                icon: Icon(Icons.article),
+              ),
+            ],
+            selected: {_extractFullChapter},
+            onSelectionChanged: (Set<bool> newSelection) {
+              setState(() {
+                _extractFullChapter = newSelection.first;
+              });
             },
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-          ),
-          RadioListTile<bool>(
-            title: const Text('提取整章内容'),
-            value: true,
-            groupValue: _extractFullChapter,
-            onChanged: (bool? value) {
-              if (value != null) {
-                setState(() {
-                  _extractFullChapter = value;
-                });
-              }
-            },
-            contentPadding: EdgeInsets.zero,
-            dense: true,
           ),
           const SizedBox(height: 12),
 
@@ -674,12 +669,13 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
             return ChapterMatchItem(
               chapter: m.chapter,
               matchCount: m.matchCount,
+              matchPositions: m.matchPositions,
             );
           }).toList();
         });
       }
     } catch (e) {
-      LoggerService.instance.e('搜索章节失败:' + e.toString());
+      LoggerService.instance.e('搜索章节失败: ${e.toString()}');
       debugPrint('❌ 搜索章节失败: $e');
       setState(() {
         _searchError = '搜索失败: $e';
@@ -766,7 +762,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
         return ChapterMatch(
           chapter: item.chapter,
           matchCount: item.matchCount,
-          matchPositions: [],
+          matchPositions: item.matchPositions, // 保留匹配位置
         );
       }).toList(),
     });

@@ -53,6 +53,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   bool _isLoading = false;
   bool _isGeneratingPrompts = false;
   bool _isGeneratingRoleCard = false;
+  bool _isAutoSaving = false;
   List<String> _aliases = []; // 别名列表
   final TextEditingController _aliasController = TextEditingController();
 
@@ -157,6 +158,47 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     }
   }
 
+  /// 从表单构建Character对象
+  ///
+  /// 使用方法：在保存角色时调用此方法，统一构建Character对象
+  /// 返回：包含当前表单所有数据的Character对象
+  Character _buildCharacterFromForm({int? id}) {
+    return Character(
+      id: id ?? widget.character?.id,
+      novelUrl: widget.novel.url,
+      name: _nameController.text.trim(),
+      age: _ageController.text.isNotEmpty
+          ? int.tryParse(_ageController.text)
+          : null,
+      gender: _selectedGender,
+      occupation: _occupationController.text.trim().isNotEmpty
+          ? _occupationController.text.trim()
+          : null,
+      personality: _personalityController.text.trim().isNotEmpty
+          ? _personalityController.text.trim()
+          : null,
+      bodyType: _bodyTypeController.text.trim().isNotEmpty
+          ? _bodyTypeController.text.trim()
+          : null,
+      clothingStyle: _clothingStyleController.text.trim().isNotEmpty
+          ? _clothingStyleController.text.trim()
+          : null,
+      appearanceFeatures: _appearanceController.text.trim().isNotEmpty
+          ? _appearanceController.text.trim()
+          : null,
+      backgroundStory: _backgroundController.text.trim().isNotEmpty
+          ? _backgroundController.text.trim()
+          : null,
+      facePrompts: _facePromptsController.text.trim().isNotEmpty
+          ? _facePromptsController.text.trim()
+          : null,
+      bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
+          ? _bodyPromptsController.text.trim()
+          : null,
+      aliases: _aliases.isEmpty ? null : List.from(_aliases),
+    );
+  }
+
   Future<void> _saveCharacter() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -167,40 +209,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     });
 
     try {
-      final character = Character(
-        id: widget.character?.id,
-        novelUrl: widget.novel.url,
-        name: _nameController.text.trim(),
-        age: _ageController.text.isNotEmpty
-            ? int.tryParse(_ageController.text)
-            : null,
-        gender: _selectedGender,
-        occupation: _occupationController.text.trim().isNotEmpty
-            ? _occupationController.text.trim()
-            : null,
-        personality: _personalityController.text.trim().isNotEmpty
-            ? _personalityController.text.trim()
-            : null,
-        bodyType: _bodyTypeController.text.trim().isNotEmpty
-            ? _bodyTypeController.text.trim()
-            : null,
-        clothingStyle: _clothingStyleController.text.trim().isNotEmpty
-            ? _clothingStyleController.text.trim()
-            : null,
-        appearanceFeatures: _appearanceController.text.trim().isNotEmpty
-            ? _appearanceController.text.trim()
-            : null,
-        backgroundStory: _backgroundController.text.trim().isNotEmpty
-            ? _backgroundController.text.trim()
-            : null,
-        facePrompts: _facePromptsController.text.trim().isNotEmpty
-            ? _facePromptsController.text.trim()
-            : null,
-        bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
-            ? _bodyPromptsController.text.trim()
-            : null,
-        aliases: _aliases.isEmpty ? null : List.from(_aliases),
-      );
+      final character = _buildCharacterFromForm();
 
       if (widget.character == null) {
         await _databaseService.createCharacter(character);
@@ -390,10 +399,14 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('提示词生成成功'),
+            content: Text('提示词生成成功，即将自动保存...'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
+
+        // 延迟自动保存
+        _autoSaveAfterPromptsGeneration();
       }
     } catch (e) {
       if (mounted) {
@@ -787,6 +800,78 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     });
   }
 
+  /// 提示词生成后自动保存
+  Future<void> _autoSaveAfterPromptsGeneration() async {
+    if (_isAutoSaving) return; // 防止重复保存
+
+    setState(() {
+      _isAutoSaving = true;
+    });
+
+    try {
+      // 延迟1.5秒后保存
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      if (!mounted) return;
+
+      final character = _buildCharacterFromForm();
+
+      // 检查是否为新建角色
+      if (widget.character == null) {
+        // 新建角色：先创建基础角色
+        await _databaseService.createCharacter(character);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('角色创建并已自动保存'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // 编辑模式：直接更新提示词字段
+        await _databaseService.updateCharacter(character);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已自动保存'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('自动保存失败: $e'),
+            backgroundColor: Colors.orange,
+            action: widget.character != null
+                ? SnackBarAction(
+                    label: '手动保存',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      // 仅更新提示词字段
+                      _saveCharacter();
+                    },
+                  )
+                : null,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAutoSaving = false;
+        });
+      }
+    }
+  }
+
   /// 显示别名冲突对话框
   ///
   /// 返回 true 表示用户仍要添加，false 表示取消
@@ -1021,15 +1106,21 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed:
-                        _isGeneratingPrompts ? null : _generateCharacterPrompts,
+                        (_isGeneratingPrompts || _isAutoSaving) ? null : _generateCharacterPrompts,
                     icon: _isGeneratingPrompts
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.auto_awesome),
-                    label: Text(_isGeneratingPrompts ? '生成中...' : '生成提示词'),
+                        : _isAutoSaving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.auto_awesome),
+                    label: Text(_isGeneratingPrompts ? '生成中...' : _isAutoSaving ? '保存中...' : '生成提示词'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,

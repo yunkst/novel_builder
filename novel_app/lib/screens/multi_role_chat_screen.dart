@@ -45,12 +45,14 @@ class MultiRoleChatScreen extends StatefulWidget {
   final List<Character> characters; // 多个角色
   final String play; // 剧本内容
   final List<Map<String, dynamic>> roleStrategy; // 角色策略
+  final String? userRole; // 用户选择的角色名(可选)
 
   const MultiRoleChatScreen({
     super.key,
     required this.characters,
     required this.play,
     required this.roleStrategy,
+    this.userRole,
   });
 
   @override
@@ -67,6 +69,9 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   // 解析状态
   bool _inDialogue = false; // 是否在角色对话中
 
+  // 标签解析状态（用于跨chunk标签解析）
+  final TagParserState _tagParserState = TagParserState();
+
   // AI响应累积（用于历史记录）
   String _currentAiResponse = '';
 
@@ -77,6 +82,10 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   final TextEditingController _actionController = TextEditingController();
   final TextEditingController _speechController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  // FocusNode用于追踪输入框焦点
+  final FocusNode _actionFocusNode = FocusNode();
+  final FocusNode _speechFocusNode = FocusNode();
 
   // 服务
   final DifyService _difyService = DifyService();
@@ -97,6 +106,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     _actionController.dispose();
     _speechController.dispose();
     _scrollController.dispose();
+    _actionFocusNode.dispose();
+    _speechFocusNode.dispose();
     super.dispose();
   }
 
@@ -114,6 +125,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
           'scene': widget.play,
           'user_input': '', // 初始聊天没有用户输入
           'chat_history': '',
+          'choice_content': widget.userRole ?? '', // 用户选择的角色名
         },
         onData: (chunk) => _handleStreamChunk(chunk),
         onError: (error) {
@@ -125,6 +137,9 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         onDone: () {
           setState(() {
             _isGenerating = false;
+
+            // 重置标签解析状态
+            _tagParserState.reset();
 
             // 将AI响应添加到历史（无包裹标签）
             if (_currentAiResponse.isNotEmpty) {
@@ -195,14 +210,17 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     // 累积原始AI响应（用于历史记录）
     _currentAiResponse += chunk;
 
-    debugPrint('🔥 收到chunk: "$chunk"');
+    final displayChunk = chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
+    debugPrint('📦 收到chunk: "$displayChunk"');
+    debugPrint('🏷️ 标签状态: ${_tagParserState.toString()}');
 
-    // 解析显示
+    // 解析显示（传递标签状态）
     final result = ChatStreamParser.parseChunkForMultiRole(
       chunk,
       _messages,
       widget.characters,
       _inDialogue,
+      tagState: _tagParserState,
     );
 
     setState(() {
@@ -242,6 +260,61 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         ),
       );
     }
+  }
+
+  /// 获取当前聚焦的输入框控制器
+  TextEditingController? _getCurrentFocusedController() {
+    if (_actionFocusNode.hasFocus) {
+      return _actionController;
+    } else if (_speechFocusNode.hasFocus) {
+      return _speechController;
+    }
+    return null;
+  }
+
+  /// 插入角色名到当前聚焦的输入框
+  void _insertCharacterName(String characterName) {
+    // 获取当前聚焦的控制器
+    TextEditingController? controller = _getCurrentFocusedController();
+
+    // 如果没有聚焦的输入框，默认使用对话输入框
+    if (controller == null) {
+      _speechFocusNode.requestFocus();
+      controller = _speechController;
+    }
+
+    // 获取当前文本和光标位置
+    final text = controller.text;
+    final selection = controller.selection;
+    final cursorPosition = selection.baseOffset >= 0
+        ? selection.baseOffset
+        : text.length;
+
+    // 在光标位置插入角色名
+    final newText = text.replaceRange(
+      cursorPosition,
+      cursorPosition,
+      characterName,
+    );
+
+    // 更新文本和光标位置
+    controller.text = newText;
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: cursorPosition + characterName.length),
+    );
+
+    // 显示插入成功提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已插入: $characterName'),
+          duration: const Duration(milliseconds: 800),
+          backgroundColor: _DarkThemeColors.buttonPrimary,
+        ),
+      );
+    }
+
+    setState(() {});
   }
 
   @override
@@ -451,26 +524,46 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         final avatarPath = snapshot.data;
 
         if (avatarPath != null && File(avatarPath).existsSync()) {
-          return Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: color, width: 2),
-            ),
-            child: ClipOval(
-              child: Image.file(
-                File(avatarPath),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildFallbackAvatar(character, color);
-                },
+          // 使用InkWell包裹头像，添加点击交互
+          return Tooltip(
+            message: '点击插入 ${character.name}',
+            child: InkWell(
+              onTap: () => _insertCharacterName(character.name),
+              customBorder: const CircleBorder(),
+              splashColor: color.withValues(alpha: 0.5),
+              hoverColor: color.withValues(alpha: 0.3),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: ClipOval(
+                  child: Image.file(
+                    File(avatarPath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildFallbackAvatar(character, color);
+                    },
+                  ),
+                ),
               ),
             ),
           );
         }
 
-        return _buildFallbackAvatar(character, color);
+        // 备用头像也添加点击交互
+        return Tooltip(
+          message: '点击插入 ${character.name}',
+          child: InkWell(
+            onTap: () => _insertCharacterName(character.name),
+            customBorder: const CircleBorder(),
+            splashColor: color.withValues(alpha: 0.5),
+            hoverColor: color.withValues(alpha: 0.3),
+            child: _buildFallbackAvatar(character, color),
+          ),
+        );
       },
     );
   }
@@ -561,6 +654,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
           // 行为输入框
           TextField(
             controller: _actionController,
+            focusNode: _actionFocusNode,
             decoration: InputDecoration(
               labelText: '行为（可选）',
               hintText: '例如：举起酒杯，微笑着说',
@@ -587,6 +681,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
           // 对话输入框
           TextField(
             controller: _speechController,
+            focusNode: _speechFocusNode,
             decoration: InputDecoration(
               labelText: '对话（可选）',
               hintText: '例如：大家好，最近怎么样？',
@@ -792,6 +887,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
           'scene': widget.play,
           'user_input': userInput,
           'chat_history': chatHistory,
+          'choice_content': widget.userRole ?? '', // 用户选择的角色名
         },
         onData: (chunk) => _handleStreamChunk(chunk),
         onError: (error) {
@@ -803,6 +899,9 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         onDone: () {
           setState(() {
             _isGenerating = false;
+
+            // 重置标签解析状态
+            _tagParserState.reset();
 
             // AI响应添加到历史（无包裹标签）
             if (_currentAiResponse.isNotEmpty) {
