@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
+import 'package:novel_api/src/model/image_with_model.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -13,7 +14,7 @@ part 'scene_gallery_response.g.dart';
 ///
 /// Properties:
 /// * [taskId] - 场面绘制任务ID
-/// * [images] - 图片文件名列表
+/// * [images] - 图片列表（带模型信息）
 /// * [modelName] 
 /// * [modelWidth] 
 /// * [modelHeight] 
@@ -23,9 +24,9 @@ abstract class SceneGalleryResponse implements Built<SceneGalleryResponse, Scene
   @BuiltValueField(wireName: r'task_id')
   String get taskId;
 
-  /// 图片文件名列表
+  /// 图片列表（带模型信息）
   @BuiltValueField(wireName: r'images')
-  BuiltList<String> get images;
+  BuiltList<ImageWithModel> get images;
 
   @BuiltValueField(wireName: r'model_name')
   String? get modelName;
@@ -67,7 +68,7 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
     yield r'images';
     yield serializers.serialize(
       object.images,
-      specifiedType: const FullType(BuiltList, [FullType(String)]),
+      specifiedType: const FullType(BuiltList, [FullType(ImageWithModel)]),
     );
     if (object.modelName != null) {
       yield r'model_name';
@@ -123,8 +124,8 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
         case r'images':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltList, [FullType(String)]),
-          ) as BuiltList<String>;
+            specifiedType: const FullType(BuiltList, [FullType(ImageWithModel)]),
+          ) as BuiltList<ImageWithModel>;
           result.images.replace(valueDes);
           break;
         case r'model_name':

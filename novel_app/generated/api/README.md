@@ -104,6 +104,7 @@ Class | Method | HTTP request | Description
  - [HTTPValidationError](doc/HTTPValidationError.md)
  - [ImageToVideoRequest](doc/ImageToVideoRequest.md)
  - [ImageToVideoResponse](doc/ImageToVideoResponse.md)
+ - [ImageWithModel](doc/ImageWithModel.md)
  - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
  - [RoleCardGenerateRequest](doc/RoleCardGenerateRequest.md)
