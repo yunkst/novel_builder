@@ -1,15 +1,19 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../models/character.dart';
+import '../models/character_relationship.dart';
 import '../models/scene_illustration.dart';
 import '../models/outline.dart';
 import '../models/chat_scene.dart';
+import '../models/ai_accompaniment_settings.dart';
+import '../models/ai_companion_response.dart';
 import '../core/di/api_service_provider.dart';
 import 'invalid_markup_cleaner.dart';
+import 'logger_service.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -48,7 +52,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 14,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -67,7 +71,9 @@ class DatabaseService {
         backgroundSetting TEXT,
         addedAt INTEGER NOT NULL,
         lastReadChapter INTEGER DEFAULT 0,
-        lastReadTime INTEGER
+        lastReadTime INTEGER,
+        aiAccompanimentEnabled INTEGER DEFAULT 0,
+        aiInfoNotificationEnabled INTEGER DEFAULT 0
       )
     ''');
 
@@ -244,7 +250,11 @@ class DatabaseService {
           )
         ''');
 
-        debugPrint('数据库升级：重新创建了 scene_illustrations 表，添加了 task_id 字段');
+        LoggerService.instance.i(
+          '数据库升级：重新创建了 scene_illustrations 表，添加了 task_id 字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'task_id'],
+        );
       }
     }
     if (oldVersion < 9) {
@@ -259,7 +269,11 @@ class DatabaseService {
           updated_at INTEGER NOT NULL
         )
       ''');
-      debugPrint('数据库升级：创建了 outlines 表');
+      LoggerService.instance.i(
+        '数据库升级：创建了 outlines 表',
+        category: LogCategory.database,
+        tags: ['migration', 'schema', 'outlines'],
+      );
     }
     if (oldVersion < 10) {
       // 创建聊天场景表
@@ -276,21 +290,78 @@ class DatabaseService {
       await db.execute('''
         CREATE INDEX idx_chat_scenes_title ON chat_scenes(title)
       ''');
-      debugPrint('数据库升级：创建了 chat_scenes 表和索引');
+      LoggerService.instance.i(
+        '数据库升级：创建了 chat_scenes 表和索引',
+        category: LogCategory.database,
+        tags: ['migration', 'schema', 'chat_scenes'],
+      );
     }
     if (oldVersion < 11) {
       // 添加章节已读时间戳字段
       await db.execute('''
         ALTER TABLE novel_chapters ADD COLUMN readAt INTEGER
       ''');
-      debugPrint('数据库升级：添加了 novel_chapters.readAt 字段');
+      LoggerService.instance.i(
+          '数据库升级：添加了 novel_chapters.readAt 字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'readAt'],
+        );
     }
     if (oldVersion < 12) {
       // 添加角色别名字段
       await db.execute('''
         ALTER TABLE characters ADD COLUMN aliases TEXT DEFAULT '[]'
       ''');
-      debugPrint('数据库升级：添加了 characters.aliases 字段');
+      LoggerService.instance.i(
+          '数据库升级：添加了 characters.aliases 字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'aliases'],
+        );
+    }
+    if (oldVersion < 13) {
+      // 创建角色关系表
+      await db.execute('''
+        CREATE TABLE character_relationships (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_character_id INTEGER NOT NULL,
+          target_character_id INTEGER NOT NULL,
+          relationship_type TEXT NOT NULL,
+          description TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER,
+          FOREIGN KEY (source_character_id) REFERENCES characters(id) ON DELETE CASCADE,
+          FOREIGN KEY (target_character_id) REFERENCES characters(id) ON DELETE CASCADE,
+          UNIQUE(source_character_id, target_character_id, relationship_type)
+        )
+      ''');
+
+      // 创建索引以优化查询性能
+      await db.execute('''
+        CREATE INDEX idx_relationships_source ON character_relationships(source_character_id)
+      ''');
+      await db.execute('''
+        CREATE INDEX idx_relationships_target ON character_relationships(target_character_id)
+      ''');
+
+      LoggerService.instance.i(
+          '数据库升级：创建了 character_relationships 表和索引',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'relationships'],
+        );
+    }
+    if (oldVersion < 14) {
+      // 添加AI伴读设置字段
+      await db.execute('''
+        ALTER TABLE bookshelf ADD COLUMN aiAccompanimentEnabled INTEGER DEFAULT 0
+      ''');
+      await db.execute('''
+        ALTER TABLE bookshelf ADD COLUMN aiInfoNotificationEnabled INTEGER DEFAULT 0
+      ''');
+      LoggerService.instance.i(
+          '数据库升级：添加了AI伴读设置字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompaniment'],
+        );
     }
   }
 
@@ -384,8 +455,51 @@ class DatabaseService {
     final db = await database;
     return await db.update(
       'bookshelf',
+      {'backgroundSetting': backgroundSetting},
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+  }
+
+  /// 获取小说的AI伴读设置
+  Future<AiAccompanimentSettings> getAiAccompanimentSettings(
+      String novelUrl) async {
+    if (isWebPlatform) {
+      return const AiAccompanimentSettings(); // Web平台返回默认值
+    }
+
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      columns: ['aiAccompanimentEnabled', 'aiInfoNotificationEnabled'],
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+
+    if (maps.isEmpty) {
+      return const AiAccompanimentSettings(); // 返回默认值
+    }
+
+    return AiAccompanimentSettings(
+      autoEnabled: (maps[0]['aiAccompanimentEnabled'] as int) == 1,
+      infoNotificationEnabled:
+          (maps[0]['aiInfoNotificationEnabled'] as int) == 1,
+    );
+  }
+
+  /// 更新小说的AI伴读设置
+  Future<int> updateAiAccompanimentSettings(
+      String novelUrl, AiAccompanimentSettings settings) async {
+    if (isWebPlatform) {
+      return 0; // Web平台什么都不做，返回0
+    }
+
+    final db = await database;
+    return await db.update(
+      'bookshelf',
       {
-        'backgroundSetting': backgroundSetting,
+        'aiAccompanimentEnabled': settings.autoEnabled ? 1 : 0,
+        'aiInfoNotificationEnabled': settings.infoNotificationEnabled ? 1 : 0,
       },
       where: 'url = ?',
       whereArgs: [novelUrl],
@@ -432,7 +546,11 @@ class DatabaseService {
       // 简单策略：清空所有缓存
       // 更好的策略是使用LRU，但这里为了简洁使用清空策略
       _cachedInMemory.clear();
-      debugPrint('🧹 内存缓存已满，已清空 ($_maxMemoryCacheSize条)');
+      LoggerService.instance.i(
+          '内存缓存已满，已清空 ($_maxMemoryCacheSize条)',
+          category: LogCategory.cache,
+          tags: ['memory', 'cleanup'],
+        );
     }
     _cachedInMemory.add(chapterUrl);
   }
@@ -491,7 +609,11 @@ class DatabaseService {
   void clearMemoryState() {
     _cachedInMemory.clear();
     _preloading.clear();
-    debugPrint('🧹 DatabaseService内存状态已清理');
+    LoggerService.instance.i(
+          'DatabaseService内存状态已清理',
+          category: LogCategory.database,
+          tags: ['memory', 'cleanup'],
+        );
   }
 
   /// 缓存章节内容
@@ -1318,7 +1440,11 @@ class DatabaseService {
         whereArgs: [existingCharacter.id],
       );
 
-      debugPrint('更新角色: ${newCharacter.name} (ID: ${existingCharacter.id})');
+      LoggerService.instance.i(
+          '更新角色: ${newCharacter.name} (ID: ${existingCharacter.id})',
+          category: LogCategory.character,
+          tags: ['update', 'success'],
+        );
       return updatedCharacter;
     } else {
       // 创建新角色
@@ -1328,7 +1454,11 @@ class DatabaseService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
-      debugPrint('创建新角色: ${newCharacter.name} (ID: $id)');
+      LoggerService.instance.i(
+          '创建新角色: ${newCharacter.name} (ID: $id)',
+          category: LogCategory.character,
+          tags: ['create', 'success'],
+        );
       return newCharacter.copyWith(id: id);
     }
   }
@@ -1344,14 +1474,21 @@ class DatabaseService {
         final updatedCharacter = await updateOrInsertCharacter(character);
         updatedCharacters.add(updatedCharacter);
       } catch (e) {
-        debugPrint('批量更新角色失败: ${character.name}, 错误: $e');
+        LoggerService.instance.e(
+          '批量更新角色失败: ${character.name}, 错误: $e',
+          category: LogCategory.character,
+          tags: ['batch', 'error'],
+        );
         // 继续处理其他角色，不中断整个批量操作
         continue;
       }
     }
 
-    debugPrint(
-        '批量更新完成，成功更新 ${updatedCharacters.length}/${newCharacters.length} 个角色');
+    LoggerService.instance.i(
+      '批量更新完成，成功更新 ${updatedCharacters.length}/${newCharacters.length} 个角色',
+      category: LogCategory.character,
+      tags: ['batch', 'update'],
+    );
     return updatedCharacters;
   }
 
@@ -1489,7 +1626,11 @@ class DatabaseService {
       whereArgs: [novelUrl, chapterUrl],
     );
 
-    debugPrint('✅ 章节已标记为已读: $chapterUrl');
+    LoggerService.instance.i(
+          '章节已标记为已读: $chapterUrl',
+          category: LogCategory.database,
+          tags: ['chapter', 'read', 'success'],
+        );
   }
 
   /// 获取章节内容
@@ -1512,7 +1653,11 @@ class DatabaseService {
       final content = await apiService.getChapterContent(chapterUrl);
       return content;
     } catch (e) {
-      debugPrint('获取章节内容失败: $e');
+      LoggerService.instance.e(
+          '获取章节内容失败: $e',
+          category: LogCategory.database,
+          tags: ['chapter', 'content', 'error'],
+        );
       return '';
     }
   }
@@ -1594,6 +1739,198 @@ class DatabaseService {
   Future<bool> hasCharacterAvatar(int characterId) async {
     final cachedUrl = await getCharacterCachedImage(characterId);
     return cachedUrl != null && cachedUrl.isNotEmpty;
+  }
+
+  // ========== 角色关系操作 ==========
+
+  /// 创建角色关系
+  /// [relationship] 要创建的关系对象
+  /// 返回新插入记录的ID，如果关系已存在则抛出异常
+  Future<int> createRelationship(CharacterRelationship relationship) async {
+    final db = await database;
+
+    try {
+      final id = await db.insert(
+        'character_relationships',
+        relationship.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.abort,
+      );
+      LoggerService.instance.i(
+          '创建关系成功: $id',
+          category: LogCategory.character,
+          tags: ['relationship', 'create', 'success'],
+        );
+      return id;
+    } catch (e) {
+      LoggerService.instance.e(
+          '创建关系失败: $e',
+          category: LogCategory.character,
+          tags: ['relationship', 'create', 'error'],
+        );
+      rethrow;
+    }
+  }
+
+  /// 获取角色的所有关系（出度 + 入度）
+  /// [characterId] 角色ID
+  /// 返回该角色相关的所有关系列表
+  Future<List<CharacterRelationship>> getRelationships(int characterId) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT * FROM character_relationships
+      WHERE source_character_id = ? OR target_character_id = ?
+      ORDER BY created_at DESC
+    ''', [characterId, characterId]);
+
+    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
+  }
+
+  /// 获取角色的出度关系（Ta → 其他人）
+  /// [characterId] 角色ID
+  /// 返回该角色发起的所有关系列表
+  Future<List<CharacterRelationship>> getOutgoingRelationships(
+      int characterId) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'character_relationships',
+      where: 'source_character_id = ?',
+      whereArgs: [characterId],
+      orderBy: 'created_at DESC',
+    );
+
+    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
+  }
+
+  /// 获取角色的入度关系（其他人 → Ta）
+  /// [characterId] 角色ID
+  /// 返回指向该角色的所有关系列表
+  Future<List<CharacterRelationship>> getIncomingRelationships(
+      int characterId) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'character_relationships',
+      where: 'target_character_id = ?',
+      whereArgs: [characterId],
+      orderBy: 'created_at DESC',
+    );
+
+    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
+  }
+
+  /// 更新角色关系
+  /// [relationship] 要更新的关系对象（必须包含id）
+  /// 返回受影响的行数
+  Future<int> updateRelationship(CharacterRelationship relationship) async {
+    if (relationship.id == null) {
+      throw ArgumentError('关系ID不能为空');
+    }
+
+    final db = await database;
+
+    try {
+      final count = await db.update(
+        'character_relationships',
+        relationship.toMap(),
+        where: 'id = ?',
+        whereArgs: [relationship.id],
+      );
+      LoggerService.instance.i(
+        '更新关系成功: ${relationship.id}',
+        category: LogCategory.character,
+        tags: ['relationship', 'update', 'success'],
+      );
+      return count;
+    } catch (e) {
+      LoggerService.instance.e(
+          '更新关系失败: $e',
+          category: LogCategory.character,
+          tags: ['relationship', 'update', 'error'],
+        );
+      rethrow;
+    }
+  }
+
+  /// 删除角色关系
+  /// [relationshipId] 关系ID
+  /// 返回受影响的行数
+  Future<int> deleteRelationship(int relationshipId) async {
+    final db = await database;
+
+    try {
+      final count = await db.delete(
+        'character_relationships',
+        where: 'id = ?',
+        whereArgs: [relationshipId],
+      );
+      LoggerService.instance.i(
+          '删除关系成功: $relationshipId',
+          category: LogCategory.character,
+          tags: ['relationship', 'delete', 'success'],
+        );
+      return count;
+    } catch (e) {
+      LoggerService.instance.e(
+          '删除关系失败: $e',
+          category: LogCategory.character,
+          tags: ['relationship', 'delete', 'error'],
+        );
+      rethrow;
+    }
+  }
+
+  /// 检查关系是否已存在
+  /// [sourceId] 源角色ID
+  /// [targetId] 目标角色ID
+  /// [type] 关系类型
+  /// 返回关系是否存在
+  Future<bool> relationshipExists(
+      int sourceId, int targetId, String type) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'character_relationships',
+      where: 'source_character_id = ? AND target_character_id = ? AND relationship_type = ?',
+      whereArgs: [sourceId, targetId, type],
+      limit: 1,
+    );
+
+    return maps.isNotEmpty;
+  }
+
+  /// 获取角色的关系数量
+  /// [characterId] 角色ID
+  /// 返回该角色的关系总数（出度 + 入度）
+  Future<int> getRelationshipCount(int characterId) async {
+    final db = await database;
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count FROM character_relationships
+      WHERE source_character_id = ? OR target_character_id = ?
+    ''', [characterId, characterId]);
+
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// 获取与某角色相关的所有角色（去重）
+  /// [characterId] 角色ID
+  /// 返回相关角色的ID列表
+  Future<List<int>> getRelatedCharacterIds(int characterId) async {
+    final db = await database;
+
+    final result = await db.rawQuery('''
+      SELECT DISTINCT
+        CASE
+          WHEN source_character_id = ? THEN target_character_id
+          ELSE source_character_id
+        END as related_id
+      FROM character_relationships
+      WHERE source_character_id = ? OR target_character_id = ?
+    ''', [characterId, characterId, characterId]);
+
+    return result.map((row) => row['related_id'] as int).toList();
   }
 
   // ========== 场景插图操作 ==========
@@ -1911,5 +2248,333 @@ class DatabaseService {
       orderBy: 'createdAt DESC',
     );
     return List.generate(maps.length, (i) => ChatScene.fromMap(maps[i]));
+  }
+
+  // ============================================================================
+  // AI伴读功能相关方法
+  // ============================================================================
+
+  /// 追加背景设定
+  ///
+  /// [novelUrl] 小说URL
+  /// [newBackground] 新增的背景设定，将追加到现有背景设定之后
+  Future<int> appendBackgroundSetting(
+    String novelUrl,
+    String newBackground,
+  ) async {
+    if (isWebPlatform) {
+      return 0; // Web平台什么都不做，返回0
+    }
+
+    if (newBackground.trim().isEmpty) {
+      LoggerService.instance.w(
+          '新增背景设定为空，跳过更新',
+          category: LogCategory.ai,
+          tags: ['background', 'validation'],
+        );
+      return 0;
+    }
+
+    final db = await database;
+
+    // 获取现有背景设定
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      columns: ['backgroundSetting'],
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      LoggerService.instance.w(
+          '未找到小说: $novelUrl',
+          category: LogCategory.database,
+          tags: ['novel', 'not_found'],
+        );
+      return 0;
+    }
+
+    final existingBackground = maps.first['backgroundSetting'] as String?;
+    final updatedBackground = existingBackground == null || existingBackground.isEmpty
+        ? newBackground
+        : '$existingBackground\n\n$newBackground';
+
+    // 更新背景设定
+    final count = await db.update(
+      'bookshelf',
+      {'backgroundSetting': updatedBackground},
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+    );
+
+    LoggerService.instance.i(
+          '背景设定追加成功: $novelUrl (新增 ${newBackground.length} 字符)',
+          category: LogCategory.ai,
+          tags: ['background', 'update', 'success'],
+        );
+    return count;
+  }
+
+  /// 批量更新或插入角色（用于AI伴读）
+  ///
+  /// [novelUrl] 小说URL
+  /// [aiRoles] AI返回的角色更新列表
+  /// 返回成功更新的角色数量
+  Future<int> batchUpdateOrInsertCharacters(
+    String novelUrl,
+    List<AICompanionRole> aiRoles,
+  ) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    if (aiRoles.isEmpty) {
+      LoggerService.instance.w(
+          'AI返回角色列表为空，跳过更新',
+          category: LogCategory.ai,
+          tags: ['character', 'batch', 'empty'],
+        );
+      return 0;
+    }
+
+    int successCount = 0;
+
+    for (final aiRole in aiRoles) {
+      try {
+        // 查找是否已存在同名角色
+        final existingCharacter = await findCharacterByName(
+          novelUrl,
+          aiRole.name,
+        );
+
+        if (existingCharacter != null) {
+          // 更新现有角色，保留原有ID和创建时间
+          final updatedCharacter = existingCharacter.copyWith(
+            gender: (aiRole.gender != null && aiRole.gender!.isNotEmpty) ? aiRole.gender : null,
+            age: aiRole.age,
+            occupation: (aiRole.occupation != null && aiRole.occupation!.isNotEmpty) ? aiRole.occupation : null,
+            personality: (aiRole.personality != null && aiRole.personality!.isNotEmpty) ? aiRole.personality : null,
+            bodyType: (aiRole.bodyType != null && aiRole.bodyType!.isNotEmpty) ? aiRole.bodyType : null,
+            clothingStyle: (aiRole.clothingStyle != null && aiRole.clothingStyle!.isNotEmpty) ? aiRole.clothingStyle : null,
+            appearanceFeatures: (aiRole.appearanceFeatures != null && aiRole.appearanceFeatures!.isNotEmpty) ? aiRole.appearanceFeatures : null,
+            backgroundStory: (aiRole.backgroundStory != null && aiRole.backgroundStory!.isNotEmpty) ? aiRole.backgroundStory : null,
+            updatedAt: DateTime.now(),
+          );
+
+          await updateCharacter(updatedCharacter);
+          successCount++;
+          LoggerService.instance.i(
+            '更新角色: ${aiRole.name}',
+            category: LogCategory.ai,
+            tags: ['character', 'update', 'success'],
+          );
+        } else {
+          // 创建新角色
+          final newCharacter = Character(
+            novelUrl: novelUrl,
+            name: aiRole.name,
+            gender: (aiRole.gender != null && aiRole.gender!.isNotEmpty) ? aiRole.gender : null,
+            age: aiRole.age,
+            occupation: (aiRole.occupation != null && aiRole.occupation!.isNotEmpty) ? aiRole.occupation : null,
+            personality: (aiRole.personality != null && aiRole.personality!.isNotEmpty) ? aiRole.personality : null,
+            bodyType: (aiRole.bodyType != null && aiRole.bodyType!.isNotEmpty) ? aiRole.bodyType : null,
+            clothingStyle: (aiRole.clothingStyle != null && aiRole.clothingStyle!.isNotEmpty) ? aiRole.clothingStyle : null,
+            appearanceFeatures: (aiRole.appearanceFeatures != null && aiRole.appearanceFeatures!.isNotEmpty) ? aiRole.appearanceFeatures : null,
+            backgroundStory: (aiRole.backgroundStory != null && aiRole.backgroundStory!.isNotEmpty) ? aiRole.backgroundStory : null,
+          );
+
+          await createCharacter(newCharacter);
+          successCount++;
+          LoggerService.instance.i(
+            '新增角色: ${aiRole.name}',
+            category: LogCategory.ai,
+            tags: ['character', 'create', 'success'],
+          );
+        }
+      } catch (e) {
+        LoggerService.instance.e(
+          '更新/插入角色失败: ${aiRole.name}, 错误: $e',
+          category: LogCategory.ai,
+          tags: ['character', 'error'],
+        );
+        // 继续处理其他角色
+        continue;
+      }
+    }
+
+    LoggerService.instance.i(
+      '批量更新角色完成: $successCount/${aiRoles.length}',
+      category: LogCategory.ai,
+      tags: ['character', 'batch', 'success'],
+    );
+    return successCount;
+  }
+
+  /// 批量更新或插入关系（用于AI伴读）
+  ///
+  /// [novelUrl] 小说URL
+  /// [aiRelations] AI返回的关系更新列表
+  /// 返回成功更新的关系数量
+  Future<int> batchUpdateOrInsertRelationships(
+    String novelUrl,
+    List<AICompanionRelation> aiRelations,
+  ) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    if (aiRelations.isEmpty) {
+      LoggerService.instance.w(
+          'AI返回关系列表为空，跳过更新',
+          category: LogCategory.ai,
+          tags: ['relationship', 'batch', 'empty'],
+        );
+      return 0;
+    }
+
+    // 获取小说的所有角色，建立名称到ID的映射
+    final allCharacters = await getCharacters(novelUrl);
+    final Map<String, int> characterNameToId = {
+      for (var c in allCharacters) if (c.id != null) c.name: c.id!,
+    };
+
+    int successCount = 0;
+
+    for (final aiRelation in aiRelations) {
+      try {
+        // 查找source和target的角色ID
+        final sourceId = characterNameToId[aiRelation.source];
+        final targetId = characterNameToId[aiRelation.target];
+
+        if (sourceId == null) {
+          LoggerService.instance.w(
+          '未找到source角色: ${aiRelation.source}，跳过关系: $aiRelation',
+          category: LogCategory.ai,
+          tags: ['relationship', 'character_not_found'],
+        );
+          continue;
+        }
+
+        if (targetId == null) {
+          LoggerService.instance.w(
+          '未找到target角色: ${aiRelation.target}，跳过关系: $aiRelation',
+          category: LogCategory.ai,
+          tags: ['relationship', 'character_not_found'],
+        );
+          continue;
+        }
+
+        // 查找是否已存在相同source和target的关系
+        final existingRelations = await _getRelationshipsByCharacterIds(sourceId, targetId);
+
+        if (existingRelations.isNotEmpty) {
+          // 更新现有关系的type
+          final existingRelation = existingRelations.first;
+          final updatedRelation = existingRelation.copyWith(
+            relationshipType: aiRelation.type,
+            updatedAt: DateTime.now(),
+          );
+
+          await updateRelationship(updatedRelation);
+          successCount++;
+          LoggerService.instance.i(
+          '更新关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
+          category: LogCategory.ai,
+          tags: ['relationship', 'update', 'success'],
+        );
+        } else {
+          // 创建新关系
+          final newRelation = CharacterRelationship(
+            sourceCharacterId: sourceId,
+            targetCharacterId: targetId,
+            relationshipType: aiRelation.type,
+          );
+
+          await createRelationship(newRelation);
+          successCount++;
+          LoggerService.instance.i(
+          '新增关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
+          category: LogCategory.ai,
+          tags: ['relationship', 'create', 'success'],
+        );
+        }
+      } catch (e) {
+        LoggerService.instance.e(
+          '更新/插入关系失败: $aiRelation, 错误: $e',
+          category: LogCategory.ai,
+          tags: ['relationship', 'error'],
+        );
+        // 继续处理其他关系
+        continue;
+      }
+    }
+
+    LoggerService.instance.i(
+      '批量更新关系完成: $successCount/${aiRelations.length}',
+      category: LogCategory.ai,
+      tags: ['relationship', 'batch', 'success'],
+    );
+    return successCount;
+  }
+
+  /// 获取小说的所有关系
+  ///
+  /// [novelUrl] 小说URL
+  /// 返回该小说的所有角色关系
+  Future<List<CharacterRelationship>> getAllRelationships(String novelUrl) async {
+    if (isWebPlatform) {
+      return [];
+    }
+
+    final db = await database;
+
+    // 获取小说的所有角色ID
+    final List<Map<String, dynamic>> characterMaps = await db.query(
+      'characters',
+      columns: ['id'],
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+    );
+
+    if (characterMaps.isEmpty) {
+      return [];
+    }
+
+    final characterIds = characterMaps.map((m) => m['id'] as int).toList();
+
+    // 构建查询条件：source或target在角色ID列表中
+    final placeholders = List.filled(characterIds.length, '?').join(',');
+    final query = '''
+      SELECT * FROM character_relationships
+      WHERE source_character_id IN ($placeholders)
+         OR target_character_id IN ($placeholders)
+      ORDER BY created_at DESC
+    ''';
+
+    final args = [...characterIds, ...characterIds];
+    final List<Map<String, dynamic>> relationMaps = await db.rawQuery(query, args);
+
+    return relationMaps.map((map) => CharacterRelationship.fromMap(map)).toList();
+  }
+
+  /// 根据source和target角色ID获取关系
+  ///
+  /// [sourceId] 源角色ID
+  /// [targetId] 目标角色ID
+  /// 返回匹配的关系列表
+  Future<List<CharacterRelationship>> _getRelationshipsByCharacterIds(
+    int sourceId,
+    int targetId,
+  ) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'character_relationships',
+      where: 'source_character_id = ? AND target_character_id = ?',
+      whereArgs: [sourceId, targetId],
+    );
+
+    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
   }
 }
