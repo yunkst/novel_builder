@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import '../core/di/api_service_provider.dart';
+import 'logger_service.dart';
 import 'api_service_wrapper.dart';
 
 /// 场景插图缓存服务
@@ -34,10 +36,22 @@ class SceneIllustrationCacheService {
       // 清理过期的缓存文件
       await _cleanExpiredCache();
 
-      debugPrint('✓ 场景插图缓存服务初始化完成');
-      debugPrint('缓存目录: ${_cacheDir!.path}');
+      LoggerService.instance.i(
+        '场景插图缓存服务初始化完成',
+        category: LogCategory.cache,
+        tags: ['illustration', 'init', 'success'],
+      );
+      LoggerService.instance.d(
+        '缓存目录: ${_cacheDir!.path}',
+        category: LogCategory.cache,
+        tags: ['illustration', 'path'],
+      );
     } catch (e) {
-      debugPrint('❌ 场景插图缓存服务初始化失败: $e');
+      LoggerService.instance.e(
+        '场景插图缓存服务初始化失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'init', 'error'],
+      );
     }
   }
 
@@ -67,7 +81,11 @@ class SceneIllustrationCacheService {
 
       // 1. 检查内存缓存
       if (_memoryCache.containsKey(filename)) {
-        debugPrint('从内存缓存获取场景插图: $filename');
+        LoggerService.instance.d(
+          '从内存缓存获取场景插图',
+          category: LogCategory.cache,
+          tags: ['illustration', 'memory', 'hit'],
+        );
         return _memoryCache[filename];
       }
 
@@ -75,7 +93,11 @@ class SceneIllustrationCacheService {
       final cacheFilePath = _getCacheFilePath(filename);
       final cacheFile = File(cacheFilePath);
       if (await cacheFile.exists()) {
-        debugPrint('从磁盘缓存获取场景插图: $filename');
+        LoggerService.instance.d(
+          '从磁盘缓存获取场景插图',
+          category: LogCategory.cache,
+          tags: ['illustration', 'disk', 'hit'],
+        );
         final bytes = await cacheFile.readAsBytes();
 
         // 加载到内存缓存
@@ -84,7 +106,11 @@ class SceneIllustrationCacheService {
       }
 
       // 3. 从网络下载
-      debugPrint('从网络下载场景插图: $filename');
+      LoggerService.instance.d(
+        '从网络下载场景插图',
+        category: LogCategory.cache,
+        tags: ['illustration', 'network', 'download'],
+      );
       final imageUrl = await _buildImageUrl(filename);
       final bytes = await _downloadImage(imageUrl);
 
@@ -98,7 +124,11 @@ class SceneIllustrationCacheService {
 
       return null;
     } catch (e) {
-      debugPrint('获取场景插图失败: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '获取场景插图失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'error'],
+      );
       return null;
     }
   }
@@ -134,11 +164,19 @@ class SceneIllustrationCacheService {
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {
-        debugPrint('下载图片失败: ${response.statusCode} - $imageUrl');
+        LoggerService.instance.w(
+          '下载图片失败: ${response.statusCode}',
+          category: LogCategory.cache,
+          tags: ['illustration', 'download', 'http'],
+        );
         return null;
       }
     } catch (e) {
-      debugPrint('下载图片异常: $imageUrl, 错误: $e');
+      LoggerService.instance.e(
+        '下载图片异常',
+        category: LogCategory.cache,
+        tags: ['illustration', 'download', 'exception'],
+      );
       return null;
     }
   }
@@ -159,15 +197,27 @@ class SceneIllustrationCacheService {
       final cacheFilePath = _getCacheFilePath(filename);
       final cacheFile = File(cacheFilePath);
       await cacheFile.writeAsBytes(bytes);
-      debugPrint('场景插图已缓存到磁盘: $filename -> $cacheFilePath');
+      LoggerService.instance.d(
+        '场景插图已缓存到磁盘',
+        category: LogCategory.cache,
+        tags: ['illustration', 'disk', 'save'],
+      );
     } catch (e) {
-      debugPrint('保存场景插图到磁盘失败: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '保存场景插图到磁盘失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'disk', 'error'],
+      );
     }
   }
 
   /// 预加载图片
   Future<void> preloadImages(List<String> filenames) async {
-    debugPrint('开始预加载场景插图: ${filenames.length} 张');
+    LoggerService.instance.i(
+      '开始预加载场景插图: ${filenames.length} 张',
+      category: LogCategory.cache,
+      tags: ['illustration', 'preload', 'start'],
+    );
 
     // 并行预加载，但限制并发数
     final futures = <Future>[];
@@ -188,7 +238,11 @@ class SceneIllustrationCacheService {
       await Future.wait(futures);
     }
 
-    debugPrint('场景插图预加载完成');
+    LoggerService.instance.i(
+      '场景插图预加载完成',
+      category: LogCategory.cache,
+      tags: ['illustration', 'preload', 'done'],
+    );
   }
 
   /// 删除指定图片的缓存
@@ -203,17 +257,29 @@ class SceneIllustrationCacheService {
       final cacheFile = File(cacheFilePath);
       if (await cacheFile.exists()) {
         await cacheFile.delete();
-        debugPrint('删除场景插图缓存: $filename');
+        LoggerService.instance.d(
+          '删除场景插图缓存',
+          category: LogCategory.cache,
+          tags: ['illustration', 'delete'],
+        );
       }
     } catch (e) {
-      debugPrint('删除场景插图缓存失败: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '删除场景插图缓存失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'delete', 'error'],
+      );
     }
   }
 
   /// 清理内存缓存
   void clearMemoryCache() {
     _memoryCache.clear();
-    debugPrint('场景插图内存缓存已清理');
+    LoggerService.instance.i(
+      '场景插图内存缓存已清理',
+      category: LogCategory.cache,
+      tags: ['illustration', 'memory', 'clear'],
+    );
   }
 
   /// 清理所有缓存
@@ -229,9 +295,17 @@ class SceneIllustrationCacheService {
         await _cacheDir!.create(recursive: true);
       }
 
-      debugPrint('场景插图所有缓存已清理');
+      LoggerService.instance.i(
+        '场景插图所有缓存已清理',
+        category: LogCategory.cache,
+        tags: ['illustration', 'clear', 'all'],
+      );
     } catch (e) {
-      debugPrint('清理场景插图缓存失败: $e');
+      LoggerService.instance.e(
+        '清理场景插图缓存失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'clear', 'error'],
+      );
     }
   }
 
@@ -257,10 +331,18 @@ class SceneIllustrationCacheService {
       }
 
       if (deletedCount > 0) {
-        debugPrint('清理了 $deletedCount 个过期的场景插图缓存文件');
+        LoggerService.instance.i(
+          '清理了 $deletedCount 个过期的场景插图缓存文件',
+          category: LogCategory.cache,
+          tags: ['illustration', 'cleanup', 'expired'],
+        );
       }
     } catch (e) {
-      debugPrint('清理过期缓存失败: $e');
+      LoggerService.instance.e(
+        '清理过期缓存失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'cleanup', 'error'],
+      );
     }
   }
 
@@ -290,7 +372,11 @@ class SceneIllustrationCacheService {
         'cacheDir': _cacheDir!.path,
       };
     } catch (e) {
-      debugPrint('获取缓存统计失败: $e');
+      LoggerService.instance.e(
+        '获取缓存统计失败',
+        category: LogCategory.cache,
+        tags: ['illustration', 'stats', 'error'],
+      );
       return {};
     }
   }

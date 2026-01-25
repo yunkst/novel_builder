@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -9,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 
 import '../models/app_version.dart';
+import 'logger_service.dart';
 import 'api_service_wrapper.dart';
 
 /// APP更新服务
@@ -78,7 +78,11 @@ class AppUpdateService {
 
       return null;
     } catch (e) {
-      debugPrint('检查更新失败: $e');
+      LoggerService.instance.e(
+        '检查更新失败',
+        category: LogCategory.general,
+        tags: ['update', 'check', 'error'],
+      );
       return null;
     }
   }
@@ -125,7 +129,11 @@ class AppUpdateService {
 
       return false;
     } catch (e) {
-      debugPrint('版本号比较失败: $e');
+      LoggerService.instance.e(
+        '版本号比较失败',
+        category: LogCategory.general,
+        tags: ['update', 'version', 'compare'],
+      );
       return false;
     }
   }
@@ -151,58 +159,118 @@ class AppUpdateService {
   }) async {
     Dio? dio;
     try {
-      debugPrint('🔄 [APP更新] 开始下载流程');
+      LoggerService.instance.i(
+        '开始下载流程',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'start'],
+      );
       onStatus?.call('准备下载...');
 
       // 请求存储权限
-      debugPrint('🔍 [APP更新] 检查存储权限');
+      LoggerService.instance.d(
+        '检查存储权限',
+        category: LogCategory.general,
+        tags: ['update', 'permission'],
+      );
       final storageStatus = await Permission.storage.request();
-      debugPrint('🔍 [APP更新] storage权限: $storageStatus');
+      LoggerService.instance.d(
+        'storage权限: $storageStatus',
+        category: LogCategory.general,
+        tags: ['update', 'permission', 'storage'],
+      );
       if (!storageStatus.isGranted) {
         final manageStatus = await Permission.manageExternalStorage.request();
-        debugPrint('🔍 [APP更新] manageExternalStorage权限: $manageStatus');
+        LoggerService.instance.d(
+          'manageExternalStorage权限: $manageStatus',
+          category: LogCategory.general,
+          tags: ['update', 'permission', 'manage'],
+        );
         if (!manageStatus.isGranted) {
-          debugPrint('❌ [APP更新] 存储权限被拒绝');
+          LoggerService.instance.w(
+            '存储权限被拒绝',
+            category: LogCategory.general,
+            tags: ['update', 'permission', 'denied'],
+          );
           onStatus?.call('需要存储权限');
           return false;
         }
       }
 
       // 获取下载目录
-      debugPrint('🔍 [APP更新] 获取下载目录');
+      LoggerService.instance.d(
+        '获取下载目录',
+        category: LogCategory.general,
+        tags: ['update', 'path'],
+      );
       final directory = await getApplicationDocumentsDirectory();
-      debugPrint('🔍 [APP更新] 下载目录: ${directory.path}');
+      LoggerService.instance.d(
+        '下载目录: ${directory.path}',
+        category: LogCategory.general,
+        tags: ['update', 'path'],
+      );
 
       // 确保 updates 目录存在
       final updatesDir = Directory('${directory.path}/updates');
       if (!await updatesDir.exists()) {
         await updatesDir.create(recursive: true);
-        debugPrint('🔍 [APP更新] 创建 updates 目录');
+        LoggerService.instance.d(
+          '创建 updates 目录',
+          category: LogCategory.general,
+          tags: ['update', 'directory'],
+        );
       }
 
       final fileName = 'novel_app_v${version.version}.apk';
       final filePath = '${updatesDir.path}/$fileName';
-      debugPrint('🔍 [APP更新] 文件路径: $filePath');
+      LoggerService.instance.d(
+        '文件路径: $filePath',
+        category: LogCategory.general,
+        tags: ['update', 'path'],
+      );
 
       // 构建完整的下载URL
-      debugPrint('🔍 [APP更新] 获取API配置');
+      LoggerService.instance.d(
+        '获取API配置',
+        category: LogCategory.general,
+        tags: ['update', 'api'],
+      );
       final baseUrl = await _apiWrapper.getHost();
-      debugPrint('🔍 [APP更新] baseUrl: $baseUrl');
-      debugPrint('🔍 [APP更新] version.downloadUrl: ${version.downloadUrl}');
+      LoggerService.instance.d(
+        'baseUrl: $baseUrl',
+        category: LogCategory.general,
+        tags: ['update', 'api'],
+      );
+      LoggerService.instance.d(
+        'version.downloadUrl: ${version.downloadUrl}',
+        category: LogCategory.general,
+        tags: ['update', 'api'],
+      );
 
       if (baseUrl == null || baseUrl.isEmpty) {
-        debugPrint('❌ [APP更新] baseUrl 配置不完整');
+        LoggerService.instance.e(
+          'baseUrl 配置不完整',
+          category: LogCategory.general,
+          tags: ['update', 'api', 'error'],
+        );
         onStatus?.call('API配置不完整');
         return false;
       }
 
       final downloadUrl = '$baseUrl${version.downloadUrl}';
-      debugPrint('🔍 [APP更新] 完整下载URL: $downloadUrl');
+      LoggerService.instance.d(
+        '完整下载URL: $downloadUrl',
+        category: LogCategory.general,
+        tags: ['update', 'url'],
+      );
 
       onStatus?.call('开始下载...');
 
       // 使用 Dio 下载文件
-      debugPrint('🚀 [APP更新] 开始执行下载');
+      LoggerService.instance.i(
+        '开始执行下载',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'execute'],
+      );
       dio = Dio();
 
       await dio.download(
@@ -211,25 +279,44 @@ class AppUpdateService {
         onReceiveProgress: (received, total) {
           if (total > 0) {
             final progress = received / total;
-            debugPrint('📥 [APP更新] 下载进度: ${(progress * 100).toStringAsFixed(0)}%');
+            LoggerService.instance.d(
+              '下载进度: ${(progress * 100).toStringAsFixed(0)}%',
+              category: LogCategory.general,
+              tags: ['update', 'download', 'progress'],
+            );
             onProgress?.call(progress);
           }
         },
       );
 
-      debugPrint('✅ [APP更新] 下载完成');
+      LoggerService.instance.i(
+        '下载完成',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'success'],
+      );
       onStatus?.call('下载完成');
       onProgress?.call(1.0);
 
       return true;
     } on DioException catch (e) {
-      debugPrint('❌ [APP更新] 下载失败: ${e.message}');
-      debugPrint('❌ [APP更新] 响应状态: ${e.response?.statusCode}');
+      LoggerService.instance.e(
+        '下载失败',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'error'],
+      );
+      LoggerService.instance.e(
+        '响应状态: ${e.response?.statusCode}',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'status'],
+      );
       onStatus?.call('下载失败: ${e.message}');
       return false;
     } catch (e, stackTrace) {
-      debugPrint('❌ [APP更新] 下载异常: $e');
-      debugPrint('❌ [APP更新] 堆栈: $stackTrace');
+      LoggerService.instance.e(
+        '下载异常',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'exception'],
+      );
       onStatus?.call('下载出错: $e');
       return false;
     } finally {
@@ -240,11 +327,19 @@ class AppUpdateService {
   /// 安装APK
   Future<bool> installUpdate(String version) async {
     try {
-      debugPrint('🔧 [APP更新] 开始安装APK');
+      LoggerService.instance.i(
+        '开始安装APK',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'start'],
+      );
       // 检查安装权限
       final hasPermission = await requestInstallPermission();
       if (!hasPermission) {
-        debugPrint('❌ [APP更新] 没有安装权限');
+        LoggerService.instance.w(
+          '没有安装权限',
+          category: LogCategory.general,
+          tags: ['update', 'install', 'permission'],
+        );
         return false;
       }
 
@@ -253,29 +348,52 @@ class AppUpdateService {
       // 获取应用文档目录
       final directory = await getApplicationDocumentsDirectory();
       final filePath = '${directory.path}/updates/$fileName';
-      debugPrint('🔍 [APP更新] APK文件路径: $filePath');
+      LoggerService.instance.d(
+        'APK文件路径: $filePath',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'path'],
+      );
 
       // 检查文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
-        debugPrint('❌ [APP更新] APK文件不存在: $filePath');
+        LoggerService.instance.e(
+          'APK文件不存在: $filePath',
+          category: LogCategory.general,
+          tags: ['update', 'install', 'notfound'],
+        );
         return false;
       }
 
       // 使用 MethodChannel 调用原生安装方法
-      debugPrint('🚀 [APP更新] 调用原生安装方法');
+      LoggerService.instance.i(
+        '调用原生安装方法',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'native'],
+      );
       final result = await _platformChannel.invokeMethod('installApk', {
         'filePath': filePath,
       });
 
       return result == true;
     } on PlatformException catch (e) {
-      debugPrint('❌ [APP更新] 安装失败: ${e.message}');
-      debugPrint('❌ [APP更新] 错误码: ${e.code}');
+      LoggerService.instance.e(
+        '安装失败',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'error'],
+      );
+      LoggerService.instance.e(
+        '错误码: ${e.code}',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'code'],
+      );
       return false;
     } catch (e, stackTrace) {
-      debugPrint('❌ [APP更新] 安装APK失败: $e');
-      debugPrint('❌ [APP更新] 堆栈: $stackTrace');
+      LoggerService.instance.e(
+        '安装APK失败',
+        category: LogCategory.general,
+        tags: ['update', 'install', 'exception'],
+      );
       return false;
     }
   }
