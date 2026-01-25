@@ -5,6 +5,7 @@ import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/character.dart';

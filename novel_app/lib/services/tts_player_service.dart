@@ -9,8 +9,7 @@ import 'tts_service.dart';
 import 'database_service.dart';
 import 'api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
-import '../core/logging/logger_service.dart';
-import '../core/logging/log_categories.dart';
+import 'logger_service.dart';
 
 /// TTS播放器状态
 enum TtsPlayerState {
