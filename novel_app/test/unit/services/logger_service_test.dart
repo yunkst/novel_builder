@@ -339,6 +339,8 @@ void main() {
           level: LogLevel.error,
           message: 'Test error',
           stackTrace: stack,
+          category: LogCategory.database,
+          tags: ['tag1', 'tag2'],
         );
 
         final map = entry.toMap();
@@ -346,6 +348,8 @@ void main() {
         expect(map['level'], LogLevel.error.index);
         expect(map['message'], 'Test error');
         expect(map['stackTrace'], stack);
+        expect(map['category'], LogCategory.database.index);
+        expect(map['tags'], ['tag1', 'tag2']);
       });
 
       test('LogEntry.fromMap()应正确反序列化', () {
@@ -356,6 +360,8 @@ void main() {
           'level': LogLevel.error.index,
           'message': 'Test error',
           'stackTrace': stack,
+          'category': LogCategory.ai.index,
+          'tags': ['ai', 'dify'],
         };
 
         final entry = LogEntry.fromMap(map);
@@ -363,6 +369,26 @@ void main() {
         expect(entry.level, LogLevel.error);
         expect(entry.message, 'Test error');
         expect(entry.stackTrace, stack);
+        expect(entry.category, LogCategory.ai);
+        expect(entry.tags, ['ai', 'dify']);
+      });
+
+      test('LogEntry.fromMap()应支持旧格式（向后兼容）', () {
+        final now = DateTime.now();
+        final map = {
+          'timestamp': now.millisecondsSinceEpoch,
+          'level': LogLevel.info.index,
+          'message': 'Old format log',
+          'stackTrace': null,
+          // 缺少category和tags字段
+        };
+
+        final entry = LogEntry.fromMap(map);
+        expect(entry.timestamp.millisecondsSinceEpoch, now.millisecondsSinceEpoch);
+        expect(entry.level, LogLevel.info);
+        expect(entry.message, 'Old format log');
+        expect(entry.category, LogCategory.general); // 默认值
+        expect(entry.tags, isEmpty); // 默认空数组
       });
 
       test('LogEntry序列化和反序列化应对称', () {
@@ -371,6 +397,8 @@ void main() {
           level: LogLevel.warning,
           message: 'Test warning',
           stackTrace: 'Warning stack',
+          category: LogCategory.network,
+          tags: ['http', 'timeout'],
         );
 
         final map = original.toMap();
@@ -381,6 +409,8 @@ void main() {
         expect(restored.level, original.level);
         expect(restored.message, original.message);
         expect(restored.stackTrace, original.stackTrace);
+        expect(restored.category, original.category);
+        expect(restored.tags, original.tags);
       });
 
       test('LogEntry.stackTrace为null时应正确处理', () {
@@ -389,6 +419,8 @@ void main() {
           'level': LogLevel.info.index,
           'message': 'Test',
           'stackTrace': null,
+          'category': LogCategory.general.index,
+          'tags': <String>[],
         };
 
         final entry = LogEntry.fromMap(map);
@@ -428,6 +460,137 @@ void main() {
         ]);
 
         expect(LoggerService.instance.logCount, 0);
+      });
+    });
+
+    group('日志分类功能', () {
+      setUp(() async {
+        await LoggerService.instance.init();
+      });
+
+      test('应能记录带分类的日志', () {
+        LoggerService.instance.i(
+          'Database query',
+          category: LogCategory.database,
+        );
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.length, 1);
+        expect(logs.last.category, LogCategory.database);
+      });
+
+      test('应能记录带标签的日志', () {
+        LoggerService.instance.i(
+          'Network request',
+          category: LogCategory.network,
+          tags: ['http', 'get'],
+        );
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.length, 1);
+        expect(logs.last.tags, ['http', 'get']);
+      });
+
+      test('默认分类应为general', () {
+        LoggerService.instance.i('Default category log');
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.last.category, LogCategory.general);
+      });
+
+      test('默认标签应为空数组', () {
+        LoggerService.instance.i('No tags log');
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.last.tags, isEmpty);
+      });
+
+      test('应能使用所有预定义分类', () {
+        LoggerService.instance.i('Database log', category: LogCategory.database);
+        LoggerService.instance.i('Network log', category: LogCategory.network);
+        LoggerService.instance.i('AI log', category: LogCategory.ai);
+        LoggerService.instance.i('UI log', category: LogCategory.ui);
+        LoggerService.instance.i('Cache log', category: LogCategory.cache);
+        LoggerService.instance.i('TTS log', category: LogCategory.tts);
+        LoggerService.instance.i('Character log', category: LogCategory.character);
+        LoggerService.instance.i('General log', category: LogCategory.general);
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.length, 8);
+        expect(logs[0].category, LogCategory.database);
+        expect(logs[1].category, LogCategory.network);
+        expect(logs[2].category, LogCategory.ai);
+        expect(logs[3].category, LogCategory.ui);
+        expect(logs[4].category, LogCategory.cache);
+        expect(logs[5].category, LogCategory.tts);
+        expect(logs[6].category, LogCategory.character);
+        expect(logs[7].category, LogCategory.general);
+      });
+
+      test('应能使用多个标签', () {
+        LoggerService.instance.w(
+          'Multiple tags',
+          category: LogCategory.ai,
+          tags: ['dify', 'stream', 'error'],
+        );
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.last.tags.length, 3);
+        expect(logs.last.tags, contains('dify'));
+        expect(logs.last.tags, contains('stream'));
+        expect(logs.last.tags, contains('error'));
+      });
+
+      test('带分类和标签的日志应能持久化', () async {
+        LoggerService.instance.i(
+          'Persistent categorized log',
+          category: LogCategory.tts,
+          tags: ['voice', 'playback'],
+        );
+
+        // 等待持久化完成
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // 创建新实例并验证
+        LoggerService.resetForTesting();
+        await LoggerService.instance.init();
+
+        final logs = LoggerService.instance.getLogs();
+        expect(logs.length, 1);
+        expect(logs.first.category, LogCategory.tts);
+        expect(logs.first.tags, ['voice', 'playback']);
+      });
+    });
+
+    group('LogCategory枚举', () {
+      test('LogCategory应有8个分类', () {
+        expect(LogCategory.values.length, 8);
+      });
+
+      test('所有分类应有正确的key和label', () {
+        expect(LogCategory.database.key, 'database');
+        expect(LogCategory.database.label, '数据库');
+
+        expect(LogCategory.network.key, 'network');
+        expect(LogCategory.network.label, '网络');
+
+        expect(LogCategory.ai.key, 'ai');
+        expect(LogCategory.ai.label, 'AI');
+
+        expect(LogCategory.ui.key, 'ui');
+        expect(LogCategory.ui.label, '界面');
+
+        expect(LogCategory.cache.key, 'cache');
+        expect(LogCategory.cache.label, '缓存');
+
+        expect(LogCategory.tts.key, 'tts');
+        expect(LogCategory.tts.label, '语音');
+
+        expect(LogCategory.character.key, 'character');
+        expect(LogCategory.character.label, '角色');
+
+        expect(LogCategory.general.key, 'general');
+        expect(LogCategory.general.label, '通用');
       });
     });
   });
