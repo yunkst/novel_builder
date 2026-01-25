@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -735,6 +736,60 @@ void main() {
         final stats = LoggerService.instance.getStatistics();
         expect(stats.total, 0);
         expect(stats.levelPercentage, isEmpty);
+      });
+    });
+
+    group('LoggerService 性能测试', () {
+      test('批量写入应减少持久化次数', () async {
+        await LoggerService.instance.init();
+        final prefs = await SharedPreferences.getInstance();
+
+        final stopwatch = Stopwatch()..start();
+
+        // 快速记录100条日志
+        for (int i = 0; i < 100; i++) {
+          LoggerService.instance.d('日志 $i');
+        }
+
+        // 等待批量写入完成
+        await LoggerService.instance.flush();
+
+        stopwatch.stop();
+
+        // 验证所有日志都被持久化
+        final logsJson = prefs.getString('app_logs');
+        expect(logsJson, isNotNull);
+
+        final List<dynamic> decoded = jsonDecode(logsJson!);
+        expect(decoded.length, 100);
+
+        print('批量写入100条日志耗时: ${stopwatch.elapsedMilliseconds}ms');
+
+        // 性能要求：100条日志写入应在1秒内完成
+        expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+
+        await LoggerService.instance.clearLogs();
+        LoggerService.resetForTesting();
+      });
+
+      test('flush() 应确保立即写入', () async {
+        await LoggerService.instance.init();
+        final prefs = await SharedPreferences.getInstance();
+
+        LoggerService.instance.d('测试日志');
+
+        // 立即刷新
+        await LoggerService.instance.flush();
+
+        // 验证已持久化
+        final logsJson = prefs.getString('app_logs');
+        expect(logsJson, isNotNull);
+
+        final List<dynamic> decoded = jsonDecode(logsJson!);
+        expect(decoded.length, 1);
+
+        await LoggerService.instance.clearLogs();
+        LoggerService.resetForTesting();
       });
     });
   });
