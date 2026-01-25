@@ -31,6 +31,11 @@ class SceneComfyUITask(Base):
         String(255), nullable=False, comment="ComfyUI 返回的 prompt_id"
     )
 
+    # 模型信息
+    model_name = Column(
+        String(100), nullable=True, comment="使用的模型名称"
+    )
+
     # 时间戳
     created_at = Column(
         DateTime(timezone=True), server_default="NOW()", comment="创建时间"
@@ -74,6 +79,11 @@ class SceneComfyUIImages(Base):
         nullable=False,
         default="[]",
         comment="生成的图片文件名列表（JSON 数组字符串）",
+    )
+
+    # 模型信息
+    model_name = Column(
+        String(100), nullable=True, comment="使用的模型名称"
     )
 
     # 状态标记

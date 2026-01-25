@@ -346,9 +346,15 @@ class ImageToVideoService:
                 # 兜底情况：如果没有prompt，使用user_input
                 original_prompt = user_input if user_input else "一个美丽的场景"
 
+            # 获取工作流配置中的 prompt_skill（I2V 可能有）
+            from ..workflow_config import WorkflowType
+
+            workflow = workflow_config_manager.get_i2v_workflow_by_title(model_name)
+            prompt_skill = workflow.prompt_skill if workflow else None
+
             logger.info(f"调用Dify生成视频提示词，原始提示词: {original_prompt}")
             video_prompt = await self.dify_client.generate_video_prompts(
-                prompts=original_prompt, user_input=user_input
+                prompts=original_prompt, user_input=user_input, prompt_skill=prompt_skill
             )
 
             if not video_prompt:

@@ -123,25 +123,32 @@ class ComfyUIVideoClient:
             )
 
             # 准备工作流数据
-            workflow_data = open(self.workflow_path, encoding="utf-8").read()
+            with open(self.workflow_path, encoding="utf-8") as f:
+                workflow_json = json.load(f)
 
-            # 替换图片占位符
-            workflow_data = workflow_data.replace(
-                "图片base64在这里替换", image_filename
-            )
+            # 创建工作流副本并修改
+            def replace_placeholders_in_workflow(workflow_dict):
+                """递归查找并替换工作流中的占位符"""
+                if isinstance(workflow_dict, dict):
+                    for key, value in workflow_dict.items():
+                        if isinstance(value, str) and value == "提示词在这里替换":
+                            workflow_dict[key] = video_prompt
+                        elif isinstance(value, str) and value == "在这替换随机数":
+                            workflow_dict[key] = random.randint(1, 999999999)
+                        elif isinstance(value, str) and value == "图片base64在这里替换":
+                            workflow_dict[key] = image_filename
+                        elif isinstance(value, (dict, list)):
+                            replace_placeholders_in_workflow(value)
+                elif isinstance(workflow_dict, list):
+                    for item in workflow_dict:
+                        replace_placeholders_in_workflow(item)
 
-            # 设置视频提示词
-            workflow_data = workflow_data.replace("提示词在这里替换", video_prompt)
-
-            # 设置随机种子
-            workflow_data = workflow_data.replace(
-                '"在这替换随机数"', str(random.randint(1, 999999999))
-            )
+            replace_placeholders_in_workflow(workflow_json)
 
             # 调用ComfyUI API
             response = requests.post(
                 f"{self.base_url}/prompt",
-                json={"prompt": json.loads(workflow_data)},
+                json={"prompt": workflow_json},
                 timeout=30,
             )
 

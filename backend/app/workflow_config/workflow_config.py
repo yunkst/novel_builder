@@ -24,6 +24,7 @@ class WorkflowInfo(BaseModel):
     model_type: str | None = Field(None, description="模型类型")
     width: int | None = Field(None, description="图片宽度（仅T2I）")
     height: int | None = Field(None, description="图片高度（仅T2I）")
+    prompt_skill: str | None = Field(None, description="AI提示词增强技巧")
 
 
 class WorkflowSettings(BaseModel):

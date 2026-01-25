@@ -412,20 +412,32 @@ class ComfyUIClient:
         if image_base64 and not image_base64.strip():
             raise ValueError("图片base64数据不能为空字符串")
 
-        # 将工作流JSON序列化为字符串
-        workflow_content = json.dumps(self.workflow_json, ensure_ascii=False)
+        # 创建工作流副本并修改（避免修改原始workflow_json）
+        workflow_json_copy = json.loads(json.dumps(self.workflow_json))
 
-        # 执行固定替换
-        workflow_content = workflow_content.replace("提示词在这里替换", prompt)
-        workflow_content = workflow_content.replace(
-            '"在这替换随机数"', str(random.randint(1, 999999))
-        )
+        # 在JSON对象中查找并替换提示词
+        def replace_prompt_in_workflow(workflow_dict):
+            """递归查找并替换工作流中的提示词占位符"""
+            if isinstance(workflow_dict, dict):
+                for key, value in workflow_dict.items():
+                    if isinstance(value, str) and value == "提示词在这里替换":
+                        workflow_dict[key] = prompt
+                    elif isinstance(value, str) and value == "在这替换随机数":
+                        workflow_dict[key] = random.randint(1, 999999)
+                    elif isinstance(value, str) and value == "图片base64在这里替换" and image_base64:
+                        workflow_dict[key] = image_base64
+                    elif isinstance(value, (dict, list)):
+                        replace_prompt_in_workflow(value)
+            elif isinstance(workflow_dict, list):
+                for item in workflow_dict:
+                    replace_prompt_in_workflow(item)
 
-        # 图生视频时替换图片base64数据
+        replace_prompt_in_workflow(workflow_json_copy)
+
+        # 序�列化为JSON字符串
+        workflow_content = json.dumps(workflow_json_copy, ensure_ascii=False)
+
         if image_base64:
-            workflow_content = workflow_content.replace(
-                "图片base64在这里替换", image_base64
-            )
             logger.info("已注入图片base64数据到工作流")
 
         logger.info(f"工作流准备完成，提示词长度: {len(prompt)}")
@@ -462,17 +474,30 @@ class ComfyUIClient:
         if not image_filename or not image_filename.strip():
             raise ValueError("图片文件名不能为空")
 
-        # 将工作流JSON序列化为字符串
-        workflow_content = json.dumps(self.workflow_json, ensure_ascii=False)
+        # 创建工作流副本并修改（避免修改原始workflow_json）
+        workflow_json_copy = json.loads(json.dumps(self.workflow_json))
 
-        # 执行固定替换
-        workflow_content = workflow_content.replace("提示词在这里替换", prompt)
-        workflow_content = workflow_content.replace(
-            '"在这替换随机数"', str(random.randint(1, 999999))
-        )
-        workflow_content = workflow_content.replace(
-            "图片base64在这里替换", image_filename
-        )
+        # 在JSON对象中查找并替换提示词
+        def replace_prompt_in_workflow(workflow_dict):
+            """递归查找并替换工作流中的提示词占位符"""
+            if isinstance(workflow_dict, dict):
+                for key, value in workflow_dict.items():
+                    if isinstance(value, str) and value == "提示词在这里替换":
+                        workflow_dict[key] = prompt
+                    elif isinstance(value, str) and value == "在这替换随机数":
+                        workflow_dict[key] = random.randint(1, 999999)
+                    elif isinstance(value, str) and value == "图片base64在这里替换":
+                        workflow_dict[key] = image_filename
+                    elif isinstance(value, (dict, list)):
+                        replace_prompt_in_workflow(value)
+            elif isinstance(workflow_dict, list):
+                for item in workflow_dict:
+                    replace_prompt_in_workflow(item)
+
+        replace_prompt_in_workflow(workflow_json_copy)
+
+        # 序列化为JSON字符串
+        workflow_content = json.dumps(workflow_json_copy, ensure_ascii=False)
 
         logger.info(
             f"图生视频工作流准备完成，提示词长度: {len(prompt)}, 图片: {image_filename}"
