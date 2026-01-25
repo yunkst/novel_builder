@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../core/logging/logger_service.dart';
-import '../core/logging/log_categories.dart';
+import 'logger_service.dart';
 
 /// 流式交互状态
 enum StreamStatus {
@@ -84,7 +83,7 @@ class StreamStateManager {
   void startStreaming() {
     LoggerService.instance.i(
       '开始流式交互',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['start'],
     );
     _updateState(StreamState(
@@ -97,7 +96,7 @@ class StreamStateManager {
   void startReceiving() {
     LoggerService.instance.i(
       '开始接收数据',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['receiving'],
     );
     _updateState(currentState.copyWith(
@@ -109,17 +108,17 @@ class StreamStateManager {
   void handleTextChunk(String text) {
     LoggerService.instance.d(
       'StreamStateManager.handleTextChunk',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'start'],
     );
     LoggerService.instance.d(
       '收到文本: "$text"',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'text'],
     );
     LoggerService.instance.d(
       '当前长度: ${currentState.characterCount}, 状态: ${currentState.status}',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'state'],
     );
 
@@ -128,7 +127,7 @@ class StreamStateManager {
 
     LoggerService.instance.d(
       '准备更新状态: $newCharacterCount 字符',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'update'],
     );
 
@@ -141,7 +140,7 @@ class StreamStateManager {
 
     LoggerService.instance.d(
       '状态更新完成',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'updated'],
     );
 
@@ -149,21 +148,21 @@ class StreamStateManager {
     scheduleMicrotask(() {
       LoggerService.instance.d(
         '调用 _onTextChunk 回调...',
-        category: LogCategory.stream,
+        category: LogCategory.general,
         tags: ['chunk', 'callback'],
       );
       try {
         _onTextChunk(text);
         LoggerService.instance.d(
           '_onTextChunk 回调完成',
-          category: LogCategory.stream,
+          category: LogCategory.general,
           tags: ['chunk', 'callback'],
         );
       } catch (e, stackTrace) {
         LoggerService.instance.e(
           '_onTextChunk 回调错误: $e',
           stackTrace: stackTrace.toString(),
-          category: LogCategory.stream,
+          category: LogCategory.general,
           tags: ['chunk', 'error'],
         );
       }
@@ -171,7 +170,7 @@ class StreamStateManager {
 
     LoggerService.instance.d(
       'StreamStateManager 文本块处理完成, 最终长度: $newCharacterCount, 最终状态: ${currentState.status}',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['chunk', 'complete'],
     );
   }
@@ -180,7 +179,7 @@ class StreamStateManager {
   void complete() {
     LoggerService.instance.i(
       '流式交互完成, 总字符数: ${currentState.characterCount}',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['complete', 'start'],
     );
     final startTime = currentState.startTime;
@@ -188,7 +187,7 @@ class StreamStateManager {
       final duration = DateTime.now().difference(startTime).inMilliseconds;
       LoggerService.instance.i(
         '耗时: ${duration}ms',
-        category: LogCategory.stream,
+        category: LogCategory.general,
         tags: ['complete', 'duration'],
       );
     }
@@ -196,7 +195,7 @@ class StreamStateManager {
     final completeContent = currentState.content;
     LoggerService.instance.i(
       '完整内容长度: ${completeContent.length}',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['complete', 'content'],
     );
 
@@ -208,13 +207,13 @@ class StreamStateManager {
     // 调用回调，传递完整内容
     LoggerService.instance.d(
       '调用 _onCompleted 回调，传递完整内容...',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['complete', 'callback'],
     );
     _onCompleted(completeContent);
     LoggerService.instance.i(
       '_onCompleted 回调完成',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['complete', 'callback'],
     );
   }
@@ -223,7 +222,7 @@ class StreamStateManager {
   void handleError(String error) {
     LoggerService.instance.e(
       '流式交互错误: $error',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['error'],
     );
 
@@ -241,7 +240,7 @@ class StreamStateManager {
   void reset() {
     LoggerService.instance.i(
       '重置流式状态',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['reset'],
     );
     _updateState(StreamState(status: StreamStatus.idle));
@@ -251,7 +250,7 @@ class StreamStateManager {
   void dispose() {
     LoggerService.instance.i(
       '释放流式状态管理器',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['dispose'],
     );
     _stateNotifier.dispose();
@@ -261,7 +260,7 @@ class StreamStateManager {
   void _updateState(StreamState newState) {
     LoggerService.instance.d(
       '状态更新: 旧状态=$currentState, 新状态=$newState',
-      category: LogCategory.stream,
+      category: LogCategory.general,
       tags: ['state', 'update'],
     );
 
