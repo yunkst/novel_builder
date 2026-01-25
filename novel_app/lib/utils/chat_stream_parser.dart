@@ -2,6 +2,41 @@ import '../models/chat_message.dart';
 import '../models/character.dart';
 import 'package:flutter/foundation.dart';
 
+/// 标签解析状态
+///
+/// 用于维护跨chunk的标签解析状态
+class TagParserState {
+  /// 部分标签内容（不包含 < 和 >）
+  String partialTag = '';
+
+  /// 是否正在解析标签
+  bool isInTag = false;
+
+  /// 是否是闭合标签（标签内容以 / 开头）
+  bool isClosingTag = false;
+
+  /// 重置状态
+  void reset() {
+    partialTag = '';
+    isInTag = false;
+    isClosingTag = false;
+  }
+
+  /// 复制状态
+  TagParserState copy() {
+    final state = TagParserState();
+    state.partialTag = partialTag;
+    state.isInTag = isInTag;
+    state.isClosingTag = isClosingTag;
+    return state;
+  }
+
+  @override
+  String toString() {
+    return 'TagParserState{isInTag: $isInTag, isClosingTag: $isClosingTag, partialTag: "$partialTag"}';
+  }
+}
+
 /// 解析结果
 class ParseResult {
   final List<ChatMessage> messages;
@@ -138,7 +173,7 @@ class ChatStreamParser {
     return buffer.toString().trim();
   }
 
-  /// 解析多角色流式文本
+  /// 解析多角色流式文本（支持跨chunk标签）
   ///
   /// 支持格式：
   /// - 纯文本 → 旁白
@@ -149,9 +184,116 @@ class ChatStreamParser {
   /// - [currentMessages] 当前消息列表
   /// - [allCharacters] 所有角色列表
   /// - [inDialogue] 当前是否在对话模式中
+  /// - [tagState] 标签解析状态（可选，用于跨chunk标签解析）
   ///
   /// 返回：更新后的消息列表和新的对话状态
   static ParseResult parseChunkForMultiRole(
+    String chunk,
+    List<ChatMessage> currentMessages,
+    List<Character> allCharacters,
+    bool inDialogue, {
+    TagParserState? tagState,
+  }) {
+    // 如果没有提供状态，创建新的
+    final state = tagState ?? TagParserState();
+
+    List<ChatMessage> messages = List.from(currentMessages);
+    Character? currentCharacter;
+
+    // 如果已经在对话中，找到当前角色
+    if (inDialogue && messages.isNotEmpty && messages.last.type == 'dialogue') {
+      currentCharacter = messages.last.character;
+    }
+
+    // 逐字符解析
+    for (int i = 0; i < chunk.length; i++) {
+      final char = chunk[i];
+
+      if (state.isInTag) {
+        // 正在解析标签中
+        if (char == '>') {
+          // 标签结束
+          state.isInTag = false;
+
+          // 解析标签
+          final tagContent = state.partialTag;
+          state.partialTag = '';
+
+          if (tagContent.startsWith('/')) {
+            // 闭合标签 </角色名>
+            final tagName = tagContent.substring(1);
+            if (currentCharacter?.name == tagName) {
+              // 移除最后的空对话消息（如果有）
+              if (messages.isNotEmpty &&
+                  messages.last.type == 'dialogue' &&
+                  messages.last.content.isEmpty) {
+                messages.removeLast();
+              }
+              currentCharacter = null; // 结束对话
+              debugPrint('✅ 闭合标签: $tagName');
+            } else {
+              // 标签不匹配，作为普通文本追加到当前消息
+              debugPrint('⚠️ 闭合标签不匹配: $tagName (当前: ${currentCharacter?.name})');
+              if (currentCharacter != null) {
+                _appendToDialogue(messages, '</$tagName>', currentCharacter);
+              } else {
+                _appendToNarration(messages, '</$tagName>');
+              }
+            }
+          } else {
+            // 开放标签 <角色名>
+            final character = _findCharacter(tagContent, allCharacters);
+            if (character != null) {
+              currentCharacter = character;
+              messages.add(ChatMessage.dialogue('', character));
+              debugPrint('🎭 开放标签: $tagContent -> ${character.name}');
+            } else {
+              // 未知角色，作为普通文本处理
+              debugPrint('❓ 未知角色标签: $tagContent');
+              _appendToNarration(messages, '<$tagContent>');
+            }
+          }
+        } else {
+          // 继续累积标签内容
+          state.partialTag += char;
+        }
+        continue;
+      }
+
+      // 不在标签中，检查是否是标签开始
+      if (char == '<') {
+        state.isInTag = true;
+        state.isClosingTag = false;
+        state.partialTag = '';
+        debugPrint('🏷️ 检测到标签开始');
+        continue;
+      }
+
+      // 处理普通字符
+      if (currentCharacter != null) {
+        // 角色对话模式
+        _appendToDialogue(messages, char, currentCharacter);
+      } else {
+        // 旁白模式
+        _appendToNarration(messages, char);
+      }
+    }
+
+    // 打印状态（如果有调试需求）
+    if (state.isInTag) {
+      debugPrint('⏳ 标签未完成: $state');
+    }
+
+    return ParseResult(
+      messages: messages,
+      inDialogue: currentCharacter != null,
+    );
+  }
+
+  /// 解析多角色流式文本（旧版本，保持向后兼容）
+  ///
+  /// 此方法不支持跨chunk标签，建议使用带tagState参数的版本
+  static ParseResult parseChunkForMultiRoleLegacy(
     String chunk,
     List<ChatMessage> currentMessages,
     List<Character> allCharacters,
