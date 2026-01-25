@@ -35,7 +35,11 @@ class DifyClient:
         }
 
     async def generate_prompts(
-        self, novel_content: str, roles: dict[str, Any] | None = None, require: str = ""
+        self,
+        novel_content: str,
+        roles: dict[str, Any] | None = None,
+        require: str = "",
+        prompt_skill: str | None = None,
     ) -> list[str]:
         """生成图片提示词.
 
@@ -43,6 +47,7 @@ class DifyClient:
             novel_content: 小说内容
             roles: 角色信息
             require: 配图要求
+            prompt_skill: AI提示词增强技巧（可选）
 
         Returns:
             生成的提示词结果列表
@@ -59,6 +64,10 @@ class DifyClient:
                 "response_mode": "blocking",
                 "user": "text2img_user",
             }
+
+            # 条件添加 prompt_skill
+            if prompt_skill:
+                request_data["inputs"]["prompt_skill"] = prompt_skill
 
             logger.info(f"调用Dify工作流: {self.api_url}")
 
@@ -146,11 +155,14 @@ class DifyClient:
             logger.error(f"解析Dify响应失败: {e}")
             return []
 
-    async def generate_photo_prompts(self, roles: list[RoleInfo]) -> list[str]:
+    async def generate_photo_prompts(
+        self, roles: list[RoleInfo], prompt_skill: str | None = None
+    ) -> list[str]:
         """生成人物卡拍照提示词.
 
         Args:
             roles: 人物卡设定信息列表 (RoleInfo 对象列表)
+            prompt_skill: AI提示词增强技巧（可选）
 
         Returns:
             生成的拍照提示词列表
@@ -169,6 +181,10 @@ class DifyClient:
                 "response_mode": "blocking",
                 "user": "role_card_user",
             }
+
+            # 条件添加 prompt_skill
+            if prompt_skill:
+                request_data["inputs"]["prompt_skill"] = prompt_skill
 
             logger.info(f"调用Dify拍照工作流: {self.api_url}")
 
@@ -266,13 +282,14 @@ class DifyClient:
             return []
 
     async def generate_scene_prompts(
-        self, chapters_content: str, roles: str
+        self, chapters_content: str, roles: str, prompt_skill: str | None = None
     ) -> str | None:
         """生成场面绘制提示词.
 
         Args:
             chapters_content: 章节内容
             roles: 格式化的角色信息字符串
+            prompt_skill: AI提示词增强技巧（可选）
 
         Returns:
             生成的提示词字符串，失败时返回None
@@ -287,6 +304,10 @@ class DifyClient:
                 "response_mode": "blocking",
                 "user": "scene_illustration_user",
             }
+
+            # 条件添加 prompt_skill
+            if prompt_skill:
+                request_data["inputs"]["prompt_skill"] = prompt_skill
 
             logger.info(f"调用Dify场面绘制工作流: {self.api_url}")
 
@@ -490,12 +511,15 @@ class DifyClient:
                 f"不支持的角色数据类型: {type(roles).__name__}，期望 List[RoleInfo] 或 Dict[str, Any]"
             )
 
-    async def generate_video_prompts(self, prompts: str, user_input: str) -> str | None:
+    async def generate_video_prompts(
+        self, prompts: str, user_input: str, prompt_skill: str | None = None
+    ) -> str | None:
         """生成图生视频提示词.
 
         Args:
             prompts: 图片对应的提示词内容
             user_input: 用户要求
+            prompt_skill: AI提示词增强技巧（可选）
 
         Returns:
             生成的视频提示词字符串，失败时返回None
@@ -510,6 +534,10 @@ class DifyClient:
                 "response_mode": "blocking",
                 "user": "image_to_video_user",
             }
+
+            # 条件添加 prompt_skill
+            if prompt_skill:
+                request_data["inputs"]["prompt_skill"] = prompt_skill
 
             logger.info(f"调用Dify图生视频工作流: {self.api_url}")
 

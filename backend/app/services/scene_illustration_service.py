@@ -16,6 +16,7 @@ from ..models.scene_comfyui_mapping import SceneComfyUIImages, SceneComfyUITask
 from ..models.scene_illustration import SceneIllustrationTask
 from ..schemas import (
     EnhancedSceneIllustrationRequest,
+    ImageWithModel,
     RoleInfo,
     SceneGalleryResponse,
     SceneIllustrationResponse,
@@ -198,8 +199,16 @@ class SceneIllustrationService:
         roles_text = self._restore_roles_from_json(request.to_roles_json())
         logger.info(f"任务 {request.task_id}: 格式化的角色信息:\n{roles_text}")
 
+        # 获取工作流配置中的 prompt_skill
+        from ..workflow_config import WorkflowType
+
+        workflow = workflow_config_manager.get_t2i_workflow_by_title(request.model_name)
+        prompt_skill = workflow.prompt_skill if workflow else None
+
         prompts = await self.dify_client.generate_scene_prompts(
-            chapters_content=request.chapters_content, roles=roles_text
+            chapters_content=request.chapters_content,
+            roles=roles_text,
+            prompt_skill=prompt_skill,
         )
 
         if not prompts:
@@ -340,7 +349,9 @@ class SceneIllustrationService:
             records_dict = {r.comfyui_prompt_id: r for r in image_records}
 
             # 3. 遍历处理每个 prompt_id
-            all_images: list[str] = []
+            from ..schemas import ImageWithModel
+
+            all_images: list[ImageWithModel] = []  # 使用明确类型
             for prompt_id in comfyui_prompt_ids:
                 logger.info(f"🔍 [DEBUG] 处理 prompt_id: {prompt_id}")
 
@@ -360,6 +371,10 @@ class SceneIllustrationService:
                 # 打印数据库状态
                 logger.info(f"  📊 [DEBUG] 数据库状态: status_fetched={image_record.status_fetched}, images_count={len(image_record.images) if image_record.images else 0}")
 
+                # 获取模型名称
+                model_name = image_record.model_name
+                logger.info(f"  🎨 [DEBUG] 模型名称: {model_name}")
+
                 # 解析图片列表（从JSON字符串）
                 try:
                     images_str: str = cast("str", image_record.images) or "[]"
@@ -374,7 +389,11 @@ class SceneIllustrationService:
                     logger.info(
                         f"  ✅ [DEBUG] 从数据库获取 {len(images_list)} 张图片，不需要重新获取"
                     )
-                    all_images.extend(images_list)
+                    # 为每张图片创建 ImageWithModel 对象
+                    for img_url in images_list:
+                        all_images.append(
+                            ImageWithModel(url=img_url, model_name=model_name)
+                        )
                 elif not image_record.status_fetched or (
                     image_record.status_fetched and not images_list
                 ):
@@ -401,15 +420,18 @@ class SceneIllustrationService:
                     db.commit()
                     logger.info(f"  💾 [DEBUG] 已更新数据库: status_fetched=True, images_count={len(images)}")
 
-                    all_images.extend(images)
+                    # 为每张图片创建 ImageWithModel 对象
+                    for img_url in images:
+                        all_images.append(
+                            ImageWithModel(url=img_url, model_name=model_name)
+                        )
                 else:
                     # 情况3：已获取过但无图片（ComfyUI 失败）
                     logger.warning(f"ComfyUI任务 {prompt_id}: 已获取过但无图片")
 
-            logger.info(f"🎯 [DEBUG] 最终返回 {len(all_images)} 张图片: {all_images}")
+            logger.info(f"🎯 [DEBUG] 最终返回 {len(all_images)} 张图片")
 
-            # 查询任务信息，获取模型名称和宽高
-            model_name = None
+            # 查询任务信息，获取模型宽高（作为默认值）
             model_width = None
             model_height = None
 
@@ -421,26 +443,25 @@ class SceneIllustrationService:
                 )
 
                 if task_record and task_record.model_name:
-                    model_name = task_record.model_name
                     # 从工作流配置中获取模型的宽高信息
                     workflow = workflow_config_manager.get_t2i_workflow_by_title(
-                        model_name
+                        task_record.model_name
                     )
                     if workflow:
                         model_width = workflow.width
                         model_height = workflow.height
                         logger.info(
-                            f"✅ 找到模型信息: {model_name}, 尺寸: {model_width}x{model_height}"
+                            f"✅ 找到模型信息: {task_record.model_name}, 尺寸: {model_width}x{model_height}"
                         )
                     else:
-                        logger.warning(f"⚠️ 未找到模型配置: {model_name}")
+                        logger.warning(f"⚠️ 未找到模型配置: {task_record.model_name}")
             except Exception as e:
                 logger.error(f"❌ 查询模型信息失败: {e}")
 
             return SceneGalleryResponse(
                 task_id=task_id,
-                images=all_images,
-                model_name=model_name,
+                images=all_images,  # 直接使用 list[ImageWithModel]
+                model_name=None,  # 已废弃，每张图片有自己的model_name
                 model_width=model_width,
                 model_height=model_height,
             )
@@ -757,13 +778,18 @@ class SceneIllustrationService:
             for prompt_id in comfyui_prompt_ids:
                 # 记录task_id到ComfyUI prompt_id的映射
                 task_mapping = SceneComfyUITask(
-                    task_id=request.task_id, comfyui_prompt_id=prompt_id
+                    task_id=request.task_id,
+                    comfyui_prompt_id=prompt_id,
+                    model_name=model_name,  # 记录使用的模型
                 )
                 db.add(task_mapping)
 
                 # 记录空的图片记录（标记为未获取）
                 image_record = SceneComfyUIImages(
-                    comfyui_prompt_id=prompt_id, images="[]", status_fetched=False
+                    comfyui_prompt_id=prompt_id,
+                    images="[]",
+                    status_fetched=False,
+                    model_name=model_name,  # 记录使用的模型
                 )
                 db.add(image_record)
 

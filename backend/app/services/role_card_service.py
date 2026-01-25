@@ -98,9 +98,15 @@ class RoleCardService:
             # 创建ComfyUI客户端
             comfyui_client = create_comfyui_client_for_model(selected_model)
 
+            # 获取工作流配置中的 prompt_skill
+            workflow = workflow_config_manager.get_t2i_workflow_by_title(selected_model)
+            prompt_skill = workflow.prompt_skill if workflow else None
+
             # 1. 调用Dify生成提示词
             logger.info(f"为角色 {request.role_id} 生成拍照提示词")
-            prompts = await self.dify_client.generate_photo_prompts(roles=request.roles)
+            prompts = await self.dify_client.generate_photo_prompts(
+                roles=request.roles, prompt_skill=prompt_skill
+            )
 
             if not prompts:
                 logger.warning("Dify未返回任何提示词")

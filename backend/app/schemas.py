@@ -345,12 +345,18 @@ class SceneIllustrationStatusResponse(BaseModel):
     progress_percentage: float = Field(..., description="进度百分比")
 
 
+class ImageWithModel(BaseModel):
+    """带模型信息的图片"""
+    url: str = Field(..., description="图片URL")
+    model_name: str | None = Field(None, description="使用的模型名称")
+
+
 class SceneGalleryResponse(BaseModel):
     """场面图片列表响应模式."""
 
     task_id: str = Field(..., description="场面绘制任务ID")
-    images: list[str] = Field(..., description="图片文件名列表")
-    model_name: str | None = Field(None, description="使用的模型名称")
+    images: list[ImageWithModel] = Field(..., description="图片列表（带模型信息）")
+    model_name: str | None = Field(None, description="原始任务使用的模型名称（已废弃）")
     model_width: int | None = Field(None, description="模型宽度")
     model_height: int | None = Field(None, description="模型高度")
 
