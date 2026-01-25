@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/logging/logger_service.dart';
+import '../core/logging/log_categories.dart';
 
 /// 流式交互状态
 enum StreamStatus {
@@ -80,7 +82,11 @@ class StreamStateManager {
 
   /// 开始流式交互
   void startStreaming() {
-    debugPrint('🚀 === 开始流式交互 ===');
+    LoggerService.instance.i(
+      '开始流式交互',
+      category: LogCategory.stream,
+      tags: ['start'],
+    );
     _updateState(StreamState(
       status: StreamStatus.connecting,
       startTime: DateTime.now(),
@@ -89,7 +95,11 @@ class StreamStateManager {
 
   /// 开始接收数据
   void startReceiving() {
-    debugPrint('📡 === 开始接收数据 ===');
+    LoggerService.instance.i(
+      '开始接收数据',
+      category: LogCategory.stream,
+      tags: ['receiving'],
+    );
     _updateState(currentState.copyWith(
       status: StreamStatus.streaming,
     ));
@@ -97,15 +107,30 @@ class StreamStateManager {
 
   /// 处理文本块 - 改进异步处理确保内容完整性
   void handleTextChunk(String text) {
-    debugPrint('📝 === StreamStateManager.handleTextChunk ===');
-    debugPrint('收到文本: "$text"');
-    debugPrint('当前长度: ${currentState.characterCount}');
-    debugPrint('状态: ${currentState.status}');
+    LoggerService.instance.d(
+      'StreamStateManager.handleTextChunk',
+      category: LogCategory.stream,
+      tags: ['chunk', 'start'],
+    );
+    LoggerService.instance.d(
+      '收到文本: "$text"',
+      category: LogCategory.stream,
+      tags: ['chunk', 'text'],
+    );
+    LoggerService.instance.d(
+      '当前长度: ${currentState.characterCount}, 状态: ${currentState.status}',
+      category: LogCategory.stream,
+      tags: ['chunk', 'state'],
+    );
 
     final newContent = currentState.content + text;
     final newCharacterCount = newContent.length;
 
-    debugPrint('准备更新状态: $newCharacterCount 字符');
+    LoggerService.instance.d(
+      '准备更新状态: $newCharacterCount 字符',
+      category: LogCategory.stream,
+      tags: ['chunk', 'update'],
+    );
 
     // 使用 microtask 确保状态更新在下一个事件循环中执行
     _updateState(currentState.copyWith(
@@ -114,37 +139,66 @@ class StreamStateManager {
       characterCount: newCharacterCount,
     ));
 
-    debugPrint('状态更新完成');
+    LoggerService.instance.d(
+      '状态更新完成',
+      category: LogCategory.stream,
+      tags: ['chunk', 'updated'],
+    );
 
     // 使用 microtask 确保回调在状态更新后执行
     scheduleMicrotask(() {
-      debugPrint('调用 _onTextChunk 回调...');
+      LoggerService.instance.d(
+        '调用 _onTextChunk 回调...',
+        category: LogCategory.stream,
+        tags: ['chunk', 'callback'],
+      );
       try {
         _onTextChunk(text);
-        debugPrint('_onTextChunk 回调完成');
-      } catch (e) {
-        debugPrint('❌ _onTextChunk 回调错误: $e');
+        LoggerService.instance.d(
+          '_onTextChunk 回调完成',
+          category: LogCategory.stream,
+          tags: ['chunk', 'callback'],
+        );
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '_onTextChunk 回调错误: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.stream,
+          tags: ['chunk', 'error'],
+        );
       }
     });
 
-    debugPrint('✅ StreamStateManager 文本块处理完成');
-    debugPrint('最终长度: $newCharacterCount');
-    debugPrint('最终状态: ${currentState.status}');
-    debugPrint('================================');
+    LoggerService.instance.d(
+      'StreamStateManager 文本块处理完成, 最终长度: $newCharacterCount, 最终状态: ${currentState.status}',
+      category: LogCategory.stream,
+      tags: ['chunk', 'complete'],
+    );
   }
 
   /// 完成流式交互 - 传递完整内容
   void complete() {
-    debugPrint('✅ === 流式交互完成 ===');
-    debugPrint('总字符数: ${currentState.characterCount}');
+    LoggerService.instance.i(
+      '流式交互完成, 总字符数: ${currentState.characterCount}',
+      category: LogCategory.stream,
+      tags: ['complete', 'start'],
+    );
     final startTime = currentState.startTime;
     if (startTime != null) {
-      debugPrint(
-          '耗时: ${DateTime.now().difference(startTime).inMilliseconds}ms');
+      final duration = DateTime.now().difference(startTime).inMilliseconds;
+      LoggerService.instance.i(
+        '耗时: ${duration}ms',
+        category: LogCategory.stream,
+        tags: ['complete', 'duration'],
+      );
     }
 
     final completeContent = currentState.content;
-    debugPrint('完整内容长度: ${completeContent.length}');
+    LoggerService.instance.i(
+      '完整内容长度: ${completeContent.length}',
+      category: LogCategory.stream,
+      tags: ['complete', 'content'],
+    );
 
     _updateState(currentState.copyWith(
       status: StreamStatus.completed,
@@ -152,15 +206,26 @@ class StreamStateManager {
     ));
 
     // 调用回调，传递完整内容
-    debugPrint('调用 _onCompleted 回调，传递完整内容...');
+    LoggerService.instance.d(
+      '调用 _onCompleted 回调，传递完整内容...',
+      category: LogCategory.stream,
+      tags: ['complete', 'callback'],
+    );
     _onCompleted(completeContent);
-    debugPrint('_onCompleted 回调完成');
+    LoggerService.instance.i(
+      '_onCompleted 回调完成',
+      category: LogCategory.stream,
+      tags: ['complete', 'callback'],
+    );
   }
 
   /// 处理错误
   void handleError(String error) {
-    debugPrint('❌ === 流式交互错误 ===');
-    debugPrint('错误: $error');
+    LoggerService.instance.e(
+      '流式交互错误: $error',
+      category: LogCategory.stream,
+      tags: ['error'],
+    );
 
     _updateState(currentState.copyWith(
       status: StreamStatus.error,
@@ -174,22 +239,31 @@ class StreamStateManager {
 
   /// 重置状态
   void reset() {
-    debugPrint('🔄 === 重置流式状态 ===');
+    LoggerService.instance.i(
+      '重置流式状态',
+      category: LogCategory.stream,
+      tags: ['reset'],
+    );
     _updateState(StreamState(status: StreamStatus.idle));
   }
 
   /// 释放资源
   void dispose() {
-    debugPrint('🗑️ === 释放流式状态管理器 ===');
+    LoggerService.instance.i(
+      '释放流式状态管理器',
+      category: LogCategory.stream,
+      tags: ['dispose'],
+    );
     _stateNotifier.dispose();
   }
 
   /// 更新状态（内部方法）
   void _updateState(StreamState newState) {
-    debugPrint('🔄 === 状态更新 ===');
-    debugPrint('旧状态: $currentState');
-    debugPrint('新状态: $newState');
-    debugPrint('==================');
+    LoggerService.instance.d(
+      '状态更新: 旧状态=$currentState, 新状态=$newState',
+      category: LogCategory.stream,
+      tags: ['state', 'update'],
+    );
 
     _stateNotifier.value = newState;
   }
