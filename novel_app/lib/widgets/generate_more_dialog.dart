@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'model_selector.dart';
 
 /// 生成更多图片数量选择对话框
 class GenerateMoreDialog extends StatefulWidget {
-  final Function(int, String?) onConfirm; // 回调函数：(数量, 模型名称)，模型名称传null使用原图模型
-  final String? apiType; // 't2i' 或 'i2v'（保留用于未来扩展）
-  final String? defaultModel; // 默认模型（保留用于未来扩展）
+  final Function(int, String?) onConfirm; // 回调函数：(数量, 模型名称)
+  final String? apiType; // 't2i' 或 'i2v'
+  final String? defaultModel; // 默认模型
+  final String? originalModel; // 原始任务使用的模型（用于标记）
 
   const GenerateMoreDialog({
     super.key,
     required this.onConfirm,
     this.apiType = 't2i',
     this.defaultModel,
+    this.originalModel,
   });
 
   @override
@@ -21,6 +24,14 @@ class GenerateMoreDialog extends StatefulWidget {
 class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
   final TextEditingController _controller = TextEditingController(text: '3');
   final List<int> _quickOptions = [1, 3, 5, 10];
+  String? _selectedModel; // 用户选择的模型
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果提供了原始模型，默认选中它
+    _selectedModel = widget.originalModel;
+  }
 
   @override
   void dispose() {
@@ -45,7 +56,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
     final count = int.tryParse(text);
 
     debugPrint('解析的数量: $count');
-    debugPrint('使用原始任务的模型（自动）');
+    debugPrint('选择的模型: $_selectedModel');
 
     if (count == null || count <= 0) {
       debugPrint('❌ 数量验证失败');
@@ -66,11 +77,9 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
         return;
       }
 
-      // 只调用回调，不要在这里调用 Navigator.pop
-      // onConfirm 回调会负责关闭对话框并返回数据
-      // 传递 null 作为 modelName，后端会自动使用原始任务的模型
-      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=null (使用原图模型)');
-      widget.onConfirm(count, null);
+      // 调用回调，传递用户选择的模型（可能为null，后端会使用原图模型）
+      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=$_selectedModel');
+      widget.onConfirm(count, _selectedModel);
       debugPrint('✅ onConfirm 回调调用完成');
     } catch (e, stackTrace) {
       debugPrint('❌❌❌ onConfirm 回调异常 ❌❌❌');
@@ -85,6 +94,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
       backgroundColor: Colors.transparent,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
+        constraints: const BoxConstraints(maxHeight: 600), // 限制最大高度
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
@@ -98,10 +108,11 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
           ],
         ),
         child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView( // 添加滚动支持
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               // 标题
               Row(
                 children: [
@@ -169,6 +180,24 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
                   suffix: const Text('张'),
                 ),
               ),
+              const SizedBox(height: 20),
+
+              // 模型选择
+              Text(
+                '选择模型：',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              ModelSelector(
+                apiType: widget.apiType ?? 't2i',
+                selectedModel: _selectedModel,
+                onModelChanged: (model) {
+                  setState(() {
+                    _selectedModel = model;
+                  });
+                },
+                hintText: '请选择生成模型',
+              ),
               const SizedBox(height: 24),
 
               // 按钮
@@ -202,6 +231,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
                 ],
               ),
             ],
+          ),
           ),
         ),
       ),

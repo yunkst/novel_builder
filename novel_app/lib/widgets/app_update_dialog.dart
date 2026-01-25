@@ -81,14 +81,17 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               ),
               const SizedBox(height: 4),
               Container(
+                constraints: const BoxConstraints(maxHeight: 150),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  widget.version.changelog!,
-                  style: theme.textTheme.bodySmall,
+                child: SingleChildScrollView(
+                  child: Text(
+                    widget.version.changelog!,
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

@@ -73,16 +73,18 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         });
       } else {
         final novels = await _databaseService.getBookshelf();
-        final Map<String, Map<String, int>> statsMap = {};
-        for (final n in novels) {
-          final stats = await _databaseService.getNovelCacheStats(n.url);
-          statsMap[n.url] = stats;
-        }
+        // 不再批量统计缓存状态，避免性能问题
+        // 缓存状态将在用户点击阅读时按需检查
+        // final Map<String, Map<String, int>> statsMap = {};
+        // for (final n in novels) {
+        //   final stats = await _databaseService.getNovelCacheStats(n.url);
+        //   statsMap[n.url] = stats;
+        // }
 
         setState(() {
           _bookshelf = novels;
           _isLoading = false;
-          _progress.addAll(statsMap);
+          // _progress.addAll(statsMap);
         });
       }
     } catch (e) {
@@ -264,100 +266,6 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     }
   }
 
-  // 显示背景设定编辑对话框
-  Future<void> _showBackgroundSettingDialog(Novel novel) async {
-    final controller =
-        TextEditingController(text: novel.backgroundSetting ?? '');
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.edit_note, color: Colors.blue),
-            const SizedBox(width: 8),
-            Text('${novel.title} - 背景设定'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '为小说设定世界观、背景、人物关系等信息，这些信息将用于AI生成内容',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: '背景设定',
-                hintText: '例如：这是一个魔法与科技并存的世界，主角拥有特殊能力...',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              maxLines: 6,
-              minLines: 3,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '提示：详细的背景设定有助于AI生成更贴合世界观的内容',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          if (novel.backgroundSetting != null &&
-              novel.backgroundSetting!.isNotEmpty)
-            TextButton(
-              onPressed: () {
-                controller.clear();
-              },
-              child: const Text('清空'),
-            ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, {'backgroundSetting': controller.text});
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      await _databaseService.updateBackgroundSetting(
-          novel.url,
-          result['backgroundSetting']!.isEmpty
-              ? null
-              : result['backgroundSetting']);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('背景设定已更新'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-      _loadBookshelf(); // 重新加载书架以更新显示
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -414,6 +322,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                     itemBuilder: (context, index) {
                       final novel = _bookshelf[index];
                       final stats = _progress[novel.url];
+                      // 注意：不再批量统计缓存状态，避免性能问题
+                      // 进度条UI将依赖预加载服务的实时更新（如果有）
                       final cached =
                           stats != null ? (stats['cachedChapters'] ?? 0) : 0;
                       final total =
@@ -515,12 +425,6 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                   ],
-                                  if (novel.backgroundSetting != null &&
-                                      novel.backgroundSetting!.isNotEmpty) ...[
-                                    const SizedBox(width: 8),
-                                    Icon(Icons.edit_note,
-                                        size: 16, color: Colors.blue),
-                                  ],
                                 ],
                               ),
                               const SizedBox(height: 6),
@@ -540,21 +444,9 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                             onSelected: (value) {
                               if (value == 'delete') {
                                 _removeFromBookshelf(novel);
-                              } else if (value == 'edit_background') {
-                                _showBackgroundSettingDialog(novel);
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit_background',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit_note, color: Colors.blue),
-                                    SizedBox(width: 8),
-                                    Text('背景设定'),
-                                  ],
-                                ),
-                              ),
                               const PopupMenuItem(
                                 value: 'delete',
                                 child: Row(

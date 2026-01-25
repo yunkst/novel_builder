@@ -38,7 +38,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   bool _isLoading = false;
   bool _hasError = false;
   String? _errorMessage;
-  List<String> _images = [];
+  List<String> _images = [];  // 图片URL列表
+  Map<int, String?> _imageModels = {};  // 索引 -> 模型名映射
   int _currentIndex = 0; // 当前页面索引
 
   // 删除相关状态
@@ -121,15 +122,32 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         // 安全解析图片列表
         final rawImages = galleryData['images'];
         List<String> images = [];
+        Map<int, String?> imageModels = {};
+
         if (rawImages is List) {
-          images = rawImages
-              .map((e) => e?.toString() ?? '')
-              .where((s) => s.isNotEmpty)
-              .toList();
+          for (var i = 0; i < rawImages.length; i++) {
+            final item = rawImages[i];
+            if (item is Map) {
+              // 新格式：{'url': 'xxx', 'model_name': 'xxx'}
+              final url = item['url']?.toString() ?? '';
+              if (url.isNotEmpty) {
+                images.add(url);
+                imageModels[i] = item['model_name']?.toString();
+              }
+            } else if (item is String) {
+              // 兼容旧格式：纯字符串
+              final url = item.toString();
+              if (url.isNotEmpty) {
+                images.add(url);
+                imageModels[i] = null;
+              }
+            }
+          }
         }
 
         setState(() {
           _images = images;
+          _imageModels = imageModels;
           _modelWidth = galleryData['model_width'];
           _modelHeight = galleryData['model_height'];
           _isLoading = false;
@@ -545,6 +563,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   Widget _buildPageImage(String imageUrl, double containerHeight) {
     // 从imageUrl中提取文件名
     final fileName = imageUrl.split('/').last;
+    // 获取当前图片的模型名称
+    final modelName = _imageModels[_currentIndex];
 
     return Stack(
       children: [
@@ -566,6 +586,28 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             ),
           ),
         ),
+
+        // 左上角模型标签
+        if (modelName != null && modelName.isNotEmpty)
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                modelName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
 
         // 右上角删除按钮
         Positioned(

@@ -44,35 +44,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final latestVersion = await updateService.checkForUpdate(forceCheck: true);
 
-      if (mounted) {
-        setState(() {
-          _isCheckingUpdate = false;
-        });
+      if (!mounted) return;
 
-        if (latestVersion != null) {
-          // 比较当前版本和最新版本
-          final currentInfo = await PackageInfo.fromPlatform();
-          final isNewVersion = updateService.hasNewVersion(
-            currentInfo.version,
-            latestVersion.version,
+      setState(() {
+        _isCheckingUpdate = false;
+      });
+
+      if (latestVersion != null) {
+        // 比较当前版本和最新版本
+        final currentInfo = await PackageInfo.fromPlatform();
+        final isNewVersion = updateService.hasNewVersion(
+          currentInfo.version,
+          latestVersion.version,
+        );
+
+        // 显示更新对话框
+        if (mounted) {
+          await showAppUpdateDialog(
+            context,
+            version: latestVersion,
+            updateService: updateService,
+            isNewVersion: isNewVersion,
           );
-
-          // 显示更新对话框
-          if (context.mounted) {
-            await showAppUpdateDialog(
-              context,
-              version: latestVersion,
-              updateService: updateService,
-              isNewVersion: isNewVersion,
-            );
-          }
-        } else {
-          // 显示已是最新版本
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('当前已是最新版本')),
-            );
-          }
+        }
+      } else {
+        // 显示已是最新版本
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('当前已是最新版本')),
+          );
         }
       }
     } catch (e) {
@@ -80,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _isCheckingUpdate = false;
         });
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('检查更新失败: $e')),
           );

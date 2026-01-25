@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/ai_accompaniment_settings.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
@@ -16,8 +17,10 @@ import '../widgets/chapter_list/chapter_list_header.dart';
 import '../widgets/chapter_list/chapter_list_item.dart';
 import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
+import '../widgets/ai_accompaniment_settings_dialog.dart';
 import '../dialogs/chapter_list/delete_chapter_dialog.dart';
 import 'insert_chapter_screen.dart';
+import 'background_setting_screen.dart';
 import '../controllers/chapter_list/bookshelf_manager.dart';
 import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
@@ -71,6 +74,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   // 重排相关状态
   bool _isReorderingMode = false;
 
+  // AI伴读设置状态
+  AiAccompanimentSettings? _aiSettings;
+
   // 生成章节相关的状态
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<String> _generatedContentNotifier =
@@ -101,6 +107,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     _initApi();
     _checkBookshelfStatus();
     _loadLastReadChapter();
+    _loadAiSettings(); // 加载AI伴读设置
 
     // 监听预加载进度
     _listenToPreloadProgress();
@@ -176,8 +183,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         });
         _updateTotalPages();
         _scrollToLastReadChapter();
-        // 初始加载所有章节的缓存状态
-        _loadCachedStatus();
+        // 不再批量加载缓存状态，避免性能问题
+        // 缓存状态将在用户点击阅读时按需检查
+        // _loadCachedStatus();
         return;
       }
 
@@ -306,6 +314,46 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     } catch (e) {
       debugPrint('获取上次阅读章节失败: $e');
     }
+  }
+
+  /// 加载AI伴读设置
+  Future<void> _loadAiSettings() async {
+    try {
+      final settings =
+          await _databaseService.getAiAccompanimentSettings(widget.novel.url);
+      if (mounted) {
+        setState(() {
+          _aiSettings = settings;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载AI伴读设置失败: $e');
+    }
+  }
+
+  /// 打开AI伴读设置对话框
+  void _openAiSettings() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AiAccompanimentSettingsDialog(
+        initialSettings: _aiSettings ?? const AiAccompanimentSettings(),
+        onSave: (settings) async {
+          await _databaseService.updateAiAccompanimentSettings(
+              widget.novel.url, settings);
+          if (mounted) {
+            setState(() {
+              _aiSettings = settings;
+            });
+            // 显示保存成功提示
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('AI伴读设置已保存')),
+              );
+            }
+          }
+        },
+      ),
+    );
   }
 
   void _scrollToLastReadChapter() {
@@ -747,6 +795,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _buildSearchButton(),
           _buildCharacterButton(),
           _buildOutlineButton(),
+          _buildBackgroundSettingButton(),
           _buildPopupMenu(),
         ],
       ),
@@ -794,6 +843,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       _buildPaginationControl(),
                   ],
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAiSettings,
+        tooltip: 'AI伴读设置',
+        child: const Icon(Icons.psychology_outlined),
+      ),
     );
   }
 
@@ -877,6 +931,24 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         );
       },
       tooltip: '大纲管理',
+    );
+  }
+
+  // 构建背景设定按钮
+  Widget _buildBackgroundSettingButton() {
+    return IconButton(
+      icon: const Icon(Icons.info_outline),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BackgroundSettingScreen(
+              novel: widget.novel,
+            ),
+          ),
+        );
+      },
+      tooltip: '背景设定',
     );
   }
 
