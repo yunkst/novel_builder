@@ -37,6 +37,38 @@ enum LogLevel {
   }
 }
 
+/// 日志分类
+enum LogCategory {
+  /// 数据库操作
+  database('database', '数据库'),
+
+  /// 网络请求
+  network('network', '网络'),
+
+  /// AI功能
+  ai('ai', 'AI'),
+
+  /// 界面交互
+  ui('ui', '界面'),
+
+  /// 缓存操作
+  cache('cache', '缓存'),
+
+  /// 语音合成
+  tts('tts', '语音'),
+
+  /// 角色管理
+  character('character', '角色'),
+
+  /// 通用（默认）
+  general('general', '通用');
+
+  final String key;
+  final String label;
+
+  const LogCategory(this.key, this.label);
+}
+
 /// 日志条目模型
 ///
 /// 用于存储单条日志记录，包含时间戳、级别、消息和堆栈信息
@@ -53,11 +85,19 @@ class LogEntry {
   /// 堆栈信息（可选）
   final String? stackTrace;
 
+  /// 日志分类
+  final LogCategory category;
+
+  /// 日志标签
+  final List<String> tags;
+
   const LogEntry({
     required this.timestamp,
     required this.level,
     required this.message,
     this.stackTrace,
+    this.category = LogCategory.general,
+    this.tags = const [],
   });
 
   /// 转换为Map用于序列化
@@ -67,6 +107,8 @@ class LogEntry {
       'level': level.index,
       'message': message,
       'stackTrace': stackTrace,
+      'category': category.index,
+      'tags': tags,
     };
   }
 
@@ -77,6 +119,14 @@ class LogEntry {
       level: LogLevel.values[map['level'] as int],
       message: map['message'] as String,
       stackTrace: map['stackTrace'] as String?,
+      // 向后兼容：如果没有category字段，默认为general
+      category: map.containsKey('category')
+          ? LogCategory.values[map['category'] as int]
+          : LogCategory.general,
+      // 向后兼容：如果没有tags字段，默认为空数组
+      tags: map.containsKey('tags')
+          ? (map['tags'] as List<dynamic>).cast<String>()
+          : const [],
     );
   }
 
@@ -181,35 +231,37 @@ class LoggerService {
   }
 
   /// 记录调试级别日志
-  void d(String message, {String? stackTrace}) {
-    _log(message, LogLevel.debug, stackTrace);
+  void d(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+    _log(message, LogLevel.debug, stackTrace, category, tags);
   }
 
   /// 记录信息级别日志
-  void i(String message, {String? stackTrace}) {
-    _log(message, LogLevel.info, stackTrace);
+  void i(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+    _log(message, LogLevel.info, stackTrace, category, tags);
   }
 
   /// 记录警告级别日志
-  void w(String message, {String? stackTrace}) {
-    _log(message, LogLevel.warning, stackTrace);
+  void w(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+    _log(message, LogLevel.warning, stackTrace, category, tags);
   }
 
   /// 记录错误级别日志
-  void e(String message, {String? stackTrace}) {
-    _log(message, LogLevel.error, stackTrace);
+  void e(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+    _log(message, LogLevel.error, stackTrace, category, tags);
   }
 
   /// 记录日志（内部方法）
   ///
   /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
   /// 添加后会触发持久化和状态通知。
-  void _log(String message, LogLevel level, [String? stackTrace]) {
+  void _log(String message, LogLevel level, [String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []]) {
     final entry = LogEntry(
       timestamp: DateTime.now(),
       level: level,
       message: message,
       stackTrace: stackTrace,
+      category: category,
+      tags: tags,
     );
 
     _logs.add(entry);
