@@ -193,6 +193,28 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
     }
   }
 
+  /// 获取日志分类的颜色
+  Color _getCategoryColor(LogCategory category) {
+    switch (category) {
+      case LogCategory.database:
+        return Colors.purple;
+      case LogCategory.network:
+        return Colors.cyan;
+      case LogCategory.ai:
+        return Colors.deepOrange;
+      case LogCategory.ui:
+        return Colors.green;
+      case LogCategory.cache:
+        return Colors.orange;
+      case LogCategory.tts:
+        return Colors.teal;
+      case LogCategory.character:
+        return Colors.pink;
+      case LogCategory.general:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -331,12 +353,44 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                             size: 18,
                             color: _getLevelColor(log.level),
                           ),
-                          title: Text(
-                            log.message,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                            ),
+                          title: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 消息内容
+                              Text(
+                                log.message,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              // 分类标签
+                              Wrap(
+                                spacing: 4,
+                                children: [
+                                  Chip(
+                                    label: Text(
+                                      log.category.label,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    backgroundColor: _getCategoryColor(log.category).withValues(alpha: 0.2),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  ...log.tags.map((tag) => Chip(
+                                    label: Text(
+                                      tag,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                  )),
+                                ],
+                              ),
+                            ],
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
