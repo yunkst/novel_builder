@@ -5,8 +5,7 @@ import '../models/character_update.dart';
 import '../services/dify_service.dart';
 import '../services/database_service.dart';
 import '../utils/character_matcher.dart';
-import '../core/logging/logger_service.dart';
-import '../core/logging/log_categories.dart';
+import 'logger_service.dart';
 
 /// CharacterCardService
 ///

@@ -88,7 +88,7 @@ class TypeSafeParser {
     final value = map[key];
     if (value == null) return null;
     if (value is Map<String, dynamic>) return value;
-    if (value is Map) return Map<String, dynamic>.from(value as Map);
+    if (value is Map) return Map<String, dynamic>.from(value);
     return null;
   }
 

@@ -145,7 +145,10 @@ class InvalidMarkupCleaner {
 
         debugPrint('✅ 数据库已更新');
       } else {
-        debugPrint('ℹ️ 章节内容无需清理');
+        // 减少日志噪音：只在调试模式下输出
+        if (kDebugMode) {
+          // debugPrint('ℹ️ 章节内容无需清理'); // 已注释，避免大量日志
+        }
       }
 
       return cleanedContent;

@@ -4,8 +4,7 @@ import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/media_markup_parser.dart';
-import '../core/logging/logger_service.dart';
-import '../core/logging/log_categories.dart';
+import 'logger_service.dart';
 import 'package:novel_api/novel_api.dart';
 
 class SceneIllustrationService {
