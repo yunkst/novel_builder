@@ -19,6 +19,7 @@ export 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
 export 'package:novel_api/src/model/http_validation_error.dart';
 export 'package:novel_api/src/model/image_to_video_request.dart';
 export 'package:novel_api/src/model/image_to_video_response.dart';
+export 'package:novel_api/src/model/image_with_model.dart';
 export 'package:novel_api/src/model/models_response.dart';
 export 'package:novel_api/src/model/novel.dart';
 export 'package:novel_api/src/model/role_card_generate_request.dart';

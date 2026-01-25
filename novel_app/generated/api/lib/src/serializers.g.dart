@@ -14,6 +14,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(HTTPValidationError.serializer)
       ..add(ImageToVideoRequest.serializer)
       ..add(ImageToVideoResponse.serializer)
+      ..add(ImageWithModel.serializer)
       ..add(ModelsResponse.serializer)
       ..add(Novel.serializer)
       ..add(RoleCardGenerateRequest.serializer)
@@ -32,14 +33,14 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(VideoStatusResponse.serializer)
       ..add(WorkflowInfo.serializer)
       ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(RoleInfo)]),
-          () => ListBuilder<RoleInfo>())
+          const FullType(BuiltList, const [const FullType(ImageWithModel)]),
+          () => ListBuilder<ImageWithModel>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(RoleInfo)]),
           () => ListBuilder<RoleInfo>())
       ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(String)]),
-          () => ListBuilder<String>())
+          const FullType(BuiltList, const [const FullType(RoleInfo)]),
+          () => ListBuilder<RoleInfo>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())

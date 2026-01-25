@@ -13,8 +13,8 @@ void main() {
       // TODO
     });
 
-    // 图片文件名列表
-    // BuiltList<String> images
+    // 图片列表（带模型信息）
+    // BuiltList<ImageWithModel> images
     test('to test the property `images`', () async {
       // TODO
     });

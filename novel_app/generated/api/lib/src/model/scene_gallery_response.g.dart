@@ -10,7 +10,7 @@ class _$SceneGalleryResponse extends SceneGalleryResponse {
   @override
   final String taskId;
   @override
-  final BuiltList<String> images;
+  final BuiltList<ImageWithModel> images;
   @override
   final String? modelName;
   @override
@@ -81,9 +81,10 @@ class SceneGalleryResponseBuilder
   String? get taskId => _$this._taskId;
   set taskId(String? taskId) => _$this._taskId = taskId;
 
-  ListBuilder<String>? _images;
-  ListBuilder<String> get images => _$this._images ??= ListBuilder<String>();
-  set images(ListBuilder<String>? images) => _$this._images = images;
+  ListBuilder<ImageWithModel>? _images;
+  ListBuilder<ImageWithModel> get images =>
+      _$this._images ??= ListBuilder<ImageWithModel>();
+  set images(ListBuilder<ImageWithModel>? images) => _$this._images = images;
 
   String? _modelName;
   String? get modelName => _$this._modelName;
