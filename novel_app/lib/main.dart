@@ -19,10 +19,12 @@ void main() async {
   FlutterError.onError = (FlutterErrorDetails details) {
     final stackTrace = details.stack?.toString() ?? '';
     final error = 'Flutter Error: ${details.exception}';
-    LoggerService.instance.e(error, stackTrace: stackTrace);
-    debugPrint('=== $error ===');
-    debugPrint('Stack trace: $stackTrace');
-    debugPrint('Library: ${details.library}');
+    LoggerService.instance.e(
+      error,
+      stackTrace: stackTrace,
+      category: LogCategory.general,
+      tags: ['flutter-error', 'crash'],
+    );
   };
 
   // 设置平台错误处理
@@ -47,22 +49,24 @@ void main() async {
     try {
       await ApiServiceProvider.initialize();
     } catch (e, stackTrace) {
-      LoggerService.instance.e('API Service Error: $e', stackTrace: stackTrace.toString());
-      debugPrint('=== API Service Error ===');
-      debugPrint('Exception: $e');
-      debugPrint('Stack trace: $stackTrace');
-      debugPrint('========================');
+      LoggerService.instance.e(
+        'API Service Error: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['api', 'service', 'error'],
+      );
 
       // 继续运行，用户可以在设置中配置
     }
 
     runApp(const NovelReaderApp());
   }, (error, stackTrace) {
-    LoggerService.instance.e('Unhandled Async Error: $error', stackTrace: stackTrace.toString());
-    debugPrint('=== Unhandled Async Error ===');
-    debugPrint('Error: $error');
-    debugPrint('Stack trace: $stackTrace');
-    debugPrint('==============================');
+    LoggerService.instance.e(
+      'Unhandled Async Error: $error',
+      stackTrace: stackTrace.toString(),
+      category: LogCategory.general,
+      tags: ['async', 'unhandled', 'error'],
+    );
   });
 }
 
@@ -93,11 +97,9 @@ class NovelReaderApp extends StatelessWidget {
           LoggerService.instance.e(
             'Widget Error: ${errorDetails.exception}',
             stackTrace: stackTrace,
+            category: LogCategory.ui,
+            tags: ['widget', 'error', 'crash'],
           );
-          debugPrint('=== Widget Error ===');
-          debugPrint('Exception: ${errorDetails.exception}');
-          debugPrint('Stack: $stackTrace');
-          debugPrint('==================');
           return MaterialApp(
             home: Scaffold(
               appBar: AppBar(title: const Text('Error Occurred')),
@@ -166,7 +168,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    debugPrint('HomePage: 初始化并添加生命周期监听器');
+    LoggerService.instance.i(
+      'HomePage: 初始化并添加生命周期监听器',
+      category: LogCategory.ui,
+      tags: ['lifecycle', 'init'],
+    );
   }
 
   @override
@@ -180,7 +186,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     // 应用退出时清理所有视频控制器
     VideoCacheManager.disposeAll();
-    debugPrint('HomePage: 移除生命周期监听器并清理资源');
+    LoggerService.instance.i(
+      'HomePage: 移除生命周期监听器并清理资源',
+      category: LogCategory.ui,
+      tags: ['lifecycle', 'dispose', 'cleanup'],
+    );
     super.dispose();
   }
 
@@ -188,32 +198,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    debugPrint('HomePage: 应用生命周期状态变化: $state');
+    LoggerService.instance.i(
+      'HomePage: 应用生命周期状态变化: $state',
+      category: LogCategory.ui,
+      tags: ['lifecycle', 'state-change'],
+    );
 
     switch (state) {
       case AppLifecycleState.paused:
         // 应用进入后台时，暂停所有视频播放
         VideoCacheManager.pauseAllExcept(null);
-        debugPrint('HomePage: 应用进入后台，暂停所有视频播放');
         break;
       case AppLifecycleState.resumed:
         // 应用恢复前台时，不自动恢复播放，让可见性检测器处理
-        debugPrint('HomePage: 应用恢复前台');
         break;
       case AppLifecycleState.inactive:
         // 应用不活跃时，暂停所有视频播放
         VideoCacheManager.pauseAllExcept(null);
-        debugPrint('HomePage: 应用变为不活跃，暂停所有视频播放');
         break;
       case AppLifecycleState.detached:
         // 应用分离时，清理所有视频控制器
         VideoCacheManager.disposeAll();
-        debugPrint('HomePage: 应用分离，清理所有视频控制器');
         break;
       case AppLifecycleState.hidden:
         // 应用隐藏时，暂停所有视频播放
         VideoCacheManager.pauseAllExcept(null);
-        debugPrint('HomePage: 应用隐藏，暂停所有视频播放');
         break;
     }
   }
