@@ -9,6 +9,8 @@ import 'tts_service.dart';
 import 'database_service.dart';
 import 'api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
+import '../core/logging/logger_service.dart';
+import '../core/logging/log_categories.dart';
 
 /// TTS播放器状态
 enum TtsPlayerState {
@@ -125,9 +127,18 @@ class TtsPlayerService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _speechRate = prefs.getDouble('tts_speech_rate') ?? 1.0;
       _pitch = prefs.getDouble('tts_pitch') ?? 1.0;
-      debugPrint('[TtsPlayerService] 加载设置: 语速=$_speechRate, 音调=$_pitch');
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 加载设置失败: $e');
+      LoggerService.instance.i(
+        '加载设置: 语速=$_speechRate, 音调=$_pitch',
+        category: LogCategory.tts,
+        tags: ['settings', 'load'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载设置失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['settings', 'error'],
+      );
     }
   }
 
@@ -137,6 +148,7 @@ class TtsPlayerService extends ChangeNotifier {
     required List<Chapter> chapters,
     required Chapter startChapter,
     String? startContent,
+    int startParagraphIndex = 0,
   }) async {
     try {
       _setState(TtsPlayerState.loading);
@@ -171,17 +183,27 @@ class TtsPlayerService extends ChangeNotifier {
 
       // 分割段落
       _paragraphs = _parseParagraphs(content);
-      _currentParagraphIndex = 0;
+      _currentParagraphIndex = startParagraphIndex.clamp(0, _paragraphs.length - 1);
 
       // 应用保存的语速和音调
       await _tts.setSpeechRate(_speechRate);
       await _tts.setPitch(_pitch);
 
       _setState(TtsPlayerState.idle);
-      debugPrint('[TtsPlayerService] 初始化完成: ${startChapter.title}');
+      LoggerService.instance.i(
+        '初始化完成: ${startChapter.title}',
+        category: LogCategory.tts,
+        tags: ['playback', 'initialize', 'success'],
+      );
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setError('初始化失败: $e');
+      LoggerService.instance.e(
+        '初始化异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'initialize', 'error'],
+      );
       return false;
     }
   }
@@ -212,11 +234,21 @@ class TtsPlayerService extends ChangeNotifier {
       _paragraphs = _parseParagraphs(content);
       _currentParagraphIndex = 0;
 
-      debugPrint('[TtsPlayerService] 跳转到章节: ${targetChapter.title}');
+      LoggerService.instance.i(
+        '跳转到章节: ${targetChapter.title}',
+        category: LogCategory.tts,
+        tags: ['playback', 'jump', 'chapter'],
+      );
       notifyListeners();
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setError('跳转章节失败: $e');
+      LoggerService.instance.e(
+        '跳转章节异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'jump', 'error'],
+      );
       return false;
     }
   }
@@ -232,8 +264,14 @@ class TtsPlayerService extends ChangeNotifier {
         await _tts.speak(currentParagraph!);
         await _saveProgress();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setError('播放失败: $e');
+      LoggerService.instance.e(
+        '播放异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'error'],
+      );
     }
   }
 
@@ -245,8 +283,13 @@ class TtsPlayerService extends ChangeNotifier {
       await _tts.pause();
       _setState(TtsPlayerState.paused);
       await _saveProgress();
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 暂停失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '暂停失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'pause', 'error'],
+      );
     }
   }
 
@@ -257,8 +300,14 @@ class TtsPlayerService extends ChangeNotifier {
     try {
       await _tts.resume();
       _setState(TtsPlayerState.playing);
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setError('继续播放失败: $e');
+      LoggerService.instance.e(
+        '继续播放异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'resume', 'error'],
+      );
     }
   }
 
@@ -267,8 +316,13 @@ class TtsPlayerService extends ChangeNotifier {
     try {
       await _tts.stop();
       _setState(TtsPlayerState.idle);
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 停止失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '停止失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'stop', 'error'],
+      );
     }
   }
 
@@ -282,9 +336,19 @@ class TtsPlayerService extends ChangeNotifier {
 
       _currentParagraphIndex = index;
       notifyListeners();
-      debugPrint('[TtsPlayerService] 跳转到段落: $index');
-    } catch (e) {
+      LoggerService.instance.i(
+        '跳转到段落: $index',
+        category: LogCategory.tts,
+        tags: ['playback', 'jump', 'paragraph'],
+      );
+    } catch (e, stackTrace) {
       _setError('跳转段落失败: $e');
+      LoggerService.instance.e(
+        '跳转段落异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'jump', 'error'],
+      );
     }
   }
 
@@ -334,11 +398,19 @@ class TtsPlayerService extends ChangeNotifier {
 
   /// 段落完成处理
   Future<void> _onParagraphComplete() async {
-    debugPrint('[TtsPlayerService] 📢 段落完成回调触发: $_currentParagraphIndex/${_paragraphs.length}');
+    LoggerService.instance.d(
+      '段落完成回调触发: $_currentParagraphIndex/${_paragraphs.length}',
+      category: LogCategory.tts,
+      tags: ['playback', 'paragraph', 'complete'],
+    );
 
     // 移动到下一段
     _currentParagraphIndex++;
-    debugPrint('[TtsPlayerService] ⏭️ 切换到段落: $_currentParagraphIndex');
+    LoggerService.instance.d(
+      '切换到段落: $_currentParagraphIndex',
+      category: LogCategory.tts,
+      tags: ['playback', 'paragraph', 'next'],
+    );
     notifyListeners();
 
     // 检查是否还有段落
@@ -346,7 +418,14 @@ class TtsPlayerService extends ChangeNotifier {
       // 继续播放下一段
       if (_autoPlayNext) {
         final nextParagraph = _paragraphs[_currentParagraphIndex];
-        debugPrint('[TtsPlayerService] 🎤 准备朗读下一段: ${nextParagraph.substring(0, nextParagraph.length > 30 ? 30 : nextParagraph.length)}...');
+        final preview = nextParagraph.length > 30
+            ? nextParagraph.substring(0, 30)
+            : nextParagraph;
+        LoggerService.instance.d(
+          '准备朗读下一段: $preview...',
+          category: LogCategory.tts,
+          tags: ['playback', 'paragraph', 'next'],
+        );
 
         // 短暂延迟后继续播放
         await Future.delayed(const Duration(milliseconds: 100));
@@ -358,26 +437,46 @@ class TtsPlayerService extends ChangeNotifier {
 
         await _tts.speak(nextParagraph);
         await _saveProgress();
-        debugPrint('[TtsPlayerService] ✅ 已启动下一段朗读');
+        LoggerService.instance.d(
+          '已启动下一段朗读',
+          category: LogCategory.tts,
+          tags: ['playback', 'paragraph', 'started'],
+        );
       } else {
-        debugPrint('[TtsPlayerService] ⏸️ 自动播放已关闭，暂停');
+        LoggerService.instance.d(
+          '自动播放已关闭，暂停',
+          category: LogCategory.tts,
+          tags: ['playback', 'autopause'],
+        );
         _setState(TtsPlayerState.paused);
       }
     } else {
       // 章节完成，尝试加载下一章
-      debugPrint('[TtsPlayerService] 📖 章节所有段落已完成');
+      LoggerService.instance.i(
+        '章节所有段落已完成',
+        category: LogCategory.tts,
+        tags: ['playback', 'chapter', 'complete'],
+      );
       await _onChapterComplete();
     }
   }
 
   /// 章节完成处理
   Future<void> _onChapterComplete() async {
-    debugPrint('[TtsPlayerService] 章节完成: ${_currentChapter?.title}');
+    LoggerService.instance.i(
+      '章节完成: ${_currentChapter?.title}',
+      category: LogCategory.tts,
+      tags: ['playback', 'chapter', 'complete'],
+    );
 
     // 优先检查定时完成
     if (_timerConfig.enabled) {
       final completed = _timerConfig.getCompletedChapters(_currentChapterIndex);
-      debugPrint('[TtsPlayerService] ⏰ 定时检查: 已完成$completed章/${_timerConfig.chapterCount}章');
+      LoggerService.instance.d(
+        '定时检查: 已完成$completed章/${_timerConfig.chapterCount}章',
+        category: LogCategory.tts,
+        tags: ['timer', 'check'],
+      );
 
       if (completed >= _timerConfig.chapterCount) {
         await _onTimerComplete();
@@ -407,7 +506,11 @@ class TtsPlayerService extends ChangeNotifier {
       final nextIndex = _currentChapterIndex + 1;
       final nextChapter = _allChapters[nextIndex];
 
-      debugPrint('[TtsPlayerService] 加载下一章: ${nextChapter.title}');
+      LoggerService.instance.i(
+        '加载下一章: ${nextChapter.title}',
+        category: LogCategory.tts,
+        tags: ['playback', 'chapter', 'load'],
+      );
 
       // 加载内容
       final content = await _loadChapterContent(nextChapter);
@@ -429,8 +532,14 @@ class TtsPlayerService extends ChangeNotifier {
       await _tts.speak(_paragraphs[0]);
       _setState(TtsPlayerState.playing);
       await _saveProgress();
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setError('加载下一章失败: $e');
+      LoggerService.instance.e(
+        '加载下一章异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['playback', 'chapter', 'error'],
+      );
     }
   }
 
@@ -440,20 +549,33 @@ class TtsPlayerService extends ChangeNotifier {
       // 先尝试从数据库获取
       final cached = await _database.getChapterContent(chapter.url);
       if (cached.isNotEmpty) {
-        debugPrint('[TtsPlayerService] 使用缓存: ${chapter.title}');
+        LoggerService.instance.d(
+          '使用缓存: ${chapter.title}',
+          category: LogCategory.tts,
+          tags: ['cache', 'hit'],
+        );
         return cached;
       }
 
       // 从API获取
-      debugPrint('[TtsPlayerService] 从API加载: ${chapter.title}');
+      LoggerService.instance.d(
+        '从API加载: ${chapter.title}',
+        category: LogCategory.tts,
+        tags: ['api', 'load'],
+      );
       final content = await _api.getChapterContent(chapter.url);
 
       // 缓存到数据库
       await _database.updateChapterContent(chapter.url, content);
 
       return content;
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 加载章节内容失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载章节内容失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['content', 'error'],
+      );
       return null;
     }
   }
@@ -480,7 +602,11 @@ class TtsPlayerService extends ChangeNotifier {
     if (_state != newState) {
       _state = newState;
       notifyListeners();
-      debugPrint('[TtsPlayerService] 状态变更: $newState');
+      LoggerService.instance.d(
+        '状态变更: $newState',
+        category: LogCategory.tts,
+        tags: ['state', 'change'],
+      );
     }
   }
 
@@ -488,7 +614,11 @@ class TtsPlayerService extends ChangeNotifier {
   void _setError(String error) {
     _errorMessage = error;
     _setState(TtsPlayerState.error);
-    debugPrint('[TtsPlayerService] 错误: $error');
+    LoggerService.instance.e(
+      '错误: $error',
+      category: LogCategory.tts,
+      tags: ['error'],
+    );
   }
 
   /// 保存进度
@@ -510,9 +640,18 @@ class TtsPlayerService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_progressKey, progress.toJsonString());
 
-      debugPrint('[TtsPlayerService] 保存进度: $progress');
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 保存进度失败: $e');
+      LoggerService.instance.d(
+        '保存进度: $progress',
+        category: LogCategory.tts,
+        tags: ['progress', 'save'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '保存进度失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['progress', 'error'],
+      );
     }
   }
 
@@ -521,9 +660,18 @@ class TtsPlayerService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_progressKey);
-      debugPrint('[TtsPlayerService] 清除进度');
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 清除进度失败: $e');
+      LoggerService.instance.i(
+        '清除进度',
+        category: LogCategory.tts,
+        tags: ['progress', 'clear'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '清除进度失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['progress', 'error'],
+      );
     }
   }
 
@@ -539,15 +687,28 @@ class TtsPlayerService extends ChangeNotifier {
 
       // 检查是否过期
       if (progress.isExpired()) {
-        debugPrint('[TtsPlayerService] 进度已过期，已清除');
+        LoggerService.instance.i(
+          '进度已过期，已清除',
+          category: LogCategory.tts,
+          tags: ['progress', 'expired'],
+        );
         await prefs.remove(_progressKey);
         return null;
       }
 
-      debugPrint('[TtsPlayerService] 加载进度: $progress');
+      LoggerService.instance.i(
+        '加载进度: $progress',
+        category: LogCategory.tts,
+        tags: ['progress', 'load'],
+      );
       return progress;
-    } catch (e) {
-      debugPrint('[TtsPlayerService] 加载进度失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载进度失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.tts,
+        tags: ['progress', 'error'],
+      );
       return null;
     }
   }
@@ -575,7 +736,11 @@ class TtsPlayerService extends ChangeNotifier {
   /// [chapterCount] 读多少章后停止（1-99）
   Future<void> setTimer(int chapterCount) async {
     if (chapterCount < 1 || chapterCount > 99) {
-      debugPrint('[TtsPlayerService] ⚠️ 无效的章节数: $chapterCount');
+      LoggerService.instance.w(
+        '无效的章节数: $chapterCount',
+        category: LogCategory.tts,
+        tags: ['timer', 'invalid'],
+      );
       return;
     }
 
@@ -586,25 +751,41 @@ class TtsPlayerService extends ChangeNotifier {
     );
 
     notifyListeners();
-    debugPrint('[TtsPlayerService] ⏰ 已设置定时: 从第${_currentChapterIndex + 1}章开始，读$chapterCount章后停止');
+    LoggerService.instance.i(
+      '已设置定时: 从第${_currentChapterIndex + 1}章开始，读$chapterCount章后停止',
+      category: LogCategory.tts,
+      tags: ['timer', 'set'],
+    );
   }
 
   /// 取消定时
   Future<void> cancelTimer() async {
     if (!_timerConfig.enabled) {
-      debugPrint('[TtsPlayerService] 定时未启用，无需取消');
+      LoggerService.instance.d(
+        '定时未启用，无需取消',
+        category: LogCategory.tts,
+        tags: ['timer', 'cancel'],
+      );
       return;
     }
 
     _timerConfig.reset();
     notifyListeners();
-    debugPrint('[TtsPlayerService] ⏰ 已取消定时');
+    LoggerService.instance.i(
+      '已取消定时',
+      category: LogCategory.tts,
+      tags: ['timer', 'cancel'],
+    );
   }
 
   /// 定时完成处理
   Future<void> _onTimerComplete() async {
     final completed = _timerConfig.getCompletedChapters(_currentChapterIndex);
-    debugPrint('[TtsPlayerService] ⏰ 定时完成: 已完成$completed章');
+    LoggerService.instance.i(
+      '定时完成: 已完成$completed章',
+      category: LogCategory.tts,
+      tags: ['timer', 'complete'],
+    );
 
     // 暂停播放
     await pause();
