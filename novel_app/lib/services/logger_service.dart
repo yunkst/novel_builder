@@ -159,6 +159,15 @@ class LogEntry {
 /// // 按级别过滤
 /// final errors = LoggerService.instance.getLogsByLevel(LogLevel.error);
 ///
+/// // 搜索日志
+/// final results = LoggerService.instance.searchLogs('API', category: LogCategory.network);
+///
+/// // 按分类获取
+/// final dbLogs = LoggerService.instance.getLogsByCategory(LogCategory.database);
+///
+/// // 按标签获取
+/// final apiLogs = LoggerService.instance.getLogsByTag('api');
+///
 /// // 清空日志
 /// await LoggerService.instance.clearLogs();
 ///
@@ -327,6 +336,67 @@ class LoggerService {
       return getLogs();
     }
     return _logs.where((log) => log.level == level).toList();
+  }
+
+  /// 按关键词搜索日志
+  ///
+  /// 在日志消息和标签中搜索包含关键词的日志。
+  ///
+  /// 参数：
+  /// - [query] 搜索关键词，空字符串返回所有符合条件的日志
+  /// - [category] 可选的分类过滤器，null表示不过滤分类
+  ///
+  /// 返回匹配的日志列表（新列表，不修改内部状态）
+  ///
+  /// 搜索特性：
+  /// - 不区分大小写
+  /// - 同时匹配消息内容和标签
+  /// - 支持与分类的组合过滤
+  List<LogEntry> searchLogs(String query, {LogCategory? category}) {
+    Iterable<LogEntry> results = _logs;
+
+    // 先按分类过滤
+    if (category != null) {
+      results = results.where((log) => log.category == category);
+    }
+
+    // 再按关键词搜索
+    if (query.isNotEmpty) {
+      final lowerQuery = query.toLowerCase();
+      results = results.where((log) {
+        // 检查消息内容
+        if (log.message.toLowerCase().contains(lowerQuery)) {
+          return true;
+        }
+        // 检查标签
+        return log.tags.any((tag) => tag.toLowerCase().contains(lowerQuery));
+      });
+    }
+
+    return results.toList();
+  }
+
+  /// 按分类获取日志
+  ///
+  /// 参数：
+  /// - [category] 日志分类
+  ///
+  /// 返回该分类的所有日志
+  List<LogEntry> getLogsByCategory(LogCategory category) {
+    return _logs.where((log) => log.category == category).toList();
+  }
+
+  /// 按标签获取日志
+  ///
+  /// 参数：
+  /// - [tag] 标签名称（不区分大小写）
+  ///
+  /// 返回包含该标签的所有日志
+  List<LogEntry> getLogsByTag(String tag) {
+    final lowerTag = tag.toLowerCase();
+    return _logs.where((log) {
+      return log.tags.any((t) => t.toLowerCase() == lowerTag);
+    }).toList();
   }
 
   /// 清空所有日志

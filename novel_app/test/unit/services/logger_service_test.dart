@@ -593,5 +593,97 @@ void main() {
         expect(LogCategory.general.label, '通用');
       });
     });
+
+    group('LoggerService 搜索功能', () {
+      setUp(() async {
+        await LoggerService.instance.init();
+
+        // 准备测试数据
+        LoggerService.instance.i('数据库连接成功', category: LogCategory.database, tags: ['connection']);
+        LoggerService.instance.e('网络请求超时', category: LogCategory.network, tags: ['timeout', 'api']);
+        LoggerService.instance.e('网络连接失败', category: LogCategory.network, tags: ['connection']);
+        LoggerService.instance.w('API限流', category: LogCategory.network, tags: ['api', 'rate-limit']);
+        LoggerService.instance.d('缓存清理完成', category: LogCategory.cache);
+      });
+
+      tearDown(() async {
+        await LoggerService.instance.clearLogs();
+        LoggerService.resetForTesting();
+      });
+
+      test('应能按关键词搜索消息', () {
+        final results = LoggerService.instance.searchLogs('网络');
+        expect(results, hasLength(2)); // "网络请求超时" 和 "网络连接失败"
+      });
+
+      test('应能按分类搜索', () {
+        final results = LoggerService.instance.searchLogs('', category: LogCategory.network);
+        expect(results, hasLength(3)); // 3条 network 分类日志
+        expect(results.every((log) => log.category == LogCategory.network), isTrue);
+      });
+
+      test('应能按标签搜索', () {
+        final results = LoggerService.instance.getLogsByTag('api');
+        expect(results, hasLength(2)); // "网络请求超时" 和 "API限流"
+      });
+
+      test('应支持关键词和分类组合搜索', () {
+        // "API"会匹配"网络请求超时"的标签(api)和"API限流"的消息
+        // 但只在network分类中，所以两条都匹配
+        final results = LoggerService.instance.searchLogs('API', category: LogCategory.network);
+        expect(results, hasLength(2)); // "网络请求超时"(标签api) + "API限流"(消息)
+      });
+
+      test('空关键词应返回所有日志', () {
+        final results = LoggerService.instance.searchLogs('');
+        expect(results.length, greaterThan(0));
+      });
+
+      test('搜索应不区分大小写', () {
+        // 搜索"网络"的小写或大写，都应该匹配中文"网络"
+        final results = LoggerService.instance.searchLogs('网络');
+        expect(results, isNotEmpty); // 应匹配"网络请求超时"和"网络连接失败"
+      });
+
+      test('搜索英文标签应不区分大小写', () {
+        // 搜索"API"的不同大小写形式
+        final results1 = LoggerService.instance.searchLogs('API');
+        final results2 = LoggerService.instance.searchLogs('api');
+        final results3 = LoggerService.instance.searchLogs('Api');
+
+        expect(results1, isNotEmpty);
+        expect(results2, isNotEmpty);
+        expect(results3, isNotEmpty);
+        expect(results1.length, equals(results2.length));
+        expect(results2.length, equals(results3.length));
+      });
+
+      test('应能按分类获取日志', () {
+        final results = LoggerService.instance.getLogsByCategory(LogCategory.network);
+        expect(results, hasLength(3));
+        expect(results.every((log) => log.category == LogCategory.network), isTrue);
+      });
+
+      test('应能按标签获取日志（不区分大小写）', () {
+        final results = LoggerService.instance.getLogsByTag('TIMEOUT');
+        expect(results, hasLength(1));
+        expect(results.first.tags, contains('timeout'));
+      });
+
+      test('搜索应同时匹配消息和标签', () {
+        final results = LoggerService.instance.searchLogs('connection');
+        expect(results, hasLength(2)); // "数据库连接成功"消息 + "网络连接失败"标签
+      });
+
+      test('不存在的标签应返回空列表', () {
+        final results = LoggerService.instance.getLogsByTag('nonexistent');
+        expect(results, isEmpty);
+      });
+
+      test('不存在的关键词应返回空列表', () {
+        final results = LoggerService.instance.searchLogs('nonexistent');
+        expect(results, isEmpty);
+      });
+    });
   });
 }
