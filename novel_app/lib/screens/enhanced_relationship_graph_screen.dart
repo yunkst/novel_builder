@@ -3,6 +3,9 @@ import 'package:graphview/graphview.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/database_service.dart';
+import '../utils/edge_weight_manager.dart';
+import '../widgets/character_detail_dialog.dart';
+import 'dart:async';
 
 /// 增强版角色关系图可视化页面
 ///
@@ -39,6 +42,12 @@ class _EnhancedRelationshipGraphScreenState
 
   // 节点关系数量缓存(用于调整节点大小)
   final Map<int, int> _nodeConnectionCount = {};
+
+  // 边权重管理器
+  final EdgeWeightManager _edgeWeightManager = EdgeWeightManager();
+
+  // 交互状态
+  int? _selectedNodeId;
 
   bool _isLoading = true;
   String? _error;
@@ -201,6 +210,68 @@ class _EnhancedRelationshipGraphScreenState
     return '?';
   }
 
+  /// 处理节点单击事件
+  void _handleNodeTap(int characterId) {
+    // 检查是否点击已选中的节点
+    if (_selectedNodeId == characterId) {
+      // 取消选中
+      _resetNodeSelection();
+    } else {
+      // 选中新节点
+      _selectNode(characterId);
+    }
+  }
+
+  /// 选中节点并加强相关引力
+  void _selectNode(int nodeId) {
+    setState(() {
+      _selectedNodeId = nodeId;
+
+      // 找出与该节点相连的所有节点
+      final connectedNodeIds = <int>[];
+      for (final rel in _relationships) {
+        if (rel.sourceCharacterId == nodeId) {
+          connectedNodeIds.add(rel.targetCharacterId);
+        } else if (rel.targetCharacterId == nodeId) {
+          connectedNodeIds.add(rel.sourceCharacterId);
+        }
+      }
+
+      // 提高这些边的权重（用于未来的布局增强）
+      _edgeWeightManager.enhanceNodeEdges(nodeId, connectedNodeIds);
+
+      // 重新构建图以应用新的权重
+      _buildGraphStructure(_allCharacters, _relationships);
+    });
+  }
+
+  /// 重置节点选择
+  void _resetNodeSelection() {
+    setState(() {
+      _selectedNodeId = null;
+      _edgeWeightManager.reset();
+
+      // 重新构建图以重置权重
+      _buildGraphStructure(_allCharacters, _relationships);
+    });
+  }
+
+  /// 处理节点双击事件
+  void _handleNodeDoubleTap(int characterId) {
+    // 找到对应的角色
+    final character = _allCharacters.firstWhere(
+      (c) => c.id == characterId,
+      orElse: () => Character(
+        id: characterId,
+        novelUrl: widget.novelUrl,
+        name: '未知',
+      ),
+    );
+
+    // 显示详情对话框
+    CharacterDetailDialog.show(context, character);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -236,9 +307,11 @@ class _EnhancedRelationshipGraphScreenState
                     child: ListBody(
                       children: [
                         Text('🔍 交互操作:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('• 捏合手势: 缩放视图 (0.1x - 5.0x)'),
+                        Text('• 捏合手势: 缩放视图 (0.01x - 10.0x)'),
                         Text('• 拖拽: 移动视图位置'),
-                        Text('• 点击刷新: 重新计算布局'),
+                        Text('• 单击节点: 选中节点，查看关系'),
+                        Text('• 双击节点: 查看角色详情'),
+                        Text('• 点击空白: 取消选中'),
                         Text(''),
                         Text('🎨 节点说明:', style: TextStyle(fontWeight: FontWeight.bold)),
                         Text('• 蓝色: 男性角色'),
@@ -266,13 +339,187 @@ class _EnhancedRelationshipGraphScreenState
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorView()
-              : _allCharacters.isEmpty
-                  ? _buildEmptyView()
-                  : _buildGraphView(),
+      body: Column(
+        children: [
+          // 主图区域
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _buildErrorView()
+                    : _allCharacters.isEmpty
+                        ? _buildEmptyView()
+                        : _buildGraphView(),
+          ),
+          // 选中节点的关系信息面板
+          if (_selectedNodeId != null)
+            _buildRelationshipPanel(),
+        ],
+      ),
+    );
+  }
+
+  /// 构建关系信息面板
+  Widget _buildRelationshipPanel() {
+    // 查找选中的角色
+    final selectedCharacter = _allCharacters.firstWhere(
+      (c) => c.id == _selectedNodeId,
+      orElse: () => Character(
+        id: _selectedNodeId,
+        novelUrl: widget.novelUrl,
+        name: '未知',
+      ),
+    );
+
+    // 找出所有与该角色相关的关系
+    final relationships = _relationships
+        .where((r) =>
+            r.sourceCharacterId == _selectedNodeId ||
+            r.targetCharacterId == _selectedNodeId)
+        .toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.amber[50],
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${selectedCharacter.name} 的关系 (${relationships.length})',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _selectedNodeId = null;
+                    });
+                  },
+                  tooltip: '关闭',
+                ),
+              ],
+            ),
+          ),
+          // 关系列表
+          if (relationships.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('暂无关系数据'),
+            )
+          else
+            SizedBox(
+              height: 120,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                itemCount: relationships.length,
+                itemBuilder: (context, index) {
+                  final rel = relationships[index];
+                  final isSource = rel.sourceCharacterId == _selectedNodeId;
+                  final otherCharacterId = isSource
+                      ? rel.targetCharacterId
+                      : rel.sourceCharacterId;
+
+                  final otherCharacter = _allCharacters.firstWhere(
+                    (c) => c.id == otherCharacterId,
+                    orElse: () => Character(
+                      id: otherCharacterId,
+                      novelUrl: widget.novelUrl,
+                      name: '未知',
+                    ),
+                  );
+
+                  return Container(
+                    width: 200,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 关系类型
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[100],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            rel.relationshipType,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // 关系方向描述
+                        Text(
+                          isSource ? '→ ${otherCharacter.name}' : '← ${otherCharacter.name}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (rel.description != null &&
+                            rel.description!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            rel.description!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -335,10 +582,10 @@ class _EnhancedRelationshipGraphScreenState
 
     return InteractiveViewer(
       transformationController: _transformationController,
-      minScale: 0.1,
-      maxScale: 5.0,
+      minScale: 0.01,
+      maxScale: 10.0,
       constrained: false,
-      boundaryMargin: const EdgeInsets.all(8),
+      boundaryMargin: EdgeInsets.zero,
       child: GraphViewCustomPainter(
         graph: _graph,
         algorithm: _algorithm,
@@ -396,68 +643,80 @@ class _EnhancedRelationshipGraphScreenState
           // 计算节点大小(根据关系数量)
           final nodeSize = _calculateNodeSize(characterId ?? 0);
           final connectionCount = _nodeConnectionCount[characterId ?? 0] ?? 0;
+          final isSelected = _selectedNodeId == characterId;
 
-          // 自定义节点渲染
-          return Container(
-            width: nodeSize,
-            height: nodeSize,
-            decoration: BoxDecoration(
-              color: _getGenderColor(character.gender),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white,
-                width: 3,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  spreadRadius: 2,
+          // 自定义节点渲染 - 添加手势检测
+          return GestureDetector(
+            onTap: () => _handleNodeTap(characterId ?? 0),
+            onDoubleTap: () => _handleNodeDoubleTap(characterId ?? 0),
+            child: Container(
+              width: nodeSize,
+              height: nodeSize,
+              decoration: BoxDecoration(
+                color: _getGenderColor(character.gender),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? Colors.amber : Colors.white,
+                  width: isSelected ? 5 : 3,
                 ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                // 中心显示角色首字母
-                Center(
-                  child: Text(
-                    _getCharacterInitial(character),
-                    style: TextStyle(
-                      fontSize: nodeSize * 0.3,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                  // 选中状态添加发光效果
+                  if (isSelected)
+                    BoxShadow(
+                      color: Colors.amber.withValues(alpha: 0.6),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // 中心显示角色首字母
+                  Center(
+                    child: Text(
+                      _getCharacterInitial(character),
+                      style: TextStyle(
+                        fontSize: nodeSize * 0.3,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                // 如果关系数>3,在右下角显示数量徽章
-                if (connectionCount > 3)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white, width: 1),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 20,
-                        minHeight: 20,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$connectionCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                  // 如果关系数>3,在右下角显示数量徽章
+                  if (connectionCount > 3)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$connectionCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         },
