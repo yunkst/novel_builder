@@ -212,6 +212,9 @@ build/
 # Claude Code
 .claude/settings.local.json
 
+# Git Worktrees
+.worktrees/
+
 # Project specific
 ch1.txt
 
