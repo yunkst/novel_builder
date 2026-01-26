@@ -85,6 +85,9 @@ dependencies:
     path: generated/api
   crypto: ^3.0.7
 
+  # 图可视化
+  graphview: ^1.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
