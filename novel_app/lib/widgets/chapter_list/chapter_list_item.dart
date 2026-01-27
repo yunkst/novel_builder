@@ -5,12 +5,14 @@ import 'chapter_badge.dart';
 
 /// 章节列表项组件（正常模式）
 /// 显示章节标题、缓存状态、插入和删除操作按钮
+/// 支持显示AI伴读状态（紫色边框）
 class ChapterListItem extends StatelessWidget {
   final Chapter chapter;
   final bool isLastRead;
   final bool isUserChapter;
   final bool isCached; // 改为直接接收状态
   final bool isRead; // 是否已读
+  final bool isAccompanied; // 是否已AI伴读
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onInsert;
@@ -22,6 +24,7 @@ class ChapterListItem extends StatelessWidget {
     required this.isUserChapter,
     required this.isCached,
     this.isRead = false,
+    this.isAccompanied = false,
     required this.onTap,
     required this.onLongPress,
     required this.onInsert,
@@ -33,14 +36,21 @@ class ChapterListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: isUserChapter ? Colors.blue.withValues(alpha: 0.05) : null,
-        border: isUserChapter
-            ? Border(
-                left: BorderSide(
-                color: Colors.blue.withValues(alpha: 0.3),
-                width: 3,
-              ))
-            : null,
+        // 背景色优先级: 已伴读 > 用户插入
+        color: isAccompanied
+            ? Colors.purple.withValues(alpha: 0.05)
+            : (isUserChapter ? Colors.blue.withValues(alpha: 0.05) : null),
+        border: Border(
+          left: BorderSide(
+            // 边框颜色优先级: 已伴读 > 用户插入
+            color: isAccompanied
+                ? Colors.purple.withValues(alpha: 0.3)
+                : (isUserChapter
+                    ? Colors.blue.withValues(alpha: 0.3)
+                    : Colors.transparent),
+            width: 3,
+          ),
+        ),
       ),
       child: ListTile(
         title: Row(

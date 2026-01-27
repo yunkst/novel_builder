@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../test_bootstrap.dart';
@@ -43,12 +45,25 @@ abstract class DatabaseTestBase {
     final db = await databaseService.database;
 
     // 清理所有测试相关的表
-    await db.delete('bookshelf');
-    await db.delete('chapter_cache');
-    await db.delete('novel_chapters');
-    await db.delete('characters');
-    await db.delete('scene_gallery');
-    await db.delete('role_gallery');
+    final tables = [
+      'bookshelf',
+      'chapter_cache',
+      'novel_chapters',
+      'characters',
+      'scene_illustrations',
+      'character_relationships',
+      'outlines',
+      'chat_scenes',
+    ];
+
+    for (final table in tables) {
+      try {
+        await db.delete(table);
+      } catch (e) {
+        // 表不存在或其他错误，忽略
+        debugPrint('清理表 $table 时出错: $e');
+      }
+    }
   }
 
   /// 清理测试环境
@@ -65,26 +80,18 @@ abstract class DatabaseTestBase {
     String title = '测试小说',
     String author = '测试作者',
   }) async {
-    final novel = {
-      'url': url,
-      'title': title,
-      'author': author,
-      'coverUrl': null,
-      'description': '测试描述',
-      'backgroundSetting': '测试背景',
-      'isInBookshelf': 0,
-      'lastReadChapterUrl': null,
-      'lastReadPosition': 0,
-      'addedTime': DateTime.now().millisecondsSinceEpoch,
-      'lastReadTime': null,
-      'updateTime': DateTime.now().millisecondsSinceEpoch,
-    };
-
-    await databaseService.addToBookshelf(
-      TestNovel.fromMap(novel),
+    final novel = Novel(
+      url: url,
+      title: title,
+      author: author,
+      coverUrl: null,
+      description: '测试描述',
+      backgroundSetting: '测试背景',
     );
 
-    return novel;
+    await databaseService.addToBookshelf(novel);
+
+    return novel.toMap();
   }
 
   /// 创建测试章节数据

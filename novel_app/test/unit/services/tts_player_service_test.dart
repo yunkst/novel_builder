@@ -1,12 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
 import 'package:novel_app/services/tts_player_service.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/models/chapter.dart';
-
-@GenerateMocks([])
-import 'tts_player_service_test.mocks.dart';
 
 void main() {
   // 测试数据

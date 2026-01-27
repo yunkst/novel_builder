@@ -8,6 +8,7 @@ import '../../services/rewrite_service.dart';
 import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
+import '../../utils/paragraph_replace_helper.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 
@@ -304,7 +305,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
         rewrittenParagraphs);
   }
 
-  // 执行删除和插入操作
+  // 执行删除和插入操作（优化版：使用工具类）
   void _executeDeleteAndInsert(
     List<String> updatedParagraphs,
     List<int> indicesToDelete,
@@ -315,38 +316,29 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
       return;
     }
 
-    // 过滤有效索引（防止越界）
-    final validIndices = indicesToDelete
-        .where((index) => index >= 0 && index < updatedParagraphs.length)
-        .toList();
+    final originalLength = widget.content.split('\n').length;
 
-    if (validIndices.isEmpty) {
-      debugPrint('⚠️ 所有索引都无效');
-      return;
+    // 使用工具类执行替换
+    final resultParagraphs = ParagraphReplaceHelper.executeReplace(
+      paragraphs: updatedParagraphs,
+      selectedIndices: indicesToDelete,
+      newContent: contentToInsert,
+    );
+
+    // 验证替换结果
+    final validation = ParagraphReplaceHelper.validateReplacement(
+      originalParagraphs: widget.content.split('\n'),
+      updatedParagraphs: resultParagraphs,
+      selectedIndices: indicesToDelete,
+    );
+
+    if (!validation.isValid) {
+      debugPrint('⚠️ ${validation.message}');
     }
-
-    // 排序并确定插入位置（第一个有效索引）
-    validIndices.sort();
-    final insertPosition = validIndices.first;
-
-    // 删除选中的段落
-    // 注意：由于removeAt会改变索引，需要从后往前删除
-    for (int i = validIndices.length - 1; i >= 0; i--) {
-      final index = validIndices[i];
-      if (index < updatedParagraphs.length) {
-        final removedContent = updatedParagraphs.removeAt(index);
-        debugPrint('🗑️ 删除段落 $index: "$removedContent"');
-      }
-    }
-
-    // 插入AI生成的内容
-    updatedParagraphs.insertAll(insertPosition, contentToInsert);
-    debugPrint('✅ 在位置 $insertPosition 插入 ${contentToInsert.length} 段内容');
 
     // 完成替换
-    final newContent = updatedParagraphs.join('\n');
-    final originalLength = widget.content.split('\n').length;
-    final newLength = updatedParagraphs.length;
+    final newContent = resultParagraphs.join('\n');
+    final newLength = resultParagraphs.length;
 
     widget.onReplace(newContent);
     Navigator.pop(context); // 关闭改写对话框
@@ -354,7 +346,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-            '已删除 ${validIndices.length} 段，插入 ${contentToInsert.length} 段（章节长度: $originalLength → $newLength）'),
+            '已删除 ${indicesToDelete.length} 段，插入 ${contentToInsert.length} 段（章节长度: $originalLength → $newLength）'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 3),
       ),

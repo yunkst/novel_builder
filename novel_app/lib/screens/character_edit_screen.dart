@@ -10,6 +10,7 @@ import '../services/character_avatar_service.dart';
 import '../utils/character_matcher.dart';
 import '../screens/gallery_view_screen.dart';
 import '../screens/character_chat_screen.dart';
+import '../screens/character_relationship_screen.dart';
 import '../widgets/model_selector.dart';
 import '../widgets/chat_scene_input_dialog.dart';
 
@@ -476,6 +477,11 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               _buildPersonalitySection(),
 
               const SizedBox(height: 32),
+
+              // 查看关系按钮（仅在编辑模式显示）
+              if (isEditing) _buildRelationshipButton(),
+
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -1389,6 +1395,43 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         builder: (context) => CharacterChatScreen(
           character: widget.character!,
           initialScene: scene,
+        ),
+      ),
+    );
+  }
+
+  /// 导航到关系页面
+  Future<void> _navigateToRelationships() async {
+    if (widget.character == null) return;
+
+    // 先保存当前更改
+    await _saveCharacter();
+
+    if (!mounted) return;
+
+    // 导航到关系页面
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CharacterRelationshipScreen(
+          character: widget.character!,
+        ),
+      ),
+    );
+  }
+
+  /// 构建查看关系按钮
+  Widget _buildRelationshipButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _navigateToRelationships,
+        icon: const Icon(Icons.link),
+        label: const Text('查看关系'),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
         ),
       ),
     );

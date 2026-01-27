@@ -12,6 +12,7 @@ import 'package:mockito/src/dummies.dart' as _i11;
 import 'package:novel_api/novel_api.dart' as _i2;
 import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i5;
 import 'package:novel_app/models/ai_companion_response.dart' as _i19;
+import 'package:novel_app/models/bookshelf.dart' as _i20;
 import 'package:novel_app/models/chapter.dart' as _i10;
 import 'package:novel_app/models/character.dart' as _i6;
 import 'package:novel_app/models/character_relationship.dart' as _i15;
@@ -1817,4 +1818,84 @@ class MockDatabaseService extends _i1.Mock implements _i13.DatabaseService {
         returnValue: _i8.Future<List<_i15.CharacterRelationship>>.value(
             <_i15.CharacterRelationship>[]),
       ) as _i8.Future<List<_i15.CharacterRelationship>>);
+
+  @override
+  _i8.Future<List<_i20.Bookshelf>> getBookshelves() => (super.noSuchMethod(
+        Invocation.method(
+          #getBookshelves,
+          [],
+        ),
+        returnValue: _i8.Future<List<_i20.Bookshelf>>.value(<_i20.Bookshelf>[]),
+      ) as _i8.Future<List<_i20.Bookshelf>>);
+
+  @override
+  _i8.Future<int> createBookshelf(String? name) => (super.noSuchMethod(
+        Invocation.method(
+          #createBookshelf,
+          [name],
+        ),
+        returnValue: _i8.Future<int>.value(0),
+      ) as _i8.Future<int>);
+
+  @override
+  _i8.Future<bool> deleteBookshelf(int? bookshelfId) => (super.noSuchMethod(
+        Invocation.method(
+          #deleteBookshelf,
+          [bookshelfId],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<List<_i9.Novel>> getNovelsByBookshelf(int? bookshelfId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getNovelsByBookshelf,
+          [bookshelfId],
+        ),
+        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
+      ) as _i8.Future<List<_i9.Novel>>);
+
+  @override
+  _i8.Future<void> addNovelToBookshelf(
+    String? novelUrl,
+    int? bookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #addNovelToBookshelf,
+          [
+            novelUrl,
+            bookshelfId,
+          ],
+        ),
+        returnValue: _i8.Future<void>.value(),
+        returnValueForMissingStub: _i8.Future<void>.value(),
+      ) as _i8.Future<void>);
+
+  @override
+  _i8.Future<bool> removeNovelFromBookshelf(
+    String? novelUrl,
+    int? bookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeNovelFromBookshelf,
+          [
+            novelUrl,
+            bookshelfId,
+          ],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getBookshelvesByNovel,
+          [novelUrl],
+        ),
+        returnValue: _i8.Future<List<int>>.value(<int>[]),
+      ) as _i8.Future<List<int>>);
 }
