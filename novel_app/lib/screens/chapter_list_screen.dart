@@ -794,8 +794,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           _buildReorderButton(),
           _buildSearchButton(),
           _buildCharacterButton(),
-          _buildOutlineButton(),
-          _buildBackgroundSettingButton(),
+          // _buildOutlineButton(),
+          // _buildBackgroundSettingButton(),
           _buildPopupMenu(),
         ],
       ),
@@ -843,11 +843,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       _buildPaginationControl(),
                   ],
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAiSettings,
-        tooltip: 'AI伴读设置',
-        child: const Icon(Icons.psychology_outlined),
-      ),
     );
   }
 
@@ -966,6 +961,30 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           case 'refresh':
             _loadChapters(forceRefresh: true);
             break;
+          case 'outline_management':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OutlineManagementScreen(
+                  novelUrl: widget.novel.url,
+                  novelTitle: widget.novel.title,
+                ),
+              ),
+            );
+            break;
+          case 'background_setting':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BackgroundSettingScreen(
+                  novel: widget.novel,
+                ),
+              ),
+            );
+            break;
+          case 'ai_accompaniment_settings':
+            _openAiSettings();
+            break;
         }
       },
       itemBuilder: (context) {
@@ -1002,6 +1021,36 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 ],
               ),
             ),
+          const PopupMenuItem(
+            value: 'outline_management',
+            child: Row(
+              children: [
+                Icon(Icons.menu_book_outlined),
+                SizedBox(width: 8),
+                Text('大纲管理'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'background_setting',
+            child: Row(
+              children: [
+                Icon(Icons.info_outline),
+                SizedBox(width: 8),
+                Text('背景设定'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'ai_accompaniment_settings',
+            child: Row(
+              children: [
+                Icon(Icons.psychology_outlined),
+                SizedBox(width: 8),
+                Text('AI伴读设置'),
+              ],
+            ),
+          ),
         ];
       },
     );
@@ -1027,6 +1076,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           isUserChapter: isUserChapter,
           isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
           isRead: chapter.isRead, // 传入已读状态
+          isAccompanied: chapter.isAccompanied, // 传入AI伴读状态
           onTap: () {
             Navigator.push(
               context,
@@ -1076,6 +1126,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           index: index,
           isLastRead: isLastRead,
           isUserChapter: isUserChapter,
+          isAccompanied: chapter.isAccompanied, // 传入AI伴读状态
         );
       },
     );
