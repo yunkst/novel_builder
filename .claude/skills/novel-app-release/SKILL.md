@@ -163,6 +163,20 @@ A: 确保Flutter SDK已安装并在PATH中，运行 `flutter doctor` 检查环�
 ### Q: 构建失败如何调试？
 A: 检查 `novel_app/android/app/build.gradle.kts` 配置，确保 `compileSdk` 和 `targetSdk` 版本正确
 
+### Q: Python脚本运行报错 "ModuleNotFoundError: No module named 'requests'"？
+A: 需要安装requests库：
+```bash
+pip install requests
+# 或者
+python -m pip install requests
+```
+
+### Q: Windows终端显示乱码怎么办？
+A: 这是Windows终端编码问题（GBK vs UTF-8），不影响实际功能。如果需要解决：
+1. 设置环境变量：`set PYTHONIOENCODING=utf-8`
+2. 或使用PowerShell代替CMD
+3. 或在Python脚本中避免使用emoji和特殊字符
+
 ### Q: 上传时 changelog 出现乱码怎么办？
 A: **重要**：避免使用 curl 命令上传，因为 Windows 下 curl 的 `-F` 参数可能不正确处理 UTF-8 编码。请使用以下方法：
 
@@ -173,7 +187,11 @@ import requests
 
 url = 'http://localhost:3800/api/app-version/upload'
 headers = {'X-API-TOKEN': 'your_token'}
-files = {'file': open('app-release.apk', 'rb')}
+
+# 使用文件对象上传（推荐）
+with open('app-release.apk', 'rb') as f:
+    files = {'file': f.read()}  # 或直接传递文件对象
+
 data = {
     'version': '1.0.4',
     'version_code': 5,
@@ -202,6 +220,18 @@ A: 需要在 `pubspec.yaml` 中更新版本号和版本码：
 ```yaml
 version: 1.0.5+6  # 版本号和版本码都需要递增
 ```
+
+### Q: 脚本报错 "找不到APK文件"？
+A: 可能的原因：
+1. 构建失败：检查构建输出日志
+2. 路径错误：确认当前在项目根目录
+3. 文件权限：检查是否有读取权限
+
+### Q: 上传超时怎么办？
+A: APK文件较大（57MB），上传可能需要较长时间。可以：
+1. 检查网络连接
+2. 增加超时时间：修改脚本中的 `timeout=300`（秒）
+3. 检查后端服务器状态
 
 ## 相关文件
 
