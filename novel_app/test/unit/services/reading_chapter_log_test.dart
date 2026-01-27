@@ -40,6 +40,16 @@ void main() {
       await dbService.cacheNovelChapters(testNovel.url, chapters);
     });
 
+    tearDown(() async {
+      // 清理数据库连接以避免锁定
+      try {
+        // DatabaseService是单例，不需要手动关闭
+        // 但我们可以清理测试数据
+      } catch (e) {
+        // 忽略清理错误
+      }
+    });
+
     test('场景1：章节内容无媒体标记 - 应该没有日志', () async {
       final testNovelUrl = 'https://test.com/novel/log-test';
       final chapterUrl = 'https://test.com/chapter/1';

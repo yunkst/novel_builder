@@ -4,7 +4,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i8;
-import 'dart:typed_data' as _i19;
+import 'dart:typed_data' as _i20;
 
 import 'package:dio/dio.dart' as _i6;
 import 'package:mockito/mockito.dart' as _i1;
@@ -12,6 +12,7 @@ import 'package:mockito/src/dummies.dart' as _i12;
 import 'package:novel_api/novel_api.dart' as _i5;
 import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i3;
 import 'package:novel_app/models/ai_companion_response.dart' as _i17;
+import 'package:novel_app/models/bookshelf.dart' as _i18;
 import 'package:novel_app/models/chapter.dart' as _i10;
 import 'package:novel_app/models/character.dart' as _i4;
 import 'package:novel_app/models/character_relationship.dart' as _i13;
@@ -20,9 +21,9 @@ import 'package:novel_app/models/novel.dart' as _i9;
 import 'package:novel_app/models/outline.dart' as _i15;
 import 'package:novel_app/models/scene_illustration.dart' as _i14;
 import 'package:novel_app/models/search_result.dart' as _i11;
-import 'package:novel_app/services/api_service_wrapper.dart' as _i18;
+import 'package:novel_app/services/api_service_wrapper.dart' as _i19;
 import 'package:novel_app/services/database_service.dart' as _i7;
-import 'package:novel_app/services/dify_service.dart' as _i20;
+import 'package:novel_app/services/dify_service.dart' as _i21;
 import 'package:sqflite/sqflite.dart' as _i2;
 
 // ignore_for_file: type=lint
@@ -1404,12 +1405,92 @@ class MockDatabaseService extends _i1.Mock implements _i7.DatabaseService {
         returnValue: _i8.Future<List<_i13.CharacterRelationship>>.value(
             <_i13.CharacterRelationship>[]),
       ) as _i8.Future<List<_i13.CharacterRelationship>>);
+
+  @override
+  _i8.Future<List<_i18.Bookshelf>> getBookshelves() => (super.noSuchMethod(
+        Invocation.method(
+          #getBookshelves,
+          [],
+        ),
+        returnValue: _i8.Future<List<_i18.Bookshelf>>.value(<_i18.Bookshelf>[]),
+      ) as _i8.Future<List<_i18.Bookshelf>>);
+
+  @override
+  _i8.Future<int> createBookshelf(String? name) => (super.noSuchMethod(
+        Invocation.method(
+          #createBookshelf,
+          [name],
+        ),
+        returnValue: _i8.Future<int>.value(0),
+      ) as _i8.Future<int>);
+
+  @override
+  _i8.Future<bool> deleteBookshelf(int? bookshelfId) => (super.noSuchMethod(
+        Invocation.method(
+          #deleteBookshelf,
+          [bookshelfId],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<List<_i9.Novel>> getNovelsByBookshelf(int? bookshelfId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getNovelsByBookshelf,
+          [bookshelfId],
+        ),
+        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
+      ) as _i8.Future<List<_i9.Novel>>);
+
+  @override
+  _i8.Future<void> addNovelToBookshelf(
+    String? novelUrl,
+    int? bookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #addNovelToBookshelf,
+          [
+            novelUrl,
+            bookshelfId,
+          ],
+        ),
+        returnValue: _i8.Future<void>.value(),
+        returnValueForMissingStub: _i8.Future<void>.value(),
+      ) as _i8.Future<void>);
+
+  @override
+  _i8.Future<bool> removeNovelFromBookshelf(
+    String? novelUrl,
+    int? bookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeNovelFromBookshelf,
+          [
+            novelUrl,
+            bookshelfId,
+          ],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getBookshelvesByNovel,
+          [novelUrl],
+        ),
+        returnValue: _i8.Future<List<int>>.value(<int>[]),
+      ) as _i8.Future<List<int>>);
 }
 
 /// A class which mocks [ApiServiceWrapper].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockApiServiceWrapper extends _i1.Mock implements _i18.ApiServiceWrapper {
+class MockApiServiceWrapper extends _i1.Mock implements _i19.ApiServiceWrapper {
   MockApiServiceWrapper() {
     _i1.throwOnMissingStub(this);
   }
@@ -1701,14 +1782,14 @@ class MockApiServiceWrapper extends _i1.Mock implements _i18.ApiServiceWrapper {
       ) as _i8.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<_i19.Uint8List> getImageProxy(String? filename) =>
+  _i8.Future<_i20.Uint8List> getImageProxy(String? filename) =>
       (super.noSuchMethod(
         Invocation.method(
           #getImageProxy,
           [filename],
         ),
-        returnValue: _i8.Future<_i19.Uint8List>.value(_i19.Uint8List(0)),
-      ) as _i8.Future<_i19.Uint8List>);
+        returnValue: _i8.Future<_i20.Uint8List>.value(_i20.Uint8List(0)),
+      ) as _i8.Future<_i20.Uint8List>);
 
   @override
   _i8.Future<_i5.ImageToVideoResponse> generateVideoFromImage({
@@ -1823,7 +1904,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i18.ApiServiceWrapper {
 /// A class which mocks [DifyService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDifyService extends _i1.Mock implements _i20.DifyService {
+class MockDifyService extends _i1.Mock implements _i21.DifyService {
   MockDifyService() {
     _i1.throwOnMissingStub(this);
   }

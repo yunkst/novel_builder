@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:novel_app/services/api_service_wrapper.dart';
 
 /// 全局测试初始化
 ///
@@ -44,4 +45,27 @@ void initDatabaseTests() {
   // 可以在这里添加更多数据库测试特定配置
   // ignore: avoid_print
   print('✅ 数据库测试环境初始化完成');
+}
+
+/// 初始化API服务（用于测试）
+///
+/// 对于需要使用API服务的测试，使用此函数
+/// 它会初始化ApiServiceWrapper单例
+///
+/// 注意：这会创建一个真实的实例，如果需要完全隔离，
+/// 应该在测试中使用Mock替代
+void initApiServiceTests() {
+  // 先执行通用初始化
+  initTests();
+
+  // 尝试初始化ApiServiceWrapper
+  try {
+    ApiServiceWrapper();
+    // ignore: avoid_print
+    print('✅ API服务初始化完成');
+  } catch (e) {
+    // 忽略初始化错误，测试可能使用Mock
+    // ignore: avoid_print
+    print('⚠️  API服务初始化跳过: $e');
+  }
 }

@@ -13,7 +13,7 @@ import '../services/logger_service.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
 import 'character_edit_screen.dart';
-import 'character_relationship_screen.dart';
+import 'enhanced_relationship_graph_screen.dart';
 
 class CharacterManagementScreen extends StatefulWidget {
   final Novel novel;
@@ -507,62 +507,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     if (_isMultiSelectMode && character.id != null) {
       _toggleCharacterSelection(character.id!);
     } else {
-      _showCharacterOptions(character);
+      // 直接进入编辑页面
+      _navigateToEdit(character: character);
     }
-  }
-
-  /// 显示角色选项菜单
-  void _showCharacterOptions(Character character) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('编辑角色'),
-              onTap: () {
-                Navigator.pop(context);
-                _navigateToEdit(character: character);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.link),
-              title: const Text('查看关系'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _navigateToRelationships(character);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('删除角色', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                // 可以在这里添加删除逻辑
-                debugPrint('删除角色: ${character.name}');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 导航到关系页面
-  Future<void> _navigateToRelationships(Character character) async {
-    await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CharacterRelationshipScreen(
-          character: character,
-        ),
-      ),
-    );
-
-    // 刷新列表（更新关系数量）
-    _loadCharacters();
   }
 
   /// 显示批量删除确认对话框
@@ -664,10 +611,28 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
               child: const Text('取消'),
             )
           else
-            IconButton(
-              onPressed: _aiCreateCharacter,
-              icon: Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
-              tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.account_tree),
+                  tooltip: '全人物关系图',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EnhancedRelationshipGraphScreen(
+                          novelUrl: widget.novel.url,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  onPressed: _aiCreateCharacter,
+                  icon: Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
+                  tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
+                ),
+              ],
             ),
         ],
       ),

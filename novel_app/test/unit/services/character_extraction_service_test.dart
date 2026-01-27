@@ -232,7 +232,6 @@ void main() {
       ];
       final merged = extractionService.mergeAndDeduplicateContexts(
         contexts,
-        minGap: 10, // 设置较小的重叠阈值
       );
 
       // 重叠部分应该被合并，保留较长的片段

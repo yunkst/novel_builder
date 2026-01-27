@@ -71,8 +71,9 @@ void main() {
             .thenAnswer((_) async => testSettings);
         when(mockDb.getCharacters(novel.url))
             .thenAnswer((_) async => []);
-        when(mockDb.getRelationshipsForCharacters(novel.url, []))
-            .thenAnswer((_) async => []);
+        // 注意：getRelationshipsForCharacters方法已移除，不再需要mock
+        // when(mockDb.getRelationshipsForCharacters(novel.url, []))
+        //     .thenAnswer((_) async => []);
 
         final mockResponse = AICompanionResponse(
           roles: [],
@@ -89,13 +90,13 @@ void main() {
         )).thenAnswer((_) async => mockResponse);
 
         when(mockDb.appendBackgroundSetting(any, any))
-            .thenAnswer((_) async {});
+            .thenAnswer((_) async => 1);
         when(mockDb.batchUpdateOrInsertCharacters(any, any))
             .thenAnswer((_) async => 0);
         when(mockDb.batchUpdateOrInsertRelationships(any, any))
             .thenAnswer((_) async => 0);
         when(mockDb.markChapterAsAccompanied(novel.url, chapter.url))
-            .thenAnswer((_) async {});
+            .thenAnswer((_) async => 1);
 
         // Act & Assert
         // 验证伴读检查被调用
@@ -226,8 +227,6 @@ void main() {
             .thenAnswer((_) async => testSettings);
         when(mockDb.getCharacters(novel.url))
             .thenAnswer((_) async => []);
-        when(mockDb.getRelationshipsForCharacters(novel.url, []))
-            .thenAnswer((_) async => []);
 
         final mockResponse = AICompanionResponse(
           roles: [],
@@ -244,13 +243,13 @@ void main() {
         )).thenAnswer((_) async => mockResponse);
 
         when(mockDb.appendBackgroundSetting(any, any))
-            .thenAnswer((_) async {});
+            .thenAnswer((_) async => 1);
         when(mockDb.batchUpdateOrInsertCharacters(any, any))
             .thenAnswer((_) async => 0);
         when(mockDb.batchUpdateOrInsertRelationships(any, any))
             .thenAnswer((_) async => 0);
         when(mockDb.markChapterAsAccompanied(novel.url, chapter.url))
-            .thenAnswer((_) async {});
+            .thenAnswer((_) async => 1);
 
         // Act: 模拟用户多次打开同一章节
         for (int i = 0; i < 3; i++) {
@@ -259,7 +258,28 @@ void main() {
 
           if (!isAccompanied) {
             // 触发伴读流程
-            await mockDb.markChapterAsAccompanied(novel.url, chapter.url);
+            final settings = await mockDb.getAiAccompanimentSettings(novel.url);
+            final characters = await mockDb.getCharacters(novel.url);
+
+            if (settings.autoEnabled) {
+              final aiRoles = characters.map((c) => AICompanionRole(
+                name: c.name ?? '',
+                aliases: [],
+                personality: c.personality,
+                roleInStory: c.occupation,
+              )).toList();
+
+              await mockDify.generateAICompanion(
+                chaptersContent: 'test content',
+                backgroundSetting: '',
+                characters: characters,
+                relationships: [],
+              );
+              await mockDb.appendBackgroundSetting(novel.url, 'background');
+              await mockDb.batchUpdateOrInsertCharacters(novel.url, aiRoles.cast<Character>());
+              await mockDb.batchUpdateOrInsertRelationships(novel.url, []);
+              await mockDb.markChapterAsAccompanied(novel.url, chapter.url);
+            }
           }
         }
 
@@ -383,8 +403,6 @@ void main() {
         when(mockDb.getAiAccompanimentSettings(novel.url))
             .thenAnswer((_) async => testSettings);
         when(mockDb.getCharacters(novel.url))
-            .thenAnswer((_) async => []);
-        when(mockDb.getRelationshipsForCharacters(novel.url, []))
             .thenAnswer((_) async => []);
 
         final mockResponse = AICompanionResponse(

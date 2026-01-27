@@ -2160,13 +2160,18 @@ class DifyService {
     return jsonEncode(charactersData);
   }
 
-  /// 格式化关系信息为AI友好的JSON字符串
+  /// 格式化关系信息为AI友好的文本格式
+  ///
+  /// 输出格式：角色A → 关系类型 → 角色B
+  /// 例如：
+  ///   张三 → 师徒 → 李四
+  ///   王五 → 恋人 → 赵六
   String _formatRelationshipsForAI(
     List<CharacterRelationship> relationships,
     List<Character> characters,
   ) {
     if (relationships.isEmpty) {
-      return jsonEncode([]);
+      return '';
     }
 
     // 创建角色ID到名称的映射
@@ -2174,17 +2179,13 @@ class DifyService {
       for (var c in characters) if (c.id != null) c.id!: c.name,
     };
 
-    final List<Map<String, dynamic>> relationsData = relationships.map((r) {
+    // 格式化为 "角色A → 关系类型 → 角色B"
+    final relations = relationships.map((r) {
       final sourceName = characterIdToName[r.sourceCharacterId] ?? '未知角色';
       final targetName = characterIdToName[r.targetCharacterId] ?? '未知角色';
+      return '$sourceName → ${r.relationshipType} → $targetName';
+    }).join('\n');
 
-      return {
-        'source': sourceName,
-        'target': targetName,
-        'type': r.relationshipType,
-      };
-    }).toList();
-
-    return jsonEncode(relationsData);
+    return relations;
   }
 }

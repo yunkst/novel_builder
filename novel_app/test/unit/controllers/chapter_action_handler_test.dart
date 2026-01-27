@@ -3,6 +3,7 @@ import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/controllers/chapter_list/chapter_action_handler.dart';
 import 'package:novel_app/services/database_service.dart';
+import '../../test_bootstrap.dart';
 import '../../test_helpers/mock_data.dart';
 
 @GenerateMocks([DatabaseService])
@@ -10,6 +11,9 @@ import 'chapter_action_handler_test.mocks.dart';
 
 /// ChapterActionHandler 单元测试
 void main() {
+  // 初始化测试环境
+  initDatabaseTests();
+
   group('ChapterActionHandler', () {
     late ChapterActionHandler handler;
     late MockDatabaseService mockDb;

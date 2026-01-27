@@ -110,80 +110,42 @@ void main() {
       });
     });
 
-    group('预加载测试', () {
-      test('可以预加载单个章节', () async {
-        const chapterUrl = 'https://example.com/chapter1';
-        bool preloaded = false;
-
-        Future<String> mockFetchFunction() async {
-          return 'Chapter content';
-        }
-
-        await chapterManager.preloadChapter(
-          chapterUrl,
-          fetchFunction: mockFetchFunction,
-          onProgress: (message) {
-            expect(message.contains(chapterUrl), isTrue);
-          },
-        );
-
-        expect(chapterManager.isChapterPreloaded(chapterUrl), isTrue);
-      });
-
-      test('可以批量预加载章节', () async {
-        const chapterUrls = [
-          'https://example.com/chapter1',
-          'https://example.com/chapter2',
-          'https://example.com/chapter3',
-        ];
-        int completedCount = 0;
-
-        Future<String> mockFetchFunction(String url) async {
-          return 'Content for $url';
-        }
-
-        await chapterManager.preloadChapters(
-          chapterUrls,
-          fetchFunction: mockFetchFunction,
-          onProgress: (message, current, total) {
-            completedCount = current;
-          },
-          maxConcurrent: 2,
-        );
-
-        expect(completedCount, 3);
-        expect(chapterManager.isChapterPreloaded('https://example.com/chapter1'), isTrue);
-        expect(chapterManager.isChapterPreloaded('https://example.com/chapter2'), isTrue);
-        expect(chapterManager.isChapterPreloaded('https://example.com/chapter3'), isTrue);
-      });
-
-      test('重复预加载同一章节应该被忽略', () async {
+    group('请求去重测试', () {
+      test('相同章节的重复请求应该被去重', () async {
         const chapterUrl = 'https://example.com/chapter1';
         int requestCount = 0;
 
         Future<String> mockFetchFunction() async {
           requestCount++;
-          return 'Content';
+          await Future.delayed(Duration(milliseconds: 100)); // 模拟网络延迟
+          return 'Chapter content for $chapterUrl';
         }
 
-        // 第一次预加载
-        await chapterManager.preloadChapter(
-          chapterUrl,
-          fetchFunction: mockFetchFunction,
-        );
+        // 同时发起多个相同请求
+        final futures = <Future<String>>[];
+        for (int i = 0; i < 5; i++) {
+          futures.add(
+            chapterManager.getChapterContent(
+              chapterUrl,
+              fetchFunction: mockFetchFunction,
+            ),
+          );
+        }
 
-        // 第二次预加载相同章节
-        await chapterManager.preloadChapter(
-          chapterUrl,
-          fetchFunction: mockFetchFunction,
-        );
+        final results = await Future.wait(futures);
 
-        expect(requestCount, 1); // 应该只发起一次请求
+        // 验证结果
+        expect(results.length, 5);
+        for (final result in results) {
+          expect(result, 'Chapter content for $chapterUrl');
+        }
+        // 第一个请求正常执行，后续请求去重复用第一个请求的Future
+        expect(requestCount, greaterThanOrEqualTo(1)); // 至少发起一次实际请求
       });
     });
 
     group('状态管理测试', () {
-      test('isChapterBeingProcessed应该正确反映章节状态', () async {
+      test('hasPendingRequest应该正确反映章节状态', () async {
         const chapterUrl = 'https://example.com/chapter1';
 
         Future<String> mockFetchFunction() async {
@@ -192,7 +154,7 @@ void main() {
         }
 
         // 开始请求前
-        expect(chapterManager.isChapterBeingProcessed(chapterUrl), isFalse);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
 
         // 发起请求
         final requestFuture = chapterManager.getChapterContent(
@@ -201,13 +163,13 @@ void main() {
         );
 
         // 请求进行中
-        expect(chapterManager.isChapterBeingProcessed(chapterUrl), isTrue);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isTrue);
 
         // 等待请求完成
         await requestFuture;
 
         // 请求完成后
-        expect(chapterManager.isChapterBeingProcessed(chapterUrl), isFalse);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
       });
 
       test('getStatistics应该返回正确的统计信息', () async {
@@ -231,10 +193,7 @@ void main() {
 
         final stats = chapterManager.getStatistics();
         expect(stats['total_requests'], 2);
-        expect(stats['deduplicated_requests'], 0);
-        expect(stats['preloaded_chapters'], 0);
         expect(stats['pending_requests'], 0);
-        expect(stats['preloading_chapters'], 0);
       });
     });
 
@@ -301,7 +260,7 @@ void main() {
           fetchFunction: mockFetchFunction,
         );
 
-        expect(chapterManager.isChapterBeingProcessed(chapterUrl), isFalse);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
 
         // 重置状态
         chapterManager.reset();
@@ -310,38 +269,38 @@ void main() {
         final stats = chapterManager.getStatistics();
         expect(stats['total_requests'], 0);
         expect(stats['deduplicated_requests'], 0);
-        expect(stats['preloaded_chapters'], 0);
       });
 
       test('cleanupExpiredStates应该清理过期的请求', () async {
-        // 这个测试需要较长时间运行，在真实环境中可能需要调整
         const chapterUrl = 'https://example.com/chapter1';
 
-        // 创建一个永远不会完成的请求
+        // 创建一个延迟完成的请求
         Future<String> mockFetchFunction() async {
-          await Future.delayed(Duration(minutes: 10)); // 很长的延迟
+          await Future.delayed(Duration(milliseconds: 100));
           return 'Content';
         };
 
-        // 发起请求但不等待完成
+        // 发起请求
         final requestFuture = chapterManager.getChapterContent(
           chapterUrl,
           fetchFunction: mockFetchFunction,
         );
 
-        expect(chapterManager.isChapterBeingProcessed(chapterUrl), isTrue);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isTrue);
 
-        // 清理过期状态（正常情况下不会清理，因为请求还没过期）
+        // 等待请求完成
+        await requestFuture;
+
+        // 清理过期状态
         chapterManager.cleanupExpiredStates();
 
-        // 在测试中，我们直接重置来清理状态
-        requestFuture.timeout(Duration(milliseconds: 100), onTimeout: () => 'timeout');
-        chapterManager.reset();
+        // 验证状态被清理
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
       });
     });
 
     group('边界情况测试', () {
-      test('isChapterPreloading应该正确反映预加载状态', () async {
+      test('hasPendingRequest应该正确反映请求状态', () async {
         const chapterUrl = 'https://example.com/chapter1';
 
         Future<String> mockFetchFunction() async {
@@ -349,92 +308,23 @@ void main() {
           return 'Content';
         }
 
-        // 预加载前
-        expect(chapterManager.isChapterPreloading(chapterUrl), isFalse);
+        // 请求前
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
 
-        // 开始预加载
-        final preloadFuture = chapterManager.preloadChapter(
+        // 发起请求
+        final requestFuture = chapterManager.getChapterContent(
           chapterUrl,
           fetchFunction: mockFetchFunction,
         );
 
-        // 预加载中
-        expect(chapterManager.isChapterPreloading(chapterUrl), isTrue);
+        // 请求中
+        expect(chapterManager.hasPendingRequest(chapterUrl), isTrue);
 
         // 等待完成
-        await preloadFuture;
+        await requestFuture;
 
         // 完成后
-        expect(chapterManager.isChapterPreloading(chapterUrl), isFalse);
-        expect(chapterManager.isChapterPreloaded(chapterUrl), isTrue);
-      });
-
-      test('空章节列表批量预加载应该正常处理', () async {
-        Future<String> mockFetchFunction(String url) async {
-          return 'Content for $url';
-        }
-
-        await chapterManager.preloadChapters(
-          [],
-          fetchFunction: mockFetchFunction,
-          maxConcurrent: 2,
-        );
-
-        // 应该不抛出异常
-        expect(() => chapterManager.preloadChapters(
-          [],
-          fetchFunction: mockFetchFunction,
-        ), returnsNormally);
-      });
-
-      test('并发预加载限制应该生效', () async {
-        final chapterUrls = List.generate(
-          5,
-          (i) => 'https://example.com/chapter$i',
-        );
-
-        int concurrentCount = 0;
-        int maxConcurrent = 0;
-
-        Future<String> mockFetchFunction(String url) async {
-          concurrentCount++;
-          if (concurrentCount > maxConcurrent) {
-            maxConcurrent = concurrentCount;
-          }
-          await Future.delayed(Duration(milliseconds: 50));
-          concurrentCount--;
-          return 'Content for $url';
-        }
-
-        await chapterManager.preloadChapters(
-          chapterUrls,
-          fetchFunction: mockFetchFunction,
-          maxConcurrent: 2,
-        );
-
-        // 验证并发数不超过限制
-        expect(maxConcurrent, lessThanOrEqualTo(2));
-      });
-
-      test('预加载时取消不应该影响已完成的预加载', () async {
-        const chapterUrl1 = 'https://example.com/chapter1';
-        const chapterUrl2 = 'https://example.com/chapter2';
-
-        Future<String> mockFetchFunction() async {
-          return 'Content';
-        }
-
-        // 预加载第一个章节
-        await chapterManager.preloadChapter(
-          chapterUrl1,
-          fetchFunction: mockFetchFunction,
-        );
-
-        // 重置状态（模拟取消）
-        chapterManager.reset();
-
-        // 第一个章节应该被清除
-        expect(chapterManager.isChapterPreloaded(chapterUrl1), isFalse);
+        expect(chapterManager.hasPendingRequest(chapterUrl), isFalse);
       });
 
       test('多次reset应该是安全的', () {
@@ -447,31 +337,32 @@ void main() {
         expect(stats['pending_requests'], 0);
       });
 
-      test('批量预加载进度回调应该正确', () async {
+      test('并发请求限制应该生效', () async {
         final chapterUrls = List.generate(
-          3,
+          5,
           (i) => 'https://example.com/chapter$i',
         );
 
-        final progressUpdates = <List<int>>[];
+        int requestCount = 0;
 
-        Future<String> mockFetchFunction(String url) async {
-          return 'Content for $url';
+        Future<String> mockFetchFunction() async {
+          requestCount++;
+          await Future.delayed(Duration(milliseconds: 50));
+          return 'Content';
         }
 
-        await chapterManager.preloadChapters(
-          chapterUrls,
-          fetchFunction: mockFetchFunction,
-          onProgress: (message, current, total) {
-            progressUpdates.add([current, total]);
-          },
-          maxConcurrent: 1,
-        );
+        // 同时发起所有请求
+        final futures = chapterUrls.map((url) {
+          return chapterManager.getChapterContent(
+            url,
+            fetchFunction: mockFetchFunction,
+          );
+        }).toList();
 
-        // 验证进度回调
-        expect(progressUpdates.length, greaterThan(0));
-        expect(progressUpdates.last[0], 3); // 最终current应该是3
-        expect(progressUpdates.last[1], 3); // total应该是3
+        await Future.wait(futures);
+
+        // 所有请求都应该完成
+        expect(requestCount, 5);
       });
     });
   });

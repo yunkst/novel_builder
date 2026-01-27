@@ -11,6 +11,7 @@ import '../models/outline.dart';
 import '../models/chat_scene.dart';
 import '../models/ai_accompaniment_settings.dart';
 import '../models/ai_companion_response.dart';
+import '../models/bookshelf.dart';
 import '../core/di/api_service_provider.dart';
 import 'invalid_markup_cleaner.dart';
 import 'logger_service.dart';
@@ -52,7 +53,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 15,
+      version: 19,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -86,7 +87,8 @@ class DatabaseService {
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         chapterIndex INTEGER,
-        cachedAt INTEGER NOT NULL
+        cachedAt INTEGER NOT NULL,
+        isAccompanied INTEGER DEFAULT 0
       )
     ''');
 
@@ -100,6 +102,7 @@ class DatabaseService {
         chapterIndex INTEGER,
         isUserInserted INTEGER DEFAULT 0,
         insertedAt INTEGER,
+        isAccompanied INTEGER DEFAULT 0,
         UNIQUE(novelUrl, chapterUrl)
       )
     ''');
@@ -118,6 +121,9 @@ class DatabaseService {
         clothingStyle TEXT,
         appearanceFeatures TEXT,
         backgroundStory TEXT,
+        facePrompts TEXT,
+        bodyPrompts TEXT,
+        cachedImageUrl TEXT,
         aliases TEXT DEFAULT '[]',
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER,
@@ -373,6 +379,184 @@ class DatabaseService {
           category: LogCategory.database,
           tags: ['migration', 'schema', 'ai_accompanied'],
       );
+    }
+    if (oldVersion < 16) {
+      // 创建书架表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bookshelves (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+          sort_order INTEGER DEFAULT 0,
+          icon TEXT DEFAULT 'book',
+          color INTEGER DEFAULT 0xFF2196F3,
+          is_system INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 创建小说-书架关联表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS novel_bookshelves (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          novel_url TEXT NOT NULL,
+          bookshelf_id INTEGER NOT NULL,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+          FOREIGN KEY (novel_url) REFERENCES bookshelf(url) ON DELETE CASCADE,
+          FOREIGN KEY (bookshelf_id) REFERENCES bookshelves(id) ON DELETE CASCADE,
+          UNIQUE(novel_url, bookshelf_id)
+        )
+      ''');
+
+      // 创建索引
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_novel_bookshelf_url ON novel_bookshelves(novel_url)
+      ''');
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_bookshelf_id ON novel_bookshelves(bookshelf_id)
+      ''');
+
+      // 插入系统书架
+      await db.execute('''
+        INSERT OR IGNORE INTO bookshelves (id, name, created_at, sort_order, is_system)
+        VALUES
+          (1, '全部小说', strftime('%s', 'now'), 0, 1),
+          (2, '我的收藏', strftime('%s', 'now'), 1, 1)
+      ''');
+
+      // 数据迁移：将现有书籍关联到"我的收藏"书架
+      await db.execute('''
+        INSERT OR IGNORE INTO novel_bookshelves (novel_url, bookshelf_id, created_at)
+        SELECT url, 2, strftime('%s', 'now')
+        FROM bookshelf
+        WHERE url IS NOT NULL
+      ''');
+
+      LoggerService.instance.i(
+        '数据库升级：创建了多书架功能相关表（bookshelves, novel_bookshelves）',
+        category: LogCategory.database,
+        tags: ['migration', 'schema', 'multi_bookshelf'],
+      );
+    }
+    if (oldVersion < 17) {
+      // 添加缺失的人物提示词字段（修复_onCreate中的遗漏）
+      // 检查字段是否已存在
+      final tableInfo = await db.rawQuery("PRAGMA table_info(characters)");
+      final hasFacePrompts = tableInfo.any((column) => column['name'] == 'facePrompts');
+
+      if (!hasFacePrompts) {
+        await db.execute('ALTER TABLE characters ADD COLUMN facePrompts TEXT');
+        await db.execute('ALTER TABLE characters ADD COLUMN bodyPrompts TEXT');
+        await db.execute('ALTER TABLE characters ADD COLUMN cachedImageUrl TEXT');
+
+        LoggerService.instance.i(
+          '数据库升级：添加了缺失的characters表字段（facePrompts, bodyPrompts, cachedImageUrl）',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'characters_fix'],
+        );
+      }
+    }
+    if (oldVersion < 18) {
+      // 添加AI伴读标记字段到chapter_cache表（如果还没有）
+      final chapterCacheInfo = await db.rawQuery("PRAGMA table_info(chapter_cache)");
+      final chapterCacheHasIsAccompanied = chapterCacheInfo.any((column) => column['name'] == 'isAccompanied');
+
+      if (!chapterCacheHasIsAccompanied) {
+        await db.execute('ALTER TABLE chapter_cache ADD COLUMN isAccompanied INTEGER DEFAULT 0');
+
+        LoggerService.instance.i(
+          '数据库升级：添加了chapter_cache.isAccompanied字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompaniment'],
+        );
+      }
+
+      // 添加AI伴读标记字段到novel_chapters表（如果还没有）
+      final novelChaptersInfo = await db.rawQuery("PRAGMA table_info(novel_chapters)");
+      final novelChaptersHasIsAccompanied = novelChaptersInfo.any((column) => column['name'] == 'isAccompanied');
+
+      if (!novelChaptersHasIsAccompanied) {
+        await db.execute('ALTER TABLE novel_chapters ADD COLUMN isAccompanied INTEGER DEFAULT 0');
+
+        LoggerService.instance.i(
+          '数据库升级：添加了novel_chapters.isAccompanied字段',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompaniment'],
+        );
+      }
+    }
+
+    if (oldVersion < 19) {
+      // 重命名字段：ai_accompanied -> isAccompanied（如果存在旧字段名）
+      final chapterCacheInfo = await db.rawQuery("PRAGMA table_info(chapter_cache)");
+      final hasOldAiAccompanied = chapterCacheInfo.any((column) => column['name'] == 'ai_accompanied');
+      final hasNewIsAccompanied = chapterCacheInfo.any((column) => column['name'] == 'isAccompanied');
+
+      if (hasOldAiAccompanied && !hasNewIsAccompanied) {
+        // SQLite 不支持直接重命名列，需要重建表
+        await db.execute('''
+          CREATE TABLE chapter_cache_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            novelUrl TEXT NOT NULL,
+            chapterUrl TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            chapterIndex INTEGER,
+            cachedAt INTEGER NOT NULL,
+            isAccompanied INTEGER DEFAULT 0
+          )
+        ''');
+
+        await db.execute('''
+          INSERT INTO chapter_cache_new (id, novelUrl, chapterUrl, title, content, chapterIndex, cachedAt, isAccompanied)
+          SELECT id, novelUrl, chapterUrl, title, content, chapterIndex, cachedAt, ai_accompanied
+          FROM chapter_cache
+        ''');
+
+        await db.execute('DROP TABLE chapter_cache');
+        await db.execute('ALTER TABLE chapter_cache_new RENAME TO chapter_cache');
+
+        LoggerService.instance.i(
+          '数据库升级：重命名 chapter_cache.ai_accompanied 为 isAccompanied',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompaniment'],
+        );
+      }
+
+      // 同样处理 novel_chapters 表
+      final novelChaptersInfo = await db.rawQuery("PRAGMA table_info(novel_chapters)");
+      final hasOldAiAccompanied2 = novelChaptersInfo.any((column) => column['name'] == 'ai_accompanied');
+      final hasNewIsAccompanied2 = novelChaptersInfo.any((column) => column['name'] == 'isAccompanied');
+
+      if (hasOldAiAccompanied2 && !hasNewIsAccompanied2) {
+        await db.execute('''
+          CREATE TABLE novel_chapters_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            novelUrl TEXT NOT NULL,
+            chapterUrl TEXT NOT NULL,
+            title TEXT NOT NULL,
+            chapterIndex INTEGER,
+            isUserInserted INTEGER DEFAULT 0,
+            insertedAt INTEGER,
+            isAccompanied INTEGER DEFAULT 0,
+            UNIQUE(novelUrl, chapterUrl)
+          )
+        ''');
+
+        await db.execute('''
+          INSERT INTO novel_chapters_new (id, novelUrl, chapterUrl, title, chapterIndex, isUserInserted, insertedAt, isAccompanied)
+          SELECT id, novelUrl, chapterUrl, title, chapterIndex, isUserInserted, insertedAt, ai_accompanied
+          FROM novel_chapters
+        ''');
+
+        await db.execute('DROP TABLE novel_chapters');
+        await db.execute('ALTER TABLE novel_chapters_new RENAME TO novel_chapters');
+
+        LoggerService.instance.i(
+          '数据库升级：重命名 novel_chapters.ai_accompanied 为 isAccompanied',
+          category: LogCategory.database,
+          tags: ['migration', 'schema', 'ai_accompaniment'],
+        );
+      }
     }
   }
 
@@ -640,6 +824,7 @@ class DatabaseService {
         'content': content,
         'chapterIndex': chapter.chapterIndex,
         'cachedAt': DateTime.now().millisecondsSinceEpoch,
+        'isAccompanied': chapter.isAccompanied ? 1 : 0, // 保存AI伴读状态
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -734,13 +919,13 @@ class DatabaseService {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'chapter_cache',
-      columns: ['ai_accompanied'],
+      columns: ['isAccompanied'],
       where: 'novelUrl = ? AND chapterUrl = ?',
       whereArgs: [novelUrl, chapterUrl],
     );
 
     if (maps.isNotEmpty) {
-      return maps.first['ai_accompanied'] == 1;
+      return maps.first['isAccompanied'] == 1;
     }
     return false;
   }
@@ -750,7 +935,7 @@ class DatabaseService {
     final db = await database;
     await db.update(
       'chapter_cache',
-      {'ai_accompanied': 1},
+      {'isAccompanied': 1},
       where: 'novelUrl = ? AND chapterUrl = ?',
       whereArgs: [novelUrl, chapterUrl],
     );
@@ -766,7 +951,7 @@ class DatabaseService {
     final db = await database;
     await db.update(
       'chapter_cache',
-      {'ai_accompanied': 0},
+      {'isAccompanied': 0},
       where: 'novelUrl = ? AND chapterUrl = ?',
       whereArgs: [novelUrl, chapterUrl],
     );
@@ -874,8 +1059,8 @@ class DatabaseService {
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT
         nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
-        nc.chapterIndex, nc.isUserInserted, nc.insertedAt, nc.readAt,
-        cc.content
+        nc.chapterIndex, nc.isUserInserted, nc.insertedAt,
+        cc.content, cc.isAccompanied
       FROM novel_chapters nc
       LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
       WHERE nc.novelUrl = ?
@@ -891,6 +1076,7 @@ class DatabaseService {
         chapterIndex: maps[i]['chapterIndex'],
         isUserInserted: maps[i]['isUserInserted'] == 1,
         readAt: maps[i]['readAt'] as int?,
+        isAccompanied: (maps[i]['isAccompanied'] ?? 0) == 1, // 读取AI伴读状态
       );
     });
   }
@@ -1656,19 +1842,25 @@ class DatabaseService {
   Future<List<Chapter>> getChapters(String novelUrl) async {
     final db = await database;
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'novel_chapters',
-      where: 'novelUrl = ?',
-      whereArgs: [novelUrl],
-      orderBy: 'chapterIndex ASC',
-    );
+    // 使用LEFT JOIN获取伴读状态（从chapter_cache表）
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT
+        nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
+        nc.chapterIndex, nc.isUserInserted, nc.insertedAt,
+        cc.isAccompanied
+      FROM novel_chapters nc
+      LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
+      WHERE nc.novelUrl = ?
+      ORDER BY nc.chapterIndex ASC
+    ''', [novelUrl]);
 
     return List.generate(maps.length, (i) {
       return Chapter(
         title: maps[i]['title'] ?? '',
         url: maps[i]['chapterUrl'] ?? '',
         chapterIndex: maps[i]['chapterIndex'] ?? 0,
-        readAt: maps[i]['readAt'] as int?,
+        readAt: null, // readAt字段不在novel_chapters表中
+        isAccompanied: (maps[i]['isAccompanied'] ?? 0) == 1, // 从chapter_cache读取AI伴读状态
       );
     });
   }
@@ -2635,5 +2827,286 @@ class DatabaseService {
     );
 
     return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
+  }
+
+  // ========== 多书架管理 ==========
+
+  /// 获取所有书架列表
+  ///
+  /// 返回所有书架，包括系统书架和用户创建的书架
+  /// 按排序字段排序
+  Future<List<Bookshelf>> getBookshelves() async {
+    if (isWebPlatform) {
+      // Web平台返回默认系统书架
+      return [
+        Bookshelf(
+          id: 1,
+          name: '全部小说',
+          createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          sortOrder: 0,
+          isSystem: true,
+        ),
+        Bookshelf(
+          id: 2,
+          name: '我的收藏',
+          createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          sortOrder: 1,
+          isSystem: true,
+        ),
+      ];
+    }
+
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelves',
+      orderBy: 'sort_order ASC',
+    );
+
+    return maps.map((map) => Bookshelf.fromJson(map)).toList();
+  }
+
+  /// 创建新书架
+  ///
+  /// [name] 书架名称
+  /// 返回新创建的书架ID
+  Future<int> createBookshelf(String name) async {
+    if (isWebPlatform) {
+      throw UnsupportedError('Web平台不支持创建书架');
+    }
+
+    final db = await database;
+
+    // 获取当前最大sort_order
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      'SELECT MAX(sort_order) as max_order FROM bookshelves',
+    );
+    final int maxOrder = result.first['max_order'] as int? ?? 0;
+
+    final int id = await db.insert(
+      'bookshelves',
+      {
+        'name': name,
+        'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        'sort_order': maxOrder + 1,
+        'is_system': 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.abort,
+    );
+
+    LoggerService.instance.i(
+      '创建书架: $name (ID: $id)',
+      category: LogCategory.database,
+      tags: ['bookshelf', 'create'],
+    );
+
+    return id;
+  }
+
+  /// 删除书架
+  ///
+  /// [bookshelfId] 书架ID
+  /// 注意：系统书架（is_system=1）不能删除
+  /// 返回是否删除成功
+  Future<bool> deleteBookshelf(int bookshelfId) async {
+    if (isWebPlatform) {
+      throw UnsupportedError('Web平台不支持删除书架');
+    }
+
+    final db = await database;
+
+    // 检查是否为系统书架
+    final List<Map<String, dynamic>> bookshelves = await db.query(
+      'bookshelves',
+      where: 'id = ?',
+      whereArgs: [bookshelfId],
+    );
+
+    if (bookshelves.isEmpty) {
+      LoggerService.instance.w(
+        '删除书架失败: 书架不存在 (ID: $bookshelfId)',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'delete'],
+      );
+      return false;
+    }
+
+    if (bookshelves.first['is_system'] == 1) {
+      LoggerService.instance.w(
+        '删除书架失败: 不能删除系统书架 (ID: $bookshelfId)',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'delete'],
+      );
+      return false;
+    }
+
+    // 删除书架（novel_bookshelves表会通过CASCADE自动删除关联记录）
+    final int count = await db.delete(
+      'bookshelves',
+      where: 'id = ?',
+      whereArgs: [bookshelfId],
+    );
+
+    final bool success = count > 0;
+
+    if (success) {
+      LoggerService.instance.i(
+        '删除书架成功 (ID: $bookshelfId)',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'delete'],
+      );
+    }
+
+    return success;
+  }
+
+  /// 获取指定书架中的小说列表
+  ///
+  /// [bookshelfId] 书架ID，如果为1（"全部小说"）则返回所有小说
+  /// 返回小说列表
+  Future<List<Novel>> getNovelsByBookshelf(int bookshelfId) async {
+    if (isWebPlatform) {
+      return [];
+    }
+
+    final db = await database;
+
+    // 如果是"全部小说"书架，返回所有小说
+    if (bookshelfId == 1) {
+      final List<Map<String, dynamic>> maps = await db.query(
+        'bookshelf',
+        orderBy: 'lastReadTime DESC, addedAt DESC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return Novel(
+          title: maps[i]['title'],
+          author: maps[i]['author'],
+          url: maps[i]['url'],
+          coverUrl: maps[i]['coverUrl'],
+          description: maps[i]['description'],
+          backgroundSetting: maps[i]['backgroundSetting'],
+          isInBookshelf: true,
+        );
+      });
+    }
+
+    // 其他书架，通过关联表查询
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT b.*
+      FROM bookshelf b
+      INNER JOIN novel_bookshelves nb ON b.url = nb.novel_url
+      WHERE nb.bookshelf_id = ?
+      ORDER BY b.lastReadTime DESC, b.addedAt DESC
+    ''', [bookshelfId]);
+
+    return List.generate(maps.length, (i) {
+      return Novel(
+        title: maps[i]['title'],
+        author: maps[i]['author'],
+        url: maps[i]['url'],
+        coverUrl: maps[i]['coverUrl'],
+        description: maps[i]['description'],
+        backgroundSetting: maps[i]['backgroundSetting'],
+        isInBookshelf: true,
+      );
+    });
+  }
+
+  /// 添加小说到指定书架
+  ///
+  /// [novelUrl] 小说URL
+  /// [bookshelfId] 书架ID
+  /// 注意："全部小说"书架（ID=1）是虚拟的，不需要添加关联
+  Future<void> addNovelToBookshelf(String novelUrl, int bookshelfId) async {
+    if (isWebPlatform) {
+      throw UnsupportedError('Web平台不支持书架操作');
+    }
+
+    if (bookshelfId == 1) {
+      // "全部小说"是虚拟书架，不需要添加关联
+      return;
+    }
+
+    final db = await database;
+
+    await db.insert(
+      'novel_bookshelves',
+      {
+        'novel_url': novelUrl,
+        'bookshelf_id': bookshelfId,
+        'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+
+    LoggerService.instance.i(
+      '添加小说到书架: $novelUrl -> 书架ID: $bookshelfId',
+      category: LogCategory.database,
+      tags: ['bookshelf', 'add_novel'],
+    );
+  }
+
+  /// 从指定书架移除小说
+  ///
+  /// [novelUrl] 小说URL
+  /// [bookshelfId] 书架ID
+  /// 注意：不能从"全部小说"书架（ID=1）移除，因为它是虚拟的
+  /// 返回是否移除成功
+  Future<bool> removeNovelFromBookshelf(String novelUrl, int bookshelfId) async {
+    if (isWebPlatform) {
+      throw UnsupportedError('Web平台不支持书架操作');
+    }
+
+    if (bookshelfId == 1) {
+      LoggerService.instance.w(
+        '不能从"全部小说"书架移除小说',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'remove_novel'],
+      );
+      return false;
+    }
+
+    final db = await database;
+
+    final int count = await db.delete(
+      'novel_bookshelves',
+      where: 'novel_url = ? AND bookshelf_id = ?',
+      whereArgs: [novelUrl, bookshelfId],
+    );
+
+    final bool success = count > 0;
+
+    if (success) {
+      LoggerService.instance.i(
+        '从书架移除小说: $novelUrl <- 书架ID: $bookshelfId',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'remove_novel'],
+      );
+    }
+
+    return success;
+  }
+
+  /// 获取小说所属的所有书架
+  ///
+  /// [novelUrl] 小说URL
+  /// 返回书架ID列表
+  Future<List<int>> getBookshelvesByNovel(String novelUrl) async {
+    if (isWebPlatform) {
+      return [1]; // Web平台默认返回"全部小说"
+    }
+
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'novel_bookshelves',
+      columns: ['bookshelf_id'],
+      where: 'novel_url = ?',
+      whereArgs: [novelUrl],
+    );
+
+    // 始终包含"全部小说"书架
+    final result = [1, ...maps.map((m) => m['bookshelf_id'] as int)];
+    return result.toSet().toList();
   }
 }

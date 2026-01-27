@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/preload_service.dart';
-import 'package:novel_app/services/rate_limiter.dart';
+import 'package:novel_app/services/database_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// 测试 PreloadService 的并发安全性
@@ -15,9 +15,20 @@ void main() {
 
   group('PreloadService 并发安全测试', () {
     late PreloadService preloadService;
+    late DatabaseService databaseService;
 
-    setUp(() {
+    setUp(() async {
+      // 每个测试使用新的PreloadService实例
       preloadService = PreloadService();
+      preloadService.clearQueue();
+
+      // 每个测试使用独立的数据库实例
+      databaseService = DatabaseService();
+      await databaseService.database; // 确保数据库已初始化
+    });
+
+    tearDown(() async {
+      // 清理队列
       preloadService.clearQueue();
     });
 
@@ -36,10 +47,10 @@ void main() {
       }
 
       // 等待所有调用完成
-      await Future.wait(calls);
+      await Future.wait(calls, eagerError: false);
 
-      // 等待一段时间,让队列处理几个任务
-      await Future.delayed(Duration(seconds: 2));
+      // 等待一小段时间，让队列初始化
+      await Future.delayed(Duration(milliseconds: 500));
 
       // 获取统计信息
       final stats = preloadService.getStatistics();
@@ -52,27 +63,16 @@ void main() {
       print('   失败: ${stats['total_failed']}');
       print('═══════════════════════════════════════');
 
-      // 验证: is_processing 应该是 true 或 false,但不能有多个循环
-      // 这可以通过检查已处理的章节数来推断
-      // 如果有并发,30秒内应该处理 > 2章
-      // 如果没有并发,30秒内应该处理 ~1章
+      // 验证: is_processing 应该是 true (因为队列非空)
+      final isProcessing = stats['is_processing'] as bool;
+      expect(isProcessing, isTrue);
 
-      // 由于我们只等待了2秒,最多应该只处理了1章
-      // 如果处理了2章或更多,说明存在并发问题
-      final processed = stats['total_processed'] as int;
-      final failed = stats['total_failed'] as int;
+      // 队列中应该有任务
+      final queueLength = stats['queue_length'] as int;
+      expect(queueLength, greaterThan(0));
 
-      // 注意: 这个测试假设第一次调用立即执行,后续调用需要等待30秒
-      // 在2秒内,如果只有1个循环,最多处理1章
-      // 如果有多个并发循环,可能处理2章或更多
-
-      print('⚠️  如果 processed >= 2,可能存在并发问题');
-      print('⚠️  当前 processed = $processed');
-
-      // 这个测试结果取决于网络速度和执行时间
-      // 仅用于演示潜在的并发问题
-      expect(processed >= 0, isTrue); // 基本断言
-    });
+      print('✅ 并发测试通过: 队列正常工作');
+    }, timeout: Timeout(Duration(seconds: 10)));
 
     test('验证单例模式', () {
       // 验证多次调用 PreloadService() 返回同一个实例
@@ -101,10 +101,10 @@ void main() {
       );
 
       // 两个调用都应该立即完成(不等待)
-      await Future.wait([future1, future2]);
+      await Future.wait([future1, future2], eagerError: false);
 
       // 等待一小段时间
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(Duration(milliseconds: 200));
 
       final stats = preloadService.getStatistics();
       print('📊 锁行为测试:');
@@ -113,6 +113,32 @@ void main() {
 
       // is_processing 应该是 true
       expect(stats['is_processing'], isTrue);
+
+      print('✅ 锁行为测试通过');
+    }, timeout: Timeout(Duration(seconds: 10)));
+
+    test('验证队列清理功能', () {
+      // 清理队列
+      preloadService.clearQueue();
+
+      final stats1 = preloadService.getStatistics();
+      expect(stats1['queue_length'], 0);
+      expect(stats1['is_processing'], isFalse);
+
+      print('✅ 队列清理功能正常');
+    });
+
+    test('验证统计信息结构', () {
+      final stats = preloadService.getStatistics();
+
+      // 验证统计信息包含必要的字段
+      expect(stats, containsPair('queue_length', isA<int>()));
+      expect(stats, containsPair('is_processing', isA<bool>()));
+      expect(stats, containsPair('total_processed', isA<int>()));
+      expect(stats, containsPair('total_failed', isA<int>()));
+      expect(stats, containsPair('enqueued_urls', isA<int>()));
+
+      print('✅ 统计信息结构正确');
     });
   });
 }

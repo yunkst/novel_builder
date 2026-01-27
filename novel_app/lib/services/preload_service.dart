@@ -279,6 +279,10 @@ class PreloadService {
     _rateLimiter.reset();
     _totalProcessed = 0;
     _totalFailed = 0;
+
+    // 重置处理状态（用于测试隔离）
+    _processingCompleter = null;
+
     debugPrint('🧹 预加载队列已清空');
   }
 
