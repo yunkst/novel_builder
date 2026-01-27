@@ -159,28 +159,37 @@ def upload_to_backend(
     print(f"正在上传到: {upload_url}")
     print(f"版本: {version} (code: {version_code})")
 
-    # 准备文件和数据
-    files = {
-        "file": (
-            f"novel_app_v{version}.apk",
-            apk_path.read_bytes(),
-            "application/vnd.android.package-archive",
-        )
-    }
+    # 检查文件是否存在
+    if not apk_path.exists():
+        raise FileNotFoundError(f"APK文件不存在: {apk_path}")
 
-    data = {
-        "version": version,
-        "version_code": str(version_code),
-        "changelog": changelog or "",
-        "force_update": "true" if force_update else "false",
-    }
+    # 检查文件大小
+    file_size = apk_path.stat().st_size
+    print(f"文件大小: {file_size / 1024 / 1024:.2f} MB")
 
-    headers = {
-        "X-API-TOKEN": api_token,
-    }
+    # 准备文件和数据（使用文件对象，而非直接读取bytes）
+    with open(apk_path, "rb") as f:
+        files = {
+            "file": (
+                f"novel_app_v{version}.apk",
+                f.read(),
+                "application/vnd.android.package-archive",
+            )
+        }
 
-    # 发送请求
-    response = requests.post(upload_url, files=files, data=data, headers=headers, timeout=300)
+        data = {
+            "version": version,
+            "version_code": str(version_code),
+            "changelog": changelog or "",
+            "force_update": "true" if force_update else "false",
+        }
+
+        headers = {
+            "X-API-TOKEN": api_token,
+        }
+
+        # 发送请求
+        response = requests.post(upload_url, files=files, data=data, headers=headers, timeout=300)
 
     if response.status_code != 200:
         print(f"上传失败! HTTP {response.status_code}")
@@ -238,7 +247,9 @@ def main():
     )
 
     print("-" * 50)
-    print("完成! 🎉")
+    print("Complete! Release successful!")
+    print(f"Version {version} (code: {version_code}) has been uploaded.")
+    print(f"Download URL: {api_url}/api/app-version/download/{version}")
 
 
 if __name__ == "__main__":
