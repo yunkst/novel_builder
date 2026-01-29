@@ -36,11 +36,16 @@ void main() {
           .thenAnswer((_) async => []);
     });
 
+    tearDown(() {
+      reset(mockDb);
+    });
+
     testWidgets('初始应该显示Loading Indicator', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: CharacterRelationshipScreen(
             character: testCharacter,
+            databaseService: mockDb,
           ),
         ),
       );
