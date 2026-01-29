@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/character_relationship.dart';
@@ -7,9 +8,10 @@ import 'package:novel_app/screens/character_relationship_screen.dart';
 import 'package:novel_app/services/database_service.dart';
 import '../../test_helpers/character_relationship_test_data.dart';
 import '../../test_bootstrap.dart';
+import 'character_relationship_screen_test.mocks.dart';
 
-/// Mock数据库服务
-class MockDatabaseService extends Mock implements DatabaseService {}
+/// 生成Mock类
+@GenerateMocks([DatabaseService])
 
 void main() {
   initTests();
