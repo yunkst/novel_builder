@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/database_service.dart';
+import '../utils/toast_utils.dart';
 
 /// 关系编辑对话框
 ///
@@ -106,12 +107,7 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
     }
 
     if (_selectedTargetCharacter == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请选择目标角色'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请选择目标角色');
       return;
     }
 
@@ -148,12 +144,7 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
             setState(() {
               _isSaving = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('该关系已存在，请使用其他关系类型'),
-                backgroundColor: Colors.orange,
-              ),
-            );
+            ToastUtils.showWarning('该关系已存在，请使用其他关系类型');
           }
           return;
         }
@@ -174,12 +165,7 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
         setState(() {
           _isSaving = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('保存失败: $e');
       }
     }
   }
@@ -203,7 +189,7 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
                 '${widget.currentCharacter.name} 的关系：',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -301,13 +287,17 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
         ),
         ElevatedButton(
           onPressed: _isSaving ? null : _save,
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.onPrimary,
+          ),
           child: _isSaving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 )
               : Text(isEditMode ? '保存' : '添加'),

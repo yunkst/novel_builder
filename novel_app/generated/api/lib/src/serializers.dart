@@ -15,6 +15,7 @@ import 'package:novel_api/src/date_serializer.dart';
 import 'package:novel_api/src/model/date.dart';
 
 import 'package:novel_api/src/model/app_version_response.dart';
+import 'package:novel_api/src/model/backup_upload_response.dart';
 import 'package:novel_api/src/model/chapter.dart';
 import 'package:novel_api/src/model/chapter_content.dart';
 import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
@@ -44,6 +45,7 @@ part 'serializers.g.dart';
 
 @SerializersFor([
   AppVersionResponse,
+  BackupUploadResponse,
   Chapter,
   ChapterContent,
   EnhancedSceneIllustrationRequest,

@@ -86,15 +86,6 @@ class ChatMessage {
     );
   }
 
-  /// 判断消息是否为对话类型
-  bool get isDialogue => type == 'dialogue';
-
-  /// 判断消息是否为旁白类型
-  bool get isNarration => type == 'narration';
-
-  /// 判断消息是否为用户消息
-  bool get isUserMessage => isUser;
-
   @override
   String toString() {
     return 'ChatMessage(type: $type, content: $content, isUser: $isUser)';

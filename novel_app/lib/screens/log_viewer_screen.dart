@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
+import '../widgets/common/common_widgets.dart';
 
 /// 日志查看页面
 ///
@@ -61,7 +63,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 将当前过滤后的所有日志格式化为纯文本后复制到剪贴板。
   void _copyAllLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('暂无日志可复制');
+      ToastUtils.show('暂无日志可复制');
       return;
     }
 
@@ -75,7 +77,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
     await Clipboard.setData(ClipboardData(text: text));
 
     if (mounted) {
-      _showSnackBar('已复制 ${_displayedLogs.length} 条日志到剪贴板');
+      ToastUtils.showSuccess('已复制 ${_displayedLogs.length} 条日志到剪贴板');
     }
   }
 
@@ -84,7 +86,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 将当前过滤后的所有日志导出为文本文件。
   Future<void> _exportLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('暂无日志可导出');
+      ToastUtils.show('暂无日志可导出');
       return;
     }
 
@@ -104,11 +106,11 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
       await Clipboard.setData(ClipboardData(text: text));
 
       if (mounted) {
-        _showSnackBar('已复制日志内容，请粘贴到文本文件保存');
+        ToastUtils.showSuccess('已复制日志内容，请粘贴到文本文件保存');
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('导出失败: $e');
+        ToastUtils.showError('导出失败: $e');
       }
     } finally {
       if (mounted) {
@@ -124,44 +126,23 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 显示确认对话框，用户确认后清空所有日志。
   Future<void> _clearLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('日志已为空');
+      ToastUtils.show('日志已为空');
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认清空'),
-        content: const Text('确定要清空所有日志吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '清空',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认清空',
+      message: '确定要清空所有日志吗？此操作不可撤销。',
+      confirmText: '清空',
+      icon: Icons.delete_outline,
+      confirmColor: Colors.red,
     );
 
     if (confirmed == true && mounted) {
       await LoggerService.instance.clearLogs();
       _loadLogs();
-      _showSnackBar('日志已清空');
-    }
-  }
-
-  /// 显示SnackBar提示
-  void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-      );
+      ToastUtils.showSuccess('日志已清空');
     }
   }
 
@@ -183,7 +164,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   Color _getLevelColor(LogLevel level) {
     switch (level) {
       case LogLevel.debug:
-        return Colors.grey;
+        return const Color(0xFF9E9E9E);
       case LogLevel.info:
         return Colors.blue;
       case LogLevel.warning:
@@ -210,8 +191,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
         return Colors.teal;
       case LogCategory.character:
         return Colors.pink;
+      case LogCategory.backup:
+        return Colors.indigo;
       case LogCategory.general:
-        return Colors.grey;
+        return const Color(0xFF9E9E9E);
     }
   }
 
@@ -287,14 +270,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                   Icon(
                     Icons.bug_report_outlined,
                     size: 64,
-                    color: Colors.grey[400],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _selectedLevel == null ? '暂无日志' : '暂无${_selectedLevel!.label}级别日志',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -383,7 +366,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                       tag,
                                       style: const TextStyle(fontSize: 10),
                                     ),
-                                    backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                                    backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     visualDensity: VisualDensity.compact,
@@ -399,7 +382,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                 _formatTimestamp(log.timestamp),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               ),
                               if (log.stackTrace != null && log.stackTrace!.isNotEmpty)
@@ -464,7 +447,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: log.stackTrace ?? ''));
               Navigator.pop(context);
-              _showSnackBar('已复制堆栈信息');
+              ToastUtils.showSuccess('已复制堆栈信息');
             },
             child: const Text('复制'),
           ),

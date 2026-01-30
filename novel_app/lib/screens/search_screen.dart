@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import 'chapter_list_screen.dart';
 import '../utils/toast_utils.dart';
 import '../core/di/api_service_provider.dart';
@@ -69,12 +71,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载源站列表失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('加载源站列表失败: $e', context: context);
       }
     }
   }
@@ -93,21 +90,31 @@ class _SearchScreenState extends State<SearchScreen> {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) {
       if (mounted) {
-        ToastUtils.showWarning(context, '请输入搜索关键词');
+        ToastUtils.showWarning('请输入搜索关键词', context: context);
       }
       return;
     }
 
     if (!_isInitialized) {
+      LoggerService.instance.w(
+        '搜索前未配置后端服务',
+        category: LogCategory.network,
+        tags: ['search', 'backend', 'not-configured'],
+      );
       if (mounted) {
-        ToastUtils.showError(context, '请先配置后端服务地址');
+        ToastUtils.showError('请先配置后端服务地址', context: context);
       }
       return;
     }
 
     if (_selectedSites.isEmpty) {
+      LoggerService.instance.w(
+        '未选择搜索源站',
+        category: LogCategory.network,
+        tags: ['search', 'sites', 'none-selected'],
+      );
       if (mounted) {
-        ToastUtils.showWarning(context, '请至少选择一个搜索源站');
+        ToastUtils.showWarning('请至少选择一个搜索源站', context: context);
       }
       return;
     }
@@ -139,7 +146,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
       // 显示开始搜索的提示
       if (mounted) {
-        ToastUtils.showLoading(context, searchInfo);
+        ToastUtils.showLoading(searchInfo, context: context);
       }
 
       // 通过后端服务进行搜索，传递选中的站点
@@ -165,12 +172,12 @@ class _SearchScreenState extends State<SearchScreen> {
       // 显示搜索结果提示
       if (mounted) {
         if (results.isNotEmpty) {
-          ToastUtils.showSuccess(context, '找到 ${results.length} 个相关小说');
+          ToastUtils.showSuccess('找到 ${results.length} 个相关小说', context: context);
         } else {
-          ToastUtils.showInfo(context, '未找到相关小说，请尝试其他关键词或调整源站筛选');
+          ToastUtils.showInfo('未找到相关小说，请尝试其他关键词或调整源站筛选', context: context);
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // 再次检查页面状态
       if (_isSearchDisposed || !mounted) return;
 
@@ -183,7 +190,13 @@ class _SearchScreenState extends State<SearchScreen> {
       }
 
       if (mounted) {
-        ToastUtils.showError(context, e.toString());
+        ErrorHelper.showErrorWithLog(
+          context,
+          '搜索小说失败',
+          stackTrace: stackTrace,
+          category: LogCategory.network,
+          tags: ['search', 'api', 'failed'],
+        );
       }
     }
   }
@@ -201,7 +214,7 @@ class _SearchScreenState extends State<SearchScreen> {
               icon: Icon(
                 _showSiteFilter ? Icons.filter_list_off : Icons.filter_list,
                 color: _selectedSites.length < _sourceSites.length
-                    ? Colors.blue
+                    ? Theme.of(context).colorScheme.primary
                     : null,
               ),
               tooltip: '源站筛选',
@@ -264,7 +277,9 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Center(
                 child: Text(
                   _errorMessage,
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
             )

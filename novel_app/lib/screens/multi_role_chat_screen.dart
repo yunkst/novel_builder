@@ -6,6 +6,7 @@ import '../services/dify_service.dart';
 import '../services/character_avatar_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/role_color_manager.dart';
+import '../utils/toast_utils.dart';
 
 /// 暗色主题颜色常量
 class _DarkThemeColors {
@@ -31,7 +32,6 @@ class _DarkThemeColors {
   static const Color divider = Color(0xFF3C3C3C);
   static const Color buttonPrimary = Color(0xFF2196F3);
   static const Color buttonDisabled = Color(0xFF3C3C3C);
-  static const Color errorBackground = Color(0xFFB71C1C);
 }
 
 /// 多角色聊天屏幕
@@ -253,12 +253,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   /// 显示错误提示
   void _showErrorSnackBar(String error) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('生成失败: $error'),
-          backgroundColor: _DarkThemeColors.errorBackground,
-        ),
-      );
+      ToastUtils.showError('生成失败: $error');
     }
   }
 
@@ -305,13 +300,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
 
     // 显示插入成功提示
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已插入: $characterName'),
-          duration: const Duration(milliseconds: 800),
-          backgroundColor: _DarkThemeColors.buttonPrimary,
-        ),
-      );
+      ToastUtils.showInfo('已插入: $characterName');
     }
 
     setState(() {});
@@ -714,7 +703,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
               onPressed: _canSend() ? _sendMessage : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _DarkThemeColors.buttonPrimary,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 disabledBackgroundColor: _DarkThemeColors.buttonDisabled,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),

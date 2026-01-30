@@ -30,11 +30,11 @@ class CharacterDetailDialog extends StatelessWidget {
         children: [
           // 角色头像（首字母）
           CircleAvatar(
-            backgroundColor: _getGenderColor(character.gender),
+            backgroundColor: _getGenderColor(context, character.gender),
             child: Text(
               _getCharacterInitial(character),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -55,17 +55,17 @@ class CharacterDetailDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 性别
-          _buildInfoRow('性别', character.gender ?? '未知'),
+          _buildInfoRow(context, '性别', character.gender ?? '未知'),
           const SizedBox(height: 8),
           // 职业（如果有）
           if (character.occupation != null && character.occupation!.isNotEmpty) ...[
-            _buildInfoRow('职业', character.occupation!),
+            _buildInfoRow(context, '职业', character.occupation!),
             const SizedBox(height: 8),
           ],
           // 背景故事（如果有）
           if (character.backgroundStory != null &&
               character.backgroundStory!.isNotEmpty) ...[
-            _buildInfoRow('背景', character.backgroundStory!),
+            _buildInfoRow(context, '背景', character.backgroundStory!),
           ],
         ],
       ),
@@ -79,7 +79,7 @@ class CharacterDetailDialog extends StatelessWidget {
   }
 
   /// 构建信息行
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -87,7 +87,10 @@ class CharacterDetailDialog extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -109,14 +112,14 @@ class CharacterDetailDialog extends StatelessWidget {
   }
 
   /// 根据性别获取颜色
-  Color _getGenderColor(String? gender) {
+  Color _getGenderColor(BuildContext context, String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue[600]!;
+        return Theme.of(context).colorScheme.primary;
       case '女':
-        return Colors.pink[400]!;
+        return Theme.of(context).colorScheme.secondary;
       default:
-        return Colors.purple;
+        return Theme.of(context).colorScheme.tertiary;
     }
   }
 }

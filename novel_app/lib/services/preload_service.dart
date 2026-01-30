@@ -8,6 +8,7 @@ import 'preload_progress_update.dart';
 import 'database_service.dart';
 import 'api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
+import 'logger_service.dart';
 
 /// 全局预加载服务（单例）
 ///
@@ -57,7 +58,11 @@ class PreloadService {
   void _initServices() {
     _databaseService = DatabaseService();
     _apiService = ApiServiceProvider.instance;
-    debugPrint('✅ PreloadService初始化完成');
+    LoggerService.instance.i(
+      'PreloadService初始化完成',
+      category: LogCategory.cache,
+      tags: ['preload', 'init'],
+    );
   }
 
   /// 添加预加载任务（智能插队）
@@ -76,18 +81,18 @@ class PreloadService {
     _novelCurrentIndex[novelUrl] = currentIndex;
     _lastActiveNovel = novelUrl;
 
-    debugPrint('📚 小说活跃: $novelTitle (第${currentIndex + 1}章)');
-
     // 使用DatabaseService的批量检查方法
     final uncachedUrls =
         await _databaseService.filterUncachedChapters(chapterUrls);
 
     if (uncachedUrls.isEmpty) {
-      debugPrint('✅ "$novelTitle" 所有章节已缓存');
+      LoggerService.instance.i(
+        '✅ "$novelTitle" 所有章节已缓存',
+        category: LogCategory.cache,
+        tags: ['preload', novelUrl],
+      );
       return;
     }
-
-    debugPrint('📋 待缓存章节数: ${uncachedUrls.length}');
 
     // 创建任务列表（后续章节优先）
     final tasks =
@@ -105,13 +110,20 @@ class PreloadService {
     }
 
     if (addedCount > 0) {
-      debugPrint('📥 任务入队: $addedCount 个 (队列长度: ${_queue.length})');
-      _printQueueStatus();
+      LoggerService.instance.i(
+        '📚 开始预加载: $novelTitle, 当前第${currentIndex + 1}章, 待缓存$addedCount个',
+        category: LogCategory.cache,
+        tags: ['preload', novelUrl, 'start'],
+      );
 
       // 启动处理（如果未在运行）
       _processQueue();
     } else {
-      debugPrint('⏭️ 所有任务已在队列中');
+      LoggerService.instance.d(
+        '⏭️ 所有任务已在队列中',
+        category: LogCategory.cache,
+        tags: ['preload', novelUrl],
+      );
     }
   }
 
@@ -153,7 +165,6 @@ class PreloadService {
   Future<void> _processQueue() async {
     // 🔒 原子检查: 如果已有Completer,说明正在处理
     if (_processingCompleter != null) {
-      debugPrint('⚠️ 队列处理中，跳过重复启动');
       return;
     }
 
@@ -161,7 +172,7 @@ class PreloadService {
     final completer = Completer<void>();
     _processingCompleter = completer;
 
-    debugPrint('🚀 开始处理预加载队列');
+    final startTime = DateTime.now();
 
     // 发送开始通知（不包含具体章节URL）
     if (_lastActiveNovel != null) {
@@ -175,7 +186,11 @@ class PreloadService {
           totalChapters: _queue.length + cachedCount,
         ));
       } catch (e) {
-        debugPrint('⚠️ 发送开始通知失败: $e');
+        LoggerService.instance.w(
+          '发送开始通知失败: $e',
+          category: LogCategory.cache,
+          tags: ['preload', 'notify'],
+        );
       }
     }
 
@@ -187,8 +202,6 @@ class PreloadService {
         // 从队列头部取出任务
         final task = _queue.removeFirst();
         _enqueuedUrls.remove(task.chapterUrl);
-
-        debugPrint('📖 [队列${_queue.length}] 正在处理: $task');
 
         try {
           // 标记正在预加载
@@ -206,18 +219,30 @@ class PreloadService {
           await _databaseService.cacheChapter(task.novelUrl, chapter, content);
 
           _totalProcessed++;
-          debugPrint('✅ 缓存成功: $task (${content.length}字符)');
+
+          // 每处理5个汇总一次进度
+          if (_totalProcessed % 5 == 0) {
+            LoggerService.instance.d(
+              '预加载进度: $_totalProcessed个已处理, $_totalFailed个失败, 剩余${_queue.length}个',
+              category: LogCategory.cache,
+              tags: ['preload', 'progress'],
+            );
+          }
 
           // 发送进度更新（包含具体章节URL）
           await _notifyProgressUpdate(task.novelUrl, task.chapterUrl);
         } catch (e) {
           _totalFailed++;
-          debugPrint('❌ 缓存失败: $task, 错误: $e');
           // 失败不中断，继续下一个
         }
       }
 
-      debugPrint('✅ 队列处理完成 (已处理: $_totalProcessed, 失败: $_totalFailed)');
+      final duration = DateTime.now().difference(startTime);
+      LoggerService.instance.i(
+        '✅ 预加载完成: 成功$_totalProcessed个, 失败$_totalFailed个, 耗时${duration.inSeconds}s',
+        category: LogCategory.cache,
+        tags: ['preload', 'complete'],
+      );
 
       // 发送完成通知
       if (_lastActiveNovel != null) {
@@ -232,7 +257,11 @@ class PreloadService {
 
       completer.complete(); // ✅ 标记完成
     } catch (e) {
-      debugPrint('❌ 队列处理异常: $e');
+      LoggerService.instance.e(
+        '❌ 队列处理异常: $e',
+        category: LogCategory.cache,
+        tags: ['preload', 'error'],
+      );
       completer.completeError(e); // ✅ 标记失败
     } finally {
       _processingCompleter = null; // ✅ 释放锁

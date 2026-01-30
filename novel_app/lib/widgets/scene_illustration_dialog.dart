@@ -5,7 +5,11 @@ import '../widgets/character_selector.dart';
 import '../widgets/model_selector.dart';
 import '../services/database_service.dart';
 import '../services/scene_illustration_service.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
+import '../utils/character_matcher.dart';
 import '../mixins/dify_streaming_mixin.dart';
+import '../utils/toast_utils.dart';
 
 class SceneIllustrationDialog extends StatefulWidget {
   final String paragraphText;
@@ -82,8 +86,13 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
       }
       // 角色加载完成后，执行预选逻辑
       _preselectAppearingCharacters();
-    } catch (e) {
-      debugPrint('加载角色列表失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '加载角色列表失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['illustration', 'characters', 'load', 'failed'],
+      );
     }
   }
 
@@ -105,41 +114,6 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     return matchableParagraphs.join('\n');
   }
 
-  /// 在章节内容中查找出现的角色（支持别名）
-  List<int> _findAppearingCharacters(
-      String content, List<Character> characters) {
-    if (content.isEmpty || characters.isEmpty) {
-      return [];
-    }
-
-    final appearingIds = <int>{};
-    final lowerContent = content.toLowerCase();
-
-    for (final character in characters) {
-      if (character.name.isEmpty) continue;
-
-      // 检查正式名称
-      final lowerName = character.name.toLowerCase();
-      if (lowerContent.contains(lowerName) && character.id != null) {
-        appearingIds.add(character.id!);
-        continue;
-      }
-
-      // 检查别名
-      final aliases = character.aliases ?? [];
-      for (final alias in aliases) {
-        if (alias.isEmpty) continue;
-        final lowerAlias = alias.toLowerCase();
-        if (lowerContent.contains(lowerAlias) && character.id != null) {
-          appearingIds.add(character.id!);
-          break;
-        }
-      }
-    }
-
-    return appearingIds.toList();
-  }
-
   /// 预选章节中出现的角色
   Future<void> _preselectAppearingCharacters() async {
     try {
@@ -155,9 +129,11 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
       final matchableContent =
           _getMatchableContent(chapterContent, widget.paragraphIndex);
 
-      // 查找出现的角色
-      final appearingIds =
-          _findAppearingCharacters(matchableContent, _characters);
+      // 使用工具类查找出现的角色ID
+      final appearingIds = CharacterMatcher.findAppearingCharacterIds(
+        matchableContent,
+        _characters,
+      );
 
       if (appearingIds.isNotEmpty) {
         if (mounted) {
@@ -168,8 +144,13 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
         debugPrint(
             '预选了 ${appearingIds.length} 个角色: ${appearingIds.join(', ')}');
       }
-    } catch (e) {
-      debugPrint('预选角色失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '预选角色失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['illustration', 'characters', 'preselect', 'failed'],
+      );
       // 预选失败不影响对话框正常显示
     }
   }
@@ -214,12 +195,12 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     final fullContext =
         _getMatchableContent(chapterContent, widget.paragraphIndex);
 
-    // 重新筛选在fullContext中出现的角色
+    // 重新筛选在fullContext中出现的角色（使用工具类）
     final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
-    final appearingCharacters =
-        _findAppearingCharacters(fullContext, allCharacters);
+    final appearingIds =
+        CharacterMatcher.findAppearingCharacterIds(fullContext, allCharacters);
     final selectedCharacters =
-        allCharacters.where((c) => appearingCharacters.contains(c.id)).toList();
+        allCharacters.where((c) => appearingIds.contains(c.id)).toList();
 
     // 构建输入参数
     final inputs = {
@@ -258,12 +239,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
 
   Future<void> generateIllustration() async {
     if (_contentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请先输入场景描写内容'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      ToastUtils.showWarning('请先输入场景描写内容');
       return;
     }
 
@@ -300,12 +276,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
           _isGenerating = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('插图任务已创建，正在生成中...'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('插图任务已创建，正在生成中...');
 
         // 通知父组件刷新
         widget.onRefresh?.call(illustrationId.toString());
@@ -313,19 +284,18 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
         // 关闭对话框
         Navigator.of(context).pop();
       }
-    } catch (e) {
-      debugPrint('创建插图失败: $e');
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '创建插图失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['illustration', 'create', 'failed'],
+      );
       if (mounted) {
         setState(() {
           _isGenerating = false;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('创建插图失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -333,11 +303,11 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.image, color: Colors.blue),
-          SizedBox(width: 8),
-          Text('创建插图'),
+          Icon(Icons.image, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          const Text('创建插图'),
         ],
       ),
       content: SizedBox(
@@ -392,10 +362,10 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _imageCount == count
-                            ? Colors.blue
-                            : Colors.grey[300],
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
                         foregroundColor:
-                            _imageCount == count ? Colors.white : Colors.black,
+                            _imageCount == count ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
                       ),
                       child: Text('$count'),
                     ),
@@ -430,7 +400,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextField(
@@ -439,14 +409,14 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                 scrollController: _scrollController,
                 maxLines: 4,
                 enabled: !isStreaming, // 生成时禁用编辑（使用 mixin 状态）
-                style: const TextStyle(color: Colors.white), // 始终白色文字
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface), // 始终白色文字
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(12),
                   filled: true,
-                  fillColor: Colors.black, // 始终黑色背景
+                  fillColor: Theme.of(context).colorScheme.surface, // 始终黑色背景
                   hintText: '请输入场景描述，或点击下方"AI生成画面"按钮自动生成',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.40)),
                 ),
               ),
             ),
@@ -456,17 +426,17 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
             ElevatedButton.icon(
               onPressed: isStreaming ? null : _startSceneDescriptionGeneration,
               icon: isStreaming
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                     )
                   : const Icon(Icons.auto_awesome),
               label: Text(isStreaming ? 'AI生成中...' : 'AI生成画面'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 minimumSize: const Size(double.infinity, 48),
               ),
             ),
@@ -477,20 +447,20 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.error_outline,
-                        size: 16, color: Colors.red.shade600),
+                        size: 16, color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _sceneGenerationError!,
                         style:
-                            TextStyle(color: Colors.red.shade600, fontSize: 14),
+                            TextStyle(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8), fontSize: 14),
                       ),
                     ),
                   ],
@@ -512,15 +482,15 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
         ElevatedButton(
           onPressed: _isGenerating ? null : generateIllustration,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isGenerating
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                 )
               : const Text('生成插图'),
         ),

@@ -11,6 +11,8 @@ class ReorderableChapterListItem extends StatelessWidget {
   final int index;
   final bool isLastRead;
   final bool isUserChapter;
+  final bool isCached; // 是否已缓存
+  final bool isRead; // 是否已读
   final bool isAccompanied; // 是否已AI伴读
 
   const ReorderableChapterListItem({
@@ -18,38 +20,41 @@ class ReorderableChapterListItem extends StatelessWidget {
     required this.index,
     required this.isLastRead,
     required this.isUserChapter,
+    required this.isCached,
+    this.isRead = false,
     this.isAccompanied = false,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       key: ValueKey(chapter.url),
       decoration: BoxDecoration(
         // 背景色优先级: 已伴读 > 用户插入
         color: isAccompanied
-            ? Colors.purple.withValues(alpha: 0.05)
+            ? colorScheme.tertiary.withValues(alpha: 0.05)
             : (isUserChapter
-                ? Colors.blue.withValues(alpha: 0.05)
-                : Colors.orange.withValues(alpha: 0.05)),
+                ? colorScheme.primary.withValues(alpha: 0.05)
+                : colorScheme.tertiary.withValues(alpha: 0.05)),
         border: isAccompanied
             ? Border(
                 // 已伴读: 紫色左边框 + 橙色外框
                 left: BorderSide(
-                  color: Colors.purple.withValues(alpha: 0.3),
+                  color: colorScheme.tertiary.withValues(alpha: 0.3),
                   width: 3,
                 ),
                 right: BorderSide(
-                  color: Colors.orange.withValues(alpha: 0.5),
+                  color: colorScheme.tertiary.withValues(alpha: 0.5),
                   width: 1,
                 ),
                 top: BorderSide(
-                  color: Colors.orange.withValues(alpha: 0.5),
+                  color: colorScheme.tertiary.withValues(alpha: 0.5),
                   width: 1,
                 ),
                 bottom: BorderSide(
-                  color: Colors.orange.withValues(alpha: 0.5),
+                  color: colorScheme.tertiary.withValues(alpha: 0.5),
                   width: 1,
                 ),
               )
@@ -57,25 +62,25 @@ class ReorderableChapterListItem extends StatelessWidget {
                 ? Border(
                     // 用户插入: 蓝色左边框 + 橙色外框
                     left: BorderSide(
-                      color: Colors.blue.withValues(alpha: 0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                       width: 3,
                     ),
                     right: BorderSide(
-                      color: Colors.orange.withValues(alpha: 0.5),
+                      color: colorScheme.tertiary.withValues(alpha: 0.5),
                       width: 1,
                     ),
                     top: BorderSide(
-                      color: Colors.orange.withValues(alpha: 0.5),
+                      color: colorScheme.tertiary.withValues(alpha: 0.5),
                       width: 1,
                     ),
                     bottom: BorderSide(
-                      color: Colors.orange.withValues(alpha: 0.5),
+                      color: colorScheme.tertiary.withValues(alpha: 0.5),
                       width: 1,
                     ),
                   )
                 : Border.all(
                     // 普通: 橙色外框
-                    color: Colors.orange.withValues(alpha: 0.5),
+                    color: colorScheme.tertiary.withValues(alpha: 0.5),
                     width: 1,
                   )),
       ),
@@ -83,7 +88,7 @@ class ReorderableChapterListItem extends StatelessWidget {
       child: ListTile(
         leading: Icon(
           Icons.drag_handle,
-          color: Colors.grey[600],
+          color: colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         title: Row(
           children: [
@@ -94,7 +99,7 @@ class ReorderableChapterListItem extends StatelessWidget {
                 vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.2),
+                color: colorScheme.tertiary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -102,7 +107,7 @@ class ReorderableChapterListItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.orange[800],
+                  color: colorScheme.tertiary.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -111,9 +116,11 @@ class ReorderableChapterListItem extends StatelessWidget {
                 title: chapter.title,
                 isLastRead: isLastRead,
                 isUserChapter: isUserChapter,
+                isRead: isRead, // 传入已读状态
               ),
             ),
             if (isUserChapter) const ChapterBadge(),
+            if (isCached) Icon(Icons.offline_pin, size: 16, color: colorScheme.primary),
           ],
         ),
         onTap: () {

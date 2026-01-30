@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/app_version.dart';
 import '../services/app_update_service.dart';
+import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
 
 /// APP更新对话框
 ///
@@ -233,6 +235,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       if (success) {
         // 下载成功后自动提示安装
         _installApk();
+      } else {
+        // 下载失败，记录日志
+        LoggerService.instance.e(
+          'APK下载失败: ${widget.version.version}',
+          category: LogCategory.network,
+          tags: ['update', 'apk', 'download', 'failed'],
+        );
       }
     }
   }
@@ -256,9 +265,12 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         widget.onUpdateComplete?.call();
       } else {
         // 安装失败，显示提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('安装失败，请手动安装')),
+        LoggerService.instance.e(
+          'APK安装失败: ${widget.version.version}',
+          category: LogCategory.general,
+          tags: ['update', 'apk', 'install', 'failed'],
         );
+        ToastUtils.showError('安装失败，请手动安装');
       }
     }
   }

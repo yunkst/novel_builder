@@ -8,6 +8,7 @@ part of 'serializers.dart';
 
 Serializers _$serializers = (Serializers().toBuilder()
       ..add(AppVersionResponse.serializer)
+      ..add(BackupUploadResponse.serializer)
       ..add(Chapter.serializer)
       ..add(ChapterContent.serializer)
       ..add(EnhancedSceneIllustrationRequest.serializer)

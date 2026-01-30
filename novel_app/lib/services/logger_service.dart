@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'preferences_service.dart';
 
 /// 日志级别
 enum LogLevel {
@@ -60,6 +61,9 @@ enum LogCategory {
   /// 角色管理
   character('character', '角色'),
 
+  /// 数据备份
+  backup('backup', '备份'),
+
   /// 通用（默认）
   general('general', '通用');
 
@@ -115,6 +119,15 @@ class LogEntry {
   /// 日志标签
   final List<String> tags;
 
+  /// 结构化额外数据（可选）
+  ///
+  /// 用于存储额外的结构化信息，如：
+  /// - 操作耗时
+  /// - 关联ID (correlation_id)
+  /// - 性能指标
+  /// - 业务上下文
+  final Map<String, dynamic>? extra;
+
   const LogEntry({
     required this.timestamp,
     required this.level,
@@ -122,6 +135,7 @@ class LogEntry {
     this.stackTrace,
     this.category = LogCategory.general,
     this.tags = const [],
+    this.extra,
   });
 
   /// 转换为Map用于序列化
@@ -133,6 +147,7 @@ class LogEntry {
       'stackTrace': stackTrace,
       'category': category.index,
       'tags': tags,
+      'extra': extra,
     };
   }
 
@@ -151,6 +166,10 @@ class LogEntry {
       tags: map.containsKey('tags')
           ? (map['tags'] as List<dynamic>).cast<String>()
           : const [],
+      // 向后兼容：如果没有extra字段，默认为null
+      extra: map.containsKey('extra')
+          ? map['extra'] as Map<String, dynamic>?
+          : null,
     );
   }
 
@@ -526,10 +545,9 @@ class LoggerService {
   /// 从SharedPreferences加载已保存的日志
   Future<void> _loadLogs() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final logsJson = prefs.getString(_prefsKey);
+      final logsJson = await PreferencesService.instance.getString(_prefsKey);
 
-      if (logsJson != null && logsJson.isNotEmpty) {
+      if (logsJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(logsJson) as List<dynamic>;
         _logs.addAll(
           decoded.map((e) => LogEntry.fromMap(e as Map<String, dynamic>)),
@@ -546,11 +564,10 @@ class LoggerService {
   /// 将当前内存队列中的所有日志序列化为JSON并保存到SharedPreferences。
   Future<void> _persistLogs() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final logsJson = jsonEncode(
         _logs.map((e) => e.toMap()).toList(),
       );
-      await prefs.setString(_prefsKey, logsJson);
+      await PreferencesService.instance.setString(_prefsKey, logsJson);
     } catch (e) {
       // 持久化失败不影响应用运行
       // 实际场景中可以添加错误计数，避免频繁重试

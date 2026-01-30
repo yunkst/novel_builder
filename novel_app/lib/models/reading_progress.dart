@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:core';
 
 /// TTS朗读进度模型
 class ReadingProgress {
@@ -81,9 +80,6 @@ class ReadingProgress {
   String toJsonString() {
     return jsonEncode(toJson());
   }
-
-  /// 格式化的进度文本
-  String get positionText => '$chapterTitle (第${paragraphIndex + 1}段)';
 
   /// 检查进度是否过期
   bool isExpired({int days = 7}) {

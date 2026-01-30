@@ -137,7 +137,7 @@ class _ModelSelectorState extends State<ModelSelector> {
               prefixIcon: const Icon(Icons.warning_amber),
               helperText: '请检查后端连接',
               helperStyle:
-                  TextStyle(color: Colors.orange.shade700, fontSize: 12),
+                  TextStyle(color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.7), fontSize: 12),
             ),
             items: const [],
             onChanged: null,
@@ -164,7 +164,7 @@ class _ModelSelectorState extends State<ModelSelector> {
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.model_training),
             filled: true,
-            fillColor: widget.enabled ? null : Colors.grey.shade100,
+            fillColor: widget.enabled ? null : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
           ),
           items: models.map((model) {
             return DropdownMenuItem<String>(
@@ -185,16 +185,16 @@ class _ModelSelectorState extends State<ModelSelector> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                                color: Colors.blue.shade200, width: 1),
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), width: 1),
                           ),
                           child: Text(
                             '默认',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.blue.shade700,
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -207,7 +207,7 @@ class _ModelSelectorState extends State<ModelSelector> {
                       '${model.width!} × ${model.height!}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                 ],

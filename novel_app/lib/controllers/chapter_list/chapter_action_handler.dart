@@ -1,18 +1,13 @@
-import '../../models/chapter.dart';
 import '../../services/database_service.dart';
-import '../../services/chapter_service.dart';
 
 /// 章节操作处理器
 /// 负责章节的增删改操作
 class ChapterActionHandler {
   final DatabaseService _databaseService;
-  final ChapterService _chapterService;
 
   ChapterActionHandler({
     required DatabaseService databaseService,
-    ChapterService? chapterService,
-  })  : _databaseService = databaseService,
-        _chapterService = chapterService ?? ChapterService();
+  }) : _databaseService = databaseService;
 
   /// 插入用户章节
   /// [novelUrl] 小说URL
@@ -39,23 +34,20 @@ class ChapterActionHandler {
     await _databaseService.deleteUserChapter(chapterUrl);
   }
 
-  /// 获取前文章节内容（用于上下文）
-  ///
-  /// 委托给 [ChapterService.getPreviousChaptersContent] 处理
-  Future<List<String>> getPreviousChaptersContent({
-    required List<Chapter> chapters,
-    required int afterIndex,
-  }) async {
-    return await _chapterService.getPreviousChaptersContent(
-      chapters: chapters,
-      afterIndex: afterIndex,
-    );
-  }
-
   /// 检查章节是否已缓存
   /// [chapterUrl] 章节URL
   /// 返回是否已缓存
   Future<bool> isChapterCached(String chapterUrl) async {
     return await _databaseService.isChapterCached(chapterUrl);
+  }
+
+  /// 批量检查章节是否已缓存
+  ///
+  /// [chapterUrls] 章节URL列表
+  /// 返回 Map&lt;chapterUrl, isCached&gt;
+  ///
+  /// 性能优化：使用单次SQL查询替代逐个查询
+  Future<Map<String, bool>> areChaptersCached(List<String> chapterUrls) async {
+    return await _databaseService.getChaptersCacheStatus(chapterUrls);
   }
 }

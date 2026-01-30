@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/database_service.dart';
 import '../../services/chapter_history_service.dart';
-import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
@@ -37,10 +35,7 @@ class FullRewriteDialog extends StatefulWidget {
 
 class _FullRewriteDialogState extends State<FullRewriteDialog>
     with DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService(
-    databaseService: DatabaseService(),
-    apiService: ApiServiceProvider.instance,
-  );
+  final ChapterHistoryService _historyService = ChapterHistoryService.create();
 
   final ValueNotifier<String> _rewriteResultNotifier =
       ValueNotifier<String>('');

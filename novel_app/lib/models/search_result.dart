@@ -1,42 +1,3 @@
-/// 简化的搜索结果模型
-class SearchResult {
-  final String novelUrl;
-  final String novelTitle;
-  final String novelAuthor;
-  final String? coverUrl;
-  final String? description;
-
-  const SearchResult({
-    required this.novelUrl,
-    required this.novelTitle,
-    required this.novelAuthor,
-    this.coverUrl,
-    this.description,
-  });
-
-  /// 从JSON创建实例
-  factory SearchResult.fromJson(Map<String, dynamic> json) {
-    return SearchResult(
-      novelUrl: json['novel_url'] ?? '',
-      novelTitle: json['novel_title'] ?? '',
-      novelAuthor: json['novel_author'] ?? '',
-      coverUrl: json['cover_url'],
-      description: json['description'],
-    );
-  }
-
-  /// 转换为JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'novel_url': novelUrl,
-      'novel_title': novelTitle,
-      'novel_author': novelAuthor,
-      'cover_url': coverUrl,
-      'description': description,
-    };
-  }
-}
-
 /// 章节搜索结果
 class ChapterSearchResult {
   final String novelUrl;
@@ -119,7 +80,4 @@ class CachedNovelInfo {
     required this.chapterCount,
     required this.lastUpdated,
   });
-
-  /// 获取章节数量文本
-  String get chapterCountText => '$chapterCount 章节';
 }

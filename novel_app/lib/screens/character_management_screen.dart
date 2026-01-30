@@ -10,8 +10,10 @@ import '../services/character_avatar_service.dart';
 import '../services/character_extraction_service.dart';
 import '../services/dify_service.dart';
 import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
+import '../widgets/common/common_widgets.dart';
 import 'character_edit_screen.dart';
 import 'enhanced_relationship_graph_screen.dart';
 
@@ -53,10 +55,10 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   static const double _nameBottomPadding = 8.0;
   static const double _nameHorizontalPadding = 8.0;
 
-  // 缓存阴影样式
-  final List<BoxShadow> _avatarShadow = [
-    const BoxShadow(
-      color: Color(0x4D000000), // Colors.black.withValues(alpha: 0.3)
+  // 缓存阴影样式（延迟初始化）
+  List<BoxShadow> get _avatarShadow => [
+    BoxShadow(
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
       blurRadius: 8,
       offset: Offset(0, 4),
     ),
@@ -121,12 +123,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('加载角色失败: $e');
       }
     }
   }
@@ -251,12 +248,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('创建角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('创建角色失败: $e');
       }
     }
   }
@@ -271,12 +263,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
     if (selectedChapters.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请至少选择一个章节'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('请至少选择一个章节');
       }
       return;
     }
@@ -363,12 +350,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('提取角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('提取角色失败: $e');
       }
     }
   }
@@ -397,45 +379,19 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
       // 显示结果
       if (mounted) {
-        String message;
-        Color backgroundColor;
-
         if (failCount == 0) {
-          message = '成功保存选中的 $successCount 个角色';
-          backgroundColor = Colors.green;
+          ToastUtils.showSuccess('成功保存选中的 $successCount 个角色');
         } else if (successCount == 0) {
-          message = '保存失败，请检查配置或重试';
-          backgroundColor = Colors.red;
+          ToastUtils.showError('保存失败，请检查配置或重试');
         } else {
-          message = '成功保存 $successCount 个角色，$failCount 个失败';
-          backgroundColor = Colors.orange;
+          ToastUtils.showWarningWithAction('成功保存 $successCount 个角色，$failCount 个失败', '查看详情', () => _showFailDetails(failedCharacters));
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: backgroundColor,
-            duration: const Duration(seconds: 4),
-            action: failCount > 0
-                ? SnackBarAction(
-                    label: '查看详情',
-                    textColor: Colors.white,
-                    onPressed: () => _showFailDetails(failedCharacters),
-                  )
-                : null,
-          ),
-        );
       }
     } catch (e) {
       LoggerService.instance.e('保存角色时发生错误: ${e.toString()}');
       debugPrint('❌ 保存角色时发生错误: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存角色时发生错误: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('保存角色时发生错误: $e');
       }
     }
   }
@@ -514,28 +470,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
   /// 显示批量删除确认对话框
   Future<bool> _showBatchDeleteConfirmationDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('批量删除角色'),
-        content: Text(
-          '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final result = await ConfirmDialog.show(
+      context,
+      title: '批量删除角色',
+      message: '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
+      confirmText: '删除',
+      icon: Icons.delete,
+      confirmColor: Colors.red,
     );
     return result ?? false;
   }
@@ -555,12 +496,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('成功删除 ${_selectedCharacterIds.length} 个角色'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('成功删除 ${_selectedCharacterIds.length} 个角色');
       }
 
       // 退出多选模式并重新加载
@@ -569,12 +505,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     } catch (e) {
       debugPrint('❌ 批量删除角色失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('批量删除失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('批量删除失败: $e');
       }
     }
   }
@@ -603,7 +534,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             ? '已选 (${_selectedCharacterIds.length})'
             : '人物管理'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           if (_isMultiSelectMode)
             TextButton(
@@ -668,7 +599,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           Icon(
             Icons.people_outline,
             size: 64,
-            color: Colors.grey[400],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           SizedBox(height: 16),
           Text(
@@ -676,14 +607,14 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           SizedBox(height: 8),
           Text(
             '点击右下角的 + 按钮创建第一个人物',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -755,7 +686,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       onTap: () => _handleCardTap(character),
       child: Card(
         elevation: isSelected ? 12 : 6,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: isSelected
@@ -798,18 +729,18 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                         right: _nameHorizontalPadding * 2,
                         child: Text(
                           character.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.surface,
                             shadows: [
                               Shadow(
-                                color: Colors.black87,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                                 blurRadius: 3,
                                 offset: Offset(1, 1),
                               ),
                               Shadow(
-                                color: Colors.black54,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                                 blurRadius: 6,
                                 offset: Offset(0, 2),
                               ),
@@ -842,8 +773,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                               ),
                               child: Text(
                                 '${_relationshipCountCache[character.id]}',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.surface,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -886,10 +817,10 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                             ),
                             child: Text(
                               character.occupation ?? '未知职业',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10, // 缩小职业字号
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.surface,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 2, // 支持换行
@@ -960,14 +891,16 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(_avatarBorderRadius),
         boxShadow: _avatarShadow,
       ),
       child: Center(
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );
@@ -979,7 +912,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(_avatarBorderRadius),
         boxShadow: _avatarShadow,
       ),

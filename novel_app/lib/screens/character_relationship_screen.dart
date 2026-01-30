@@ -3,6 +3,8 @@ import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/database_service.dart';
 import '../widgets/relationship_edit_dialog.dart';
+import '../widgets/common/common_widgets.dart';
+import '../utils/toast_utils.dart';
 import 'character_relationship_graph_screen.dart';
 
 /// 角色关系列表页面
@@ -13,10 +15,12 @@ import 'character_relationship_graph_screen.dart';
 /// - Tab 3: 关系Ta的人 (入度：其他人 → Ta)
 class CharacterRelationshipScreen extends StatefulWidget {
   final Character character;
+  final DatabaseService? databaseService;
 
   const CharacterRelationshipScreen({
     super.key,
     required this.character,
+    this.databaseService,
   });
 
   @override
@@ -27,7 +31,7 @@ class CharacterRelationshipScreen extends StatefulWidget {
 class _CharacterRelationshipScreenState
     extends State<CharacterRelationshipScreen>
     with SingleTickerProviderStateMixin {
-  final DatabaseService _databaseService = DatabaseService();
+  late DatabaseService _databaseService;
 
   late TabController _tabController;
 
@@ -44,6 +48,7 @@ class _CharacterRelationshipScreenState
   @override
   void initState() {
     super.initState();
+    _databaseService = widget.databaseService ?? DatabaseService();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
@@ -97,12 +102,7 @@ class _CharacterRelationshipScreenState
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载关系失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('加载关系失败: $e');
       }
     }
   }
@@ -138,12 +138,7 @@ class _CharacterRelationshipScreenState
 
     if (availableCharacters.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('没有其他角色可以建立关系'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('没有其他角色可以建立关系');
       }
       return;
     }
@@ -160,12 +155,7 @@ class _CharacterRelationshipScreenState
       // 刷新列表
       _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('关系添加成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('关系添加成功');
       }
     }
   }
@@ -191,7 +181,7 @@ class _CharacterRelationshipScreenState
       appBar: AppBar(
         title: Text('${widget.character.name} - 人物关系'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.account_tree),
@@ -206,9 +196,9 @@ class _CharacterRelationshipScreenState
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: Theme.of(context).colorScheme.onPrimary,
+          unselectedLabelColor: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
+          indicatorColor: Theme.of(context).colorScheme.onPrimary,
           tabs: const [
             Tab(text: 'Ta的关系'),
             Tab(text: '关系Ta的人'),
@@ -269,13 +259,13 @@ class _CharacterRelationshipScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.grey[400]),
+          Icon(icon, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -305,8 +295,8 @@ class _CharacterRelationshipScreenState
             targetCharacter?.name.isNotEmpty ?? false
                 ? targetCharacter!.name[0].toUpperCase()
                 : '?',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.surface,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -333,7 +323,7 @@ class _CharacterRelationshipScreenState
                   relationship.description!,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -411,12 +401,7 @@ class _CharacterRelationshipScreenState
       // 刷新列表
       _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('关系更新成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('关系更新成功');
       }
     }
   }
@@ -424,28 +409,13 @@ class _CharacterRelationshipScreenState
   /// 删除关系
   Future<void> _deleteRelationship(CharacterRelationship relationship) async {
     // 二次确认
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除关系'),
-        content: Text(
-          '确定要删除 "${relationship.relationshipType}" 这个关系吗？\n此操作无法撤销。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '删除关系',
+      message: '确定要删除 "${relationship.relationshipType}" 这个关系吗？\n此操作无法撤销。',
+      confirmText: '删除',
+      icon: Icons.delete,
+      confirmColor: Theme.of(context).colorScheme.error,
     );
 
     if (confirmed != true) return;
@@ -457,22 +427,12 @@ class _CharacterRelationshipScreenState
       _loadData();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('关系删除成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('关系删除成功');
       }
     } catch (e) {
       debugPrint('❌ 删除关系失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('删除失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('删除失败: $e');
       }
     }
   }

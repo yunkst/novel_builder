@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
+import '../core/di/api_service_provider.dart';
 
 /// ChapterHistoryService
 ///
@@ -12,6 +13,10 @@ import '../services/database_service.dart';
 ///
 /// 使用方式：
 /// ```dart
+/// // 使用默认依赖（推荐）
+/// final service = ChapterHistoryService.create();
+///
+/// // 或手动指定依赖
 /// final service = ChapterHistoryService(
 ///   databaseService: _databaseService,
 ///   apiService: _apiService,
@@ -26,6 +31,14 @@ import '../services/database_service.dart';
 class ChapterHistoryService {
   final DatabaseService _databaseService;
   final ApiServiceWrapper _apiService;
+
+  /// 使用默认依赖创建实例（推荐）
+  factory ChapterHistoryService.create() {
+    return ChapterHistoryService(
+      databaseService: DatabaseService(),
+      apiService: ApiServiceProvider.instance,
+    );
+  }
 
   ChapterHistoryService({
     required DatabaseService databaseService,

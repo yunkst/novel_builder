@@ -87,6 +87,7 @@ dependencies:
 
   # 图可视化
   graphview: ^1.5.1
+  flutter_force_directed_graph: ^1.0.8
 
 dev_dependencies:
   flutter_test:

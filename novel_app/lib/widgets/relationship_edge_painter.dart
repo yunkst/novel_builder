@@ -11,12 +11,20 @@ class RelationshipEdgePainter extends CustomPainter {
   final Map<String, double> edgeWeights;
   final double scale;
 
+  // 颜色配置
+  final Color? primaryColor;
+  final Color? onSurfaceColor;
+  final Color? surfaceColor;
+
   RelationshipEdgePainter({
     required this.graph,
     required this.nodePositions,
     required this.edgeLabels,
     required this.edgeWeights,
     this.scale = 1.0,
+    this.primaryColor,
+    this.onSurfaceColor,
+    this.surfaceColor,
   });
 
   @override
@@ -52,7 +60,9 @@ class RelationshipEdgePainter extends CustomPainter {
   /// 绘制连线
   void _drawEdge(Canvas canvas, Offset start, Offset end, double weight) {
     final paint = Paint()
-      ..color = weight > 1.5 ? Colors.orange : Colors.grey
+      ..color = weight > 1.5
+          ? const Color(0xFFFF9800) // 橙色表示重要关系
+          : (onSurfaceColor ?? const Color(0xFF9E9E9E)) // 默认灰色
       ..strokeWidth = weight > 1.5 ? 3.0 : 1.5
       ..style = PaintingStyle.stroke;
 
@@ -79,7 +89,7 @@ class RelationshipEdgePainter extends CustomPainter {
         text: label,
         style: TextStyle(
           fontSize: 12 / scale,
-          color: Colors.black87,
+          color: onSurfaceColor?.withValues(alpha: 0.87) ?? const Color(0xDD000000),
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -96,11 +106,15 @@ class RelationshipEdgePainter extends CustomPainter {
     );
 
     final bgPaint = Paint()
-      ..color = weight > 1.5 ? Colors.amber[100]! : Colors.white
+      ..color = weight > 1.5
+          ? const Color(0xFFFFECB3) // 琥珀色背景表示重要关系
+          : (surfaceColor ?? const Color(0xFFFFFFFF))
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = weight > 1.5 ? Colors.orange : Colors.grey
+      ..color = weight > 1.5
+          ? const Color(0xFFFF9800) // 橙色边框表示重要关系
+          : (onSurfaceColor ?? const Color(0xFF9E9E9E))
       ..strokeWidth = 1.0 / scale
       ..style = PaintingStyle.stroke;
 
@@ -162,6 +176,9 @@ class RelationshipEdgePainter extends CustomPainter {
   bool shouldRepaint(covariant RelationshipEdgePainter oldDelegate) {
     return oldDelegate.scale != scale ||
         oldDelegate.edgeLabels != edgeLabels ||
-        oldDelegate.edgeWeights != edgeWeights;
+        oldDelegate.edgeWeights != edgeWeights ||
+        oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.onSurfaceColor != onSurfaceColor ||
+        oldDelegate.surfaceColor != surfaceColor;
   }
 }

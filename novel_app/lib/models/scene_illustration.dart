@@ -93,9 +93,6 @@ class SceneIllustration {
   // 是否失败
   bool get isFailed => status == 'failed';
 
-  // 获取主要图片（第一张）
-  String? get primaryImage => images.isNotEmpty ? images.first : null;
-
   // 复制并更新状态
   SceneIllustration copyWith({
     int? id,

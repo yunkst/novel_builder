@@ -6,6 +6,49 @@ import '../services/database_service.dart';
 /// 用于分析章节内容中的角色出现情况并准备角色更新数据
 class CharacterMatcher {
   static final DatabaseService _databaseService = DatabaseService();
+  CharacterMatcher._();
+
+  /// 从章节内容中提取出现的角色ID列表（支持别名，不区分大小写）
+  ///
+  /// [content] 文本内容
+  /// [characters] 角色列表
+  ///
+  /// 返回在内容中出现的角色ID列表
+  static List<int> findAppearingCharacterIds(
+    String content,
+    List<Character> characters,
+  ) {
+    if (content.isEmpty || characters.isEmpty) {
+      return [];
+    }
+
+    final appearingIds = <int>{};
+    final lowerContent = content.toLowerCase();
+
+    for (final character in characters) {
+      if (character.name.isEmpty) continue;
+
+      // 检查正式名称
+      final lowerName = character.name.toLowerCase();
+      if (lowerContent.contains(lowerName) && character.id != null) {
+        appearingIds.add(character.id!);
+        continue;
+      }
+
+      // 检查别名
+      final aliases = character.aliases ?? [];
+      for (final alias in aliases) {
+        if (alias.isEmpty) continue;
+        final lowerAlias = alias.toLowerCase();
+        if (lowerContent.contains(lowerAlias) && character.id != null) {
+          appearingIds.add(character.id!);
+          break;
+        }
+      }
+    }
+
+    return appearingIds.toList();
+  }
 
   /// 从章节内容中提取出现的角色名称
   ///

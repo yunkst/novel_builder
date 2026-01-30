@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import '../utils/toast_utils.dart';
 import '../models/novel.dart';
+import '../models/bookshelf.dart';
 import '../services/database_service.dart';
 import '../services/preload_service.dart';
 import '../services/preload_progress_update.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
+import '../widgets/common/common_widgets.dart';
 import 'chapter_list_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:async';
@@ -116,33 +121,150 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   }
 
   Future<void> _removeFromBookshelf(Novel novel) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认删除',
+      message: '确定要从书架移除《${novel.title}》吗？',
+      confirmText: '删除',
+    );
+
+    if (confirmed == true) {
+      try {
+        await _databaseService.removeFromBookshelf(novel.url);
+        if (mounted) {
+          ToastUtils.showSuccess('已从书架移除', context: context);
+        }
+        _loadBookshelf();
+      } catch (e, stackTrace) {
+        ErrorHelper.showErrorWithLog(
+          context,
+          '从书架移除失败',
+          error: e,
+          stackTrace: stackTrace,
+          category: LogCategory.database,
+          tags: ['bookshelf', 'remove', 'failed'],
+        );
+      }
+    }
+  }
+
+  /// 显示书架选择对话框
+  ///
+  /// [novel] 要操作的小说
+  /// [mode] 操作模式：'move' 或 'copy'
+  Future<void> _showBookshelfSelectionDialog(
+    Novel novel,
+    String mode,
+  ) async {
+    final bookshelves = await _databaseService.getBookshelves();
+
+    // 过滤掉当前书架和"全部小说"书架
+    final availableBookshelves = bookshelves
+        .where((b) => b.id != _currentBookshelfId && b.id != 1)
+        .toList();
+
+    if (availableBookshelves.isEmpty) {
+      if (mounted) {
+        ToastUtils.showWarning('没有可用的目标书架', context: context);
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    final selectedBookshelf = await showDialog<Bookshelf>(
       context: context,
-      barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要从书架移除《${novel.title}》吗？'),
+        title: Row(
+          children: [
+            Icon(
+              mode == 'move' ? Icons.drive_file_move_outline : Icons.copy,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(mode == 'move' ? '移动到书架' : '复制到书架'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableBookshelves.length,
+            itemBuilder: (context, index) {
+              final bookshelf = availableBookshelves[index];
+              return ListTile(
+                leading: Icon(
+                  bookshelf.isSystem
+                      ? Icons.folder_shared
+                      : Icons.folder,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: Text(bookshelf.name),
+                subtitle: Text(bookshelf.isSystem ? '系统书架' : '自定义书架'),
+                onTap: () => Navigator.pop(context, bookshelf),
+              );
+            },
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      await _databaseService.removeFromBookshelf(novel.url);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已从书架移除')),
-        );
+    if (selectedBookshelf != null && mounted) {
+      if (mode == 'move') {
+        await _moveNovelToBookshelf(novel, selectedBookshelf.id);
+      } else {
+        await _copyNovelToBookshelf(novel, selectedBookshelf.id);
       }
-      _loadBookshelf();
+    }
+  }
+
+  /// 移动小说到指定书架
+  Future<void> _moveNovelToBookshelf(Novel novel, int toBookshelfId) async {
+    try {
+      await _databaseService.moveNovelToBookshelf(
+        novel.url,
+        _currentBookshelfId,
+        toBookshelfId,
+      );
+
+      if (mounted) {
+        ToastUtils.showSuccess('已移动到目标书架', context: context);
+        _loadBookshelf(); // 刷新当前书架
+      }
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '移动失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['bookshelf', 'move', 'failed'],
+      );
+    }
+  }
+
+  /// 复制小说到指定书架
+  Future<void> _copyNovelToBookshelf(Novel novel, int toBookshelfId) async {
+    try {
+      await _databaseService.addNovelToBookshelf(novel.url, toBookshelfId);
+
+      if (mounted) {
+        ToastUtils.showSuccess('已复制到目标书架', context: context);
+        // 不刷新当前书架，因为小说还在原书架
+      }
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '复制失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['bookshelf', 'copy', 'failed'],
+      );
     }
   }
 
@@ -158,7 +280,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.create, color: Colors.blue),
+            Icon(Icons.create),
             SizedBox(width: 8),
             Text('创建新小说'),
           ],
@@ -211,12 +333,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
               final author = authorController.text.trim();
 
               if (title.isEmpty || author.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('请填写小说标题和作者'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                ToastUtils.showError('请填写小说标题和作者', context: context);
                 return;
               }
 
@@ -234,8 +351,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('创建'),
           ),
@@ -251,22 +368,12 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
           description: result['description'],
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('小说创建成功！'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('小说创建成功！', context: context);
         }
         _loadBookshelf(); // 重新加载书架
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('创建失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastUtils.showError('创建失败: $e', context: context);
         }
       }
     }
@@ -295,10 +402,10 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.library_books,
                               size: 64,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -316,8 +423,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                               icon: const Icon(Icons.create),
                               label: const Text('创建新小说'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               ),
                             ),
                           ],
@@ -349,8 +456,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                 title: Row(
                                   children: [
                                     if (_isPreloading(novel.url))
-                                      const Padding(
-                                        padding: EdgeInsets.only(right: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 8),
                                         child: SizedBox(
                                           width: 16,
                                           height: 16,
@@ -358,7 +465,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                             strokeWidth: 2,
                                             valueColor:
                                                 AlwaysStoppedAnimation<Color>(
-                                                    Colors.blue),
+                                                    Theme.of(context).colorScheme.primary),
                                           ),
                                         ),
                                       ),
@@ -390,19 +497,25 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: Colors.purple
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .tertiary
                                                   .withValues(alpha: 0.1),
                                               borderRadius:
                                                   BorderRadius.circular(10),
                                               border: Border.all(
-                                                  color: Colors.purple
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .tertiary
                                                       .withValues(alpha: 0.3)),
                                             ),
                                             child: Text(
                                               '原创',
                                               style: TextStyle(
                                                 fontSize: 10,
-                                                color: Colors.purple[700],
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .tertiary,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
@@ -426,16 +539,46 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                 ),
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) {
-                                    if (value == 'delete') {
-                                      _removeFromBookshelf(novel);
+                                    switch (value) {
+                                      case 'move':
+                                        _showBookshelfSelectionDialog(novel, 'move');
+                                        break;
+                                      case 'copy':
+                                        _showBookshelfSelectionDialog(novel, 'copy');
+                                        break;
+                                      case 'delete':
+                                        _removeFromBookshelf(novel);
+                                        break;
                                     }
                                   },
                                   itemBuilder: (context) => [
                                     const PopupMenuItem(
+                                      value: 'move',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.drive_file_move_outline,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('移动到书架'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'copy',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.copy),
+                                          SizedBox(width: 8),
+                                          Text('复制到书架'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
                                       value: 'delete',
                                       child: Row(
                                         children: [
-                                          Icon(Icons.delete, color: Colors.red),
+                                          Icon(Icons.delete),
                                           SizedBox(width: 8),
                                           Text('从书架移除'),
                                         ],

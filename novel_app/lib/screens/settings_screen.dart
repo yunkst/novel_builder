@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import '../services/app_update_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../services/api_service_wrapper.dart';
+import '../utils/toast_utils.dart';
+import '../services/theme_service.dart';
+import '../services/backup_service.dart';
+import '../widgets/backup_confirm_dialog.dart';
+import '../widgets/backup_progress_dialog.dart';
+import '../utils/format_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,11 +24,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   PackageInfo? _packageInfo;
   bool _isCheckingUpdate = false;
+  String? _lastBackupTime;
 
   @override
   void initState() {
     super.initState();
     _loadPackageInfo();
+    _loadLastBackupTime();
   }
 
   Future<void> _loadPackageInfo() async {
@@ -29,6 +38,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       setState(() {
         _packageInfo = info;
+      });
+    }
+  }
+
+  /// 加载上次备份时间
+  Future<void> _loadLastBackupTime() async {
+    final backupService = BackupService();
+    final timeText = await backupService.getLastBackupTimeText();
+    if (mounted) {
+      setState(() {
+        _lastBackupTime = timeText;
       });
     }
   }
@@ -70,9 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } else {
         // 显示已是最新版本
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('当前已是最新版本')),
-          );
+          ToastUtils.show('当前已是最新版本');
         }
       }
     } catch (e) {
@@ -81,9 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isCheckingUpdate = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('检查更新失败: $e')),
-          );
+          ToastUtils.showError('检查更新失败: $e');
         }
       }
     }
@@ -157,6 +173,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Divider(),
 
+          // 主题模式设置
+          Consumer<ThemeService>(
+            builder: (context, themeService, child) {
+              return ListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: const Text('主题模式'),
+                subtitle: Text(_getThemeModeText(themeService.themeMode)),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () => _showThemeModeDialog(themeService),
+              );
+            },
+          ),
+          const Divider(),
+
           // 应用日志入口
           ListTile(
             leading: const Icon(Icons.bug_report_outlined),
@@ -173,8 +203,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const Divider(),
+
+          // 数据备份入口
+          ListTile(
+            leading: const Icon(Icons.backup_rounded),
+            title: const Text('数据备份'),
+            subtitle: Text(_lastBackupTime != null
+                ? '上次备份: $_lastBackupTime'
+                : '将数据库备份到服务器'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: _handleBackup,
+          ),
+          const Divider(),
         ],
       ),
     );
+  }
+
+  /// 获取主题模式显示文本
+  String _getThemeModeText(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return '亮色模式';
+      case AppThemeMode.dark:
+        return '暗色模式';
+      case AppThemeMode.system:
+        return '跟随系统';
+    }
+  }
+
+  /// 显示主题模式选择对话框
+  void _showThemeModeDialog(ThemeService themeService) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('选择主题模式'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('亮色模式'),
+                    subtitle: const Text('使用浅色主题'),
+                    value: AppThemeMode.light,
+                    groupValue: themeService.themeMode,
+                    onChanged: (AppThemeMode? value) {
+                      if (value != null) {
+                        themeService.setThemeMode(value);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('暗色模式'),
+                    subtitle: const Text('使用深色主题'),
+                    value: AppThemeMode.dark,
+                    groupValue: themeService.themeMode,
+                    onChanged: (AppThemeMode? value) {
+                      if (value != null) {
+                        themeService.setThemeMode(value);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('跟随系统'),
+                    subtitle: const Text('跟随系统设置自动切换'),
+                    value: AppThemeMode.system,
+                    groupValue: themeService.themeMode,
+                    onChanged: (AppThemeMode? value) {
+                      if (value != null) {
+                        themeService.setThemeMode(value);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 处理数据备份
+  Future<void> _handleBackup() async {
+    try {
+      final backupService = BackupService();
+
+      // 获取数据库文件
+      final dbFile = await backupService.getDatabaseFile();
+      final fileSize = await dbFile.length();
+      final fileName = dbFile.path.split('/').last;
+      final fileSizeText = FormatUtils.formatFileSize(fileSize);
+
+      // 显示确认对话框
+      final confirmed = await BackupConfirmDialog.show(
+        context: context,
+        fileName: fileName,
+        fileSize: fileSizeText,
+      );
+
+      if (!confirmed) return;
+
+      // 显示进度对话框并执行上传
+      final result = await BackupProgressDialog.show(
+        context: context,
+        uploadTask: () => backupService.uploadBackup(
+          dbFile: dbFile,
+          onProgress: (sent, total) {
+            // 进度回调会在ProgressDialog内部处理
+          },
+        ),
+      );
+
+      if (result != null && mounted) {
+        // 上传成功
+        ToastUtils.show('备份成功: ${result.storedName}');
+        // 刷新备份时间
+        _loadLastBackupTime();
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.show('备份失败: $e');
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/chat_scene_management_screen.dart';
+import '../utils/toast_utils.dart';
 
 /// 聊天场景输入对话框
 class ChatSceneInputDialog extends StatefulWidget {
@@ -97,8 +98,8 @@ class _ChatSceneInputDialogState extends State<ChatSceneInputDialog> {
         ElevatedButton(
           onPressed: _onConfirm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: const Text('开始聊天'),
         ),
@@ -109,12 +110,7 @@ class _ChatSceneInputDialogState extends State<ChatSceneInputDialog> {
   void _onConfirm() {
     final scene = _controller.text.trim();
     if (scene.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入场景描述'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请输入场景描述');
       return;
     }
 

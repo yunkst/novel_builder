@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferences_service.dart';
 
 /// 阅读器设置服务
 ///
@@ -21,30 +21,29 @@ class ReaderSettingsService {
   static const double _defaultFontSize = 18.0;
   static const double _defaultScrollSpeed = 1.0;
 
+  // ========== Preferences 服务实例 ==========
+  static final PreferencesService _prefs = PreferencesService();
+
   // ========== 公开方法 ==========
 
   /// 获取字体大小
   Future<double> getFontSize() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getDouble(_keyFontSize) ?? _defaultFontSize;
+    return await _prefs.getDouble(_keyFontSize, defaultValue: _defaultFontSize);
   }
 
   /// 设置字体大小
   Future<void> setFontSize(double fontSize) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyFontSize, fontSize);
+    await _prefs.setDouble(_keyFontSize, fontSize);
   }
 
   /// 获取滚动速度
   Future<double> getScrollSpeed() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getDouble(_keyScrollSpeed) ?? _defaultScrollSpeed;
+    return await _prefs.getDouble(_keyScrollSpeed, defaultValue: _defaultScrollSpeed);
   }
 
   /// 设置滚动速度
   Future<void> setScrollSpeed(double scrollSpeed) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyScrollSpeed, scrollSpeed);
+    await _prefs.setDouble(_keyScrollSpeed, scrollSpeed);
   }
 
   /// 重置所有设置为默认值

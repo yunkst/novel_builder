@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/logger_service.dart';
 import '../widgets/model_selector.dart';
+import '../utils/toast_utils.dart';
 
 /// 视频生成要求输入对话框
 class VideoInputDialog extends StatefulWidget {
@@ -87,7 +89,9 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
               decoration: BoxDecoration(
                 color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: Colors.blue.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,15 +133,17 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
           onPressed: _isLoading ? null : _onConfirm,
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.surface,
           ),
           child: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.surface,
+                    ),
                   ),
                 )
               : const Text('开始生成'),
@@ -151,12 +157,12 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
 
     // 检查是否输入了内容
     if (input.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入视频效果描述'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.w(
+        '视频效果描述为空',
+        category: LogCategory.ui,
+        tags: ['video', 'validation', 'empty-description'],
       );
+      ToastUtils.showError('请输入视频效果描述');
       return;
     }
 

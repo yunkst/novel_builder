@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/character.dart';
+import '../../utils/toast_utils.dart';
 import 'immersive_role_selector.dart';
 
 /// 沉浸体验配置数据类
@@ -172,45 +173,25 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
 
     // 验证：用户要求不能为空
     if (requirement.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入沉浸体验要求'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请输入沉浸体验要求');
       return null;
     }
 
     // 验证：至少选择一个角色
     if (_selectedRoles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个参与角色'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请至少选择一个参与角色');
       return null;
     }
 
     // 验证：必须选择用户角色
     if (_userRole == null || _userRole!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请选择您要扮演的角色'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请选择您要扮演的角色');
       return null;
     }
 
     // 验证：用户角色必须在已选角色中
     if (!_selectedRoles.any((r) => r.name == _userRole)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('您扮演的角色必须在参与角色中'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('您扮演的角色必须在参与角色中');
       return null;
     }
 
@@ -229,7 +210,7 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.theater_comedy, color: Colors.purple, size: 28),
+          Icon(Icons.theater_comedy, color: theme.colorScheme.primary, size: 28),
           const SizedBox(width: 8),
           const Text('沉浸体验配置'),
         ],
@@ -251,10 +232,10 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _requirementController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: '请描述您的沉浸体验要求',
                   hintText: '例如：我想体验一个充满悬疑和戏剧张力的场景...',
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(),
                   alignLabelWithHint: true,
                 ),
                 maxLines: 3,
@@ -275,7 +256,7 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                 icon: const Icon(Icons.group_add),
                 label: Text('选择角色 (已选${_selectedRoles.length}个)'),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.purple,
+                  foregroundColor: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -289,13 +270,13 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                     child: Row(
                       children: [
                         Icon(Icons.lightbulb,
-                            size: 16, color: Colors.blue.shade700),
+                            size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.8)),
                         const SizedBox(width: 4),
                         Text(
                           '已自动选择在本章中出现的角色',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.blue.shade700,
+                            color: theme.colorScheme.primary.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -313,12 +294,12 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                       avatar: _userRole == role.name
                           ? const Icon(Icons.person, size: 16)
                           : null,
-                      selectedColor: Colors.purple.withValues(alpha: 0.2),
-                      backgroundColor: Colors.grey.shade200,
+                      selectedColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       labelStyle: TextStyle(
                         color: isSelected
-                            ? Colors.purple
-                            : Colors.grey.shade700,
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         fontWeight: isSelected
                             ? FontWeight.w600
                             : FontWeight.normal,
@@ -328,7 +309,7 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                 ),
                 const SizedBox(height: 16),
               ] else
-                const Text('未选择角色', style: TextStyle(color: Colors.grey)),
+                Text('未选择角色', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
               const SizedBox(height: 8),
 
               // 用户角色选择
@@ -340,11 +321,11 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: '选择您要扮演的角色',
                   hintText: '从已选角色中选择',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
                 ),
                 items: _selectedRoles.map((role) {
                   return DropdownMenuItem(
@@ -376,8 +357,8 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.purple,
-            foregroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
           ),
           child: const Text('开始生成'),
         ),

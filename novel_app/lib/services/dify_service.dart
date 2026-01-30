@@ -1,20 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../models/ai_companion_response.dart';
 import 'dify_sse_parser.dart';
 import 'stream_state_manager.dart';
 import 'logger_service.dart';
+import 'preferences_service.dart';
 
 class DifyService {
   // 获取流式响应token
   Future<String> _getFlowToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('dify_flow_token');
-    if (token == null || token.isEmpty) {
+    final token = await PreferencesService.instance.getString('dify_flow_token');
+    if (token.isEmpty) {
       throw Exception('请先在设置中配置 Flow Token (流式响应)');
     }
     return token;
@@ -23,12 +22,11 @@ class DifyService {
   // 获取结构化响应token
   // 用于 runWorkflowBlocking 方法
   Future<String> _getStructToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('dify_struct_token');
-    if (token == null || token.isEmpty) {
+    final token = await PreferencesService.instance.getString('dify_struct_token');
+    if (token.isEmpty) {
       // 如果struct_token不存在，尝试使用flow_token作为降级
-      final flowToken = prefs.getString('dify_flow_token');
-      if (flowToken != null && flowToken.isNotEmpty) {
+      final flowToken = await PreferencesService.instance.getString('dify_flow_token');
+      if (flowToken.isNotEmpty) {
         LoggerService.instance.w(
           '⚠️ Struct Token未配置，使用Flow Token作为降级',
           category: LogCategory.ai,
@@ -77,12 +75,11 @@ class DifyService {
     required Function(String chunk) onChunk,
     Function()? onComplete,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
+    final difyUrl = await PreferencesService.instance.getString('dify_url');
     final difyToken = await _getFlowToken();
-    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
 
-    if (difyUrl == null || difyUrl.isEmpty) {
+    if (difyUrl.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL');
     }
 
@@ -92,19 +89,9 @@ class DifyService {
       onTextChunk: onChunk,
       onCompleted: (String completeContent) {
         LoggerService.instance.i(
-          '🎯 === 特写生成完成 ===',
+          '✅ 特写生成完成: ${completeContent.length} 字符',
           category: LogCategory.ai,
           tags: ['success', 'dify'],
-        );
-        LoggerService.instance.d(
-          '完整内容长度: ${completeContent.length}',
-          category: LogCategory.ai,
-          tags: ['stats', 'dify'],
-        );
-        LoggerService.instance.d(
-          '完整内容预览: "${completeContent.substring(0, completeContent.length > 100 ? 100 : completeContent.length)}..."',
-          category: LogCategory.ai,
-          tags: ['stats', 'preview', 'dify'],
         );
 
         // 在完成时将完整内容通过特殊标记传递，确保UI显示完整内容
@@ -117,12 +104,7 @@ class DifyService {
       },
       onError: (error) {
         LoggerService.instance.e(
-          '❌ === 特写生成错误 ===',
-          category: LogCategory.ai,
-          tags: ['error', 'dify'],
-        );
-        LoggerService.instance.e(
-          '错误: $error',
+          '❌ 特写生成错误: $error',
           category: LogCategory.ai,
           tags: ['error', 'dify'],
         );
@@ -150,25 +132,11 @@ class DifyService {
         'user': 'novel-builder-app',
       };
 
+      final cmd = (requestBody['inputs'] as Map<String, dynamic>)['cmd'] as String?;
       LoggerService.instance.i(
-        '🚀 === Dify 特写 API 请求 ===',
+        '🚀 Dify API请求: ${cmd ?? 'unknown'}',
         category: LogCategory.ai,
         tags: ['api', 'request', 'dify'],
-      );
-      LoggerService.instance.d(
-        'URL: $url',
-        category: LogCategory.ai,
-        tags: ['network', 'dify'],
-      );
-      LoggerService.instance.i(
-        'Request Body: ${jsonEncode(requestBody)}',
-        category: LogCategory.ai,
-        tags: ['info', 'dify'],
-      );
-      LoggerService.instance.d(
-        '==========================',
-        category: LogCategory.ai,
-        tags: ['debug', 'separator', 'dify'],
       );
 
       final request = http.Request('POST', url);
@@ -179,12 +147,6 @@ class DifyService {
       request.body = jsonEncode(requestBody);
 
       final streamedResponse = await request.send();
-
-      LoggerService.instance.i(
-        '📡 === 响应状态码: ${streamedResponse.statusCode} ===',
-        category: LogCategory.ai,
-        tags: ['api', 'response', 'dify'],
-      );
 
       if (streamedResponse.statusCode == 200) {
         stateManager.startReceiving();
@@ -199,52 +161,38 @@ class DifyService {
         bool textStreamDone = false;
         bool textStreamError = false;
 
+        // 流式处理采样统计
+        int chunkCount = 0;
+        int totalChars = 0;
+
         // 监听文本流
         final textSubscription = textStream.listen(
           (textChunk) {
-            LoggerService.instance.d(
-              '🔥 === onChunk回调 ===',
-              category: LogCategory.ai,
-              tags: ['stream', 'chunk', 'dify'],
-            );
-            LoggerService.instance.d(
-              '文本块: "$textChunk"',
-              category: LogCategory.ai,
-              tags: ['stream', 'chunk', 'dify'],
-            );
-            LoggerService.instance.i(
-              '当前状态: ${stateManager.currentState}',
-              category: LogCategory.ai,
-              tags: ['info', 'dify'],
-            );
+            chunkCount++;
+            totalChars += textChunk.length;
+
+            // 采样：每10个chunk记录一次进度
+            if (chunkCount % 10 == 0) {
+              LoggerService.instance.d(
+                '📊 流式处理进度: $chunkCount chunks, $totalChars chars',
+                category: LogCategory.ai,
+                tags: ['stream', 'progress', 'dify'],
+              );
+            }
+
             stateManager.handleTextChunk(textChunk);
-            LoggerService.instance.i(
-              '✅ stateManager.handleTextChunk 完成',
-              category: LogCategory.ai,
-              tags: ['success', 'dify'],
-            );
-            LoggerService.instance.d(
-              '========================',
-              category: LogCategory.ai,
-              tags: ['debug', 'separator', 'dify'],
-            );
           },
           onDone: () {
             LoggerService.instance.i(
-              '📝 文本流结束',
+              '✅ AI生成完成: $chunkCount chunks, $totalChars chars',
               category: LogCategory.ai,
-              tags: ['stream', 'end', 'dify'],
+              tags: ['stream', 'complete', 'dify'],
             );
             textStreamDone = true;
 
             // 添加短暂延迟，确保最后的文本块被处理
             Future.delayed(const Duration(milliseconds: 100), () {
               if (completer.isCompleted) return;
-              LoggerService.instance.i(
-                '⏰ 文本流结束后的延迟检查',
-                category: LogCategory.ai,
-                tags: ['stream', 'end', 'dify'],
-              );
               if (!textStreamError) {
                 completer.complete(true);
               }
@@ -436,11 +384,10 @@ class DifyService {
     Function(String error)? onError,
     Function()? onDone,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
+    final difyUrl = await PreferencesService.instance.getString('dify_url');
     final difyToken = await _getFlowToken();
 
-    if (difyUrl == null || difyUrl.isEmpty) {
+    if (difyUrl.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL');
     }
 
@@ -665,11 +612,10 @@ class DifyService {
     Function(String error)? onError,
     Function()? onDone,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
+    final difyUrl = await PreferencesService.instance.getString('dify_url');
     final difyToken = await _getFlowToken();
 
-    if (difyUrl == null || difyUrl.isEmpty) {
+    if (difyUrl.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL');
     }
 
@@ -803,11 +749,10 @@ class DifyService {
   Future<Map<String, dynamic>?> runWorkflowBlocking({
     required Map<String, dynamic> inputs,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
+    final difyUrl = await PreferencesService.instance.getString('dify_url');
     final difyToken = await _getStructToken();
 
-    if (difyUrl == null || difyUrl.isEmpty) {
+    if (difyUrl.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL');
     }
 
@@ -921,8 +866,7 @@ class DifyService {
     required String novelUrl,
     required String backgroundSetting,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'user_input': userInput,
@@ -1035,8 +979,7 @@ class DifyService {
     required String userInput,
     required String novelUrl,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'outline': outline,
@@ -1142,15 +1085,14 @@ class DifyService {
     }
   }
 
-  // 更新角色卡专用方法
+  /// 更新角色卡专用方法
   Future<List<Character>> updateCharacterCards({
     required String chaptersContent,
     required String roles,
     required String novelUrl,
     String backgroundSetting = '',
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'chapters_content': chaptersContent,
@@ -1584,11 +1526,10 @@ class DifyService {
     try {
       stateManager.startStreaming();
 
-      final prefs = await SharedPreferences.getInstance();
-      final difyUrl = prefs.getString('dify_url');
+      final difyUrl = await PreferencesService.instance.getString('dify_url');
       final difyToken = await _getFlowToken();
 
-      if (difyUrl == null || difyUrl.isEmpty) {
+      if (difyUrl.isEmpty) {
         throw Exception('请先在设置中配置 Dify URL');
       }
 

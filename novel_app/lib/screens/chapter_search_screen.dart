@@ -4,7 +4,10 @@ import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../services/database_service.dart';
 import '../services/chapter_search_service.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import '../widgets/highlighted_text.dart';
+import '../utils/toast_utils.dart';
 import 'reader_screen.dart';
 
 class ChapterSearchScreen extends StatefulWidget {
@@ -45,8 +48,13 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
       setState(() {
         _chapters = chapters;
       });
-    } catch (e) {
-      debugPrint('加载章节列表失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载章节列表失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter', 'list', 'load', 'failed'],
+      );
     }
   }
 
@@ -73,15 +81,17 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
         _searchResults = results;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('搜索失败: $e')),
-        );
-      }
+      ErrorHelper.showErrorWithLog(
+        context,
+        '搜索失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['chapter', 'search', 'failed'],
+      );
     }
   }
 
@@ -211,14 +221,14 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
             Icon(
               Icons.search,
               size: 64,
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
               '输入关键词搜索章节内容',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 8),
@@ -226,7 +236,7 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
               '支持搜索章节标题和内容',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ],
@@ -242,14 +252,14 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
             Icon(
               Icons.search_off,
               size: 64,
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
               '未找到相关内容',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 8),
@@ -257,7 +267,7 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
               '尝试使用其他关键词',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
             const SizedBox(height: 16),
@@ -265,7 +275,7 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
               '提示：可以搜索章节标题或内容',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
               ),
             ),
           ],
@@ -308,7 +318,7 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
                     ' (${result.matchCount}处匹配)',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       fontWeight: FontWeight.normal,
                     ),
                   ),
@@ -327,7 +337,7 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
                     '缓存于 ${result.cachedDate.toString().substring(0, 19).replaceAll('-', '/')}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                 ),
@@ -348,9 +358,12 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
                   ),
                 );
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('无法打开该章节')),
+                LoggerService.instance.e(
+                  '无法打开章节: Chapter not found for URL: ${result.chapterUrl}',
+                  category: LogCategory.database,
+                  tags: ['chapter', 'open', 'not-found'],
                 );
+                ToastUtils.show('无法打开该章节');
               }
             },
           ),

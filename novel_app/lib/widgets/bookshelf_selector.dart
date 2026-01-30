@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/bookshelf.dart';
 import '../services/database_service.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
+import '../utils/toast_utils.dart';
 
 /// 书架选择器组件
 ///
@@ -46,8 +49,13 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint('加载书架列表失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载书架列表失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookshelf', 'list', 'load', 'failed'],
+      );
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -63,11 +71,11 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.create_new_folder, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('新建书架'),
+            Icon(Icons.create_new_folder, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('新建书架'),
           ],
         ),
         content: TextField(
@@ -88,19 +96,19 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
             onPressed: () {
               final name = nameController.text.trim();
               if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('请输入书架名称'),
-                    backgroundColor: Colors.red,
-                  ),
+                LoggerService.instance.w(
+                  '书架名称为空',
+                  category: LogCategory.ui,
+                  tags: ['bookshelf', 'validation', 'empty-name'],
                 );
+                ToastUtils.showError('请输入书架名称');
                 return;
               }
               Navigator.pop(context, name);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('创建'),
           ),
@@ -112,23 +120,22 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
       try {
         await _databaseService.createBookshelf(result);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('书架创建成功'),
-              backgroundColor: Colors.green,
-            ),
+          ErrorHelper.showSuccessWithLog(
+            context,
+            '书架创建成功',
+            category: LogCategory.database,
+            tags: ['bookshelf', 'create', 'success'],
           );
           _loadBookshelves(); // 重新加载书架列表
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('创建失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } catch (e, stackTrace) {
+        ErrorHelper.showErrorWithLog(
+          context,
+          '创建失败',
+          stackTrace: stackTrace,
+          category: LogCategory.database,
+          tags: ['bookshelf', 'create', 'failed'],
+        );
       }
     }
   }
@@ -141,14 +148,14 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.folder_open, color: Colors.blue),
+              leading: Icon(Icons.folder_open, color: Theme.of(context).colorScheme.primary),
               title: Text(bookshelf.name),
               subtitle: Text(bookshelf.isSystem ? '系统书架' : '自定义书架'),
             ),
             const Divider(),
             if (!bookshelf.isSystem) ...[
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
+                leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
                 title: const Text('删除书架'),
                 onTap: () async {
                   Navigator.pop(context);
@@ -170,7 +177,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
+                            foregroundColor: Theme.of(context).colorScheme.error,
                           ),
                           child: const Text('删除'),
                         ),
@@ -190,16 +197,9 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                         widget.onBookshelfChanged(1);
                       }
                       _loadBookshelves();
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('书架已删除')),
-                      );
+                      ToastUtils.showSuccess('书架已删除');
                     } else {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('删除失败'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      ToastUtils.showError('删除失败');
                     }
                   }
                 },
@@ -248,7 +248,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
             currentBookshelf.isSystem
                 ? Icons.folder_shared
                 : Icons.folder,
-            color: Colors.blue,
+            color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -297,18 +297,22 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                   bookshelf.isSystem
                       ? Icons.folder_shared
                       : Icons.folder,
-                  color: isSelected ? Colors.blue : Colors.grey,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 title: Text(
                   bookshelf.name,
                   style: TextStyle(
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? Colors.blue : null,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
                 trailing: isSelected
-                    ? const Icon(Icons.check, color: Colors.blue)
+                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                     : IconButton(
                         icon: const Icon(Icons.more_vert),
                         onPressed: () {

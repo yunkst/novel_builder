@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import '../utils/format_utils.dart';
 
 /// 角色图片缓存管理器
 ///
@@ -296,17 +297,7 @@ class CharacterImageCacheService {
       'totalSize': size,
       'fileCount': count,
       'cacheDir': _cacheDir.path,
-      'sizeFormatted': _formatBytes(size),
+      'sizeFormatted': FormatUtils.formatFileSize(size),
     };
-  }
-
-  /// 格式化字节数为可读格式
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

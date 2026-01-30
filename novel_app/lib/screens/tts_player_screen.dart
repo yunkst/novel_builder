@@ -10,6 +10,8 @@ import '../widgets/tts_content_display.dart';
 import '../widgets/tts_chapter_selector.dart';
 import '../widgets/tts_timer_settings_sheet.dart';
 import '../widgets/tts_timer_complete_dialog.dart';
+import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
 
 /// TTS播放器全屏页面
 class TtsPlayerScreen extends StatefulWidget {
@@ -65,12 +67,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
     if (!success && mounted) {
       // 初始化失败，显示错误并返回
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('TTS初始化失败: ${_playerService.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        'TTS初始化失败: ${_playerService.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'initialization', 'failed'],
       );
+      ToastUtils.showError('TTS初始化失败: ${_playerService.errorMessage}');
       Navigator.pop(context);
     }
   }
@@ -100,7 +102,7 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
                 children: [
                   Text(
                     widget.novel.title,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
                   ),
                   Row(
                     children: [
@@ -114,7 +116,7 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
                       if (totalChapters > 0)
                         Text(
                           ' ${currentIndex + 1}/$totalChapters',
-                          style: const TextStyle(fontSize: 14, color: Colors.grey),
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
                         ),
                     ],
                   ),
@@ -154,9 +156,9 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
                             ),
                             child: Text(
                               '$timerCount',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.surface,
                                 fontWeight: FontWeight.bold,
                               ),
                               textAlign: TextAlign.center,
@@ -293,12 +295,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
           Navigator.pop(builderContext);
           final success = await player.jumpToChapter(chapter);
           if (!success && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('跳转章节失败: ${player.errorMessage}'),
-                backgroundColor: Colors.red,
-              ),
+            LoggerService.instance.e(
+              '跳转章节失败: ${player.errorMessage}',
+              category: LogCategory.tts,
+              tags: ['player', 'chapter', 'jump', 'failed'],
             );
+            ToastUtils.showError('跳转章节失败: ${player.errorMessage}');
           }
         },
       ),
@@ -378,12 +380,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
     final prevChapter = widget.chapters[player.currentChapterIndex - 1];
     final success = await player.jumpToChapter(prevChapter);
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('跳转上一章失败: ${player.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        '跳转上一章失败: ${player.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'chapter', 'previous', 'failed'],
       );
+      ToastUtils.showError('跳转上一章失败: ${player.errorMessage}');
     }
   }
 
@@ -394,12 +396,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
     final nextChapter = widget.chapters[player.currentChapterIndex + 1];
     final success = await player.jumpToChapter(nextChapter);
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('跳转下一章失败: ${player.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        '跳转下一章失败: ${player.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'chapter', 'next', 'failed'],
       );
+      ToastUtils.showError('跳转下一章失败: ${player.errorMessage}');
     }
   }
 
@@ -417,13 +419,7 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
         onConfirm: (chapterCount) async {
           await player.setTimer(chapterCount);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('已设置：朗读$chapterCount章后停止'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ToastUtils.showSuccess('已设置：朗读$chapterCount章后停止');
           }
         },
       ),

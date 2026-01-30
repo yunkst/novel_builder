@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/database_service.dart';
 import '../../services/chapter_history_service.dart';
-import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
+import '../../utils/toast_utils.dart';
 
 /// 章节总结对话框
 ///
@@ -35,10 +34,7 @@ class ChapterSummaryDialog extends StatefulWidget {
 
 class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
     with DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService(
-    databaseService: DatabaseService(),
-    apiService: ApiServiceProvider.instance,
-  );
+  final ChapterHistoryService _historyService = ChapterHistoryService.create();
 
   String _summaryResult = '';
   bool _showConfirmDialog = true;
@@ -64,11 +60,11 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.summarize, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('章节总结'),
+            Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('章节总结'),
           ],
         ),
         content: Column(
@@ -79,7 +75,7 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
               '将对当前章节内容进行总结',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -87,7 +83,7 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
               '提示：AI将提取章节的核心内容和关键情节',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -100,8 +96,8 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('开始总结'),
           ),
@@ -160,13 +156,7 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('准备总结时出错: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showError('准备总结时出错: $e');
       }
     }
   }
@@ -194,11 +184,11 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
 
   Widget _buildSummaryResultView() {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.summarize, color: Colors.orange),
-          SizedBox(width: 8),
-          Text('章节总结'),
+          Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          const Text('章节总结'),
         ],
       ),
       content: SizedBox(
@@ -210,8 +200,8 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
             Container(
               constraints: const BoxConstraints(maxHeight: 400),
               decoration: BoxDecoration(
-                color: Colors.grey[800],
-                border: Border.all(color: Colors.grey[700]!),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.all(12),
@@ -243,12 +233,12 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '您可以查看总结内容或关闭',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                   ),
                 ),
               ],
@@ -275,12 +265,7 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
               : () {
                   // 复制到剪贴板
                   Clipboard.setData(ClipboardData(text: _summaryResult));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('已复制到剪贴板'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  ToastUtils.showSuccess('已复制到剪贴板');
                 },
           icon: const Icon(Icons.copy),
           label: const Text('复制'),

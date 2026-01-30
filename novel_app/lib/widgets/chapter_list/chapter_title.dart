@@ -32,11 +32,12 @@ class ChapterTitle extends StatelessWidget {
   /// 获取标题颜色
   /// 优先级：最后阅读 > 已读 > 默认
   Color? _getTextColor(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (isLastRead) {
-      return Colors.red;
+      return colorScheme.error;
     }
     if (isRead) {
-      return Colors.grey;
+      return colorScheme.onSurface.withValues(alpha: 0.6);
     }
     return null;
   }

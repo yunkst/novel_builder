@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:path/path.dart' as path;
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/character.dart';
@@ -14,6 +14,8 @@ import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
 import 'chapter_manager.dart';
 import 'logger_service.dart';
+import '../utils/logging/log_scope.dart';
+import 'preferences_service.dart';
 
 /// API 服务封装层
 ///
@@ -211,7 +213,13 @@ class ApiServiceWrapper {
       // 强制关闭旧连接（如果存在）
       try {
         _dio.close(force: true);
-      } catch (e) {
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '关闭旧连接时出错',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.network,
+          tags: ['error', 'api', 'dispose'],
+        );
         LoggerService.instance.i(
           '关闭旧连接时出错: $e',
           category: LogCategory.network,
@@ -227,11 +235,12 @@ class ApiServiceWrapper {
         category: LogCategory.network,
         tags: ['success', 'api'],
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       LoggerService.instance.e(
-        '❌ API连接重新初始化失败: $e',
+        '❌ API连接重新初始化失败',
+        stackTrace: stackTrace.toString(),
         category: LogCategory.network,
-        tags: ['error', 'api'],
+        tags: ['error', 'api', 'reinit', 'failed'],
       );
       throw Exception('连接重新初始化失败: $e');
     }
@@ -267,11 +276,17 @@ class ApiServiceWrapper {
         category: LogCategory.network,
         tags: ['error', 'api'],
       );
-      _reinitializeConnection().catchError((e) {
+      _reinitializeConnection().catchError((e, stackTrace) {
         LoggerService.instance.e(
           '❌ 自动恢复连接失败: $e',
           category: LogCategory.network,
           tags: ['error', 'api'],
+        );
+        LoggerService.instance.e(
+          '自动恢复连接失败',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.network,
+          tags: ['error', 'api', 'reinit', 'failed'],
         );
       });
     }
@@ -279,22 +294,19 @@ class ApiServiceWrapper {
 
   /// 获取配置的 Host
   Future<String?> getHost() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefsHostKey);
+    return await PreferencesService.instance.getString(_prefsHostKey);
   }
 
   /// 获取配置的 Token
   Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefsTokenKey);
+    return await PreferencesService.instance.getString(_prefsTokenKey);
   }
 
   /// 设置后端配置
   Future<void> setConfig({required String host, String? token}) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsHostKey, host.trim());
+    await PreferencesService.instance.setString(_prefsHostKey, host.trim());
     if (token != null) {
-      await prefs.setString(_prefsTokenKey, token.trim());
+      await PreferencesService.instance.setString(_prefsTokenKey, token.trim());
     }
 
     // 重新初始化
@@ -319,17 +331,12 @@ class ApiServiceWrapper {
 
         // 成功时重置错误计数
         if (_lastErrorCount > 0) {
-          LoggerService.instance.e(
-            '✅ 请求成功，重置错误计数 (之前: $_lastErrorCount)',
-            category: LogCategory.network,
-            tags: ['error', 'api'],
-          );
           _lastErrorCount = 0;
           _lastErrorTime = null;
         }
 
         return result;
-      } catch (e) {
+      } catch (e, stackTrace) {
         retryCount++;
 
         // 记录连接错误
@@ -338,19 +345,15 @@ class ApiServiceWrapper {
         if (retryCount > maxRetries) {
           LoggerService.instance.e(
             '❌ $operationName 最终失败: $e',
+            stackTrace: stackTrace.toString(),
             category: LogCategory.network,
-            tags: ['error', 'api'],
+            tags: ['error', 'api', 'retry', 'failed'],
           );
           throw _handleError(e);
         }
 
         // 如果是连接错误，尝试重新初始化并重试
         if (_isConnectionError(e)) {
-          LoggerService.instance.e(
-            '🔄 检测到连接错误，重新初始化并重试 ($retryCount/$maxRetries)',
-            category: LogCategory.network,
-            tags: ['error', 'api'],
-          );
           await _reinitializeConnection();
           await Future.delayed(
               Duration(milliseconds: 1000 * retryCount)); // 指数退避
@@ -358,11 +361,6 @@ class ApiServiceWrapper {
         }
 
         // 其他错误也重试，但延迟更短
-        LoggerService.instance.e(
-          '⚠️ $operationName 失败，重试中 ($retryCount/$maxRetries): $e',
-          category: LogCategory.network,
-          tags: ['error', 'api'],
-        );
         await Future.delayed(Duration(milliseconds: 500 * retryCount));
       }
     }
@@ -525,74 +523,50 @@ class ApiServiceWrapper {
       } else {
         throw Exception('生成人物卡失败：${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '生成人物卡失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'role_card', 'failed'],
+      );
       throw _handleError(e);
     }
   }
 
   /// 获取角色图集
   Future<Map<String, dynamic>> getRoleGallery(String roleId) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
+    return LogScope.capture(
+      name: '获取角色图集',
+      category: LogCategory.network,
+      tags: ['api', 'gallery'],
+      context: {'roleId': roleId},
+      action: () async {
+        _ensureInitialized();
+        final token = await getToken();
 
-      final response = await _api.getRoleCardGalleryApiRoleCardGalleryRoleIdGet(
-        roleId: roleId,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = response.data;
-        LoggerService.instance.i(
-          '图集API响应数据类型: ${responseData.runtimeType}',
-          category: LogCategory.network,
-          tags: ['api', 'response'],
-        );
-        LoggerService.instance.i(
-          '图集API响应数据: $responseData',
-          category: LogCategory.network,
-          tags: ['api', 'response'],
+        final response = await _api.getRoleCardGalleryApiRoleCardGalleryRoleIdGet(
+          roleId: roleId,
+          X_API_TOKEN: token,
         );
 
-        if (responseData != null) {
-          try {
-            LoggerService.instance.d(
-              '开始解析RoleGalleryResponse对象',
-              category: LogCategory.network,
-              tags: ['data', 'parse'],
-            );
-
-            // 直接处理RoleGalleryResponse对象
-            final apiImages = responseData.images; // BuiltList<String>
+        if (response.statusCode == 200) {
+          final responseData = response.data;
+          if (responseData != null) {
+            final apiImages = responseData.images;
             final imageList = apiImages.toList();
-
-            LoggerService.instance.i(
-              '直接解析到的图片列表: $imageList',
-              category: LogCategory.network,
-              tags: ['image', 'generation'],
-            );
-
             return {
               'role_id': responseData.roleId,
               'images': imageList,
               'message': '图集获取成功'
             };
-          } catch (e) {
-            LoggerService.instance.e(
-              '解析图集数据失败: $e',
-              category: LogCategory.network,
-              tags: ['error', 'api'],
-            );
-            return {'role_id': roleId, 'images': [], 'message': '图集数据解析失败'};
           }
+          return {'role_id': roleId, 'images': [], 'message': '图集响应为空'};
+        } else {
+          throw Exception('获取图集失败：${response.statusCode}');
         }
-        return {'role_id': roleId, 'images': [], 'message': '图集响应为空'};
-      } else {
-        throw Exception('获取图集失败：${response.statusCode}');
-      }
-    } catch (e) {
-      throw _handleError(e);
-    }
+      },
+    );
   }
 
   /// 删除角色图片
@@ -624,7 +598,13 @@ class ApiServiceWrapper {
       } else {
         throw Exception('删除图片失败：${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除角色图片失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'delete', 'failed'],
+      );
       throw _handleError(e);
     }
   }
@@ -633,70 +613,68 @@ class ApiServiceWrapper {
   Future<Map<String, dynamic>> generateMoreImages({
     required String roleId,
     required int count,
-    String? referenceImageUrl, // 可选的参考图片URL
+    String? referenceImageUrl,
   }) async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      LoggerService.instance.i(
-        '生成图片请求，角色ID: $roleId, 数量: $count',
-        category: LogCategory.network,
-        tags: ['api', 'request'],
-      );
+    return LogScope.capture(
+      name: '生成更多图片',
+      category: LogCategory.network,
+      tags: ['api', 'generate'],
+      context: {
+        'roleId': roleId,
+        'count': count,
+        if (referenceImageUrl != null) 'hasReference': true,
+      },
+      action: () async {
+        _ensureInitialized();
+        final token = await getToken();
 
-      if (referenceImageUrl != null && referenceImageUrl.isNotEmpty) {
-        // 使用参考图片生成相似图片
-        final regenerateRequest = RoleRegenerateRequest((b) => b
-          ..imgUrl = referenceImageUrl
-          ..count = count);
+        if (referenceImageUrl != null && referenceImageUrl.isNotEmpty) {
+          // 使用参考图片生成相似图片
+          final regenerateRequest = RoleRegenerateRequest((b) => b
+            ..imgUrl = referenceImageUrl
+            ..count = count);
 
-        final response =
-            await _api.regenerateSimilarImagesApiRoleCardRegeneratePost(
-          roleRegenerateRequest: regenerateRequest,
-          X_API_TOKEN: token,
-        );
+          final response =
+              await _api.regenerateSimilarImagesApiRoleCardRegeneratePost(
+            roleRegenerateRequest: regenerateRequest,
+            X_API_TOKEN: token,
+          );
 
-        if (response.statusCode == 200) {
-          return {
-            'message': '图片生成请求已提交，正在根据参考图片生成 $count 张相似图片',
-            'count': count,
-            'status': 'processing',
-            'reference_image': referenceImageUrl
-          };
+          if (response.statusCode == 200) {
+            return {
+              'message': '图片生成请求已提交，正在根据参考图片生成 $count 张相似图片',
+              'count': count,
+              'status': 'processing',
+              'reference_image': referenceImageUrl
+            };
+          } else {
+            throw Exception('生成图片失败：${response.statusCode}');
+          }
         } else {
-          throw Exception('生成图片失败：${response.statusCode}');
-        }
-      } else {
-        // 如果没有参考图片，使用角色ID重新生成
-        final generateRequest = RoleCardGenerateRequest((b) => b
-          ..roleId = roleId
-          ..roles.replace(BuiltList<RoleInfo>([])));
+          // 如果没有参考图片，使用角色ID重新生成
+          final generateRequest = RoleCardGenerateRequest((b) => b
+            ..roleId = roleId
+            ..roles.replace(BuiltList<RoleInfo>([])));
 
-        final response =
-            await _api.generateRoleCardImagesApiRoleCardGeneratePost(
-          roleCardGenerateRequest: generateRequest,
-          X_API_TOKEN: token,
-        );
+          final response =
+              await _api.generateRoleCardImagesApiRoleCardGeneratePost(
+            roleCardGenerateRequest: generateRequest,
+            X_API_TOKEN: token,
+          );
 
-        if (response.statusCode == 200) {
-          return {
-            'message': '图片生成请求已提交，正在生成 $count 张新图片',
-            'count': count,
-            'status': 'processing',
-            'type': 'new_generation'
-          };
-        } else {
-          throw Exception('生成图片失败：${response.statusCode}');
+          if (response.statusCode == 200) {
+            return {
+              'message': '图片生成请求已提交，正在生成 $count 张新图片',
+              'count': count,
+              'status': 'processing',
+              'type': 'new_generation'
+            };
+          } else {
+            throw Exception('生成图片失败：${response.statusCode}');
+          }
         }
-      }
-    } catch (e) {
-      LoggerService.instance.e(
-        '❌ 生成图片失败: $e',
-        category: LogCategory.network,
-        tags: ['error', 'api'],
-      );
-      throw _handleError(e);
-    }
+      },
+    );
   }
 
   /// 获取 Dio 实例（用于构建图片URL）
@@ -821,7 +799,13 @@ class ApiServiceWrapper {
             for (final entry in map.entries) {
               result[entry.key.toString()] = entry.value;
             }
-          } catch (e) {
+          } catch (e, stackTrace) {
+            LoggerService.instance.e(
+              '解析场景插图响应数据失败',
+              stackTrace: stackTrace.toString(),
+              category: LogCategory.network,
+              tags: ['error', 'api', 'parse', 'failed'],
+            );
             throw Exception('重新生成场景插图图片失败：无法解析响应数据');
           }
           return result;
@@ -941,7 +925,13 @@ class ApiServiceWrapper {
       } else {
         throw Exception('生成图生视频失败：${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '生成图生视频失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'video', 'failed'],
+      );
       LoggerService.instance.e(
         '生成图生视频异常: $e',
         category: LogCategory.network,
@@ -971,7 +961,13 @@ class ApiServiceWrapper {
       } else {
         throw Exception('检查视频状态失败：${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '检查视频状态失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'video', 'failed'],
+      );
       LoggerService.instance.e(
         '检查视频状态异常: $e',
         category: LogCategory.network,
@@ -1002,156 +998,67 @@ class ApiServiceWrapper {
     required int count,
     String? modelName,
   }) async {
-    LoggerService.instance.d(
-      '=== ApiServiceWrapper.regenerateSceneIllustrationImages ===',
+    return LogScope.capture(
+      name: '重新生成场景插图',
       category: LogCategory.network,
-      tags: ['debug', 'lifecycle'],
-    );
-    LoggerService.instance.i(
-      '参数: taskId=$taskId, count=$count, modelName=$modelName',
-      category: LogCategory.network,
-      tags: ['api'],
-    );
+      tags: ['api', 'scene_illustration'],
+      context: {
+        'taskId': taskId,
+        'count': count,
+        if (modelName != null) 'model': modelName,
+      },
+      action: () async {
+        _ensureInitialized();
+        final token = await getToken();
+        final request = SceneRegenerateRequest((b) => b
+          ..taskId = taskId
+          ..count = count
+          ..model = modelName ?? '');
 
-    _ensureInitialized();
-    LoggerService.instance.i(
-      '✅ 初始化检查通过',
-      category: LogCategory.network,
-      tags: ['success', 'api'],
-    );
-
-    try {
-      LoggerService.instance.i(
-        '🔄 获取 token...',
-        category: LogCategory.network,
-        tags: ['retry', 'reinit'],
-      );
-      final token = await getToken();
-      LoggerService.instance.i(
-        '✅ token获取成功: ${token?.substring(0, 10)}...',
-        category: LogCategory.network,
-        tags: ['success', 'api'],
-      );
-
-      LoggerService.instance.i(
-        '🔄 构建请求参数...',
-        category: LogCategory.network,
-        tags: ['retry', 'reinit'],
-      );
-      final request = SceneRegenerateRequest((b) => b
-        ..taskId = taskId
-        ..count = count
-        ..model = modelName ?? '');
-      LoggerService.instance.d(
-        '请求数据: taskId=${request.taskId}, count=${request.count}, model=${request.model}',
-        category: LogCategory.network,
-        tags: ['api', 'request', 'debug'],
-      );
-
-      LoggerService.instance.i(
-        '🔄 发起API请求...',
-        category: LogCategory.network,
-        tags: ['retry', 'reinit'],
-      );
-      final response =
-          await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
-        sceneRegenerateRequest: request,
-        X_API_TOKEN: token,
-      );
-
-      LoggerService.instance.i(
-        '✅ API响应收到',
-        category: LogCategory.network,
-        tags: ['success', 'api'],
-      );
-      LoggerService.instance.i(
-        '状态码: ${response.statusCode}',
-        category: LogCategory.network,
-        tags: ['api', 'response'],
-      );
-      LoggerService.instance.i(
-        '响应类型: ${response.data.runtimeType}',
-        category: LogCategory.network,
-        tags: ['api', 'response'],
-      );
-
-      if (response.statusCode == 200) {
-        LoggerService.instance.i(
-          '✅ 请求成功',
-          category: LogCategory.network,
-          tags: ['success', 'api'],
+        final response =
+            await _api.regenerateSceneImagesApiSceneIllustrationRegeneratePost(
+          sceneRegenerateRequest: request,
+          X_API_TOKEN: token,
         );
-        // API返回的已经是 SceneRegenerateResponse 类型
-        final data = response.data;
-        if (data != null) {
-          return {
-            'task_id': data.taskId,
-            'total_prompts': data.totalPrompts,
-            'message': data.message,
-          };
+
+        if (response.statusCode == 200) {
+          final data = response.data;
+          if (data != null) {
+            return {
+              'task_id': data.taskId,
+              'total_prompts': data.totalPrompts,
+              'message': data.message,
+            };
+          }
+          throw Exception('重新生成场景插图失败：响应数据为空');
+        } else {
+          throw Exception('重新生成场景插图失败：${response.statusCode}');
         }
-        throw Exception('重新生成场景插图失败：响应数据为空');
-      } else {
-        LoggerService.instance.e(
-          '❌ 请求失败，状态码: ${response.statusCode}',
-          category: LogCategory.network,
-          tags: ['error', 'api'],
-        );
-        throw Exception('重新生成场景插图失败：${response.statusCode}');
-      }
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '❌ API调用异常',
-        category: LogCategory.network,
-        tags: ['error', 'api'],
-      );
-      LoggerService.instance.e(
-        '异常类型: ${e.runtimeType}',
-        category: LogCategory.network,
-        tags: ['error', 'api'],
-      );
-      LoggerService.instance.e(
-        '异常信息: $e',
-        category: LogCategory.network,
-        tags: ['error', 'api'],
-      );
-      LoggerService.instance.i(
-        '堆栈跟踪:\n$stackTrace',
-        category: LogCategory.network,
-        tags: ['api'],
-      );
-      LoggerService.instance.d(
-        '====================================',
-        category: LogCategory.network,
-        tags: ['debug', 'lifecycle'],
-      );
-      rethrow;
-    }
+      },
+    );
   }
 
   /// 获取所有可用模型列表
   Future<ModelsResponse> getModels() async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
+    return LogScope.capture(
+      name: '获取模型列表',
+      category: LogCategory.network,
+      tags: ['api', 'models'],
+      action: () async {
+        _ensureInitialized();
+        final token = await getToken();
 
-      final response = await _api.getModelsApiModelsGet(
-        X_API_TOKEN: token,
-      );
+        final response = await _api.getModelsApiModelsGet(
+          X_API_TOKEN: token,
+        );
 
-      if (response.statusCode == 200) {
-        return response.data!;
-      } else {
-        throw Exception('获取模型列表失败：${response.statusCode}');
-      }
-    } catch (e) {
-      LoggerService.instance.e(
-        '获取模型列表异常: $e',
-        category: LogCategory.network,
-        tags: ['error', 'api'],
-      );
-      throw _handleError(e);
-    }
+        if (response.statusCode == 200) {
+          return response.data!;
+        } else {
+          throw Exception('获取模型列表失败：${response.statusCode}');
+        }
+      },
+    );
   }
 
   /// 获取指定类型的模型标题列表
@@ -1176,11 +1083,77 @@ class ApiServiceWrapper {
           }
           return allModels;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取模型标题列表失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'models', 'failed'],
+      );
       LoggerService.instance.e(
         '获取模型标题列表异常: $e',
         category: LogCategory.network,
         tags: ['error', 'api'],
+      );
+      throw _handleError(e);
+    }
+  }
+
+  /// 上传数据库备份
+  ///
+  /// [dbFile] 数据库文件
+  /// [onProgress] 上传进度回调
+  ///
+  /// 返回BackupUploadResponse，包含上传结果信息
+  Future<BackupUploadResponse> uploadBackup({
+    required File dbFile,
+    ProgressCallback? onProgress,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      if (token == null || token.isEmpty) {
+        throw Exception('API Token未配置');
+      }
+
+      // 创建MultipartFile
+      final multipartFile = await MultipartFile.fromFile(
+        dbFile.path,
+        filename: path.basename(dbFile.path),
+      );
+
+      // 创建BackupApi实例
+      final backupApi = BackupApi(_dio, standardSerializers);
+
+      // 上传文件
+      final response = await backupApi.uploadBackupApiBackupUploadPost(
+        file: multipartFile,
+        X_API_TOKEN: token,
+        onSendProgress: onProgress,
+      );
+
+      if (response.statusCode == 200) {
+        LoggerService.instance.i(
+          '备份上传成功: ${response.data?.storedPath}',
+          category: LogCategory.network,
+          tags: ['backup', 'success'],
+        );
+        return response.data!;
+      } else {
+        throw Exception('备份上传失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '备份上传失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'backup', 'failed'],
+      );
+      LoggerService.instance.e(
+        '备份上传异常: $e',
+        category: LogCategory.network,
+        tags: ['error', 'backup'],
       );
       throw _handleError(e);
     }

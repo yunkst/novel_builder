@@ -9,6 +9,7 @@ import 'package:novel_api/src/auth/api_key_auth.dart';
 import 'package:novel_api/src/auth/basic_auth.dart';
 import 'package:novel_api/src/auth/bearer_auth.dart';
 import 'package:novel_api/src/auth/oauth.dart';
+import 'package:novel_api/src/api/backup_api.dart';
 import 'package:novel_api/src/api/default_api.dart';
 
 class NovelApi {
@@ -63,6 +64,12 @@ class NovelApi {
     if (this.dio.interceptors.any((i) => i is ApiKeyAuthInterceptor)) {
       (this.dio.interceptors.firstWhere((element) => element is ApiKeyAuthInterceptor) as ApiKeyAuthInterceptor).apiKeys[name] = apiKey;
     }
+  }
+
+  /// Get BackupApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  BackupApi getBackupApi() {
+    return BackupApi(dio, serializers);
   }
 
   /// Get DefaultApi instance, base route and serializer can be overridden by a given but be careful,

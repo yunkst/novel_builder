@@ -1,0 +1,25 @@
+00:00 +0: loading D:/myspace/novel_builder/novel_app/test/unit/widgets/character_relationship_screen_test.dart
+✅ 测试环境初始化完成 (SQLite FFI)
+00:00 +0: CharacterRelationshipScreen - 关系列表渲染 应该显示TabBar
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'Null' is not a subtype of type 'Future<List<CharacterRelationship>>'
+
+When the exception was thrown, this was the stack:
+#0      MockDatabaseService.getOutgoingRelationships (file:///D:/myspace/novel_builder/novel_app/test/unit/widgets/character_relationship_screen_test.dart:12:7)
+#1      main.<anonymous closure>.<anonymous closure> (file:///D:/myspace/novel_builder/novel_app/test/unit/widgets/character_relationship_screen_test.dart:204:19)
+#2      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1059:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  应该显示TabBar
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:00 +0 -1: CharacterRelationshipScreen - 关系列表渲染 应该显示TabBar [E]
+  Test failed. See exception logs above.
+  The test description was: 应该显示TabBar
+  
+00:00 +0 -1: Some tests failed.

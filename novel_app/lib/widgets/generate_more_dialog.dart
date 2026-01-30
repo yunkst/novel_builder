@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
+import '../utils/toast_utils.dart';
 import 'model_selector.dart';
 
 /// 生成更多图片数量选择对话框
@@ -60,12 +63,12 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
 
     if (count == null || count <= 0) {
       debugPrint('❌ 数量验证失败');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('请输入有效的图片数量'),
-          backgroundColor: Colors.orange,
-        ),
+      LoggerService.instance.w(
+        '图片数量验证失败: count=$count',
+        category: LogCategory.ui,
+        tags: ['validation', 'image-count', 'invalid'],
       );
+      ToastUtils.showWarning('请输入有效的图片数量');
       return;
     }
 
@@ -82,9 +85,12 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
       widget.onConfirm(count, _selectedModel);
       debugPrint('✅ onConfirm 回调调用完成');
     } catch (e, stackTrace) {
-      debugPrint('❌❌❌ onConfirm 回调异常 ❌❌❌');
-      debugPrint('异常: $e');
-      debugPrint('堆栈:\n$stackTrace');
+      ErrorHelper.logError(
+        'onConfirm回调执行失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ui,
+        tags: ['dialog', 'callback', 'failed'],
+      );
     }
   }
 
@@ -101,7 +107,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
               blurRadius: 10,
               spreadRadius: 2,
             ),
@@ -134,7 +140,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
               Text(
                 '请输入您想生成的图片数量',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
               ),
               const SizedBox(height: 20),
@@ -219,7 +225,7 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
                       onPressed: _handleConfirm,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -262,18 +268,20 @@ class _QuickOptionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? Theme.of(context).colorScheme.primary
-              : Colors.grey[100],
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.grey[300]!,
+                : Theme.of(context).colorScheme.outline,
           ),
         ),
         child: Text(
           '$count张',
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 14,
           ),

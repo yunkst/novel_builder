@@ -2,7 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/novel.dart';
 import '../services/database_service.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import '../widgets/reader/background_summary_dialog.dart';
+import '../widgets/common/common_widgets.dart';
+import '../utils/toast_utils.dart';
 
 /// 背景设定独立页面
 ///
@@ -27,10 +31,14 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
   @override
   void initState() {
     super.initState();
-    _controller.text = widget.novel.backgroundSetting ?? '';
+    // 初始化为空，然后从数据库加载最新数据
+    _controller.text = '';
 
     // 监听文本变化，检测修改状态
     _controller.addListener(_onTextChanged);
+
+    // 从数据库加载最新的背景设定
+    _loadBackgroundSetting();
   }
 
   @override
@@ -83,18 +91,15 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
         });
 
         // 显示轻量级提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已自动保存'),
-            duration: Duration(seconds: 1),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        ToastUtils.showInfo('已自动保存');
       }
-    } catch (e) {
-      if (mounted) {
-        debugPrint('自动保存失败: $e');
-      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '自动保存失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['background-setting', 'auto-save', 'failed'],
+      );
     }
   }
 
@@ -121,25 +126,18 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
         });
 
         // 显示保存成功提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('背景设定已保存'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('背景设定已保存');
         // 返回上一页
         Navigator.pop(context);
       }
-    } catch (e) {
-      if (mounted) {
-        // 显示保存失败提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '保存失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['background-setting', 'save', 'failed'],
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -153,25 +151,13 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
   Future<bool> _confirmDiscardChanges() async {
     if (!_isModified) return true;
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('放弃修改？'),
-        content: const Text('您有未保存的修改，确定要放弃吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('继续编辑'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('放弃修改'),
-          ),
-        ],
-      ),
+    final result = await ConfirmDialog.show(
+      context,
+      title: '放弃修改？',
+      message: '您有未保存的修改，确定要放弃吗？',
+      confirmText: '放弃修改',
+      cancelText: '继续编辑',
+      confirmColor: Colors.red,
     );
 
     return result ?? false;
@@ -193,8 +179,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
     }
   }
 
-  /// 重新加载背景设定
-  Future<void> _reloadBackgroundSetting() async {
+  /// 从数据库加载背景设定
+  Future<void> _loadBackgroundSetting() async {
     try {
       final backgroundSetting = await _databaseService.getBackgroundSetting(widget.novel.url);
       if (mounted) {
@@ -204,8 +190,20 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
         });
       }
     } catch (e) {
-      debugPrint('重新加载背景设定失败: $e');
+      debugPrint('加载背景设定失败: $e');
+      if (mounted) {
+        // 如果加载失败，使用widget.novel中的值作为后备
+        setState(() {
+          _controller.text = widget.novel.backgroundSetting ?? '';
+          _isModified = false;
+        });
+      }
     }
+  }
+
+  /// 重新加载背景设定（用于AI总结后刷新）
+  Future<void> _reloadBackgroundSetting() async {
+    await _loadBackgroundSetting();
   }
 
   @override
@@ -234,12 +232,12 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
             // 保存按钮
             IconButton(
               icon: _isSaving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     )
                   : const Icon(Icons.save),
@@ -265,7 +263,7 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
               Text(
                 '请输入小说的背景设定，包括世界观、时代背景、地理环境等信息',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
               ),
               const SizedBox(height: 16),
@@ -298,7 +296,7 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
                   Icon(
                     Icons.info_outline,
                     size: 14,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -307,7 +305,7 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
                           ? '内容已修改，2秒后自动保存或点击右上角保存'
                           : '点击右上角保存按钮保存修改',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _isModified ? Colors.orange : Colors.grey,
+                            color: _isModified ? Colors.orange : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                     ),
                   ),
