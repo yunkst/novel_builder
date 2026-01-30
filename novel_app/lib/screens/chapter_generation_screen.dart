@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import '../widgets/common/common_widgets.dart';
 
 /// 章节生成全屏页面
 ///
@@ -122,26 +123,13 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
       canPop: !widget.isGeneratingNotifier.value,
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop && widget.isGeneratingNotifier.value) {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('确认取消'),
-              content: const Text('章节正在生成中,确定要取消吗?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('继续生成'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('确认取消'),
-                ),
-              ],
-            ),
+          final confirmed = await ConfirmDialog.show(
+            context,
+            title: '确认取消',
+            message: '章节正在生成中,确定要取消吗?',
+            confirmText: '确认取消',
+            cancelText: '继续生成',
+            confirmColor: Theme.of(context).colorScheme.error,
           );
           if (confirmed == true && context.mounted) {
             Navigator.pop(context);
@@ -152,34 +140,20 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () {
+            onPressed: () async {
               if (widget.isGeneratingNotifier.value) {
                 // 生成中,显示确认对话框
-                showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('确认取消'),
-                    content: const Text('章节正在生成中,确定要取消吗?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('继续生成'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('确认取消'),
-                      ),
-                    ],
-                  ),
-                ).then((confirmed) {
-                  if (confirmed == true && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                });
+                final confirmed = await ConfirmDialog.show(
+                  context,
+                  title: '确认取消',
+                  message: '章节正在生成中,确定要取消吗?',
+                  confirmText: '确认取消',
+                  cancelText: '继续生成',
+                  confirmColor: Theme.of(context).colorScheme.error,
+                );
+                if (confirmed == true && context.mounted) {
+                  Navigator.pop(context);
+                }
               } else {
                 // 非生成中,直接返回
                 Navigator.pop(context);
@@ -188,7 +162,7 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.auto_awesome, size: 20, color: Colors.amber),
+              Icon(Icons.auto_awesome, size: 20, color: Theme.of(context).colorScheme.tertiary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -201,9 +175,9 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
           actions: [
             TextButton(
               onPressed: _handleCancel,
-              child: const Text(
+              child: Text(
                 '取消',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
               ),
             ),
           ],
@@ -244,7 +218,7 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                             vertical: 8,
                             horizontal: 16,
                           ),
-                          color: Colors.blue.shade900,
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
                           child: Row(
                             children: [
                               SizedBox(
@@ -252,14 +226,14 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.blue.shade300,
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Text(
                                 '正在生成中...',
                                 style: TextStyle(
-                                  color: Colors.blue.shade100,
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                                   fontSize: 14,
                                 ),
                               ),
@@ -270,10 +244,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                       // 内容显示区域
                       Expanded(
                         child: Container(
-                          color: Colors.grey[900],
+                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                           padding: const EdgeInsets.all(16),
                           child: Card(
-                            color: Colors.grey[850],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
                             elevation: 2,
                             child: Padding(
                               padding: const EdgeInsets.all(20),
@@ -285,10 +259,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                     // 章节标题
                                     Text(
                                       widget.title,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: Theme.of(context).colorScheme.onSurface,
                                       ),
                                     ),
                                     const Divider(
@@ -299,10 +273,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                     // 章节内容
                                     SelectableText(
                                       content,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 16,
                                         height: 1.8,
-                                        color: Color(0xFFE0E0E0),
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                                       ),
                                     ),
                                   ],
@@ -321,20 +295,20 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                             vertical: 8,
                             horizontal: 16,
                           ),
-                          color: Colors.orange.shade900,
+                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.9),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.info_outline,
                                 size: 16,
-                                color: Colors.orange.shade300,
+                                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '已暂停自动滚动,内容仍在生成中',
                                   style: TextStyle(
-                                    color: Colors.orange.shade100,
+                                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -350,7 +324,7 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                   '恢复滚动',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.orange.shade300,
+                                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                                   ),
                                 ),
                               ),
@@ -373,10 +347,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[900],
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                             blurRadius: 4,
                             offset: const Offset(0, -2),
                           ),
@@ -389,9 +363,9 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                             // 取消按钮
                             TextButton(
                               onPressed: _handleCancel,
-                              child: const Text(
+                              child: Text(
                                 '取消',
-                                style: TextStyle(color: Color(0xFFBDBDBD)),
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.74)),
                               ),
                             ),
 
@@ -405,8 +379,8 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                 isGenerating ? '生成中' : '重试',
                                 style: TextStyle(
                                   color: isGenerating
-                                      ? const Color(0xFF757575)
-                                      : const Color(0xFF64B5F6),
+                                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.457)
+                                      : Theme.of(context).colorScheme.primary.withValues(alpha: 0.71),
                                 ),
                               ),
                             ),
@@ -420,10 +394,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                               icon: const Icon(Icons.check, size: 18),
                               label: const Text('插入'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF388E3C),
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor: const Color(0xFF616161),
-                                disabledForegroundColor: const Color(0xFF9E9E9E),
+                                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.22),
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
+                                disabledForegroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
                               ),
                             ),
                           ],

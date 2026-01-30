@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/dify_service.dart';
+import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
 
 /// Dify流式交互的Mixin
 ///
@@ -76,7 +78,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     bool enableDebugLog = false,
   }) async {
     if (_isStreaming) {
-      debugPrint('⚠️ 已有流式请求在进行中');
+      LoggerService.instance.w(
+        '已有流式请求在进行中',
+        category: LogCategory.ai,
+        tags: ['dify', 'streaming', 'duplicate'],
+      );
       return;
     }
 
@@ -157,7 +163,7 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           }
 
           if (completeMessage != null && showErrorSnackBar && mounted) {
-            _showSnackBar(completeMessage, Colors.green);
+            ToastUtils.showSuccess(completeMessage);
           }
 
           onComplete?.call(_fullContent);
@@ -181,14 +187,21 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
           final errorMsg = '${errorMessagePrefix ?? "操作失败"}: $error';
           if (showErrorSnackBar) {
-            _showSnackBar(errorMsg, Colors.orange);
+            ToastUtils.showError(errorMsg);
           }
 
           onError?.call(errorMsg);
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (!mounted) return;
+
+      LoggerService.instance.e(
+        '流式交互异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['dify', 'streaming', 'error'],
+      );
 
       setState(() {
         _isStreaming = false;
@@ -203,38 +216,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
       final errorMsg = '${errorMessagePrefix ?? "操作异常"}: $e';
       if (showErrorSnackBar) {
-        _showSnackBar(errorMsg, Colors.red);
+        ToastUtils.showError(errorMsg);
       }
 
       onError?.call(errorMsg);
     }
-  }
-
-  /// 处理特殊标记的数据块（性能优化）
-  ///
-  /// [chunk] 原始数据块
-  ///
-  /// 返回：处理后的内容
-  ///
-  /// 用途：处理特殊标记（如 &lt;&lt;COMPLETE_CONTENT&gt;&gt;），避免UI逐字渲染长文本导致的性能问题
-  ///
-  /// 示例：
-  /// ```dart
-  /// onChunk: (chunk) {
-  ///   final processed = handleSpecialChunk(chunk);
-  ///   setState(() {
-  ///     _content += processed;
-  ///   });
-  /// }
-  /// ```
-  String handleSpecialChunk(String chunk) {
-    const completeContentMarker = '<<COMPLETE_CONTENT>>';
-    if (chunk.startsWith(completeContentMarker)) {
-      // 返回完整内容（去除标记）
-      return chunk.substring(completeContentMarker.length);
-    }
-    // 返回原始内容
-    return chunk;
   }
 
   /// 取消流式输出
@@ -242,7 +228,6 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   /// [reason] 可选的取消原因
   void cancelStreaming({String? reason}) {
     if (!_isStreaming) {
-      debugPrint('⚠️ 没有正在进行的流式请求');
       return;
     }
 
@@ -254,12 +239,16 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     hideStreamingProgress();
 
     if (reason != null && mounted) {
-      _showSnackBar('已取消: $reason', Colors.grey);
+      ToastUtils.show('已取消: $reason');
     } else if (mounted) {
-      _showSnackBar('已取消生成，内容已保留', Colors.grey);
+      ToastUtils.show('已取消生成，内容已保留');
     }
 
-    debugPrint('🚫 流式输出已取消${reason != null ? ": $reason" : ""}');
+    LoggerService.instance.d(
+      '流式输出已取消${reason != null ? ": $reason" : ""}',
+      category: LogCategory.ai,
+      tags: ['dify', 'streaming', 'cancel'],
+    );
   }
 
   // ========== 辅助方法（可被子类重写） ==========
@@ -269,7 +258,6 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   /// 子类可以重写此方法来自定义进度显示
   void showStreamingProgress({String? message}) {
     // 默认空实现，子类可重写
-    debugPrint('📡 流式输出开始${message != null ? ": $message" : ""}');
   }
 
   /// 隐藏流式输出进度（可选实现）
@@ -277,7 +265,6 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   /// 子类可以重写此方法来自定义进度隐藏
   void hideStreamingProgress() {
     // 默认空实现，子类可重写
-    debugPrint('✅ 流式输出结束');
   }
 
   // ========== 生命周期管理 ==========
@@ -285,7 +272,6 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   @override
   @mustCallSuper
   void dispose() {
-    debugPrint('🧹 DifyStreamingMixin 清理资源');
     // 清理状态
     _isStreaming = false;
     _isCancelled = false;
@@ -294,17 +280,4 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   }
 
   // ========== 内部辅助方法 ==========
-
-  /// 显示SnackBar
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
 }

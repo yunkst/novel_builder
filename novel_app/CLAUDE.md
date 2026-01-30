@@ -112,21 +112,43 @@ class Chapter {
 
 ### 本地数据库
 - **类型**: SQLite
-- **版本**: v3
+- **版本**: v20
 - **位置**: 应用私有目录
 
 ### 表结构
-1. **bookshelf**: 用户书架
-   - 小说元数据、阅读进度
-   - 添加时间、最后阅读时间
 
-2. **chapter_cache**: 章节内容缓存
+**重要命名说明**:
+- `bookshelf` 表：物理表，存储小说元数据（历史遗留命名）
+- `novels` 视图：bookshelf表的别名视图，提供更清晰的语义
+- `bookshelves` 表：书架分类表（注意复数形式，与Bookshelf模型对应）
+- `Bookshelf` 模型：书架分类功能（id, name, icon, color）
+
+#### 物理表
+1. **bookshelf** (小说表)
+   - 存储小说元数据、阅读进度
+   - 添加时间、最后阅读时间
+   - 注意：表名是历史遗留，实际存储小说数据
+
+2. **bookshelves** (书架分类表)
+   - 书架分类功能（如"我的收藏"、"玄幻小说"）
+   - 与Bookshelf模型对应
+
+3. **novel_bookshelves** (小说-书架关联表)
+   - 多对多关系表
+   - 支持一本小说属于多个书架
+
+4. **chapter_cache**: 章节内容缓存
    - 章节内容、索引
    - 缓存时间管理
 
-3. **novel_chapters**: 章节列表元数据
+5. **novel_chapters**: 章节列表元数据
    - 支持用户插入章节 (`isUserInserted`)
    - 章节索引自动管理
+
+#### 逻辑视图
+- **novels**: bookshelf表的别名视图，提供更清晰的语义
+  - 推荐新代码使用此视图进行查询
+  - 保持数据兼容性
 
 ### 数据库服务
 - **Database Service**: `lib/services/database_service.dart`

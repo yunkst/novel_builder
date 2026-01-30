@@ -4,6 +4,7 @@ import '../models/chapter.dart';
 import '../models/ai_accompaniment_settings.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
+import '../services/logger_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/dify_service.dart';
 import '../services/preload_service.dart';
@@ -21,12 +22,12 @@ import '../widgets/ai_accompaniment_settings_dialog.dart';
 import '../dialogs/chapter_list/delete_chapter_dialog.dart';
 import 'insert_chapter_screen.dart';
 import 'background_setting_screen.dart';
-import '../controllers/chapter_list/bookshelf_manager.dart';
 import '../controllers/chapter_list/chapter_loader.dart';
 import '../controllers/chapter_list/chapter_action_handler.dart';
 import '../controllers/chapter_list/chapter_reorder_controller.dart';
 import '../services/chapter_service.dart';
 import '../constants/chapter_constants.dart';
+import '../utils/toast_utils.dart';
 import 'dart:async';
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
@@ -48,7 +49,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   StreamSubscription<PreloadProgressUpdate>? _preloadSubscription;
 
   // 控制器
-  late final BookshelfManager _bookshelfManager;
   late final ChapterLoader _chapterLoader;
   late final ChapterActionHandler _chapterActionHandler;
   late final ChapterReorderController _reorderController;
@@ -71,6 +71,13 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   // 章节缓存状态映射（chapterUrl -> isCached）
   final Map<String, bool> _cachedStatus = {};
 
+  /// 获取已缓存章节数量
+  ///
+  /// 遍历 _cachedStatus Map，统计值为 true 的项数量
+  /// 每次缓存状态更新时自动反映最新数量
+  int get cachedCount =>
+      _cachedStatus.values.where((isCached) => isCached).length;
+
   // 重排相关状态
   bool _isReorderingMode = false;
 
@@ -86,10 +93,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   void initState() {
     super.initState();
 
-    // 初始化控制器
-    _bookshelfManager = BookshelfManager(
-      databaseService: _databaseService,
-    );
+    // 初始化控制器（轻量级，同步操作）
     _chapterLoader = ChapterLoader(
       api: _api,
       databaseService: _databaseService,
@@ -104,13 +108,26 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       databaseService: _databaseService,
     );
 
-    _initApi();
-    _checkBookshelfStatus();
-    _loadLastReadChapter();
-    _loadAiSettings(); // 加载AI伴读设置
+    // 异步初始化重量级数据加载
+    _initializeAsyncData();
 
     // 监听预加载进度
     _listenToPreloadProgress();
+  }
+
+  /// 异步初始化数据
+  ///
+  /// 性能优化：并行执行多个独立的异步操作，减少总初始化时间
+  Future<void> _initializeAsyncData() async {
+    // 并行执行所有独立的初始化操作
+    await Future.wait([
+      _initApi(),
+      _checkBookshelfStatus(),
+      _loadLastReadChapter(),
+      _loadAiSettings(),
+    ]);
+
+    debugPrint('✅ 所有异步数据初始化完成');
   }
 
   /// 监听预加载进度
@@ -146,8 +163,13 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     try {
       await _chapterLoader.initApi();
       _loadChapters();
-    } catch (e) {
-      debugPrint('❌ 初始化API失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '初始化API失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['api', 'init', 'failed'],
+      );
       setState(() {
         _isLoading = false;
         _errorMessage = '初始化API失败: $e';
@@ -242,14 +264,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         _updateTotalPages();
         _scrollToLastReadChapter();
 
-        // 初始加载所有章节的缓存状态
-        _loadCachedStatus();
+        // 只加载当前页的缓存状态（性能优化）
+        _loadCurrentPageCacheStatus();
 
         // 显示更新成功提示
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('章节列表已更新')),
-          );
+          ToastUtils.show('章节列表已更新');
         }
       } else {
         setState(() {
@@ -262,9 +282,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       // 如果已经有缓存数据，不显示错误，只显示提示
       if (_chapters.isNotEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('更新章节列表失败: $e')),
-          );
+          ToastUtils.show('更新章节列表失败: $e');
         }
       } else {
         setState(() {
@@ -275,26 +293,49 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-  /// 加载所有章节的缓存状态
+  /// 加载当前页章节的缓存状态
+  ///
+  /// 性能优化：只加载当前可见页面的缓存状态，而不是全部章节
+  /// 避免在章节数量多时产生大量数据库查询
+  Future<void> _loadCurrentPageCacheStatus() async {
+    final pageChapters = _getCurrentPageChapters();
+    if (pageChapters.isEmpty) return;
+
+    try {
+      // 批量查询当前页章节的缓存状态
+      final chapterUrls = pageChapters.map((c) => c.url).toList();
+      final results = await _chapterActionHandler.areChaptersCached(chapterUrls);
+
+      if (mounted) {
+        setState(() {
+          _cachedStatus.addAll(results);
+        });
+      }
+
+      debugPrint('✅ 已加载当前页 ${results.length} 个章节的缓存状态');
+    } catch (e) {
+      debugPrint('⚠️ 加载当前页缓存状态失败: $e');
+    }
+  }
+
+  /// 加载所有章节的缓存状态（已废弃，保留用于降级）
   ///
   /// 批量查询数据库，填充 _cachedStatus 映射
-  /// 避免每个章节都单独查询
+  /// ⚠️ 性能警告：章节数量多时会很慢，推荐使用 _loadCurrentPageCacheStatus
+  @Deprecated('使用 _loadCurrentPageCacheStatus 替代')
+  // ignore: unused_element
   Future<void> _loadCachedStatus() async {
     if (_chapters.isEmpty) return;
 
     try {
       // 批量查询所有章节的缓存状态
-      final futures = _chapters
-          .map((chapter) => _chapterActionHandler.isChapterCached(chapter.url));
-
-      final results = await Future.wait(futures);
+      final chapterUrls = _chapters.map((c) => c.url).toList();
+      final results = await _chapterActionHandler.areChaptersCached(chapterUrls);
 
       // 更新状态映射
       if (mounted) {
         setState(() {
-          for (int i = 0; i < _chapters.length; i++) {
-            _cachedStatus[_chapters[i].url] = results[i];
-          }
+          _cachedStatus.addAll(results);
         });
       }
 
@@ -346,9 +387,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             });
             // 显示保存成功提示
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('AI伴读设置已保存')),
-              );
+              ToastUtils.show('AI伴读设置已保存');
             }
           }
         },
@@ -444,6 +483,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       _currentPage = page;
     });
 
+    // 加载新页面的缓存状态
+    _loadCurrentPageCacheStatus();
+
     // 滚动到列表顶部
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -504,8 +546,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   Future<void> _checkBookshelfStatus() async {
-    final isInBookshelf =
-        await _bookshelfManager.isInBookshelf(widget.novel.url);
+    final isInBookshelf = await _databaseService.isInBookshelf(widget.novel.url);
     setState(() {
       _isInBookshelf = isInBookshelf;
     });
@@ -513,18 +554,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   Future<void> _toggleBookshelf() async {
     if (_isInBookshelf) {
-      await _bookshelfManager.removeFromBookshelf(widget.novel.url);
+      await _databaseService.removeFromBookshelf(widget.novel.url);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已从书架移除')),
-        );
+        ToastUtils.show('已从书架移除');
       }
     } else {
-      await _bookshelfManager.addToBookshelf(widget.novel);
+      await _databaseService.addToBookshelf(widget.novel);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已添加到书架')),
-        );
+        ToastUtils.show('已添加到书架');
       }
     }
     await _checkBookshelfStatus();
@@ -556,18 +593,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   Future<void> _clearCache() async {
     try {
-      await _bookshelfManager.clearNovelCache(widget.novel.url);
+      await _databaseService.clearNovelCache(widget.novel.url);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('缓存已清除')),
-        );
+        ToastUtils.show('缓存已清除');
       }
     } catch (e) {
       debugPrint('❌ 清除缓存失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('清除缓存失败: $e')),
-        );
+        ToastUtils.show('清除缓存失败: $e');
       }
     }
   }
@@ -661,9 +694,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         },
         onError: (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('生成失败: $error')),
-            );
+            ToastUtils.showError('生成失败: $error');
           }
         },
         onDone: () {
@@ -675,9 +706,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       debugPrint('❌ 调用Dify生成章节失败: $e');
       _isGeneratingNotifier.value = false;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成失败: $e')),
-        );
+        ToastUtils.showError('生成失败: $e');
       }
     }
   }
@@ -722,9 +751,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('插入章节失败: $e')),
-        );
+        ToastUtils.showError('插入章节失败: $e');
       }
     }
   }
@@ -748,12 +775,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     try {
       // 显示加载提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在删除章节...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        ToastUtils.show('正在删除章节...');
       }
 
       // 调用数据库删除方法
@@ -764,22 +786,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
       // 显示成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('章节删除成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('章节删除成功');
       }
     } catch (e) {
       // 显示错误提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('删除章节失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('删除章节失败: $e');
       }
     }
   }
@@ -823,6 +835,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                     ChapterListHeader(
                       novel: widget.novel,
                       chapterCount: _chapters.length,
+                      cachedCount: cachedCount,
                     ),
                     const Divider(),
                     Expanded(
@@ -855,17 +868,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           setState(() {
             _isReorderingMode = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已退出重排模式'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          ToastUtils.show('已退出重排模式');
         },
         tooltip: '完成重排',
         style: IconButton.styleFrom(
           backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+          foregroundColor: Theme.of(context).colorScheme.surface,
         ),
       );
     } else {
@@ -907,43 +915,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         );
       },
       tooltip: '人物管理',
-    );
-  }
-
-  // 构建大纲管理按钮
-  Widget _buildOutlineButton() {
-    return IconButton(
-      icon: const Icon(Icons.menu_book_outlined),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OutlineManagementScreen(
-              novelUrl: widget.novel.url,
-              novelTitle: widget.novel.title,
-            ),
-          ),
-        );
-      },
-      tooltip: '大纲管理',
-    );
-  }
-
-  // 构建背景设定按钮
-  Widget _buildBackgroundSettingButton() {
-    return IconButton(
-      icon: const Icon(Icons.info_outline),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BackgroundSettingScreen(
-              novel: widget.novel,
-            ),
-          ),
-        );
-      },
-      tooltip: '背景设定',
     );
   }
 
@@ -1126,6 +1097,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           index: index,
           isLastRead: isLastRead,
           isUserChapter: isUserChapter,
+          isCached: _cachedStatus[chapter.url] ?? false, // 传入缓存状态
+          isRead: chapter.isRead, // 传入已读状态
           isAccompanied: chapter.isAccompanied, // 传入AI伴读状态
         );
       },
@@ -1139,12 +1112,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     });
 
     if (_isReorderingMode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('已进入重排模式，拖拽章节调整顺序'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      ToastUtils.show('已进入重排模式，拖拽章节调整顺序');
     }
   }
 
@@ -1166,12 +1134,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   Future<void> _saveReorderedChapters() async {
     try {
       // 显示保存进度提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正在保存章节顺序...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      ToastUtils.show('正在保存章节顺序...');
 
       // 批量更新章节索引
       await _reorderController.saveReorderedChapters(
@@ -1183,23 +1146,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       await _loadChapters();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('章节顺序已保存'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        ToastUtils.showSuccess('章节顺序已保存');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存章节顺序失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showError('保存章节顺序失败: $e');
       }
     }
   }

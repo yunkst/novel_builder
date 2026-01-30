@@ -46,11 +46,11 @@ void main() {
         ),
       );
 
-      // 等待初始渲染
-      await tester.pump();
-
-      // 验证显示CircularProgressIndicator
+      // 立即验证，不等pump完成
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // 然后等待加载完成
+      await tester.pumpAndSettle();
     });
 
     testWidgets('加载完成后应该显示内容', (tester) async {

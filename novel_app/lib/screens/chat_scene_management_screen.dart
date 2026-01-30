@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/chat_scene.dart';
 import '../services/database_service.dart';
+import '../utils/toast_utils.dart';
 import '../widgets/chat_scene_edit_dialog.dart';
+import '../widgets/common/common_widgets.dart';
 
 /// 聊天场景管理页面
 ///
@@ -52,12 +54,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载场景失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('加载场景失败: $e');
       }
     }
   }
@@ -74,21 +71,11 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
         await _db.insertChatScene(result);
         await _loadScenes();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('场景添加成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('场景添加成功');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('添加失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastUtils.showError('添加失败: $e');
         }
       }
     }
@@ -106,21 +93,11 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
         await _db.updateChatScene(result);
         await _loadScenes();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('场景更新成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('场景更新成功');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('更新失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastUtils.showError('更新失败: $e');
         }
       }
     }
@@ -128,26 +105,13 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
 
   /// 删除场景
   Future<void> _deleteScene(ChatScene scene) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除场景'),
-        content: Text('确定要删除场景"${scene.title}"吗？此操作无法撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '删除场景',
+      message: '确定要删除场景"${scene.title}"吗？此操作无法撤销。',
+      confirmText: '删除',
+      icon: Icons.delete,
+      confirmColor: Theme.of(context).colorScheme.error,
     );
 
     if (confirmed == true) {
@@ -155,21 +119,11 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
         await _db.deleteChatScene(scene.id!);
         await _loadScenes();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('场景删除成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('场景删除成功');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('删除失败: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastUtils.showError('删除失败: $e');
         }
       }
     }
@@ -215,17 +169,17 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '搜索场景...',
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.white70),
+                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)),
                 ),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                 onChanged: _onSearchChanged,
               )
             : const Text('场景管理'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -257,7 +211,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
           Icon(
             hasScenes ? Icons.search_off : Icons.bookmark_outline,
             size: 64,
-            color: Colors.grey[400],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(
@@ -265,14 +219,14 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             hasScenes ? '请尝试其他关键词' : '点击右下角的 + 按钮创建第一个场景',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -326,7 +280,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
                     onPressed: () => _deleteScene(scene),
                     tooltip: '删除',
                     visualDensity: VisualDensity.compact,
-                    color: Colors.red,
+                    color: Theme.of(context).colorScheme.error,
                   ),
                 ],
               ),
@@ -339,7 +293,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   height: 1.5,
                 ),
               ),
@@ -348,13 +302,13 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
               // 底部信息
               Row(
                 children: [
-                  Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                  Icon(Icons.access_time, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   const SizedBox(width: 4),
                   Text(
                     _formatDate(scene.createdAt),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                   const Spacer(),

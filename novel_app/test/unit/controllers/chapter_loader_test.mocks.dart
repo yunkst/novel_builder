@@ -3,27 +3,17 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i8;
-import 'dart:typed_data' as _i12;
+import 'dart:async' as _i5;
+import 'dart:io' as _i10;
+import 'dart:typed_data' as _i9;
 
 import 'package:dio/dio.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i11;
+import 'package:mockito/src/dummies.dart' as _i8;
 import 'package:novel_api/novel_api.dart' as _i2;
-import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i5;
-import 'package:novel_app/models/ai_companion_response.dart' as _i19;
-import 'package:novel_app/models/bookshelf.dart' as _i20;
-import 'package:novel_app/models/chapter.dart' as _i10;
-import 'package:novel_app/models/character.dart' as _i6;
-import 'package:novel_app/models/character_relationship.dart' as _i15;
-import 'package:novel_app/models/chat_scene.dart' as _i18;
-import 'package:novel_app/models/novel.dart' as _i9;
-import 'package:novel_app/models/outline.dart' as _i17;
-import 'package:novel_app/models/scene_illustration.dart' as _i16;
-import 'package:novel_app/models/search_result.dart' as _i14;
-import 'package:novel_app/services/api_service_wrapper.dart' as _i7;
-import 'package:novel_app/services/database_service.dart' as _i13;
-import 'package:sqflite/sqflite.dart' as _i4;
+import 'package:novel_app/models/chapter.dart' as _i7;
+import 'package:novel_app/models/novel.dart' as _i6;
+import 'package:novel_app/services/api_service_wrapper.dart' as _i4;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -93,29 +83,9 @@ class _FakeModelsResponse_4 extends _i1.SmartFake
         );
 }
 
-class _FakeDatabase_5 extends _i1.SmartFake implements _i4.Database {
-  _FakeDatabase_5(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeAiAccompanimentSettings_6 extends _i1.SmartFake
-    implements _i5.AiAccompanimentSettings {
-  _FakeAiAccompanimentSettings_6(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeCharacter_7 extends _i1.SmartFake implements _i6.Character {
-  _FakeCharacter_7(
+class _FakeBackupUploadResponse_5 extends _i1.SmartFake
+    implements _i2.BackupUploadResponse {
+  _FakeBackupUploadResponse_5(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -127,7 +97,7 @@ class _FakeCharacter_7 extends _i1.SmartFake implements _i6.Character {
 /// A class which mocks [ApiServiceWrapper].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
+class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
   MockApiServiceWrapper() {
     _i1.throwOnMissingStub(this);
   }
@@ -157,14 +127,14 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
       ) as _i3.Dio);
 
   @override
-  _i8.Future<void> init() => (super.noSuchMethod(
+  _i5.Future<void> init() => (super.noSuchMethod(
         Invocation.method(
           #init,
           [],
         ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 
   @override
   Map<String, dynamic> getInitStatus() => (super.noSuchMethod(
@@ -176,25 +146,25 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
       ) as Map<String, dynamic>);
 
   @override
-  _i8.Future<String?> getHost() => (super.noSuchMethod(
+  _i5.Future<String?> getHost() => (super.noSuchMethod(
         Invocation.method(
           #getHost,
           [],
         ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
+        returnValue: _i5.Future<String?>.value(),
+      ) as _i5.Future<String?>);
 
   @override
-  _i8.Future<String?> getToken() => (super.noSuchMethod(
+  _i5.Future<String?> getToken() => (super.noSuchMethod(
         Invocation.method(
           #getToken,
           [],
         ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
+        returnValue: _i5.Future<String?>.value(),
+      ) as _i5.Future<String?>);
 
   @override
-  _i8.Future<void> setConfig({
+  _i5.Future<void> setConfig({
     required String? host,
     String? token,
   }) =>
@@ -207,12 +177,12 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             #token: token,
           },
         ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 
   @override
-  _i8.Future<List<_i9.Novel>> searchNovels(
+  _i5.Future<List<_i6.Novel>> searchNovels(
     String? keyword, {
     List<String>? sites,
   }) =>
@@ -222,32 +192,32 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           [keyword],
           {#sites: sites},
         ),
-        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
-      ) as _i8.Future<List<_i9.Novel>>);
+        returnValue: _i5.Future<List<_i6.Novel>>.value(<_i6.Novel>[]),
+      ) as _i5.Future<List<_i6.Novel>>);
 
   @override
-  _i8.Future<List<Map<String, dynamic>>> getSourceSites() =>
+  _i5.Future<List<Map<String, dynamic>>> getSourceSites() =>
       (super.noSuchMethod(
         Invocation.method(
           #getSourceSites,
           [],
         ),
-        returnValue: _i8.Future<List<Map<String, dynamic>>>.value(
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
             <Map<String, dynamic>>[]),
-      ) as _i8.Future<List<Map<String, dynamic>>>);
+      ) as _i5.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i8.Future<List<_i10.Chapter>> getChapters(String? novelUrl) =>
+  _i5.Future<List<_i7.Chapter>> getChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getChapters,
           [novelUrl],
         ),
-        returnValue: _i8.Future<List<_i10.Chapter>>.value(<_i10.Chapter>[]),
-      ) as _i8.Future<List<_i10.Chapter>>);
+        returnValue: _i5.Future<List<_i7.Chapter>>.value(<_i7.Chapter>[]),
+      ) as _i5.Future<List<_i7.Chapter>>);
 
   @override
-  _i8.Future<String> getChapterContent(
+  _i5.Future<String> getChapterContent(
     String? chapterUrl, {
     bool? forceRefresh = false,
   }) =>
@@ -257,7 +227,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           [chapterUrl],
           {#forceRefresh: forceRefresh},
         ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
+        returnValue: _i5.Future<String>.value(_i8.dummyValue<String>(
           this,
           Invocation.method(
             #getChapterContent,
@@ -265,7 +235,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             {#forceRefresh: forceRefresh},
           ),
         )),
-      ) as _i8.Future<String>);
+      ) as _i5.Future<String>);
 
   @override
   void dispose() => super.noSuchMethod(
@@ -277,7 +247,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
       );
 
   @override
-  _i8.Future<Map<String, dynamic>> generateRoleCardImages({
+  _i5.Future<Map<String, dynamic>> generateRoleCardImages({
     required String? roleId,
     required Map<String, dynamic>? roles,
     String? modelName,
@@ -293,22 +263,22 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
+  _i5.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRoleGallery,
           [roleId],
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<bool> deleteRoleImage({
+  _i5.Future<bool> deleteRoleImage({
     required String? roleId,
     required String? imageUrl,
   }) =>
@@ -321,11 +291,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             #imageUrl: imageUrl,
           },
         ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
 
   @override
-  _i8.Future<Map<String, dynamic>> generateMoreImages({
+  _i5.Future<Map<String, dynamic>> generateMoreImages({
     required String? roleId,
     required int? count,
     String? referenceImageUrl,
@@ -341,11 +311,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<Map<String, dynamic>> createSceneIllustration({
+  _i5.Future<Map<String, dynamic>> createSceneIllustration({
     required String? chaptersContent,
     required String? taskId,
     required dynamic roles,
@@ -365,11 +335,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<Map<String, dynamic>> getSceneIllustrationGallery(
+  _i5.Future<Map<String, dynamic>> getSceneIllustrationGallery(
           String? taskId) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -377,11 +347,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           [taskId],
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
+  _i5.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
     required String? taskId,
     required String? filename,
   }) =>
@@ -395,11 +365,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<Map<String, dynamic>> regenerateSceneIllustration({
+  _i5.Future<Map<String, dynamic>> regenerateSceneIllustration({
     required String? taskId,
     required int? count,
     String? model,
@@ -415,21 +385,21 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<_i12.Uint8List> getImageProxy(String? filename) =>
+  _i5.Future<_i9.Uint8List> getImageProxy(String? filename) =>
       (super.noSuchMethod(
         Invocation.method(
           #getImageProxy,
           [filename],
         ),
-        returnValue: _i8.Future<_i12.Uint8List>.value(_i12.Uint8List(0)),
-      ) as _i8.Future<_i12.Uint8List>);
+        returnValue: _i5.Future<_i9.Uint8List>.value(_i9.Uint8List(0)),
+      ) as _i5.Future<_i9.Uint8List>);
 
   @override
-  _i8.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
+  _i5.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
     required String? imgName,
     required String? userInput,
     String? modelName,
@@ -444,7 +414,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             #modelName: modelName,
           },
         ),
-        returnValue: _i8.Future<_i2.ImageToVideoResponse>.value(
+        returnValue: _i5.Future<_i2.ImageToVideoResponse>.value(
             _FakeImageToVideoResponse_2(
           this,
           Invocation.method(
@@ -457,16 +427,16 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i8.Future<_i2.ImageToVideoResponse>);
+      ) as _i5.Future<_i2.ImageToVideoResponse>);
 
   @override
-  _i8.Future<_i2.VideoStatusResponse> checkVideoStatus(String? imgName) =>
+  _i5.Future<_i2.VideoStatusResponse> checkVideoStatus(String? imgName) =>
       (super.noSuchMethod(
         Invocation.method(
           #checkVideoStatus,
           [imgName],
         ),
-        returnValue: _i8.Future<_i2.VideoStatusResponse>.value(
+        returnValue: _i5.Future<_i2.VideoStatusResponse>.value(
             _FakeVideoStatusResponse_3(
           this,
           Invocation.method(
@@ -474,25 +444,25 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             [imgName],
           ),
         )),
-      ) as _i8.Future<_i2.VideoStatusResponse>);
+      ) as _i5.Future<_i2.VideoStatusResponse>);
 
   @override
-  _i8.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
+  _i5.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
         Invocation.method(
           #getVideoFileUrl,
           [imgName],
         ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
+        returnValue: _i5.Future<String>.value(_i8.dummyValue<String>(
           this,
           Invocation.method(
             #getVideoFileUrl,
             [imgName],
           ),
         )),
-      ) as _i8.Future<String>);
+      ) as _i5.Future<String>);
 
   @override
-  _i8.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+  _i5.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
     required String? taskId,
     required int? count,
     String? modelName,
@@ -508,1394 +478,60 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
+  _i5.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
         Invocation.method(
           #getModels,
           [],
         ),
-        returnValue: _i8.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_4(
+        returnValue: _i5.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_4(
           this,
           Invocation.method(
             #getModels,
             [],
           ),
         )),
-      ) as _i8.Future<_i2.ModelsResponse>);
+      ) as _i5.Future<_i2.ModelsResponse>);
 
   @override
-  _i8.Future<List<String>> getModelTitles({String? apiType}) =>
+  _i5.Future<List<String>> getModelTitles({String? apiType}) =>
       (super.noSuchMethod(
         Invocation.method(
           #getModelTitles,
           [],
           {#apiType: apiType},
         ),
-        returnValue: _i8.Future<List<String>>.value(<String>[]),
-      ) as _i8.Future<List<String>>);
-}
-
-/// A class which mocks [DatabaseService].
-///
-/// See the documentation for Mockito's code generation for more information.
-class MockDatabaseService extends _i1.Mock implements _i13.DatabaseService {
-  MockDatabaseService() {
-    _i1.throwOnMissingStub(this);
-  }
+        returnValue: _i5.Future<List<String>>.value(<String>[]),
+      ) as _i5.Future<List<String>>);
 
   @override
-  bool get isWebPlatform => (super.noSuchMethod(
-        Invocation.getter(#isWebPlatform),
-        returnValue: false,
-      ) as bool);
-
-  @override
-  _i8.Future<_i4.Database> get database => (super.noSuchMethod(
-        Invocation.getter(#database),
-        returnValue: _i8.Future<_i4.Database>.value(_FakeDatabase_5(
-          this,
-          Invocation.getter(#database),
-        )),
-      ) as _i8.Future<_i4.Database>);
-
-  @override
-  _i8.Future<int> addToBookshelf(_i9.Novel? novel) => (super.noSuchMethod(
-        Invocation.method(
-          #addToBookshelf,
-          [novel],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> removeFromBookshelf(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #removeFromBookshelf,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i9.Novel>> getBookshelf() => (super.noSuchMethod(
-        Invocation.method(
-          #getBookshelf,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
-      ) as _i8.Future<List<_i9.Novel>>);
-
-  @override
-  _i8.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #isInBookshelf,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<int> updateLastReadChapter(
-    String? novelUrl,
-    int? chapterIndex,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateLastReadChapter,
-          [
-            novelUrl,
-            chapterIndex,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> updateBackgroundSetting(
-    String? novelUrl,
-    String? backgroundSetting,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateBackgroundSetting,
-          [
-            novelUrl,
-            backgroundSetting,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<_i5.AiAccompanimentSettings> getAiAccompanimentSettings(
-          String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getAiAccompanimentSettings,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<_i5.AiAccompanimentSettings>.value(
-            _FakeAiAccompanimentSettings_6(
-          this,
-          Invocation.method(
-            #getAiAccompanimentSettings,
-            [novelUrl],
-          ),
-        )),
-      ) as _i8.Future<_i5.AiAccompanimentSettings>);
-
-  @override
-  _i8.Future<int> updateAiAccompanimentSettings(
-    String? novelUrl,
-    _i5.AiAccompanimentSettings? settings,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateAiAccompanimentSettings,
-          [
-            novelUrl,
-            settings,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<String?> getBackgroundSetting(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getBackgroundSetting,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
-
-  @override
-  _i8.Future<int> getLastReadChapter(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #getLastReadChapter,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<bool> isChapterCached(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #isChapterCached,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<List<String>> filterUncachedChapters(List<String>? chapterUrls) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #filterUncachedChapters,
-          [chapterUrls],
-        ),
-        returnValue: _i8.Future<List<String>>.value(<String>[]),
-      ) as _i8.Future<List<String>>);
-
-  @override
-  void markAsPreloading(String? chapterUrl) => super.noSuchMethod(
-        Invocation.method(
-          #markAsPreloading,
-          [chapterUrl],
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  bool isPreloading(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #isPreloading,
-          [chapterUrl],
-        ),
-        returnValue: false,
-      ) as bool);
-
-  @override
-  void clearMemoryState() => super.noSuchMethod(
-        Invocation.method(
-          #clearMemoryState,
-          [],
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  _i8.Future<int> cacheChapter(
-    String? novelUrl,
-    _i10.Chapter? chapter,
-    String? content,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #cacheChapter,
-          [
-            novelUrl,
-            chapter,
-            content,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> updateChapterContent(
-    String? chapterUrl,
-    String? content,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateChapterContent,
-          [
-            chapterUrl,
-            content,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> deleteChapterCache(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteChapterCache,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<String?> getCachedChapter(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedChapter,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
-
-  @override
-  _i8.Future<List<_i10.Chapter>> getCachedChapters(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedChapters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<_i10.Chapter>>.value(<_i10.Chapter>[]),
-      ) as _i8.Future<List<_i10.Chapter>>);
-
-  @override
-  _i8.Future<int> deleteCachedChapters(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteCachedChapters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<bool> isChapterAccompanied(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #isChapterAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<void> markChapterAsAccompanied(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #markChapterAsAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> resetChapterAccompaniedFlag(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #resetChapterAccompaniedFlag,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> clearNovelCache(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #clearNovelCache,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<Map<String, int>> getNovelCacheStats(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getNovelCacheStats,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<Map<String, int>>.value(<String, int>{}),
-      ) as _i8.Future<Map<String, int>>);
-
-  @override
-  _i8.Future<void> cacheWholeNovel(
-    String? novelUrl,
-    List<_i10.Chapter>? chapters,
-    _i8.Future<String> Function(String)? getContent,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #cacheWholeNovel,
-          [
-            novelUrl,
-            chapters,
-            getContent,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> cacheNovelChapters(
-    String? novelUrl,
-    List<_i10.Chapter>? chapters,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #cacheNovelChapters,
-          [
-            novelUrl,
-            chapters,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<List<_i10.Chapter>> getCachedNovelChapters(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedNovelChapters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<_i10.Chapter>>.value(<_i10.Chapter>[]),
-      ) as _i8.Future<List<_i10.Chapter>>);
-
-  @override
-  _i8.Future<void> insertUserChapter(
-    String? novelUrl,
-    String? title,
-    String? content,
-    int? insertIndex,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #insertUserChapter,
-          [
-            novelUrl,
-            title,
-            content,
-            insertIndex,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> clearAllCache() => (super.noSuchMethod(
-        Invocation.method(
-          #clearAllCache,
-          [],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<int> createCustomNovel(
-    String? title,
-    String? author, {
-    String? description,
+  _i5.Future<_i2.BackupUploadResponse> uploadBackup({
+    required _i10.File? dbFile,
+    _i3.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
-          #createCustomNovel,
-          [
-            title,
-            author,
-          ],
-          {#description: description},
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> createCustomChapter(
-    String? novelUrl,
-    String? title,
-    String? content,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #createCustomChapter,
-          [
-            novelUrl,
-            title,
-            content,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<void> updateChaptersOrder(
-    String? novelUrl,
-    List<_i10.Chapter>? chapters,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateChaptersOrder,
-          [
-            novelUrl,
-            chapters,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<String?> getCustomChapterContent(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCustomChapterContent,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
-
-  @override
-  _i8.Future<void> updateCustomChapter(
-    String? chapterUrl,
-    String? title,
-    String? content,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateCustomChapter,
-          [
-            chapterUrl,
-            title,
-            content,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> deleteCustomChapter(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #deleteCustomChapter,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<List<_i14.ChapterSearchResult>> searchInCachedContent(
-    String? keyword, {
-    String? novelUrl,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #searchInCachedContent,
-          [keyword],
-          {#novelUrl: novelUrl},
-        ),
-        returnValue: _i8.Future<List<_i14.ChapterSearchResult>>.value(
-            <_i14.ChapterSearchResult>[]),
-      ) as _i8.Future<List<_i14.ChapterSearchResult>>);
-
-  @override
-  _i8.Future<List<_i14.CachedNovelInfo>> getCachedNovels() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedNovels,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i14.CachedNovelInfo>>.value(
-            <_i14.CachedNovelInfo>[]),
-      ) as _i8.Future<List<_i14.CachedNovelInfo>>);
-
-  @override
-  _i8.Future<void> close() => (super.noSuchMethod(
-        Invocation.method(
-          #close,
-          [],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> updateNovelInBookshelf(_i9.Novel? novel) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateNovelInBookshelf,
-          [novel],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> clearBookshelfCache() => (super.noSuchMethod(
-        Invocation.method(
-          #clearBookshelfCache,
-          [],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<int> getCachedChaptersCount(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedChaptersCount,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<_i10.Chapter?> getChapterByUrl(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapterByUrl,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<_i10.Chapter?>.value(),
-      ) as _i8.Future<_i10.Chapter?>);
-
-  @override
-  _i8.Future<void> deleteUserChapter(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteUserChapter,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> updateReadingProgress(
-    String? novelUrl,
-    int? chapterIndex,
-    double? progress,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateReadingProgress,
-          [
-            novelUrl,
-            chapterIndex,
-            progress,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<int> createCharacter(_i6.Character? character) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #createCharacter,
-          [character],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i6.Character>> getCharacters(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCharacters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<_i6.Character>>.value(<_i6.Character>[]),
-      ) as _i8.Future<List<_i6.Character>>);
-
-  @override
-  _i8.Future<_i6.Character?> getCharacter(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #getCharacter,
-          [id],
-        ),
-        returnValue: _i8.Future<_i6.Character?>.value(),
-      ) as _i8.Future<_i6.Character?>);
-
-  @override
-  _i8.Future<int> updateCharacter(_i6.Character? character) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateCharacter,
-          [character],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> deleteCharacter(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteCharacter,
-          [id],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<_i6.Character?> findCharacterByName(
-    String? novelUrl,
-    String? name,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #findCharacterByName,
-          [
-            novelUrl,
-            name,
-          ],
-        ),
-        returnValue: _i8.Future<_i6.Character?>.value(),
-      ) as _i8.Future<_i6.Character?>);
-
-  @override
-  _i8.Future<_i6.Character> updateOrInsertCharacter(
-          _i6.Character? newCharacter) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateOrInsertCharacter,
-          [newCharacter],
-        ),
-        returnValue: _i8.Future<_i6.Character>.value(_FakeCharacter_7(
-          this,
-          Invocation.method(
-            #updateOrInsertCharacter,
-            [newCharacter],
-          ),
-        )),
-      ) as _i8.Future<_i6.Character>);
-
-  @override
-  _i8.Future<List<_i6.Character>> batchUpdateCharacters(
-          List<_i6.Character>? newCharacters) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #batchUpdateCharacters,
-          [newCharacters],
-        ),
-        returnValue: _i8.Future<List<_i6.Character>>.value(<_i6.Character>[]),
-      ) as _i8.Future<List<_i6.Character>>);
-
-  @override
-  _i8.Future<List<String>> getCharacterNames(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCharacterNames,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<String>>.value(<String>[]),
-      ) as _i8.Future<List<String>>);
-
-  @override
-  _i8.Future<bool> characterExists(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #characterExists,
-          [id],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<List<_i6.Character>> getCharactersByIds(List<int>? ids) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCharactersByIds,
-          [ids],
-        ),
-        returnValue: _i8.Future<List<_i6.Character>>.value(<_i6.Character>[]),
-      ) as _i8.Future<List<_i6.Character>>);
-
-  @override
-  _i8.Future<int> deleteAllCharacters(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteAllCharacters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> updateCharacterCachedImage(
-    int? characterId,
-    String? imageUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateCharacterCachedImage,
-          [
-            characterId,
-            imageUrl,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> clearCharacterCachedImage(int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #clearCharacterCachedImage,
-          [characterId],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> clearAllCharacterCachedImages(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #clearAllCharacterCachedImages,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i10.Chapter>> getChapters(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapters,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<_i10.Chapter>>.value(<_i10.Chapter>[]),
-      ) as _i8.Future<List<_i10.Chapter>>);
-
-  @override
-  _i8.Future<void> markChapterAsRead(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #markChapterAsRead,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<String> getChapterContent(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapterContent,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
-          this,
-          Invocation.method(
-            #getChapterContent,
-            [chapterUrl],
-          ),
-        )),
-      ) as _i8.Future<String>);
-
-  @override
-  _i8.Future<String> getCachedChapterContent(String? chapterUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCachedChapterContent,
-          [chapterUrl],
-        ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
-          this,
-          Invocation.method(
-            #getCachedChapterContent,
-            [chapterUrl],
-          ),
-        )),
-      ) as _i8.Future<String>);
-
-  @override
-  _i8.Future<String?> getCharacterCachedImage(int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getCharacterCachedImage,
-          [characterId],
-        ),
-        returnValue: _i8.Future<String?>.value(),
-      ) as _i8.Future<String?>);
-
-  @override
-  _i8.Future<int> updateCharacterAvatar(
-    int? characterId, {
-    String? imageUrl,
-    String? originalFilename,
-    String? originalImageUrl,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateCharacterAvatar,
-          [characterId],
-          {
-            #imageUrl: imageUrl,
-            #originalFilename: originalFilename,
-            #originalImageUrl: originalImageUrl,
-          },
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<bool> hasCharacterAvatar(int? characterId) => (super.noSuchMethod(
-        Invocation.method(
-          #hasCharacterAvatar,
-          [characterId],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<int> createRelationship(
-          _i15.CharacterRelationship? relationship) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #createRelationship,
-          [relationship],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i15.CharacterRelationship>> getRelationships(
-          int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getRelationships,
-          [characterId],
-        ),
-        returnValue: _i8.Future<List<_i15.CharacterRelationship>>.value(
-            <_i15.CharacterRelationship>[]),
-      ) as _i8.Future<List<_i15.CharacterRelationship>>);
-
-  @override
-  _i8.Future<List<_i15.CharacterRelationship>> getOutgoingRelationships(
-          int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getOutgoingRelationships,
-          [characterId],
-        ),
-        returnValue: _i8.Future<List<_i15.CharacterRelationship>>.value(
-            <_i15.CharacterRelationship>[]),
-      ) as _i8.Future<List<_i15.CharacterRelationship>>);
-
-  @override
-  _i8.Future<List<_i15.CharacterRelationship>> getIncomingRelationships(
-          int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getIncomingRelationships,
-          [characterId],
-        ),
-        returnValue: _i8.Future<List<_i15.CharacterRelationship>>.value(
-            <_i15.CharacterRelationship>[]),
-      ) as _i8.Future<List<_i15.CharacterRelationship>>);
-
-  @override
-  _i8.Future<int> updateRelationship(
-          _i15.CharacterRelationship? relationship) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateRelationship,
-          [relationship],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> deleteRelationship(int? relationshipId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #deleteRelationship,
-          [relationshipId],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<bool> relationshipExists(
-    int? sourceId,
-    int? targetId,
-    String? type,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #relationshipExists,
-          [
-            sourceId,
-            targetId,
-            type,
-          ],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<int> getRelationshipCount(int? characterId) => (super.noSuchMethod(
-        Invocation.method(
-          #getRelationshipCount,
-          [characterId],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<int>> getRelatedCharacterIds(int? characterId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getRelatedCharacterIds,
-          [characterId],
-        ),
-        returnValue: _i8.Future<List<int>>.value(<int>[]),
-      ) as _i8.Future<List<int>>);
-
-  @override
-  _i8.Future<int> insertSceneIllustration(
-          _i16.SceneIllustration? illustration) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #insertSceneIllustration,
-          [illustration],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> updateSceneIllustrationStatus(
-    int? id,
-    String? status, {
-    List<String>? images,
-    String? prompts,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateSceneIllustrationStatus,
-          [
-            id,
-            status,
-          ],
-          {
-            #images: images,
-            #prompts: prompts,
-          },
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i16.SceneIllustration>> getSceneIllustrationsByChapter(
-    String? novelUrl,
-    String? chapterId,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSceneIllustrationsByChapter,
-          [
-            novelUrl,
-            chapterId,
-          ],
-        ),
-        returnValue: _i8.Future<List<_i16.SceneIllustration>>.value(
-            <_i16.SceneIllustration>[]),
-      ) as _i8.Future<List<_i16.SceneIllustration>>);
-
-  @override
-  _i8.Future<_i16.SceneIllustration?> getSceneIllustrationByTaskId(
-          String? taskId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSceneIllustrationByTaskId,
-          [taskId],
-        ),
-        returnValue: _i8.Future<_i16.SceneIllustration?>.value(),
-      ) as _i8.Future<_i16.SceneIllustration?>);
-
-  @override
-  _i8.Future<Map<String, dynamic>> getSceneIllustrationsPaginated({
-    required int? page,
-    required int? limit,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSceneIllustrationsPaginated,
+          #uploadBackup,
           [],
           {
-            #page: page,
-            #limit: limit,
+            #dbFile: dbFile,
+            #onProgress: onProgress,
           },
         ),
-        returnValue:
-            _i8.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i8.Future<Map<String, dynamic>>);
-
-  @override
-  _i8.Future<int> deleteSceneIllustration(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteSceneIllustration,
-          [id],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> deleteSceneIllustrationsByChapter(
-    String? novelUrl,
-    String? chapterId,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #deleteSceneIllustrationsByChapter,
-          [
-            novelUrl,
-            chapterId,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i16.SceneIllustration>> getPendingSceneIllustrations() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getPendingSceneIllustrations,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i16.SceneIllustration>>.value(
-            <_i16.SceneIllustration>[]),
-      ) as _i8.Future<List<_i16.SceneIllustration>>);
-
-  @override
-  _i8.Future<int> batchUpdateSceneIllustrations(
-    List<int>? ids,
-    String? status,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #batchUpdateSceneIllustrations,
-          [
-            ids,
-            status,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> saveOutline(_i17.Outline? outline) => (super.noSuchMethod(
-        Invocation.method(
-          #saveOutline,
-          [outline],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<_i17.Outline?> getOutlineByNovelUrl(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getOutlineByNovelUrl,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<_i17.Outline?>.value(),
-      ) as _i8.Future<_i17.Outline?>);
-
-  @override
-  _i8.Future<List<_i17.Outline>> getAllOutlines() => (super.noSuchMethod(
-        Invocation.method(
-          #getAllOutlines,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i17.Outline>>.value(<_i17.Outline>[]),
-      ) as _i8.Future<List<_i17.Outline>>);
-
-  @override
-  _i8.Future<int> deleteOutline(String? novelUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteOutline,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> updateOutlineContent(
-    String? novelUrl,
-    String? title,
-    String? content,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateOutlineContent,
-          [
-            novelUrl,
-            title,
-            content,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> insertChatScene(_i18.ChatScene? scene) => (super.noSuchMethod(
-        Invocation.method(
-          #insertChatScene,
-          [scene],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<void> updateChatScene(_i18.ChatScene? scene) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #updateChatScene,
-          [scene],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> deleteChatScene(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteChatScene,
-          [id],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<List<_i18.ChatScene>> getAllChatScenes() => (super.noSuchMethod(
-        Invocation.method(
-          #getAllChatScenes,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i18.ChatScene>>.value(<_i18.ChatScene>[]),
-      ) as _i8.Future<List<_i18.ChatScene>>);
-
-  @override
-  _i8.Future<_i18.ChatScene?> getChatSceneById(int? id) => (super.noSuchMethod(
-        Invocation.method(
-          #getChatSceneById,
-          [id],
-        ),
-        returnValue: _i8.Future<_i18.ChatScene?>.value(),
-      ) as _i8.Future<_i18.ChatScene?>);
-
-  @override
-  _i8.Future<List<_i18.ChatScene>> searchChatScenes(String? query) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #searchChatScenes,
-          [query],
-        ),
-        returnValue: _i8.Future<List<_i18.ChatScene>>.value(<_i18.ChatScene>[]),
-      ) as _i8.Future<List<_i18.ChatScene>>);
-
-  @override
-  _i8.Future<int> appendBackgroundSetting(
-    String? novelUrl,
-    String? newBackground,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #appendBackgroundSetting,
-          [
-            novelUrl,
-            newBackground,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> batchUpdateOrInsertCharacters(
-    String? novelUrl,
-    List<_i19.AICompanionRole>? aiRoles,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #batchUpdateOrInsertCharacters,
-          [
-            novelUrl,
-            aiRoles,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<int> batchUpdateOrInsertRelationships(
-    String? novelUrl,
-    List<_i19.AICompanionRelation>? aiRelations,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #batchUpdateOrInsertRelationships,
-          [
-            novelUrl,
-            aiRelations,
-          ],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<List<_i15.CharacterRelationship>> getAllRelationships(
-          String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getAllRelationships,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<_i15.CharacterRelationship>>.value(
-            <_i15.CharacterRelationship>[]),
-      ) as _i8.Future<List<_i15.CharacterRelationship>>);
-
-  @override
-  _i8.Future<List<_i20.Bookshelf>> getBookshelves() => (super.noSuchMethod(
-        Invocation.method(
-          #getBookshelves,
-          [],
-        ),
-        returnValue: _i8.Future<List<_i20.Bookshelf>>.value(<_i20.Bookshelf>[]),
-      ) as _i8.Future<List<_i20.Bookshelf>>);
-
-  @override
-  _i8.Future<int> createBookshelf(String? name) => (super.noSuchMethod(
-        Invocation.method(
-          #createBookshelf,
-          [name],
-        ),
-        returnValue: _i8.Future<int>.value(0),
-      ) as _i8.Future<int>);
-
-  @override
-  _i8.Future<bool> deleteBookshelf(int? bookshelfId) => (super.noSuchMethod(
-        Invocation.method(
-          #deleteBookshelf,
-          [bookshelfId],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<List<_i9.Novel>> getNovelsByBookshelf(int? bookshelfId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getNovelsByBookshelf,
-          [bookshelfId],
-        ),
-        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
-      ) as _i8.Future<List<_i9.Novel>>);
-
-  @override
-  _i8.Future<void> addNovelToBookshelf(
-    String? novelUrl,
-    int? bookshelfId,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #addNovelToBookshelf,
-          [
-            novelUrl,
-            bookshelfId,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<bool> removeNovelFromBookshelf(
-    String? novelUrl,
-    int? bookshelfId,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #removeNovelFromBookshelf,
-          [
-            novelUrl,
-            bookshelfId,
-          ],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getBookshelvesByNovel,
-          [novelUrl],
-        ),
-        returnValue: _i8.Future<List<int>>.value(<int>[]),
-      ) as _i8.Future<List<int>>);
+        returnValue: _i5.Future<_i2.BackupUploadResponse>.value(
+            _FakeBackupUploadResponse_5(
+          this,
+          Invocation.method(
+            #uploadBackup,
+            [],
+            {
+              #dbFile: dbFile,
+              #onProgress: onProgress,
+            },
+          ),
+        )),
+      ) as _i5.Future<_i2.BackupUploadResponse>);
 }

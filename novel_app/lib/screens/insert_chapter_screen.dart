@@ -5,8 +5,9 @@ import '../models/outline.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
 import '../services/outline_service.dart';
-import '../controllers/chapter_list/outline_integration_handler.dart';
+import '../services/chapter_service.dart';
 import '../mixins/dify_streaming_mixin.dart';
+import '../utils/toast_utils.dart';
 
 /// 插入模式枚举
 enum _InsertMode { manual, outline }
@@ -108,12 +109,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     // 最终确认：生成章节
     if (_currentStep == 1) {
       if (_titleController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请输入章节标题'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请输入章节标题');
         return;
       }
 
@@ -122,12 +118,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           : _userInputController.text.trim();
 
       if (content.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请输入章节内容要求'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请输入章节内容要求');
         return;
       }
 
@@ -142,12 +133,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     if (_currentMode == _InsertMode.manual) {
       if (_titleController.text.trim().isEmpty ||
           _userInputController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请填写完整的章节信息'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请填写完整的章节信息');
         return;
       }
 
@@ -162,23 +148,13 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
   /// 生成大纲细纲
   Future<void> _generateOutlineDraft() async {
     if (_outline == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('未找到大纲，请先创建大纲'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('未找到大纲，请先创建大纲');
       return;
     }
 
     // 并发调用防护：如果正在生成，直接返回
     if (isStreaming) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正在生成中，请稍候...'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      ToastUtils.showWarning('正在生成中，请稍候...');
       return;
     }
 
@@ -209,23 +185,16 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成细纲失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('生成细纲失败: $e');
       }
     }
   }
 
   /// 获取前文内容（封装为独立方法，便于缓存）
   Future<List<String>> _getPreviousChapters() async {
-    final handler = OutlineIntegrationHandler(
-      outlineService: _outlineService,
-    );
+    final chapterService = ChapterService();
 
-    return await handler.getPreviousChaptersContent(
+    return await chapterService.getPreviousChaptersContent(
       chapters: widget.chapters,
       afterIndex: widget.afterIndex,
     );
@@ -325,12 +294,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('重新生成失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('重新生成失败: $e');
       }
     }
   }
@@ -422,7 +386,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
         children: [
           _buildStepItem(0, '输入要求'),
           const SizedBox(width: 32),
-          const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+          Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 32),
           _buildStepItem(1, '编辑细纲'),
         ],
@@ -441,14 +405,14 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? Colors.blue : Colors.grey.shade300,
+            color: isActive ? Colors.blue : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
           ),
           child: Center(
             child: Text(
               '${step + 1}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -459,7 +423,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           label,
           style: TextStyle(
             fontSize: 13,
-            color: isActive ? Colors.blue : Colors.grey.shade600,
+            color: isActive ? Colors.blue : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -521,7 +485,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                           : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade700,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   ),
@@ -654,7 +618,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                         : _outline!.content,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       height: 1.6,
                     ),
                   ),
@@ -684,7 +648,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
             'AI将根据大纲生成章节细纲，您可以提供额外要求来引导生成方向',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
         ],
@@ -769,11 +733,11 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                           const SizedBox(height: 12),
                         // 内容显示区域
                         if (_draftEditingController.text.isEmpty && !isStreaming)
-                          const Expanded(
+                          Expanded(
                             child: Center(
                               child: Text(
                                 '等待生成细纲内容...',
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                               ),
                             ),
                           )
@@ -894,8 +858,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     return Container(
       constraints: const BoxConstraints(maxHeight: 250),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
-        border: Border.all(color: Colors.grey[700]!),
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: SingleChildScrollView(
@@ -908,10 +872,10 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           ),
           maxLines: null,
           enabled: !isStreaming,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 1.6,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
           ),
         ),
       ),
@@ -927,7 +891,7 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
         color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

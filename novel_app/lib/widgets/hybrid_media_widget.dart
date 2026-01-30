@@ -6,6 +6,7 @@ import '../services/api_service_wrapper.dart';
 import '../utils/video_cache_manager.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
+import 'common/common_widgets.dart';
 
 /// 媒体类型枚举
 enum MediaType {
@@ -171,12 +172,14 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
       height: widget.height,
       width: widget.width,
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         borderRadius: widget.borderRadius,
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+        ),
       ),
-      child: const Center(
-        child: CircularProgressIndicator(),
+      child: const LoadingStateWidget(
+        centered: true,
       ),
     );
   }
@@ -187,19 +190,16 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
       height: widget.height,
       width: widget.width,
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: Colors.red.withValues(alpha: 0.05),
         borderRadius: widget.borderRadius,
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(height: 8),
-            Text('媒体加载失败', style: TextStyle(color: Colors.red)),
-          ],
+        border: Border.all(
+          color: Colors.red.withValues(alpha: 0.2),
         ),
+      ),
+      child: const ErrorStateWidget(
+        message: '媒体加载失败',
+        icon: Icons.error_outline,
+        centered: true,
       ),
     );
   }
@@ -271,22 +271,23 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                     borderRadius: widget.borderRadius,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.surface,
+                          ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           '正在生成视频...',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.surface,
                             fontSize: 14,
                           ),
                         ),

@@ -155,17 +155,17 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.grey[400]!,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.16),
           width: 1,
         ),
       ),
       child: Icon(
         Icons.photo_library_outlined,
         size: size * 0.4,
-        color: Colors.grey[600],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
       ),
     );
   }
@@ -175,17 +175,17 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.red[300]!,
+          color: Colors.red.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Icon(
         Icons.broken_image_outlined,
         size: size * 0.4,
-        color: Colors.red[400],
+        color: Colors.red.withValues(alpha: 0.4),
       ),
     );
   }
@@ -204,14 +204,14 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
           color: Colors.blue,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             width: 1.5,
           ),
         ),
         child: Text(
           imageCount > 99 ? '99+' : '$imageCount',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
@@ -225,16 +225,18 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
+      child: Center(
         child: SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.surface,
+            ),
           ),
         ),
       ),
@@ -295,7 +297,7 @@ class GalleryPreviewCard extends StatelessWidget {
                     Text(
                       '点击查看完整图集',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                     ),
                   ],
@@ -305,7 +307,7 @@ class GalleryPreviewCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ],
           ),

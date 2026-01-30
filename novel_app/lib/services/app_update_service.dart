@@ -4,12 +4,12 @@ import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_api/novel_api.dart';
 
 import '../models/app_version.dart';
 import 'logger_service.dart';
 import 'api_service_wrapper.dart';
+import 'preferences_service.dart';
 
 /// APP更新服务
 ///
@@ -36,11 +36,10 @@ class AppUpdateService {
     try {
       // 检查是否需要跳过此次检查（距离上次检查不足1小时且非强制检查）
       if (!forceCheck) {
-        final prefs = await SharedPreferences.getInstance();
-        final lastCheck = prefs.getInt(_lastCheckKey);
+        final lastCheck = await PreferencesService.instance.getInt(_lastCheckKey);
         final now = DateTime.now().millisecondsSinceEpoch;
 
-        if (lastCheck != null && (now - lastCheck) < 3600000) {
+        if ((now - lastCheck) < 3600000) {
           // 1小时内已检查过，跳过
           return null;
         }
@@ -63,8 +62,7 @@ class AppUpdateService {
 
       if (response.statusCode == 200 && response.data != null) {
         // 记录检查时间
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(
+        await PreferencesService.instance.setInt(
             _lastCheckKey, DateTime.now().millisecondsSinceEpoch);
 
         final latestVersion = _convertToAppVersion(response.data!);
@@ -400,20 +398,17 @@ class AppUpdateService {
 
   /// 忽略此版本更新
   Future<void> ignoreVersion(String version) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_ignoreVersionKey, version);
+    await PreferencesService.instance.setString(_ignoreVersionKey, version);
   }
 
   /// 检查版本是否被忽略
   Future<bool> isVersionIgnored(String version) async {
-    final prefs = await SharedPreferences.getInstance();
-    final ignored = prefs.getString(_ignoreVersionKey);
+    final ignored = await PreferencesService.instance.getString(_ignoreVersionKey);
     return ignored == version;
   }
 
   /// 清除忽略的版本
   Future<void> clearIgnoredVersion() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_ignoreVersionKey);
+    await PreferencesService.instance.remove(_ignoreVersionKey);
   }
 }

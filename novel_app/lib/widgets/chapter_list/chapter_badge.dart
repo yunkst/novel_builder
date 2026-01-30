@@ -13,6 +13,7 @@ class ChapterBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(left: 8),
       padding: const EdgeInsets.symmetric(
@@ -20,14 +21,14 @@ class ChapterBadge extends StatelessWidget {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.2),
+        color: colorScheme.primary.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 10,
-          color: Colors.blue[700],
+          color: colorScheme.primary.withValues(alpha: 0.7),
           fontWeight: FontWeight.bold,
         ),
       ),

@@ -8,11 +8,13 @@ import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/character_avatar_service.dart';
 import '../utils/character_matcher.dart';
+import '../utils/toast_utils.dart';
 import '../screens/gallery_view_screen.dart';
 import '../screens/character_chat_screen.dart';
 import '../screens/character_relationship_screen.dart';
 import '../widgets/model_selector.dart';
 import '../widgets/chat_scene_input_dialog.dart';
+import '../widgets/common/common_widgets.dart';
 
 /// 使用方法：RoleGalleryCacheService用于检查角色图集是否为空，在头像点击时进行验证
 /// 调用方式：在_openGallery方法中调用_checkGalleryEmpty方法检查图集状态
@@ -146,13 +148,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('数据已刷新'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 1),
-          ),
-        );
+        ToastUtils.showInfo('数据已刷新');
       }
     } catch (e) {
       debugPrint('❌ 刷新角色数据失败: $e');
@@ -215,22 +211,12 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       if (widget.character == null) {
         await _databaseService.createCharacter(character);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('人物创建成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('人物创建成功');
         }
       } else {
         await _databaseService.updateCharacter(character);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('人物更新成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('人物更新成功');
         }
       }
 
@@ -239,12 +225,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('保存失败: $e');
       }
     } finally {
       setState(() {
@@ -256,12 +237,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Future<void> _generateRoleCardImages() async {
     if (_nameController.text.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先填写角色姓名'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请先填写角色姓名');
       }
       return;
     }
@@ -328,23 +304,13 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('图片生成中，请耐心等待'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('图片生成中，请耐心等待');
       }
 
       debugPrint('角色卡生成响应: $response');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('生成失败: $e');
       }
     } finally {
       if (mounted) {
@@ -358,12 +324,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Future<void> _generateCharacterPrompts() async {
     if (_nameController.text.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先填写角色姓名'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请先填写角色姓名');
       }
       return;
     }
@@ -398,13 +359,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
           _isGeneratingPrompts = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('提示词生成成功，即将自动保存...'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        ToastUtils.showSuccess('提示词生成成功，即将自动保存...');
 
         // 延迟自动保存
         _autoSaveAfterPromptsGeneration();
@@ -415,12 +370,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
           _isGeneratingPrompts = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('生成失败: $e');
       }
     }
   }
@@ -433,7 +383,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       appBar: AppBar(
         title: Text(isEditing ? '编辑人物' : '创建人物'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveCharacter,
@@ -446,7 +396,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Text('保存', style: TextStyle(color: Colors.white)),
+                : Text('保存', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
           ),
         ],
       ),
@@ -499,10 +449,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: Colors.blue,
+        color: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -539,10 +489,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
             children: [
               Text(
                 _nameController.text.isNotEmpty ? _nameController.text : '新角色',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -551,7 +501,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 '点击头像管理图集',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -670,7 +620,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               '${_aliases.length}/10',
               style: TextStyle(
                 fontSize: 12,
-                color: _aliases.length >= 10 ? Colors.red : Colors.grey,
+                color: _aliases.length >= 10
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -696,8 +648,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
             }).toList(),
           ),
         if (_aliases.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               '暂无别名，可添加常用称呼',
               style: TextStyle(color: Colors.grey, fontSize: 14),
@@ -719,7 +671,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
                       color: _aliases.length >= 10
-                          ? Colors.grey
+                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
                           : Theme.of(context).primaryColor,
                     ),
                   ),
@@ -733,9 +685,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               onPressed: _aliases.length >= 10 ? null : _addAlias,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _aliases.length >= 10
-                    ? Colors.grey
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
                     : Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 16,
@@ -756,12 +708,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     // 验证别名不为空
     if (alias.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请输入别名'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请输入别名');
       }
       return;
     }
@@ -769,12 +716,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     // 验证别名不重复
     if (_aliases.contains(alias)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('该别名已存在'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('该别名已存在');
       }
       return;
     }
@@ -828,46 +770,22 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         await _databaseService.createCharacter(character);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('角色创建并已自动保存'),
-              backgroundColor: Colors.blue,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ToastUtils.showInfo('角色创建并已自动保存');
         }
       } else {
         // 编辑模式：直接更新提示词字段
         await _databaseService.updateCharacter(character);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已自动保存'),
-              backgroundColor: Colors.blue,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ToastUtils.showInfo('已自动保存');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('自动保存失败: $e'),
-            backgroundColor: Colors.orange,
-            action: widget.character != null
-                ? SnackBarAction(
-                    label: '手动保存',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      // 仅更新提示词字段
-                      _saveCharacter();
-                    },
-                  )
-                : null,
-          ),
-        );
+        ToastUtils.showWarningWithAction('自动保存失败: $e', '手动保存', () {
+          // 仅更新提示词字段
+          _saveCharacter();
+        });
       }
     } finally {
       if (mounted) {
@@ -884,34 +802,14 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Future<bool> _showAliasConflictDialog(String conflictMessage) async {
     if (!mounted) return false;
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('检测到别名冲突'),
-          ],
-        ),
-        content: Text(
-          '$conflictMessage，\n可能导致角色匹配混乱。\n\n是否仍要添加？',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('仍要添加'),
-          ),
-        ],
-      ),
+    final result = await ConfirmDialog.show(
+      context,
+      title: '检测到别名冲突',
+      message: '$conflictMessage，\n可能导致角色匹配混乱。\n\n是否仍要添加？',
+      confirmText: '仍要添加',
+      cancelText: '取消',
+      icon: Icons.warning,
+      confirmColor: Colors.orange,
     );
 
     return result ?? false;
@@ -943,7 +841,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -977,7 +875,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         border: Border.all(
           color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
           width: 1,
@@ -989,7 +887,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
           height: size * 0.3,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
           ),
         ),
       ),
@@ -1128,8 +1028,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                             : const Icon(Icons.auto_awesome),
                     label: Text(_isGeneratingPrompts ? '生成中...' : _isAutoSaving ? '保存中...' : '生成提示词'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -1155,9 +1055,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                     label: Text(_isGeneratingRoleCard ? '生成中...' : '生图'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _nameController.text.trim().isEmpty
-                          ? Colors.grey
+                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
                           : Colors.green,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.surface,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -1173,19 +1073,19 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Theme.of(context).colorScheme.onSurface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'AI生成的提示词',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1193,18 +1093,18 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   // 面部提示词
                   TextFormField(
                     controller: _facePromptsController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                    decoration: InputDecoration(
                       labelText: '面部提示词',
                       hintText: '用于AI绘画的面部描述',
-                      border: OutlineInputBorder(),
-                      labelStyle: TextStyle(color: Colors.white70),
-                      hintStyle: TextStyle(color: Colors.white38),
+                      border: const OutlineInputBorder(),
+                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7)),
+                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38)),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white24),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white54),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.54)),
                       ),
                     ),
                     maxLines: 2,
@@ -1214,18 +1114,18 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   // 身材提示词
                   TextFormField(
                     controller: _bodyPromptsController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                    decoration: InputDecoration(
                       labelText: '身材提示词',
                       hintText: '用于AI绘画的身材描述',
-                      border: OutlineInputBorder(),
-                      labelStyle: TextStyle(color: Colors.white70),
-                      hintStyle: TextStyle(color: Colors.white38),
+                      border: const OutlineInputBorder(),
+                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7)),
+                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38)),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white24),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white54),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.54)),
                       ),
                     ),
                     maxLines: 2,
@@ -1321,12 +1221,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Future<void> _openGallery() async {
     if (widget.character?.id == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先保存角色后再管理图集'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请先保存角色后再管理图集');
       }
       return;
     }
@@ -1357,12 +1252,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('打开图集失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('打开图集失败: $e');
       }
     }
   }
@@ -1371,12 +1261,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Future<void> _startChat() async {
     if (widget.character == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先保存角色后再开始聊天'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ToastUtils.showWarning('请先保存角色后再开始聊天');
       }
       return;
     }
@@ -1430,8 +1315,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
         label: const Text('查看关系'),
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
         ),
       ),
     );

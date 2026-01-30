@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/role_gallery_cache_service.dart';
+import 'common/common_widgets.dart';
 
 /// 使用API客户端的图片加载组件
 class ApiImageWidget extends StatefulWidget {
@@ -137,25 +138,10 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
             Container(
               width: widget.width,
               height: widget.height,
-              color: Colors.black.withValues(alpha: 0.7),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '加载中...',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              child: const LoadingStateWidget(
+                message: '加载中...',
+                centered: true,
               ),
             ),
         ],
@@ -168,28 +154,14 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
       return widget.placeholder!;
     }
 
-    return Container(
+    return SizedBox(
       width: widget.width,
       height: widget.height,
-      color: Colors.grey[300],
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.image_outlined,
-              size: 32,
-              color: Colors.grey[500],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '加载中...',
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 12,
-              ),
-            ),
-          ],
+      child: Container(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+        child: const LoadingStateWidget(
+          message: '加载中...',
+          centered: true,
         ),
       ),
     );
@@ -200,42 +172,17 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
       return widget.errorWidget!;
     }
 
-    return Container(
+    return SizedBox(
       width: widget.width,
       height: widget.height,
-      color: Colors.grey[200],
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.broken_image_outlined,
-            size: 32,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '图片加载失败',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-          if (widget.enableRetry) ...[
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: _retry,
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('重试'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                minimumSize: const Size(80, 32),
-              ),
-            ),
-          ],
-        ],
+      child: Container(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+        child: ErrorStateWidget(
+          message: '图片加载失败',
+          icon: Icons.broken_image_outlined,
+          onRetry: widget.enableRetry ? _retry : null,
+          centered: true,
+        ),
       ),
     );
   }

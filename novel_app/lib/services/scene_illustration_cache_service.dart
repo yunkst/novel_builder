@@ -1,13 +1,13 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
 import 'api_service_wrapper.dart';
+import '../utils/cache_utils.dart';
+import '../utils/format_utils.dart';
 
 /// 场景插图缓存服务
 /// 参考RoleGalleryCacheService的实现模式
@@ -68,8 +68,7 @@ class SceneIllustrationCacheService {
   /// 获取缓存文件路径
   String _getCacheFilePath(String filename) {
     _ensureInitialized();
-    // 使用MD5哈希作为文件名，避免特殊字符问题
-    final hash = md5.convert(utf8.encode(filename)).toString();
+    final hash = CacheUtils.generateHashFilename(filename);
     return '${_cacheDir!.path}/$hash.jpg';
   }
 
@@ -368,7 +367,7 @@ class SceneIllustrationCacheService {
         'memoryCacheCount': _memoryCache.length,
         'diskCacheCount': fileCount,
         'diskCacheSize': totalSize,
-        'diskCacheSizeFormatted': _formatBytes(totalSize),
+        'diskCacheSizeFormatted': FormatUtils.formatFileSize(totalSize),
         'cacheDir': _cacheDir!.path,
       };
     } catch (e) {
@@ -379,15 +378,5 @@ class SceneIllustrationCacheService {
       );
       return {};
     }
-  }
-
-  /// 格式化字节数
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

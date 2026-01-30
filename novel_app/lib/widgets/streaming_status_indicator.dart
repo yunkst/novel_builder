@@ -31,6 +31,7 @@ class StreamingStatusIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -39,18 +40,18 @@ class StreamingStatusIndicator extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: isStreaming
               ? [
-                  Colors.orange.shade600,
-                  Colors.orange.shade800,
+                  colorScheme.tertiary.withValues(alpha: 0.8),
+                  colorScheme.tertiary,
                 ]
               : [
-                  Colors.green.shade600,
-                  Colors.green.shade800,
+                  colorScheme.primary.withValues(alpha: 0.8),
+                  colorScheme.primary,
                 ],
         ),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: (isStreaming ? Colors.orange : Colors.green)
+            color: (isStreaming ? colorScheme.tertiary : colorScheme.primary)
                 .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -67,7 +68,7 @@ class StreamingStatusIndicator extends StatelessWidget {
               Icon(
                 isStreaming ? Icons.stream : Icons.check_circle,
                 size: 20,
-                color: Colors.white,
+                color: colorScheme.onPrimary,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -75,9 +76,9 @@ class StreamingStatusIndicator extends StatelessWidget {
                   isStreaming
                       ? (streamingText ?? '实时生成中...')
                       : (completedText ?? '生成完成'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -89,8 +90,8 @@ class StreamingStatusIndicator extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Colors.white70,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.onPrimary.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -103,7 +104,7 @@ class StreamingStatusIndicator extends StatelessWidget {
             '已接收 $characterCount 字符',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: colorScheme.onPrimary.withValues(alpha: 0.9),
             ),
           ),
           if (isStreaming) ...[
@@ -113,7 +114,7 @@ class StreamingStatusIndicator extends StatelessWidget {
               '正在生成中，请稍候...',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.7),
+                color: colorScheme.onPrimary.withValues(alpha: 0.7),
                 fontStyle: FontStyle.italic,
               ),
             ),

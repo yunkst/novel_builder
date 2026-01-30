@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
@@ -29,8 +28,8 @@ import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始�
 import '../widgets/reader/ai_companion_confirm_dialog.dart';
 import '../services/reader_settings_service.dart'; // 阅读器设置持久化
 import '../utils/toast_utils.dart';
-
 import '../utils/media_markup_parser.dart';
+import '../utils/character_matcher.dart';
 import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/reader_content_controller.dart';
 import '../controllers/reader_interaction_controller.dart';
@@ -39,6 +38,8 @@ import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
 import 'package:provider/provider.dart';
 import 'tts_player_screen.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Novel novel;
@@ -165,7 +166,13 @@ class _ReaderScreenState extends State<ReaderScreen>
       // 初始加载时不重置滚动位置，以保持搜索匹配跳转行为
       _loadChapterContent(resetScrollPosition: false);
       // 新系统不需要 _loadIllustrations()
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        '初始化API并加载内容失败',
+        stackTrace: stackTrace,
+        category: LogCategory.cache,
+        tags: ['initialization', 'load-content'],
+      );
       if (mounted) {
         setState(() {
           // _contentController 会处理错误状态
@@ -208,7 +215,13 @@ class _ReaderScreenState extends State<ReaderScreen>
               '✅ 默认模型尺寸已加载: ${defaultModel.width} × ${defaultModel.height}');
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        '加载默认模型尺寸失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['model', 'illustration'],
+      );
       debugPrint('⚠️ 加载默认模型尺寸失败: $e');
       // 使用默认值 704×1280
       if (mounted) {
@@ -285,7 +298,13 @@ class _ReaderScreenState extends State<ReaderScreen>
         chapterUrls: chapterUrls,
         currentIndex: currentIndex,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        '预加载启动失败',
+        stackTrace: stackTrace,
+        category: LogCategory.cache,
+        tags: ['preload', 'chapter'],
+      );
       debugPrint('❌ 预加载启动失败: $e');
     }
   }
@@ -322,9 +341,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
                   child: Text(
                     paragraph.length > 100
@@ -332,14 +351,14 @@ class _ReaderScreenState extends State<ReaderScreen>
                         : paragraph,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 // 操作选项
                 ListTile(
-                  leading: Icon(Icons.add_photo_alternate, color: Colors.blue),
+                  leading: Icon(Icons.add_photo_alternate),
                   title: Text('创建插图'),
                   subtitle: Text('为这个段落生成插图'),
                   onTap: () {
@@ -350,7 +369,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                 if (MediaMarkupParser.isMediaMarkup(paragraph)) ...[
                   const Divider(),
                   ListTile(
-                    leading: Icon(Icons.info_outline, color: Colors.green),
+                    leading: Icon(Icons.info_outline),
                     title: Text('插图信息'),
                     subtitle: Text('查看插图详情'),
                     onTap: () {
@@ -433,18 +452,9 @@ class _ReaderScreenState extends State<ReaderScreen>
           );
 
           // 显示跳转提示
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text('已跳转到匹配位置 (${widget.searchResult!.matchCount} 处匹配)'),
-              duration: const Duration(seconds: 2),
-              action: SnackBarAction(
-                label: '查看全部',
-                onPressed: () {
-                  _showSearchMatchDialog();
-                },
-              ),
-            ),
+          ToastUtils.showInfo(
+            '已跳转到匹配位置 (${widget.searchResult!.matchCount} 处匹配)',
+            context: context,
           );
         }
       }
@@ -552,7 +562,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (currentIndex > 0) {
       _navigateToChapter(widget.chapters[currentIndex - 1]);
     } else {
-      _showSnackBar(message: '已经是第一章了');
+      ToastUtils.showInfo('已经是第一章了', context: context);
     }
   }
 
@@ -562,7 +572,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (currentIndex != -1 && currentIndex < widget.chapters.length - 1) {
       _navigateToChapter(widget.chapters[currentIndex + 1]);
     } else {
-      _showSnackBar(message: '已经是最后一章了');
+      ToastUtils.showInfo('已经是最后一章了', context: context);
     }
   }
 
@@ -595,19 +605,19 @@ class _ReaderScreenState extends State<ReaderScreen>
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.refresh, color: Colors.blue),
+            Icon(Icons.refresh),
             SizedBox(width: 8),
             Text('刷新章节'),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('将从服务器重新获取最新内容并覆盖本地缓存。'),
-            SizedBox(height: 8),
+            const Text('将从服务器重新获取最新内容并覆盖本地缓存。'),
+            const SizedBox(height: 8),
             Text('这可能会花费一些时间，请确认是否继续？',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           ],
         ),
         actions: [
@@ -618,8 +628,8 @@ class _ReaderScreenState extends State<ReaderScreen>
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('确认刷新'),
           ),
@@ -633,10 +643,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     await _loadChapterContent(resetScrollPosition: true, forceRefresh: true);
 
     if (mounted && _errorMessage.isEmpty) {
-      _showSnackBar(
-        message: '章节已刷新到最新内容',
-        backgroundColor: Colors.green,
-      );
+      ToastUtils.showSuccess('章节已刷新到最新内容', context: context);
     }
   }
 
@@ -644,18 +651,12 @@ class _ReaderScreenState extends State<ReaderScreen>
   Future<void> _updateCharacterCards() async {
     // 防重复点击检查
     if (_isUpdatingRoleCards) {
-      _showSnackBar(
-        message: '角色卡正在更新中,请稍候...',
-        backgroundColor: Colors.orange,
-      );
+      ToastUtils.showWarning('角色卡正在更新中,请稍候...', context: context);
       return;
     }
 
     if (_content.isEmpty) {
-      _showSnackBar(
-        message: '章节内容为空，无法更新角色卡',
-        backgroundColor: Colors.orange,
-      );
+      ToastUtils.showWarning('章节内容为空，无法更新角色卡', context: context);
       return;
     }
 
@@ -687,24 +688,22 @@ class _ReaderScreenState extends State<ReaderScreen>
                 await service.saveCharacters(selectedCharacters);
 
             if (mounted) {
-              _showSnackBar(
-                message: '成功更新 ${savedCharacters.length} 个角色卡',
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              );
+              ToastUtils.showSuccess(
+                  '成功更新 ${savedCharacters.length} 个角色卡',
+                  context: context,
+                  duration: const Duration(seconds: 3));
             }
           },
         );
       }
-    } catch (e) {
-      // 静默处理错误，仅显示提示
-      if (mounted) {
-        _showSnackBar(
-          message: '更新角色卡失败: $e',
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        );
-      }
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '更新角色卡失败',
+        stackTrace: stackTrace,
+        category: LogCategory.character,
+        tags: ['update', 'character-card'],
+      );
     } finally {
       // 无论成功或失败都重置状态
       if (mounted) {
@@ -758,7 +757,13 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     try {
       await _handleAICompanionSilent(settings);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        '自动AI伴读失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['auto-companion', 'chapter'],
+      );
       debugPrint('❌ 自动AI伴读失败: $e');
     } finally {
       _isAutoCompanionRunning = false;
@@ -768,19 +773,12 @@ class _ReaderScreenState extends State<ReaderScreen>
   // AI伴读功能
   Future<void> _handleAICompanion() async {
     if (_content.isEmpty) {
-      _showSnackBar(
-        message: '章节内容为空，无法进行AI伴读',
-        backgroundColor: Colors.orange,
-      );
+      ToastUtils.showWarning('章节内容为空，无法进行AI伴读', context: context);
       return;
     }
 
     // 显示loading提示
-    _showSnackBar(
-      message: 'AI正在分析章节...',
-      backgroundColor: Colors.blue,
-      duration: const Duration(minutes: 5),
-    );
+    ToastUtils.showInfo('AI正在分析章节...', context: context, duration: const Duration(minutes: 5));
 
     try {
       // 获取本书的所有角色
@@ -823,7 +821,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
       // 关闭loading
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ToastUtils.dismiss();
       }
 
       // 显示确认对话框
@@ -844,15 +842,17 @@ class _ReaderScreenState extends State<ReaderScreen>
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        'AI伴读失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['companion', 'chapter-analysis'],
+      );
       debugPrint('❌ AI伴读失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        _showSnackBar(
-          message: 'AI伴读失败: $e',
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        );
+        ToastUtils.dismiss();
       }
     }
   }
@@ -920,9 +920,15 @@ class _ReaderScreenState extends State<ReaderScreen>
             ? 'AI伴读内容已更新'
             : 'AI伴读已完成: 更新${messages.join('、')}';
 
-        ToastUtils.showSuccess(context, message);
+        ToastUtils.showSuccess(message, context: context);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        '静默AI伴读失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['silent-companion', 'auto'],
+      );
       debugPrint('❌ 静默AI伴读失败: $e');
       // 静默失败，不打扰用户
       rethrow; // 抛出异常供上层记录日志
@@ -937,11 +943,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     try {
       // 仅在非静默模式下显示更新进度
       if (!isSilent) {
-        _showSnackBar(
-          message: '正在更新数据...',
-          backgroundColor: Colors.blue,
-          duration: const Duration(minutes: 5),
-        );
+        ToastUtils.showInfo('正在更新数据...', context: context, duration: const Duration(minutes: 5));
       }
 
       // 1. 追加背景设定
@@ -976,7 +978,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       // 关闭进度提示
       if (mounted) {
         if (!isSilent) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ToastUtils.dismiss();
 
           // 仅在非静默模式下显示成功提示
           String successMessage = 'AI伴读更新完成';
@@ -994,22 +996,20 @@ class _ReaderScreenState extends State<ReaderScreen>
             successMessage += ' (${updates.join('、')})';
           }
 
-          _showSnackBar(
-            message: successMessage,
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          );
+          ToastUtils.showSuccess(successMessage, context: context, duration: const Duration(seconds: 3));
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.logError(
+        'AI伴读数据更新失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['companion', 'update'],
+      );
       debugPrint('❌ AI伴读数据更新失败: $e');
       if (mounted && !isSilent) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        _showSnackBar(
-          message: '数据更新失败: $e',
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        );
+        ToastUtils.dismiss();
+        ToastUtils.showError('数据更新失败: $e', duration: const Duration(seconds: 4), context: context);
       }
     }
   }
@@ -1023,43 +1023,12 @@ class _ReaderScreenState extends State<ReaderScreen>
     List<Character> allCharacters,
     String chapterContent,
   ) async {
-    if (allCharacters.isEmpty) {
-      return [];
-    }
-
-    // 包含角色别名的集合（用于匹配）
-    final Map<String, Character> nameToCharacter = {};
-
-    for (final character in allCharacters) {
-      if (character.name.isEmpty) continue;
-
-      nameToCharacter[character.name] = character;
-
-      // 添加别名
-      if (character.aliases != null && character.aliases!.isNotEmpty) {
-        for (final alias in character.aliases!) {
-          if (alias.isNotEmpty) {
-            nameToCharacter[alias] = character;
-          }
-        }
-      }
-    }
-
-    // 查找本章出现的角色名
-    final foundCharacters = <Character>[];
-    final addedIds = <int>{};
-
-    for (final entry in nameToCharacter.entries) {
-      final name = entry.key;
-      if (chapterContent.contains(name)) {
-        final character = entry.value;
-        // 避免重复添加同一个角色（通过ID判断）
-        if (character.id != null && !addedIds.contains(character.id!)) {
-          foundCharacters.add(character);
-          addedIds.add(character.id!);
-        }
-      }
-    }
+    // 使用工具类进行角色筛选
+    final foundCharacters =
+        CharacterMatcher.extractCharactersFromChapter(
+      chapterContent,
+      allCharacters,
+    );
 
     debugPrint('✅ 章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}');
     return foundCharacters;
@@ -1153,23 +1122,6 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // ========== 辅助方法 ==========
 
-  /// 显示SnackBar提示
-  void _showSnackBar({
-    required String message,
-    Color backgroundColor = Colors.grey,
-    Duration duration = const Duration(seconds: 2),
-  }) {
-    // 使用FlutterToast替代SnackBar，显示在顶部
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: duration.inSeconds >= 3 ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT,
-      gravity: ToastGravity.TOP,
-      backgroundColor: backgroundColor,
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
-  }
-
   // 切换特写模式
   void _toggleCloseupMode() {
     _interactionController.toggleCloseupMode();
@@ -1185,10 +1137,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   /// 显示段落改写对话框
   Future<void> _showParagraphRewriteDialog() async {
     if (_selectedParagraphIndices.isEmpty) {
-      _showSnackBar(
-        message: '请先选择要改写的段落',
-        backgroundColor: Colors.orange,
-      );
+      ToastUtils.showWarning('请先选择要改写的段落', context: context);
       return;
     }
 
@@ -1256,19 +1205,17 @@ class _ReaderScreenState extends State<ReaderScreen>
                 _currentChapter.url, newContent);
 
             if (mounted) {
-              _showSnackBar(
-                message: '全文重写完成并已保存',
-                backgroundColor: Colors.green,
-              );
+              ToastUtils.showSuccess('全文重写完成并已保存', context: context);
             }
-          } catch (e) {
+          } catch (e, stackTrace) {
+            ErrorHelper.showErrorWithLog(
+              context,
+              '保存章节内容失败',
+              stackTrace: stackTrace,
+              category: LogCategory.database,
+              tags: ['save', 'chapter-content', 'full-rewrite'],
+            );
             debugPrint('保存章节内容失败: $e');
-            if (mounted) {
-              _showSnackBar(
-                message: '保存失败: $e',
-                backgroundColor: Colors.red,
-              );
-            }
           }
         },
       ),
@@ -1282,20 +1229,17 @@ class _ReaderScreenState extends State<ReaderScreen>
           _currentChapter.url, _content);
 
       if (mounted) {
-        _showSnackBar(
-          message: '章节内容已保存',
-          backgroundColor: Colors.green,
-        );
+        ToastUtils.showSuccess('章节内容已保存', context: context);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '保存编辑内容失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['save', 'chapter-content', 'edit'],
+      );
       debugPrint('保存编辑内容失败: $e');
-      if (mounted) {
-        _showSnackBar(
-          message: '保存失败: $e',
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        );
-      }
     }
   }
 
@@ -1331,17 +1275,17 @@ class _ReaderScreenState extends State<ReaderScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
+                        color: Theme.of(context).colorScheme.secondary,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.edit, size: 14, color: Colors.white),
+                          Icon(Icons.edit, size: 14),
                           SizedBox(width: 4),
                           Text('编辑模式',
                               style:
-                                  TextStyle(fontSize: 12, color: Colors.white)),
+                                  TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
@@ -1364,7 +1308,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       editModeProvider.toggleEditMode();
                     },
                     tooltip: '完成编辑并保存',
-                    icon: const Icon(Icons.check, color: Colors.green),
+                    icon: const Icon(Icons.check),
                   ),
                 // 沉浸体验按钮
                 if (!editModeProvider.isEditMode)
@@ -1372,7 +1316,6 @@ class _ReaderScreenState extends State<ReaderScreen>
                     onPressed: _showImmersiveSetup,
                     tooltip: '沉浸体验',
                     icon: const Icon(Icons.theater_comedy_outlined),
-                    color: Colors.purple,
                   ),
                 // 更多功能菜单
                 PopupMenuButton<String>(
@@ -1384,7 +1327,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       value: 'refresh',
                       child: Row(
                         children: [
-                          Icon(Icons.refresh, size: 18, color: Colors.blue),
+                          Icon(Icons.refresh, size: 18),
                           SizedBox(width: 12),
                           Text('刷新章节'),
                         ],
@@ -1414,7 +1357,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       value: 'summarize',
                       child: Row(
                         children: [
-                          Icon(Icons.summarize, size: 18, color: Colors.orange),
+                          Icon(Icons.summarize, size: 18),
                           SizedBox(width: 12),
                           Text('总结'),
                         ],
@@ -1424,7 +1367,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       value: 'tts_read',
                       child: Row(
                         children: [
-                          Icon(Icons.headphones, size: 18, color: Colors.deepPurple),
+                          Icon(Icons.headphones, size: 18),
                           SizedBox(width: 12),
                           Text('朗读'),
                         ],
@@ -1435,7 +1378,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       child: Row(
                         children: [
                           Icon(Icons.auto_stories,
-                              size: 18, color: Colors.green),
+                              size: 18),
                           SizedBox(width: 12),
                           Text('全文重写'),
                         ],
@@ -1453,12 +1396,12 @@ class _ReaderScreenState extends State<ReaderScreen>
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor:
-                                        const AlwaysStoppedAnimation<Color>(
-                                            Colors.purple),
+                                        AlwaysStoppedAnimation<Color>(
+                                            Theme.of(context).colorScheme.tertiary),
                                   ),
                                 )
                               : const Icon(Icons.person_search,
-                                  size: 18, color: Colors.purple),
+                                  size: 18),
                           const SizedBox(width: 12),
                           Text(_isUpdatingRoleCards ? '更新中...' : '更新角色卡'),
                         ],
@@ -1468,7 +1411,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       value: 'ai_companion',
                       child: Row(
                         children: [
-                          Icon(Icons.auto_stories, size: 18, color: Colors.orange),
+                          Icon(Icons.auto_stories, size: 18),
                           SizedBox(width: 12),
                           Text('AI伴读'),
                         ],
@@ -1487,7 +1430,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                           children: [
                             Text(
                               _errorMessage,
-                              style: const TextStyle(color: Colors.red),
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton(
@@ -1582,7 +1525,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 color: Theme.of(context).colorScheme.surface,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
+                                    color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
                                     blurRadius: 4,
                                     offset: const Offset(0, -2),
                                   ),
@@ -1703,16 +1646,15 @@ class _ReaderScreenState extends State<ReaderScreen>
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ErrorHelper.showErrorWithLog(
+        context,
+        '打开沉浸体验失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ui,
+        tags: ['immersive', 'setup'],
+      );
       debugPrint('❌ 打开沉浸体验失败: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('打开沉浸体验失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 

@@ -244,9 +244,12 @@ void main() {
 
       await tester.pump();
 
-      // 查找头像相关的图标或容器 - 简化查找
-      expect(find.byType(CircleAvatar), findsAtLeastNWidgets(1),
-          reason: '应该存在头像区域');
+      // 查找头像相关的容器 - 实际实现使用Container + ClipOval
+      expect(find.byType(Container), findsWidgets,
+          reason: '应该存在头像区域的Container');
+      // 查找ClipOval（圆形裁剪）
+      expect(find.byType(ClipOval), findsAtLeastNWidgets(1),
+          reason: '应该存在头像的圆形裁剪');
     });
 
     testWidgets(

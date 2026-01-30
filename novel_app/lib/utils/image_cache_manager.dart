@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service_wrapper.dart';
+import 'format_utils.dart';
 
 /// 图片缓存管理器
 /// 用于管理插图图片的缓存和生命周期，避免重复从后端加载
@@ -53,15 +54,8 @@ class ImageCacheManager {
       final removed = _cache.remove(oldestKey);
       _cacheTime.remove(oldestKey);
       final size = removed?.length ?? 0;
-      debugPrint('🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${_formatBytes(size)}');
+      debugPrint('🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}');
     }
-  }
-
-  /// 格式化字节大小
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   /// 获取图片数据（带缓存）
@@ -108,7 +102,7 @@ class ImageCacheManager {
       }
 
       if (data.length > _maxImageSize) {
-        debugPrint('⚠️ 图片过大，跳过缓存: ${_formatBytes(data.length)}');
+        debugPrint('⚠️ 图片过大，跳过缓存: ${FormatUtils.formatFileSize(data.length)}');
         return data;
       }
 
@@ -121,7 +115,7 @@ class ImageCacheManager {
       _cache[imageUrl] = data;
       _cacheTime[imageUrl] = DateTime.now();
 
-      debugPrint('✅ 图片已缓存: $imageUrl, 大小: ${_formatBytes(data.length)}, '
+      debugPrint('✅ 图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
           '缓存数量: ${_cache.length}/$_maxCacheSize');
 
       return data;
@@ -169,7 +163,7 @@ class ImageCacheManager {
     _cache.clear();
     _cacheTime.clear();
     _loadingRequests.clear();
-    debugPrint('🗑️ 清除所有图片缓存: $count 张, 总大小: ${_formatBytes(totalSize)}');
+    debugPrint('🗑️ 清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}');
   }
 
   /// 获取缓存统计信息
@@ -179,7 +173,7 @@ class ImageCacheManager {
     return {
       'cachedCount': _cache.length,
       'maxCacheSize': _maxCacheSize,
-      'totalSize': _formatBytes(totalSize),
+      'totalSize': FormatUtils.formatFileSize(totalSize),
       'totalSizeBytes': totalSize,
       'loadingCount': _loadingRequests.length,
       'cachedUrls': _cache.keys.toList(),

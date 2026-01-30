@@ -4,6 +4,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i8;
+import 'dart:io' as _i21;
 import 'dart:typed_data' as _i20;
 
 import 'package:dio/dio.dart' as _i6;
@@ -23,7 +24,7 @@ import 'package:novel_app/models/scene_illustration.dart' as _i14;
 import 'package:novel_app/models/search_result.dart' as _i11;
 import 'package:novel_app/services/api_service_wrapper.dart' as _i19;
 import 'package:novel_app/services/database_service.dart' as _i7;
-import 'package:novel_app/services/dify_service.dart' as _i21;
+import 'package:novel_app/services/dify_service.dart' as _i22;
 import 'package:sqflite/sqflite.dart' as _i2;
 
 // ignore_for_file: type=lint
@@ -125,6 +126,17 @@ class _FakeModelsResponse_7 extends _i1.SmartFake
         );
 }
 
+class _FakeBackupUploadResponse_8 extends _i1.SmartFake
+    implements _i5.BackupUploadResponse {
+  _FakeBackupUploadResponse_8(
+    Object parent,
+    Invocation parentInvocation,
+  ) : super(
+          parent,
+          parentInvocation,
+        );
+}
+
 /// A class which mocks [DatabaseService].
 ///
 /// See the documentation for Mockito's code generation for more information.
@@ -170,6 +182,15 @@ class MockDatabaseService extends _i1.Mock implements _i7.DatabaseService {
   _i8.Future<List<_i9.Novel>> getBookshelf() => (super.noSuchMethod(
         Invocation.method(
           #getBookshelf,
+          [],
+        ),
+        returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
+      ) as _i8.Future<List<_i9.Novel>>);
+
+  @override
+  _i8.Future<List<_i9.Novel>> getNovels() => (super.noSuchMethod(
+        Invocation.method(
+          #getNovels,
           [],
         ),
         returnValue: _i8.Future<List<_i9.Novel>>.value(<_i9.Novel>[]),
@@ -287,6 +308,17 @@ class MockDatabaseService extends _i1.Mock implements _i7.DatabaseService {
         ),
         returnValue: _i8.Future<List<String>>.value(<String>[]),
       ) as _i8.Future<List<String>>);
+
+  @override
+  _i8.Future<Map<String, bool>> getChaptersCacheStatus(
+          List<String>? chapterUrls) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getChaptersCacheStatus,
+          [chapterUrls],
+        ),
+        returnValue: _i8.Future<Map<String, bool>>.value(<String, bool>{}),
+      ) as _i8.Future<Map<String, bool>>);
 
   @override
   void markAsPreloading(String? chapterUrl) => super.noSuchMethod(
@@ -1477,6 +1509,25 @@ class MockDatabaseService extends _i1.Mock implements _i7.DatabaseService {
       ) as _i8.Future<bool>);
 
   @override
+  _i8.Future<void> moveNovelToBookshelf(
+    String? novelUrl,
+    int? fromBookshelfId,
+    int? toBookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #moveNovelToBookshelf,
+          [
+            novelUrl,
+            fromBookshelfId,
+            toBookshelfId,
+          ],
+        ),
+        returnValue: _i8.Future<void>.value(),
+        returnValueForMissingStub: _i8.Future<void>.value(),
+      ) as _i8.Future<void>);
+
+  @override
   _i8.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1899,12 +1950,40 @@ class MockApiServiceWrapper extends _i1.Mock implements _i19.ApiServiceWrapper {
         ),
         returnValue: _i8.Future<List<String>>.value(<String>[]),
       ) as _i8.Future<List<String>>);
+
+  @override
+  _i8.Future<_i5.BackupUploadResponse> uploadBackup({
+    required _i21.File? dbFile,
+    _i6.ProgressCallback? onProgress,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #uploadBackup,
+          [],
+          {
+            #dbFile: dbFile,
+            #onProgress: onProgress,
+          },
+        ),
+        returnValue: _i8.Future<_i5.BackupUploadResponse>.value(
+            _FakeBackupUploadResponse_8(
+          this,
+          Invocation.method(
+            #uploadBackup,
+            [],
+            {
+              #dbFile: dbFile,
+              #onProgress: onProgress,
+            },
+          ),
+        )),
+      ) as _i8.Future<_i5.BackupUploadResponse>);
 }
 
 /// A class which mocks [DifyService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDifyService extends _i1.Mock implements _i21.DifyService {
+class MockDifyService extends _i1.Mock implements _i22.DifyService {
   MockDifyService() {
     _i1.throwOnMissingStub(this);
   }

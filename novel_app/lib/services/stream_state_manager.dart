@@ -228,7 +228,6 @@ class StreamStateManager {
 
     _updateState(currentState.copyWith(
       status: StreamStatus.error,
-      error: error,
       endTime: DateTime.now(),
     ));
 

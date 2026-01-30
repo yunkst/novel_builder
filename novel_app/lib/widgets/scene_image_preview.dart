@@ -4,8 +4,12 @@ import '../services/api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
+import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import 'hybrid_media_widget.dart';
 import 'generate_more_dialog.dart';
+import 'common/common_widgets.dart';
 
 class SceneImagePreview extends StatefulWidget {
   final SceneIllustration? illustration; // 可选，用于向后兼容
@@ -156,7 +160,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
               '✅ 加载插图信息: ${_images.length} 张图片, 模型尺寸: ${_modelWidth}x$_modelHeight');
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -166,6 +170,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         });
       }
       debugPrint('从后端加载插图失败: $e');
+      LoggerService.instance.e(
+        '从后端加载插图失败',
+        stackTrace: stackTrace.toString(),
+      );
     }
   }
 
@@ -212,63 +220,51 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         return Container(
           height: containerHeight,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
           ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).primaryColor,
-                  ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const LoadingStateWidget(
+                message: '图片生成中...',
+                centered: false,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '预计需要1-3分钟',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  '图片生成中...',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '预计需要1-3分钟',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.onDelete != null) ...[
-                      OutlinedButton.icon(
-                        onPressed: () => widget.onDelete!(widget.taskId!),
-                        icon: const Icon(Icons.delete, size: 16),
-                        label: const Text('删除'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    TextButton.icon(
-                      onPressed: _refreshIllustration,
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('刷新'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.onDelete != null) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => widget.onDelete!(widget.taskId!),
+                      icon: const Icon(Icons.delete, size: 16),
+                      label: const Text('删除'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
                       ),
                     ),
+                    const SizedBox(width: 8),
                   ],
-                ),
-              ],
-            ),
+                  TextButton.icon(
+                    onPressed: _refreshIllustration,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('刷新'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -287,62 +283,43 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         return Container(
           height: containerHeight,
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: Theme.of(context).colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red.shade200),
+            border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
           ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 32, color: Colors.red.shade400),
-                const SizedBox(height: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ErrorStateWidget(
+                message: message ?? '插图加载失败',
+                icon: Icons.error_outline,
+                onRetry: _refreshIllustration,
+                retryText: '重试',
+                centered: false,
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 4),
                 Text(
-                  message ?? '插图加载失败',
+                  _errorMessage!,
                   style: TextStyle(
-                    color: Colors.red.shade600,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.7),
+                    fontSize: 12,
                   ),
-                ),
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade400,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.onDelete != null) ...[
-                      OutlinedButton.icon(
-                        onPressed: () => widget.onDelete!(widget.taskId!),
-                        icon: const Icon(Icons.delete, size: 16),
-                        label: const Text('删除'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    TextButton.icon(
-                      onPressed: _refreshIllustration,
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('重试'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red.shade600,
-                      ),
-                    ),
-                  ],
+                  textAlign: TextAlign.center,
                 ),
               ],
-            ),
+              if (widget.onDelete != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => widget.onDelete!(widget.taskId!),
+                  icon: const Icon(Icons.delete, size: 16),
+                  label: const Text('删除'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
+            ],
           ),
         );
       },
@@ -359,9 +336,9 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         return Container(
           height: containerHeight,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
           ),
           child: Center(
             child: Column(
@@ -370,7 +347,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 Icon(
                   Icons.image,
                   size: 48,
-                  color: Colors.blue.shade300,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -385,7 +362,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 Text(
                   'AI正在创作图片，请耐心等待',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -399,7 +376,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                         icon: const Icon(Icons.delete, size: 16),
                         label: const Text('删除'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
+                          foregroundColor: Theme.of(context).colorScheme.error,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -409,8 +386,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                       icon: const Icon(Icons.refresh, size: 16),
                       label: const Text('检查状态'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                       ),
@@ -452,7 +429,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         // 图片容器（自适应高度）
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: GestureDetector(
@@ -486,7 +463,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                   icon: const Icon(Icons.delete, size: 16),
                   label: const Text('删除'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
+                    foregroundColor: Theme.of(context).colorScheme.error,
                   ),
                 ),
               ),
@@ -497,7 +474,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('刷新'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -531,7 +508,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             Container(
               height: containerHeight,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: PageView.builder(
@@ -572,7 +549,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         Container(
           height: containerHeight, // 使用动态高度
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: ClipRRect(
@@ -595,13 +572,13 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
                 modelName,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.surface,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -620,11 +597,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -636,12 +613,12 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                        valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.error),
                       ),
                     )
                   : Icon(
                       Icons.delete,
-                      color: Colors.red,
+                      color: Theme.of(context).colorScheme.error,
                       size: 20,
                     ),
             ),
@@ -658,7 +635,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(8),
             topRight: Radius.circular(8),
@@ -667,7 +644,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         child: Text(
           '1 张图片',
           style: TextStyle(
-            color: Theme.of(context).primaryColor,
+            color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -678,7 +655,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.1),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(8),
           topRight: Radius.circular(8),
@@ -701,8 +678,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Icon(
               Icons.keyboard_arrow_left,
               color: currentIndex > 0
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(width: 16),
@@ -710,7 +687,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           Text(
             '${currentIndex + 1} / $total',
             style: TextStyle(
-              color: Theme.of(context).primaryColor,
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -729,8 +706,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Icon(
               Icons.keyboard_arrow_right,
               color: currentIndex < total - 1
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -741,9 +718,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   /// 显示生成更多图片对话框
   void _showGenerateMoreDialog() {
     if (widget.taskId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法获取任务ID')),
-      );
+      ToastUtils.showInfo('无法获取任务ID');
       return;
     }
 
@@ -770,12 +745,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
 
     try {
       // 显示加载提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正在生成更多图片，请稍候...'),
-          duration: Duration(seconds: 3),
-        ),
-      );
+      ToastUtils.showInfo('正在生成更多图片，请稍候...');
 
       // 使用ApiServiceWrapper确保正确的token认证
       final apiService = ApiServiceProvider.instance;
@@ -791,21 +761,18 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
       await _loadIllustrationFromBackend();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('图片生成完成'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('图片生成完成');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('生成更多图片失败: $e');
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成图片失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+        ErrorHelper.showErrorWithLog(
+          context,
+          '生成图片失败',
+          stackTrace: stackTrace,
+          category: LogCategory.ai,
+          tags: ['image', 'regenerate', 'failed'],
         );
       }
     }
@@ -855,13 +822,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         });
 
         // 显示成功提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('图片删除成功'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        ToastUtils.showSuccess('图片删除成功');
 
         // 调用删除成功回调，让父组件处理后续逻辑
         widget.onImageDeleted?.call();
@@ -871,17 +832,16 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           await _loadIllustrationFromBackend();
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('删除图片失败: $e');
 
       if (mounted) {
-        // 显示错误提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('删除图片失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
+        ErrorHelper.showErrorWithLog(
+          context,
+          '删除图片失败',
+          stackTrace: stackTrace,
+          category: LogCategory.ai,
+          tags: ['image', 'delete', 'failed'],
         );
       }
     } finally {

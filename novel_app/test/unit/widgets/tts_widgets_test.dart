@@ -105,18 +105,14 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: true,
-              hasNext: true,
               hasPreviousChapter: true,
               hasNextChapter: true,
               speechRate: 1.0,
               onPlay: () => playCalled = true,
               onPause: () => pauseCalled = true,
               onStop: () => stopCalled = true,
-              onPrevious: () => prevCalled = true,
-              onNext: () => nextCalled = true,
-              onPreviousChapter: () {},
-              onNextChapter: () {},
+              onPreviousChapter: () => prevCalled = true,
+              onNextChapter: () => nextCalled = true,
               onRateChanged: (_) {},
             ),
           ),
@@ -129,9 +125,9 @@ void main() {
       // 验证停止按钮存在
       expect(find.byIcon(Icons.stop_circle), findsOneWidget);
 
-      // 验证上一段/下一段按钮存在
-      expect(find.byIcon(Icons.first_page), findsOneWidget);
-      expect(find.byIcon(Icons.last_page), findsOneWidget);
+      // 验证上一章/下一章按钮存在
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
     });
 
     testWidgets('播放状态应该显示暂停按钮', (WidgetTester tester) async {
@@ -140,16 +136,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.playing,
-              hasPrevious: true,
-              hasNext: true,
-              hasPreviousChapter: false,
-              hasNextChapter: false,
+              hasPreviousChapter: true,
+              hasNextChapter: true,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -167,16 +159,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: true,
-              hasNext: true,
-              hasPreviousChapter: false,
-              hasNextChapter: false,
+              hasPreviousChapter: true,
+              hasNextChapter: true,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -194,16 +182,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: false, // 没有上一段
-              hasNext: true,
               hasPreviousChapter: false,
-              hasNextChapter: false,
+              hasNextChapter: true,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -212,8 +196,8 @@ void main() {
         ),
       );
 
-      // 验证上一段按钮存在（虽然可能被禁用）
-      expect(find.byIcon(Icons.first_page), findsOneWidget);
+      // 验证上一章按钮存在（虽然可能被禁用）
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
     });
 
     testWidgets('没有下一段时按钮应该禁用', (WidgetTester tester) async {
@@ -222,16 +206,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: true,
-              hasNext: false, // 没有下一段
-              hasPreviousChapter: false,
+              hasPreviousChapter: true,
               hasNextChapter: false,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -240,8 +220,8 @@ void main() {
         ),
       );
 
-      // 验证下一段按钮存在
-      expect(find.byIcon(Icons.last_page), findsOneWidget);
+      // 验证下一章按钮存在
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
     });
 
     testWidgets('点击播放按钮应该调用onPlay回调', (WidgetTester tester) async {
@@ -252,16 +232,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: false,
-              hasNext: false,
               hasPreviousChapter: false,
               hasNextChapter: false,
               speechRate: 1.0,
               onPlay: () => playCalled = true,
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -280,16 +256,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: false,
-              hasNext: false,
               hasPreviousChapter: false,
               hasNextChapter: false,
               speechRate: 1.5,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},
@@ -309,16 +281,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: false,
-              hasNext: false,
               hasPreviousChapter: false,
               hasNextChapter: false,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (rate) => newRate = rate,
@@ -343,16 +311,12 @@ void main() {
           home: Scaffold(
             body: TtsControlPanel(
               state: TtsPlayerState.paused,
-              hasPrevious: false,
-              hasNext: false,
-              hasPreviousChapter: true,
-              hasNextChapter: true,
+              hasPreviousChapter: false,
+              hasNextChapter: false,
               speechRate: 1.0,
               onPlay: () {},
               onPause: () {},
               onStop: () {},
-              onPrevious: () {},
-              onNext: () {},
               onPreviousChapter: () {},
               onNextChapter: () {},
               onRateChanged: (_) {},

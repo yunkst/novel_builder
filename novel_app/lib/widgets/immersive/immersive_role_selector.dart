@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/character.dart';
 import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
+import '../../utils/toast_utils.dart';
 
 /// 沉浸体验角色选择器
 ///
@@ -122,12 +123,7 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   /// 确认选择
   void _confirmSelection() {
     if (_selectedRoleIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个角色'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      ToastUtils.showWarning('请至少选择一个角色');
       return;
     }
 
@@ -192,19 +188,19 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.person_off,
-                            size: 64, color: Colors.grey.shade400),
+                            size: 64, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
                         Text(
                           '暂无角色',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.grey,
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '请先在角色管理中创建角色',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -219,8 +215,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
               onPressed: _confirmSelection,
               icon: const Icon(Icons.check),
               label: Text('确认 (${_selectedRoleIds.length})'),
-              backgroundColor: Colors.purple,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
             )
           : null,
     );
@@ -285,16 +281,17 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   Widget _buildCharacterCard(Character character) {
     final isSelected =
         character.id != null && _selectedRoleIds.contains(character.id!);
+    final theme = Theme.of(context);
 
     return GestureDetector(
       onTap: () => _toggleRole(character),
       child: Card(
         elevation: isSelected ? 12 : 6,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: isSelected
-              ? BorderSide(color: Colors.purple, width: 2)
+              ? BorderSide(color: theme.colorScheme.primary, width: 2)
               : BorderSide.none,
         ),
         child: Stack(
@@ -307,7 +304,7 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                   flex: 3,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(12),
                       ),
@@ -337,9 +334,9 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                         if (character.occupation != null)
                           Text(
                             character.occupation!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -347,9 +344,9 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                         if (character.personality != null)
                           Text(
                             character.personality!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -367,13 +364,13 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                 right: 8,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.purple,
+                    color: theme.colorScheme.primary,
                     shape: BoxShape.circle,
                     boxShadow: _avatarShadow,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check,
-                    color: Colors.white,
+                    color: theme.colorScheme.onPrimary,
                     size: 20,
                   ),
                 ),
@@ -420,13 +417,15 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
 
   /// 构建占位符头像
   Widget _buildPlaceholderAvatar(Character character) {
+    final theme = Theme.of(context);
+
     return Container(
-      color: Colors.purple.withValues(alpha: 0.1),
+      color: theme.colorScheme.primary.withValues(alpha: 0.1),
       child: Center(
         child: Icon(
           Icons.person,
           size: 48,
-          color: Colors.purple.withValues(alpha: 0.5),
+          color: theme.colorScheme.primary.withValues(alpha: 0.5),
         ),
       ),
     );

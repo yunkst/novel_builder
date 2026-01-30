@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
 import 'package:novel_app/models/chapter.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/services/chapter_service.dart';
 import 'package:novel_app/services/database_service.dart';
+import 'package:sqflite_common/sqlite_api.dart';
+import '../../base/database_test_base.dart';
 import '../../test_bootstrap.dart';
 
-@GenerateMocks([DatabaseService])
-import 'chapter_service_test.mocks.dart';
+// 创建具体的测试基类
+class _ChapterServiceTestBase extends DatabaseTestBase {}
 
 /// ChapterService 单元测试
 ///
@@ -18,35 +18,30 @@ import 'chapter_service_test.mocks.dart';
 /// - 前文章节列表获取
 /// - 角色信息格式化
 /// - AI参数构建
+///
+/// 迁移说明：
+/// - 使用真实数据库替代Mock
+/// - 保留纯业务逻辑测试
+/// - 数据库交互测试使用真实数据验证
 void main() {
   // 初始化数据库FFI
   initDatabaseTests();
 
   group('ChapterService 历史章节内容', () {
     late ChapterService chapterService;
-    late MockDatabaseService mockDb;
-    late List<Chapter> testChapters;
-    late Novel testNovel;
+    late _ChapterServiceTestBase base;
 
-    setUp(() {
-      mockDb = MockDatabaseService();
-      chapterService = ChapterService(databaseService: mockDb);
+    setUp(() async {
+      base = _ChapterServiceTestBase();
+      await base.setUp();
 
-      // 创建测试数据
-      testChapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-        Chapter(title: '第二章', url: 'chapter2', chapterIndex: 1),
-        Chapter(title: '第三章', url: 'chapter3', chapterIndex: 2),
-        Chapter(title: '第四章', url: 'chapter4', chapterIndex: 3),
-        Chapter(title: '第五章', url: 'chapter5', chapterIndex: 4),
-      ];
-
-      testNovel = Novel(
-        title: '测试小说',
-        author: '测试作者',
-        url: 'test_novel',
-        description: '这是一个测试小说的背景描述',
+      chapterService = ChapterService(
+        databaseService: base.databaseService,
       );
+    });
+
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('空章节列表且无novel时应返回空字符串', () async {
@@ -59,29 +54,31 @@ void main() {
     });
 
     test('空章节列表且有novel时应返回默认引导文本', () async {
+      final novel = await base.createAndAddNovel();
+
       final result = await chapterService.getHistoryChaptersContent(
         chapters: [],
         afterIndex: 0,
-        novel: testNovel,
+        novel: novel,
       );
 
       expect(result, contains('这是小说的开始'));
       expect(result, contains('引人入胜的第一章'));
-      expect(result, contains('小说背景：${testNovel.description}'));
-      expect(result, contains('作者：${testNovel.author}'));
+      expect(result, contains('小说背景：${novel.description}'));
+      expect(result, contains('作者：${novel.author}'));
     });
 
     test('空章节列表novel无描述时应不显示背景', () async {
-      final novelWithoutDesc = Novel(
+      final novel = Novel(
         title: '测试小说',
         author: '测试作者',
-        url: 'test_novel',
+        url: 'https://test.com/novel/1',
       );
 
       final result = await chapterService.getHistoryChaptersContent(
         chapters: [],
         afterIndex: 0,
-        novel: novelWithoutDesc,
+        novel: novel,
       );
 
       expect(result, contains('这是小说的开始'));
@@ -89,38 +86,55 @@ void main() {
     });
 
     test('应获取最近章节的内容', () async {
-      // Mock数据库返回
-      when(mockDb.getCachedChapter('chapter2')).thenAnswer((_) async => '第二章内容');
-      when(mockDb.getCachedChapter('chapter3')).thenAnswer((_) async => '第三章内容');
-      when(mockDb.getCachedChapter('chapter4')).thenAnswer((_) async => '第四章内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 5,
+      );
 
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 3, // 第四章
       );
 
-      expect(result, contains('第四章'));
-      expect(result, contains('第四章内容'));
-      verify(mockDb.getCachedChapter('chapter4')).called(1);
+      expect(result, contains(chapters[3].title));
+      expect(result, contains('这是${chapters[3].title}的内容'));
     });
 
     test('未缓存的章节应被跳过', () async {
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => null); // 未缓存
-      when(mockDb.getCachedChapter('chapter2')).thenAnswer((_) async => '第二章内容');
-      when(mockDb.getCachedChapter('chapter3')).thenAnswer((_) async => null); // 未缓存
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
+
+      // 手动删除其中一个章节的缓存
+      await base.databaseService.database.then((db) async {
+        await db.delete(
+          'chapter_cache',
+          where: 'chapterUrl = ?',
+          whereArgs: [chapters[0].url],
+        );
+      });
 
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 2,
       );
 
-      expect(result, contains('第二章'));
-      expect(result, isNot(contains('第三章')));
+      expect(result, isNot(contains(chapters[0].title)));
+      expect(result, contains(chapters[1].title));
     });
 
     test('索引越界时应返回空字符串', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 5,
+      );
+
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 10, // 越界
       );
 
@@ -128,8 +142,14 @@ void main() {
     });
 
     test('负索引时应返回空字符串', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 5,
+      );
+
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: -1,
       );
 
@@ -137,66 +157,94 @@ void main() {
     });
 
     test('应正确格式化章节标题和内容', () async {
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => '测试内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
 
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 0,
       );
 
-      expect(result, contains('第1章 第一章'));
-      expect(result, contains('测试内容'));
+      expect(result, contains('第1章 ${chapters[0].title}'));
+      expect(result, contains('这是${chapters[0].title}的内容'));
     });
 
     test('多个历史章节应被拼接', () async {
-      when(mockDb.getCachedChapter(any)).thenAnswer((_) async => '章节内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 5,
+      );
 
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 2,
       );
 
       // 应该包含多个章节
       expect(result, contains('第'));
       expect(result, contains('章'));
+      expect(result, contains(chapters[0].title));
+      expect(result, contains(chapters[1].title));
+      expect(result, contains(chapters[2].title));
     });
   });
 
   group('ChapterService 前文章节内容列表', () {
     late ChapterService chapterService;
-    late MockDatabaseService mockDb;
-    late List<Chapter> testChapters;
+    late _ChapterServiceTestBase base;
 
-    setUp(() {
-      mockDb = MockDatabaseService();
-      chapterService = ChapterService(databaseService: mockDb);
+    setUp(() async {
+      base = _ChapterServiceTestBase();
+      await base.setUp();
 
-      testChapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-        Chapter(title: '第二章', url: 'chapter2', chapterIndex: 1),
-        Chapter(title: '第三章', url: 'chapter3', chapterIndex: 2),
-      ];
+      chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
+    });
+
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('应返回前文章节内容列表', () async {
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => '第一章内容');
-      when(mockDb.getCachedChapter('chapter2')).thenAnswer((_) async => '第二章内容');
-      when(mockDb.getCachedChapter('chapter3')).thenAnswer((_) async => '第三章内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
 
       final result = await chapterService.getPreviousChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 2,
       );
 
       expect(result, isA<List<String>>());
       expect(result.length, greaterThan(0));
+      expect(result.length, lessThanOrEqualTo(3)); // 最多返回3章（根据contextChapterCount）
     });
 
     test('未缓存章节应显示提示', () async {
-      when(mockDb.getCachedChapter(any)).thenAnswer((_) async => null);
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
+
+      // 删除第二个章节的缓存
+      await base.databaseService.database.then((db) async {
+        await db.delete(
+          'chapter_cache',
+          where: 'chapterUrl = ?',
+          whereArgs: [chapters[1].url],
+        );
+      });
 
       final result = await chapterService.getPreviousChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 1,
       );
 
@@ -204,22 +252,30 @@ void main() {
     });
 
     test('已缓存章节应包含实际内容', () async {
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => '实际内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
 
       final result = await chapterService.getPreviousChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 0,
       );
 
-      expect(result, anyElement(contains('实际内容')));
+      expect(result, anyElement(contains('这是${chapters[0].title}的内容')));
       expect(result, isNot(anyElement(contains('内容未缓存'))));
     });
 
     test('afterIndex为0时应只返回当前章', () async {
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => '第一章内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
 
       final result = await chapterService.getPreviousChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 0,
       );
 
@@ -228,10 +284,14 @@ void main() {
     });
 
     test('应正确格式化章节号', () async {
-      when(mockDb.getCachedChapter(any)).thenAnswer((_) async => '内容');
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 3,
+      );
 
       final result = await chapterService.getPreviousChaptersContent(
-        chapters: testChapters,
+        chapters: chapters,
         afterIndex: 2,
       );
 
@@ -243,11 +303,19 @@ void main() {
 
   group('ChapterService 角色信息格式化', () {
     late ChapterService chapterService;
-    late MockDatabaseService mockDb;
+    late _ChapterServiceTestBase base;
 
-    setUp(() {
-      mockDb = MockDatabaseService();
-      chapterService = ChapterService(databaseService: mockDb);
+    setUp(() async {
+      base = _ChapterServiceTestBase();
+      await base.setUp();
+
+      chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
+    });
+
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('空角色列表应返回默认文本', () async {
@@ -257,52 +325,44 @@ void main() {
     });
 
     test('应查询数据库获取角色信息', () async {
-      final characters = [
-        Character(
-          id: 1,
-          novelUrl: 'test_novel',
-          name: '张三',
-          age: 25,
-          appearanceFeatures: '英俊',
-          personality: '勇敢',
-        ),
-      ];
+      final novel = await base.createAndAddNovel();
+      final character = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '张三',
+      );
 
-      when(mockDb.getCharactersByIds([1])).thenAnswer((_) async => characters as List<Character>);
+      final result = await chapterService.getRolesInfoForAI([character.id!]);
 
-      await chapterService.getRolesInfoForAI([1]);
-
-      verify(mockDb.getCharactersByIds([1])).called(1);
+      expect(result, contains('张三'));
     });
 
     test('应返回格式化的角色信息', () async {
-      final characters = [
-        Character(
-          id: 1,
-          novelUrl: 'test_novel',
-          name: '张三',
-          age: 25,
-          appearanceFeatures: '英俊',
-          personality: '勇敢',
-        ),
-      ];
+      final novel = await base.createAndAddNovel();
+      final character = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '张三',
+      );
 
-      when(mockDb.getCharactersByIds([1])).thenAnswer((_) async => characters as List<Character>);
-
-      final result = await chapterService.getRolesInfoForAI([1]);
+      final result = await chapterService.getRolesInfoForAI([character.id!]);
 
       expect(result, contains('张三'));
     });
 
     test('多个角色应被一起格式化', () async {
-      final characters = [
-        Character(id: 1, novelUrl: 'test_novel', name: '张三'),
-        Character(id: 2, novelUrl: 'test_novel', name: '李四'),
-      ];
+      final novel = await base.createAndAddNovel();
+      final character1 = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '张三',
+      );
+      final character2 = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '李四',
+      );
 
-      when(mockDb.getCharactersByIds([1, 2])).thenAnswer((_) async => characters as List<Character>);
-
-      final result = await chapterService.getRolesInfoForAI([1, 2]);
+      final result = await chapterService.getRolesInfoForAI([
+        character1.id!,
+        character2.id!,
+      ]);
 
       expect(result, contains('张三'));
       expect(result, contains('李四'));
@@ -311,35 +371,31 @@ void main() {
 
   group('ChapterService AI参数构建', () {
     late ChapterService chapterService;
-    late MockDatabaseService mockDb;
-    late Novel testNovel;
-    late List<Chapter> testChapters;
+    late _ChapterServiceTestBase base;
 
-    setUp(() {
-      mockDb = MockDatabaseService();
-      chapterService = ChapterService(databaseService: mockDb);
+    setUp(() async {
+      base = _ChapterServiceTestBase();
+      await base.setUp();
 
-      testNovel = Novel(
-        title: '测试小说',
-        author: '测试作者',
-        url: 'test_novel',
-        description: '背景设定',
+      chapterService = ChapterService(
+        databaseService: base.databaseService,
       );
+    });
 
-      testChapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-        Chapter(title: '第二章', url: 'chapter2', chapterIndex: 1),
-      ];
-
-      // Mock数据库调用
-      when(mockDb.getCachedChapter(any)).thenAnswer((_) async => '章节内容');
-      when(mockDb.getCharactersByIds(any)).thenAnswer((_) async => []);
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('应构建完整的inputs参数', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
-        chapters: testChapters,
+        novel: novel,
+        chapters: chapters,
         afterIndex: 1,
         userInput: '生成第二章',
         characterIds: [],
@@ -347,13 +403,19 @@ void main() {
 
       expect(result, isA<Map<String, dynamic>>());
       expect(result['user_input'], '生成第二章');
-      expect(result['background_setting'], testNovel.description);
+      expect(result['background_setting'], novel.description);
     });
 
     test('应包含历史章节内容', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
-        chapters: testChapters,
+        novel: novel,
+        chapters: chapters,
         afterIndex: 1,
         userInput: '测试',
         characterIds: [],
@@ -364,21 +426,33 @@ void main() {
     });
 
     test('应包含角色信息', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
+      final character = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '张三',
+      );
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
-        chapters: testChapters,
+        novel: novel,
+        chapters: chapters,
         afterIndex: 0,
         userInput: '测试',
-        characterIds: [1, 2],
+        characterIds: [character.id!],
       );
 
       expect(result.containsKey('roles'), true);
-      verify(mockDb.getCharactersByIds([1, 2])).called(1);
+      expect(result['roles'], contains('张三'));
     });
 
     test('应包含空的cmd和current_chapter_content字段', () async {
+      final novel = await base.createAndAddNovel();
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
+        novel: novel,
         chapters: [],
         afterIndex: 0,
         userInput: '测试',
@@ -392,8 +466,10 @@ void main() {
     });
 
     test('空章节列表时应使用默认引导文本', () async {
+      final novel = await base.createAndAddNovel();
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
+        novel: novel,
         chapters: [],
         afterIndex: 0,
         userInput: '创建第一章',
@@ -404,14 +480,14 @@ void main() {
     });
 
     test('无描述的novel应设置background_setting为空字符串', () async {
-      final novelWithoutDesc = Novel(
+      final novel = Novel(
         title: '测试',
         author: '作者',
-        url: 'test',
+        url: 'https://test.com/novel/1',
       );
 
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: novelWithoutDesc,
+        novel: novel,
         chapters: [],
         afterIndex: 0,
         userInput: '测试',
@@ -422,12 +498,22 @@ void main() {
     });
 
     test('应正确传递所有必需参数', () async {
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
+      final character = await base.createAndSaveCharacter(
+        novelUrl: novel.url,
+        name: '张三',
+      );
+
       final result = await chapterService.buildChapterGenerationInputs(
-        novel: testNovel,
-        chapters: testChapters,
+        novel: novel,
+        chapters: chapters,
         afterIndex: 1,
         userInput: '用户输入内容',
-        characterIds: [1],
+        characterIds: [character.id!],
       );
 
       expect(result.keys, containsAll([
@@ -445,23 +531,30 @@ void main() {
 
   group('ChapterService 边界场景', () {
     late ChapterService chapterService;
-    late MockDatabaseService mockDb;
+    late _ChapterServiceTestBase base;
 
-    setUp(() {
-      mockDb = MockDatabaseService();
-      chapterService = ChapterService(databaseService: mockDb);
+    setUp(() async {
+      base = _ChapterServiceTestBase();
+      await base.setUp();
+
+      chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
+    });
+
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('极长章节列表应正确处理', () async {
-      final longChapterList = List.generate(
-        100,
-        (i) => Chapter(title: '第${i + 1}章', url: 'chapter$i', chapterIndex: i),
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 100,
       );
 
-      when(mockDb.getCachedChapter(any)).thenAnswer((_) async => '内容');
-
       final result = await chapterService.getHistoryChaptersContent(
-        chapters: longChapterList,
+        chapters: chapters,
         afterIndex: 99,
       );
 
@@ -469,45 +562,70 @@ void main() {
     });
 
     test('章节内容为空字符串时应被跳过', () async {
-      final chapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-        Chapter(title: '第二章', url: 'chapter2', chapterIndex: 1),
-      ];
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 2,
+      );
 
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => '');
-      when(mockDb.getCachedChapter('chapter2')).thenAnswer((_) async => '有内容');
+      // 手动将第一个章节内容设置为空
+      await base.databaseService.database.then((db) async {
+        await db.update(
+          'chapter_cache',
+          {'content': ''},
+          where: 'chapterUrl = ?',
+          whereArgs: [chapters[0].url],
+        );
+      });
 
       final result = await chapterService.getHistoryChaptersContent(
         chapters: chapters,
         afterIndex: 1,
       );
 
-      expect(result, isNot(contains('第一章')));
-      expect(result, contains('第二章'));
+      expect(result, isNot(contains(chapters[0].title)));
+      expect(result, contains(chapters[1].title));
     });
 
     test('角色列表包含大量ID时应正确处理', () async {
-      final manyIds = List.generate(50, (i) => i);
-      final characters = manyIds
-          .map((id) => Character(id: id, novelUrl: 'test_novel', name: '角色$id'))
-          .toList();
+      final novel = await base.createAndAddNovel();
+      final characterIds = <int>[];
 
-      when(mockDb.getCharactersByIds(manyIds)).thenAnswer((_) async => characters as List<Character>);
+      // 创建50个角色
+      for (var i = 0; i < 50; i++) {
+        final character = await base.createAndSaveCharacter(
+          novelUrl: novel.url,
+          name: '角色$i',
+        );
+        characterIds.add(character.id!);
+      }
 
-      final result = await chapterService.getRolesInfoForAI(manyIds);
+      final result = await chapterService.getRolesInfoForAI(characterIds);
 
       expect(result, isNotEmpty);
-      verify(mockDb.getCharactersByIds(manyIds)).called(1);
+      for (var i = 0; i < 50; i++) {
+        expect(result, contains('角色$i'));
+      }
     });
 
     test('特殊字符在章节内容中应正常处理', () async {
-      final chapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-      ];
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 1,
+      );
 
       const specialContent = '特殊字符: \n\t\r测试';
 
-      when(mockDb.getCachedChapter('chapter1')).thenAnswer((_) async => specialContent);
+      // 更新章节内容为特殊字符
+      await base.databaseService.database.then((db) async {
+        await db.update(
+          'chapter_cache',
+          {'content': specialContent},
+          where: 'chapterUrl = ?',
+          whereArgs: [chapters[0].url],
+        );
+      });
 
       final result = await chapterService.getHistoryChaptersContent(
         chapters: chapters,
@@ -520,14 +638,21 @@ void main() {
 
   group('ChapterService 错误处理', () {
     test('DatabaseService抛出异常时应传播', () async {
-      final mockDb = MockDatabaseService();
-      final chapterService = ChapterService(databaseService: mockDb);
+      final base = _ChapterServiceTestBase();
+      await base.setUp();
 
-      final chapters = [
-        Chapter(title: '第一章', url: 'chapter1', chapterIndex: 0),
-      ];
+      final chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
 
-      when(mockDb.getCachedChapter(any)).thenThrow(Exception('数据库错误'));
+      final novel = await base.createAndAddNovel();
+      final chapters = await base.createAndCacheChapters(
+        novelUrl: novel.url,
+        count: 1,
+      );
+
+      // 关闭数据库连接以模拟错误
+      await base.databaseService.close();
 
       expect(
         () => chapterService.getHistoryChaptersContent(
@@ -536,18 +661,27 @@ void main() {
         ),
         throwsException,
       );
+
+      await base.tearDown();
     });
 
     test('获取角色失败时应传播异常', () async {
-      final mockDb = MockDatabaseService();
-      final chapterService = ChapterService(databaseService: mockDb);
+      final base = _ChapterServiceTestBase();
+      await base.setUp();
 
-      when(mockDb.getCharactersByIds(any)).thenThrow(Exception('查询失败'));
+      final chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
+
+      // 关闭数据库连接以模拟错误
+      await base.databaseService.close();
 
       expect(
         () => chapterService.getRolesInfoForAI([1]),
         throwsException,
       );
+
+      await base.tearDown();
     });
   });
 
@@ -560,11 +694,17 @@ void main() {
   });
 
   group('ChapterService 依赖注入', () {
-    test('应使用传入的DatabaseService', () {
-      final mockDb = MockDatabaseService();
-      final chapterService = ChapterService(databaseService: mockDb);
+    test('应使用传入的DatabaseService', () async {
+      final base = _ChapterServiceTestBase();
+      await base.setUp();
+
+      final chapterService = ChapterService(
+        databaseService: base.databaseService,
+      );
 
       expect(chapterService, isNotNull);
+
+      await base.tearDown();
     });
 
     test('传入null时应使用默认DatabaseService', () {
@@ -573,56 +713,4 @@ void main() {
       expect(chapterService, isNotNull);
     });
   });
-}
-
-/// 测试数据创建辅助
-class ChapterTestData {
-  static Chapter createChapter({
-    required String title,
-    required String url,
-    required int index,
-  }) {
-    return Chapter(
-      title: title,
-      url: url,
-      chapterIndex: index,
-    );
-  }
-
-  static List<Chapter> createChapterList(int count) {
-    return List.generate(
-      count,
-      (i) => createChapter(
-        title: '第${i + 1}章',
-        url: 'chapter$i',
-        index: i,
-      ),
-    );
-  }
-
-  static Novel createTestNovel({
-    String title = '测试小说',
-    String author = '测试作者',
-    String? description,
-  }) {
-    return Novel(
-      title: title,
-      author: author,
-      url: 'test_novel',
-      description: description,
-    );
-  }
-
-  static Character createCharacter({
-    required int id,
-    required String name,
-    String? backgroundStory,
-  }) {
-    return Character(
-      id: id,
-      novelUrl: 'test_novel',
-      name: name,
-      backgroundStory: backgroundStory,
-    );
-  }
 }

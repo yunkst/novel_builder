@@ -47,16 +47,15 @@ Please follow the [installation procedure](#installation--usage) and then run th
 import 'package:novel_api/novel_api.dart';
 
 
-final api = NovelApi().getDefaultApi();
-final String url = url_example; // String | 章节URL
-final bool forceRefresh = true; // bool | 强制刷新，从源站重新获取
+final api = NovelApi().getBackupApi();
+final MultipartFile file = BINARY_DATA_HERE; // MultipartFile | 数据库备份文件(.db)
 final String X_API_TOKEN = X_API_TOKEN_example; // String | 
 
 try {
-    final response = await api.chapterContentChapterContentGet(url, forceRefresh, X_API_TOKEN);
+    final response = await api.uploadBackupApiBackupUploadPost(file, X_API_TOKEN);
     print(response);
 } catch on DioException (e) {
-    print("Exception when calling DefaultApi->chapterContentChapterContentGet: $e\n");
+    print("Exception when calling BackupApi->uploadBackupApiBackupUploadPost: $e\n");
 }
 
 ```
@@ -67,6 +66,7 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+[*BackupApi*](doc/BackupApi.md) | [**uploadBackupApiBackupUploadPost**](doc/BackupApi.md#uploadbackupapibackupuploadpost) | **POST** /api/backup/upload | Upload Backup
 [*DefaultApi*](doc/DefaultApi.md) | [**chapterContentChapterContentGet**](doc/DefaultApi.md#chaptercontentchaptercontentget) | **GET** /chapter-content | Chapter Content
 [*DefaultApi*](doc/DefaultApi.md) | [**chaptersChaptersGet**](doc/DefaultApi.md#chapterschaptersget) | **GET** /chapters | Chapters
 [*DefaultApi*](doc/DefaultApi.md) | [**checkVideoStatusApiImageToVideoHasVideoImgNameGet**](doc/DefaultApi.md#checkvideostatusapiimagetovideohasvideoimgnameget) | **GET** /api/image-to-video/has-video/{img_name} | Check Video Status
@@ -98,6 +98,7 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [AppVersionResponse](doc/AppVersionResponse.md)
+ - [BackupUploadResponse](doc/BackupUploadResponse.md)
  - [Chapter](doc/Chapter.md)
  - [ChapterContent](doc/ChapterContent.md)
  - [EnhancedSceneIllustrationRequest](doc/EnhancedSceneIllustrationRequest.md)

@@ -5,6 +5,8 @@ import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/character.dart';
 import '../../services/dify_service.dart';
+import '../../services/logger_service.dart';
+import '../../utils/toast_utils.dart';
 import 'immersive_setup_dialog.dart';
 import '../../screens/multi_role_chat_screen.dart';
 
@@ -167,12 +169,20 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
       debugPrint('✅ 剧本生成成功');
       debugPrint('剧本长度: ${play.length} 字符');
       debugPrint('角色策略数量: ${roleStrategyList.length}');
-    } catch (e) {
+    } catch (e, stackTrace) {
       // 停止动画和提示轮播
       _tipTimer?.cancel();
       _animationController.stop();
 
       if (!mounted) return;
+
+      // 记录错误日志
+      LoggerService.instance.e(
+        '剧本生成失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['immersive', 'script', 'generate', 'failed'],
+      );
 
       setState(() {
         _status = ImmersiveStatus.error;
@@ -236,18 +246,21 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('重新生成成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('重新生成成功');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       _tipTimer?.cancel();
       _animationController.stop();
 
       if (!mounted) return;
+
+      // 记录错误日志
+      LoggerService.instance.e(
+        '剧本重新生成失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['immersive', 'script', 'regenerate', 'failed'],
+      );
 
       setState(() {
         _status = ImmersiveStatus.error;
@@ -262,14 +275,16 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
 
   /// 显示错误对话框
   void _showErrorDialog(String error) {
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.error, color: Colors.red),
-            SizedBox(width: 8),
-            Text('生成失败'),
+            Icon(Icons.error, color: theme.colorScheme.error),
+            const SizedBox(width: 8),
+            const Text('生成失败'),
           ],
         ),
         content: Text(error),
@@ -296,15 +311,16 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
   /// 显示修改意见对话框
   void _showModifyDialog() {
     final controller = TextEditingController();
+    final theme = Theme.of(context);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.edit, color: Colors.purple),
-            SizedBox(width: 8),
-            Text('修改意见'),
+            Icon(Icons.edit, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('修改意见'),
           ],
         ),
         content: TextField(
@@ -327,12 +343,7 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
             onPressed: () {
               final feedback = controller.text.trim();
               if (feedback.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('请输入修改意见'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+                ToastUtils.showWarning('请输入修改意见');
                 return;
               }
 
@@ -340,8 +351,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
               _regenerateWithFeedback(feedback);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
             ),
             child: const Text('重新生成'),
           ),
@@ -408,10 +419,10 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                 ),
               );
             },
-            child: const Icon(
+            child: Icon(
               Icons.theater_comedy,
               size: 80,
-              color: Colors.purple,
+              color: theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 24),
@@ -420,21 +431,21 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           Text(
             _tips[_currentTipIndex],
             style: theme.textTheme.titleMedium?.copyWith(
-              color: Colors.purple,
+              color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '剧本生成中...',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
           ),
           const SizedBox(height: 32),
 
           // 进度指示器
-          const CircularProgressIndicator(
-            color: Colors.purple,
+          CircularProgressIndicator(
+            color: theme.colorScheme.primary,
           ),
         ],
       ),
@@ -443,18 +454,20 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
 
   /// 成功视图（选项B：TabBar切换）
   Widget _buildSuccessView() {
+    final theme = Theme.of(context);
+
     return DefaultTabController(
       length: 2,
       child: Column(
         children: [
           // TabBar
-          const TabBar(
-            tabs: [
+          TabBar(
+            tabs: const [
               Tab(text: '📜 剧本'),
               Tab(text: '🎭 角色策略'),
             ],
-            labelColor: Colors.purple,
-            indicatorColor: Colors.purple,
+            labelColor: theme.colorScheme.primary,
+            indicatorColor: theme.colorScheme.primary,
           ),
 
           // TabBarView
@@ -478,8 +491,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                     label: const Text('重新生成'),
                     onPressed: _showModifyDialog,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.purple,
-                      side: const BorderSide(color: Colors.purple),
+                      foregroundColor: theme.colorScheme.primary,
+                      side: BorderSide(color: theme.colorScheme.primary),
                     ),
                   ),
                 ),
@@ -490,8 +503,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                     label: const Text('确认'),
                     onPressed: _confirmScript,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
                     ),
                   ),
                 ),
@@ -527,6 +540,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
 
   /// 角色策略视图
   Widget _buildRoleStrategyView() {
+    final theme = Theme.of(context);
+
     if (_roleStrategy == null || _roleStrategy!.isEmpty) {
       return const Center(
         child: Text('暂无角色策略'),
@@ -582,10 +597,10 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                     Expanded(
                       child: Text(
                         characterName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
-                          color: Colors.purple,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
                     ),
@@ -599,7 +614,9 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                   style: TextStyle(
                     height: 1.5,
                     fontSize: 14,
-                    color: strategy.isNotEmpty ? null : Colors.grey,
+                    color: strategy.isNotEmpty
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -621,13 +638,13 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           Icon(
             Icons.error_outline,
             size: 80,
-            color: Colors.red.shade300,
+            color: theme.colorScheme.error.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 24),
           Text(
             '生成失败',
             style: theme.textTheme.titleLarge?.copyWith(
-              color: Colors.red,
+              color: theme.colorScheme.error,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -637,7 +654,7 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
             child: Text(
               _errorMessage ?? '未知错误',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade700,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -663,8 +680,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  foregroundColor: theme.colorScheme.surface,
                 ),
                 child: const Text('返回'),
               ),

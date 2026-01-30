@@ -82,7 +82,7 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.7),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             Colors.transparent,
           ],
         ),
@@ -104,8 +104,8 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: index == widget.currentIndex
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.4),
+                          ? Theme.of(context).colorScheme.surface
+                          : Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
                     ),
                   ),
                 ),
@@ -202,7 +202,7 @@ class _ActionButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

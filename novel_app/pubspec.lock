@@ -283,6 +283,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_force_directed_graph:
+    dependency: "direct main"
+    description:
+      name: flutter_force_directed_graph
+      sha256: "5024c7e1854341f6dbca656d23efa387c40986599d6d613b4b55f0abffde0416"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.8"
   flutter_lints:
     dependency: "direct dev"
     description:

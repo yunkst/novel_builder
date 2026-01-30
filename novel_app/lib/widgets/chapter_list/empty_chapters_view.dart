@@ -17,6 +17,7 @@ class EmptyChaptersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isCustomNovel = novel.url.startsWith('custom://');
 
     return Center(
@@ -26,7 +27,7 @@ class EmptyChaptersView extends StatelessWidget {
           Icon(
             Icons.menu_book,
             size: 64,
-            color: Colors.grey[400],
+            color: colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(
@@ -34,14 +35,14 @@ class EmptyChaptersView extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             isCustomNovel ? '点击下方按钮创建第一个章节' : '你可以从源网站获取章节，或创建自己的章节',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 24),
@@ -50,8 +51,8 @@ class EmptyChaptersView extends StatelessWidget {
             icon: const Icon(Icons.auto_awesome),
             label: const Text('AI生成章节'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,

@@ -194,11 +194,11 @@ class _EnhancedRelationshipGraphScreenState
   Color _getGenderColor(String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue[600]!;
+        return Theme.of(context).colorScheme.primary.withValues(alpha: 0.6);
       case '女':
-        return Colors.pink[400]!;
+        return Theme.of(context).colorScheme.secondary.withValues(alpha: 0.4);
       default:
-        return Colors.purple;
+        return Theme.of(context).colorScheme.tertiary;
     }
   }
 
@@ -278,7 +278,7 @@ class _EnhancedRelationshipGraphScreenState
       appBar: AppBar(
         title: Text(_allCharacters.isNotEmpty ? "全局角色关系图" : "角色关系图"),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           if (_allCharacters.isNotEmpty)
             Center(
@@ -380,13 +380,13 @@ class _EnhancedRelationshipGraphScreenState
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         border: Border(
-          top: BorderSide(color: Colors.grey[300]!, width: 1),
+          top: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -399,14 +399,14 @@ class _EnhancedRelationshipGraphScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.amber[50],
+              color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
               border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                bottom: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), width: 1),
               ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                Icon(Icons.info_outline, color: Theme.of(context).colorScheme.secondary, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -463,9 +463,9 @@ class _EnhancedRelationshipGraphScreenState
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +478,7 @@ class _EnhancedRelationshipGraphScreenState
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange[100],
+                            color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -495,7 +495,7 @@ class _EnhancedRelationshipGraphScreenState
                           isSource ? '→ ${otherCharacter.name}' : '← ${otherCharacter.name}',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[700],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -506,7 +506,7 @@ class _EnhancedRelationshipGraphScreenState
                             rel.description!,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -529,16 +529,16 @@ class _EnhancedRelationshipGraphScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+          Icon(Icons.error_outline, size: 64, color: Theme.of(context).colorScheme.error.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text(
             '加载失败',
-            style: TextStyle(fontSize: 18, color: Colors.grey[800]),
+            style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)),
           ),
           const SizedBox(height: 8),
           Text(
             _error!,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -557,16 +557,16 @@ class _EnhancedRelationshipGraphScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+          Icon(Icons.people_outline, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text(
             '暂无角色数据',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
           ),
           const SizedBox(height: 8),
           Text(
             '请先添加角色后再查看关系图',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ),
         ],
       ),
@@ -590,7 +590,7 @@ class _EnhancedRelationshipGraphScreenState
         graph: _graph,
         algorithm: _algorithm,
         paint: Paint()
-          ..color = Colors.white
+          ..color = Theme.of(context).colorScheme.surface
           ..style = PaintingStyle.fill,
         builder: (Node node) {
           // 获取对应的角色
@@ -623,9 +623,9 @@ class _EnhancedRelationshipGraphScreenState
               width: size,
               height: size,
               decoration: BoxDecoration(
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
               ),
               child: Center(
                 child: Text(
@@ -633,7 +633,7 @@ class _EnhancedRelationshipGraphScreenState
                   style: TextStyle(
                     fontSize: size * 0.3,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                   ),
                 ),
               ),
@@ -656,19 +656,19 @@ class _EnhancedRelationshipGraphScreenState
                 color: _getGenderColor(character.gender),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? Colors.amber : Colors.white,
+                  color: isSelected ? Theme.of(context).colorScheme.tertiary : Theme.of(context).colorScheme.surface,
                   width: isSelected ? 5 : 3,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                     blurRadius: 10,
                     spreadRadius: 2,
                   ),
                   // 选中状态添加发光效果
                   if (isSelected)
                     BoxShadow(
-                      color: Colors.amber.withValues(alpha: 0.6),
+                      color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.6),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -683,7 +683,7 @@ class _EnhancedRelationshipGraphScreenState
                       style: TextStyle(
                         fontSize: nodeSize * 0.3,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                       ),
                     ),
                   ),
@@ -695,9 +695,9 @@ class _EnhancedRelationshipGraphScreenState
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
+                          color: Theme.of(context).colorScheme.tertiary,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white, width: 1),
+                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1),
                         ),
                         constraints: const BoxConstraints(
                           minWidth: 20,
@@ -706,8 +706,8 @@ class _EnhancedRelationshipGraphScreenState
                         child: Center(
                           child: Text(
                             '$connectionCount',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.surface,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),

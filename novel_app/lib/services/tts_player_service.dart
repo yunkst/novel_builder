@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/reading_progress.dart';
@@ -10,6 +9,7 @@ import 'database_service.dart';
 import 'api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
+import 'preferences_service.dart';
 
 /// TTS播放器状态
 enum TtsPlayerState {
@@ -123,9 +123,8 @@ class TtsPlayerService extends ChangeNotifier {
   /// 加载保存的设置
   Future<void> _loadSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _speechRate = prefs.getDouble('tts_speech_rate') ?? 1.0;
-      _pitch = prefs.getDouble('tts_pitch') ?? 1.0;
+      _speechRate = await PreferencesService.instance.getDouble('tts_speech_rate', defaultValue: 1.0);
+      _pitch = await PreferencesService.instance.getDouble('tts_pitch', defaultValue: 1.0);
       LoggerService.instance.i(
         '加载设置: 语速=$_speechRate, 音调=$_pitch',
         category: LogCategory.tts,
@@ -375,8 +374,7 @@ class TtsPlayerService extends ChangeNotifier {
     await _tts.setSpeechRate(rate);
 
     // 保存设置
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('tts_speech_rate', rate);
+    await PreferencesService.instance.setDouble('tts_speech_rate', rate);
 
     notifyListeners();
   }
@@ -389,8 +387,7 @@ class TtsPlayerService extends ChangeNotifier {
     await _tts.setPitch(pitch);
 
     // 保存设置
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('tts_pitch', pitch);
+    await PreferencesService.instance.setDouble('tts_pitch', pitch);
 
     notifyListeners();
   }
@@ -636,8 +633,7 @@ class TtsPlayerService extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_progressKey, progress.toJsonString());
+      await PreferencesService.instance.setString(_progressKey, progress.toJsonString());
 
       LoggerService.instance.d(
         '保存进度: $progress',
@@ -657,8 +653,7 @@ class TtsPlayerService extends ChangeNotifier {
   /// 清除进度
   Future<void> _clearProgress() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_progressKey);
+      await PreferencesService.instance.remove(_progressKey);
       LoggerService.instance.i(
         '清除进度',
         category: LogCategory.tts,
@@ -677,9 +672,8 @@ class TtsPlayerService extends ChangeNotifier {
   /// 加载保存的进度
   static Future<ReadingProgress?> loadSavedProgress() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_progressKey);
-      if (jsonString == null) return null;
+      final jsonString = await PreferencesService.instance.getString(_progressKey);
+      if (jsonString.isEmpty) return null;
 
       final progress = ReadingProgress.fromJsonString(jsonString);
       if (progress == null) return null;
@@ -691,7 +685,7 @@ class TtsPlayerService extends ChangeNotifier {
           category: LogCategory.tts,
           tags: ['progress', 'expired'],
         );
-        await prefs.remove(_progressKey);
+        await PreferencesService.instance.remove(_progressKey);
         return null;
       }
 

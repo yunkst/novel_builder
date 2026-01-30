@@ -34,19 +34,20 @@ class ChapterListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
         // 背景色优先级: 已伴读 > 用户插入
         color: isAccompanied
-            ? Colors.purple.withValues(alpha: 0.05)
-            : (isUserChapter ? Colors.blue.withValues(alpha: 0.05) : null),
+            ? colorScheme.tertiary.withValues(alpha: 0.05)
+            : (isUserChapter ? colorScheme.primary.withValues(alpha: 0.05) : null),
         border: Border(
           left: BorderSide(
             // 边框颜色优先级: 已伴读 > 用户插入
             color: isAccompanied
-                ? Colors.purple.withValues(alpha: 0.3)
+                ? colorScheme.tertiary.withValues(alpha: 0.3)
                 : (isUserChapter
-                    ? Colors.blue.withValues(alpha: 0.3)
+                    ? colorScheme.primary.withValues(alpha: 0.3)
                     : Colors.transparent),
             width: 3,
           ),
@@ -71,26 +72,26 @@ class ChapterListItem extends StatelessWidget {
           children: [
             if (chapter.isUserInserted && onDelete != null)
               IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.delete_outline,
-                  color: Colors.red,
+                  color: colorScheme.error,
                 ),
                 onPressed: onDelete,
                 tooltip: '删除此章节',
               ),
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.add_circle_outline,
-                color: Colors.blue,
+                color: colorScheme.primary,
               ),
               onPressed: onInsert,
               tooltip: '在此章节后插入新章节',
             ),
             // 直接显示缓存状态，不再使用 FutureBuilder
             if (isCached)
-              const Icon(
+              Icon(
                 Icons.download_done,
-                color: Colors.green,
+                color: colorScheme.primary,
               ),
           ],
         ),

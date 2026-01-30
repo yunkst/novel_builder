@@ -240,6 +240,17 @@ class MockDatabaseService extends _i1.Mock implements _i5.DatabaseService {
       ) as _i6.Future<List<String>>);
 
   @override
+  _i6.Future<Map<String, bool>> getChaptersCacheStatus(
+          List<String>? chapterUrls) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getChaptersCacheStatus,
+          [chapterUrls],
+        ),
+        returnValue: _i6.Future<Map<String, bool>>.value(<String, bool>{}),
+      ) as _i6.Future<Map<String, bool>>);
+
+  @override
   void markAsPreloading(String? chapterUrl) => super.noSuchMethod(
         Invocation.method(
           #markAsPreloading,

@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
 import '../core/di/api_service_provider.dart';
+import '../utils/cache_utils.dart';
 
 /// 角色图集缓存服务
 class RoleGalleryCacheService {
@@ -49,7 +48,7 @@ class RoleGalleryCacheService {
   /// 获取缓存文件路径
   String _getCacheFilePath(String filename) {
     _ensureInitialized();
-    final hash = md5.convert(utf8.encode(filename)).toString();
+    final hash = CacheUtils.generateHashFilename(filename);
     return '${_cacheDir!.path}/$hash.jpg';
   }
 

@@ -1420,6 +1420,25 @@ class MockDatabaseService extends _i1.Mock implements _i5.DatabaseService {
       ) as _i6.Future<bool>);
 
   @override
+  _i6.Future<void> moveNovelToBookshelf(
+    String? novelUrl,
+    int? fromBookshelfId,
+    int? toBookshelfId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #moveNovelToBookshelf,
+          [
+            novelUrl,
+            fromBookshelfId,
+            toBookshelfId,
+          ],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
   _i6.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
