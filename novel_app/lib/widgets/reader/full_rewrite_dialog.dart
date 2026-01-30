@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/chapter_history_service.dart';
+import '../../services/novel_context_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
@@ -35,7 +35,7 @@ class FullRewriteDialog extends StatefulWidget {
 
 class _FullRewriteDialogState extends State<FullRewriteDialog>
     with DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService.create();
+  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
 
   final ValueNotifier<String> _rewriteResultNotifier =
       ValueNotifier<String>('');
@@ -141,27 +141,16 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
     _isGeneratingNotifier.value = true;
 
     try {
-      // 使用 ChapterHistoryService 获取历史章节内容
-      final historyChaptersContent =
-          await _historyService.fetchHistoryChaptersContent(
-        chapters: widget.chapters,
-        currentChapter: widget.currentChapter,
-        maxHistoryCount: 2,
+      // 使用 NovelContextBuilder 统一获取上下文数据
+      final context = await _contextBuilder.buildContext(
+        widget.novel,
+        widget.chapters,
+        widget.currentChapter,
+        widget.content,
       );
 
       // 构建全文重写的参数
-      final inputs = {
-        'user_input': userInput,
-        'cmd': '', // 空的cmd参数
-        'history_chapters_content': historyChaptersContent,
-        'current_chapter_content': widget.content,
-        'choice_content': '', // 空的choice_content参数
-        'ai_writer_setting': '',
-        'background_setting':
-            widget.novel.backgroundSetting ?? widget.novel.description ?? '',
-        'next_chapter_overview': '',
-        'characters_info': '',
-      };
+      final inputs = context.buildFullRewriteInputs(userInput);
 
       // 显示结果弹窗
       _showResultDialog();
