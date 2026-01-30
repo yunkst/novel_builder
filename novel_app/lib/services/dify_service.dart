@@ -2107,6 +2107,8 @@ class DifyService {
   /// 例如：
   ///   张三 → 师徒 → 李四
   ///   王五 → 恋人 → 赵六
+  ///
+  /// 注意：会过滤掉包含未在角色列表中的角色的关系
   String _formatRelationshipsForAI(
     List<CharacterRelationship> relationships,
     List<Character> characters,
@@ -2120,10 +2122,26 @@ class DifyService {
       for (var c in characters) if (c.id != null) c.id!: c.name,
     };
 
+    // 过滤掉包含未出现角色的关系
+    final validRelationships = relationships.where((r) {
+      return characterIdToName.containsKey(r.sourceCharacterId) &&
+          characterIdToName.containsKey(r.targetCharacterId);
+    });
+
+    // 如果有被过滤的关系，记录日志
+    if (validRelationships.length < relationships.length) {
+      final filteredCount = relationships.length - validRelationships.length;
+      LoggerService.instance.i(
+        '🔍 AI伴读：过滤了 $filteredCount 条包含未出现角色的关系',
+        category: LogCategory.ai,
+        tags: ['ai-companion', 'relationships', 'filtered'],
+      );
+    }
+
     // 格式化为 "角色A → 关系类型 → 角色B"
-    final relations = relationships.map((r) {
-      final sourceName = characterIdToName[r.sourceCharacterId] ?? '未知角色';
-      final targetName = characterIdToName[r.targetCharacterId] ?? '未知角色';
+    final relations = validRelationships.map((r) {
+      final sourceName = characterIdToName[r.sourceCharacterId]!;
+      final targetName = characterIdToName[r.targetCharacterId]!;
       return '$sourceName → ${r.relationshipType} → $targetName';
     }).join('\n');
 
