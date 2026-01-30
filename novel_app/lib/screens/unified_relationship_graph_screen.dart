@@ -6,38 +6,37 @@ import '../models/character_relationship.dart';
 import '../services/database_service.dart';
 import '../utils/toast_utils.dart';
 
-/// 角色关系图可视化页面 - 使用力导向布局
+/// 统一的角色关系图可视化页面
 ///
 /// 特性:
+/// - 支持单角色模式和全局模式
 /// - 力导向自动布局 - 避免节点重叠
 /// - 交互式拖拽 - 用户可以拖动节点调整位置
 /// - 缩放和平移 - 双指缩放,单指拖动画布
 /// - 动态节点大小 - 根据关系数量自动调整
-/// - 颜色编码 - 按性别区分角色
-/// - 高性能 - 支持大量节点渲染
-class CharacterRelationshipGraphScreen extends StatefulWidget {
-  final Character character;
+/// - 颜色编码连线 - 按关系类型区分
+/// - 头像预加载 - 优先显示真实头像
+class UnifiedRelationshipGraphScreen extends StatefulWidget {
+  final String novelUrl;
+  final Character? focusCharacter; // null = 全局模式
 
-  const CharacterRelationshipGraphScreen({
+  const UnifiedRelationshipGraphScreen({
     super.key,
-    required this.character,
+    required this.novelUrl,
+    this.focusCharacter,
   });
 
   @override
-  State<CharacterRelationshipGraphScreen> createState() =>
-      _CharacterRelationshipGraphScreenState();
+  State<UnifiedRelationshipGraphScreen> createState() =>
+      _UnifiedRelationshipGraphScreenState();
 }
 
-class _CharacterRelationshipGraphScreenState
-    extends State<CharacterRelationshipGraphScreen> {
+class _UnifiedRelationshipGraphScreenState
+    extends State<UnifiedRelationshipGraphScreen> {
   final DatabaseService _databaseService = DatabaseService();
 
   // 控制器
   late final ForceDirectedGraphController<int> _controller;
-
-  // 数据
-  List<Character> _allCharacters = [];
-  List<CharacterRelationship> _relationships = [];
 
   // 角色映射表: id -> Character
   final Map<int, Character> _characterMap = {};
@@ -48,15 +47,19 @@ class _CharacterRelationshipGraphScreenState
   // 头像缓存
   final Map<int, ImageProvider> _avatarProviders = {};
 
+  // 关系列表(用于计算节点度数)
+  List<CharacterRelationship> _relationships = [];
+
   bool _isLoading = true;
   double _currentScale = 1.0;
 
   @override
   void initState() {
     super.initState();
+    // 修复缩放问题: 设置初始缩放为0.6,允许用户缩小和放大
     _controller = ForceDirectedGraphController<int>(
-      minScale: 0.3,
-      maxScale: 3.0,
+      minScale: 0.1, // 允许缩小到10%
+      maxScale: 5.0, // 允许放大到5倍
     )..setOnScaleChange((scale) {
         if (mounted) {
           setState(() {
@@ -80,52 +83,21 @@ class _CharacterRelationshipGraphScreenState
     });
 
     try {
-      // 加载所有角色
-      final allCharacters =
-          await _databaseService.getCharacters(widget.character.novelUrl);
-
-      // 加载当前角色的所有关系
-      final relationships =
-          await _databaseService.getRelationships(widget.character.id!);
-
-      // 收集相关角色ID
-      final relatedCharacterIds = <int>{};
-      for (final rel in relationships) {
-        relatedCharacterIds.add(rel.sourceCharacterId);
-        relatedCharacterIds.add(rel.targetCharacterId);
+      if (widget.focusCharacter != null) {
+        // 单角色模式:只加载相关节点
+        await _loadSingleCharacterData();
+      } else {
+        // 全局模式:加载所有节点
+        await _loadGlobalData();
       }
-
-      // 过滤出相关角色
-      final relatedCharacters = allCharacters
-          .where((c) => c.id != null && relatedCharacterIds.contains(c.id))
-          .toList();
-
-      // 构建映射表
-      for (final character in relatedCharacters) {
-        if (character.id != null) {
-          _characterMap[character.id!] = character;
-        }
-      }
-
-      for (final rel in relationships) {
-        final key = '${rel.sourceCharacterId}-${rel.targetCharacterId}';
-        _relationshipMap[key] = rel;
-      }
-
-      // 预加载头像
-      await _preloadAvatars(relatedCharacters);
-
-      // 构建图数据
-      _buildGraph(relatedCharacters, relationships);
 
       setState(() {
-        _allCharacters = relatedCharacters;
-        _relationships = relationships;
         _isLoading = false;
       });
 
+      final mode = widget.focusCharacter != null ? '单角色' : '全局';
       debugPrint(
-          '✅ 关系图加载完成: ${_characterMap.length} 个节点, ${relationships.length} 条边');
+          '✅ 关系图加载完成($mode): ${_characterMap.length} 个节点, ${_relationships.length} 条边');
     } catch (e) {
       debugPrint('❌ 加载关系图数据失败: $e');
       setState(() {
@@ -136,6 +108,100 @@ class _CharacterRelationshipGraphScreenState
         ToastUtils.showError('加载数据失败: $e');
       }
     }
+  }
+
+  /// 加载单角色数据
+  Future<void> _loadSingleCharacterData() async {
+    final character = widget.focusCharacter!;
+    final allCharacters =
+        await _databaseService.getCharacters(character.novelUrl);
+
+    // 加载当前角色的所有关系
+    final relationships =
+        await _databaseService.getRelationships(character.id!);
+
+    // 收集相关角色ID
+    final relatedCharacterIds = <int>{};
+    for (final rel in relationships) {
+      relatedCharacterIds.add(rel.sourceCharacterId);
+      relatedCharacterIds.add(rel.targetCharacterId);
+    }
+
+    // 过滤出相关角色
+    final relatedCharacters = allCharacters
+        .where((c) => c.id != null && relatedCharacterIds.contains(c.id))
+        .toList();
+
+    // 构建映射表
+    for (final character in relatedCharacters) {
+      if (character.id != null) {
+        _characterMap[character.id!] = character;
+      }
+    }
+
+    for (final rel in relationships) {
+      final key = '${rel.sourceCharacterId}-${rel.targetCharacterId}';
+      _relationshipMap[key] = rel;
+    }
+
+    // 预加载头像
+    await _preloadAvatars(relatedCharacters);
+
+    // 构建图数据
+    _buildGraph(relatedCharacters, relationships);
+
+    _relationships = relationships;
+  }
+
+  /// 加载全局数据
+  Future<void> _loadGlobalData() async {
+    // 加载所有角色
+    final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
+
+    if (allCharacters.isEmpty) {
+      return;
+    }
+
+    // 加载所有角色的关系
+    final Set<CharacterRelationship> allRelationships = {};
+    for (final character in allCharacters) {
+      if (character.id != null) {
+        final rels = await _databaseService.getRelationships(character.id!);
+        allRelationships.addAll(rels);
+      }
+    }
+
+    // 构建映射表
+    for (final character in allCharacters) {
+      if (character.id != null) {
+        _characterMap[character.id!] = character;
+      }
+    }
+
+    // 去重关系(因为关系是双向的)
+    final uniqueRelationships = <CharacterRelationship>[];
+    final seenKeys = <String>{};
+
+    for (final rel in allRelationships) {
+      final key = '${rel.sourceCharacterId}-${rel.targetCharacterId}';
+      final reverseKey = '${rel.targetCharacterId}-${rel.sourceCharacterId}';
+
+      if (!seenKeys.contains(key) && !seenKeys.contains(reverseKey)) {
+        seenKeys.add(key);
+        uniqueRelationships.add(rel);
+      }
+
+      // 建立关系映射
+      _relationshipMap[key] = rel;
+    }
+
+    // 预加载头像
+    await _preloadAvatars(allCharacters);
+
+    // 构建图数据
+    _buildGraph(allCharacters, uniqueRelationships);
+
+    _relationships = uniqueRelationships;
   }
 
   /// 预加载头像
@@ -185,9 +251,12 @@ class _CharacterRelationshipGraphScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isSingleMode = widget.focusCharacter != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.character.name} - 关系图'),
+        title: Text(
+            isSingleMode ? '${widget.focusCharacter!.name} - 关系图' : '全人物关系图'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
@@ -202,6 +271,17 @@ class _CharacterRelationshipGraphScreenState
               ),
             ),
           ),
+          // 显示节点和边数量
+          if (!isSingleMode)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Text(
+                  '节点: ${_characterMap.length} | 边: ${_relationships.length}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
           // 重新居中
           IconButton(
             icon: const Icon(Icons.fit_screen),
@@ -211,17 +291,16 @@ class _CharacterRelationshipGraphScreenState
               ToastUtils.showSuccess('已重新居中');
             },
           ),
-          // 定位到中心角色
-          IconButton(
-            icon: const Icon(Icons.person_search),
-            tooltip: '定位到主角',
-            onPressed: widget.character.id != null
-                ? () {
-                    _controller.locateTo(widget.character.id!);
-                    ToastUtils.showSuccess('已定位到${widget.character.name}');
-                  }
-                : null,
-          ),
+          // 定位到中心角色(仅单角色模式)
+          if (isSingleMode && widget.focusCharacter!.id != null)
+            IconButton(
+              icon: const Icon(Icons.person_search),
+              tooltip: '定位到主角',
+              onPressed: () {
+                _controller.locateTo(widget.focusCharacter!.id!);
+                ToastUtils.showSuccess('已定位到${widget.focusCharacter!.name}');
+              },
+            ),
         ],
       ),
       body: _isLoading
@@ -238,15 +317,17 @@ class _CharacterRelationshipGraphScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.link_off,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4)),
+          Icon(
+            widget.focusCharacter != null
+                ? Icons.link_off
+                : Icons.people_outline,
+            size: 64,
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
           Text(
-            '还没有任何关系',
+            widget.focusCharacter != null ? '还没有任何关系' : '暂无角色数据',
             style: TextStyle(
                 fontSize: 18,
                 color: Theme.of(context)
@@ -298,8 +379,9 @@ class _CharacterRelationshipGraphScreenState
             r.targetCharacterId == characterId)
         .length;
 
-    // 是否是中心节点
-    final isCenter = character.id == widget.character.id;
+    // 是否是中心节点(仅单角色模式)
+    final isCenter = widget.focusCharacter != null &&
+        character.id == widget.focusCharacter!.id;
 
     // 根据度数和是否是中心节点计算大小
     final baseSize = isCenter ? 70.0 : 50.0;

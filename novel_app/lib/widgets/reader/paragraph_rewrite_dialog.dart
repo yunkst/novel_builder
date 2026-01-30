@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/chapter_history_service.dart';
+import '../../services/novel_context_service.dart';
 import '../../services/rewrite_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
@@ -42,7 +42,7 @@ class ParagraphRewriteDialog extends StatefulWidget {
 
 class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     with TickerProviderStateMixin, DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService.create();
+  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
   final RewriteService _rewriteService = RewriteService();
 
   // 光标动画控制器
@@ -131,7 +131,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-        builder: (context) => AlertDialog(
+      builder: (context) => AlertDialog(
         title: const Text('输入改写要求'),
         content: SingleChildScrollView(
           child: Column(
@@ -142,7 +142,10 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
                 '已选择 ${widget.selectedParagraphIndices.length} 个段落',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 12),
@@ -186,12 +189,12 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
   // 生成改写内容（流式）
   Future<void> _generateRewrite(String selectedText, String userInput) async {
     try {
-      // 使用 ChapterHistoryService 获取历史章节内容
-      final historyChaptersContent =
-          await _historyService.fetchHistoryChaptersContent(
-        chapters: widget.chapters,
-        currentChapter: widget.currentChapter,
-        maxHistoryCount: 2,
+      // 使用 NovelContextBuilder 统一获取上下文数据
+      final novelContext = await _contextBuilder.buildContext(
+        widget.novel,
+        widget.chapters,
+        widget.currentChapter,
+        widget.content,
       );
 
       // 特写功能不使用角色选择
@@ -205,9 +208,9 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
       final inputs = _rewriteService.buildRewriteInputsWithHistory(
         selectedText: selectedText,
         userInput: userInput,
-        currentChapterContent: widget.content,
-        historyChaptersContent: historyChaptersContent,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        currentChapterContent: novelContext.currentChapterContent,
+        historyChaptersContent: novelContext.historyChaptersContent,
+        backgroundSetting: novelContext.backgroundSetting,
         aiWriterSetting: aiWriterSetting,
         rolesInfo: rolesInfo,
       );
@@ -373,8 +376,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.3),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(
@@ -397,8 +407,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-                border: Border.all(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)),
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer
+                    .withValues(alpha: 0.3),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .secondary
+                        .withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -468,7 +485,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+          Icon(Icons.auto_awesome,
+              color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           const Text('改写结果'),
         ],
@@ -482,8 +500,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.08),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.all(12),
@@ -516,12 +541,22 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                Icon(Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '你可以选择替换原文、重新改写或关闭',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)),
                   ),
                 ),
               ],

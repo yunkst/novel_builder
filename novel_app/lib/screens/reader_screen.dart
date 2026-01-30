@@ -12,6 +12,7 @@ import '../services/database_service.dart';
 import '../services/preload_service.dart';
 import '../services/character_card_service.dart';
 import '../services/dify_service.dart';
+import '../services/novel_context_service.dart';
 import '../core/di/api_service_provider.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
@@ -70,6 +71,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   final ScrollController _scrollController = ScrollController();
   final ReaderSettingsService _settingsService = ReaderSettingsService.instance;
   final DifyService _difyService = DifyService();
+  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -206,7 +208,9 @@ class _ReaderScreenState extends State<ReaderScreen>
           orElse: () => t2iModels.first,
         );
 
-        if (defaultModel.width != null && defaultModel.height != null && mounted) {
+        if (defaultModel.width != null &&
+            defaultModel.height != null &&
+            mounted) {
           setState(() {
             _defaultModelWidth = defaultModel.width;
             _defaultModelHeight = defaultModel.height;
@@ -341,7 +345,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Theme.of(context).dividerColor),
                   ),
@@ -351,7 +358,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                         : paragraph,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -617,7 +627,12 @@ class _ReaderScreenState extends State<ReaderScreen>
             const Text('将从服务器重新获取最新内容并覆盖本地缓存。'),
             const SizedBox(height: 8),
             Text('这可能会花费一些时间，请确认是否继续？',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6))),
           ],
         ),
         actions: [
@@ -688,10 +703,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                 await service.saveCharacters(selectedCharacters);
 
             if (mounted) {
-              ToastUtils.showSuccess(
-                  '成功更新 ${savedCharacters.length} 个角色卡',
-                  context: context,
-                  duration: const Duration(seconds: 3));
+              ToastUtils.showSuccess('成功更新 ${savedCharacters.length} 个角色卡',
+                  context: context, duration: const Duration(seconds: 3));
             }
           },
         );
@@ -778,11 +791,13 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
 
     // 显示loading提示
-    ToastUtils.showInfo('AI正在分析章节...', context: context, duration: const Duration(minutes: 5));
+    ToastUtils.showInfo('AI正在分析章节...',
+        context: context, duration: const Duration(minutes: 5));
 
     try {
       // 获取本书的所有角色
-      final allCharacters = await _databaseService.getCharacters(widget.novel.url);
+      final allCharacters =
+          await _databaseService.getCharacters(widget.novel.url);
 
       // 筛选当前章节出现的角色
       final chapterCharacters = await _filterCharactersInChapter(
@@ -801,10 +816,15 @@ class _ReaderScreenState extends State<ReaderScreen>
       debugPrint('本章出现角色数: ${chapterCharacters.length}');
       debugPrint('相关关系数: ${chapterRelationships.length}');
 
+      // 使用 NovelContextBuilder 获取背景设定
+      final backgroundSetting = await _contextBuilder.getBackgroundSetting(
+        widget.novel.url,
+      );
+
       // 调用DifyService
       final response = await _difyService.generateAICompanion(
         chaptersContent: _content,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        backgroundSetting: backgroundSetting,
         characters: chapterCharacters,
         relationships: chapterRelationships,
       );
@@ -858,7 +878,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   /// 静默模式AI伴读（不显示确认对话框）
-  Future<void> _handleAICompanionSilent(AiAccompanimentSettings settings) async {
+  Future<void> _handleAICompanionSilent(
+      AiAccompanimentSettings settings) async {
     try {
       // 获取本书的所有角色
       final allCharacters = await _databaseService.getCharacters(
@@ -882,10 +903,15 @@ class _ReaderScreenState extends State<ReaderScreen>
       debugPrint('本章出现角色数: ${chapterCharacters.length}');
       debugPrint('相关关系数: ${chapterRelationships.length}');
 
+      // 使用 NovelContextBuilder 获取背景设定
+      final backgroundSetting = await _contextBuilder.getBackgroundSetting(
+        widget.novel.url,
+      );
+
       // 调用DifyService
       final response = await _difyService.generateAICompanion(
         chaptersContent: _content,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        backgroundSetting: backgroundSetting,
         characters: chapterCharacters,
         relationships: chapterRelationships,
       );
@@ -916,9 +942,8 @@ class _ReaderScreenState extends State<ReaderScreen>
         if (response.relations.isNotEmpty) messages.add('关系');
         if (response.background.isNotEmpty) messages.add('背景');
 
-        final message = messages.isEmpty
-            ? 'AI伴读内容已更新'
-            : 'AI伴读已完成: 更新${messages.join('、')}';
+        final message =
+            messages.isEmpty ? 'AI伴读内容已更新' : 'AI伴读已完成: 更新${messages.join('、')}';
 
         ToastUtils.showSuccess(message, context: context);
       }
@@ -943,7 +968,8 @@ class _ReaderScreenState extends State<ReaderScreen>
     try {
       // 仅在非静默模式下显示更新进度
       if (!isSilent) {
-        ToastUtils.showInfo('正在更新数据...', context: context, duration: const Duration(minutes: 5));
+        ToastUtils.showInfo('正在更新数据...',
+            context: context, duration: const Duration(minutes: 5));
       }
 
       // 1. 追加背景设定
@@ -968,7 +994,8 @@ class _ReaderScreenState extends State<ReaderScreen>
       // 3. 批量更新或插入关系
       int updatedRelations = 0;
       if (response.relations.isNotEmpty) {
-        updatedRelations = await _databaseService.batchUpdateOrInsertRelationships(
+        updatedRelations =
+            await _databaseService.batchUpdateOrInsertRelationships(
           widget.novel.url,
           response.relations,
         );
@@ -996,7 +1023,8 @@ class _ReaderScreenState extends State<ReaderScreen>
             successMessage += ' (${updates.join('、')})';
           }
 
-          ToastUtils.showSuccess(successMessage, context: context, duration: const Duration(seconds: 3));
+          ToastUtils.showSuccess(successMessage,
+              context: context, duration: const Duration(seconds: 3));
         }
       }
     } catch (e, stackTrace) {
@@ -1009,7 +1037,8 @@ class _ReaderScreenState extends State<ReaderScreen>
       debugPrint('❌ AI伴读数据更新失败: $e');
       if (mounted && !isSilent) {
         ToastUtils.dismiss();
-        ToastUtils.showError('数据更新失败: $e', duration: const Duration(seconds: 4), context: context);
+        ToastUtils.showError('数据更新失败: $e',
+            duration: const Duration(seconds: 4), context: context);
       }
     }
   }
@@ -1024,8 +1053,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     String chapterContent,
   ) async {
     // 使用工具类进行角色筛选
-    final foundCharacters =
-        CharacterMatcher.extractCharactersFromChapter(
+    final foundCharacters = CharacterMatcher.extractCharactersFromChapter(
       chapterContent,
       allCharacters,
     );
@@ -1048,12 +1076,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
 
     // 获取角色ID集合
-    final characterIds = characters
-        .map((c) => c.id)
-        .whereType<int>()
-        .toSet();
+    final characterIds = characters.map((c) => c.id).whereType<int>().toSet();
 
-    final allRelationships = await _databaseService.getAllRelationships(novelUrl);
+    final allRelationships =
+        await _databaseService.getAllRelationships(novelUrl);
 
     // 筛选出涉及这些角色的关系
     final filteredRelationships = allRelationships.where((rel) {
@@ -1061,7 +1087,8 @@ class _ReaderScreenState extends State<ReaderScreen>
           characterIds.contains(rel.targetCharacterId);
     }).toList();
 
-    debugPrint('✅ 关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}');
+    debugPrint(
+        '✅ 关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}');
     return filteredRelationships;
   }
 
@@ -1283,9 +1310,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                         children: [
                           Icon(Icons.edit, size: 14),
                           SizedBox(width: 4),
-                          Text('编辑模式',
-                              style:
-                                  TextStyle(fontSize: 12)),
+                          Text('编辑模式', style: TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
@@ -1377,8 +1402,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       value: 'full_rewrite',
                       child: Row(
                         children: [
-                          Icon(Icons.auto_stories,
-                              size: 18),
+                          Icon(Icons.auto_stories, size: 18),
                           SizedBox(width: 12),
                           Text('全文重写'),
                         ],
@@ -1395,13 +1419,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                                   height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(
-                                            Theme.of(context).colorScheme.tertiary),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Theme.of(context).colorScheme.tertiary),
                                   ),
                                 )
-                              : const Icon(Icons.person_search,
-                                  size: 18),
+                              : const Icon(Icons.person_search, size: 18),
                           const SizedBox(width: 12),
                           Text(_isUpdatingRoleCards ? '更新中...' : '更新角色卡'),
                         ],
@@ -1430,7 +1452,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                           children: [
                             Text(
                               _errorMessage,
-                              style: TextStyle(color: Theme.of(context).colorScheme.error),
+                              style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error),
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton(
@@ -1465,57 +1488,61 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 padding: const EdgeInsets.all(16.0),
                                 itemCount: paragraphs.length + 1, // +1 为了添加底部空白
                                 itemBuilder: (context, index) {
-                                // 最后一个位置添加空白
-                                if (index == paragraphs.length) {
-                                  return SizedBox(
-                                    height: 160, // 底部留白高度，避免被按钮遮挡
-                                    child: Container(), // 空容器只占位
+                                  // 最后一个位置添加空白
+                                  if (index == paragraphs.length) {
+                                    return SizedBox(
+                                      height: 160, // 底部留白高度，避免被按钮遮挡
+                                      child: Container(), // 空容器只占位
+                                    );
+                                  }
+
+                                  final paragraph = paragraphs[index];
+                                  final isSelected =
+                                      _selectedParagraphIndices.contains(index);
+
+                                  return ParagraphWidget(
+                                    paragraph: paragraph,
+                                    index: index,
+                                    fontSize: _fontSize ?? 18.0,
+                                    isCloseupMode: _isCloseupMode,
+                                    isEditMode: editModeProvider
+                                        .isEditMode, // From Consumer
+                                    isSelected: isSelected,
+                                    onTap: _handleParagraphTap,
+                                    onLongPress: (idx) => _handleLongPress(
+                                        idx), // _handleLongPress now accepts index
+                                    onContentChanged: (newContent) {
+                                      final updatedParagraphs =
+                                          List<String>.from(paragraphs);
+                                      updatedParagraphs[index] = newContent;
+                                      // 使用 addPostFrameCallback 避免在构建阶段调用 setState
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        if (mounted) {
+                                          setState(() {
+                                            _content =
+                                                updatedParagraphs.join('\n');
+                                          });
+                                        }
+                                      });
+                                    },
+                                    onImageTap:
+                                        (taskId, imageUrl, imageIndex) =>
+                                            handleImageTap(taskId, imageUrl,
+                                                imageIndex), // Mixin方法
+                                    onImageDelete: (taskId) =>
+                                        deleteIllustrationByTaskId(
+                                            taskId), // Mixin方法
+                                    generateVideoFromIllustration:
+                                        generateVideoFromIllustration, // Mixin方法
+                                    modelWidth: _defaultModelWidth, // 传递模型宽度
+                                    modelHeight: _defaultModelHeight, // 传递模型高度
                                   );
-                                }
-
-                                final paragraph = paragraphs[index];
-                                final isSelected =
-                                    _selectedParagraphIndices.contains(index);
-
-                                return ParagraphWidget(
-                                  paragraph: paragraph,
-                                  index: index,
-                                  fontSize: _fontSize ?? 18.0,
-                                  isCloseupMode: _isCloseupMode,
-                                  isEditMode: editModeProvider
-                                      .isEditMode, // From Consumer
-                                  isSelected: isSelected,
-                                  onTap: _handleParagraphTap,
-                                  onLongPress: (idx) => _handleLongPress(
-                                      idx), // _handleLongPress now accepts index
-                                  onContentChanged: (newContent) {
-                                    final updatedParagraphs =
-                                        List<String>.from(paragraphs);
-                                    updatedParagraphs[index] = newContent;
-                                    // 使用 addPostFrameCallback 避免在构建阶段调用 setState
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      if (mounted) {
-                                        setState(() {
-                                          _content = updatedParagraphs.join('\n');
-                                        });
-                                      }
-                                    });
-                                  },
-                                  onImageTap: (taskId, imageUrl, imageIndex) =>
-                                      handleImageTap(taskId, imageUrl,
-                                          imageIndex), // Mixin方法
-                                  onImageDelete: (taskId) =>
-                                      deleteIllustrationByTaskId(taskId), // Mixin方法
-                                  generateVideoFromIllustration:
-                                      generateVideoFromIllustration, // Mixin方法
-                                  modelWidth: _defaultModelWidth, // 传递模型宽度
-                                  modelHeight: _defaultModelHeight, // 传递模型高度
-                                );
-                              },
+                                },
+                              ),
                             ),
-                          ),
-                        ), // GestureDetector 和 NotificationListener 闭合
-                        // 固定在底部的章节切换按钮
+                          ), // GestureDetector 和 NotificationListener 闭合
+                          // 固定在底部的章节切换按钮
                           Positioned(
                             left: 0,
                             right: 0,
@@ -1525,7 +1552,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 color: Theme.of(context).colorScheme.surface,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+                                    color: Theme.of(context)
+                                        .shadowColor
+                                        .withValues(alpha: 0.1),
                                     blurRadius: 4,
                                     offset: const Offset(0, -2),
                                   ),

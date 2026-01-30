@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/chapter_history_service.dart';
+import '../../services/novel_context_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
@@ -34,7 +34,7 @@ class ChapterSummaryDialog extends StatefulWidget {
 
 class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
     with DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService.create();
+  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
 
   String _summaryResult = '';
   bool _showConfirmDialog = true;
@@ -75,7 +75,10 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
               '将对当前章节内容进行总结',
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -83,7 +86,10 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
               '提示：AI将提取章节的核心内容和关键情节',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -120,27 +126,16 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
   // 生成章节总结（流式）
   Future<void> _generateSummarize() async {
     try {
-      // 使用 ChapterHistoryService 获取历史章节内容
-      final historyChaptersContent =
-          await _historyService.fetchHistoryChaptersContent(
-        chapters: widget.chapters,
-        currentChapter: widget.currentChapter,
-        maxHistoryCount: 2,
+      // 使用 NovelContextBuilder 统一获取上下文数据
+      final context = await _contextBuilder.buildContext(
+        widget.novel,
+        widget.chapters,
+        widget.currentChapter,
+        widget.content,
       );
 
       // 构建总结的参数
-      final inputs = {
-        'user_input': '总结',
-        'cmd': '总结',
-        'history_chapters_content': historyChaptersContent,
-        'current_chapter_content': widget.content,
-        'choice_content': '',
-        'ai_writer_setting': '',
-        'background_setting':
-            widget.novel.backgroundSetting ?? widget.novel.description ?? '',
-        'next_chapter_overview': '',
-        'characters_info': '',
-      };
+      final inputs = context.buildSummaryInputs();
 
       // 调用 DifyStreamingMixin 的流式方法
       await callDifyStreaming(
@@ -200,8 +195,15 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
             Container(
               constraints: const BoxConstraints(maxHeight: 400),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.08),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.all(12),
@@ -233,12 +235,22 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                Icon(Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '您可以查看总结内容或关闭',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)),
                   ),
                 ),
               ],

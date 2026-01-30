@@ -15,7 +15,7 @@ import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import 'character_edit_screen.dart';
-import 'enhanced_relationship_graph_screen.dart';
+import 'unified_relationship_graph_screen.dart';
 
 class CharacterManagementScreen extends StatefulWidget {
   final Novel novel;
@@ -57,12 +57,12 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
   // 缓存阴影样式（延迟初始化）
   List<BoxShadow> get _avatarShadow => [
-    BoxShadow(
-      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-      blurRadius: 8,
-      offset: Offset(0, 4),
-    ),
-  ];
+        BoxShadow(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          blurRadius: 8,
+          offset: Offset(0, 4),
+        ),
+      ];
 
   @override
   void initState() {
@@ -134,7 +134,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       if (character.id == null) continue;
 
       try {
-        final count = await _databaseService.getRelationshipCount(character.id!);
+        final count =
+            await _databaseService.getRelationshipCount(character.id!);
         _relationshipCountCache[character.id!] = count;
       } catch (e) {
         debugPrint('❌ 加载关系数量失败 - ${character.name}: $e');
@@ -312,7 +313,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       // 合并去重
-      final mergedContent = extractionService.mergeAndDeduplicateContexts(allContexts);
+      final mergedContent =
+          extractionService.mergeAndDeduplicateContexts(allContexts);
 
       // 调用 Dify 提取角色
       final extractedCharacters = await _difyService.extractCharacter(
@@ -384,7 +386,10 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
         } else if (successCount == 0) {
           ToastUtils.showError('保存失败，请检查配置或重试');
         } else {
-          ToastUtils.showWarningWithAction('成功保存 $successCount 个角色，$failCount 个失败', '查看详情', () => _showFailDetails(failedCharacters));
+          ToastUtils.showWarningWithAction(
+              '成功保存 $successCount 个角色，$failCount 个失败',
+              '查看详情',
+              () => _showFailDetails(failedCharacters));
         }
       }
     } catch (e) {
@@ -551,8 +556,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EnhancedRelationshipGraphScreen(
+                        builder: (context) => UnifiedRelationshipGraphScreen(
                           novelUrl: widget.novel.url,
+                          // focusCharacter 为 null,进入全局模式
                         ),
                       ),
                     );
@@ -560,7 +566,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                 ),
                 IconButton(
                   onPressed: _aiCreateCharacter,
-                  icon: Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
+                  icon:
+                      Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
                   tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
                 ),
               ],
@@ -572,22 +579,22 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           : _characters.isEmpty
               ? _buildEmptyState()
               : _buildCharacterList(),
-      floatingActionButton: _isMultiSelectMode &&
-              _selectedCharacterIds.isNotEmpty
-          ? FloatingActionButton.extended(
-              heroTag: 'batch_delete_fab',
-              onPressed: _deleteSelectedCharacters,
-              icon: const Icon(Icons.delete),
-              label: Text('删除 (${_selectedCharacterIds.length})'),
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            )
-          : FloatingActionButton(
-              heroTag: 'character_management_fab',
-              onPressed: () => _navigateToEdit(),
-              tooltip: '添加人物',
-              child: const Icon(Icons.add),
-            ),
+      floatingActionButton:
+          _isMultiSelectMode && _selectedCharacterIds.isNotEmpty
+              ? FloatingActionButton.extended(
+                  heroTag: 'batch_delete_fab',
+                  onPressed: _deleteSelectedCharacters,
+                  icon: const Icon(Icons.delete),
+                  label: Text('删除 (${_selectedCharacterIds.length})'),
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                )
+              : FloatingActionButton(
+                  heroTag: 'character_management_fab',
+                  onPressed: () => _navigateToEdit(),
+                  tooltip: '添加人物',
+                  child: const Icon(Icons.add),
+                ),
     );
   }
 
@@ -599,7 +606,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           Icon(
             Icons.people_outline,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           SizedBox(height: 16),
           Text(
@@ -607,14 +615,20 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           SizedBox(height: 8),
           Text(
             '点击右下角的 + 按钮创建第一个人物',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -686,7 +700,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       onTap: () => _handleCardTap(character),
       child: Card(
         elevation: isSelected ? 12 : 6,
-        shadowColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+        shadowColor:
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: isSelected
@@ -706,137 +721,145 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
               height: cardHeight,
               child: Column(
                 children: [
-                // 头像区域
-                Expanded(
-                  flex: 3,
-                  child: Stack(
-                    children: [
-                      // 方形头像背景
-                      _buildSquareAvatarBackground(character),
-
-                      // 头像图片
-                      Positioned.fill(
-                        child: Hero(
-                          tag: 'character_${character.id ?? character.name}',
-                          child: _buildCharacterAvatar(character),
-                        ),
-                      ),
-
-                      // 底部浮动名字
-                      Positioned(
-                        bottom: _nameBottomPadding,
-                        left: _nameHorizontalPadding * 2,
-                        right: _nameHorizontalPadding * 2,
-                        child: Text(
-                          character.name,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.surface,
-                            shadows: [
-                              Shadow(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
-                                blurRadius: 3,
-                                offset: Offset(1, 1),
-                              ),
-                              Shadow(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-
-                      // 关系数量徽章
-                      if (character.id != null &&
-                          _relationshipCountCache[character.id] != null &&
-                          _relationshipCountCache[character.id]! > 0)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Material(
-                            elevation: 4,
-                            shape: const CircleBorder(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${_relationshipCountCache[character.id]}',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // 信息区域
-                Expanded(
-                  flex: 2, // 减少flex比例，让下半部分更紧凑
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8), // 减少padding
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // 头像区域
+                  Expanded(
+                    flex: 3,
+                    child: Stack(
                       children: [
-                        // 职业标签
-                        Expanded(
-                          flex: 3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4), // 减少padding
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .primaryColor
-                                  .withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(12), // 稍微减小圆角
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .primaryColor
-                                    .withValues(alpha: 0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              character.occupation ?? '未知职业',
-                              style: TextStyle(
-                                fontSize: 10, // 缩小职业字号
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context).colorScheme.surface,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2, // 支持换行
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                        // 方形头像背景
+                        _buildSquareAvatarBackground(character),
+
+                        // 头像图片
+                        Positioned.fill(
+                          child: Hero(
+                            tag: 'character_${character.id ?? character.name}',
+                            child: _buildCharacterAvatar(character),
                           ),
                         ),
+
+                        // 底部浮动名字
+                        Positioned(
+                          bottom: _nameBottomPadding,
+                          left: _nameHorizontalPadding * 2,
+                          right: _nameHorizontalPadding * 2,
+                          child: Text(
+                            character.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.surface,
+                              shadows: [
+                                Shadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.87),
+                                  blurRadius: 3,
+                                  offset: Offset(1, 1),
+                                ),
+                                Shadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.54),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+
+                        // 关系数量徽章
+                        if (character.id != null &&
+                            _relationshipCountCache[character.id] != null &&
+                            _relationshipCountCache[character.id]! > 0)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Material(
+                              elevation: 4,
+                              shape: const CircleBorder(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${_relationshipCountCache[character.id]}',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.surface,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+
+                  // 信息区域
+                  Expanded(
+                    flex: 2, // 减少flex比例，让下半部分更紧凑
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8), // 减少padding
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // 职业标签
+                          Expanded(
+                            flex: 3,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4), // 减少padding
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .primaryColor
+                                    .withValues(alpha: 0.8),
+                                borderRadius:
+                                    BorderRadius.circular(12), // 稍微减小圆角
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .primaryColor
+                                      .withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                character.occupation ?? '未知职业',
+                                style: TextStyle(
+                                  fontSize: 10, // 缩小职业字号
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.surface,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2, // 支持换行
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
