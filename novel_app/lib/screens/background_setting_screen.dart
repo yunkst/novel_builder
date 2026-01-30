@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/novel.dart';
 import '../services/database_service.dart';
 import '../services/logger_service.dart';
@@ -10,7 +11,7 @@ import '../utils/toast_utils.dart';
 
 /// 背景设定独立页面
 ///
-/// 用于查看和编辑小说的背景设定内容
+/// 用于查看和编辑小说的背景设定内容，支持Markdown预览
 class BackgroundSettingScreen extends StatefulWidget {
   final Novel novel;
 
@@ -20,13 +21,15 @@ class BackgroundSettingScreen extends StatefulWidget {
   State<BackgroundSettingScreen> createState() => _BackgroundSettingScreenState();
 }
 
-class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
+class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _controller = TextEditingController();
 
   bool _isSaving = false;
-  bool _isModified = false;  // 跟踪内容是否被修改
-  Timer? _autoSaveTimer;  // 自动保存定时器
+  bool _isModified = false; // 跟踪内容是否被修改
+  Timer? _autoSaveTimer; // 自动保存定时器
+  int _currentTabIndex = 0; // 0=编辑, 1=预览
 
   @override
   void initState() {
@@ -122,7 +125,7 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
 
       if (mounted) {
         setState(() {
-          _isModified = false;  // 重置修改状态
+          _isModified = false; // 重置修改状态
         });
 
         // 显示保存成功提示
@@ -131,13 +134,15 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
         Navigator.pop(context);
       }
     } catch (e, stackTrace) {
-      ErrorHelper.showErrorWithLog(
-        context,
-        '保存失败',
-        stackTrace: stackTrace,
-        category: LogCategory.database,
-        tags: ['background-setting', 'save', 'failed'],
-      );
+      if (mounted) {
+        ErrorHelper.showErrorWithLog(
+          context,
+          '保存失败',
+          stackTrace: stackTrace,
+          category: LogCategory.database,
+          tags: ['background-setting', 'save', 'failed'],
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -182,7 +187,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
   /// 从数据库加载背景设定
   Future<void> _loadBackgroundSetting() async {
     try {
-      final backgroundSetting = await _databaseService.getBackgroundSetting(widget.novel.url);
+      final backgroundSetting =
+          await _databaseService.getBackgroundSetting(widget.novel.url);
       if (mounted) {
         setState(() {
           _controller.text = backgroundSetting ?? '';
@@ -206,112 +212,249 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen> {
     await _loadBackgroundSetting();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_isModified,
-      onPopInvokedWithResult: (bool didPop, dynamic result) async {
-        if (didPop) return;
+  /// Tab切换时的处理
+  Future<void> _onTabChanged(int index) async {
+    // 从编辑切换到预览时，触发自动保存
+    if (_currentTabIndex == 0 && index == 1 && _isModified) {
+      await _autoSave();
+    }
 
-        final shouldPop = await _confirmDiscardChanges();
-        if (shouldPop && context.mounted) {
-          Navigator.pop(context);
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('背景设定'),
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          actions: [
-            // 总结按钮
-            IconButton(
-              icon: const Icon(Icons.summarize),
-              tooltip: 'AI总结',
-              onPressed: _showSummaryDialog,
+    setState(() {
+      _currentTabIndex = index;
+    });
+  }
+
+  /// 构建编辑模式
+  Widget _buildEditMode() {
+    return Column(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: '在此输入背景设定（支持Markdown格式）...',
+              contentPadding: const EdgeInsets.all(16),
+              counterText: '${_controller.text.length} 字符',
             ),
-            // 保存按钮
-            IconButton(
-              icon: _isSaving
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    )
-                  : const Icon(Icons.save),
-              onPressed: (_isSaving || !_isModified) ? null : _saveBackgroundSetting,
-              tooltip: '保存',
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
+            ),
+          ),
+        ),
+        // 底部提示
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 14,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                _isModified
+                    ? '内容已修改，2秒后自动保存或点击右上角保存'
+                    : '点击右上角保存按钮保存修改',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _isModified
+                          ? Colors.orange
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6),
+                    ),
+              ),
             ),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 小说标题
-              Text(
-                widget.novel.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+      ],
+    );
+  }
+
+  /// 构建预览模式
+  Widget _buildPreviewMode() {
+    final content = _controller.text.trim();
+
+    if (content.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无内容',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5),
               ),
-              const SizedBox(height: 8),
-              // 提示文本
-              Text(
-                '请输入小说的背景设定，包括世界观、时代背景、地理环境等信息',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+        ),
+      );
+    }
+
+    return Markdown(
+      data: content,
+      selectable: true,
+      padding: const EdgeInsets.all(16),
+      styleSheet: MarkdownStyleSheet(
+        // 使用主题颜色，自动适配暗色模式
+        p: Theme.of(context).textTheme.bodyMedium,
+        h1: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+        h2: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+        h3: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+        h4: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+        strong: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+        em: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+        listBullet: Theme.of(context).textTheme.bodyMedium,
+        code: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest,
+            ),
+        codeblockDecoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        blockquote: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
+            ),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 4,
+            ),
+          ),
+        ),
+        horizontalRuleDecoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      initialIndex: _currentTabIndex,
+      child: PopScope(
+        canPop: !_isModified,
+        onPopInvokedWithResult: (bool didPop, dynamic result) async {
+          if (didPop) return;
+
+          final shouldPop = await _confirmDiscardChanges();
+          if (shouldPop && context.mounted) {
+            Navigator.pop(context);
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('背景设定'),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+            actions: [
+              // 总结按钮
+              IconButton(
+                icon: const Icon(Icons.summarize),
+                tooltip: 'AI总结',
+                onPressed: _showSummaryDialog,
               ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 16),
-              // 编辑区域
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    hintText: '在此输入背景设定...',
-                    contentPadding: const EdgeInsets.all(16),
-                    // 字符计数器
-                    counterText: '${_controller.text.length} 字符',
-                  ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-              // 底部提示
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      _isModified
-                          ? '内容已修改，2秒后自动保存或点击右上角保存'
-                          : '点击右上角保存按钮保存修改',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _isModified ? Colors.orange : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                    ),
-                  ),
-                ],
+              // 保存按钮
+              IconButton(
+                icon: _isSaving
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      )
+                    : const Icon(Icons.save),
+                onPressed: (_isSaving || !_isModified)
+                    ? null
+                    : _saveBackgroundSetting,
+                tooltip: '保存',
               ),
             ],
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 小说标题
+                Text(
+                  widget.novel.title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                // 提示文本
+                Text(
+                  '请输入小说的背景设定，包括世界观、时代背景、地理环境等信息（支持Markdown格式）',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                // TabBar
+                TabBar(
+                  tabs: const [
+                    Tab(text: '编辑', icon: Icon(Icons.edit)),
+                    Tab(text: '预览', icon: Icon(Icons.preview)),
+                  ],
+                  labelColor: Theme.of(context).colorScheme.primary,
+                  onTap: _onTabChanged,
+                ),
+                const SizedBox(height: 8),
+                // TabBarView
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildEditMode(),
+                      _buildPreviewMode(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
