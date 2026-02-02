@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/character.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/model_selector.dart';
-import '../services/database_service.dart';
 import '../services/scene_illustration_service.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/character_matcher.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
+import '../core/providers/database_providers.dart';
 
-class SceneIllustrationDialog extends StatefulWidget {
+class SceneIllustrationDialog extends ConsumerStatefulWidget {
   final String paragraphText;
   final String novelUrl;
   final String chapterId;
@@ -28,17 +29,16 @@ class SceneIllustrationDialog extends StatefulWidget {
   });
 
   @override
-  State<SceneIllustrationDialog> createState() =>
+  ConsumerState<SceneIllustrationDialog> createState() =>
       _SceneIllustrationDialogState();
 }
 
-class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
+class _SceneIllustrationDialogState extends ConsumerState<SceneIllustrationDialog>
     with DifyStreamingMixin {
   final _contentController = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
 
-  final DatabaseService _databaseService = DatabaseService();
   final SceneIllustrationService _sceneIllustrationService =
       SceneIllustrationService();
   List<int> _selectedCharacterIds = [];
@@ -77,8 +77,9 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
   }
 
   Future<void> _loadCharacters() async {
+    final databaseService = ref.read(databaseServiceProvider);
     try {
-      final characters = await _databaseService.getCharacters(widget.novelUrl);
+      final characters = await databaseService.getCharacters(widget.novelUrl);
       if (mounted) {
         setState(() {
           _characters = characters;
@@ -116,10 +117,11 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
 
   /// 预选章节中出现的角色
   Future<void> _preselectAppearingCharacters() async {
+    final databaseService = ref.read(databaseServiceProvider);
     try {
       // 获取当前章节内容
       final chapterContent =
-          await _databaseService.getCachedChapter(widget.chapterId);
+          await databaseService.getCachedChapter(widget.chapterId);
       if (chapterContent == null || chapterContent.isEmpty) {
         debugPrint('章节内容为空，跳过角色预选');
         return;
@@ -181,8 +183,9 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
     }
 
     // 获取章节内容
+    final databaseService = ref.read(databaseServiceProvider);
     final chapterContent =
-        await _databaseService.getCachedChapter(widget.chapterId);
+        await databaseService.getCachedChapter(widget.chapterId);
     if (chapterContent == null || chapterContent.isEmpty) {
       debugPrint('章节内容为空，跳过场景描写生成');
       setState(() {
@@ -196,7 +199,7 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
         _getMatchableContent(chapterContent, widget.paragraphIndex);
 
     // 重新筛选在fullContext中出现的角色（使用工具类）
-    final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
+    final allCharacters = await databaseService.getCharacters(widget.novelUrl);
     final appearingIds =
         CharacterMatcher.findAppearingCharacterIds(fullContext, allCharacters);
     final selectedCharacters =
@@ -363,9 +366,13 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _imageCount == count
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
-                        foregroundColor:
-                            _imageCount == count ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.12),
+                        foregroundColor: _imageCount == count
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
                       child: Text('$count'),
                     ),
@@ -400,7 +407,11 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextField(
@@ -409,14 +420,19 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                 scrollController: _scrollController,
                 maxLines: 4,
                 enabled: !isStreaming, // 生成时禁用编辑（使用 mixin 状态）
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface), // 始终白色文字
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface), // 始终白色文字
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(12),
                   filled: true,
                   fillColor: Theme.of(context).colorScheme.surface, // 始终黑色背景
                   hintText: '请输入场景描述，或点击下方"AI生成画面"按钮自动生成',
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.40)),
+                  hintStyle: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.40)),
                 ),
               ),
             ),
@@ -430,7 +446,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.onPrimary),
                     )
                   : const Icon(Icons.auto_awesome),
               label: Text(isStreaming ? 'AI生成中...' : 'AI生成画面'),
@@ -447,20 +464,35 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .error
+                      .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .error
+                          .withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.error_outline,
-                        size: 16, color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8)),
+                        size: 16,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .error
+                            .withValues(alpha: 0.8)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _sceneGenerationError!,
-                        style:
-                            TextStyle(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8), fontSize: 14),
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .error
+                                .withValues(alpha: 0.8),
+                            fontSize: 14),
                       ),
                     ),
                   ],
@@ -490,7 +522,8 @@ class _SceneIllustrationDialogState extends State<SceneIllustrationDialog>
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
+                      strokeWidth: 2,
+                      color: Theme.of(context).colorScheme.onPrimary),
                 )
               : const Text('生成插图'),
         ),

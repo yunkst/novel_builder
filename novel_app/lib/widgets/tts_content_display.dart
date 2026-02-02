@@ -45,7 +45,10 @@ class _TtsContentDisplayState extends State<TtsContentDisplay> {
               color: isCurrent
                   ? Theme.of(context).colorScheme.primaryContainer
                   : isPast
-                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06)
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.06)
                       : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: isCurrent
@@ -63,7 +66,10 @@ class _TtsContentDisplayState extends State<TtsContentDisplay> {
                 color: isCurrent
                     ? Theme.of(context).colorScheme.onPrimaryContainer
                     : isPast
-                        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                        ? Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)
                         : Theme.of(context).colorScheme.onSurface,
                 fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
               ),

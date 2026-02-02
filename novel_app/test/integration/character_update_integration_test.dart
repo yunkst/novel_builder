@@ -3,8 +3,14 @@ import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/character_update.dart';
 import 'package:novel_app/services/character_card_service.dart';
 import 'package:novel_app/models/novel.dart';
+import '../test_bootstrap.dart';
 
 void main() {
+  // 初始化数据库测试环境
+  setUpAll(() {
+    initTests();
+  });
+
   group('角色更新流程集成测试', () {
     late CharacterCardService service;
 

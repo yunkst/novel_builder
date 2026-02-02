@@ -12,7 +12,8 @@ import 'preferences_service.dart';
 class DifyService {
   // 获取流式响应token
   Future<String> _getFlowToken() async {
-    final token = await PreferencesService.instance.getString('dify_flow_token');
+    final token =
+        await PreferencesService.instance.getString('dify_flow_token');
     if (token.isEmpty) {
       throw Exception('请先在设置中配置 Flow Token (流式响应)');
     }
@@ -22,10 +23,12 @@ class DifyService {
   // 获取结构化响应token
   // 用于 runWorkflowBlocking 方法
   Future<String> _getStructToken() async {
-    final token = await PreferencesService.instance.getString('dify_struct_token');
+    final token =
+        await PreferencesService.instance.getString('dify_struct_token');
     if (token.isEmpty) {
       // 如果struct_token不存在，尝试使用flow_token作为降级
-      final flowToken = await PreferencesService.instance.getString('dify_flow_token');
+      final flowToken =
+          await PreferencesService.instance.getString('dify_flow_token');
       if (flowToken.isNotEmpty) {
         LoggerService.instance.w(
           '⚠️ Struct Token未配置，使用Flow Token作为降级',
@@ -77,7 +80,8 @@ class DifyService {
   }) async {
     final difyUrl = await PreferencesService.instance.getString('dify_url');
     final difyToken = await _getFlowToken();
-    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
 
     if (difyUrl.isEmpty) {
       throw Exception('请先在设置中配置 Dify URL');
@@ -132,7 +136,8 @@ class DifyService {
         'user': 'novel-builder-app',
       };
 
-      final cmd = (requestBody['inputs'] as Map<String, dynamic>)['cmd'] as String?;
+      final cmd =
+          (requestBody['inputs'] as Map<String, dynamic>)['cmd'] as String?;
       LoggerService.instance.i(
         '🚀 Dify API请求: ${cmd ?? 'unknown'}',
         category: LogCategory.ai,
@@ -866,7 +871,8 @@ class DifyService {
     required String novelUrl,
     required String backgroundSetting,
   }) async {
-    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'user_input': userInput,
@@ -979,7 +985,8 @@ class DifyService {
     required String userInput,
     required String novelUrl,
   }) async {
-    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'outline': outline,
@@ -1092,7 +1099,8 @@ class DifyService {
     required String novelUrl,
     String backgroundSetting = '',
   }) async {
-    final aiWriterSetting = await PreferencesService.instance.getString('ai_writer_prompt', defaultValue: '');
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
 
     final inputs = {
       'chapters_content': chaptersContent,
@@ -1786,8 +1794,9 @@ class DifyService {
 
     final Map<String, dynamic> inputs = {
       'cmd': '生成剧本',
-      'chapters_content': chapterContent,     // 参数名修改: chapter_content -> chapters_content
-      'roles': formattedRoles,                // 使用格式化后的完整信息
+      'chapters_content':
+          chapterContent, // 参数名修改: chapter_content -> chapters_content
+      'roles': formattedRoles, // 使用格式化后的完整信息
       'user_input': userInput,
       'user_choice_role': userChoiceRole,
     };
@@ -2093,7 +2102,8 @@ class DifyService {
         if (c.personality != null) 'personality': c.personality,
         if (c.bodyType != null) 'bodyType': c.bodyType,
         if (c.clothingStyle != null) 'clothingStyle': c.clothingStyle,
-        if (c.appearanceFeatures != null) 'appearanceFeatures': c.appearanceFeatures,
+        if (c.appearanceFeatures != null)
+          'appearanceFeatures': c.appearanceFeatures,
         if (c.backgroundStory != null) 'backgroundStory': c.backgroundStory,
       };
     }).toList();
@@ -2119,7 +2129,8 @@ class DifyService {
 
     // 创建角色ID到名称的映射
     final Map<int, String> characterIdToName = {
-      for (var c in characters) if (c.id != null) c.id!: c.name,
+      for (var c in characters)
+        if (c.id != null) c.id!: c.name,
     };
 
     // 过滤掉包含未出现角色的关系

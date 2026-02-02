@@ -36,8 +36,8 @@ class BackupService {
         throw Exception('数据库文件不存在: $dbFilePath');
       }
 
-      LoggerService.instance.i('获取数据库文件: ${file.path}',
-          category: LogCategory.backup);
+      LoggerService.instance
+          .i('获取数据库文件: ${file.path}', category: LogCategory.backup);
       return file;
     } catch (e, stackTrace) {
       LoggerService.instance.e('获取数据库文件失败: $e',
@@ -57,12 +57,13 @@ class BackupService {
     ProgressCallback? onProgress,
   }) async {
     try {
-      LoggerService.instance.i('开始上传备份: ${dbFile.path}',
-          category: LogCategory.backup);
+      LoggerService.instance
+          .i('开始上传备份: ${dbFile.path}', category: LogCategory.backup);
 
       // 获取文件大小
       final fileSize = await dbFile.length();
-      LoggerService.instance.i('数据库文件大小: ${FormatUtils.formatFileSize(fileSize)}',
+      LoggerService.instance.i(
+          '数据库文件大小: ${FormatUtils.formatFileSize(fileSize)}',
           category: LogCategory.backup);
 
       // 使用ApiServiceWrapper上传
@@ -75,8 +76,8 @@ class BackupService {
       // 记录备份时间
       await saveBackupTime(DateTime.now());
 
-      LoggerService.instance.i('备份上传成功: ${result.storedPath}',
-          category: LogCategory.backup);
+      LoggerService.instance
+          .i('备份上传成功: ${result.storedPath}', category: LogCategory.backup);
 
       return result;
     } catch (e, stackTrace) {
@@ -108,8 +109,7 @@ class BackupService {
   Future<void> saveBackupTime(DateTime time) async {
     try {
       await _prefs.setInt(_prefsLastBackupTimeKey, time.millisecondsSinceEpoch);
-      LoggerService.instance.i('记录备份时间: $time',
-          category: LogCategory.backup);
+      LoggerService.instance.i('记录备份时间: $time', category: LogCategory.backup);
     } catch (e, stackTrace) {
       LoggerService.instance.e('保存备份时间失败: $e',
           category: LogCategory.backup, stackTrace: stackTrace.toString());
@@ -122,8 +122,7 @@ class BackupService {
   Future<void> clearBackupTime() async {
     try {
       await _prefs.remove(_prefsLastBackupTimeKey);
-      LoggerService.instance.i('清除备份时间记录',
-          category: LogCategory.backup);
+      LoggerService.instance.i('清除备份时间记录', category: LogCategory.backup);
     } catch (e, stackTrace) {
       LoggerService.instance.e('清除备份时间失败: $e',
           category: LogCategory.backup, stackTrace: stackTrace.toString());

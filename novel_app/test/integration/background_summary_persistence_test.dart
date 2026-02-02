@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../test_bootstrap.dart';
+import '../base/database_test_base.dart';
 
 /// 背景设定持久化集成测试
 ///
@@ -13,15 +14,20 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   // 初始化 FFI
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('背景设定持久化 - 集成测试', () {
+    late DatabaseTestBase testBase;
     late DatabaseService dbService;
-
     setUp(() async {
-      dbService = DatabaseService();
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+      dbService = testBase.databaseService;
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
     });
 
     test('场景1: 小说在书架中 - 应该成功保存', () async {

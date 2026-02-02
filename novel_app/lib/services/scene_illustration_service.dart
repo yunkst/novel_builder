@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import '../models/scene_illustration.dart';
 import '../services/database_service.dart';
 import '../core/di/api_service_provider.dart';
@@ -161,12 +160,12 @@ class SceneIllustrationService {
       // 获取当前章节内容
       final currentContent = await _databaseService.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
-        LoggerService.instance.w(
+        LoggerService.instance.e(
           '章节内容为空，无法插入插图标记',
           category: LogCategory.ai,
-          tags: ['illustration', 'markup', 'warning'],
+          tags: ['illustration', 'markup', 'error'],
         );
-        return;
+        throw Exception('章节内容为空，无法插入插图标记');
       }
 
       // 分割为段落
@@ -236,7 +235,8 @@ class SceneIllustrationService {
         category: LogCategory.ai,
         tags: ['illustration', 'markup', 'error'],
       );
-      // 不抛出异常，避免影响插图创建流程
+      // 重新抛出异常，停止插图创建流程
+      rethrow;
     }
   }
 

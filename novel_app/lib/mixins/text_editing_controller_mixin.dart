@@ -324,7 +324,8 @@ class MultiTextEditingControllerManager {
 
   /// 是否所有文本都不为空
   bool get allValid {
-    return _controllers.values.every((controller) => controller.text.isNotEmpty);
+    return _controllers.values
+        .every((controller) => controller.text.isNotEmpty);
   }
 
   /// 释放所有控制器

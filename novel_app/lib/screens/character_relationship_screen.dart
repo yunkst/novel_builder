@@ -113,8 +113,7 @@ class _CharacterRelationshipScreenState
 
     try {
       final novelUrl = widget.character.novelUrl;
-      final characters =
-          await _databaseService.getCharacters(novelUrl);
+      final characters = await _databaseService.getCharacters(novelUrl);
 
       // 过滤出相关的角色并缓存
       for (final character in characters) {
@@ -132,9 +131,8 @@ class _CharacterRelationshipScreenState
     // 获取所有可选角色（排除当前角色）
     final allCharacters =
         await _databaseService.getCharacters(widget.character.novelUrl);
-    final availableCharacters = allCharacters
-        .where((c) => c.id != widget.character.id)
-        .toList();
+    final availableCharacters =
+        allCharacters.where((c) => c.id != widget.character.id).toList();
 
     if (availableCharacters.isEmpty) {
       if (mounted) {
@@ -198,7 +196,8 @@ class _CharacterRelationshipScreenState
         bottom: TabBar(
           controller: _tabController,
           labelColor: Theme.of(context).colorScheme.onPrimary,
-          unselectedLabelColor: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
+          unselectedLabelColor:
+              Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
           indicatorColor: Theme.of(context).colorScheme.onPrimary,
           tabs: const [
             Tab(text: 'Ta的关系'),
@@ -260,13 +259,21 @@ class _CharacterRelationshipScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+          Icon(icon,
+              size: 64,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
               fontSize: 16,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -324,7 +331,10 @@ class _CharacterRelationshipScreenState
                   relationship.description!,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -385,9 +395,8 @@ class _CharacterRelationshipScreenState
     // 获取所有可选角色（排除当前角色）
     final allCharacters =
         await _databaseService.getCharacters(widget.character.novelUrl);
-    final availableCharacters = allCharacters
-        .where((c) => c.id != widget.character.id)
-        .toList();
+    final availableCharacters =
+        allCharacters.where((c) => c.id != widget.character.id).toList();
 
     if (!mounted) return;
 

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/outline.dart';
 import '../../models/novel.dart';
-import '../../services/outline_service.dart';
-import '../../services/database_service.dart';
+import '../../core/providers/database_providers.dart';
 import '../../utils/toast_utils.dart';
 import '../../widgets/common/common_widgets.dart';
 import 'create_outline_screen.dart';
 
 /// 大纲管理页面
 /// 显示小说的大纲，支持创建、查看、编辑、删除大纲
-class OutlineManagementScreen extends StatefulWidget {
+class OutlineManagementScreen extends ConsumerStatefulWidget {
   final String novelUrl;
   final String novelTitle;
 
@@ -20,13 +20,12 @@ class OutlineManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<OutlineManagementScreen> createState() =>
+  ConsumerState<OutlineManagementScreen> createState() =>
       _OutlineManagementScreenState();
 }
 
-class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
-  final OutlineService _outlineService = OutlineService();
-  final DatabaseService _databaseService = DatabaseService();
+class _OutlineManagementScreenState
+    extends ConsumerState<OutlineManagementScreen> {
   Outline? _outline;
   bool _loading = true;
   String? _error;
@@ -45,7 +44,8 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
     });
 
     try {
-      final outline = await _outlineService.getOutline(widget.novelUrl);
+      final repository = ref.read(outlineRepositoryProvider);
+      final outline = await repository.getOutlineByNovelUrl(widget.novelUrl);
       setState(() {
         _outline = outline;
         _loading = false;
@@ -63,7 +63,8 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
     // 获取小说背景设定
     String? backgroundSetting;
     try {
-      final bookshelf = await _databaseService.getBookshelf();
+      final repository = ref.read(novelRepositoryProvider);
+      final bookshelf = await repository.getNovels();
       final novel = bookshelf.firstWhere(
         (n) => n.url == widget.novelUrl,
         orElse: () => Novel(
@@ -103,7 +104,8 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
     // 获取小说背景设定
     String? backgroundSetting;
     try {
-      final bookshelf = await _databaseService.getBookshelf();
+      final repository = ref.read(novelRepositoryProvider);
+      final bookshelf = await repository.getNovels();
       final novel = bookshelf.firstWhere(
         (n) => n.url == widget.novelUrl,
         orElse: () => Novel(
@@ -150,7 +152,8 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await _outlineService.deleteOutline(widget.novelUrl);
+        final repository = ref.read(outlineRepositoryProvider);
+        await repository.deleteOutline(widget.novelUrl);
         setState(() {
           _outline = null;
         });
@@ -260,7 +263,10 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
               '• 保持故事连贯性和结构完整\n'
               '• 更好地规划故事发展',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
                   ),
               textAlign: TextAlign.center,
             ),
@@ -305,7 +311,10 @@ class _OutlineManagementScreenState extends State<OutlineManagementScreen> {
                 Text(
                   '最后更新: ${_formatDate(_outline!.updatedAt)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
                       ),
                 ),
                 const SizedBox(height: 16),

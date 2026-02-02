@@ -25,7 +25,8 @@ class AiAccompanimentSettings {
   factory AiAccompanimentSettings.fromJson(Map<String, dynamic> json) {
     return AiAccompanimentSettings(
       autoEnabled: json['autoEnabled'] as bool? ?? false,
-      infoNotificationEnabled: json['infoNotificationEnabled'] as bool? ?? false,
+      infoNotificationEnabled:
+          json['infoNotificationEnabled'] as bool? ?? false,
     );
   }
 

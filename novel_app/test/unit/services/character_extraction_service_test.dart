@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/character_extraction_service.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/chapter.dart';
 import '../../test_helpers/mock_data.dart';
+import '../../test_bootstrap.dart';
 
 /// CharacterExtractionService 单元测试
 ///
@@ -15,8 +15,7 @@ import '../../test_helpers/mock_data.dart';
 void main() {
   // 设置FFI用于测试环境
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('CharacterExtractionService - 搜索章节测试', () {
@@ -25,6 +24,8 @@ void main() {
     final testNovelUrl = 'https://test.com/novel/1';
 
     setUp(() async {
+      // 使用全局DatabaseService单例，因为CharacterExtractionService内部使用单例
+      // 这是单例模式的限制，理想情况应该支持依赖注入
       dbService = DatabaseService();
       extractionService = CharacterExtractionService();
 
@@ -68,6 +69,12 @@ void main() {
           chapter.content ?? '',
         );
       }
+    });
+
+    tearDown(() async {
+      // 清理测试数据
+      final db = await dbService.database;
+      await db.delete('chapter_cache');
     });
 
     test('searchChaptersByName 应该找到包含正式名称的章节', () async {
@@ -216,25 +223,34 @@ void main() {
     });
 
     test('mergeAndDeduplicateContexts 不重叠片段应该用分隔符连接', () {
-      final contexts = ['第一个片段', '第二个片段', '第三个片段'];
+      final contexts = ['第一个片段\n第二个片段', '第三个片段\n第四个片段', '第五个片段'];
       final merged = extractionService.mergeAndDeduplicateContexts(contexts);
 
       expect(merged, contains('第一个片段'));
       expect(merged, contains('第二个片段'));
       expect(merged, contains('第三个片段'));
-      expect(merged, contains('\n\n...\n\n'));
+      expect(merged, contains('第四个片段'));
+      expect(merged, contains('第五个片段'));
+
+      // 验证所有段落都被保留（无字数限制）
+      final paragraphs = merged.split('\n').where((p) => p.isNotEmpty).toList();
+      expect(paragraphs.length, 5);
     });
 
     test('mergeAndDeduplicateContexts 重叠片段应该去重', () {
       final contexts = [
-        '这是一段很长的内容，有重叠的部分',
-        '很长的内容，有重叠的部分在这里',
+        '第一段内容。\n第二段内容。\n第三段内容。',
+        '第二段内容。\n第三段内容。\n第四段内容。',
       ];
       final merged = extractionService.mergeAndDeduplicateContexts(
         contexts,
       );
 
-      // 重叠部分应该被合并，保留较长的片段
+      // 第二段和第三段重复，应该被去重
+      final paragraphs = merged.split('\n').where((p) => p.isNotEmpty).toList();
+      expect(paragraphs.length, 4); // 第一段、第二段、第三段、第四段
+
+      // 验证去重后长度小于原始长度之和
       expect(merged.length, lessThan(contexts[0].length + contexts[1].length));
     });
   });

@@ -138,7 +138,10 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
             Container(
               width: widget.width,
               height: widget.height,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
               child: const LoadingStateWidget(
                 message: '加载中...',
                 centered: true,

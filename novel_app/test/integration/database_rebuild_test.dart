@@ -2,19 +2,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
 import 'dart:io';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../test_bootstrap.dart';
+import '../base/database_test_base.dart';
 
 void main() {
   // 初始化测试环境
   initDatabaseTests();
 
   group('数据库重建测试', () {
+    late DatabaseTestBase testBase;
+    late DatabaseService dbService;
+
+    setUp(() async {
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+      dbService = testBase.databaseService;
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
+    });
+
     test('应该能够重建数据库并包含完整的Schema', () async {
       print('🔍 步骤1: 初始化数据库服务');
-      final dbService = DatabaseService();
-
-      print('🔍 步骤2: 获取数据库实例');
       final db = await dbService.database;
       expect(db.isOpen, true);
 
@@ -22,7 +32,7 @@ void main() {
       final result = await db.rawQuery('PRAGMA user_version');
       final version = result.first['user_version'] as int;
       print('   当前数据库版本: $version');
-      expect(version, equals(19), reason: '数据库版本应该是19');
+      expect(version, equals(21), reason: '数据库版本应该是21');
 
       print('🔍 步骤4: 检查 novel_chapters 表结构');
       final columns = await db.rawQuery('PRAGMA table_info(novel_chapters)');
@@ -40,7 +50,6 @@ void main() {
 
     test('标记章节为已读应该成功', () async {
       print('🔍 步骤1: 创建测试小说');
-      final dbService = DatabaseService();
       final novel = Novel(
         title: '测试小说',
         author: '测试作者',

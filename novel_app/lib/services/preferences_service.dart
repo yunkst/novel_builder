@@ -95,7 +95,8 @@ class PreferencesService {
   /// 获取字符串列表值
   ///
   /// 如果键不存在或值为null，返回 [defaultValue]
-  Future<List<String>> getStringList(String key, {List<String> defaultValue = const []}) async {
+  Future<List<String>> getStringList(String key,
+      {List<String> defaultValue = const []}) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(key) ?? defaultValue;
   }

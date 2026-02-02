@@ -179,7 +179,7 @@ class TestDataFactory {
     String? gender,
   }) {
     return Character(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: null, // 不设置ID,让数据库自动生成
       novelUrl: novelUrl,
       name: name,
       occupation: occupation,

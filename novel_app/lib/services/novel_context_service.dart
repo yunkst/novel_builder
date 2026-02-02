@@ -100,7 +100,7 @@ class NovelContextBuilder {
     ]);
 
     final historyContent = results[0] as String;
-    final backgroundSetting = results[1] as String? ?? '';
+    final backgroundSetting = results[1] ?? '';
 
     return NovelContext(
       backgroundSetting: backgroundSetting,

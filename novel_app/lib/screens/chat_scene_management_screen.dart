@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/chat_scene.dart';
-import '../services/database_service.dart';
+import '../repositories/chat_scene_repository.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/chat_scene_edit_dialog.dart';
 import '../widgets/common/common_widgets.dart';
@@ -9,7 +9,13 @@ import '../widgets/common/common_widgets.dart';
 ///
 /// 用于管理所有预设的聊天场景，支持增删改查和搜索功能
 class ChatSceneManagementScreen extends StatefulWidget {
-  const ChatSceneManagementScreen({super.key});
+  /// 可选的依赖注入参数 - 用于测试
+  final ChatSceneRepository? chatSceneRepository;
+
+  const ChatSceneManagementScreen({
+    super.key,
+    this.chatSceneRepository,
+  });
 
   @override
   State<ChatSceneManagementScreen> createState() =>
@@ -17,7 +23,7 @@ class ChatSceneManagementScreen extends StatefulWidget {
 }
 
 class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
-  final DatabaseService _db = DatabaseService();
+  late final ChatSceneRepository _chatSceneRepository;
   List<ChatScene> _scenes = [];
   List<ChatScene> _filteredScenes = [];
   bool _isLoading = true;
@@ -27,6 +33,10 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 使用注入的依赖或创建默认实例
+    _chatSceneRepository = widget.chatSceneRepository ?? ChatSceneRepository();
+
     _loadScenes();
   }
 
@@ -38,22 +48,26 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
 
   /// 加载所有场景
   Future<void> _loadScenes() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final scenes = await _db.getAllChatScenes();
-      setState(() {
-        _scenes = scenes;
-        _filteredScenes = scenes;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      final scenes = await _chatSceneRepository.getAllChatScenes();
       if (mounted) {
+        setState(() {
+          _scenes = scenes;
+          _filteredScenes = scenes;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ToastUtils.showError('加载场景失败: $e');
       }
     }
@@ -68,7 +82,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
 
     if (result != null) {
       try {
-        await _db.insertChatScene(result);
+        await _chatSceneRepository.insertChatScene(result);
         await _loadScenes();
         if (mounted) {
           ToastUtils.showSuccess('场景添加成功');
@@ -90,7 +104,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
 
     if (result != null) {
       try {
-        await _db.updateChatScene(result);
+        await _chatSceneRepository.updateChatScene(result);
         await _loadScenes();
         if (mounted) {
           ToastUtils.showSuccess('场景更新成功');
@@ -116,7 +130,7 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
 
     if (confirmed == true) {
       try {
-        await _db.deleteChatScene(scene.id!);
+        await _chatSceneRepository.deleteChatScene(scene.id!);
         await _loadScenes();
         if (mounted) {
           ToastUtils.showSuccess('场景删除成功');
@@ -172,9 +186,14 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
                 decoration: InputDecoration(
                   hintText: '搜索场景...',
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)),
+                  hintStyle: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onPrimary
+                          .withValues(alpha: 0.7)),
                 ),
-                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                 onChanged: _onSearchChanged,
               )
             : const Text('场景管理'),
@@ -211,7 +230,8 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
           Icon(
             hasScenes ? Icons.search_off : Icons.bookmark_outline,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(
@@ -219,14 +239,20 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             hasScenes ? '请尝试其他关键词' : '点击右下角的 + 按钮创建第一个场景',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -293,7 +319,10 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7),
                   height: 1.5,
                 ),
               ),
@@ -302,13 +331,21 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
               // 底部信息
               Row(
                 children: [
-                  Icon(Icons.access_time, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                  Icon(Icons.access_time,
+                      size: 14,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5)),
                   const SizedBox(width: 4),
                   Text(
                     _formatDate(scene.createdAt),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5),
                     ),
                   ),
                   const Spacer(),

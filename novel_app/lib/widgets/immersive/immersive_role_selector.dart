@@ -188,19 +188,23 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.person_off,
-                            size: 64, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                            size: 64,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
                         Text(
                           '暂无角色',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '请先在角色管理中创建角色',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -336,7 +340,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                             character.occupation!,
                             style: TextStyle(
                               fontSize: 12,
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -346,7 +351,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                             character.personality!,
                             style: TextStyle(
                               fontSize: 11,
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

@@ -29,20 +29,34 @@ import '../services/chapter_service.dart';
 import '../constants/chapter_constants.dart';
 import '../utils/toast_utils.dart';
 import 'dart:async';
+
 class ChapterListScreen extends StatefulWidget {
   final Novel novel;
 
-  const ChapterListScreen({super.key, required this.novel});
+  // 可选的依赖注入参数 - 用于测试
+  final ApiServiceWrapper? api;
+  final DatabaseService? databaseService;
+  final DifyService? difyService;
+  final PreloadService? preloadService;
+
+  const ChapterListScreen({
+    super.key,
+    required this.novel,
+    this.api,
+    this.databaseService,
+    this.difyService,
+    this.preloadService,
+  });
 
   @override
   State<ChapterListScreen> createState() => _ChapterListScreenState();
 }
 
 class _ChapterListScreenState extends State<ChapterListScreen> {
-  final ApiServiceWrapper _api = ApiServiceProvider.instance;
-  final DatabaseService _databaseService = DatabaseService();
-  final DifyService _difyService = DifyService();
-  final PreloadService _preloadService = PreloadService();
+  late final ApiServiceWrapper _api;
+  late final DatabaseService _databaseService;
+  late final DifyService _difyService;
+  late final PreloadService _preloadService;
   final ScrollController _scrollController = ScrollController();
 
   // 预加载监听
@@ -92,6 +106,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 使用注入的依赖或创建默认实例
+    _api = widget.api ?? ApiServiceProvider.instance;
+    _databaseService = widget.databaseService ?? DatabaseService();
+    _difyService = widget.difyService ?? DifyService();
+    _preloadService = widget.preloadService ?? PreloadService();
 
     // 初始化控制器（轻量级，同步操作）
     _chapterLoader = ChapterLoader(
@@ -304,7 +324,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     try {
       // 批量查询当前页章节的缓存状态
       final chapterUrls = pageChapters.map((c) => c.url).toList();
-      final results = await _chapterActionHandler.areChaptersCached(chapterUrls);
+      final results =
+          await _chapterActionHandler.areChaptersCached(chapterUrls);
 
       if (mounted) {
         setState(() {
@@ -330,7 +351,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     try {
       // 批量查询所有章节的缓存状态
       final chapterUrls = _chapters.map((c) => c.url).toList();
-      final results = await _chapterActionHandler.areChaptersCached(chapterUrls);
+      final results =
+          await _chapterActionHandler.areChaptersCached(chapterUrls);
 
       // 更新状态映射
       if (mounted) {
@@ -400,7 +422,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // 计算目标章节所在的页码
         final targetPage =
-            (_lastReadChapterIndex / ChapterConstants.chaptersPerPage).floor() + 1;
+            (_lastReadChapterIndex / ChapterConstants.chaptersPerPage).floor() +
+                1;
 
         // 跳转到目标页
         if (targetPage != _currentPage) {
@@ -413,7 +436,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
             // 计算目标章节在当前页中的索引
-            final startIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage;
+            final startIndex =
+                (_currentPage - 1) * ChapterConstants.chaptersPerPage;
             final indexInPage = _lastReadChapterIndex - startIndex;
 
             // 使用简单的滚动方法，避免复杂计算导致的过头问题
@@ -442,7 +466,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     if (_chapters.isEmpty) {
       _totalPages = 1;
     } else {
-      _totalPages = (_chapters.length / ChapterConstants.chaptersPerPage).ceil();
+      _totalPages =
+          (_chapters.length / ChapterConstants.chaptersPerPage).ceil();
     }
 
     // 清除缓存，因为章节数已变化
@@ -469,8 +494,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     if (_chapters.isEmpty) return [];
 
     final startIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage;
-    final endIndex =
-        (startIndex + ChapterConstants.chaptersPerPage).clamp(0, _chapters.length);
+    final endIndex = (startIndex + ChapterConstants.chaptersPerPage)
+        .clamp(0, _chapters.length);
 
     return _chapters.sublist(startIndex, endIndex);
   }
@@ -518,7 +543,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           // 上一页按钮
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
+            onPressed:
+                _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
             tooltip: '上一页',
           ),
           // 页码显示
@@ -537,7 +563,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           // 末页按钮
           IconButton(
             icon: const Icon(Icons.last_page),
-            onPressed: _currentPage < _totalPages ? () => _goToPage(_totalPages) : null,
+            onPressed: _currentPage < _totalPages
+                ? () => _goToPage(_totalPages)
+                : null,
             tooltip: '末页',
           ),
         ],
@@ -546,7 +574,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   Future<void> _checkBookshelfStatus() async {
-    final isInBookshelf = await _databaseService.isInBookshelf(widget.novel.url);
+    final isInBookshelf =
+        await _databaseService.isInBookshelf(widget.novel.url);
     setState(() {
       _isInBookshelf = isInBookshelf;
     });
@@ -852,7 +881,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               : _buildNormalChapterList(),
                     ),
                     // 只在非重排模式、有章节且总页数大于1时显示分页控制栏
-                    if (!_isReorderingMode && _chapters.isNotEmpty && _totalPages > 1)
+                    if (!_isReorderingMode &&
+                        _chapters.isNotEmpty &&
+                        _totalPages > 1)
                       _buildPaginationControl(),
                   ],
                 ),
@@ -1037,7 +1068,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       itemBuilder: (context, index) {
         final chapter = pageChapters[index];
         // 计算在全部章节中的实际索引
-        final globalIndex = (_currentPage - 1) * ChapterConstants.chaptersPerPage + index;
+        final globalIndex =
+            (_currentPage - 1) * ChapterConstants.chaptersPerPage + index;
         final isLastRead = globalIndex == _lastReadChapterIndex;
         final isUserChapter = chapter.isUserInserted;
 

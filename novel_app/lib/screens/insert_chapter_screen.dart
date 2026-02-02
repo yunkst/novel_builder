@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
-import '../services/outline_service.dart';
 import '../services/chapter_service.dart';
+import '../core/providers/database_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 
@@ -14,7 +15,7 @@ enum _InsertMode { manual, outline }
 
 /// 插入章节全屏页面
 /// 支持手动输入和按大纲生成两种模式
-class InsertChapterScreen extends StatefulWidget {
+class InsertChapterScreen extends ConsumerStatefulWidget {
   final Novel novel;
   final int afterIndex;
   final List<Chapter> chapters;
@@ -31,16 +32,16 @@ class InsertChapterScreen extends StatefulWidget {
   });
 
   @override
-  State<InsertChapterScreen> createState() => _InsertChapterScreenState();
+  ConsumerState<InsertChapterScreen> createState() =>
+      _InsertChapterScreenState();
 }
 
-class _InsertChapterScreenState extends State<InsertChapterScreen>
+class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
     with DifyStreamingMixin {
   // 控制器和初始化
   late final TextEditingController _titleController;
   late final TextEditingController _userInputController;
   late final TextEditingController _draftEditingController;
-  final OutlineService _outlineService = OutlineService();
 
   // 状态管理
   _InsertMode _currentMode = _InsertMode.manual;
@@ -77,7 +78,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     });
 
     try {
-      final outline = await _outlineService.getOutline(widget.novel.url);
+      final repository = ref.read(outlineRepositoryProvider);
+      final outline = await repository.getOutlineByNovelUrl(widget.novel.url);
       setState(() {
         _outline = outline;
         _isLoadingOutline = false;
@@ -386,7 +388,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
         children: [
           _buildStepItem(0, '输入要求'),
           const SizedBox(width: 32),
-          Icon(Icons.chevron_right, size: 20, color: Theme.of(context).colorScheme.onSurface),
+          Icon(Icons.chevron_right,
+              size: 20, color: Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 32),
           _buildStepItem(1, '编辑细纲'),
         ],
@@ -405,7 +408,12 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? Colors.blue : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+            color: isActive
+                ? Colors.blue
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
           ),
           child: Center(
             child: Text(
@@ -423,7 +431,12 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
           label,
           style: TextStyle(
             fontSize: 13,
-            color: isActive ? Colors.blue : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            color: isActive
+                ? Colors.blue
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -485,7 +498,10 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                           : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7),
                       ),
                     ),
                   ),
@@ -618,7 +634,10 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                         : _outline!.content,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.7),
                       height: 1.6,
                     ),
                   ),
@@ -648,7 +667,10 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
             'AI将根据大纲生成章节细纲，您可以提供额外要求来引导生成方向',
             style: TextStyle(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -722,22 +744,29 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // 状态指示器
-                        if (_draftEditingController.text.isNotEmpty || isStreaming)
+                        if (_draftEditingController.text.isNotEmpty ||
+                            isStreaming)
                           StreamingStatusIndicator(
                             isStreaming: isStreaming,
                             characterCount: _draftEditingController.text.length,
                             streamingText: '实时生成中...',
                             completedText: '生成完成',
                           ),
-                        if (_draftEditingController.text.isNotEmpty || isStreaming)
+                        if (_draftEditingController.text.isNotEmpty ||
+                            isStreaming)
                           const SizedBox(height: 12),
                         // 内容显示区域
-                        if (_draftEditingController.text.isEmpty && !isStreaming)
+                        if (_draftEditingController.text.isEmpty &&
+                            !isStreaming)
                           Expanded(
                             child: Center(
                               child: Text(
                                 '等待生成细纲内容...',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.5)),
                               ),
                             ),
                           )
@@ -858,8 +887,10 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
     return Container(
       constraints: const BoxConstraints(maxHeight: 250),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+        border: Border.all(
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: SingleChildScrollView(
@@ -891,7 +922,8 @@ class _InsertChapterScreenState extends State<InsertChapterScreen>
         color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/character_relationship.dart';
 import 'package:novel_app/services/database_service.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite/sqflite.dart';
 import '../test_helpers/character_relationship_test_data.dart';
 import '../test_bootstrap.dart';
@@ -22,8 +21,6 @@ void main() {
     setUp(() async {
       // 设置测试专用的数据库路径
       final testDbPath = '.dart_tool/sqflite_common_ffi/databases/test_relationships.db';
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
 
       // 创建DatabaseService实例
       dbService = DatabaseService();

@@ -4,8 +4,8 @@ import 'preferences_service.dart';
 
 /// 应用主题模式枚举
 enum AppThemeMode {
-  light,  // 亮色模式
-  dark,   // 暗色模式
+  light, // 亮色模式
+  dark, // 暗色模式
   system, // 跟随系统
 }
 

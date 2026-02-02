@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'core/di/api_service_provider.dart';
+import 'core/providers/theme_provider.dart';
 import 'utils/video_cache_manager.dart';
 import 'services/logger_service.dart';
-import 'services/theme_service.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
@@ -47,24 +47,6 @@ void main() async {
 
   // 捕获未处理的异步错误
   runZonedGuarded(() async {
-    // 初始化主题服务
-    try {
-      await ThemeService.instance.init();
-      LoggerService.instance.i(
-        '主题服务初始化完成',
-        category: LogCategory.general,
-        tags: ['theme', 'init'],
-      );
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '主题服务初始化失败: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.general,
-        tags: ['theme', 'error'],
-      );
-      // 继续运行，使用默认主题
-    }
-
     // 初始化 API 服务
     try {
       await ApiServiceProvider.initialize();
@@ -79,7 +61,9 @@ void main() async {
       // 继续运行，用户可以在设置中配置
     }
 
-    runApp(const NovelReaderApp());
+    runApp(const ProviderScope(
+      child: NovelReaderApp(),
+    ));
   }, (error, stackTrace) {
     LoggerService.instance.e(
       'Unhandled Async Error: $error',
@@ -90,59 +74,103 @@ void main() async {
   });
 }
 
-class NovelReaderApp extends StatelessWidget {
+class NovelReaderApp extends ConsumerWidget {
   const NovelReaderApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ThemeService.instance,
-      child: Consumer<ThemeService>(
-        builder: (context, themeService, child) {
-          return MaterialApp(
-            title: 'Novel App',
-            theme: themeService.getLightTheme(),
-            darkTheme: themeService.getDarkTheme(),
-            themeMode: themeService.flutterThemeMode,
-            home: const HomePage(),
-            debugShowCheckedModeBanner: true,
-            builder: (context, child) {
-              // 捕获并记录所有Widget错误
-              ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
-                final stackTrace = errorDetails.stack?.toString() ?? '';
-                LoggerService.instance.e(
-                  'Widget Error: ${errorDetails.exception}',
-                  stackTrace: stackTrace,
-                  category: LogCategory.ui,
-                  tags: ['widget', 'error', 'crash'],
-                );
-                return MaterialApp(
-                  home: Scaffold(
-                    appBar: AppBar(title: const Text('Error Occurred')),
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error, size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          const Text('An error occurred. Check console for details.'),
-                          const SizedBox(height: 8),
-                          Text(
-                            errorDetails.exception.toString(),
-                            style: const TextStyle(fontSize: 12),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 监听主题提供者
+    final themeAsync = ref.watch(themeNotifierProvider);
+
+    return themeAsync.when(
+      data: (themeState) {
+        return MaterialApp(
+          title: 'Novel App',
+          theme: themeState.getLightTheme(),
+          darkTheme: themeState.getDarkTheme(),
+          themeMode: themeState.flutterThemeMode,
+          home: const HomePage(),
+          debugShowCheckedModeBanner: true,
+          builder: (context, child) {
+            // 捕获并记录所有Widget错误
+            ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
+              final stackTrace = errorDetails.stack?.toString() ?? '';
+              LoggerService.instance.e(
+                'Widget Error: ${errorDetails.exception}',
+                stackTrace: stackTrace,
+                category: LogCategory.ui,
+                tags: ['widget', 'error', 'crash'],
+              );
+              return MaterialApp(
+                home: Scaffold(
+                  appBar: AppBar(title: const Text('Error Occurred')),
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        const Text(
+                            'An error occurred. Check console for details.'),
+                        const SizedBox(height: 8),
+                        Text(
+                          errorDetails.exception.toString(),
+                          style: const TextStyle(fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
-                );
-              };
-              return child!;
-            },
-          );
-        },
-      ),
+                ),
+              );
+            };
+            return child!;
+          },
+        );
+      },
+      loading: () {
+        // 加载中显示默认主题
+        return MaterialApp(
+          title: 'Novel App',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+          ),
+          home: const Center(
+            child: CircularProgressIndicator(),
+          ),
+          debugShowCheckedModeBanner: true,
+        );
+      },
+      error: (error, stack) {
+        // 错误时显示错误信息
+        return MaterialApp(
+          title: 'Novel App',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+          ),
+          home: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('主题加载失败: $error'),
+                const SizedBox(height: 8),
+                const Text('使用默认主题继续运行'),
+              ],
+            ),
+          ),
+          debugShowCheckedModeBanner: true,
+        );
+      },
     );
   }
 }

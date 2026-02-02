@@ -1,106 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
-import '../services/database_service.dart';
-import '../services/chapter_search_service.dart';
-import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../widgets/highlighted_text.dart';
 import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
+import '../core/providers/chapter_search_providers.dart';
 import 'reader_screen.dart';
 
-class ChapterSearchScreen extends StatefulWidget {
+/// 章节搜索页面 - Riverpod 版本
+///
+/// 支持在小说章节内容中搜索关键词
+/// 使用 Riverpod 管理状态和依赖
+class ChapterSearchScreen extends ConsumerStatefulWidget {
   final Novel novel;
 
-  const ChapterSearchScreen({super.key, required this.novel});
+  const ChapterSearchScreen({
+    super.key,
+    required this.novel,
+  });
 
   @override
-  State<ChapterSearchScreen> createState() => _ChapterSearchScreenState();
+  ConsumerState<ChapterSearchScreen> createState() =>
+      _ChapterSearchScreenState();
 }
 
-class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
+class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final ChapterSearchService _searchService = ChapterSearchService();
-  final DatabaseService _databaseService = DatabaseService();
-
-  List<ChapterSearchResult> _searchResults = [];
-  List<Chapter> _chapters = [];
-  bool _isLoading = false;
-  bool _hasSearched = false;
 
   @override
   void initState() {
     super.initState();
-    _loadChapters();
+
+    // 设置 Novel 参数
+    ref.read(novelParamProvider.notifier).setNovel(widget.novel);
+
+    // 监听搜索框输入
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadChapters() async {
-    try {
-      final chapters =
-          await _databaseService.getCachedNovelChapters(widget.novel.url);
-      setState(() {
-        _chapters = chapters;
-      });
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '加载章节列表失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['chapter', 'list', 'load', 'failed'],
-      );
-    }
+  void _onSearchChanged() {
+    // 实时更新搜索查询
+    ref.read(searchQueryProvider.notifier).update(_searchController.text);
   }
 
   Future<void> _performSearch(String keyword) async {
     if (keyword.trim().isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _hasSearched = false;
-      });
+      ref.read(searchStateProvider.notifier).reset();
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _hasSearched = true;
-    });
-
-    try {
-      final results = await _searchService.searchInNovel(
-        widget.novel.url,
-        keyword.trim(),
-      );
-      setState(() {
-        _searchResults = results;
-        _isLoading = false;
-      });
-    } catch (e, stackTrace) {
-      setState(() {
-        _isLoading = false;
-      });
-      ErrorHelper.showErrorWithLog(
-        context,
-        '搜索失败',
-        stackTrace: stackTrace,
-        category: LogCategory.database,
-        tags: ['chapter', 'search', 'failed'],
-      );
-    }
+    ref.read(searchStateProvider.notifier).setIsLoading(true);
+    ref.read(searchStateProvider.notifier).setHasSearched(true);
   }
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() {
-      _searchResults = [];
-      _hasSearched = false;
-    });
+    ref.read(searchQueryProvider.notifier).clear();
+    ref.read(searchStateProvider.notifier).reset();
   }
 
   /// 构建所有匹配项的高亮显示
@@ -135,9 +101,12 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
     }).toList();
   }
 
-  Chapter? _findChapterByUrl(String chapterUrl) {
+  Chapter? _findChapterByUrl(
+    List<Chapter> chapters,
+    String chapterUrl,
+  ) {
     try {
-      return _chapters.firstWhere((chapter) => chapter.url == chapterUrl);
+      return chapters.firstWhere((chapter) => chapter.url == chapterUrl);
     } catch (e) {
       return null;
     }
@@ -145,12 +114,21 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听搜索状态
+    final searchState = ref.watch(searchStateProvider);
+
+    // 监听搜索结果
+    final searchResultsAsync = ref.watch(searchResultsProvider);
+
+    // 监听章节列表
+    final chaptersAsync = ref.watch(chaptersListProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜索章节内容'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
-          if (_hasSearched)
+          if (searchState.hasSearched)
             IconButton(
               icon: const Icon(Icons.clear),
               onPressed: _clearSearch,
@@ -183,24 +161,31 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
                 fillColor: Theme.of(context).colorScheme.surface,
               ),
               onSubmitted: _performSearch,
-              onChanged: (value) {
-                // 实时更新清除按钮的显示状态
-                setState(() {});
-              },
             ),
           ),
 
           // 搜索结果
           Expanded(
-            child: _buildSearchResults(),
+            child: _buildSearchResults(
+              context,
+              searchState,
+              searchResultsAsync,
+              chaptersAsync,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchResults() {
-    if (_isLoading) {
+  Widget _buildSearchResults(
+    BuildContext context,
+    SearchStateData searchState,
+    AsyncValue<List<ChapterSearchResult>> searchResultsAsync,
+    AsyncValue<List<Chapter>> chaptersAsync,
+  ) {
+    // 显示加载中
+    if (searchState.isLoading) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -213,7 +198,8 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
       );
     }
 
-    if (!_hasSearched) {
+    // 显示初始提示
+    if (!searchState.hasSearched) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -221,14 +207,20 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
             Icon(
               Icons.search,
               size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             Text(
               '输入关键词搜索章节内容',
               style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 8),
@@ -236,7 +228,10 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
               '支持搜索章节标题和内容',
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -244,128 +239,249 @@ class _ChapterSearchScreenState extends State<ChapterSearchScreen> {
       );
     }
 
-    if (_searchResults.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '未找到相关内容',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '尝试使用其他关键词',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '提示：可以搜索章节标题或内容',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final result = _searchResults[index];
-        final chapter = _findChapterByUrl(result.chapterUrl);
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          elevation: 2,
-          child: ListTile(
-            title: Row(
+    // 显示搜索结果或错误
+    return searchResultsAsync.when(
+      loading: () {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+      data: (searchResults) {
+        // 无结果
+        if (searchResults.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: result.hasHighlight
-                      ? TitleHighlight(
-                          title: result.chapterTitle,
-                          keywords: result.searchKeywords,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '未找到相关内容',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '尝试使用其他关键词',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '提示：可以搜索章节标题或内容',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.4),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // 显示结果列表
+        return chaptersAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          data: (chapters) {
+            return ListView.builder(
+              itemCount: searchResults.length,
+              itemBuilder: (context, index) {
+                final result = searchResults[index];
+                final chapter = _findChapterByUrl(chapters, result.chapterUrl);
+
+                return Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  elevation: 2,
+                  child: ListTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: result.hasHighlight
+                              ? TitleHighlight(
+                                  title: result.chapterTitle,
+                                  keywords: result.searchKeywords,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                )
+                              : Text(
+                                  result.chapterTitle,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                        ),
+                        if (result.matchCount > 0)
+                          Text(
+                            ' (${result.matchCount}处匹配)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
+                              fontWeight: FontWeight.normal,
+                            ),
                           ),
-                        )
-                      : Text(
-                          result.chapterTitle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 匹配的文本片段列表（带高亮）
+                        ..._buildMatchHighlights(result),
+
+                        // 缓存时间
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '缓存于 ${result.cachedDate.toString().substring(0, 19).replaceAll('-', '/')}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.5),
+                            ),
                           ),
                         ),
-                ),
-                if (result.matchCount > 0)
+                      ],
+                    ),
+                    onTap: () {
+                      if (chapter != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReaderScreen(
+                              novel: widget.novel,
+                              chapter: chapter,
+                              chapters: chapters,
+                              // 传递搜索结果以便精确跳转
+                              searchResult: result,
+                            ),
+                          ),
+                        );
+                      } else {
+                        LoggerService.instance.e(
+                          '无法打开章节: Chapter not found for URL: ${result.chapterUrl}',
+                          category: LogCategory.database,
+                          tags: ['chapter', 'open', 'not-found'],
+                        );
+                        ToastUtils.show('无法打开该章节');
+                      }
+                    },
+                  ),
+                );
+              },
+            );
+          },
+          error: (error, stack) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error
+                        .withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    ' (${result.matchCount}处匹配)',
+                    '加载章节列表失败',
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                      fontWeight: FontWeight.normal,
+                      fontSize: 16,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 匹配的文本片段列表（带高亮）
-                ..._buildMatchHighlights(result),
-
-                // 缓存时间
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '缓存于 ${result.cachedDate.toString().substring(0, 19).replaceAll('-', '/')}',
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5),
                     ),
+                    textAlign: TextAlign.center,
                   ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+      error: (error, stack) {
+        ErrorHelper.showErrorWithLog(
+          context,
+          '搜索失败',
+          stackTrace: stack,
+          category: LogCategory.database,
+          tags: ['chapter', 'search', 'failed'],
+        );
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color:
+                    Theme.of(context).colorScheme.error.withValues(alpha: 0.6),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '搜索失败',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
                 ),
-              ],
-            ),
-            onTap: () {
-              if (chapter != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ReaderScreen(
-                      novel: widget.novel,
-                      chapter: chapter,
-                      chapters: _chapters,
-                      // 传递搜索结果以便精确跳转
-                      searchResult: result,
-                    ),
-                  ),
-                );
-              } else {
-                LoggerService.instance.e(
-                  '无法打开章节: Chapter not found for URL: ${result.chapterUrl}',
-                  category: LogCategory.database,
-                  tags: ['chapter', 'open', 'not-found'],
-                );
-                ToastUtils.show('无法打开该章节');
-              }
-            },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         );
       },
@@ -429,10 +545,8 @@ class _SingleMatchHighlight extends StatelessWidget {
       spans.add(TextSpan(
         text: text.substring(match.start, match.end),
         style: TextStyle(
-          backgroundColor: Theme.of(context)
-              .colorScheme
-              .primary
-              .withValues(alpha: 0.3),
+          backgroundColor:
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
           fontWeight: FontWeight.bold,
         ),
       ));

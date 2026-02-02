@@ -127,7 +127,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     // 查询数据库获取插图信息（使用用户输入的场景描述）
     String? prompts;
     try {
-      final illustrations = await databaseService.getSceneIllustrationsByChapter(
+      final illustrations =
+          await databaseService.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );

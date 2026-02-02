@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:provider/provider.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
@@ -8,20 +8,20 @@ import '../services/app_update_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/toast_utils.dart';
-import '../services/theme_service.dart';
+import '../core/providers/theme_provider.dart';
 import '../services/backup_service.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../utils/format_utils.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   PackageInfo? _packageInfo;
   bool _isCheckingUpdate = false;
   String? _lastBackupTime;
@@ -62,7 +62,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final apiWrapper = ApiServiceWrapper();
       final updateService = AppUpdateService(apiWrapper: apiWrapper);
 
-      final latestVersion = await updateService.checkForUpdate(forceCheck: true);
+      final latestVersion =
+          await updateService.checkForUpdate(forceCheck: true);
 
       if (!mounted) return;
 
@@ -107,6 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听主题提供者
+    final themeAsync = ref.watch(themeNotifierProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
@@ -137,7 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : const Icon(Icons.system_update_alt),
             title: const Text('检查更新'),
             subtitle: const Text('查看是否有新版本可用'),
-            trailing: _isCheckingUpdate ? null : const Icon(Icons.arrow_forward_ios),
+            trailing:
+                _isCheckingUpdate ? null : const Icon(Icons.arrow_forward_ios),
             onTap: _isCheckingUpdate ? null : _checkForUpdate,
           ),
           const Divider(),
@@ -174,16 +179,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
 
           // 主题模式设置
-          Consumer<ThemeService>(
-            builder: (context, themeService, child) {
+          themeAsync.when(
+            data: (themeState) {
               return ListTile(
                 leading: const Icon(Icons.palette_outlined),
                 title: const Text('主题模式'),
-                subtitle: Text(_getThemeModeText(themeService.themeMode)),
+                subtitle: Text(_getThemeModeText(themeState.themeMode)),
                 trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => _showThemeModeDialog(themeService),
+                onTap: () => _showThemeModeDialog(themeState),
               );
             },
+            loading: () => const ListTile(
+              leading: Icon(Icons.palette_outlined),
+              title: Text('主题模式'),
+              subtitle: Text('加载中...'),
+            ),
+            error: (_, __) => const ListTile(
+              leading: Icon(Icons.palette_outlined),
+              title: Text('主题模式'),
+              subtitle: Text('加载失败'),
+            ),
           ),
           const Divider(),
 
@@ -233,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// 显示主题模式选择对话框
-  void _showThemeModeDialog(ThemeService themeService) {
+  void _showThemeModeDialog(ThemeState themeState) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -248,10 +263,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('亮色模式'),
                     subtitle: const Text('使用浅色主题'),
                     value: AppThemeMode.light,
-                    groupValue: themeService.themeMode,
+                    groupValue: themeState.themeMode,
                     onChanged: (AppThemeMode? value) {
                       if (value != null) {
-                        themeService.setThemeMode(value);
+                        ref
+                            .read(themeNotifierProvider.notifier)
+                            .setThemeMode(value);
                         Navigator.pop(context);
                       }
                     },
@@ -260,10 +277,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('暗色模式'),
                     subtitle: const Text('使用深色主题'),
                     value: AppThemeMode.dark,
-                    groupValue: themeService.themeMode,
+                    groupValue: themeState.themeMode,
                     onChanged: (AppThemeMode? value) {
                       if (value != null) {
-                        themeService.setThemeMode(value);
+                        ref
+                            .read(themeNotifierProvider.notifier)
+                            .setThemeMode(value);
                         Navigator.pop(context);
                       }
                     },
@@ -272,10 +291,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('跟随系统'),
                     subtitle: const Text('跟随系统设置自动切换'),
                     value: AppThemeMode.system,
-                    groupValue: themeService.themeMode,
+                    groupValue: themeState.themeMode,
                     onChanged: (AppThemeMode? value) {
                       if (value != null) {
-                        themeService.setThemeMode(value);
+                        ref
+                            .read(themeNotifierProvider.notifier)
+                            .setThemeMode(value);
                         Navigator.pop(context);
                       }
                     },

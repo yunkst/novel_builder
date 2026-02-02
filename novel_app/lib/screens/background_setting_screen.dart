@@ -15,15 +15,20 @@ import '../utils/toast_utils.dart';
 class BackgroundSettingScreen extends StatefulWidget {
   final Novel novel;
 
-  const BackgroundSettingScreen({super.key, required this.novel});
+  // 可选的依赖注入参数 - 用于测试
+  final DatabaseService? databaseService;
+
+  const BackgroundSettingScreen(
+      {super.key, required this.novel, this.databaseService});
 
   @override
-  State<BackgroundSettingScreen> createState() => _BackgroundSettingScreenState();
+  State<BackgroundSettingScreen> createState() =>
+      _BackgroundSettingScreenState();
 }
 
 class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
     with SingleTickerProviderStateMixin {
-  final DatabaseService _databaseService = DatabaseService();
+  late final DatabaseService _databaseService;
   final TextEditingController _controller = TextEditingController();
 
   bool _isSaving = false;
@@ -34,6 +39,10 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
   @override
   void initState() {
     super.initState();
+
+    // 使用注入的依赖或创建默认实例
+    _databaseService = widget.databaseService ?? DatabaseService();
+
     // 初始化为空，然后从数据库加载最新数据
     _controller.text = '';
 
@@ -261,9 +270,7 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
             const SizedBox(width: 4),
             Expanded(
               child: Text(
-                _isModified
-                    ? '内容已修改，2秒后自动保存或点击右上角保存'
-                    : '点击右上角保存按钮保存修改',
+                _isModified ? '内容已修改，2秒后自动保存或点击右上角保存' : '点击右上角保存按钮保存修改',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: _isModified
                           ? Colors.orange
@@ -326,9 +333,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
         listBullet: Theme.of(context).textTheme.bodyMedium,
         code: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontFamily: 'monospace',
-              backgroundColor: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
         codeblockDecoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -402,9 +408,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
                         ),
                       )
                     : const Icon(Icons.save),
-                onPressed: (_isSaving || !_isModified)
-                    ? null
-                    : _saveBackgroundSetting,
+                onPressed:
+                    (_isSaving || !_isModified) ? null : _saveBackgroundSetting,
                 tooltip: '保存',
               ),
             ],

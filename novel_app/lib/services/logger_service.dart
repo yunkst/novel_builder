@@ -299,22 +299,34 @@ class LoggerService {
   }
 
   /// 记录调试级别日志
-  void d(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+  void d(String message,
+      {String? stackTrace,
+      LogCategory category = LogCategory.general,
+      List<String> tags = const []}) {
     _log(message, LogLevel.debug, stackTrace, category, tags);
   }
 
   /// 记录信息级别日志
-  void i(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+  void i(String message,
+      {String? stackTrace,
+      LogCategory category = LogCategory.general,
+      List<String> tags = const []}) {
     _log(message, LogLevel.info, stackTrace, category, tags);
   }
 
   /// 记录警告级别日志
-  void w(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+  void w(String message,
+      {String? stackTrace,
+      LogCategory category = LogCategory.general,
+      List<String> tags = const []}) {
     _log(message, LogLevel.warning, stackTrace, category, tags);
   }
 
   /// 记录错误级别日志
-  void e(String message, {String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []}) {
+  void e(String message,
+      {String? stackTrace,
+      LogCategory category = LogCategory.general,
+      List<String> tags = const []}) {
     _log(message, LogLevel.error, stackTrace, category, tags);
   }
 
@@ -335,7 +347,10 @@ class LoggerService {
   ///
   /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
   /// 添加后会触发持久化和状态通知。
-  void _log(String message, LogLevel level, [String? stackTrace, LogCategory category = LogCategory.general, List<String> tags = const []]) {
+  void _log(String message, LogLevel level,
+      [String? stackTrace,
+      LogCategory category = LogCategory.general,
+      List<String> tags = const []]) {
     final entry = LogEntry(
       timestamp: DateTime.now(),
       level: level,
@@ -384,7 +399,7 @@ class LoggerService {
 
     _isPersisting = true;
     _pendingPersist = false;
-    _lastPersistTime = DateTime.now();  // 新增：更新时间戳
+    _lastPersistTime = DateTime.now(); // 新增：更新时间戳
 
     try {
       await _persistLogs();
@@ -528,13 +543,11 @@ class LoggerService {
     final directory = await getApplicationDocumentsDirectory();
     final file = File('${directory.path}/$_exportFileName');
 
-    final content = _logs
-        .map((log) {
-          final timestamp = _formatTimestamp(log.timestamp);
-          final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-          return '[$timestamp] [${log.level.label}] ${log.message}$stackTrace';
-        })
-        .join('\n\n---\n\n');
+    final content = _logs.map((log) {
+      final timestamp = _formatTimestamp(log.timestamp);
+      final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+      return '[$timestamp] [${log.level.label}] ${log.message}$stackTrace';
+    }).join('\n\n---\n\n');
 
     await file.writeAsString(content, flush: true);
     return file;

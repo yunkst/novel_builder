@@ -1,0 +1,4 @@
+# 禁用并行测试运行,避免数据库锁定问题
+tags:
+  integration:
+    timeout: Timeout(Duration(minutes: 2))

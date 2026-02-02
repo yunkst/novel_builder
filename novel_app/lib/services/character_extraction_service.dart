@@ -15,21 +15,6 @@ class ChapterMatch {
   });
 }
 
-/// 辅助类：带来源信息的段落
-class _ParagraphInfo {
-  final String content;
-  final int contextIndex;
-  final bool isFirst;
-  final bool isLast;
-
-  _ParagraphInfo({
-    required this.content,
-    required this.contextIndex,
-    required this.isFirst,
-    required this.isLast,
-  });
-}
-
 /// 角色提取服务
 /// 用于从章节内容中提取角色相关的上下文
 class CharacterExtractionService {
@@ -147,49 +132,92 @@ class CharacterExtractionService {
   /// [contexts] 上下文片段列表（按位置排序）
   ///
   /// 返回合并后的内容（去重后的所有内容，无字数限制）
-  /// 注意：会丢弃每个片段的第一段和最后一段（因为它们可能被截断）
+  /// 策略：
+  /// - 按段落分割所有内容
+  /// - 使用 Set 去重重复段落
+  /// - 保留所有段落（不丢弃首尾）
   String mergeAndDeduplicateContexts(List<String> contexts) {
     if (contexts.isEmpty) return '';
     if (contexts.length == 1) return contexts[0];
 
     // 按段落分割所有内容
-    final allParagraphs = <_ParagraphInfo>[];
-    int contextIndex = 0;
+    final allParagraphs = <String>[];
 
     for (final context in contexts) {
       // 按换行符分割段落，去除空白段落
-      final paragraphs = context.split('\n')
+      final paragraphs = context
+          .split('\n')
           .map((p) => p.trim())
           .where((p) => p.isNotEmpty)
           .toList();
 
-      // 为每个段落标记来源片段索引和位置
-      for (int i = 0; i < paragraphs.length; i++) {
-        allParagraphs.add(_ParagraphInfo(
-          content: paragraphs[i],
-          contextIndex: contextIndex,
-          isFirst: i == 0,
-          isLast: i == paragraphs.length - 1,
-        ));
-      }
-
-      contextIndex++;
+      allParagraphs.addAll(paragraphs);
     }
 
     if (allParagraphs.isEmpty) return '';
-
-    // 过滤掉每个片段的第一段和最后一段（它们可能被截断）
-    final filteredParagraphs = allParagraphs.where((p) {
-      return !p.isFirst && !p.isLast;
-    }).map((p) => p.content).toList();
-
-    if (filteredParagraphs.isEmpty) return '';
 
     // 使用 Set 去重（保持顺序）
     final seen = <String>{};
     final uniqueParagraphs = <String>[];
 
-    for (final paragraph in filteredParagraphs) {
+    for (final paragraph in allParagraphs) {
+      if (!seen.contains(paragraph)) {
+        seen.add(paragraph);
+        uniqueParagraphs.add(paragraph);
+      }
+    }
+
+    // 用换行符连接所有段落（无字数限制）
+    return uniqueParagraphs.join('\n');
+  }
+
+  /// 合并并去重上下文片段（丢弃首尾段落版本）
+  ///
+  /// [contexts] 上下文片段列表（按位置排序）
+  ///
+  /// 返回合并后的内容（去重后的所有内容，无字数限制）
+  /// 策略：
+  /// - 按段落分割所有内容
+  /// - 对每个片段，丢弃首尾段落（因为可能是截断的）
+  /// - 使用 Set 去重重复段落
+  /// - 保留所有有效段落
+  String mergeAndDeduplicateContextsWithDrop(List<String> contexts) {
+    if (contexts.isEmpty) return '';
+    if (contexts.length == 1) return contexts[0];
+
+    // 按片段分割并丢弃首尾段落
+    final allParagraphs = <String>[];
+
+    for (final context in contexts) {
+      // 按换行符分割段落，去除空白段落
+      final paragraphs = context
+          .split('\n')
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
+
+      // 如果有多个段落，丢弃首尾（可能是截断的）
+      if (paragraphs.length > 2) {
+        // 保留中间段落
+        final middleParagraphs = paragraphs.sublist(1, paragraphs.length - 1);
+        allParagraphs.addAll(middleParagraphs);
+      } else if (paragraphs.length == 2) {
+        // 只有2个段落时，都是"首尾"，都丢弃
+        // 不添加任何内容
+      } else if (paragraphs.length == 1) {
+        // 只有1个段落时，无法丢弃，保留
+        allParagraphs.add(paragraphs[0]);
+      }
+      // length == 0 时，不添加任何内容
+    }
+
+    if (allParagraphs.isEmpty) return '';
+
+    // 使用 Set 去重（保持顺序）
+    final seen = <String>{};
+    final uniqueParagraphs = <String>[];
+
+    for (final paragraph in allParagraphs) {
       if (!seen.contains(paragraph)) {
         seen.add(paragraph);
         uniqueParagraphs.add(paragraph);

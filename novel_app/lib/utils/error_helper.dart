@@ -32,7 +32,8 @@ class ErrorHelper {
 
     // 显示用户提示
     if (context.mounted) {
-      ToastUtils.showError(error != null ? '$userMessage: $error' : userMessage, context: context);
+      ToastUtils.showError(error != null ? '$userMessage: $error' : userMessage,
+          context: context);
     }
   }
 
@@ -59,7 +60,9 @@ class ErrorHelper {
 
     // 显示用户提示
     if (context.mounted) {
-      ToastUtils.showWarning(error != null ? '$userMessage: $error' : userMessage, context: context);
+      ToastUtils.showWarning(
+          error != null ? '$userMessage: $error' : userMessage,
+          context: context);
     }
   }
 

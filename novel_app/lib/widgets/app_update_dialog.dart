@@ -104,8 +104,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               if (_isDownloading) ...[
                 LinearProgressIndicator(
                   value: _downloadProgress,
-                  backgroundColor:
-                      theme.colorScheme.surfaceContainerHighest,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 ),
                 const SizedBox(height: 8),
                 Text(

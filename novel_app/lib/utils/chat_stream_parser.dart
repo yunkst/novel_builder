@@ -123,7 +123,8 @@ class ChatStreamParser {
     debugPrint('=== $title ===');
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
-      debugPrint('[$i] ${msg.type} (${msg.isUser ? "用户" : "AI"}): ${msg.content}');
+      debugPrint(
+          '[$i] ${msg.type} (${msg.isUser ? "用户" : "AI"}): ${msg.content}');
     }
     debugPrint('================');
   }
@@ -233,7 +234,8 @@ class ChatStreamParser {
               debugPrint('✅ 闭合标签: $tagName');
             } else {
               // 标签不匹配，作为普通文本追加到当前消息
-              debugPrint('⚠️ 闭合标签不匹配: $tagName (当前: ${currentCharacter?.name})');
+              debugPrint(
+                  '⚠️ 闭合标签不匹配: $tagName (当前: ${currentCharacter?.name})');
               if (currentCharacter != null) {
                 _appendToDialogue(messages, '</$tagName>', currentCharacter);
               } else {

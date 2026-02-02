@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../test_bootstrap.dart';
+import '../base/database_test_base.dart';
 
 /// 真实用户场景模拟测试
 ///
@@ -11,15 +12,20 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// 3. A != B 导致保存失败
 void main() {
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('真实用户场景模拟', () {
+    late DatabaseTestBase testBase;
     late DatabaseService dbService;
-
     setUp(() async {
-      dbService = DatabaseService();
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+      dbService = testBase.databaseService;
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
     });
 
     test('场景1: 用户通过"全部小说"书架进入', () async {

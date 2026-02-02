@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/screens/character_edit_screen.dart';
 import 'package:novel_app/services/database_service.dart';
-import 'package:novel_app/services/chapter_manager.dart';
+import 'package:novel_app/services/api_service_wrapper.dart';
+import 'package:novel_app/services/dify_service.dart';
+import 'package:novel_app/services/character_avatar_service.dart';
+import 'package:novel_app/core/providers/character_screen_providers.dart';
+import 'package:novel_app/core/providers/database_providers.dart';
+import 'package:novel_app/core/providers/service_providers.dart';
 import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
+
+// 生成 Nice Mock 类（不需要手动 stub 每个方法）
+@GenerateNiceMocks([
+  MockSpec<ApiServiceWrapper>(),
+  MockSpec<DifyService>(),
+  MockSpec<CharacterAvatarService>(),
+])
+import 'character_edit_screen_auto_save_test.mocks.dart';
 
 /// CharacterEditScreen 自动保存功能单元测试
+///
+/// **重要修复说明** (2025-02-01):
+/// - 使用 DatabaseTestBase 创建独立的数据库实例
+/// - 避免多个测试共享同一个数据库导致锁定冲突
+/// - 每个测试完成后正确清理数据库连接
 ///
 /// 测试目标:
 /// 1. 验证生成提示词后自动保存功能正常工作
@@ -18,30 +40,33 @@ import '../../test_bootstrap.dart';
 /// 6. 验证错误处理和提示
 ///
 /// 注意:
-/// - 由于CharacterEditScreen依赖多个服务初始化
-/// - 这里主要测试UI元素的存在和基本交互
+/// - 测试使用 Riverpod ProviderScope
+/// - CharacterEditScreen 使用 ConsumerStatefulWidget
+/// - 主要测试UI元素的存在和基本交互
 /// - 完整的自动保存逻辑需要集成测试支持
 void main() {
   // 初始化测试环境
   initDatabaseTests();
-  final databaseService = DatabaseService();
 
   group('CharacterEditScreen - 提示词生成后自动保存功能', () {
+    late DatabaseTestBase testBase;
     late Character testCharacter;
     late Novel testNovel;
+    late MockApiServiceWrapper mockApiService;
+    late MockDifyService mockDifyService;
+    late MockCharacterAvatarService mockAvatarService;
 
     setUpAll(() async {
-      // 初始化数据库服务
-      final db = await databaseService.database;
-      // 清理测试数据
-      try {
-        await db.delete('characters');
-      } catch (_) {}
+      // 创建 Mock 实例
+      mockApiService = MockApiServiceWrapper();
+      mockDifyService = MockDifyService();
+      mockAvatarService = MockCharacterAvatarService();
     });
 
-    setUp(() {
-      // 清理ChapterManager以避免Timer泄漏
-      // ChapterManager现在是工厂构造函数，不需要手动清理
+    setUp(() async {
+      // 每个测试使用独立的数据库实例（关键修复！）
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
 
       // 准备测试用小说
       testNovel = Novel(
@@ -72,17 +97,36 @@ void main() {
       );
     });
 
-    tearDown(() {
-      // 测试结束后清理
-      // ChapterManager现在是工厂构造函数，不需要手动清理
+    tearDown(() async {
+      // 清理测试数据库（关键修复！）
+      await testBase.tearDown();
     });
+
+    /// 创建测试用的 ProviderScope
+    ProviderScope createTestScope({required Widget child}) {
+      return ProviderScope(
+        overrides: [
+          // 使用测试数据库服务
+          databaseServiceProvider.overrideWithValue(testBase.databaseService),
+          // Mock API 服务
+          apiServiceWrapperProvider.overrideWithValue(mockApiService),
+          // Mock Dify 服务
+          difyServiceProvider.overrideWithValue(mockDifyService),
+          // Mock 头像服务
+          characterAvatarServiceProvider.overrideWithValue(mockAvatarService),
+        ],
+        child: MaterialApp(
+          home: child,
+        ),
+      );
+    }
 
     testWidgets('测试1: 新建模式下UI应包含生成提示词按钮',
         (WidgetTester tester) async {
-      // 构建测试界面（新建模式）
+      // 构建测试界面（新建模式）- 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             novel: testNovel,
           ),
         ),
@@ -98,10 +142,10 @@ void main() {
 
     testWidgets('测试2: 编辑模式下UI应包含生成提示词按钮',
         (WidgetTester tester) async {
-      // 构建测试界面（编辑模式）
+      // 构建测试界面（编辑模式）- 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -117,10 +161,10 @@ void main() {
 
     testWidgets('测试3: 编辑模式下提示词字段应显示现有值',
         (WidgetTester tester) async {
-      // 构建测试界面（编辑模式）
+      // 构建测试界面（编辑模式）- 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -138,10 +182,10 @@ void main() {
 
     testWidgets('测试4: 新建模式下必填字段验证',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             novel: testNovel,
           ),
         ),
@@ -160,10 +204,10 @@ void main() {
 
     testWidgets('测试5: 验证表单字段完整性',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -179,10 +223,10 @@ void main() {
 
     testWidgets('测试6: 验证保存按钮存在',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -197,10 +241,10 @@ void main() {
 
     testWidgets('测试7: 新建模式下的AppBar标题',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             novel: testNovel,
           ),
         ),
@@ -214,10 +258,10 @@ void main() {
 
     testWidgets('测试8: 编辑模式下的AppBar标题',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -232,10 +276,10 @@ void main() {
 
     testWidgets('测试9: 验证头像显示区域存在',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -244,24 +288,29 @@ void main() {
 
       await tester.pump();
 
-      // 查找头像相关的容器 - 实际实现使用Container + ClipOval
-      expect(find.byType(Container), findsWidgets,
+      // 查找头像相关的容器
+      // 注意: ClipOval只在有实际头像文件时渲染,测试环境中可能没有文件
+      // 因此验证Container(备用头像也会使用Container)
+      final containers = find.byType(Container);
+      expect(containers, findsWidgets,
           reason: '应该存在头像区域的Container');
-      // 查找ClipOval（圆形裁剪）
-      expect(find.byType(ClipOval), findsAtLeastNWidgets(1),
-          reason: '应该存在头像的圆形裁剪');
+
+      // 验证至少有一个圆形的Container(备用头像或实际头像)
+      final circularContainers = tester.widgetList<Container>(containers).where((container) {
+        final decoration = container.decoration as BoxDecoration?;
+        return decoration?.shape == BoxShape.circle;
+      });
+
+      expect(circularContainers.isNotEmpty, true,
+          reason: '应该存在圆形的头像区域(实际头像或备用头像)');
     });
 
-    testWidgets(
-      '测试10: 验证提示词输入框是可编辑的 [SKIPPED: Timer pending]',
-      (WidgetTester tester) async {
-      // ⚠️ 暂时跳过此测试,待修复Timer pending问题
-      return;
-
-      // 构建测试界面
+    testWidgets('测试10: 验证提示词输入框是可编辑的',
+        (WidgetTester tester) async {
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -284,10 +333,10 @@ void main() {
 
     testWidgets('测试11: 验证生成提示词按钮存在',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),
@@ -306,10 +355,10 @@ void main() {
 
     testWidgets('测试12: 验证姓名字段可正常输入',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             novel: testNovel,
           ),
         ),
@@ -331,10 +380,10 @@ void main() {
 
     testWidgets('测试13: 验证性别选择框存在',
         (WidgetTester tester) async {
-      // 构建测试界面
+      // 构建测试界面 - 使用统一的 ProviderScope
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterEditScreen(
+        createTestScope(
+          child: CharacterEditScreen(
             character: testCharacter,
             novel: testNovel,
           ),

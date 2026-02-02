@@ -58,7 +58,8 @@ class CharacterDetailDialog extends StatelessWidget {
           _buildInfoRow(context, '性别', character.gender ?? '未知'),
           const SizedBox(height: 8),
           // 职业（如果有）
-          if (character.occupation != null && character.occupation!.isNotEmpty) ...[
+          if (character.occupation != null &&
+              character.occupation!.isNotEmpty) ...[
             _buildInfoRow(context, '职业', character.occupation!),
             const SizedBox(height: 8),
           ],
@@ -87,10 +88,8 @@ class CharacterDetailDialog extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.6),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),

@@ -1,18 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/role_gallery.dart';
-import '../services/api_service_wrapper.dart';
-import '../services/role_gallery_cache_service.dart';
-import '../services/character_avatar_sync_service.dart';
-import '../services/character_avatar_service.dart';
-import '../services/image_crop_service.dart';
+import '../core/providers/service_providers.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/api_image_widget.dart';
 import '../widgets/gallery_action_panel.dart';
-import '../core/di/api_service_provider.dart';
+import '../services/image_crop_service.dart';
 
-/// 图集浏览页面
-class GalleryViewScreen extends StatefulWidget {
+/// 图集浏览页面 - Riverpod 版本
+class GalleryViewScreen extends ConsumerStatefulWidget {
   final String roleId;
   final String? roleName;
 
@@ -23,10 +20,10 @@ class GalleryViewScreen extends StatefulWidget {
   });
 
   @override
-  State<GalleryViewScreen> createState() => _GalleryViewScreenState();
+  ConsumerState<GalleryViewScreen> createState() => _GalleryViewScreenState();
 }
 
-class _GalleryViewScreenState extends State<GalleryViewScreen>
+class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
   late AnimationController _fadeController;
@@ -37,12 +34,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   RoleGallery? _gallery;
   List<RoleImage> _sortedImages = [];
   bool _hasGalleryLoadError = false;
-
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final RoleGalleryCacheService _cacheService = RoleGalleryCacheService();
-  final CharacterAvatarSyncService _avatarSyncService =
-      CharacterAvatarSyncService();
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
 
   @override
   void initState() {
@@ -63,8 +54,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _initializeCacheService() async {
     try {
-      await _cacheService.init();
-      await _avatarSyncService.init();
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final avatarSyncService = ref.read(characterAvatarSyncServiceProvider);
+
+      await cacheService.init();
+      await avatarSyncService.init();
       _loadGallery();
       _fadeController.forward();
     } catch (e) {
@@ -84,7 +78,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _loadGallery() async {
     try {
-      final galleryData = await _apiService.getRoleGallery(widget.roleId);
+      final apiService = ref.read(apiServiceWrapperProvider);
+      final galleryData = await apiService.getRoleGallery(widget.roleId);
 
       setState(() {
         _gallery = RoleGallery.fromJson(galleryData);
@@ -113,12 +108,13 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   Future<void> _preloadImages() async {
     if (_sortedImages.isEmpty) return;
 
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
     final preloadFilenames = _sortedImages
         .take(3) // 预加载前3张
         .map((img) => img.filename)
         .toList();
 
-    await _cacheService.preloadImages(preloadFilenames);
+    await cacheService.preloadImages(preloadFilenames);
   }
 
   void _onPageChanged(int index) {
@@ -144,18 +140,22 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
     });
 
     // 清除相关缓存
-    _cacheService.clearMemoryCache();
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
+    cacheService.clearMemoryCache();
 
     await _loadGallery();
   }
 
   Future<void> _onDeleteImage(RoleImage image) async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 删除本地缓存
-      await _cacheService.deleteCachedImage(image.filename);
+      await cacheService.deleteCachedImage(image.filename);
 
       // 调用后端删除接口
-      final success = await _apiService.deleteRoleImage(
+      final success = await apiService.deleteRoleImage(
         roleId: widget.roleId,
         imageUrl: image.filename,
       );
@@ -192,6 +192,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _onGenerateMoreImages(int count) async {
     try {
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 获取当前显示的图片作为参考图片
       final currentImage =
           _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
@@ -199,7 +201,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
       debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl');
 
-      await _apiService.generateMoreImages(
+      await apiService.generateMoreImages(
         roleId: widget.roleId,
         count: count,
         referenceImageUrl: referenceImageUrl,
@@ -230,10 +232,13 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _onSetAsAvatar(RoleImage image) async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final avatarService = ref.read(characterAvatarServiceProvider);
+
       debugPrint('🎨 开始设置图片为头像: ${image.filename}');
 
       // 获取图片字节数据
-      final imageBytes = await _cacheService.getImageBytes(image.filename);
+      final imageBytes = await cacheService.getImageBytes(image.filename);
       if (imageBytes == null) {
         debugPrint('❌ 无法获取图片数据: ${image.filename}');
         if (mounted) {
@@ -302,7 +307,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         final imageBytes = await croppedFile.readAsBytes();
 
         // 直接使用CharacterAvatarService设置头像
-        final avatarPath = await _avatarService.setAvatarFromGallery(
+        final avatarPath = await avatarService.setAvatarFromGallery(
           characterId,
           imageBytes,
           'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -378,7 +383,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   /// 显示带操作的信息提示（用于查看生成详情）
-  void showInfoWithAction(String message, String actionLabel, VoidCallback onAction) {
+  void showInfoWithAction(
+      String message, String actionLabel, VoidCallback onAction) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -557,6 +563,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   Widget _buildImagePage(RoleImage image, int index) {
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -567,7 +575,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         height: double.infinity,
         fit: BoxFit.contain,
         onRetry: () => _refreshGallery(),
-        cacheService: _cacheService, // 传递已初始化的缓存服务
+        cacheService: cacheService, // 传递已初始化的缓存服务
       ),
     );
   }
@@ -663,7 +671,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               IconButton(
                 onPressed: () =>
                     Navigator.of(context).pop(true), // 总是返回true以触发数据刷新
-                icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFFFFFF)),
+                icon:
+                    const Icon(Icons.arrow_back_ios, color: Color(0xFFFFFFFF)),
               ),
               Expanded(
                 child: Text(
@@ -781,9 +790,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   /// 处理图集加载出错时的删除操作
   Future<void> _handleErrorDelete() async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+
       // 由于图集加载失败，我们无法获取具体的图片信息
       // 这里只清除本地缓存，并尝试重新加载
-      _cacheService.clearMemoryCache();
+      cacheService.clearMemoryCache();
 
       if (mounted) {
         ToastUtils.showInfo('缓存已清除，正在重新加载图集...');

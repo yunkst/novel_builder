@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/character_relationship.dart';

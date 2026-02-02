@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
 import '../models/chat_message.dart';
 import '../services/dify_service.dart';
 import '../services/character_avatar_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/toast_utils.dart';
+import '../screens/providers/dify_provider.dart';
+import '../screens/providers/character_avatar_provider.dart';
 import 'dart:io';
 
-/// 角色聊天屏幕
-class CharacterChatScreen extends StatefulWidget {
+/// 角色聊天屏幕 (Riverpod版本)
+class CharacterChatScreen extends ConsumerStatefulWidget {
   final Character character;
   final String initialScene;
 
@@ -19,10 +22,11 @@ class CharacterChatScreen extends StatefulWidget {
   });
 
   @override
-  State<CharacterChatScreen> createState() => _CharacterChatScreenState();
+  ConsumerState<CharacterChatScreen> createState() =>
+      _CharacterChatScreenState();
 }
 
-class _CharacterChatScreenState extends State<CharacterChatScreen> {
+class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
   List<ChatMessage> _messages = [];
   bool _isGenerating = false;
   bool _inDialogue = false; // 解析状态：是否在对话中
@@ -32,14 +36,21 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
   final TextEditingController _actionController = TextEditingController();
   final TextEditingController _speechController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final DifyService _difyService = DifyService();
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
+
+  // 通过Provider获取服务实例
+  late DifyService _difyService;
+  late CharacterAvatarService _avatarService;
 
   @override
   void initState() {
     super.initState();
     _scene = widget.initialScene;
-    _startInitialChat();
+    // 延迟初始化聊天，确保服务已加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _difyService = ref.read(difyServiceProvider);
+      _avatarService = ref.read(characterAvatarServiceProvider);
+      _startInitialChat();
+    });
   }
 
   @override
@@ -303,7 +314,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
               '场景：$_scene',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -337,7 +351,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
                 Text(
                   '正在建立连接...',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.7),
                     fontSize: 16,
                   ),
                 ),
@@ -346,7 +363,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
           : Text(
               '开始你们的对话吧！',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
                 fontSize: 18,
               ),
             ),
@@ -415,7 +435,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
                 color: Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .secondary
+                      .withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -427,7 +450,8 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.5,
-                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        color:
+                            Theme.of(context).colorScheme.onSecondaryContainer,
                       ),
                     ),
                   ),
@@ -455,7 +479,8 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
             color: Theme.of(context).colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             ),
           ),
           child: Text(
@@ -487,7 +512,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondary
+                    .withValues(alpha: 0.3),
                 width: 2,
               ),
             ),
@@ -543,8 +571,8 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor:
-              AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+          valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.primary),
         ),
       ),
     );
@@ -570,16 +598,27 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
               labelText: '行为（可选）',
               hintText: '例如：举起酒杯，微笑着说',
               border: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                borderSide:
+                    BorderSide(color: Theme.of(context).colorScheme.primary),
               ),
-              labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+              labelStyle: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7)),
+              hintStyle: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
               contentPadding: EdgeInsets.all(12),
             ),
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
@@ -596,16 +635,27 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
               labelText: '对话（可选）',
               hintText: '例如：你好，最近怎么样？',
               border: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                borderSide:
+                    BorderSide(color: Theme.of(context).colorScheme.primary),
               ),
-              labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+              labelStyle: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7)),
+              hintStyle: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
               contentPadding: EdgeInsets.all(12),
             ),
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
@@ -625,7 +675,10 @@ class _CharacterChatScreenState extends State<CharacterChatScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                disabledBackgroundColor: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: Text(_isGenerating ? '生成中...' : '发送'),

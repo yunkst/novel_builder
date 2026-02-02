@@ -1,0 +1,18 @@
+# 实验报告输出目录
+reports/
+*.txt
+*.log
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 临时文件
+*.tmp
+*.bak
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db

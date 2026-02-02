@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/common/common_widgets.dart';
 
-/// 章节生成全屏页面
+/// 章节生成全屏页面 (Riverpod版本)
 ///
 /// 功能:
 /// - 全屏展示AI生成的小说内容
 /// - 实时流式显示生成内容
 /// - 提供取消/重试/插入三个操作按钮
-class ChapterGenerationScreen extends StatefulWidget {
+class ChapterGenerationScreen extends ConsumerStatefulWidget {
   final String title;
   final ValueNotifier<String> generatedContentNotifier;
   final ValueNotifier<bool> isGeneratingNotifier;
@@ -44,10 +45,12 @@ class ChapterGenerationScreen extends StatefulWidget {
   }
 
   @override
-  State<ChapterGenerationScreen> createState() => _ChapterGenerationScreenState();
+  ConsumerState<ChapterGenerationScreen> createState() =>
+      _ChapterGenerationScreenState();
 }
 
-class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
+class _ChapterGenerationScreenState
+    extends ConsumerState<ChapterGenerationScreen> {
   late final ScrollController _scrollController;
   bool _userScrolled = false; // 用户是否手动滚动过
 
@@ -82,7 +85,8 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
   /// 用户手动滚动的回调
   void _onUserScroll() {
     // 如果用户向上滚动,则暂停自动滚动
-    if (_scrollController.position.userScrollDirection != ScrollDirection.forward) {
+    if (_scrollController.position.userScrollDirection !=
+        ScrollDirection.forward) {
       setState(() {
         _userScrolled = true;
       });
@@ -162,7 +166,8 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
           ),
           title: Row(
             children: [
-              Icon(Icons.auto_awesome, size: 20, color: Theme.of(context).colorScheme.tertiary),
+              Icon(Icons.auto_awesome,
+                  size: 20, color: Theme.of(context).colorScheme.tertiary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -177,7 +182,8 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
               onPressed: _handleCancel,
               child: Text(
                 '取消',
-                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onPrimary),
               ),
             ),
           ],
@@ -218,7 +224,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                             vertical: 8,
                             horizontal: 16,
                           ),
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.9),
                           child: Row(
                             children: [
                               SizedBox(
@@ -226,14 +235,20 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.3),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Text(
                                 '正在生成中...',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.1),
                                   fontSize: 14,
                                 ),
                               ),
@@ -244,10 +259,16 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                       // 内容显示区域
                       Expanded(
                         child: Container(
-                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.9),
                           padding: const EdgeInsets.all(16),
                           child: Card(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.85),
                             elevation: 2,
                             child: Padding(
                               padding: const EdgeInsets.all(20),
@@ -262,7 +283,9 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                       style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                       ),
                                     ),
                                     const Divider(
@@ -276,7 +299,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                       style: TextStyle(
                                         fontSize: 16,
                                         height: 1.8,
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.87),
                                       ),
                                     ),
                                   ],
@@ -295,20 +321,29 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                             vertical: 8,
                             horizontal: 16,
                           ),
-                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.9),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondary
+                              .withValues(alpha: 0.9),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.info_outline,
                                 size: 16,
-                                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withValues(alpha: 0.3),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '已暂停自动滚动,内容仍在生成中',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary
+                                        .withValues(alpha: 0.1),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -324,7 +359,10 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                   '恢复滚动',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary
+                                        .withValues(alpha: 0.3),
                                   ),
                                 ),
                               ),
@@ -347,10 +385,16 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surface
+                            .withValues(alpha: 0.9),
                         boxShadow: [
                           BoxShadow(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.3),
                             blurRadius: 4,
                             offset: const Offset(0, -2),
                           ),
@@ -365,7 +409,11 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                               onPressed: _handleCancel,
                               child: Text(
                                 '取消',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.74)),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.74)),
                               ),
                             ),
 
@@ -379,8 +427,14 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
                                 isGenerating ? '生成中' : '重试',
                                 style: TextStyle(
                                   color: isGenerating
-                                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.457)
-                                      : Theme.of(context).colorScheme.primary.withValues(alpha: 0.71),
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.457)
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.71),
                                 ),
                               ),
                             ),
@@ -389,15 +443,26 @@ class _ChapterGenerationScreenState extends State<ChapterGenerationScreen> {
 
                             // 插入按钮
                             ElevatedButton.icon(
-                              onPressed:
-                                  (isGenerating || content.isEmpty) ? null : _handleInsert,
+                              onPressed: (isGenerating || content.isEmpty)
+                                  ? null
+                                  : _handleInsert,
                               icon: const Icon(Icons.check, size: 18),
                               label: const Text('插入'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.22),
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
-                                disabledForegroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.22),
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                disabledBackgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.38),
+                                disabledForegroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.62),
                               ),
                             ),
                           ],

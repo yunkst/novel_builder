@@ -376,9 +376,7 @@ class DialogManager {
                 : Text(itemLabel!(item)),
             leading: Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
-              color: isSelected
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
+              color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
             ),
             onTap: () => Navigator.of(context).pop(item),
           );

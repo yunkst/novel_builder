@@ -129,10 +129,10 @@ class ToastUtils {
     required Color backgroundColor,
     Duration? duration,
   }) {
-    final toastLength = duration != null &&
-            (duration.inSeconds >= 3 || duration.inMinutes >= 1)
-        ? Toast.LENGTH_LONG
-        : Toast.LENGTH_SHORT;
+    final toastLength =
+        duration != null && (duration.inSeconds >= 3 || duration.inMinutes >= 1)
+            ? Toast.LENGTH_LONG
+            : Toast.LENGTH_SHORT;
 
     Fluttertoast.showToast(
       msg: message,

@@ -18,7 +18,7 @@ void main() {
         '片段2第一段（可能截断）。\n片段2中间段B。\n片段2中间段C。\n片段2最后段（可能截断）。',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
       print('合并结果：\n$merged');
 
@@ -43,9 +43,9 @@ void main() {
         '第一段。\n中间段。\n最后段。',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
-      // 单个片段直接返回原值
+      // 单个片段直接返回原值（特殊处理）
       expect(merged, '第一段。\n中间段。\n最后段。');
     });
 
@@ -55,7 +55,7 @@ void main() {
         '唯一一段。',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
       // 单个片段直接返回原值（特殊处理）
       expect(merged, '唯一一段。');
@@ -68,7 +68,7 @@ void main() {
         '片段3-首（截断）。\n片段3-中1。\n片段3-中2。\n片段3-中3。\n片段3-尾（截断）。',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
       print('合并结果：\n$merged');
 
@@ -79,7 +79,7 @@ void main() {
       expect(merged, contains('片段1-中1。'));
       expect(merged, contains('片段1-中2。'));
 
-      // 片段2保留1个中间段（不是首尾的就是中间段）
+      // 片段2有3个段落，保留中间1段
       expect(merged, contains('片段2-中。'));
 
       // 片段3保留3个中间段
@@ -97,15 +97,15 @@ void main() {
         '片段2-首。\n重复段落。\n片段2-尾。',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
       print('合并结果：\n$merged');
 
-      // "重复段落"应该只出现一次
+      // "重复段落"应该只出现一次（两个片段的中间段都是"重复段落"，去重后只剩1个）
       final count = merged.split('\n').where((p) => p == '重复段落。').length;
       expect(count, 1);
 
-      // 最终只有1个段落（两个片段的中间段都是"重复段落"，去重后只剩1个）
+      // 最终只有1个段落
       final paragraphs = merged.split('\n');
       expect(paragraphs.length, 1);
     });
@@ -121,7 +121,7 @@ void main() {
 两人一路疾行，中途周维清几乎没怎么休息。''',
       ];
 
-      final merged = extractionService.mergeAndDeduplicateContexts(contexts);
+      final merged = extractionService.mergeAndDeduplicateContextsWithDrop(contexts);
 
       print('合并结果：\n$merged');
       print('长度：${merged.length} 字');

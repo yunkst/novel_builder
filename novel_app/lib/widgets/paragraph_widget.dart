@@ -139,8 +139,13 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -148,7 +153,10 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
             style: TextStyle(
               fontSize: widget.fontSize * 0.9,
               fontFamily: 'monospace',
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -170,7 +178,10 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
       padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), width: 1),
+        border: Border.all(
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            width: 1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: TextField(
@@ -204,13 +215,19 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
             decoration: BoxDecoration(
-              color:
-                  widget.isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2) : null,
+              color: widget.isSelected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                  : null,
               border: widget.isSelected
-                  ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary, width: 2)
                   : widget.isCloseupMode
                       ? Border.all(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), width: 1)
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.3),
+                          width: 1)
                       : null,
               borderRadius: BorderRadius.circular(8),
             ),

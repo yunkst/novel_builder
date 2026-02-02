@@ -1,12 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart' as local_novel;
 import '../models/character.dart';
-import '../services/database_service.dart';
-import '../services/dify_service.dart';
-import '../services/api_service_wrapper.dart';
-import '../core/di/api_service_provider.dart';
-import '../services/character_avatar_service.dart';
 import '../utils/character_matcher.dart';
 import '../utils/toast_utils.dart';
 import '../screens/gallery_view_screen.dart';
@@ -15,11 +11,14 @@ import '../screens/character_relationship_screen.dart';
 import '../widgets/model_selector.dart';
 import '../widgets/chat_scene_input_dialog.dart';
 import '../widgets/common/common_widgets.dart';
+import '../core/providers/character_screen_providers.dart';
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
 
 /// 使用方法：RoleGalleryCacheService用于检查角色图集是否为空，在头像点击时进行验证
 /// 调用方式：在_openGallery方法中调用_checkGalleryEmpty方法检查图集状态
 
-class CharacterEditScreen extends StatefulWidget {
+class CharacterEditScreen extends ConsumerStatefulWidget {
   final local_novel.Novel novel;
   final Character? character;
 
@@ -30,13 +29,11 @@ class CharacterEditScreen extends StatefulWidget {
   });
 
   @override
-  State<CharacterEditScreen> createState() => _CharacterEditScreenState();
+  ConsumerState<CharacterEditScreen> createState() =>
+      _CharacterEditScreenState();
 }
 
-class _CharacterEditScreenState extends State<CharacterEditScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
+class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // 表单控制器
@@ -56,7 +53,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   bool _isLoading = false;
   bool _isGeneratingPrompts = false;
   bool _isGeneratingRoleCard = false;
-  bool _isAutoSaving = false;
   List<String> _aliases = []; // 别名列表
   final TextEditingController _aliasController = TextEditingController();
 
@@ -121,31 +117,41 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     if (widget.character?.id == null) return;
 
     try {
-      // 重新从数据库获取角色数据
-      final characters = await _databaseService.getCharacters(widget.novel.url);
-      final updatedCharacter = characters.firstWhere(
-        (c) => c.id == widget.character!.id,
-        orElse: () => widget.character!,
-      );
+      // 使用 Provider 的 refresh 方法
+      await ref
+          .read(characterEditControllerProvider(
+            novel: widget.novel,
+            character: widget.character,
+          ).notifier)
+          .refresh();
 
-      // 更新控制器数据
-      _nameController.text = updatedCharacter.name;
-      _ageController.text = updatedCharacter.age?.toString() ?? '';
-      _selectedGender = updatedCharacter.gender;
-      _occupationController.text = updatedCharacter.occupation ?? '';
-      _personalityController.text = updatedCharacter.personality ?? '';
-      _bodyTypeController.text = updatedCharacter.bodyType ?? '';
-      _clothingStyleController.text = updatedCharacter.clothingStyle ?? '';
-      _appearanceController.text = updatedCharacter.appearanceFeatures ?? '';
-      _backgroundController.text = updatedCharacter.backgroundStory ?? '';
-      _facePromptsController.text = updatedCharacter.facePrompts ?? '';
-      _bodyPromptsController.text = updatedCharacter.bodyPrompts ?? '';
-      _aliases = List.from(updatedCharacter.aliases ?? []);
+      // 获取更新后的数据
+      final updatedCharacter = ref.read(characterEditControllerProvider(
+        novel: widget.novel,
+        character: widget.character,
+      ));
 
-      // 触发UI更新
-      setState(() {
-        // 这里可以更新widget.character，但由于它是final，我们只能更新控制器
-      });
+      if (updatedCharacter.value != null) {
+        // 更新控制器数据
+        _nameController.text = updatedCharacter.value!.name;
+        _ageController.text = updatedCharacter.value!.age?.toString() ?? '';
+        _selectedGender = updatedCharacter.value!.gender;
+        _occupationController.text = updatedCharacter.value!.occupation ?? '';
+        _personalityController.text = updatedCharacter.value!.personality ?? '';
+        _bodyTypeController.text = updatedCharacter.value!.bodyType ?? '';
+        _clothingStyleController.text =
+            updatedCharacter.value!.clothingStyle ?? '';
+        _appearanceController.text =
+            updatedCharacter.value!.appearanceFeatures ?? '';
+        _backgroundController.text =
+            updatedCharacter.value!.backgroundStory ?? '';
+        _facePromptsController.text = updatedCharacter.value!.facePrompts ?? '';
+        _bodyPromptsController.text = updatedCharacter.value!.bodyPrompts ?? '';
+        _aliases = List.from(updatedCharacter.value!.aliases ?? []);
+
+        // 触发UI更新
+        setState(() {});
+      }
 
       if (mounted) {
         ToastUtils.showInfo('数据已刷新');
@@ -153,47 +159,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     } catch (e) {
       debugPrint('❌ 刷新角色数据失败: $e');
     }
-  }
-
-  /// 从表单构建Character对象
-  ///
-  /// 使用方法：在保存角色时调用此方法，统一构建Character对象
-  /// 返回：包含当前表单所有数据的Character对象
-  Character _buildCharacterFromForm({int? id}) {
-    return Character(
-      id: id ?? widget.character?.id,
-      novelUrl: widget.novel.url,
-      name: _nameController.text.trim(),
-      age: _ageController.text.isNotEmpty
-          ? int.tryParse(_ageController.text)
-          : null,
-      gender: _selectedGender,
-      occupation: _occupationController.text.trim().isNotEmpty
-          ? _occupationController.text.trim()
-          : null,
-      personality: _personalityController.text.trim().isNotEmpty
-          ? _personalityController.text.trim()
-          : null,
-      bodyType: _bodyTypeController.text.trim().isNotEmpty
-          ? _bodyTypeController.text.trim()
-          : null,
-      clothingStyle: _clothingStyleController.text.trim().isNotEmpty
-          ? _clothingStyleController.text.trim()
-          : null,
-      appearanceFeatures: _appearanceController.text.trim().isNotEmpty
-          ? _appearanceController.text.trim()
-          : null,
-      backgroundStory: _backgroundController.text.trim().isNotEmpty
-          ? _backgroundController.text.trim()
-          : null,
-      facePrompts: _facePromptsController.text.trim().isNotEmpty
-          ? _facePromptsController.text.trim()
-          : null,
-      bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
-          ? _bodyPromptsController.text.trim()
-          : null,
-      aliases: _aliases.isEmpty ? null : List.from(_aliases),
-    );
   }
 
   Future<void> _saveCharacter() async {
@@ -206,22 +171,51 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     });
 
     try {
-      final character = _buildCharacterFromForm();
+      final controller = ref.read(characterEditControllerProvider(
+        novel: widget.novel,
+        character: widget.character,
+      ).notifier);
 
-      if (widget.character == null) {
-        await _databaseService.createCharacter(character);
-        if (mounted) {
-          ToastUtils.showSuccess('人物创建成功');
-        }
-      } else {
-        await _databaseService.updateCharacter(character);
-        if (mounted) {
-          ToastUtils.showSuccess('人物更新成功');
-        }
-      }
+      final success = await controller.saveCharacter(
+        name: _nameController.text.trim(),
+        age: _ageController.text.isNotEmpty
+            ? int.tryParse(_ageController.text)
+            : null,
+        gender: _selectedGender,
+        occupation: _occupationController.text.trim().isNotEmpty
+            ? _occupationController.text.trim()
+            : null,
+        personality: _personalityController.text.trim().isNotEmpty
+            ? _personalityController.text.trim()
+            : null,
+        bodyType: _bodyTypeController.text.trim().isNotEmpty
+            ? _bodyTypeController.text.trim()
+            : null,
+        clothingStyle: _clothingStyleController.text.trim().isNotEmpty
+            ? _clothingStyleController.text.trim()
+            : null,
+        appearanceFeatures: _appearanceController.text.trim().isNotEmpty
+            ? _appearanceController.text.trim()
+            : null,
+        backgroundStory: _backgroundController.text.trim().isNotEmpty
+            ? _backgroundController.text.trim()
+            : null,
+        facePrompts: _facePromptsController.text.trim().isNotEmpty
+            ? _facePromptsController.text.trim()
+            : null,
+        bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
+            ? _bodyPromptsController.text.trim()
+            : null,
+        aliases: _aliases.isEmpty ? null : List.from(_aliases),
+      );
 
-      if (mounted) {
+      if (success && mounted) {
+        ToastUtils.showSuccess(
+          widget.character == null ? '人物创建成功' : '人物更新成功',
+        );
         Navigator.pop(context, true);
+      } else if (mounted) {
+        ToastUtils.showError('保存失败');
       }
     } catch (e) {
       if (mounted) {
@@ -247,6 +241,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
     });
 
     try {
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 构建角色数据 - 包含完整的角色信息
       final roles = <String, dynamic>{};
 
@@ -292,9 +288,6 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       // 使用角色ID或临时ID
       final String roleId = widget.character?.id?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString();
-
-      // 使用ApiServiceWrapper确保正确的token认证
-      final apiService = ApiServiceProvider.instance;
 
       // 调用API服务包装器的方法，自动处理token认证
       final response = await apiService.generateRoleCardImages(
@@ -347,7 +340,7 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       '''
           .trim();
 
-      final difyService = DifyService();
+      final difyService = ref.read(difyServiceProvider);
       final prompts = await difyService.generateCharacterPrompts(
         characterDescription: characterDescription,
       );
@@ -396,7 +389,9 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : Text('保存', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
+                : Text('保存',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary)),
           ),
         ],
       ),
@@ -492,7 +487,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.87),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -501,7 +499,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 '点击头像管理图集',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -622,7 +623,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                 fontSize: 12,
                 color: _aliases.length >= 10
                     ? Colors.red
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -643,7 +647,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                     _aliases.remove(alias);
                   });
                 },
-                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                backgroundColor:
+                    Theme.of(context).primaryColor.withValues(alpha: 0.1),
               );
             }).toList(),
           ),
@@ -671,7 +676,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(
                       color: _aliases.length >= 10
-                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.4)
                           : Theme.of(context).primaryColor,
                     ),
                   ),
@@ -685,7 +693,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               onPressed: _aliases.length >= 10 ? null : _addAlias,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _aliases.length >= 10
-                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
+                    ? Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.4)
                     : Theme.of(context).primaryColor,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(
@@ -728,7 +739,8 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
       name: _nameController.text.trim(),
     );
 
-    final allCharacters = await _databaseService.getCharacters(widget.novel.url);
+    final databaseService = ref.read(databaseServiceProvider);
+    final allCharacters = await databaseService.getCharacters(widget.novel.url);
     final conflict = CharacterMatcher.checkAliasConflict(
       alias,
       tempCharacter,
@@ -750,11 +762,12 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 
   /// 提示词生成后自动保存
   Future<void> _autoSaveAfterPromptsGeneration() async {
-    if (_isAutoSaving) return; // 防止重复保存
+    final autoSaveStateNotifier = ref.read(autoSaveStateProvider.notifier);
+    final isAutoSaving = ref.read(autoSaveStateProvider);
 
-    setState(() {
-      _isAutoSaving = true;
-    });
+    if (isAutoSaving) return; // 防止重复保存
+
+    autoSaveStateNotifier.setSaving(true);
 
     try {
       // 延迟1.5秒后保存
@@ -762,36 +775,36 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
 
       if (!mounted) return;
 
-      final character = _buildCharacterFromForm();
+      final controller = ref.read(characterEditControllerProvider(
+        novel: widget.novel,
+        character: widget.character,
+      ).notifier);
 
-      // 检查是否为新建角色
-      if (widget.character == null) {
-        // 新建角色：先创建基础角色
-        await _databaseService.createCharacter(character);
+      // 使用 Provider 的 autoSave 方法
+      await controller.autoSave(
+        name: _nameController.text.trim(),
+        facePrompts: _facePromptsController.text.trim().isNotEmpty
+            ? _facePromptsController.text.trim()
+            : null,
+        bodyPrompts: _bodyPromptsController.text.trim().isNotEmpty
+            ? _bodyPromptsController.text.trim()
+            : null,
+      );
 
-        if (mounted) {
-          ToastUtils.showInfo('角色创建并已自动保存');
-        }
-      } else {
-        // 编辑模式：直接更新提示词字段
-        await _databaseService.updateCharacter(character);
-
-        if (mounted) {
-          ToastUtils.showInfo('已自动保存');
-        }
+      if (mounted) {
+        ToastUtils.showInfo(
+          widget.character == null ? '角色创建并已自动保存' : '已自动保存',
+        );
       }
     } catch (e) {
       if (mounted) {
         ToastUtils.showWarningWithAction('自动保存失败: $e', '手动保存', () {
-          // 仅更新提示词字段
           _saveCharacter();
         });
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isAutoSaving = false;
-        });
+        autoSaveStateNotifier.setSaving(false);
       }
     }
   }
@@ -819,50 +832,60 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   Widget _buildCharacterAvatar() {
     return GestureDetector(
       onTap: _openGallery,
-      child: FutureBuilder<String?>(
-        future: widget.character?.id != null
-            ? _avatarService.getCharacterAvatarPath(widget.character!.id!)
-            : Future.value(null),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return _buildLoadingAvatar(80);
-          }
+      child: Consumer(
+        builder: (context, ref, child) {
+          final avatarService = ref.watch(characterAvatarServiceProvider);
 
-          final avatarPath = snapshot.data;
-          if (avatarPath != null && File(avatarPath).existsSync()) {
-            return Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Image.file(
-                  File(avatarPath),
+          return FutureBuilder<String?>(
+            future: widget.character?.id != null
+                ? avatarService.getCharacterAvatarPath(widget.character!.id!)
+                : Future.value(null),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _buildLoadingAvatar(80);
+              }
+
+              final avatarPath = snapshot.data;
+              if (avatarPath != null && File(avatarPath).existsSync()) {
+                return Container(
                   width: 80,
                   height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('❌ 头像加载失败: $error');
-                    return _buildFallbackAvatar(80);
-                  },
-                ),
-              ),
-            );
-          }
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color:
+                          Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.file(
+                      File(avatarPath),
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('❌ 头像加载失败: $error');
+                        return _buildFallbackAvatar(80);
+                      },
+                    ),
+                  ),
+                );
+              }
 
-          return _buildFallbackAvatar(80);
+              return _buildFallbackAvatar(80);
+            },
+          );
         },
       ),
     );
@@ -1010,31 +1033,46 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               children: [
                 // 生成提示词按钮
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed:
-                        (_isGeneratingPrompts || _isAutoSaving) ? null : _generateCharacterPrompts,
-                    icon: _isGeneratingPrompts
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : _isAutoSaving
+                  child: Consumer(
+                    builder: (context, ref, child) {
+                      final isAutoSaving = ref.watch(autoSaveStateProvider);
+
+                      return ElevatedButton.icon(
+                        onPressed: (_isGeneratingPrompts || isAutoSaving)
+                            ? null
+                            : _generateCharacterPrompts,
+                        icon: _isGeneratingPrompts
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(Icons.auto_awesome),
-                    label: Text(_isGeneratingPrompts ? '生成中...' : _isAutoSaving ? '保存中...' : '生成提示词'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                            : isAutoSaving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.auto_awesome),
+                        label: Text(_isGeneratingPrompts
+                            ? '生成中...'
+                            : isAutoSaving
+                                ? '保存中...'
+                                : '生成提示词'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1055,7 +1093,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                     label: Text(_isGeneratingRoleCard ? '生成中...' : '生图'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _nameController.text.trim().isEmpty
-                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.4)
                           : Colors.green,
                       foregroundColor: Theme.of(context).colorScheme.surface,
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1075,7 +1116,11 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.onSurface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1093,18 +1138,35 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   // 面部提示词
                   TextFormField(
                     controller: _facePromptsController,
-                    style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.surface),
                     decoration: InputDecoration(
                       labelText: '面部提示词',
                       hintText: '用于AI绘画的面部描述',
                       border: const OutlineInputBorder(),
-                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7)),
-                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38)),
+                      labelStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.7)),
+                      hintStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.38)),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24)),
+                        borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withValues(alpha: 0.24)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.54)),
+                        borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withValues(alpha: 0.54)),
                       ),
                     ),
                     maxLines: 2,
@@ -1114,18 +1176,35 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
                   // 身材提示词
                   TextFormField(
                     controller: _bodyPromptsController,
-                    style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.surface),
                     decoration: InputDecoration(
                       labelText: '身材提示词',
                       hintText: '用于AI绘画的身材描述',
                       border: const OutlineInputBorder(),
-                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7)),
-                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38)),
+                      labelStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.7)),
+                      hintStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.38)),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24)),
+                        borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withValues(alpha: 0.24)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.54)),
+                        borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withValues(alpha: 0.54)),
                       ),
                     ),
                     maxLines: 2,
@@ -1177,8 +1256,10 @@ class _CharacterEditScreenState extends State<CharacterEditScreen> {
   /// 返回true表示图集为空，false表示图集不为空
   Future<bool> _checkGalleryEmpty(String characterId) async {
     try {
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 通过ApiServiceWrapper调用，token自动处理
-      final galleryData = await _apiService.getRoleGallery(characterId);
+      final galleryData = await apiService.getRoleGallery(characterId);
 
       final rawImages = galleryData['images'];
       if (rawImages is List && rawImages.isNotEmpty) {

@@ -30,6 +30,7 @@ class ChapterMatchItem {
 class CharacterInputDialog extends StatefulWidget {
   /// 是否有大纲可用于生成角色
   final bool hasOutline;
+
   /// 小说URL（用于提取角色功能）
   final String? novelUrl;
 
@@ -97,7 +98,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     super.dispose();
   }
 
-  bool get _canExtract => widget.novelUrl != null && widget.novelUrl!.isNotEmpty;
+  bool get _canExtract =>
+      widget.novelUrl != null && widget.novelUrl!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +138,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
@@ -144,8 +147,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           children: [
             _buildModeButton('AI描述', CreateMode.describe),
             const SizedBox(width: 8),
-            if (widget.hasOutline)
-              _buildModeButton('从大纲', CreateMode.outline),
+            if (widget.hasOutline) _buildModeButton('从大纲', CreateMode.outline),
             if (widget.hasOutline) const SizedBox(width: 8),
             _buildModeButton('提取角色', CreateMode.extract),
           ],
@@ -168,11 +170,15 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           backgroundColor: isSelected
               ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
               : null,
-          foregroundColor: isSelected ? Theme.of(context).colorScheme.primary : null,
+          foregroundColor:
+              isSelected ? Theme.of(context).colorScheme.primary : null,
           side: BorderSide(
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.4),
           ),
         ),
         child: Text(label),
@@ -279,7 +285,10 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
               color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .error
+                      .withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -439,7 +448,10 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
                     Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error
+                        .withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -583,8 +595,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
               child: Text(
                 '内容过长可能导致处理失败，建议减少选中章节或缩短上下文长度',
                 style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.error),
+                    fontSize: 11, color: Theme.of(context).colorScheme.error),
               ),
             ),
         ],
@@ -608,7 +619,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
         color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+            color:
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

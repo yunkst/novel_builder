@@ -86,6 +86,9 @@ class ReadingProgress {
     return DateTime.now().difference(timestamp).inDays > days;
   }
 
+  /// 获取位置文本描述
+  String get positionText => '$chapterTitle (第${paragraphIndex + 1}段)';
+
   /// 复制并修改部分字段
   ReadingProgress copyWith({
     String? novelUrl,

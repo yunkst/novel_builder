@@ -113,7 +113,10 @@ class _ChatSceneEditDialogState extends State<ChatSceneEditDialog> {
                 '提示：场景内容将作为角色聊天的背景设定',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.60),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.60),
                 ),
               ),
             ],

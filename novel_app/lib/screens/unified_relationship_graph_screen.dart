@@ -5,6 +5,8 @@ import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/database_service.dart';
 import '../utils/toast_utils.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/database_providers.dart';
 
 /// 统一的角色关系图可视化页面
 ///
@@ -16,7 +18,7 @@ import '../utils/toast_utils.dart';
 /// - 动态节点大小 - 根据关系数量自动调整
 /// - 颜色编码连线 - 按关系类型区分
 /// - 头像预加载 - 优先显示真实头像
-class UnifiedRelationshipGraphScreen extends StatefulWidget {
+class UnifiedRelationshipGraphScreen extends ConsumerStatefulWidget {
   final String novelUrl;
   final Character? focusCharacter; // null = 全局模式
 
@@ -27,13 +29,13 @@ class UnifiedRelationshipGraphScreen extends StatefulWidget {
   });
 
   @override
-  State<UnifiedRelationshipGraphScreen> createState() =>
+  ConsumerState<UnifiedRelationshipGraphScreen> createState() =>
       _UnifiedRelationshipGraphScreenState();
 }
 
 class _UnifiedRelationshipGraphScreenState
-    extends State<UnifiedRelationshipGraphScreen> {
-  final DatabaseService _databaseService = DatabaseService();
+    extends ConsumerState<UnifiedRelationshipGraphScreen> {
+  late final DatabaseService _databaseService;
 
   // 控制器
   late final ForceDirectedGraphController<int> _controller;
@@ -56,7 +58,9 @@ class _UnifiedRelationshipGraphScreenState
   @override
   void initState() {
     super.initState();
-    // 修复缩放问题: 设置初始缩放为0.6,允许用户缩小和放大
+
+    // 使用 Riverpod Provider 获取已初始化的 DatabaseService 实例
+    // 延迟到 firstBuild 中获取,因为 initState 中无法访问 ref
     _controller = ForceDirectedGraphController<int>(
       minScale: 0.1, // 允许缩小到10%
       maxScale: 5.0, // 允许放大到5倍
@@ -67,7 +71,12 @@ class _UnifiedRelationshipGraphScreenState
           });
         }
       });
-    _loadData();
+
+    // 在第一帧时加载数据
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _databaseService = ref.read(databaseServiceProvider);
+      _loadData();
+    });
   }
 
   @override

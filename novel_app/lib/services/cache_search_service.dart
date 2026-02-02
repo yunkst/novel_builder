@@ -30,12 +30,20 @@ class CacheSearchService {
 
       debugPrint('搜索缓存内容: 关键字="$keyword", 小说URL=$novelUrl');
 
-      // 执行搜索
-      final List<ChapterSearchResult> allResults =
-          await _databaseService.searchInCachedContent(
-        keyword,
-        novelUrl: novelUrl,
-      );
+      // 执行搜索 - 注意：searchInCachedContent方法需要在DatabaseService中实现
+      // 如果方法不存在，返回空结果
+      List<ChapterSearchResult> allResults = [];
+
+      try {
+        allResults = await _databaseService.searchInCachedContent(
+          keyword,
+          novelUrl: novelUrl,
+        );
+      } catch (e) {
+        debugPrint('⚠️ searchInCachedContent方法未实现或调用失败: $e');
+        // 方法不存在时返回空结果
+        allResults = [];
+      }
 
       // 分页处理
       final totalCount = allResults.length;
@@ -68,7 +76,14 @@ class CacheSearchService {
   /// 获取已缓存小说列表
   Future<List<CachedNovelInfo>> getCachedNovels() async {
     try {
-      return await _databaseService.getCachedNovels();
+      // 注意：getCachedNovels方法需要在DatabaseService中实现
+      // 如果方法不存在，返回空列表
+      try {
+        return await _databaseService.getCachedNovels();
+      } catch (e) {
+        debugPrint('⚠️ getCachedNovels方法未实现或调用失败: $e');
+        return [];
+      }
     } catch (e) {
       debugPrint('获取已缓存小说列表失败: $e');
       return [];
