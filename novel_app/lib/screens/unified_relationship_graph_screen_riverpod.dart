@@ -386,10 +386,12 @@ class _UnifiedRelationshipGraphScreenRiverpodState
         character.id == widget.focusCharacter!.id;
 
     // 根据度数和是否是中心节点计算大小
-    final baseSize = isCenter ? 70.0 : 50.0;
-    final size = baseSize + degree * 2.0;
-    final maxSize = 90.0;
-    final finalSize = size > maxSize ? maxSize : size;
+    // 优化：减小基础大小，增加度数权重的影响，使节点大小差异更明显
+    final baseSize = isCenter ? 60.0 : 40.0;  // 减小基础大小
+    final size = baseSize + degree * 3.0;  // 增加度数权重
+    final maxSize = 85.0;  // 减小最大尺寸
+    final minSize = 35.0;  // 设置最小尺寸，防止节点过小
+    final finalSize = size.clamp(minSize, maxSize);  // 使用clamp限制大小范围
 
     return GestureDetector(
       onTap: () {
