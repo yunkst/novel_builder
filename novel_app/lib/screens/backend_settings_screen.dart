@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/api_service_wrapper.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
-import '../core/di/api_service_provider.dart';
+import '../core/providers/services/network_service_providers.dart';
 
-class BackendSettingsScreen extends StatefulWidget {
+class BackendSettingsScreen extends ConsumerStatefulWidget {
   const BackendSettingsScreen({super.key});
 
   @override
-  State<BackendSettingsScreen> createState() => _BackendSettingsScreenState();
+  ConsumerState<BackendSettingsScreen> createState() => _BackendSettingsScreenState();
 }
 
-class _BackendSettingsScreenState extends State<BackendSettingsScreen> {
-  final ApiServiceWrapper _api = ApiServiceProvider.instance;
+class _BackendSettingsScreenState extends ConsumerState<BackendSettingsScreen> {
   final TextEditingController _hostController = TextEditingController();
   final TextEditingController _tokenController = TextEditingController();
   bool _isLoading = true;
@@ -67,7 +66,8 @@ class _BackendSettingsScreenState extends State<BackendSettingsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _api.setConfig(host: host, token: token);
+      final apiService = ref.read(apiServiceWrapperProvider);
+      await apiService.setConfig(host: host, token: token);
       if (mounted) {
         ToastUtils.showSuccess('已保存后端配置', context: context);
         Navigator.pop(context);
