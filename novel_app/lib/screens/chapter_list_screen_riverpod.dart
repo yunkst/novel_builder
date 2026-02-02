@@ -50,6 +50,9 @@ class _ChapterListScreenRiverpodState
   // 标记是否已经设置了监听
   bool _hasSetupListener = false;
 
+  // 标记是否已经自动滚动到上次阅读位置
+  bool _hasScrolledToLastRead = false;
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +98,16 @@ class _ChapterListScreenRiverpodState
 
     final state = ref.watch(chapterListProvider(widget.novel));
     final notifier = ref.read(chapterListProvider(widget.novel).notifier);
+
+    // 首次加载完成时，自动滚动到上次阅读位置（只执行一次）
+    if (!_hasScrolledToLastRead &&
+        state.chapters.isNotEmpty &&
+        state.lastReadChapterIndex >= 0) {
+      _hasScrolledToLastRead = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToLastReadChapter();
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
