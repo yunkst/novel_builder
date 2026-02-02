@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/chat_scene.dart';
 import '../repositories/chat_scene_repository.dart';
+import '../services/database_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/chat_scene_edit_dialog.dart';
 import '../widgets/common/common_widgets.dart';
@@ -24,6 +25,7 @@ class ChatSceneManagementScreen extends StatefulWidget {
 
 class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
   late final ChatSceneRepository _chatSceneRepository;
+  late final DatabaseService _databaseService;
   List<ChatScene> _scenes = [];
   List<ChatScene> _filteredScenes = [];
   bool _isLoading = true;
@@ -35,7 +37,9 @@ class _ChatSceneManagementScreenState extends State<ChatSceneManagementScreen> {
     super.initState();
 
     // 使用注入的依赖或创建默认实例
-    _chatSceneRepository = widget.chatSceneRepository ?? ChatSceneRepository();
+    _databaseService = DatabaseService();
+    _chatSceneRepository =
+        widget.chatSceneRepository ?? _databaseService.chatSceneRepository;
 
     _loadScenes();
   }

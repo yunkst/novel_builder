@@ -144,13 +144,15 @@ class ChatSceneManagementScreenRiverpod extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showEditSceneDialog(context, scene, notifier),
+                    onPressed: () =>
+                        _showEditSceneDialog(context, scene, notifier),
                     tooltip: '编辑',
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete, size: 20),
-                    onPressed: () => _showDeleteConfirmDialog(context, scene, notifier),
+                    onPressed: () =>
+                        _showDeleteConfirmDialog(context, scene, notifier),
                     tooltip: '删除',
                     visualDensity: VisualDensity.compact,
                     color: Theme.of(context).colorScheme.error,

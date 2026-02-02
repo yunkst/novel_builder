@@ -6,31 +6,8 @@ part of 'chat_scene_management_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chatSceneRepositoryHash() =>
-    r'024f2c0b2e7f39442d8a93b92b79c65be3bb1854';
-
-/// ChatSceneManagement Provider
-///
-/// 提供聊天场景数据访问
-///
-/// Copied from [chatSceneRepository].
-@ProviderFor(chatSceneRepository)
-final chatSceneRepositoryProvider =
-    AutoDisposeProvider<ChatSceneRepository>.internal(
-  chatSceneRepository,
-  name: r'chatSceneRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$chatSceneRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ChatSceneRepositoryRef = AutoDisposeProviderRef<ChatSceneRepository>;
 String _$chatSceneManagementHash() =>
-    r'd3360fcb8730605f7d51ddad866ce207f3556107';
+    r'b723186abd07d4d9a2fd3825c42d112f21c81a71';
 
 /// ChatSceneManagementState Provider
 ///

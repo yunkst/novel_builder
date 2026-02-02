@@ -17,7 +17,8 @@ part 'backup_upload_response.g.dart';
 /// * [uploadedAt] - 上传时间(ISO格式)
 /// * [storedName] - 存储文件名
 @BuiltValue()
-abstract class BackupUploadResponse implements Built<BackupUploadResponse, BackupUploadResponseBuilder> {
+abstract class BackupUploadResponse
+    implements Built<BackupUploadResponse, BackupUploadResponseBuilder> {
   /// 原始文件名
   @BuiltValueField(wireName: r'filename')
   String get filename;
@@ -40,18 +41,24 @@ abstract class BackupUploadResponse implements Built<BackupUploadResponse, Backu
 
   BackupUploadResponse._();
 
-  factory BackupUploadResponse([void updates(BackupUploadResponseBuilder b)]) = _$BackupUploadResponse;
+  factory BackupUploadResponse([void updates(BackupUploadResponseBuilder b)]) =
+      _$BackupUploadResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(BackupUploadResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<BackupUploadResponse> get serializer => _$BackupUploadResponseSerializer();
+  static Serializer<BackupUploadResponse> get serializer =>
+      _$BackupUploadResponseSerializer();
 }
 
-class _$BackupUploadResponseSerializer implements PrimitiveSerializer<BackupUploadResponse> {
+class _$BackupUploadResponseSerializer
+    implements PrimitiveSerializer<BackupUploadResponse> {
   @override
-  final Iterable<Type> types = const [BackupUploadResponse, _$BackupUploadResponse];
+  final Iterable<Type> types = const [
+    BackupUploadResponse,
+    _$BackupUploadResponse
+  ];
 
   @override
   final String wireName = r'BackupUploadResponse';
@@ -94,7 +101,9 @@ class _$BackupUploadResponseSerializer implements PrimitiveSerializer<BackupUplo
     BackupUploadResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -172,4 +181,3 @@ class _$BackupUploadResponseSerializer implements PrimitiveSerializer<BackupUplo
     return result.build();
   }
 }
-

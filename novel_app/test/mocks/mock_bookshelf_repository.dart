@@ -106,7 +106,9 @@ class MockBookshelfRepository implements BookshelfRepository {
           .map((entry) => entry.key)
           .toSet();
 
-      return mockNovels.where((novel) => novelUrls.contains(novel.url)).toList();
+      return mockNovels
+          .where((novel) => novelUrls.contains(novel.url))
+          .toList();
     }
   }
 
@@ -126,7 +128,8 @@ class MockBookshelfRepository implements BookshelfRepository {
   }
 
   @override
-  Future<bool> removeNovelFromBookshelf(String novelUrl, int bookshelfId) async {
+  Future<bool> removeNovelFromBookshelf(
+      String novelUrl, int bookshelfId) async {
     if (mockNovelBookshelves.containsKey(novelUrl)) {
       final removed = mockNovelBookshelves[novelUrl]!.remove(bookshelfId);
       if (mockNovelBookshelves[novelUrl]!.isEmpty) {
@@ -172,4 +175,3 @@ class MockBookshelfRepository implements BookshelfRepository {
     // 真实实现会更新 sortOrder
   }
 }
-

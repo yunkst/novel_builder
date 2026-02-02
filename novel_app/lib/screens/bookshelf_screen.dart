@@ -50,8 +50,9 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     super.initState();
 
     // 使用注入的依赖或创建默认实例
-    _bookshelfRepository = widget.bookshelfRepository ?? BookshelfRepository();
     _databaseService = widget.databaseService ?? DatabaseService();
+    _bookshelfRepository =
+        widget.bookshelfRepository ?? _databaseService.bookshelfRepository;
     _preloadService = widget.preloadService ?? PreloadService();
 
     _loadBookshelf();

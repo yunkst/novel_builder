@@ -71,14 +71,16 @@ Future<void> checkTestDatabaseSchema() async {
     final database = await openDatabase(dbFile, version: 19);
 
     // 检查 novel_chapters 表结构
-    final columns = await database.rawQuery('PRAGMA table_info(novel_chapters)');
+    final columns =
+        await database.rawQuery('PRAGMA table_info(novel_chapters)');
     final columnNames = columns.map((row) => row['name'] as String).toList();
 
     print('   当前字段: $columnNames');
 
     // 检查关键字段
     final requiredColumns = ['readAt', 'isUserInserted', 'isAccompanied'];
-    final missingColumns = requiredColumns.where((col) => !columnNames.contains(col));
+    final missingColumns =
+        requiredColumns.where((col) => !columnNames.contains(col));
 
     if (missingColumns.isNotEmpty) {
       print('❌ 缺少字段: ${missingColumns.join(', ')}');

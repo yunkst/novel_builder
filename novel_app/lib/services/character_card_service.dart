@@ -27,8 +27,14 @@ import 'logger_service.dart';
 /// );
 /// ```
 class CharacterCardService {
-  final DifyService _difyService = DifyService();
-  final DatabaseService _databaseService = DatabaseService();
+  final DifyService _difyService;
+  final DatabaseService _databaseService;
+
+  CharacterCardService({
+    DifyService? difyService,
+    DatabaseService? databaseService,
+  })  : _difyService = difyService ?? DifyService(),
+        _databaseService = databaseService ?? DatabaseService();
 
   /// 更新角色卡片
   ///

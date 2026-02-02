@@ -1,9 +1,9 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' show join;
 import '../models/bookshelf.dart';
 import '../models/novel.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
+import '../core/interfaces/repositories/i_bookshelf_repository.dart';
 
 /// 书架数据仓库
 ///
@@ -24,26 +24,10 @@ import 'base_repository.dart';
 ///
 /// - ID=1: "全部小说" - 虚拟书架，显示所有小说，不可编辑
 /// - ID=2: "我的收藏" - 默认收藏书架，不可删除
-class BookshelfRepository extends BaseRepository {
-  Database? _sharedDatabase;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (_sharedDatabase != null) return _sharedDatabase!;
-    if (isWebPlatform) {
-      throw Exception('Database is not supported on web platform');
-    }
-
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'novel_reader.db');
-
-    _sharedDatabase = await openDatabase(
-      path,
-      version: 21,
-    );
-
-    return _sharedDatabase!;
-  }
+class BookshelfRepository extends BaseRepository
+    implements IBookshelfRepository {
+  /// 构造函数 - 接受数据库连接实例
+  BookshelfRepository({required super.dbConnection});
 
   // ==================== 书架CRUD操作 ====================
 
@@ -53,6 +37,7 @@ class BookshelfRepository extends BaseRepository {
   /// 按排序字段（sort_order）升序排列
   ///
   /// Web平台返回默认系统书架（全部小说、我的收藏）
+  @override
   Future<List<Bookshelf>> getBookshelves() async {
     if (isWebPlatform) {
       // Web平台返回默认系统书架
@@ -92,6 +77,7 @@ class BookshelfRepository extends BaseRepository {
   /// 自动计算并设置排序顺序（最大sort_order + 1）
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<int> createBookshelf(String name) async {
     if (isWebPlatform) {
       throw UnsupportedError('Web平台不支持创建书架');
@@ -137,6 +123,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 删除书架会级联删除novel_bookshelves表中的关联记录
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<bool> deleteBookshelf(int bookshelfId) async {
     if (isWebPlatform) {
       throw UnsupportedError('Web平台不支持删除书架');
@@ -203,6 +190,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 其他书架：通过novel_bookshelves关联表查询
   ///
   /// Web平台返回空列表
+  @override
   Future<List<Novel>> getNovelsByBookshelf(int bookshelfId) async {
     if (isWebPlatform) {
       return [];
@@ -262,6 +250,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 其他书架：在novel_bookshelves表中创建关联记录
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<void> addNovelToBookshelf(String novelUrl, int bookshelfId) async {
     if (isWebPlatform) {
       throw UnsupportedError('Web平台不支持书架操作');
@@ -303,6 +292,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 其他书架：从novel_bookshelves表中删除关联记录
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<bool> removeNovelFromBookshelf(
       String novelUrl, int bookshelfId) async {
     if (isWebPlatform) {
@@ -350,6 +340,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 源书架和目标书架相同时无操作
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<void> moveNovelToBookshelf(
     String novelUrl,
     int fromBookshelfId,
@@ -400,6 +391,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 返回去重后的列表
   ///
   /// Web平台返回[1]（全部小说）
+  @override
   Future<List<int>> getBookshelvesByNovel(String novelUrl) async {
     if (isWebPlatform) {
       return [1]; // Web平台默认返回"全部小说"
@@ -428,6 +420,7 @@ class BookshelfRepository extends BaseRepository {
   /// 特殊处理：
   /// - bookshelfId=1（全部小说）：返回bookshelf表中的所有小说数量
   /// - 其他书架：返回novel_bookshelves表中的关联记录数量
+  @override
   Future<int> getNovelCountByBookshelf(int bookshelfId) async {
     if (isWebPlatform) {
       return 0;
@@ -461,6 +454,7 @@ class BookshelfRepository extends BaseRepository {
   /// 特殊处理：
   /// - bookshelfId=1（全部小说）：检查小说是否在bookshelf表中
   /// - 其他书架：检查novel_bookshelves表中是否存在关联记录
+  @override
   Future<bool> isNovelInBookshelf(String novelUrl, int bookshelfId) async {
     if (isWebPlatform) {
       return false;
@@ -498,6 +492,7 @@ class BookshelfRepository extends BaseRepository {
   /// 系统书架（ID=1,2）不会改变其位置
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<void> reorderBookshelves(List<int> bookshelfIds) async {
     if (isWebPlatform) {
       throw UnsupportedError('Web平台不支持书架操作');
@@ -542,6 +537,7 @@ class BookshelfRepository extends BaseRepository {
   /// - 用户书架可以更新name、icon、color、sort_order
   ///
   /// Web平台抛出UnsupportedError异常
+  @override
   Future<int> updateBookshelf(Bookshelf bookshelf) async {
     if (isWebPlatform) {
       throw UnsupportedError('Web平台不支持书架操作');

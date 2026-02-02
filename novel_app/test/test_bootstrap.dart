@@ -322,19 +322,31 @@ Future<void> _createTestDatabaseSchema(Database db, int version) async {
   ''');
 
   // 创建索引
-  await db.execute('CREATE INDEX idx_chapter_cache_novel_url ON chapter_cache(novelUrl)');
-  await db.execute('CREATE INDEX idx_chapter_cache_chapter_url ON chapter_cache(chapterUrl)');
-  await db.execute('CREATE INDEX idx_novel_chapters_novel_url ON novel_chapters(novelUrl)');
-  await db.execute('CREATE INDEX idx_novel_chapters_chapter_url ON novel_chapters(chapterUrl)');
-  await db.execute('CREATE INDEX idx_novel_chapters_chapter_index ON novel_chapters(chapterIndex)');
-  await db.execute('CREATE INDEX idx_characters_novel_url ON characters(novelUrl)');
-  await db.execute('CREATE INDEX idx_relationships_source ON character_relationships(source_character_id)');
-  await db.execute('CREATE INDEX idx_relationships_target ON character_relationships(target_character_id)');
+  await db.execute(
+      'CREATE INDEX idx_chapter_cache_novel_url ON chapter_cache(novelUrl)');
+  await db.execute(
+      'CREATE INDEX idx_chapter_cache_chapter_url ON chapter_cache(chapterUrl)');
+  await db.execute(
+      'CREATE INDEX idx_novel_chapters_novel_url ON novel_chapters(novelUrl)');
+  await db.execute(
+      'CREATE INDEX idx_novel_chapters_chapter_url ON novel_chapters(chapterUrl)');
+  await db.execute(
+      'CREATE INDEX idx_novel_chapters_chapter_index ON novel_chapters(chapterIndex)');
+  await db
+      .execute('CREATE INDEX idx_characters_novel_url ON characters(novelUrl)');
+  await db.execute(
+      'CREATE INDEX idx_relationships_source ON character_relationships(source_character_id)');
+  await db.execute(
+      'CREATE INDEX idx_relationships_target ON character_relationships(target_character_id)');
   await db.execute('CREATE INDEX idx_chat_scenes_title ON chat_scenes(title)');
-  await db.execute('CREATE INDEX idx_novel_bookshelf_url ON novel_bookshelves(novel_url)');
-  await db.execute('CREATE INDEX idx_bookshelf_id ON novel_bookshelves(bookshelf_id)');
-  await db.execute('CREATE INDEX idx_ai_accompaniment_novel ON chapter_ai_accompaniment(novelUrl)');
-  await db.execute('CREATE INDEX idx_ai_accompaniment_chapter ON chapter_ai_accompaniment(chapterUrl)');
+  await db.execute(
+      'CREATE INDEX idx_novel_bookshelf_url ON novel_bookshelves(novel_url)');
+  await db.execute(
+      'CREATE INDEX idx_bookshelf_id ON novel_bookshelves(bookshelf_id)');
+  await db.execute(
+      'CREATE INDEX idx_ai_accompaniment_novel ON chapter_ai_accompaniment(novelUrl)');
+  await db.execute(
+      'CREATE INDEX idx_ai_accompaniment_chapter ON chapter_ai_accompaniment(chapterUrl)');
 
   debugPrint('✅ 测试数据库表创建完成');
 }

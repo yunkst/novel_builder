@@ -4,11 +4,11 @@ import 'database_service.dart';
 
 /// 缓存内容搜索服务
 class CacheSearchService {
-  static final CacheSearchService _instance = CacheSearchService._internal();
-  factory CacheSearchService() => _instance;
-  CacheSearchService._internal();
+  final DatabaseService _databaseService;
 
-  final DatabaseService _databaseService = DatabaseService();
+  /// 构造函数 - 支持依赖注入
+  CacheSearchService({DatabaseService? databaseService})
+      : _databaseService = databaseService ?? DatabaseService();
 
   /// 搜索缓存内容
   Future<CacheSearchResult> searchInCache({

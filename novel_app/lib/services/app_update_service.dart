@@ -78,7 +78,8 @@ class AppUpdateService {
 
         // 比较版本号
         // 强制检查时，即使版本相同也返回版本信息（允许用户重新下载安装）
-        final hasNew = hasNewVersion(currentInfo.version, latestVersion.version);
+        final hasNew =
+            hasNewVersion(currentInfo.version, latestVersion.version);
         LoggerService.instance.d(
           '版本比较: ${currentInfo.version} vs ${latestVersion.version}, hasNew: $hasNew, forceCheck: $forceCheck',
           category: LogCategory.general,

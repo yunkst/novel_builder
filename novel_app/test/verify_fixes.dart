@@ -32,7 +32,6 @@ void main() {
         } else {
           print('❌ 修复失败: dispose()仍然关闭了Dio连接');
         }
-
       } catch (e) {
         print('⚠️ 测试过程中的错误 (测试环境中预期): $e');
       }
@@ -55,7 +54,6 @@ void main() {
         } else {
           print('⚠️ 连接状态不健康，但这是测试环境的正常情况');
         }
-
       } catch (e) {
         print('⚠️ 连接健康检查测试失败: $e');
       }
@@ -84,7 +82,6 @@ void main() {
           } else {
             print('⚠️ 请求可能触发了重试机制（这是正常的容错行为）');
           }
-
         } catch (e) {
           final endTime = DateTime.now();
           final duration = endTime.difference(startTime);
@@ -97,7 +94,6 @@ void main() {
             print('✅ 检测到重试行为 (耗时${duration.inMilliseconds}ms > 2秒)');
           }
         }
-
       } catch (e) {
         print('❌ 自动重试测试失败: $e');
       }
@@ -125,7 +121,6 @@ void main() {
         } else {
           print('❌ 无法获取Dio实例');
         }
-
       } catch (e) {
         print('⚠️ 连接池配置测试失败: $e');
       }

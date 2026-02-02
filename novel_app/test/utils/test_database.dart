@@ -125,7 +125,8 @@ class TestDatabase {
   ///   // 即使这里抛出异常，事务也会回滚
   /// });
   /// ```
-  Future<T> runInTransaction<T>(Future<T> Function(Transaction txn) callback) async {
+  Future<T> runInTransaction<T>(
+      Future<T> Function(Transaction txn) callback) async {
     if (!_isInitialized) {
       throw StateError('TestDatabase 未初始化');
     }

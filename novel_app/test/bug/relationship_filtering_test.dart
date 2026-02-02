@@ -30,7 +30,8 @@ void main() {
 
       // 模拟 FormatRelationshipsForAI 的过滤逻辑
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       // 过滤掉包含未出现角色的关系
@@ -79,7 +80,8 @@ void main() {
       final chapterCharacters = allCharacters;
 
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       final validRelationships = allRelationships.where((r) {
@@ -135,7 +137,8 @@ void main() {
       ];
 
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       final validRelationships = allRelationships.where((r) {
@@ -166,9 +169,21 @@ void main() {
 
     test('应该记录被过滤的关系数量', () {
       final allRelationships = [
-        CharacterRelationship(id: 1, sourceCharacterId: 1, targetCharacterId: 3, relationshipType: '师徒'),
-        CharacterRelationship(id: 2, sourceCharacterId: 2, targetCharacterId: 3, relationshipType: '师徒'),
-        CharacterRelationship(id: 3, sourceCharacterId: 1, targetCharacterId: 2, relationshipType: '朋友'),
+        CharacterRelationship(
+            id: 1,
+            sourceCharacterId: 1,
+            targetCharacterId: 3,
+            relationshipType: '师徒'),
+        CharacterRelationship(
+            id: 2,
+            sourceCharacterId: 2,
+            targetCharacterId: 3,
+            relationshipType: '师徒'),
+        CharacterRelationship(
+            id: 3,
+            sourceCharacterId: 1,
+            targetCharacterId: 2,
+            relationshipType: '朋友'),
       ];
 
       final chapterCharacters = [
@@ -178,7 +193,8 @@ void main() {
       ];
 
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       final validRelationships = allRelationships.where((r) {

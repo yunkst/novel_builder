@@ -1,7 +1,6 @@
 import 'package:test/test.dart';
 import 'package:novel_api/novel_api.dart';
 
-
 /// tests for BackupApi
 void main() {
   final instance = NovelApi().getBackupApi();
@@ -15,6 +14,5 @@ void main() {
     test('test uploadBackupApiBackupUploadPost', () async {
       // TODO
     });
-
   });
 }

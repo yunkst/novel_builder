@@ -437,7 +437,7 @@ final chapterReorderControllerProvider =
 typedef ChapterReorderControllerRef
     = AutoDisposeProviderRef<ChapterReorderController>;
 String _$sceneIllustrationServiceHash() =>
-    r'fc122804f336f372345cf3a409a2d5a726094cea';
+    r'a44a6203dde2b82a848a3c2186df1ffbb5e6d3e0';
 
 /// SceneIllustrationService Provider
 ///
@@ -449,7 +449,7 @@ String _$sceneIllustrationServiceHash() =>
 /// - 图片 URL 处理
 ///
 /// **依赖**:
-/// - [illustrationRepositoryProvider] - 插图数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [apiServiceWrapperProvider] - API 服务
 ///
 /// **使用示例**:
@@ -463,7 +463,7 @@ String _$sceneIllustrationServiceHash() =>
 /// - 插图生成是异步操作
 ///
 /// **相关 Providers**:
-/// - [illustrationRepositoryProvider] - 插图数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [apiServiceWrapperProvider] - API 服务
 ///
 /// Copied from [sceneIllustrationService].
@@ -619,7 +619,7 @@ final characterAvatarServiceProvider =
 // ignore: unused_element
 typedef CharacterAvatarServiceRef = ProviderRef<CharacterAvatarService>;
 String _$chapterSearchServiceHash() =>
-    r'bb7c2c0d0d4b73939d4e182f47f1375664ad18bb';
+    r'21ce57174a65102b6d277ad76ca3814cd2c0bc0c';
 
 /// ChapterSearchService Provider
 ///
@@ -631,8 +631,7 @@ String _$chapterSearchServiceHash() =>
 /// - 模糊搜索
 ///
 /// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [cacheSearchServiceProvider] - 缓存搜索
+/// - [databaseServiceProvider] - 数据库访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -645,7 +644,7 @@ String _$chapterSearchServiceHash() =>
 /// - 搜索操作是异步的
 ///
 /// **相关 Providers**:
-/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [cacheSearchServiceProvider] - 缓存搜索
 ///
 /// Copied from [chapterSearchService].
@@ -664,5 +663,193 @@ final chapterSearchServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterSearchServiceRef = AutoDisposeProviderRef<ChapterSearchService>;
+String _$cacheSearchServiceHash() =>
+    r'4370118bed06ea27cca12571856a3ab59f4bd2f1';
+
+/// CacheSearchService Provider
+///
+/// 提供缓存搜索服务实例，支持缓存内容的搜索和分页。
+///
+/// **功能**:
+/// - 缓存内容搜索
+/// - 搜索结果分页
+/// - 搜索建议
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final cacheSearch = ref.watch(cacheSearchServiceProvider);
+/// final results = await cacheSearch.searchInCache(keyword: '关键词');
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 搜索操作是异步的
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterSearchServiceProvider] - 章节搜索
+///
+/// Copied from [cacheSearchService].
+@ProviderFor(cacheSearchService)
+final cacheSearchServiceProvider =
+    AutoDisposeProvider<CacheSearchService>.internal(
+  cacheSearchService,
+  name: r'cacheSearchServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$cacheSearchServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CacheSearchServiceRef = AutoDisposeProviderRef<CacheSearchService>;
+String _$characterCardServiceHash() =>
+    r'81cc000c8decf4c094e583195bbf8ed6997630b8';
+
+/// CharacterCardService Provider
+///
+/// 提供角色卡片服务实例，处理角色卡片的更新和管理。
+///
+/// **功能**:
+/// - 角色卡片更新
+/// - AI生成角色信息
+/// - 角色信息保存
+///
+/// **依赖**:
+/// - [difyServiceProvider] - Dify AI服务
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final cardService = ref.watch(characterCardServiceProvider);
+/// await cardService.updateCharacterCards(
+///   novel: novel,
+///   chapterContent: content,
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - AI生成是异步操作
+///
+/// **相关 Providers**:
+/// - [difyServiceProvider] - Dify AI服务
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// Copied from [characterCardService].
+@ProviderFor(characterCardService)
+final characterCardServiceProvider =
+    AutoDisposeProvider<CharacterCardService>.internal(
+  characterCardService,
+  name: r'characterCardServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$characterCardServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
+String _$characterExtractionServiceHash() =>
+    r'10d5518f3673a2e1a796f63f775dd1086ee3ffb3';
+
+/// CharacterExtractionService Provider
+///
+/// 提供角色提取服务实例，从章节内容中提取角色相关信息。
+///
+/// **功能**:
+/// - 角色名字搜索
+/// - 章节内容匹配
+/// - 上下文提取
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final extractionService = ref.watch(characterExtractionServiceProvider);
+/// final matches = await extractionService.searchChaptersByName(
+///   novelUrl: novelUrl,
+///   names: ['张三', '李四'],
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 搜索操作是异步的
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// Copied from [characterExtractionService].
+@ProviderFor(characterExtractionService)
+final characterExtractionServiceProvider =
+    Provider<CharacterExtractionService>.internal(
+  characterExtractionService,
+  name: r'characterExtractionServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$characterExtractionServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CharacterExtractionServiceRef = ProviderRef<CharacterExtractionService>;
+String _$outlineServiceHash() => r'52735f7a564a6abca156960b8255fe62326e1d5c';
+
+/// OutlineService Provider
+///
+/// 提供大纲服务实例，处理小说大纲的管理和生成。
+///
+/// **功能**:
+/// - 大纲CRUD操作
+/// - 大纲AI生成
+/// - 章节细纲生成
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final outlineService = ref.watch(outlineServiceProvider);
+/// await outlineService.saveOutline(
+///   novelUrl: novelUrl,
+///   title: title,
+///   content: content,
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - AI生成是异步操作
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [difyServiceProvider] - Dify AI服务
+///
+/// Copied from [outlineService].
+@ProviderFor(outlineService)
+final outlineServiceProvider = AutoDisposeProvider<OutlineService>.internal(
+  outlineService,
+  name: r'outlineServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$outlineServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef OutlineServiceRef = AutoDisposeProviderRef<OutlineService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

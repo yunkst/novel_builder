@@ -40,10 +40,13 @@ void main() {
       final providerInstance = ApiServiceProvider.instance;
 
       print('📊 实例比较结果:');
-      print('  ApiServiceWrapper() === ApiServiceWrapper(): ${identical(instance1, instance2)}');
-      print('  ApiServiceWrapper() === ApiServiceProvider.instance: ${identical(instance1, providerInstance)}');
+      print(
+          '  ApiServiceWrapper() === ApiServiceWrapper(): ${identical(instance1, instance2)}');
+      print(
+          '  ApiServiceWrapper() === ApiServiceProvider.instance: ${identical(instance1, providerInstance)}');
 
-      if (identical(instance1, instance2) && identical(instance1, providerInstance)) {
+      if (identical(instance1, instance2) &&
+          identical(instance1, providerInstance)) {
         print('✅ 所有方式都返回相同的单例实例');
       } else {
         print('⚠️ 存在多个实例，但这是ApiServiceWrapper设计的单例行为');
@@ -99,7 +102,6 @@ void main() {
         }
 
         expect(instance, isNotNull);
-
       } catch (e) {
         print('⚠️ 测试环境中的预期错误: $e');
         // 在测试环境中，这可能是正常的，但我们仍能验证dispose行为

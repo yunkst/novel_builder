@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:riverpod/riverpod.dart';
 import '../../models/chat_scene.dart';
-import '../../repositories/chat_scene_repository.dart';
+import '../interfaces/repositories/i_chat_scene_repository.dart';
+import 'database_providers.dart';
 
 part 'chat_scene_management_providers.g.dart';
 
@@ -38,20 +38,12 @@ class ChatSceneManagementState {
   }
 }
 
-/// ChatSceneManagement Provider
-///
-/// 提供聊天场景数据访问
-@riverpod
-ChatSceneRepository chatSceneRepository(Ref ref) {
-  return ChatSceneRepository();
-}
-
 /// ChatSceneManagementState Provider
 ///
 /// 管理聊天场景管理界面的状态
 @riverpod
 class ChatSceneManagement extends _$ChatSceneManagement {
-  late ChatSceneRepository _repository;
+  late IChatSceneRepository _repository;
 
   @override
   ChatSceneManagementState build() {

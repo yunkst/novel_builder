@@ -33,8 +33,8 @@ class SceneIllustrationDialog extends ConsumerStatefulWidget {
       _SceneIllustrationDialogState();
 }
 
-class _SceneIllustrationDialogState extends ConsumerState<SceneIllustrationDialog>
-    with DifyStreamingMixin {
+class _SceneIllustrationDialogState
+    extends ConsumerState<SceneIllustrationDialog> with DifyStreamingMixin {
   final _contentController = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();

@@ -297,7 +297,8 @@ class TestDataFactory {
     int characterCount = 3,
     String? novelUrl,
   }) async {
-    final url = novelUrl ?? 'https://example.com/novel/${DateTime.now().millisecondsSinceEpoch}';
+    final url = novelUrl ??
+        'https://example.com/novel/${DateTime.now().millisecondsSinceEpoch}';
 
     // 1. 创建并添加小说
     final novel = await createAndAddNovel(
@@ -351,7 +352,8 @@ class TestDataFactory {
           relationshipType: ['朋友', '师徒', '敌人', '亲人'][i % 4],
         );
 
-        final relationshipId = await db.insert('character_relationships', relationship.toMap());
+        final relationshipId =
+            await db.insert('character_relationships', relationship.toMap());
 
         relationships.add(relationship);
       }

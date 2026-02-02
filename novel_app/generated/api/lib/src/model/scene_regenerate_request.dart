@@ -13,9 +13,10 @@ part 'scene_regenerate_request.g.dart';
 /// Properties:
 /// * [taskId] - 原始任务ID
 /// * [count] - 生成图片数量
-/// * [model] 
+/// * [model]
 @BuiltValue()
-abstract class SceneRegenerateRequest implements Built<SceneRegenerateRequest, SceneRegenerateRequestBuilder> {
+abstract class SceneRegenerateRequest
+    implements Built<SceneRegenerateRequest, SceneRegenerateRequestBuilder> {
   /// 原始任务ID
   @BuiltValueField(wireName: r'task_id')
   String get taskId;
@@ -29,18 +30,25 @@ abstract class SceneRegenerateRequest implements Built<SceneRegenerateRequest, S
 
   SceneRegenerateRequest._();
 
-  factory SceneRegenerateRequest([void updates(SceneRegenerateRequestBuilder b)]) = _$SceneRegenerateRequest;
+  factory SceneRegenerateRequest(
+          [void updates(SceneRegenerateRequestBuilder b)]) =
+      _$SceneRegenerateRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SceneRegenerateRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<SceneRegenerateRequest> get serializer => _$SceneRegenerateRequestSerializer();
+  static Serializer<SceneRegenerateRequest> get serializer =>
+      _$SceneRegenerateRequestSerializer();
 }
 
-class _$SceneRegenerateRequestSerializer implements PrimitiveSerializer<SceneRegenerateRequest> {
+class _$SceneRegenerateRequestSerializer
+    implements PrimitiveSerializer<SceneRegenerateRequest> {
   @override
-  final Iterable<Type> types = const [SceneRegenerateRequest, _$SceneRegenerateRequest];
+  final Iterable<Type> types = const [
+    SceneRegenerateRequest,
+    _$SceneRegenerateRequest
+  ];
 
   @override
   final String wireName = r'SceneRegenerateRequest';
@@ -75,7 +83,9 @@ class _$SceneRegenerateRequestSerializer implements PrimitiveSerializer<SceneReg
     SceneRegenerateRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -140,4 +150,3 @@ class _$SceneRegenerateRequestSerializer implements PrimitiveSerializer<SceneReg
     return result.build();
   }
 }
-
