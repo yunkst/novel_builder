@@ -5,6 +5,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import '../../services/reader_settings_service.dart';
 import '../../services/novel_context_service.dart';
 import '../../services/character_card_service.dart';
@@ -17,7 +18,7 @@ part 'reader_screen_providers.g.dart';
 /// 提供阅读器设置服务实例（单例）
 /// 负责字体大小、滚动速度等设置的持久化
 @riverpod
-ReaderSettingsService readerSettingsService(ReaderSettingsServiceRef ref) {
+ReaderSettingsService readerSettingsService(Ref ref) {
   return ReaderSettingsService.instance;
 }
 
@@ -25,7 +26,7 @@ ReaderSettingsService readerSettingsService(ReaderSettingsServiceRef ref) {
 ///
 /// 提供小说上下文构建服务实例（单例）
 @riverpod
-NovelContextBuilder novelContextBuilder(NovelContextBuilderRef ref) {
+NovelContextBuilder novelContextBuilder(Ref ref) {
   return NovelContextBuilder();
 }
 
@@ -34,7 +35,7 @@ NovelContextBuilder novelContextBuilder(NovelContextBuilderRef ref) {
 /// 提供角色卡服务实例
 /// 注意：这个服务每次访问都创建新实例，因为它的使用场景是临时性的
 @riverpod
-CharacterCardService characterCardService(CharacterCardServiceRef ref) {
+CharacterCardService characterCardService(Ref ref) {
   return CharacterCardService();
 }
 
@@ -42,6 +43,6 @@ CharacterCardService characterCardService(CharacterCardServiceRef ref) {
 ///
 /// 提供预加载服务实例（单例）
 @riverpod
-PreloadService preloadService(PreloadServiceRef ref) {
+PreloadService preloadService(Ref ref) {
   return PreloadService();
 }

@@ -51,7 +51,7 @@ class AICompanionRole {
   /// 经历简述
   final String? backgroundStory;
 
-  AICompanionRole({
+  const AICompanionRole({
     required this.name,
     this.gender,
     this.age,
@@ -154,7 +154,7 @@ class AICompanionRelation {
   /// 例如：A是B的徒弟，则此字段为"徒弟"
   final String type;
 
-  AICompanionRelation({
+  const AICompanionRelation({
     required this.source,
     required this.target,
     required this.type,
@@ -201,7 +201,7 @@ class AICompanionResponse {
   /// 人物之间的关系
   final List<AICompanionRelation> relations;
 
-  AICompanionResponse({
+  const AICompanionResponse({
     required this.roles,
     required this.background,
     required this.summery,

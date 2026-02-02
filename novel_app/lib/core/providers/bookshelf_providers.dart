@@ -4,6 +4,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../models/novel.dart';
 import '../../core/providers/database_providers.dart';
@@ -29,7 +30,7 @@ class CurrentBookshelfId extends _$CurrentBookshelfId {
 ///
 /// 根据当前书架ID异步加载小说列表
 @riverpod
-Future<List<Novel>> bookshelfNovels(BookshelfNovelsRef ref) async {
+Future<List<Novel>> bookshelfNovels(Ref ref) async {
   // 获取当前书架ID
   final bookshelfId = ref.watch(currentBookshelfIdProvider);
 

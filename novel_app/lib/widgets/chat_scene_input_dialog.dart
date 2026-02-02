@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../screens/chat_scene_management_screen.dart';
+import '../screens/chat_scene_management_screen_riverpod.dart';
 import '../utils/toast_utils.dart';
 
 /// 聊天场景输入对话框
@@ -33,7 +33,7 @@ class _ChatSceneInputDialogState extends State<ChatSceneInputDialog> {
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => const ChatSceneManagementScreen(),
+        builder: (context) => const ChatSceneManagementScreenRiverpod(),
       ),
     );
 

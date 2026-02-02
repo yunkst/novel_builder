@@ -5,6 +5,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/character.dart';
 import '../../services/character_image_cache_service.dart';
@@ -97,7 +98,7 @@ class CharacterManagementState extends _$CharacterManagementState {
 ///
 /// 为每个角色缓存关系数量
 @riverpod
-Map<int, int> relationshipCountCache(RelationshipCountCacheRef ref) {
+Map<int, int> relationshipCountCache(Ref ref) {
   return {};
 }
 

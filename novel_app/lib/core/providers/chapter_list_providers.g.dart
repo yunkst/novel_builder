@@ -6,7 +6,7 @@ part of 'chapter_list_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentNovelHash() => r'8ddbbf4f395511b15997fd2bb1f21103426a6512';
+String _$currentNovelHash() => r'eb3f11bb130c340d4ce14cecbe9caf17116461d5';
 
 /// ChapterListScreen 的 Novel 参数 Provider
 ///

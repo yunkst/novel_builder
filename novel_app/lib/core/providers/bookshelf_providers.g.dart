@@ -6,7 +6,7 @@ part of 'bookshelf_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$bookshelfNovelsHash() => r'52d6085197e593b58b329fea20b9413db29a0969';
+String _$bookshelfNovelsHash() => r'7146bd588697beffd5018216273f368319ab8bab';
 
 /// 书架小说列表
 ///

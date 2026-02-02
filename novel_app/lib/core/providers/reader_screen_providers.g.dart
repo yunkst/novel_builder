@@ -7,7 +7,7 @@ part of 'reader_screen_providers.dart';
 // **************************************************************************
 
 String _$readerSettingsServiceHash() =>
-    r'28ded929d03ad72863e47350e2f2ef65bf67915a';
+    r'31222f7d9fbe916f42bd1062231ff481ce24cd34';
 
 /// ReaderSettingsService Provider
 ///
@@ -32,7 +32,7 @@ final readerSettingsServiceProvider =
 typedef ReaderSettingsServiceRef
     = AutoDisposeProviderRef<ReaderSettingsService>;
 String _$novelContextBuilderHash() =>
-    r'b9fd020570d0ff30945bde7fd25bff0a69a09954';
+    r'9b148ed3ba0bcdbe8f8eb2bc2685385b7a0c04a5';
 
 /// NovelContextBuilder Provider
 ///
@@ -55,7 +55,7 @@ final novelContextBuilderProvider =
 // ignore: unused_element
 typedef NovelContextBuilderRef = AutoDisposeProviderRef<NovelContextBuilder>;
 String _$characterCardServiceHash() =>
-    r'a89d01b01432222a245f1dff623e39c78f6bf510';
+    r'ac43ab78c5e4fb62d573d1d16ae59e851fc9dcc9';
 
 /// CharacterCardService Provider
 ///
@@ -78,7 +78,7 @@ final characterCardServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
-String _$preloadServiceHash() => r'884948409649900fa2fde495dc06b95f41bafe20';
+String _$preloadServiceHash() => r'acec577aee64db912232979ba60e241953f3b237';
 
 /// PreloadService Provider
 ///

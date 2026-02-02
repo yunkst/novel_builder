@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/search_screen_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../screens/chapter_list_screen_riverpod.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
-import 'chapter_list_screen.dart';
 import '../utils/toast_utils.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -152,7 +152,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                ChapterListScreen(novel: novel),
+                                ChapterListScreenRiverpod(novel: novel),
                           ),
                         );
                       },
