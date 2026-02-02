@@ -29,13 +29,11 @@ import '../widgets/reader/ai_companion_confirm_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../utils/media_markup_parser.dart';
 import '../utils/character_matcher.dart';
-import '../providers/reader_edit_mode_provider.dart';
 import '../controllers/reader_content_controller.dart';
 import '../controllers/reader_interaction_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
-import 'package:provider/provider.dart' as legacy_provider;
 import 'tts_player_screen.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
@@ -44,6 +42,7 @@ import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/reader_screen_providers.dart';
 import '../core/providers/reader_settings_state.dart';
+import '../core/providers/reader_edit_mode_provider.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -1213,6 +1212,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _fontSize = settingsState.value?.fontSize ?? 18.0;
     _scrollSpeed = settingsState.value?.scrollSpeed ?? 1.0;
 
+    // 使用 ref.watch 监听编辑模式状态
+    final isEditMode = ref.watch(readerEditModeProvider);
+
     final currentIndex = _currentChapterIndex;
     final hasPrevious = currentIndex > 0;
     final hasNext =
@@ -1220,69 +1222,65 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     final paragraphs = _paragraphs;
 
-    // 使用 ChangeNotifierProvider 包装整个页面
-    return legacy_provider.ChangeNotifierProvider(
-      create: (_) => ReaderEditModeProvider(),
-      child: legacy_provider.Consumer<ReaderEditModeProvider>(
-        builder: (context, editModeProvider, child) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _currentChapter.title,
-                      style: const TextStyle(fontSize: 18),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ),
-                  // 编辑模式状态指示器
-                  if (editModeProvider.isEditMode)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.edit, size: 14),
-                          SizedBox(width: 4),
-                          Text('编辑模式', style: TextStyle(fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                ],
+    // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _currentChapter.title,
+                style: const TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
-              actions: [
-                // 编辑模式切换按钮
-                if (!editModeProvider.isEditMode)
-                  IconButton(
-                    onPressed: editModeProvider.toggleEditMode,
-                    tooltip: '进入编辑模式',
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                // 编辑完成按钮
-                if (editModeProvider.isEditMode)
-                  IconButton(
-                    onPressed: () async {
-                      // 保存编辑内容并退出编辑模式
-                      await _saveEditedContent();
-                      editModeProvider.toggleEditMode();
-                    },
-                    tooltip: '完成编辑并保存',
-                    icon: const Icon(Icons.check),
-                  ),
-                // 沉浸体验按钮
-                if (!editModeProvider.isEditMode)
-                  IconButton(
-                    onPressed: _showImmersiveSetup,
-                    tooltip: '沉浸体验',
-                    icon: const Icon(Icons.theater_comedy_outlined),
-                  ),
+            ),
+            // 编辑模式状态指示器
+            if (isEditMode)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit, size: 14),
+                    SizedBox(width: 4),
+                    Text('编辑模式', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          // 编辑模式切换按钮
+          if (!isEditMode)
+            IconButton(
+              onPressed: () => ref.read(readerEditModeProvider.notifier).toggle(),
+              tooltip: '进入编辑模式',
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          // 编辑完成按钮
+          if (isEditMode)
+            IconButton(
+              onPressed: () async {
+                // 保存编辑内容并退出编辑模式
+                await _saveEditedContent();
+                ref.read(readerEditModeProvider.notifier).toggle();
+              },
+              tooltip: '完成编辑并保存',
+              icon: const Icon(Icons.check),
+            ),
+          // 沉浸体验按钮
+          if (!isEditMode)
+            IconButton(
+              onPressed: _showImmersiveSetup,
+              tooltip: '沉浸体验',
+              icon: const Icon(Icons.theater_comedy_outlined),
+            ),
                 // 更多功能菜单
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
@@ -1446,8 +1444,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                     index: index,
                                     fontSize: _fontSize ?? 18.0,
                                     isCloseupMode: _isCloseupMode,
-                                    isEditMode: editModeProvider
-                                        .isEditMode, // From Consumer
+                                    isEditMode: isEditMode, // From Riverpod Provider
                                     isSelected: isSelected,
                                     onTap: _handleParagraphTap,
                                     onLongPress: (idx) => _handleLongPress(
@@ -1552,10 +1549,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                     onToggleCloseupMode: _toggleCloseupMode,
                     onToggleAutoScroll: toggleAutoScroll, // Mixin method
                   ),
-          );
-        },
-      ),
-    );
+        );
   }
 
   // 注意：插图处理相关方法已提取到 IllustrationHandlerMixin
