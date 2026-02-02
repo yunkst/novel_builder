@@ -257,7 +257,13 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
   // 替换选中的段落（新逻辑：删除选中段落 + 插入AI生成内容）
   void _replaceSelectedParagraphs() {
-    final paragraphs = widget.content.split('\n');
+    // ⚠️ 重要：必须过滤空段落，与UI层保持一致
+    // UI层（reader_screen.dart）使用的是过滤后的段落列表
+    // 如果不在这里过滤，会导致索引不匹配
+    final paragraphs = widget.content
+        .split('\n')
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
     final rewrittenParagraphs = _rewriteResult.split('\n');
 
     // 显示操作信息（可选）

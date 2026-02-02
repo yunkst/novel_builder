@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/database_service.dart';
 import '../../repositories/character_repository.dart';
@@ -62,7 +63,7 @@ INovelRepository novelRepository(Ref ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-IChapterRepository chapterRepository(ChapterRepositoryRef ref) {
+IChapterRepository chapterRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return ChapterRepository(dbConnection: dbConnection);
 }
@@ -71,7 +72,7 @@ IChapterRepository chapterRepository(ChapterRepositoryRef ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-ICharacterRepository characterRepository(CharacterRepositoryRef ref) {
+ICharacterRepository characterRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return CharacterRepository(dbConnection: dbConnection);
 }
@@ -91,7 +92,7 @@ ICharacterRelationRepository characterRelationRepository(
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-IIllustrationRepository illustrationRepository(IllustrationRepositoryRef ref) {
+IIllustrationRepository illustrationRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return IllustrationRepository(dbConnection: dbConnection);
 }
@@ -100,7 +101,7 @@ IIllustrationRepository illustrationRepository(IllustrationRepositoryRef ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-IOutlineRepository outlineRepository(OutlineRepositoryRef ref) {
+IOutlineRepository outlineRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return OutlineRepository(dbConnection: dbConnection);
 }
@@ -109,7 +110,7 @@ IOutlineRepository outlineRepository(OutlineRepositoryRef ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-IChatSceneRepository chatSceneRepository(ChatSceneRepositoryRef ref) {
+IChatSceneRepository chatSceneRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return ChatSceneRepository(dbConnection: dbConnection);
 }
@@ -118,7 +119,7 @@ IChatSceneRepository chatSceneRepository(ChatSceneRepositoryRef ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-IBookshelfRepository bookshelfRepository(BookshelfRepositoryRef ref) {
+IBookshelfRepository bookshelfRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return BookshelfRepository(dbConnection: dbConnection);
 }

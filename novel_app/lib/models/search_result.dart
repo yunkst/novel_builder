@@ -11,7 +11,7 @@ class ChapterSearchResult {
   final List<MatchPosition> matchPositions;
   final DateTime cachedAt;
 
-  ChapterSearchResult({
+  const ChapterSearchResult({
     required this.novelUrl,
     required this.novelTitle,
     required this.novelAuthor,

@@ -10,7 +10,7 @@ import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
 import '../repositories/bookshelf_repository.dart';
-import 'chapter_list_screen.dart';
+import '../screens/chapter_list_screen_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:async';
 
@@ -632,7 +632,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          ChapterListScreen(novel: novel),
+                                          ChapterListScreenRiverpod(novel: novel),
                                     ),
                                   ).then((_) => _loadBookshelf());
                                 },

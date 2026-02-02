@@ -5,7 +5,7 @@ import '../services/database_service.dart';
 import '../widgets/relationship_edit_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
-import 'unified_relationship_graph_screen.dart';
+import 'unified_relationship_graph_screen_riverpod.dart';
 
 /// 角色关系列表页面
 ///
@@ -163,7 +163,7 @@ class _CharacterRelationshipScreenState
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => UnifiedRelationshipGraphScreen(
+        builder: (context) => UnifiedRelationshipGraphScreenRiverpod(
           novelUrl: widget.character.novelUrl,
           focusCharacter: widget.character, // 单角色模式
         ),

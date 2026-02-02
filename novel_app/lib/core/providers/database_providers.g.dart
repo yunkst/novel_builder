@@ -73,7 +73,7 @@ final novelRepositoryProvider = AutoDisposeProvider<INovelRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NovelRepositoryRef = AutoDisposeProviderRef<INovelRepository>;
-String _$chapterRepositoryHash() => r'7c47ea3e4e04554fa166c1baa031c81485457207';
+String _$chapterRepositoryHash() => r'16896315729c603d33914948ef0266482431719c';
 
 /// ChapterRepository Provider
 ///
@@ -96,7 +96,7 @@ final chapterRepositoryProvider =
 // ignore: unused_element
 typedef ChapterRepositoryRef = AutoDisposeProviderRef<IChapterRepository>;
 String _$characterRepositoryHash() =>
-    r'ff94ee80c4084e95876cca66272efe87f31e8aa4';
+    r'88d938991a24b892168a768899b6196a7546688f';
 
 /// CharacterRepository Provider
 ///
@@ -143,7 +143,7 @@ final characterRelationRepositoryProvider =
 typedef CharacterRelationRepositoryRef
     = AutoDisposeProviderRef<ICharacterRelationRepository>;
 String _$illustrationRepositoryHash() =>
-    r'7db35f749e14012db0f723fd94ef5c06916eea5d';
+    r'7b06c45523f227a39e04d2c1b4d249ad41b486c0';
 
 /// IllustrationRepository Provider
 ///
@@ -166,7 +166,7 @@ final illustrationRepositoryProvider =
 // ignore: unused_element
 typedef IllustrationRepositoryRef
     = AutoDisposeProviderRef<IIllustrationRepository>;
-String _$outlineRepositoryHash() => r'b276d9989f1cac58190108f9fce75085fefe6eaa';
+String _$outlineRepositoryHash() => r'2729584c4249fb2abd7fc024f86002df82fa90a5';
 
 /// OutlineRepository Provider
 ///
@@ -189,7 +189,7 @@ final outlineRepositoryProvider =
 // ignore: unused_element
 typedef OutlineRepositoryRef = AutoDisposeProviderRef<IOutlineRepository>;
 String _$chatSceneRepositoryHash() =>
-    r'3d06084b06ed6af389b19023a0e8652233bcc4a3';
+    r'533f26c9557fd2b10c89ed7d025c9a45c0f539a2';
 
 /// ChatSceneRepository Provider
 ///
@@ -212,7 +212,7 @@ final chatSceneRepositoryProvider =
 // ignore: unused_element
 typedef ChatSceneRepositoryRef = AutoDisposeProviderRef<IChatSceneRepository>;
 String _$bookshelfRepositoryHash() =>
-    r'36245ec10e83fc23c2b7f781ba70fd27a622d648';
+    r'9f12c5aa18a12c4d48303b9f926256e73f2b1d7b';
 
 /// BookshelfRepository Provider
 ///

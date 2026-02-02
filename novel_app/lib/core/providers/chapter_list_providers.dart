@@ -5,6 +5,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/ai_accompaniment_settings.dart';
@@ -405,7 +406,7 @@ class ChapterList extends _$ChapterList {
 ///
 /// 用于在屏幕中传递 novel 参数
 @riverpod
-Novel currentNovel(CurrentNovelRef ref) {
+Novel currentNovel(Ref ref) {
   throw UnimplementedError('currentNovel must be overridden');
 }
 

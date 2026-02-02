@@ -4,6 +4,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/search_result.dart';
@@ -36,7 +37,7 @@ class NovelParam extends _$NovelParam {
 ///
 /// 提供小说的章节列表
 @riverpod
-Future<List<Chapter>> chaptersList(ChaptersListRef ref) async {
+Future<List<Chapter>> chaptersList(Ref ref) async {
   final novelParam = ref.watch(novelParamProvider);
   if (novelParam == null) {
     return [];
@@ -82,7 +83,7 @@ class SearchQuery extends _$SearchQuery {
 ///
 /// 提供章节搜索结果
 @riverpod
-Future<List<ChapterSearchResult>> searchResults(SearchResultsRef ref) async {
+Future<List<ChapterSearchResult>> searchResults(Ref ref) async {
   final novelParam = ref.watch(novelParamProvider);
   final query = ref.watch(searchQueryProvider);
 

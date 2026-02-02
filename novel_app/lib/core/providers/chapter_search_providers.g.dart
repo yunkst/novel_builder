@@ -6,7 +6,7 @@ part of 'chapter_search_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chaptersListHash() => r'69c85834d3a795c4fa0af6e4bbe5181821ddb521';
+String _$chaptersListHash() => r'a6007807d7ad550dd1406dfb681fa28fbb5bb727';
 
 /// Chapters List Provider
 ///
@@ -26,7 +26,7 @@ final chaptersListProvider = AutoDisposeFutureProvider<List<Chapter>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChaptersListRef = AutoDisposeFutureProviderRef<List<Chapter>>;
-String _$searchResultsHash() => r'43c45c2bf22e853a71ee778a20c9c831d8bcc0b3';
+String _$searchResultsHash() => r'f3000ed1fd333865a943aaa9217123be7e98c75f';
 
 /// Search Results Provider
 ///

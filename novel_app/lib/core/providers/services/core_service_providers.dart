@@ -1,0 +1,84 @@
+/// Core Service Providers
+///
+/// 此文件定义核心基础服务的 Provider。
+///
+/// **功能**:
+/// - 日志服务
+/// - 偏好设置服务
+///
+/// **依赖**:
+/// - 无（最底层服务）
+///
+/// **相关 Providers**:
+/// - [ai_service_providers.dart] - AI相关 Providers
+/// - [network_service_providers.dart] - 网络相关 Providers
+/// - [database_service_providers.dart] - 数据库相关 Providers
+/// - [cache_service_providers.dart] - 缓存相关 Providers
+library;
+
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../services/logger_service.dart';
+import '../../../services/preferences_service.dart';
+
+part 'core_service_providers.g.dart';
+
+/// LoggerService Provider
+///
+/// 提供全局日志服务实例，用于记录应用运行时的日志信息。
+///
+/// **功能**:
+/// - 支持多级别日志（debug, info, warning, error）
+/// - 支持日志分类和标签
+/// - 持久化日志到本地文件
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// class MyWidget extends ConsumerWidget {
+///   @override
+///   Widget build(BuildContext context, WidgetRef ref) {
+///     final logger = ref.watch(loggerServiceProvider);
+///     logger.info('Widget 已构建');
+///     return Container();
+///   }
+/// }
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `LoggerService.instance` 单例模式
+/// - 日志文件位于应用文档目录
+/// - 支持异步日志写入
+@riverpod
+LoggerService loggerService(LoggerServiceRef ref) {
+  return LoggerService.instance;
+}
+
+/// PreferencesService Provider
+///
+/// 提供全局 SharedPreferences 服务实例，用于存储用户偏好设置。
+///
+/// **功能**:
+/// - 持久化键值对存储
+/// - 支持多种数据类型（String、int、bool、double、List<String>等）
+/// - 线程安全访问
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final prefs = ref.watch(preferencesServiceProvider);
+/// await prefs.setString('theme_mode', 'dark');
+/// final themeMode = await prefs.getString('theme_mode');
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `PreferencesService.instance` 单例模式
+/// - 所有操作都是异步的
+/// - 数据存储在本地 SharedPreferences
+@riverpod
+PreferencesService preferencesService(PreferencesServiceRef ref) {
+  return PreferencesService.instance;
+}

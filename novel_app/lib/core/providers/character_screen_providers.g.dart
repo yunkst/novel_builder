@@ -31,7 +31,7 @@ final characterImageCacheServiceProvider =
 // ignore: unused_element
 typedef CharacterImageCacheServiceRef = ProviderRef<CharacterImageCacheService>;
 String _$relationshipCountCacheHash() =>
-    r'2f36d293fe1b2f9a5954ca9ef060eff4ba22a311';
+    r'65dd262eb42624d2d5933ce6957faa78835bd34b';
 
 /// 角色关系数量缓存 Provider
 ///

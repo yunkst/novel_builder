@@ -26,7 +26,7 @@ class ReadingProgress {
   /// 保存时间戳
   final DateTime timestamp;
 
-  ReadingProgress({
+  const ReadingProgress({
     required this.novelUrl,
     required this.novelTitle,
     required this.chapterUrl,

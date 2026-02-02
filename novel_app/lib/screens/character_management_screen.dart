@@ -12,7 +12,7 @@ import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import 'character_edit_screen.dart';
-import 'unified_relationship_graph_screen.dart';
+import 'unified_relationship_graph_screen_riverpod.dart';
 import '../core/providers/character_screen_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
@@ -470,7 +470,7 @@ class _CharacterManagementScreenState
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => UnifiedRelationshipGraphScreen(
+                        builder: (context) => UnifiedRelationshipGraphScreenRiverpod(
                           novelUrl: widget.novel.url,
                           // focusCharacter 为 null,进入全局模式
                         ),

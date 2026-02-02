@@ -47,7 +47,7 @@ class Bookshelf {
   /// 用户创建的书架：isSystem=false，可以编辑和删除
   final bool isSystem;
 
-  Bookshelf({
+  const Bookshelf({
     required this.id,
     required this.name,
     required this.createdAt,
