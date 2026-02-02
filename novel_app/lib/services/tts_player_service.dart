@@ -13,12 +13,12 @@ import 'preferences_service.dart';
 
 /// TTS播放器状态
 enum TtsPlayerState {
-  idle,       // 空闲
-  loading,    // 加载中
-  playing,    // 播放中
-  paused,     // 已暂停
-  error,      // 错误
-  completed,  // 完成
+  idle, // 空闲
+  loading, // 加载中
+  playing, // 播放中
+  paused, // 已暂停
+  error, // 错误
+  completed, // 完成
 }
 
 /// TTS播放器服务 - 管理播放状态、章节切换和进度保存
@@ -58,7 +58,8 @@ class TtsPlayerService extends ChangeNotifier {
   int get currentParagraphIndex => _currentParagraphIndex;
 
   String? get currentParagraph {
-    if (_currentParagraphIndex >= 0 && _currentParagraphIndex < _paragraphs.length) {
+    if (_currentParagraphIndex >= 0 &&
+        _currentParagraphIndex < _paragraphs.length) {
       return _paragraphs[_currentParagraphIndex];
     }
     return null;
@@ -79,7 +80,7 @@ class TtsPlayerService extends ChangeNotifier {
   static const String _progressKey = 'tts_reading_progress';
 
   // 播放队列控制
-  bool _autoPlayNext = true;  // 是否自动播放下一段/下一章
+  bool _autoPlayNext = true; // 是否自动播放下一段/下一章
   bool get autoPlayNext => _autoPlayNext;
   set autoPlayNext(bool value) {
     _autoPlayNext = value;
@@ -123,8 +124,10 @@ class TtsPlayerService extends ChangeNotifier {
   /// 加载保存的设置
   Future<void> _loadSettings() async {
     try {
-      _speechRate = await PreferencesService.instance.getDouble('tts_speech_rate', defaultValue: 1.0);
-      _pitch = await PreferencesService.instance.getDouble('tts_pitch', defaultValue: 1.0);
+      _speechRate = await PreferencesService.instance
+          .getDouble('tts_speech_rate', defaultValue: 1.0);
+      _pitch = await PreferencesService.instance
+          .getDouble('tts_pitch', defaultValue: 1.0);
       LoggerService.instance.i(
         '加载设置: 语速=$_speechRate, 音调=$_pitch',
         category: LogCategory.tts,
@@ -165,7 +168,8 @@ class TtsPlayerService extends ChangeNotifier {
       _novel = novel;
       _allChapters = chapters;
       _currentChapter = startChapter;
-      _currentChapterIndex = chapters.indexWhere((c) => c.url == startChapter.url);
+      _currentChapterIndex =
+          chapters.indexWhere((c) => c.url == startChapter.url);
 
       if (_currentChapterIndex == -1) {
         _setError('未找到起始章节');
@@ -181,7 +185,8 @@ class TtsPlayerService extends ChangeNotifier {
 
       // 分割段落
       _paragraphs = _parseParagraphs(content);
-      _currentParagraphIndex = startParagraphIndex.clamp(0, _paragraphs.length - 1);
+      _currentParagraphIndex =
+          startParagraphIndex.clamp(0, _paragraphs.length - 1);
 
       // 应用保存的语速和音调
       await _tts.setSpeechRate(_speechRate);
@@ -213,7 +218,8 @@ class TtsPlayerService extends ChangeNotifier {
       await stop();
 
       // 找到目标章节索引
-      final targetIndex = _allChapters.indexWhere((c) => c.url == targetChapter.url);
+      final targetIndex =
+          _allChapters.indexWhere((c) => c.url == targetChapter.url);
       if (targetIndex == -1) {
         _setError('未找到目标章节');
         return false;
@@ -544,7 +550,7 @@ class TtsPlayerService extends ChangeNotifier {
     try {
       // 先尝试从数据库获取
       final cached = await _database.getChapterContent(chapter.url);
-      if (cached.isNotEmpty) {
+      if (cached != null && cached.isNotEmpty) {
         LoggerService.instance.d(
           '使用缓存: ${chapter.title}',
           category: LogCategory.tts,
@@ -589,8 +595,8 @@ class TtsPlayerService extends ChangeNotifier {
   /// 检查是否为标记段落
   bool _isMarkupParagraph(String paragraph) {
     return paragraph.startsWith('[插图:') ||
-           paragraph.startsWith('[视频:') ||
-           paragraph.startsWith('[图片:');
+        paragraph.startsWith('[视频:') ||
+        paragraph.startsWith('[图片:');
   }
 
   /// 设置状态
@@ -633,7 +639,8 @@ class TtsPlayerService extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
 
-      await PreferencesService.instance.setString(_progressKey, progress.toJsonString());
+      await PreferencesService.instance
+          .setString(_progressKey, progress.toJsonString());
 
       LoggerService.instance.d(
         '保存进度: $progress',
@@ -672,7 +679,8 @@ class TtsPlayerService extends ChangeNotifier {
   /// 加载保存的进度
   static Future<ReadingProgress?> loadSavedProgress() async {
     try {
-      final jsonString = await PreferencesService.instance.getString(_progressKey);
+      final jsonString =
+          await PreferencesService.instance.getString(_progressKey);
       if (jsonString.isEmpty) return null;
 
       final progress = ReadingProgress.fromJsonString(jsonString);
@@ -717,9 +725,8 @@ class TtsPlayerService extends ChangeNotifier {
     if (_allChapters.isEmpty) return 0.0;
 
     final completedChapters = _currentChapterIndex;
-    final chapterProgress = _paragraphs.isEmpty
-        ? 0.0
-        : _currentParagraphIndex / _paragraphs.length;
+    final chapterProgress =
+        _paragraphs.isEmpty ? 0.0 : _currentParagraphIndex / _paragraphs.length;
 
     return (completedChapters + chapterProgress) / _allChapters.length;
   }

@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../test_bootstrap.dart';
+import '../base/database_test_base.dart';
 
 /// URL一致性诊断测试
 ///
@@ -10,15 +11,20 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// 假设：读取和保存使用了不同的URL
 void main() {
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('URL一致性诊断', () {
+    late DatabaseTestBase testBase;
     late DatabaseService dbService;
-
     setUp(() async {
-      dbService = DatabaseService();
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+      dbService = testBase.databaseService;
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
     });
 
     test('诊断: 检查URL细微差异', () async {

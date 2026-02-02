@@ -23,7 +23,8 @@ class BackgroundSummaryDialog extends StatefulWidget {
   });
 
   @override
-  State<BackgroundSummaryDialog> createState() => _BackgroundSummaryDialogState();
+  State<BackgroundSummaryDialog> createState() =>
+      _BackgroundSummaryDialogState();
 }
 
 class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
@@ -77,7 +78,10 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
               '将对当前背景设定进行AI总结',
               style: TextStyle(
                 fontSize: 15,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 12),
@@ -88,7 +92,10 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -259,7 +266,10 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
             TabBar(
               controller: _tabController,
               labelColor: Theme.of(context).colorScheme.primary,
-              unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              unselectedLabelColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
               indicatorColor: Theme.of(context).colorScheme.primary,
               tabs: const [
                 Tab(text: '原文'),

@@ -1,25 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
+import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// novels 视图功能测试
 ///
 /// 验证 novels 视图正确创建并作为 bookshelf 表的语义别名
 void main() {
   // 初始化 FFI
-  sqfliteFfiInit();
+  initTests();
 
   group('novels 视图基础测试', () {
+    late DatabaseTestBase base;
     late DatabaseService databaseService;
 
     setUp(() async {
-      // 使用内存数据库进行测试
-      databaseService = DatabaseService();
+      base = DatabaseTestBase();
+      await base.setUp();
+      databaseService = base.databaseService;
     });
 
     tearDown(() async {
-      // 清理
+      await base.tearDown();
     });
 
     test('novels视图应该与bookshelf表数据一致', () async {
@@ -112,8 +115,19 @@ void main() {
   });
 
   group('novels 视图语义测试', () {
+    late DatabaseTestBase base;
+
+    setUp(() async {
+      base = DatabaseTestBase();
+      await base.setUp();
+    });
+
+    tearDown(() async {
+      await base.tearDown();
+    });
+
     test('getNovels和getBookshelf应该返回相同结果', () async {
-      final databaseService = DatabaseService();
+      final databaseService = base.databaseService;
 
       final testNovel = Novel(
         title: '语义测试小说',
@@ -139,9 +153,8 @@ void main() {
       // 这个测试主要验证文档注释的存在
       // 在实际代码审查中，应检查 getNovels() 方法的文档注释
 
-      // 验证 DatabaseService 类可以被实例化
-      final service = DatabaseService();
-      expect(service, isNotNull);
+      // 验证 DatabaseService 类可以被实例化（通过base）
+      expect(base.databaseService, isNotNull);
     });
   });
 }

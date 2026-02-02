@@ -110,7 +110,8 @@ class CacheUtils {
   /// // true
   /// ```
   static bool isCacheExpiredMs(int cacheTimestampMs, Duration maxAge) {
-    final cacheTimestamp = DateTime.fromMillisecondsSinceEpoch(cacheTimestampMs);
+    final cacheTimestamp =
+        DateTime.fromMillisecondsSinceEpoch(cacheTimestampMs);
     return isCacheExpired(cacheTimestamp, maxAge);
   }
 
@@ -208,9 +209,11 @@ class CacheUtils {
       // 文档
       'pdf': 'application/pdf',
       'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'xls': 'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'txt': 'text/plain',
       'json': 'application/json',
       'xml': 'application/xml',

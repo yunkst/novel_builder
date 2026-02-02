@@ -11,9 +11,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Mock classes
 @GenerateMocks([SharedPreferences])
 import 'paragraph_rewrite_integration_test.mocks.dart';
+import '../test_bootstrap.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  // 初始化数据库测试环境
+  setUpAll(() {
+    initTests();
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
 
   group('段落替换集成测试', () {
     late Novel testNovel;

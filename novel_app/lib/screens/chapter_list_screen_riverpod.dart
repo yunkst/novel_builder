@@ -1,0 +1,830 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/novel.dart';
+import '../models/chapter.dart';
+import '../core/providers/chapter_list_providers.dart';
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
+import '../widgets/chapter_list/chapter_list_header.dart';
+import '../widgets/chapter_list/chapter_list_item.dart';
+import '../widgets/chapter_list/reorderable_chapter_item.dart';
+import '../widgets/chapter_list/empty_chapters_view.dart';
+import '../constants/chapter_constants.dart';
+import '../utils/toast_utils.dart';
+import 'reader_screen.dart';
+import 'chapter_search_screen.dart';
+import 'character_management_screen.dart';
+import 'outline/outline_management_screen.dart';
+import 'background_setting_screen.dart';
+import 'insert_chapter_screen.dart';
+import 'chapter_generation_screen.dart';
+import '../widgets/ai_accompaniment_settings_dialog.dart';
+import '../models/ai_accompaniment_settings.dart';
+
+/// 章节列表页面 - Riverpod版本
+///
+/// 这是原始 ChapterListScreen 的 Riverpod 包装器
+/// 所有状态管理通过 Riverpod Provider 完成
+class ChapterListScreenRiverpod extends ConsumerStatefulWidget {
+  final Novel novel;
+
+  const ChapterListScreenRiverpod({
+    super.key,
+    required this.novel,
+  });
+
+  @override
+  ConsumerState<ChapterListScreenRiverpod> createState() =>
+      _ChapterListScreenRiverpodState();
+}
+
+class _ChapterListScreenRiverpodState
+    extends ConsumerState<ChapterListScreenRiverpod> {
+  final ScrollController _scrollController = ScrollController();
+
+  // 生成章节相关的状态
+  final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> _generatedContentNotifier =
+      ValueNotifier<String>('');
+
+  // 标记是否已经设置了监听
+  bool _hasSetupListener = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 监听预加载进度 - 延迟到 build 方法中设置
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _isGeneratingNotifier.dispose();
+    _generatedContentNotifier.dispose();
+    super.dispose();
+  }
+
+  /// 监听预加载进度
+  void _listenToPreloadProgress() {
+    ref.listen(
+      preloadProgressProvider(widget.novel),
+      (previous, next) {
+        next.when(
+          data: (update) {
+            if (update.chapterUrl != null) {
+              // 更新特定章节的缓存状态
+              ref.read(chapterListProvider(widget.novel).notifier)
+                  .updateChapterCacheStatus(update.chapterUrl!, true);
+            }
+          },
+          loading: () {},
+          error: (_, __) {},
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 设置监听（只设置一次）
+    if (!_hasSetupListener) {
+      _hasSetupListener = true;
+      _listenToPreloadProgress();
+    }
+
+    final state = ref.watch(chapterListProvider(widget.novel));
+    final notifier = ref.read(chapterListProvider(widget.novel).notifier);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.novel.title),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          _buildReorderButton(state, notifier),
+          _buildSearchButton(),
+          _buildCharacterButton(),
+          _buildPopupMenu(state, notifier, context),
+        ],
+      ),
+      body: state.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : state.errorMessage.isNotEmpty
+              ? _buildErrorView(state, notifier)
+              : Column(
+                  children: [
+                    ChapterListHeader(
+                      novel: widget.novel,
+                      chapterCount: state.chapters.length,
+                      cachedCount: state.cachedCount,
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: state.chapters.isEmpty
+                          ? EmptyChaptersView(
+                              novel: widget.novel,
+                              onGenerateChapter: () =>
+                                  _showInsertChapterDialog(0),
+                              onLoadFromSource: () =>
+                                  notifier.refreshChapters(),
+                            )
+                          : state.isReorderingMode
+                              ? _buildReorderableChapterList(state, notifier)
+                              : _buildNormalChapterList(state),
+                    ),
+                    // 只在非重排模式、有章节且总页数大于1时显示分页控制栏
+                    if (!state.isReorderingMode &&
+                        state.chapters.isNotEmpty &&
+                        state.totalPages > 1)
+                      _buildPaginationControl(state, notifier),
+                  ],
+                ),
+    );
+  }
+
+  /// 构建错误视图
+  Widget _buildErrorView(ChapterListState state, ChapterList notifier) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            state.errorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => notifier.refreshChapters(),
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建重排按钮
+  Widget _buildReorderButton(ChapterListState state, ChapterList notifier) {
+    if (state.isReorderingMode) {
+      return IconButton(
+        icon: const Icon(Icons.check),
+        onPressed: () {
+          notifier.exitReorderingMode();
+          ToastUtils.show('已退出重排模式');
+        },
+        tooltip: '完成重排',
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Theme.of(context).colorScheme.surface,
+        ),
+      );
+    } else {
+      return IconButton(
+        icon: const Icon(Icons.reorder),
+        onPressed: () => notifier.toggleReorderingMode(),
+        tooltip: '重排章节',
+      );
+    }
+  }
+
+  /// 构建搜索按钮
+  Widget _buildSearchButton() {
+    return IconButton(
+      icon: const Icon(Icons.search),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChapterSearchScreen(novel: widget.novel),
+          ),
+        );
+      },
+      tooltip: '搜索章节内容',
+    );
+  }
+
+  /// 构建人物管理按钮
+  Widget _buildCharacterButton() {
+    return IconButton(
+      icon: const Icon(Icons.people),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                CharacterManagementScreen(novel: widget.novel),
+          ),
+        );
+      },
+      tooltip: '人物管理',
+    );
+  }
+
+  /// 构建弹出菜单
+  Widget _buildPopupMenu(
+    ChapterListState state,
+    ChapterList notifier,
+    BuildContext context,
+  ) {
+    final isCustomNovel = widget.novel.url.startsWith('custom://');
+
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        switch (value) {
+          case 'toggle_bookmark':
+            _handleToggleBookshelf(notifier);
+            break;
+          case 'clear_cache':
+            _showClearCacheDialog(notifier);
+            break;
+          case 'refresh':
+            notifier.refreshChapters();
+            break;
+          case 'outline_management':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OutlineManagementScreen(
+                  novelUrl: widget.novel.url,
+                  novelTitle: widget.novel.title,
+                ),
+              ),
+            );
+            break;
+          case 'background_setting':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BackgroundSettingScreen(
+                  novel: widget.novel,
+                ),
+              ),
+            );
+            break;
+          case 'ai_accompaniment_settings':
+            _openAiSettings(state);
+            break;
+        }
+      },
+      itemBuilder: (context) {
+        return [
+          PopupMenuItem(
+            value: 'toggle_bookmark',
+            child: Row(
+              children: [
+                Icon(state.isInBookshelf ? Icons.bookmark : Icons.bookmark_border),
+                const SizedBox(width: 8),
+                Text(state.isInBookshelf ? '移出书架' : '加入书架'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'clear_cache',
+            child: Row(
+              children: [
+                Icon(Icons.clear_all, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('清除缓存'),
+              ],
+            ),
+          ),
+          if (!isCustomNovel)
+            const PopupMenuItem(
+              value: 'refresh',
+              child: Row(
+                children: [
+                  Icon(Icons.refresh),
+                  SizedBox(width: 8),
+                  Text('刷新章节'),
+                ],
+              ),
+            ),
+          const PopupMenuItem(
+            value: 'outline_management',
+            child: Row(
+              children: [
+                Icon(Icons.menu_book_outlined),
+                SizedBox(width: 8),
+                Text('大纲管理'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'background_setting',
+            child: Row(
+              children: [
+                Icon(Icons.info_outline),
+                SizedBox(width: 8),
+                Text('背景设定'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'ai_accompaniment_settings',
+            child: Row(
+              children: [
+                Icon(Icons.psychology_outlined),
+                SizedBox(width: 8),
+                Text('AI伴读设置'),
+              ],
+            ),
+          ),
+        ];
+      },
+    );
+  }
+
+  /// 构建正常的章节列表
+  Widget _buildNormalChapterList(ChapterListState state) {
+    final pageChapters = _getCurrentPageChapters(state);
+
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: pageChapters.length,
+      itemBuilder: (context, index) {
+        final chapter = pageChapters[index];
+        // 计算在全部章节中的实际索引
+        final globalIndex =
+            (state.currentPage - 1) * ChapterConstants.chaptersPerPage + index;
+        final isLastRead = globalIndex == state.lastReadChapterIndex;
+        final isUserChapter = chapter.isUserInserted;
+
+        return ChapterListItem(
+          chapter: chapter,
+          isLastRead: isLastRead,
+          isUserChapter: isUserChapter,
+          isCached: state.cachedStatus[chapter.url] ?? false,
+          isRead: chapter.isRead,
+          isAccompanied: chapter.isAccompanied,
+          onTap: () => _navigateToReader(chapter, state),
+          onLongPress: () =>
+              ref.read(chapterListProvider(widget.novel).notifier)
+                  .toggleReorderingMode(),
+          onInsert: () => _showInsertChapterDialog(index),
+          onDelete: chapter.isUserInserted
+              ? () => _showDeleteChapterDialog(chapter, index)
+              : null,
+        );
+      },
+    );
+  }
+
+  /// 构建可重排的章节列表
+  Widget _buildReorderableChapterList(
+    ChapterListState state,
+    ChapterList notifier,
+  ) {
+    return ReorderableListView.builder(
+      itemCount: state.chapters.length,
+      onReorder: (oldIndex, newIndex) =>
+          notifier.reorderChapters(oldIndex, newIndex),
+      itemBuilder: (context, index) {
+        final chapter = state.chapters[index];
+        final isLastRead = index == state.lastReadChapterIndex;
+        final isUserChapter = chapter.isUserInserted;
+
+        return ReorderableChapterListItem(
+          key: ValueKey(chapter.url),
+          chapter: chapter,
+          index: index,
+          isLastRead: isLastRead,
+          isUserChapter: isUserChapter,
+          isCached: state.cachedStatus[chapter.url] ?? false,
+          isRead: chapter.isRead,
+          isAccompanied: chapter.isAccompanied,
+        );
+      },
+    );
+  }
+
+  /// 构建分页控制栏
+  Widget _buildPaginationControl(ChapterListState state, ChapterList notifier) {
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 首页按钮
+          IconButton(
+            icon: const Icon(Icons.first_page),
+            onPressed:
+                state.currentPage > 1 ? () => notifier.goToPage(1) : null,
+            tooltip: '首页',
+          ),
+          // 上一页按钮
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: state.currentPage > 1
+                ? () => notifier.goToPage(state.currentPage - 1)
+                : null,
+            tooltip: '上一页',
+          ),
+          // 页码显示
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text('第 ${state.currentPage} / ${state.totalPages} 页'),
+          ),
+          // 下一页按钮
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: state.currentPage < state.totalPages
+                ? () => notifier.goToPage(state.currentPage + 1)
+                : null,
+            tooltip: '下一页',
+          ),
+          // 末页按钮
+          IconButton(
+            icon: const Icon(Icons.last_page),
+            onPressed: state.currentPage < state.totalPages
+                ? () => notifier.goToPage(state.totalPages)
+                : null,
+            tooltip: '末页',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 获取当前页章节
+  List<Chapter> _getCurrentPageChapters(ChapterListState state) {
+    if (state.chapters.isEmpty) return [];
+
+    final startIndex =
+        (state.currentPage - 1) * ChapterConstants.chaptersPerPage;
+    final endIndex = (startIndex + ChapterConstants.chaptersPerPage)
+        .clamp(0, state.chapters.length);
+
+    return state.chapters.sublist(startIndex, endIndex);
+  }
+
+  /// 切换书架状态
+  Future<void> _handleToggleBookshelf(ChapterList notifier) async {
+    try {
+      await notifier.toggleBookshelf();
+      if (mounted) {
+        final newState = ref.read(chapterListProvider(widget.novel));
+        ToastUtils.show(
+            newState.isInBookshelf ? '已添加到书架' : '已从书架移除');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError('操作失败: $e');
+      }
+    }
+  }
+
+  /// 显示清除缓存对话框
+  Future<void> _showClearCacheDialog(ChapterList notifier) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('清除缓存'),
+        content: const Text('确定要清除该小说的所有缓存吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await notifier.clearCache();
+                if (mounted) {
+                  ToastUtils.show('缓存已清除');
+                }
+              } catch (e) {
+                if (mounted) {
+                  ToastUtils.showError('清除缓存失败: $e');
+                }
+              }
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 打开AI伴读设置对话框
+  void _openAiSettings(ChapterListState state) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AiAccompanimentSettingsDialog(
+        initialSettings: state.aiSettings ?? const AiAccompanimentSettings(),
+        onSave: (settings) async {
+          final databaseService = ref.read(databaseServiceProvider);
+          await databaseService.updateAiAccompanimentSettings(
+              widget.novel.url, settings);
+          // 重新加载设置
+          ref.invalidate(chapterListProvider(widget.novel));
+          // 显示保存成功提示
+          if (context.mounted) {
+            ToastUtils.show('AI伴读设置已保存');
+          }
+        },
+      ),
+    );
+  }
+
+  /// 导航到阅读页面
+  Future<void> _navigateToReader(Chapter chapter, ChapterListState state) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReaderScreen(
+          novel: widget.novel,
+          chapter: chapter,
+          chapters: state.chapters,
+        ),
+      ),
+    );
+
+    // 返回时重新加载上次阅读位置并跳转
+    if (mounted) {
+      await ref.read(chapterListProvider(widget.novel).notifier).reloadLastReadChapter();
+      // 滚动到上次阅读位置
+      _scrollToLastReadChapter();
+    }
+  }
+
+  /// 滚动到上次阅读章节
+  void _scrollToLastReadChapter() {
+    final state = ref.read(chapterListProvider(widget.novel));
+    if (state.lastReadChapterIndex >= 0 && state.chapters.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // 延迟执行滚动，确保ListView已经重建完成
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            // 计算目标章节在当前页中的索引
+            final startIndex =
+                (state.currentPage - 1) * ChapterConstants.chaptersPerPage;
+            final indexInPage = state.lastReadChapterIndex - startIndex;
+
+            // 使用简单的滚动方法
+            final itemHeight = ChapterConstants.listItemHeight;
+            final targetOffset = indexInPage * itemHeight;
+
+            // 获取可视区域高度
+            final viewportHeight = _scrollController.position.viewportDimension;
+            final adjustedOffset =
+                (targetOffset - viewportHeight * 0.25)
+                    .clamp(0.0, _scrollController.position.maxScrollExtent);
+
+            _scrollController.animateTo(
+              adjustedOffset,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
+      });
+    }
+  }
+
+  /// 显示插入章节对话框
+  Future<void> _showInsertChapterDialog(
+    int afterIndex, {
+    String? prefillTitle,
+    String? prefillContent,
+  }) async {
+    final state = ref.read(chapterListProvider(widget.novel));
+
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InsertChapterScreen(
+          novel: widget.novel,
+          afterIndex: afterIndex,
+          chapters: state.chapters,
+          prefillTitle: prefillTitle,
+          prefillContent: prefillContent,
+        ),
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      await _generateNewChapter(
+        afterIndex,
+        result['title']!,
+        result['content']!,
+        result['characterIds'] as List<int>? ?? [],
+      );
+    }
+  }
+
+  /// 生成新章节
+  Future<void> _generateNewChapter(
+    int afterIndex,
+    String title,
+    String userInput,
+    List<int> characterIds,
+  ) async {
+    // 在后台开始生成内容
+    _callDifyToGenerateChapter(afterIndex, userInput, characterIds);
+
+    // 显示全屏生成页面并等待用户操作
+    final result = await ChapterGenerationScreen.show(
+      context: context,
+      title: title,
+      generatedContentNotifier: _generatedContentNotifier,
+      isGeneratingNotifier: _isGeneratingNotifier,
+    );
+
+    if (result == null) {
+      // 用户取消
+      return;
+    } else if (result == false) {
+      // 用户选择重试
+      _showInsertChapterDialog(
+        afterIndex,
+        prefillTitle: title,
+        prefillContent: userInput,
+      );
+      return;
+    }
+
+    // 用户选择插入
+    final content = _generatedContentNotifier.value;
+    if (content.isNotEmpty) {
+      await _insertGeneratedChapter(afterIndex, title, content);
+    }
+  }
+
+  /// 调用Dify生成章节
+  Future<void> _callDifyToGenerateChapter(
+    int afterIndex,
+    String userInput,
+    List<int> characterIds,
+  ) async {
+    _isGeneratingNotifier.value = true;
+    _generatedContentNotifier.value = '';
+
+    try {
+      final difyService = ref.read(difyServiceProvider);
+      final chapterService = ref.read(chapterServiceProvider);
+
+      // 构建完整的 inputs
+      final state = ref.read(chapterListProvider(widget.novel));
+      final inputs = await chapterService.buildChapterGenerationInputs(
+        novel: widget.novel,
+        chapters: state.chapters,
+        afterIndex: afterIndex,
+        userInput: userInput,
+        characterIds: characterIds,
+      );
+
+      // 直接调用 DifyService 进行流式生成
+      await difyService.runWorkflowStreaming(
+        inputs: inputs,
+        onData: (data) {
+          if (mounted) {
+            _generatedContentNotifier.value += data;
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            ToastUtils.showError('生成失败: $error');
+          }
+        },
+        onDone: () {
+          _isGeneratingNotifier.value = false;
+        },
+        enableDebugLog: false,
+      );
+    } catch (e) {
+      debugPrint('❌ 调用Dify生成章节失败: $e');
+      _isGeneratingNotifier.value = false;
+      if (mounted) {
+        ToastUtils.showError('生成失败: $e');
+      }
+    }
+  }
+
+  /// 插入生成的章节
+  Future<void> _insertGeneratedChapter(
+    int afterIndex,
+    String title,
+    String content,
+  ) async {
+    try {
+      final state = ref.read(chapterListProvider(widget.novel));
+      final chapterActionHandler = ref.read(chapterActionHandlerProvider);
+
+      // 统一使用insertUserChapter方法
+      final insertIndex = state.chapters.isEmpty ? 0 : afterIndex + 1;
+      debugPrint('AI生成章节：使用insertUserChapter插入到位置$insertIndex');
+
+      await chapterActionHandler.insertChapter(
+        novelUrl: widget.novel.url,
+        title: title,
+        content: content,
+        insertIndex: insertIndex,
+      );
+
+      // 重新加载章节列表
+      await ref
+          .read(chapterListProvider(widget.novel).notifier)
+          .refreshChapters();
+
+      if (mounted) {
+        final newState = ref.read(chapterListProvider(widget.novel));
+
+        // 查找刚插入的章节
+        final insertedChapter = newState.chapters.firstWhere(
+          (c) => c.title == title,
+          orElse: () => newState.chapters.isNotEmpty
+              ? newState.chapters[insertIndex]
+              : newState.chapters.last,
+        );
+
+        // 跳转到阅读页面
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReaderScreen(
+              novel: widget.novel,
+              chapter: insertedChapter,
+              chapters: newState.chapters,
+            ),
+          ),
+          (route) => route.isFirst,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError('插入章节失败: $e');
+      }
+    }
+  }
+
+  /// 显示删除章节确认对话框
+  Future<void> _showDeleteChapterDialog(
+    Chapter chapter,
+    int index,
+  ) async {
+    final state = ref.read(chapterListProvider(widget.novel));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除章节'),
+        content: Text(
+          '确定要删除章节"${chapter.title}"吗？\n\n'
+          '共有 ${state.chapters.length} 个章节，删除后无法恢复。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteChapter(chapter);
+            },
+            child: const Text('删除'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 删除章节
+  Future<void> _deleteChapter(Chapter chapter) async {
+    try {
+      final chapterActionHandler = ref.read(chapterActionHandlerProvider);
+
+      // 显示加载提示
+      if (mounted) {
+        ToastUtils.show('正在删除章节...');
+      }
+
+      // 调用数据库删除方法
+      await chapterActionHandler.deleteChapter(chapter.url);
+
+      // 重新加载章节列表
+      await ref
+          .read(chapterListProvider(widget.novel).notifier)
+          .refreshChapters();
+
+      // 显示成功提示
+      if (mounted) {
+        ToastUtils.showSuccess('章节删除成功');
+      }
+    } catch (e) {
+      // 显示错误提示
+      if (mounted) {
+        ToastUtils.showError('删除章节失败: $e');
+      }
+    }
+  }
+}

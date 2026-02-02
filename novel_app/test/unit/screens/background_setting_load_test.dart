@@ -1,22 +1,30 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:novel_app/core/providers/database_providers.dart';
+import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// 背景设定实时加载测试
 ///
 /// 验证修复：每次打开背景设定页面都从数据库读取最新数据
 void main() {
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('背景设定实时加载测试', () {
+    late DatabaseTestBase testBase;
     late DatabaseService dbService;
-
     setUp(() async {
-      dbService = DatabaseService();
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+      dbService = testBase.databaseService;
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
     });
 
     test('验证：数据库读取和内存对象不一致时的行为', () async {

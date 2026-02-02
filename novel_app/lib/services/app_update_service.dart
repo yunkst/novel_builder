@@ -17,15 +17,23 @@ import 'preferences_service.dart';
 class AppUpdateService {
   static const String _lastCheckKey = 'app_update_last_check';
   static const String _ignoreVersionKey = 'app_update_ignore_version';
-  static const _platformChannel = MethodChannel('com.example.novel_app/app_install');
+  static const _platformChannel =
+      MethodChannel('com.example.novel_app/app_install');
 
   final ApiServiceWrapper _apiWrapper;
+  final Future<PackageInfo> Function()? _packageInfoGetter;
 
-  AppUpdateService({required ApiServiceWrapper apiWrapper})
-      : _apiWrapper = apiWrapper;
+  AppUpdateService({
+    required ApiServiceWrapper apiWrapper,
+    Future<PackageInfo> Function()? packageInfoGetter,
+  })  : _apiWrapper = apiWrapper,
+        _packageInfoGetter = packageInfoGetter;
 
   /// 获取当前APP版本信息
   Future<PackageInfo> getCurrentVersion() async {
+    if (_packageInfoGetter != null) {
+      return await _packageInfoGetter!();
+    }
     return await PackageInfo.fromPlatform();
   }
 
@@ -36,7 +44,8 @@ class AppUpdateService {
     try {
       // 检查是否需要跳过此次检查（距离上次检查不足1小时且非强制检查）
       if (!forceCheck) {
-        final lastCheck = await PreferencesService.instance.getInt(_lastCheckKey);
+        final lastCheck =
+            await PreferencesService.instance.getInt(_lastCheckKey);
         final now = DateTime.now().millisecondsSinceEpoch;
 
         if ((now - lastCheck) < 3600000) {
@@ -60,16 +69,23 @@ class AppUpdateService {
         X_API_TOKEN: token,
       );
 
-      if (response.statusCode == 200 && response.data != null) {
+      if (response.data != null) {
         // 记录检查时间
-        await PreferencesService.instance.setInt(
-            _lastCheckKey, DateTime.now().millisecondsSinceEpoch);
+        await PreferencesService.instance
+            .setInt(_lastCheckKey, DateTime.now().millisecondsSinceEpoch);
 
         final latestVersion = _convertToAppVersion(response.data!);
 
         // 比较版本号
         // 强制检查时，即使版本相同也返回版本信息（允许用户重新下载安装）
-        if (forceCheck || hasNewVersion(currentInfo.version, latestVersion.version)) {
+        final hasNew = hasNewVersion(currentInfo.version, latestVersion.version);
+        LoggerService.instance.d(
+          '版本比较: ${currentInfo.version} vs ${latestVersion.version}, hasNew: $hasNew, forceCheck: $forceCheck',
+          category: LogCategory.general,
+          tags: ['update', 'debug'],
+        );
+
+        if (forceCheck || hasNew) {
           return latestVersion;
         }
       }
@@ -309,7 +325,7 @@ class AppUpdateService {
       );
       onStatus?.call('下载失败: ${e.message}');
       return false;
-    } catch (e, stackTrace) {
+    } catch (e) {
       LoggerService.instance.e(
         '下载异常',
         category: LogCategory.general,
@@ -386,7 +402,7 @@ class AppUpdateService {
         tags: ['update', 'install', 'code'],
       );
       return false;
-    } catch (e, stackTrace) {
+    } catch (e) {
       LoggerService.instance.e(
         '安装APK失败',
         category: LogCategory.general,
@@ -403,7 +419,8 @@ class AppUpdateService {
 
   /// 检查版本是否被忽略
   Future<bool> isVersionIgnored(String version) async {
-    final ignored = await PreferencesService.instance.getString(_ignoreVersionKey);
+    final ignored =
+        await PreferencesService.instance.getString(_ignoreVersionKey);
     return ignored == version;
   }
 

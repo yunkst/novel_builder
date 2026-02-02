@@ -47,6 +47,7 @@ class PreloadService {
 
   // 执行状态
   Completer<void>? _processingCompleter; // 🔒 使用Completer防止并发
+  bool _shouldStop = false; // 停止标志（用于测试清理）
   int _totalProcessed = 0;
   int _totalFailed = 0;
 
@@ -94,9 +95,22 @@ class PreloadService {
       return;
     }
 
+    // 查找当前章节在过滤后列表中的索引
+    final currentChapterUrl = currentIndex >= 0 && currentIndex < chapterUrls.length
+        ? chapterUrls[currentIndex]
+        : null;
+    final filteredIndex = currentChapterUrl != null
+        ? uncachedUrls.indexOf(currentChapterUrl)
+        : -1;
+
     // 创建任务列表（后续章节优先）
-    final tasks =
-        _createTasks(novelUrl, novelTitle, uncachedUrls, currentIndex);
+    // 使用过滤后的索引，避免数组越界
+    final tasks = _createTasks(
+      novelUrl,
+      novelTitle,
+      uncachedUrls,
+      filteredIndex >= 0 ? filteredIndex : (uncachedUrls.length - 1),
+    );
 
     // 去重并入队
     int addedCount = 0;
@@ -128,6 +142,8 @@ class PreloadService {
   }
 
   /// 创建预加载任务（后续章节优先）
+  ///
+  /// [currentIndex] 应该是基于 [chapterUrls] 的索引，必须保证在有效范围内
   List<PreloadTask> _createTasks(
     String novelUrl,
     String novelTitle,
@@ -136,8 +152,21 @@ class PreloadService {
   ) {
     final tasks = <PreloadTask>[];
 
+    // 边界检查：确保索引在有效范围内
+    if (chapterUrls.isEmpty) {
+      LoggerService.instance.w(
+        '章节列表为空，无法创建预加载任务',
+        category: LogCategory.cache,
+        tags: ['preload', 'warning'],
+      );
+      return tasks;
+    }
+
+    // 如果索引超出范围，默认使用最后一个章节
+    final safeIndex = currentIndex.clamp(0, chapterUrls.length - 1);
+
     // 首先添加后续章节（优先级高）
-    for (int i = currentIndex + 1; i < chapterUrls.length; i++) {
+    for (int i = safeIndex + 1; i < chapterUrls.length; i++) {
       tasks.add(PreloadTask(
         chapterUrl: chapterUrls[i],
         novelUrl: novelUrl,
@@ -147,7 +176,7 @@ class PreloadService {
     }
 
     // 然后添加前序章节（优先级低）
-    for (int i = currentIndex - 1; i >= 0; i--) {
+    for (int i = safeIndex - 1; i >= 0; i--) {
       tasks.add(PreloadTask(
         chapterUrl: chapterUrls[i],
         novelUrl: novelUrl,
@@ -195,8 +224,8 @@ class PreloadService {
     }
 
     try {
-      while (_queue.isNotEmpty) {
-        // 速率限制：等待30秒
+      while (_queue.isNotEmpty && !_shouldStop) {
+        // 速率限制:等待30秒
         await _rateLimiter.acquire();
 
         // 从队列头部取出任务
@@ -268,24 +297,6 @@ class PreloadService {
     }
   }
 
-  /// 打印队列状态（调试用）
-  void _printQueueStatus() {
-    if (_queue.isEmpty) {
-      debugPrint('📭 队列为空');
-      return;
-    }
-
-    debugPrint('📊 队列状态 (共${_queue.length}个任务):');
-    int count = 0;
-    for (final task in _queue.iterable) {
-      if (count++ >= 5) {
-        debugPrint('   ... 还有 ${_queue.length - 5} 个任务');
-        break;
-      }
-      debugPrint('   $count. $task');
-    }
-  }
-
   /// 获取统计信息
   Map<String, dynamic> getStatistics() {
     return {
@@ -300,7 +311,11 @@ class PreloadService {
   }
 
   /// 清空队列（用于测试或强制重置）
-  void clearQueue() {
+  Future<void> clearQueue() async {
+    // 设置停止标志,让正在运行的任务退出循环
+    _shouldStop = true;
+
+    // 清空队列
     _queue.clear();
     _enqueuedUrls.clear();
     _novelCurrentIndex.clear();
@@ -309,8 +324,24 @@ class PreloadService {
     _totalProcessed = 0;
     _totalFailed = 0;
 
-    // 重置处理状态（用于测试隔离）
+    // 等待正在运行的任务完成
+    if (_processingCompleter != null && !_processingCompleter!.isCompleted) {
+      try {
+        await _processingCompleter!.future.timeout(
+          Duration(seconds: 2),
+          onTimeout: () {
+            // 超时后强制重置
+            _processingCompleter = null;
+          },
+        );
+      } catch (e) {
+        // 忽略错误,强制重置
+      }
+    }
+
+    // 重置处理状态和停止标志
     _processingCompleter = null;
+    _shouldStop = false;
 
     debugPrint('🧹 预加载队列已清空');
   }

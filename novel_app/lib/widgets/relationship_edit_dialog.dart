@@ -41,8 +41,7 @@ class RelationshipEditDialog extends StatefulWidget {
   }
 
   @override
-  State<RelationshipEditDialog> createState() =>
-      _RelationshipEditDialogState();
+  State<RelationshipEditDialog> createState() => _RelationshipEditDialogState();
 }
 
 class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
@@ -87,9 +86,8 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
 
       // 查找目标角色（注意方向）
       final targetId = widget.relationship!.targetCharacterId;
-      _selectedTargetCharacter = widget.availableCharacters
-          .where((c) => c.id == targetId)
-          .firstOrNull;
+      _selectedTargetCharacter =
+          widget.availableCharacters.where((c) => c.id == targetId).firstOrNull;
     }
   }
 
@@ -189,7 +187,10 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
                 '${widget.currentCharacter.name} 的关系：',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -240,7 +241,8 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
                 onSelected: (String selection) {
                   _relationshipTypeController.text = selection;
                 },
-                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                fieldViewBuilder:
+                    (context, controller, focusNode, onFieldSubmitted) {
                   _relationshipTypeController.text = controller.text;
                   return TextFormField(
                     controller: controller,

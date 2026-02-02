@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
-import '../services/database_service.dart';
+import '../core/providers/database_providers.dart';
 
-class CharacterSelector extends StatefulWidget {
+class CharacterSelector extends ConsumerStatefulWidget {
   final String novelUrl;
   final List<int> initialSelectedIds;
   final Function(List<int>) onSelectionChanged;
@@ -15,11 +16,10 @@ class CharacterSelector extends StatefulWidget {
   });
 
   @override
-  State<CharacterSelector> createState() => _CharacterSelectorState();
+  ConsumerState<CharacterSelector> createState() => _CharacterSelectorState();
 }
 
-class _CharacterSelectorState extends State<CharacterSelector> {
-  final DatabaseService _databaseService = DatabaseService();
+class _CharacterSelectorState extends ConsumerState<CharacterSelector> {
   List<Character> _characters = [];
   Set<int> _selectedIds = {};
   List<Character> _filteredCharacters = [];
@@ -39,8 +39,9 @@ class _CharacterSelectorState extends State<CharacterSelector> {
   }
 
   Future<void> _loadCharacters() async {
+    final databaseService = ref.read(databaseServiceProvider);
     try {
-      final characters = await _databaseService.getCharacters(widget.novelUrl);
+      final characters = await databaseService.getCharacters(widget.novelUrl);
       if (mounted) {
         setState(() {
           _characters = characters;
@@ -291,15 +292,15 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                 child: Text(
                                   _getAvatarText(character.name),
                                   style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimary,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
                                 ),
                               ),
-                              activeColor: Theme.of(context).colorScheme.primary,
+                              activeColor:
+                                  Theme.of(context).colorScheme.primary,
                             );
                           },
                         ),

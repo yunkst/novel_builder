@@ -69,12 +69,9 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCount =
-        _selectedUpdates.where((selected) => selected).length;
-    final newCount =
-        widget.characterUpdates.where((u) => u.isNew).length;
-    final updateCount =
-        widget.characterUpdates.where((u) => u.isUpdate).length;
+    final selectedCount = _selectedUpdates.where((selected) => selected).length;
+    final newCount = widget.characterUpdates.where((u) => u.isNew).length;
+    final updateCount = widget.characterUpdates.where((u) => u.isUpdate).length;
 
     return Dialog(
       child: Container(
@@ -267,7 +264,9 @@ class CharacterPreviewCard extends StatelessWidget {
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: isSelected
-                                          ? Theme.of(context).colorScheme.primary
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
                                           : null,
                                     ),
                               ),
@@ -290,9 +289,8 @@ class CharacterPreviewCard extends StatelessWidget {
                                   character.gender!,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -343,14 +341,13 @@ class CharacterPreviewCard extends StatelessWidget {
                             context,
                             '外貌特征',
                             [
-                              if (character.bodyType != null) character.bodyType!,
+                              if (character.bodyType != null)
+                                character.bodyType!,
                               if (character.appearanceFeatures != null)
                                 character.appearanceFeatures!,
                               if (character.clothingStyle != null)
                                 character.clothingStyle!,
-                            ]
-                                .where((text) => text.isNotEmpty)
-                                .toList()),
+                            ].where((text) => text.isNotEmpty).toList()),
 
                         const SizedBox(height: 4),
 
@@ -396,7 +393,9 @@ class CharacterPreviewCard extends StatelessWidget {
                   ),
                   childrenPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  children: diffs.map((diff) => _buildDiffField(context, diff)).toList(),
+                  children: diffs
+                      .map((diff) => _buildDiffField(context, diff))
+                      .toList(),
                 ),
               ],
             ],
@@ -441,10 +440,7 @@ class CharacterPreviewCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .onSurface
-            .withValues(alpha: 0.05),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -547,7 +543,8 @@ class CharacterPreviewCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoSection(BuildContext context, String title, List<String> items) {
+  Widget _buildInfoSection(
+      BuildContext context, String title, List<String> items) {
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -558,10 +555,8 @@ class CharacterPreviewCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.6),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 2),

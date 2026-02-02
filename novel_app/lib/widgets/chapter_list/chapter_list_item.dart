@@ -40,7 +40,9 @@ class ChapterListItem extends StatelessWidget {
         // 背景色优先级: 已伴读 > 用户插入
         color: isAccompanied
             ? colorScheme.tertiary.withValues(alpha: 0.05)
-            : (isUserChapter ? colorScheme.primary.withValues(alpha: 0.05) : null),
+            : (isUserChapter
+                ? colorScheme.primary.withValues(alpha: 0.05)
+                : null),
         border: Border(
           left: BorderSide(
             // 边框颜色优先级: 已伴读 > 用户插入

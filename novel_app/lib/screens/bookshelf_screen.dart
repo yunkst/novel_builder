@@ -9,20 +9,32 @@ import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
+import '../repositories/bookshelf_repository.dart';
 import 'chapter_list_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:async';
 
 class BookshelfScreen extends StatefulWidget {
-  const BookshelfScreen({super.key});
+  /// 可选的依赖注入参数 - 用于测试
+  final BookshelfRepository? bookshelfRepository;
+  final DatabaseService? databaseService;
+  final PreloadService? preloadService;
+
+  const BookshelfScreen({
+    super.key,
+    this.bookshelfRepository,
+    this.databaseService,
+    this.preloadService,
+  });
 
   @override
   State<BookshelfScreen> createState() => _BookshelfScreenState();
 }
 
 class _BookshelfScreenState extends State<BookshelfScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-  final PreloadService _preloadService = PreloadService();
+  late final BookshelfRepository _bookshelfRepository;
+  late final DatabaseService _databaseService;
+  late final PreloadService _preloadService;
   List<Novel> _bookshelf = [];
   bool _isLoading = true;
   final Map<String, Map<String, int>> _progress = {}; // novelUrl -> stats
@@ -36,6 +48,12 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 使用注入的依赖或创建默认实例
+    _bookshelfRepository = widget.bookshelfRepository ?? BookshelfRepository();
+    _databaseService = widget.databaseService ?? DatabaseService();
+    _preloadService = widget.preloadService ?? PreloadService();
+
     _loadBookshelf();
 
     // 监听预加载进度
@@ -76,26 +94,32 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
           ),
         ];
 
-        setState(() {
-          _bookshelf = mockNovels;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _bookshelf = mockNovels;
+            _isLoading = false;
+          });
+        }
       } else {
-        // 使用多书架查询方法
-        final novels = await _databaseService.getNovelsByBookshelf(
+        // 使用Repository方法获取书架中的小说
+        final novels = await _bookshelfRepository.getNovelsByBookshelf(
           _currentBookshelfId,
         );
-        setState(() {
-          _bookshelf = novels;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _bookshelf = novels;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('加载书架失败: $e');
-      setState(() {
-        _bookshelf = [];
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _bookshelf = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -130,6 +154,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
     if (confirmed == true) {
       try {
+        // 从数据库中删除小说（这会删除bookshelf表中的记录）
         await _databaseService.removeFromBookshelf(novel.url);
         if (mounted) {
           ToastUtils.showSuccess('已从书架移除', context: context);
@@ -156,7 +181,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     Novel novel,
     String mode,
   ) async {
-    final bookshelves = await _databaseService.getBookshelves();
+    // 使用Repository获取书架列表
+    final bookshelves = await _bookshelfRepository.getBookshelves();
 
     // 过滤掉当前书架和"全部小说"书架
     final availableBookshelves = bookshelves
@@ -194,9 +220,7 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
               final bookshelf = availableBookshelves[index];
               return ListTile(
                 leading: Icon(
-                  bookshelf.isSystem
-                      ? Icons.folder_shared
-                      : Icons.folder,
+                  bookshelf.isSystem ? Icons.folder_shared : Icons.folder,
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 title: Text(bookshelf.name),
@@ -227,7 +251,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   /// 移动小说到指定书架
   Future<void> _moveNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
-      await _databaseService.moveNovelToBookshelf(
+      // 使用Repository移动小说
+      await _bookshelfRepository.moveNovelToBookshelf(
         novel.url,
         _currentBookshelfId,
         toBookshelfId,
@@ -251,7 +276,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   /// 复制小说到指定书架
   Future<void> _copyNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
-      await _databaseService.addNovelToBookshelf(novel.url, toBookshelfId);
+      // 使用Repository复制小说
+      await _bookshelfRepository.addNovelToBookshelf(novel.url, toBookshelfId);
 
       if (mounted) {
         ToastUtils.showSuccess('已复制到目标书架', context: context);
@@ -405,7 +431,10 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                             Icon(
                               Icons.library_books,
                               size: 64,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.4),
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -423,8 +452,10 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                               icon: const Icon(Icons.create),
                               label: const Text('创建新小说'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
                               ),
                             ),
                           ],
@@ -439,12 +470,15 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                             final stats = _progress[novel.url];
                             // 注意：不再批量统计缓存状态，避免性能问题
                             // 进度条UI将依赖预加载服务的实时更新（如果有）
-                            final cached =
-                                stats != null ? (stats['cachedChapters'] ?? 0) : 0;
-                            final total =
-                                stats != null ? (stats['totalChapters'] ?? 0) : 0;
-                            final double percent =
-                                (total > 0) ? (cached / total).clamp(0.0, 1.0) : 0.0;
+                            final cached = stats != null
+                                ? (stats['cachedChapters'] ?? 0)
+                                : 0;
+                            final total = stats != null
+                                ? (stats['totalChapters'] ?? 0)
+                                : 0;
+                            final double percent = (total > 0)
+                                ? (cached / total).clamp(0.0, 1.0)
+                                : 0.0;
                             return Card(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -457,7 +491,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                   children: [
                                     if (_isPreloading(novel.url))
                                       Padding(
-                                        padding: const EdgeInsets.only(right: 8),
+                                        padding:
+                                            const EdgeInsets.only(right: 8),
                                         child: SizedBox(
                                           width: 16,
                                           height: 16,
@@ -465,7 +500,9 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                             strokeWidth: 2,
                                             valueColor:
                                                 AlwaysStoppedAnimation<Color>(
-                                                    Theme.of(context).colorScheme.primary),
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary),
                                           ),
                                         ),
                                       ),
@@ -492,7 +529,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                             maxLines: 1,
                                           ),
                                         ),
-                                        if (novel.url.startsWith('custom://')) ...[
+                                        if (novel.url
+                                            .startsWith('custom://')) ...[
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
@@ -541,10 +579,12 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
                                   onSelected: (value) {
                                     switch (value) {
                                       case 'move':
-                                        _showBookshelfSelectionDialog(novel, 'move');
+                                        _showBookshelfSelectionDialog(
+                                            novel, 'move');
                                         break;
                                       case 'copy':
-                                        _showBookshelfSelectionDialog(novel, 'copy');
+                                        _showBookshelfSelectionDialog(
+                                            novel, 'copy');
                                         break;
                                       case 'delete':
                                         _removeFromBookshelf(novel);

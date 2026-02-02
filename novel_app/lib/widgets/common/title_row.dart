@@ -169,7 +169,8 @@ class TitleRowWithAction extends StatelessWidget {
     if (actionText != null || actionIcon != null) {
       trailing = TextButton.icon(
         onPressed: onPressed,
-        icon: actionIcon != null ? Icon(actionIcon, size: 18) : const SizedBox(),
+        icon:
+            actionIcon != null ? Icon(actionIcon, size: 18) : const SizedBox(),
         label: Text(actionText ?? ''),
       );
     }

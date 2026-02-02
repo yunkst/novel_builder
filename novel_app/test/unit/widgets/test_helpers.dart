@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novel_app/services/logger_service.dart';
@@ -14,10 +15,12 @@ class TestHelpers {
   ///
   /// 使用统一的测试配置，确保测试一致性。
   static Widget makeTestableWidget(Widget child) {
-    return MaterialApp(
-      home: child,
-      theme: ThemeData.light(),
-      debugShowCheckedModeBanner: false,
+    return ProviderScope(
+      child: MaterialApp(
+        home: child,
+        theme: ThemeData.light(),
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 
@@ -25,16 +28,18 @@ class TestHelpers {
   ///
   /// 用于需要导航功能的测试场景。
   static Widget makeTestableWidgetWithNavigator(Widget child) {
-    return MaterialApp(
-      home: child,
-      theme: ThemeData.light(),
-      debugShowCheckedModeBanner: false,
-      // 添加 Navigator 支持
-      onGenerateRoute: (settings) {
-        return MaterialPageRoute(
-          builder: (context) => child,
-        );
-      },
+    return ProviderScope(
+      child: MaterialApp(
+        home: child,
+        theme: ThemeData.light(),
+        debugShowCheckedModeBanner: false,
+        // 添加 Navigator 支持
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            builder: (context) => child,
+          );
+        },
+      ),
     );
   }
 

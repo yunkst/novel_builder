@@ -105,7 +105,10 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
                       shape: BoxShape.circle,
                       color: index == widget.currentIndex
                           ? Theme.of(context).colorScheme.surface
-                          : Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
+                          : Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.4),
                     ),
                   ),
                 ),

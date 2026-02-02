@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/logger_service.dart';
+import '../core/providers/service_providers.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
 
@@ -8,14 +10,14 @@ import '../widgets/common/common_widgets.dart';
 ///
 /// 提供应用日志的查看、过滤、导出和清空功能。
 /// 日志按时间倒序显示（最新日志在最上方），支持按级别过滤。
-class LogViewerScreen extends StatefulWidget {
+class LogViewerScreen extends ConsumerStatefulWidget {
   const LogViewerScreen({super.key});
 
   @override
-  State<LogViewerScreen> createState() => _LogViewerScreenState();
+  ConsumerState<LogViewerScreen> createState() => _LogViewerScreenState();
 }
 
-class _LogViewerScreenState extends State<LogViewerScreen> {
+class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   /// 当前选择的日志级别过滤器
   LogLevel? _selectedLevel;
 
@@ -50,9 +52,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
 
   /// 从LoggerService加载日志
   void _loadLogs() {
+    final loggerService = ref.read(loggerServiceProvider);
     final logs = _selectedLevel == null
-        ? LoggerService.instance.getLogs()
-        : LoggerService.instance.getLogsByLevel(_selectedLevel);
+        ? loggerService.getLogs()
+        : loggerService.getLogsByLevel(_selectedLevel);
     setState(() {
       _displayedLogs = logs;
     });
@@ -67,12 +70,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
       return;
     }
 
-    final text = _displayedLogs
-        .map((log) {
-          final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-          return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
-        })
-        .join('\n\n---\n\n');
+    final text = _displayedLogs.map((log) {
+      final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+      return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
+    }).join('\n\n---\n\n');
 
     await Clipboard.setData(ClipboardData(text: text));
 
@@ -96,12 +97,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
 
     try {
       // 使用临时方案：生成文本内容后让用户复制
-      final text = _displayedLogs
-          .map((log) {
-            final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-            return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
-          })
-          .join('\n\n---\n\n');
+      final text = _displayedLogs.map((log) {
+        final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+        return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
+      }).join('\n\n---\n\n');
 
       await Clipboard.setData(ClipboardData(text: text));
 
@@ -140,7 +139,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await LoggerService.instance.clearLogs();
+      await ref.read(loggerServiceProvider).clearLogs();
       _loadLogs();
       ToastUtils.showSuccess('日志已清空');
     }
@@ -270,14 +269,22 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                   Icon(
                     Icons.bug_report_outlined,
                     size: 64,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.4),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _selectedLevel == null ? '暂无日志' : '暂无${_selectedLevel!.label}级别日志',
+                    _selectedLevel == null
+                        ? '暂无日志'
+                        : '暂无${_selectedLevel!.label}级别日志',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -290,7 +297,8 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                 if (_selectedLevel != null)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     color: Theme.of(context).colorScheme.secondaryContainer,
                     child: Row(
                       children: [
@@ -304,7 +312,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                           '仅显示 ${_selectedLevel!.label} 级别日志 (${_displayedLogs.length} 条)',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSecondaryContainer,
                           ),
                         ),
                         const Spacer(),
@@ -326,9 +336,11 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                     itemCount: _displayedLogs.length,
                     reverse: true,
                     itemBuilder: (context, index) {
-                      final log = _displayedLogs[_displayedLogs.length - 1 - index];
+                      final log =
+                          _displayedLogs[_displayedLogs.length - 1 - index];
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         child: ListTile(
                           dense: true,
                           leading: Icon(
@@ -356,21 +368,28 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                       log.category.label,
                                       style: const TextStyle(fontSize: 10),
                                     ),
-                                    backgroundColor: _getCategoryColor(log.category).withValues(alpha: 0.2),
+                                    backgroundColor:
+                                        _getCategoryColor(log.category)
+                                            .withValues(alpha: 0.2),
                                     padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     visualDensity: VisualDensity.compact,
                                   ),
                                   ...log.tags.map((tag) => Chip(
-                                    label: Text(
-                                      tag,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                  )),
+                                        label: Text(
+                                          tag,
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.1),
+                                        padding: EdgeInsets.zero,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        visualDensity: VisualDensity.compact,
+                                      )),
                                 ],
                               ),
                             ],
@@ -382,10 +401,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                 _formatTimestamp(log.timestamp),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.6),
                                 ),
                               ),
-                              if (log.stackTrace != null && log.stackTrace!.isNotEmpty)
+                              if (log.stackTrace != null &&
+                                  log.stackTrace!.isNotEmpty)
                                 InkWell(
                                   onTap: () {
                                     _showStackTraceDialog(log);
@@ -396,7 +419,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                       '查看堆栈信息',
                                       style: TextStyle(
                                         fontSize: 10,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
                                         decoration: TextDecoration.underline,
                                       ),
                                     ),

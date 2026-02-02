@@ -1,31 +1,30 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/models/chapter.dart';
 import '../../test_helpers/mock_data.dart';
+import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// 性能优化验证测试
 ///
 /// 验证移除批量检查后的性能提升
+@Tags(['database'])
+@TestOn('vm')
 void main() {
   // 设置FFI用于测试环境
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('性能优化验证 - 移除批量检查', () {
+    late DatabaseTestBase base;
     late DatabaseService dbService;
 
     setUp(() async {
-      dbService = DatabaseService();
-      final db = await dbService.database;
-
-      // 清理测试数据
-      await db.delete('bookshelf');
-      await db.delete('chapter_cache');
-      await db.delete('novel_chapters');
+      base = DatabaseTestBase();
+      await base.setUp();
+      dbService = base.databaseService;
 
       // 添加测试小说
       final testNovel = MockData.createTestNovel(
@@ -33,6 +32,10 @@ void main() {
         url: 'https://test.com/novel/perf-test',
       );
       await dbService.addToBookshelf(testNovel);
+    });
+
+    tearDown(() async {
+      await base.tearDown();
     });
 
     test('验证：不再批量检查所有章节', () async {

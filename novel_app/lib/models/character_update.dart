@@ -41,13 +41,15 @@ class CharacterUpdate {
     _addDiff(diffs, '性格', oldChar.personality, newChar.personality);
     _addDiff(diffs, '体型', oldChar.bodyType, newChar.bodyType);
     _addDiff(diffs, '着装', oldChar.clothingStyle, newChar.clothingStyle);
-    _addDiff(diffs, '外貌', oldChar.appearanceFeatures, newChar.appearanceFeatures);
+    _addDiff(
+        diffs, '外貌', oldChar.appearanceFeatures, newChar.appearanceFeatures);
     _addDiff(diffs, '背景', oldChar.backgroundStory, newChar.backgroundStory);
 
     return diffs.where((d) => d.hasChanged).toList();
   }
 
-  void _addDiff(List<FieldDiff> diffs, String label, String? oldVal, String? newVal) {
+  void _addDiff(
+      List<FieldDiff> diffs, String label, String? oldVal, String? newVal) {
     if (oldVal != newVal) {
       diffs.add(FieldDiff(
         label: label,

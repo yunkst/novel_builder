@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bookshelf.dart';
-import '../services/database_service.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
+import '../core/providers/database_providers.dart';
 
 /// 书架选择器组件
 ///
 /// 显示在BookshelfScreen顶部，用于切换和创建书架
-class BookshelfSelector extends StatefulWidget {
+class BookshelfSelector extends ConsumerStatefulWidget {
   /// 当前选中的书架ID
   final int currentBookshelfId;
 
@@ -22,11 +23,10 @@ class BookshelfSelector extends StatefulWidget {
   });
 
   @override
-  State<BookshelfSelector> createState() => _BookshelfSelectorState();
+  ConsumerState<BookshelfSelector> createState() => _BookshelfSelectorState();
 }
 
-class _BookshelfSelectorState extends State<BookshelfSelector> {
-  final DatabaseService _databaseService = DatabaseService();
+class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
   List<Bookshelf> _bookshelves = [];
   bool _isLoading = true;
 
@@ -37,12 +37,13 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
   }
 
   Future<void> _loadBookshelves() async {
+    final databaseService = ref.read(databaseServiceProvider);
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final bookshelves = await _databaseService.getBookshelves();
+      final bookshelves = await databaseService.getBookshelves();
       if (mounted) {
         setState(() {
           _bookshelves = bookshelves;
@@ -65,6 +66,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
   }
 
   Future<void> _showCreateBookshelfDialog() async {
+    final databaseService = ref.read(databaseServiceProvider);
     final nameController = TextEditingController();
 
     final result = await showDialog<String>(
@@ -73,7 +75,8 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.create_new_folder, color: Theme.of(context).colorScheme.primary),
+            Icon(Icons.create_new_folder,
+                color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
             const Text('新建书架'),
           ],
@@ -118,7 +121,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
 
     if (result != null) {
       try {
-        await _databaseService.createBookshelf(result);
+        await databaseService.createBookshelf(result);
         if (mounted) {
           ErrorHelper.showSuccessWithLog(
             context,
@@ -141,6 +144,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
   }
 
   void _showBookshelfMenu(Bookshelf bookshelf) {
+    final databaseService = ref.read(databaseServiceProvider);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -148,18 +152,19 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.folder_open, color: Theme.of(context).colorScheme.primary),
+              leading: Icon(Icons.folder_open,
+                  color: Theme.of(context).colorScheme.primary),
               title: Text(bookshelf.name),
               subtitle: Text(bookshelf.isSystem ? '系统书架' : '自定义书架'),
             ),
             const Divider(),
             if (!bookshelf.isSystem) ...[
               ListTile(
-                leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+                leading: Icon(Icons.delete,
+                    color: Theme.of(context).colorScheme.error),
                 title: const Text('删除书架'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final messenger = ScaffoldMessenger.of(context);
 
                   final confirmed = await showDialog<bool>(
                     context: context,
@@ -177,7 +182,8 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
                           style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(context).colorScheme.error,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.error,
                           ),
                           child: const Text('删除'),
                         ),
@@ -186,7 +192,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                   );
 
                   if (confirmed == true) {
-                    final success = await _databaseService.deleteBookshelf(
+                    final success = await databaseService.deleteBookshelf(
                       bookshelf.id,
                     );
                     if (!mounted) return;
@@ -225,6 +231,49 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
       );
     }
 
+    // 如果书架列表为空，显示提示信息
+    if (_bookshelves.isEmpty) {
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: Theme.of(context).dividerColor,
+              width: 1,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.folder_off,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                '暂无书架',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: '新建书架',
+              onPressed: _showCreateBookshelfDialog,
+            ),
+          ],
+        ),
+      );
+    }
+
     final currentBookshelf = _bookshelves.firstWhere(
       (b) => b.id == widget.currentBookshelfId,
       orElse: () => _bookshelves.first,
@@ -245,9 +294,7 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
       child: Row(
         children: [
           Icon(
-            currentBookshelf.isSystem
-                ? Icons.folder_shared
-                : Icons.folder,
+            currentBookshelf.isSystem ? Icons.folder_shared : Icons.folder,
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: 12),
@@ -294,12 +341,13 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
 
               return ListTile(
                 leading: Icon(
-                  bookshelf.isSystem
-                      ? Icons.folder_shared
-                      : Icons.folder,
+                  bookshelf.isSystem ? Icons.folder_shared : Icons.folder,
                   color: isSelected
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                 ),
                 title: Text(
                   bookshelf.name,
@@ -312,7 +360,8 @@ class _BookshelfSelectorState extends State<BookshelfSelector> {
                   ),
                 ),
                 trailing: isSelected
-                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    ? Icon(Icons.check,
+                        color: Theme.of(context).colorScheme.primary)
                     : IconButton(
                         icon: const Icon(Icons.more_vert),
                         onPressed: () {

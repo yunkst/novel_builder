@@ -54,7 +54,8 @@ class ImageCacheManager {
       final removed = _cache.remove(oldestKey);
       _cacheTime.remove(oldestKey);
       final size = removed?.length ?? 0;
-      debugPrint('🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}');
+      debugPrint(
+          '🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}');
     }
   }
 
@@ -115,7 +116,8 @@ class ImageCacheManager {
       _cache[imageUrl] = data;
       _cacheTime[imageUrl] = DateTime.now();
 
-      debugPrint('✅ 图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
+      debugPrint(
+          '✅ 图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
           '缓存数量: ${_cache.length}/$_maxCacheSize');
 
       return data;
@@ -158,17 +160,20 @@ class ImageCacheManager {
 
   /// 清除所有缓存
   static void clearAll() {
-    final totalSize = _cache.values.fold<int>(0, (sum, data) => sum + data.length);
+    final totalSize =
+        _cache.values.fold<int>(0, (sum, data) => sum + data.length);
     final count = _cache.length;
     _cache.clear();
     _cacheTime.clear();
     _loadingRequests.clear();
-    debugPrint('🗑️ 清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}');
+    debugPrint(
+        '🗑️ 清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}');
   }
 
   /// 获取缓存统计信息
   static Map<String, dynamic> getCacheInfo() {
-    final totalSize = _cache.values.fold<int>(0, (sum, data) => sum + data.length);
+    final totalSize =
+        _cache.values.fold<int>(0, (sum, data) => sum + data.length);
 
     return {
       'cachedCount': _cache.length,

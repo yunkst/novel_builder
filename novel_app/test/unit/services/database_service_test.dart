@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/models/chapter.dart';
 import '../../test_helpers/mock_data.dart';
+import '../../test_bootstrap.dart';
 
 /// DatabaseService 单元测试
 ///
@@ -15,8 +15,7 @@ import '../../test_helpers/mock_data.dart';
 void main() {
   // 设置FFI用于测试环境
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('DatabaseService - 初始化测试', () {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
@@ -13,11 +14,9 @@ import '../services/preload_service.dart';
 import '../services/character_card_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
-import '../core/di/api_service_provider.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
 import '../mixins/reader/illustration_handler_mixin.dart';
-import '../widgets/highlighted_text.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/scene_illustration_dialog.dart';
 import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
@@ -27,7 +26,6 @@ import '../widgets/paragraph_widget.dart'; // 新增导入
 import '../widgets/immersive/immersive_setup_dialog.dart'; // 沉浸体验配置对话框
 import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始化页面
 import '../widgets/reader/ai_companion_confirm_dialog.dart';
-import '../services/reader_settings_service.dart'; // 阅读器设置持久化
 import '../utils/toast_utils.dart';
 import '../utils/media_markup_parser.dart';
 import '../utils/character_matcher.dart';
@@ -37,12 +35,17 @@ import '../controllers/reader_interaction_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 import 'tts_player_screen.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
+// Riverpod Providers
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
+import '../core/providers/reader_screen_providers.dart';
+import '../core/providers/reader_settings_state.dart';
 
-class ReaderScreen extends StatefulWidget {
+class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
   final Chapter chapter;
   final List<Chapter> chapters;
@@ -57,21 +60,22 @@ class ReaderScreen extends StatefulWidget {
   });
 
   @override
-  State<ReaderScreen> createState() => _ReaderScreenState();
+  ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends State<ReaderScreen>
+class _ReaderScreenState extends ConsumerState<ReaderScreen>
     with
         TickerProviderStateMixin,
         DifyStreamingMixin,
         AutoScrollMixin,
         IllustrationHandlerMixin {
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final DatabaseService _databaseService = DatabaseService();
+  late final ApiServiceWrapper _apiService;
+  late final DatabaseService _databaseService;
   final ScrollController _scrollController = ScrollController();
-  final ReaderSettingsService _settingsService = ReaderSettingsService.instance;
-  final DifyService _difyService = DifyService();
-  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
+
+  // ========== 服务实例（通过 ref.read 获取）==========
+  late final DifyService _difyService;
+  late final NovelContextBuilder _contextBuilder;
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -127,10 +131,18 @@ class _ReaderScreenState extends State<ReaderScreen>
   @override
   void initState() {
     super.initState();
+
+    // 使用 Riverpod 获取依赖
+    _apiService = ref.read(apiServiceWrapperProvider);
+    _databaseService = ref.read(databaseServiceProvider);
+    _difyService = ref.read(difyServiceProvider);
+    _contextBuilder = ref.read(novelContextBuilderProvider);
+
     _currentChapter = widget.chapter;
 
     // ========== 加载持久化设置 ==========
-    _loadSettings();
+    // 设置会在 ReaderSettingsStateNotifier 中自动加载
+    // 我们通过 ref.watch 在 build 方法中获取
 
     // ========== 初始化 ReaderContentController ==========
     _contentController = ReaderContentController(
@@ -180,18 +192,6 @@ class _ReaderScreenState extends State<ReaderScreen>
           // _contentController 会处理错误状态
         });
       }
-    }
-  }
-
-  /// 加载阅读器设置
-  Future<void> _loadSettings() async {
-    final fontSize = await _settingsService.getFontSize();
-    final scrollSpeed = await _settingsService.getScrollSpeed();
-    if (mounted) {
-      setState(() {
-        _fontSize = fontSize;
-        _scrollSpeed = scrollSpeed;
-      });
     }
   }
 
@@ -471,67 +471,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     });
   }
 
-  /// 显示搜索匹配详情对话框
-  void _showSearchMatchDialog() {
-    if (widget.searchResult == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => AlertDialog(
-        title: const Text('搜索匹配详情'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('章节: ${widget.searchResult!.chapterTitle}'),
-              const SizedBox(height: 8),
-              Text('匹配数量: ${widget.searchResult!.matchCount} 处'),
-              const SizedBox(height: 16),
-              const Text('搜索关键词:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Wrap(
-                children: widget.searchResult!.searchKeywords.map((keyword) {
-                  return Chip(
-                    label: Text(keyword),
-                    backgroundColor: Theme.of(context).colorScheme.primary
-                      ..withValues(alpha: 0.1),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text('匹配预览:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Container(
-                width: double.maxFinite,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: SearchResultHighlight(
-                  originalText: widget.searchResult!.content,
-                  keywords: widget.searchResult!.searchKeywords,
-                  maxLines: 5,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// 导航到指定章节（支持自动滚动状态保持）
   ///
   /// [targetChapter] 目标章节
@@ -593,12 +532,10 @@ class _ReaderScreenState extends State<ReaderScreen>
       builder: (context) => FontSizeAdjusterDialog(
         initialFontSize: _fontSize ?? 18.0,
         onFontSizeChanged: (newSize) async {
-          await _settingsService.setFontSize(newSize);
-          if (mounted) {
-            setState(() {
-              _fontSize = newSize;
-            });
-          }
+          // 使用 Riverpod Provider 更新字体大小
+          await ref
+              .read(readerSettingsStateNotifierProvider.notifier)
+              .setFontSize(newSize);
         },
       ),
     );
@@ -1133,13 +1070,12 @@ class _ReaderScreenState extends State<ReaderScreen>
       builder: (context) => ScrollSpeedAdjusterDialog(
         initialScrollSpeed: _scrollSpeed ?? 1.0,
         onScrollSpeedChanged: (newSpeed) async {
-          await _settingsService.setScrollSpeed(newSpeed);
-          if (mounted) {
-            setState(() {
-              _scrollSpeed = newSpeed;
-            });
-            startAutoScroll(); // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
-          }
+          // 使用 Riverpod Provider 更新滚动速度
+          await ref
+              .read(readerSettingsStateNotifierProvider.notifier)
+              .setScrollSpeed(newSpeed);
+          // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
+          startAutoScroll();
         },
       ),
     );
@@ -1272,6 +1208,11 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
+    // 使用 ref.watch 监听设置状态变化
+    final settingsState = ref.watch(readerSettingsStateNotifierProvider);
+    _fontSize = settingsState.value?.fontSize ?? 18.0;
+    _scrollSpeed = settingsState.value?.scrollSpeed ?? 1.0;
+
     final currentIndex = _currentChapterIndex;
     final hasPrevious = currentIndex > 0;
     final hasNext =
@@ -1280,9 +1221,9 @@ class _ReaderScreenState extends State<ReaderScreen>
     final paragraphs = _paragraphs;
 
     // 使用 ChangeNotifierProvider 包装整个页面
-    return ChangeNotifierProvider(
+    return legacy_provider.ChangeNotifierProvider(
       create: (_) => ReaderEditModeProvider(),
-      child: Consumer<ReaderEditModeProvider>(
+      child: legacy_provider.Consumer<ReaderEditModeProvider>(
         builder: (context, editModeProvider, child) {
           return Scaffold(
             appBar: AppBar(

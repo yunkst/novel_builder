@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
@@ -134,7 +133,8 @@ class CharacterCardService {
       onProgress?.call('正在分析章节内容...');
 
       // 获取现有角色用于对比
-      final existingCharacters = await _databaseService.getCharacters(novel.url);
+      final existingCharacters =
+          await _databaseService.getCharacters(novel.url);
 
       final updateData = await CharacterMatcher.prepareUpdateData(
         novel.url,
@@ -204,7 +204,8 @@ class CharacterCardService {
 
     // 2. 包含匹配(如"张三"匹配"张三丰")
     for (final char in existingChars) {
-      if (char.name.contains(newChar.name) || newChar.name.contains(char.name)) {
+      if (char.name.contains(newChar.name) ||
+          newChar.name.contains(char.name)) {
         LoggerService.instance.d(
           '角色匹配: 包含匹配 "${newChar.name}" -> "${char.name}"',
           category: LogCategory.character,

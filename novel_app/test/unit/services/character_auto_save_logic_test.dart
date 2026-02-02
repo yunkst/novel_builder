@@ -2,7 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/services/database_service.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// CharacterEditScreen 自动保存功能的实际保存逻辑测试
 ///
@@ -14,17 +15,26 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   // 初始化FFI数据库
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('CharacterEditScreen - 自动保存数据库逻辑', () {
     late DatabaseService databaseService;
+    late DatabaseTestBase testBase;
     late Novel testNovel;
     late Character testCharacter;
 
     setUp(() async {
-      databaseService = DatabaseService();
+      // 初始化测试基类
+      testBase = DatabaseTestBase();
+      await testBase.setUp();
+
+      databaseService = testBase.databaseService;
+
+      // 关键修复：必须先访问database属性来触发数据库初始化和Repository注入
+      // 这确保CharacterRepository获得了数据库实例
+      await databaseService.database;
+
       testNovel = Novel(
         title: '测试小说',
         author: '测试作者',
@@ -48,6 +58,10 @@ void main() {
         facePrompts: 'face prompt',
         bodyPrompts: 'body prompt',
       );
+    });
+
+    tearDown(() async {
+      await testBase.tearDown();
     });
 
     test('测试1: 验证createCharacter方法可以正常保存角色',

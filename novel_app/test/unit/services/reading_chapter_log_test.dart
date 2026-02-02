@@ -1,28 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/models/chapter.dart';
 import '../../test_helpers/mock_data.dart';
+import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// 测试阅读章节时的实际日志输出
 void main() {
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initTests();
   });
 
   group('阅读章节日志测试', () {
+    late DatabaseTestBase base;
     late DatabaseService dbService;
 
     setUp(() async {
-      dbService = DatabaseService();
-      final db = await dbService.database;
-
-      await db.delete('bookshelf');
-      await db.delete('chapter_cache');
-      await db.delete('novel_chapters');
-      await db.delete('scene_illustrations');
+      base = DatabaseTestBase();
+      await base.setUp();
+      dbService = base.databaseService;
 
       final testNovel = MockData.createTestNovel(
         title: '测试小说',
@@ -41,13 +38,7 @@ void main() {
     });
 
     tearDown(() async {
-      // 清理数据库连接以避免锁定
-      try {
-        // DatabaseService是单例，不需要手动关闭
-        // 但我们可以清理测试数据
-      } catch (e) {
-        // 忽略清理错误
-      }
+      await base.tearDown();
     });
 
     test('场景1：章节内容无媒体标记 - 应该没有日志', () async {

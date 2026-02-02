@@ -164,10 +164,8 @@ class TitleHighlight extends StatelessWidget {
       text: title,
       keywords: keywords,
       style: HighlightStyle(
-        backgroundColor: Theme.of(context)
-            .colorScheme
-            .primary
-            .withValues(alpha: 0.2),
+        backgroundColor:
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
         textColor: Theme.of(context).colorScheme.onSurface,
         fontWeight: FontWeight.bold,
       ),

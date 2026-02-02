@@ -208,7 +208,10 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
             // 加载指示器（缓冲时显示）
             if (_controller!.value.isBuffering)
               Container(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
                 child: Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -238,7 +241,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       height: widget.height,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+          color:
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const LoadingStateWidget(
@@ -335,7 +339,10 @@ class _LiveVideoPlayerWithThumbnailState
               width: widget.width,
               height: widget.height,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
@@ -346,7 +353,10 @@ class _LiveVideoPlayerWithThumbnailState
                       : null,
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -357,13 +367,19 @@ class _LiveVideoPlayerWithThumbnailState
               width: widget.width,
               height: widget.height,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
                 child: Icon(
                   Icons.error_outline,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             );

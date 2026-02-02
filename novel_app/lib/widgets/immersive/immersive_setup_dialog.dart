@@ -6,8 +6,8 @@ import 'immersive_role_selector.dart';
 /// 沉浸体验配置数据类
 class ImmersiveConfig {
   final String userRequirement;
-  final List<String> roleNames;        // 保留,用于UI展示
-  final List<Character> characters;     // 新增,用于AI格式化
+  final List<String> roleNames; // 保留,用于UI展示
+  final List<Character> characters; // 新增,用于AI格式化
   final String userRole;
 
   ImmersiveConfig({
@@ -198,7 +198,7 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     return ImmersiveConfig(
       userRequirement: requirement,
       roleNames: _selectedRoles.map((r) => r.name).toList(),
-      characters: _selectedRoles,        // 新增: 传递完整角色对象
+      characters: _selectedRoles, // 新增: 传递完整角色对象
       userRole: _userRole!,
     );
   }
@@ -210,7 +210,8 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.theater_comedy, color: theme.colorScheme.primary, size: 28),
+          Icon(Icons.theater_comedy,
+              color: theme.colorScheme.primary, size: 28),
           const SizedBox(width: 8),
           const Text('沉浸体验配置'),
         ],
@@ -270,13 +271,16 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                     child: Row(
                       children: [
                         Icon(Icons.lightbulb,
-                            size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.8)),
+                            size: 16,
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.8)),
                         const SizedBox(width: 4),
                         Text(
                           '已自动选择在本章中出现的角色',
                           style: TextStyle(
                             fontSize: 12,
-                            color: theme.colorScheme.primary.withValues(alpha: 0.8),
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -294,22 +298,27 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
                       avatar: _userRole == role.name
                           ? const Icon(Icons.person, size: 16)
                           : null,
-                      selectedColor: theme.colorScheme.primary.withValues(alpha: 0.2),
-                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      selectedColor:
+                          theme.colorScheme.primary.withValues(alpha: 0.2),
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
                       labelStyle: TextStyle(
                         color: isSelected
                             ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
+                            : theme.colorScheme.onSurface
+                                .withValues(alpha: 0.7),
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                     );
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
               ] else
-                Text('未选择角色', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                Text('未选择角色',
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.6))),
               const SizedBox(height: 8),
 
               // 用户角色选择

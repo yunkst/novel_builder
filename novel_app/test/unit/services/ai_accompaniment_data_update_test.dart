@@ -4,6 +4,7 @@ import 'package:novel_app/models/character.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/services/database_service.dart';
 import '../../test_bootstrap.dart';
+import '../../base/database_test_base.dart';
 
 /// AI伴读数据更新逻辑单元测试
 ///
@@ -28,6 +29,11 @@ void main() {
     setUp(() async {
       // 创建数据库服务实例
       db = DatabaseService();
+
+      // 关键修复：必须先访问database属性来触发数据库初始化和Repository注入
+      // 这确保CharacterRepository获得了数据库实例
+      await db.database;
+
       testNovelUrl = 'https://test.com/novel/1';
 
       // 创建测试小说

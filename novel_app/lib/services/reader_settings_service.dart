@@ -38,7 +38,8 @@ class ReaderSettingsService {
 
   /// 获取滚动速度
   Future<double> getScrollSpeed() async {
-    return await _prefs.getDouble(_keyScrollSpeed, defaultValue: _defaultScrollSpeed);
+    return await _prefs.getDouble(_keyScrollSpeed,
+        defaultValue: _defaultScrollSpeed);
   }
 
   /// 设置滚动速度

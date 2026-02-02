@@ -1,35 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/screens/character_management_screen.dart';
-// 注意: EnhancedRelationshipGraphScreen目前有编译错误,暂时注释掉导入
-// import 'package:novel_app/screens/enhanced_relationship_graph_screen.dart';
+import '../../test_bootstrap.dart';
 
-/// CharacterManagementScreen 关系图入口测试
+/// CharacterManagementScreen 依赖注入测试
 ///
 /// 测试目标:
-/// 1. 验证非多选模式下,AppBar中显示关系图图标按钮
-/// 2. 验证点击关系图按钮能正确导航到关系图页面
-/// 3. 验证多选模式下关系图按钮不显示
+/// 1. 验证依赖注入参数正确传递
+/// 2. 验证非多选模式下,AppBar中显示关系图图标按钮
+/// 3. 验证点击关系图按钮能正确导航到关系图页面
+/// 4. 验证多选模式下关系图按钮不显示
+///
+/// 修复策略:
+/// - 使用ProviderScope包装Widget
+/// - 只测试UI逻辑,不等待异步数据加载完成
+/// - 移除pumpAndSettle调用,避免Pending Timer问题
 void main() {
-  group('CharacterManagementScreen - 关系图入口功能', () {
-    // 创建测试用的Novel对象
+  // 初始化 FFI 数据库 (避免databaseFactory未初始化的错误)
+  setUpAll(() {
+    initTests();
+  });
+
+  group('CharacterManagementScreen - 依赖注入测试', () {
     final testNovel = Novel(
       title: '测试小说',
       author: '测试作者',
       url: 'https://example.com/test-novel',
     );
 
-    testWidgets('测试1: 非多选模式下应显示关系图按钮', (WidgetTester tester) async {
-      // 构建测试界面
+    testWidgets('测试1: 使用依赖注入创建Screen', (WidgetTester tester) async {
+      // 构建测试界面，使用ProviderScope包装
+      // CharacterManagementScreen 是 Riverpod ConsumerWidget
+      // 所有服务通过 Provider 自动注入，无需手动传递
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(
+              novel: testNovel,
+            ),
+          ),
         ),
       );
 
-      // 等待界面加载完成
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染,不等待异步数据加载完成
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 验证界面渲染成功
+      expect(find.text('人物管理'), findsOneWidget);
+
+      // 不需要等待异步操作完成,直接结束测试
+      // 这样避免了Pending Timer问题
+    });
+
+    testWidgets('测试2: 非多选模式下应显示关系图按钮', (WidgetTester tester) async {
+      // 构建测试界面，使用ProviderScope包装
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
+        ),
+      );
+
+      // 只需要pump几次让界面渲染,不等待异步数据加载完成
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 查找关系图按钮 (使用Icon的图标类型来查找)
       final relationshipButton = find.byWidgetPredicate(
@@ -39,7 +77,7 @@ void main() {
             (widget.icon as Icon).icon == Icons.account_tree,
       );
 
-      // 验证按钮存在
+      // 验证按钮存在 (即使数据加载失败,按钮也应该显示)
       expect(relationshipButton, findsOneWidget,
           reason: '非多选模式下AppBar应该显示关系图按钮');
 
@@ -49,16 +87,19 @@ void main() {
           reason: '关系图按钮的tooltip应该正确显示');
     });
 
-    testWidgets('测试2: 点击关系图按钮应触发导航', (WidgetTester tester) async {
-      // 构建测试界面
+    testWidgets('测试3: 点击关系图按钮应触发导航', (WidgetTester tester) async {
+      // 构建测试界面，使用ProviderScope包装
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
         ),
       );
 
-      // 等待界面加载完成
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       // 查找并点击关系图按钮
       final relationshipButton = find.byWidgetPredicate(
@@ -68,23 +109,33 @@ void main() {
             (widget.icon as Icon).icon == Icons.account_tree,
       );
 
-      expect(relationshipButton, findsOneWidget);
+      expect(relationshipButton, findsOneWidget,
+          reason: '关系图按钮应该存在');
 
-      // 验证按钮可以被点击(不实际触发导航,因为目标页面有编译错误)
+      // 验证按钮可交互,不实际触发点击(避免导航相关的异步操作)
       expect(tester.getRect(relationshipButton), isNotNull,
           reason: '关系图按钮应该是可交互的');
-    });
 
-    testWidgets('测试3: 多选模式下不应显示关系图按钮', (WidgetTester tester) async {
-      // 构建测试界面
+      // 添加少量pump处理可能的微任务,但不等待数据库Timer
+      await tester.pump(const Duration(milliseconds: 10));
+
+      // 立即销毁widget,避免等待异步操作完成
+      await tester.pumpWidget(Container());
+    }, timeout: const Timeout(Duration(seconds: 5)));
+
+    testWidgets('测试4: 多选模式下不应显示关系图按钮', (WidgetTester tester) async {
+      // 构建测试界面，使用ProviderScope包装
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
         ),
       );
 
-      // 等待界面加载完成
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 初始状态下应该显示关系图按钮
       final relationshipButton = find.byWidgetPredicate(
@@ -100,16 +151,19 @@ void main() {
       // 实际的多选模式测试需要更多的mock数据
     });
 
-    testWidgets('测试4: 关系图按钮应该与AI创建按钮同时显示', (WidgetTester tester) async {
-      // 构建测试界面
+    testWidgets('测试5: 关系图按钮应该与AI创建按钮同时显示', (WidgetTester tester) async {
+      // 构建测试界面，使用ProviderScope包装
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
         ),
       );
 
-      // 等待界面加载完成
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 查找关系图按钮
       final relationshipButton = find.byWidgetPredicate(
@@ -131,7 +185,7 @@ void main() {
           reason: '关系图按钮应该存在');
     });
 
-    testWidgets('测试5: 验证导航时传递正确的novelUrl参数',
+    testWidgets('测试6: 验证导航时传递正确的novelUrl参数',
         (WidgetTester tester) async {
       const testUrl = 'https://example.com/test-novel-123';
 
@@ -141,15 +195,18 @@ void main() {
         url: testUrl,
       );
 
-      // 构建测试界面
+      // 构建测试界面，使用ProviderScope包装
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovelWithUrl),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovelWithUrl),
+          ),
         ),
       );
 
-      // 等待界面加载完成
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 查找关系图按钮
       final relationshipButton = find.byWidgetPredicate(
@@ -162,9 +219,8 @@ void main() {
       expect(relationshipButton, findsOneWidget,
           reason: '关系图按钮应该存在,以便验证导航参数');
 
-      // 注意: 由于EnhancedRelationshipGraphScreen有编译错误,
-      // 这里我们只验证按钮存在且可交互
-      // 实际的参数传递验证需要目标页面编译通过后才能进行
+      // 注意: 我们只验证按钮存在且可交互
+      // 实际的参数传递验证需要集成测试
       expect(relationshipButton, findsOneWidget);
     });
   });
@@ -176,28 +232,36 @@ void main() {
       url: 'https://example.com/test-novel',
     );
 
-    testWidgets('测试6: AppBar应该包含正确的标题', (WidgetTester tester) async {
+    testWidgets('测试7: AppBar应该包含正确的标题', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
         ),
       );
 
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 查找AppBar标题
       final title = find.text('人物管理');
       expect(title, findsOneWidget, reason: 'AppBar标题应该显示"人物管理"');
     });
 
-    testWidgets('测试7: 关系图按钮应该使用正确的图标', (WidgetTester tester) async {
+    testWidgets('测试8: 关系图按钮应该使用正确的图标', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: CharacterManagementScreen(novel: testNovel),
+        ProviderScope(
+          child: MaterialApp(
+            home: CharacterManagementScreen(novel: testNovel),
+          ),
         ),
       );
 
-      await tester.pumpAndSettle();
+      // 只需要pump几次让界面渲染
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // 查找关系图按钮
       final relationshipButton = find.byWidgetPredicate(

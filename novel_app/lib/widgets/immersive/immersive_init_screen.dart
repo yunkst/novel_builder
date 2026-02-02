@@ -13,9 +13,9 @@ import '../../screens/multi_role_chat_screen.dart';
 /// 沉浸体验状态枚举
 enum ImmersiveStatus {
   initializing, // 初始化
-  loading,      // 加载中
-  success,      // 成功
-  error,        // 错误
+  loading, // 加载中
+  success, // 成功
+  error, // 错误
 }
 
 /// 沉浸体验初始化页面
@@ -54,7 +54,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
 
   // 生成结果
   String? _play;
-  List<Map<String, dynamic>>? _roleStrategy;  // 类型修改: List<String> -> List<Map<String, dynamic>>
+  List<Map<String, dynamic>>?
+      _roleStrategy; // 类型修改: List<String> -> List<Map<String, dynamic>>
 
   // 动画控制器
   late AnimationController _animationController;
@@ -133,7 +134,7 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
     try {
       final outputs = await _difyService.generateImmersiveScript(
         chapterContent: widget.chapterContent,
-        characters: widget.config.characters,    // 传递完整角色对象
+        characters: widget.config.characters, // 传递完整角色对象
         userInput: widget.config.userRequirement,
         userChoiceRole: widget.config.userRole,
       );
@@ -216,7 +217,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
         userInput: feedback, // 使用用户的修改意见
         userChoiceRole: widget.config.userRole,
         existingPlay: _play, // 传入当前剧本
-        existingRoleStrategy: _roleStrategy, // 传入当前角色策略 (List<Map<String, dynamic>>)
+        existingRoleStrategy:
+            _roleStrategy, // 传入当前角色策略 (List<Map<String, dynamic>>)
       );
 
       if (outputs == null || outputs.isEmpty) {
@@ -439,7 +441,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
           const SizedBox(height: 8),
           Text(
             '剧本生成中...',
-            style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+            style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
           ),
           const SizedBox(height: 32),
 
@@ -549,9 +552,7 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
     }
 
     // 性能优化: 构建角色名到角色的映射,避免在列表构建中重复查找 (O(1) vs O(n))
-    final characterMap = {
-      for (var c in widget.config.characters) c.name: c
-    };
+    final characterMap = {for (var c in widget.config.characters) c.name: c};
 
     // 准备降级角色对象(用于找不到角色时)
     final fallbackCharacter = widget.config.characters.isNotEmpty
@@ -583,7 +584,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
                     if (character.cachedImageUrl != null)
                       CircleAvatar(
                         radius: 20,
-                        backgroundImage: FileImage(File(character.cachedImageUrl!)),
+                        backgroundImage:
+                            FileImage(File(character.cachedImageUrl!)),
                       )
                     else
                       CircleAvatar(
@@ -680,7 +682,8 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  backgroundColor:
+                      theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   foregroundColor: theme.colorScheme.surface,
                 ),
                 child: const Text('返回'),

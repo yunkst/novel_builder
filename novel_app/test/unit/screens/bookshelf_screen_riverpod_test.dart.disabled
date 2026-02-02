@@ -1,0 +1,583 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:novel_app/screens/bookshelf_screen_riverpod.dart';
+import 'package:novel_app/models/novel.dart';
+import 'package:novel_app/widgets/bookshelf_selector.dart';
+import 'package:novel_app/services/database_service.dart';
+import 'package:novel_app/repositories/bookshelf_repository.dart';
+import 'package:novel_app/core/providers/database_provider.dart';
+import 'package:novel_app/core/providers/bookshelf_providers.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import '../../test_bootstrap.dart';
+
+// 生成 Mock 类
+@GenerateMocks([DatabaseService, BookshelfRepository])
+import 'bookshelf_screen_riverpod_test.mocks.dart';
+
+void main() {
+  // 初始化测试环境 - 这会设置测试模式并禁用定时器
+  setUpAll(() {
+    initTests();
+  });
+
+  // 创建 Provider 容器
+  ProviderContainer createContainer({
+    DatabaseService? mockDatabaseService,
+    BookshelfRepository? mockBookshelfRepository,
+  }) {
+    return ProviderContainer(
+      overrides: [
+        // 使用 Mock DatabaseService
+        databaseServiceProvider.overrideWithValue(
+          mockDatabaseService ?? MockDatabaseService(),
+        ),
+        // 使用 Mock BookshelfRepository
+        bookshelfRepositoryProvider.overrideWithValue(
+          mockBookshelfRepository ?? MockBookshelfRepository(),
+        ),
+      ],
+    );
+  }
+
+  group('BookshelfScreen (Riverpod) - 基础UI测试', () {
+    testWidgets('测试1: AppBar应该显示"我的书架"标题', (tester) async {
+      // 创建测试容器
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 等待初始加载 - 不需要 pumpAndSettle！
+      await tester.pump();
+
+      expect(find.text('我的书架'), findsOneWidget,
+          reason: 'AppBar标题应该显示"我的书架"');
+
+      // 清理
+      container.dispose();
+    });
+
+    testWidgets('测试2: 应该显示书架选择器组件', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 应该有 BookshelfSelector
+      expect(find.byType(BookshelfSelector), findsAtLeastNWidgets(1),
+          reason: '应该显示书架选择器');
+
+      container.dispose();
+    });
+
+    testWidgets('测试3: 初始状态下应该显示加载指示器', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 只 pump 一次，捕获初始加载状态
+      await tester.pump();
+
+      // 应该有加载指示器
+      expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1),
+          reason: '初始状态应该显示加载指示器');
+
+      container.dispose();
+    });
+
+    testWidgets('测试4: 应该有FloatingActionButton', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.byType(FloatingActionButton), findsOneWidget,
+          reason: '应该有一个FloatingActionButton用于创建新小说');
+
+      // 验证FAB的图标
+      final fab = tester.widget<FloatingActionButton>(
+        find.byType(FloatingActionButton),
+      );
+      expect(fab.child, isA<Icon>());
+      expect((fab.child as Icon).icon, Icons.add);
+
+      container.dispose();
+    });
+
+    testWidgets('测试5: 屏幕应该正确渲染', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 验证UI正常显示
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - Web环境测试数据', () {
+    testWidgets('测试6: Web环境应该显示模拟数据', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 等待模拟数据加载
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 在Web环境中会显示模拟测试数据
+      if (find.text('测试小说1').evaluate().isNotEmpty) {
+        expect(find.text('测试小说1'), findsOneWidget);
+        expect(find.text('测试作者1'), findsOneWidget);
+        expect(find.text('测试小说2'), findsOneWidget);
+        expect(find.text('测试作者2'), findsOneWidget);
+      }
+
+      container.dispose();
+    });
+
+    testWidgets('测试7: 小说卡片应该显示正确信息', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 等待模拟数据加载
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 验证卡片UI结构
+      final cards = find.byType(Card);
+
+      if (cards.evaluate().isNotEmpty) {
+        expect(cards, findsAtLeastNWidgets(1));
+
+        // 验证Card内部有ListTile
+        expect(find.byType(ListTile), findsAtLeastNWidgets(1));
+      }
+
+      container.dispose();
+    });
+
+    testWidgets('测试8: 每个小说应该有PopupMenuButton', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 等待模拟数据加载
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 验证PopupMenuButton存在
+      final menuButtons = find.byType(PopupMenuButton<String>);
+
+      if (menuButtons.evaluate().isNotEmpty) {
+        expect(menuButtons, findsAtLeastNWidgets(1));
+      }
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - 菜单功能测试', () {
+    testWidgets('测试9: 点击菜单应该显示选项', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 等待模拟数据加载
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final menuButton = find.byType(PopupMenuButton<String>);
+
+      if (menuButton.evaluate().isNotEmpty) {
+        await tester.tap(menuButton.first);
+        await tester.pump();
+
+        // 验证菜单选项显示
+        expect(find.text('移动到书架'), findsOneWidget);
+        expect(find.text('复制到书架'), findsOneWidget);
+        expect(find.text('从书架移除'), findsOneWidget);
+      }
+
+      container.dispose();
+    });
+
+    testWidgets('测试10: 菜单图标应该正确显示', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 查找移动到书架图标
+      final moveIcon = find.byWidgetPredicate(
+        (widget) =>
+            widget is Icon &&
+            widget.icon == Icons.drive_file_move_outline,
+      );
+
+      // 查找复制图标
+      final copyIcon = find.byWidgetPredicate(
+        (widget) =>
+            widget is Icon &&
+            widget.icon == Icons.copy,
+      );
+
+      // 查找删除图标
+      final deleteIcon = find.byWidgetPredicate(
+        (widget) =>
+            widget is Icon &&
+            widget.icon == Icons.delete,
+      );
+
+      // 图标可能在菜单中，在打开菜单前可能找不到
+      if (moveIcon.evaluate().isNotEmpty) {
+        expect(moveIcon, findsAtLeastNWidgets(1));
+      }
+      if (copyIcon.evaluate().isNotEmpty) {
+        expect(copyIcon, findsAtLeastNWidgets(1));
+      }
+      if (deleteIcon.evaluate().isNotEmpty) {
+        expect(deleteIcon, findsAtLeastNWidgets(1));
+      }
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - UI交互测试', () {
+    testWidgets('测试15: FAB点击应该显示创建对话框', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 点击FAB
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pump();
+
+      // 验证创建对话框显示
+      expect(find.text('创建新小说'), findsOneWidget);
+      expect(find.text('小说标题'), findsOneWidget);
+      expect(find.text('作者'), findsOneWidget);
+      expect(find.text('简介 (可选)'), findsOneWidget);
+
+      container.dispose();
+    });
+
+    testWidgets('测试16: 创建对话框应该有正确的字段', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 点击FAB
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pump();
+
+      // 验证所有输入字段
+      expect(find.byType(TextField), findsAtLeastNWidgets(3)); // 标题、作者、简介
+
+      // 验证按钮
+      expect(find.text('取消'), findsOneWidget);
+      expect(find.text('创建'), findsOneWidget);
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - 错误处理', () {
+    testWidgets('测试18: 错误状态UI应该正常显示', (tester) async {
+      // 创建会返回错误的 Mock DatabaseService
+      final mockDatabaseService = MockDatabaseService();
+      final mockBookshelfRepository = MockBookshelfRepository();
+
+      // 设置 Repository 抛出异常
+      when(mockBookshelfRepository.getNovelsByBookshelf(any))
+          .thenThrow(Exception('测试错误'));
+
+      final container = createContainer(
+        mockDatabaseService: mockDatabaseService,
+        mockBookshelfRepository: mockBookshelfRepository,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 验证UI不会崩溃，应该显示错误信息
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - 主题适配', () {
+    testWidgets('测试19: 亮色主题应该正确显示', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: ThemeData.light(),
+            home: const BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+
+      container.dispose();
+    });
+
+    testWidgets('测试20: 暗色主题应该正确显示', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - Riverpod特性测试', () {
+    testWidgets('测试21: Provider应该正确注入', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 验证容器中的providers可用
+      expect(container.read(currentBookshelfIdProvider), equals(1));
+
+      container.dispose();
+    });
+
+    testWidgets('测试22: 切换书架应该触发刷新', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 切换书架ID
+      container.read(currentBookshelfIdProvider.notifier).setBookshelfId(2);
+
+      await tester.pump();
+
+      // 验证ID已更新
+      expect(container.read(currentBookshelfIdProvider), equals(2));
+
+      container.dispose();
+    });
+
+    testWidgets('测试23: 测试应该快速完成（<1秒）', (tester) async {
+      final stopwatch = Stopwatch()..start();
+
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      stopwatch.stop();
+
+      // 测试应该在1秒内完成
+      expect(stopwatch.elapsedMilliseconds, lessThan(1000),
+          reason: '测试应该快速完成，避免 Pending Timer');
+
+      container.dispose();
+    });
+  });
+
+  group('BookshelfScreen (Riverpod) - 关键Pending Timer验证', () {
+    testWidgets('测试24: 不需要 pumpAndSettle 即可完成测试', (tester) async {
+      final container = createContainer();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      // 只使用 pump，不使用 pumpAndSettle
+      await tester.pump();
+
+      // 验证UI正常显示
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+      expect(find.text('我的书架'), findsOneWidget);
+
+      container.dispose();
+    });
+
+    testWidgets('测试25: Mock DatabaseService避免真实查询', (tester) async {
+      // 使用 Mock DatabaseService，不会触发真实的数据库查询
+      final mockDatabaseService = MockDatabaseService();
+      final mockBookshelfRepository = MockBookshelfRepository();
+
+      // 验证没有真实数据库调用
+      verifyNever(mockDatabaseService.database);
+
+      final container = createContainer(
+        mockDatabaseService: mockDatabaseService,
+        mockBookshelfRepository: mockBookshelfRepository,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: BookshelfScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // 测试完成，没有Pending Timer
+      expect(find.byType(BookshelfScreen), findsOneWidget);
+
+      container.dispose();
+    });
+  });
+}

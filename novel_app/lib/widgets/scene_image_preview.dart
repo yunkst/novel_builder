@@ -42,8 +42,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
   bool _isLoading = false;
   bool _hasError = false;
   String? _errorMessage;
-  List<String> _images = [];  // 图片URL列表
-  Map<int, String?> _imageModels = {};  // 索引 -> 模型名映射
+  List<String> _images = []; // 图片URL列表
+  Map<int, String?> _imageModels = {}; // 索引 -> 模型名映射
   int _currentIndex = 0; // 当前页面索引
 
   // 删除相关状态
@@ -222,7 +222,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -285,7 +289,9 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
+            border: Border.all(
+                color:
+                    Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -302,7 +308,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 Text(
                   _errorMessage!,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.7),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error
+                        .withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                   textAlign: TextAlign.center,
@@ -338,7 +347,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12)),
           ),
           child: Center(
             child: Column(
@@ -347,7 +360,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 Icon(
                   Icons.image,
                   size: 48,
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.6),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -362,7 +378,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                 Text(
                   'AI正在创作图片，请耐心等待',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -387,7 +406,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                       label: const Text('检查状态'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                       ),
@@ -429,7 +449,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         // 图片容器（自适应高度）
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: GestureDetector(
@@ -508,7 +532,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             Container(
               height: containerHeight,
               decoration: BoxDecoration(
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: PageView.builder(
@@ -549,7 +577,11 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
         Container(
           height: containerHeight, // 使用动态高度
           decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: ClipRRect(
@@ -572,7 +604,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
@@ -597,11 +632,17 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surface
+                    .withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.2),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -613,7 +654,8 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.error),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.error),
                       ),
                     )
                   : Icon(
@@ -679,7 +721,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
               Icons.keyboard_arrow_left,
               color: currentIndex > 0
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(width: 16),
@@ -707,7 +752,10 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
               Icons.keyboard_arrow_right,
               color: currentIndex < total - 1
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.4),
             ),
           ),
         ],

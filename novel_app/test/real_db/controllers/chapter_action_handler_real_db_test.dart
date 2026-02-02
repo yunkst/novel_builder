@@ -143,7 +143,7 @@ void main() {
         await base.databaseService.database.then((db) async {
           await db.insert('novel_chapters', {
             'novelUrl': 'delete-test-novel',
-            'url': 'user://chapter-to-delete',
+            'chapterUrl': 'user://chapter-to-delete',
             'title': '要删除的章节',
             'chapterIndex': 0,
             'isUserInserted': 1,
@@ -318,88 +318,8 @@ void main() {
       });
     });
 
-    group('getPreviousChaptersContent', () {
-      test('应获取前文章节的内容', () async {
-        // 准备测试数据
-        final novel = await base.createAndAddNovel(url: 'prev-content-novel');
-        final chapters = await base.createAndCacheChapters(
-          novelUrl: 'prev-content-novel',
-          count: 5,
-        );
-
-        // 执行测试：获取前3章的内容
-        final result = await handler.getPreviousChaptersContent(
-          chapters: chapters,
-          afterIndex: 3,
-        );
-
-        // 验证结果
-        expect(result.length, 3);
-        expect(result[0].contains('第一章'), isTrue);
-        expect(result[1].contains('第二章'), isTrue);
-        expect(result[2].contains('第三章'), isTrue);
-      });
-
-      test('空章节列表应返回空列表', () async {
-        // 执行测试
-        final result = await handler.getPreviousChaptersContent(
-          chapters: [],
-          afterIndex: 0,
-        );
-
-        // 验证结果
-        expect(result, isEmpty);
-      });
-
-      test('afterIndex为0应返回空列表', () async {
-        // 准备测试数据
-        final novel = await base.createAndAddNovel(url: 'after-index-novel');
-        final chapters = await base.createAndCacheChapters(
-          novelUrl: 'after-index-novel',
-          count: 3,
-        );
-
-        // 执行测试
-        final result = await handler.getPreviousChaptersContent(
-          chapters: chapters,
-          afterIndex: 0,
-        );
-
-        // 验证结果
-        expect(result, isEmpty);
-      });
-
-      test('应跳过未缓存的章节', () async {
-        // 准备测试数据
-        final novel = await base.createAndAddNovel(url: 'skip-uncached-novel');
-        final chapters = await base.createAndCacheChapters(
-          novelUrl: 'skip-uncached-novel',
-          count: 5,
-        );
-
-        // 删除中间章节的缓存
-        final db = await base.databaseService.database;
-        await db.delete(
-          'chapter_cache',
-          where: 'chapterUrl = ?',
-          whereArgs: [chapters[1].url],
-        );
-        await db.delete(
-          'chapter_cache',
-          where: 'chapterUrl = ?',
-          whereArgs: [chapters[3].url],
-        );
-
-        // 执行测试
-        final result = await handler.getPreviousChaptersContent(
-          chapters: chapters,
-          afterIndex: 5,
-        );
-
-        // 验证结果：应该只有3章（跳过了2章未缓存的）
-        expect(result.length, 3);
-      });
-    });
+    // 注意: getPreviousChaptersContent 方法属于 ChapterService，不是 ChapterActionHandler
+    // 相关测试应该移动到 chapter_service_real_db_test.dart 中
   });
 }
 

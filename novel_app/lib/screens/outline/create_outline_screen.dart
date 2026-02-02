@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/outline.dart';
-import '../../services/outline_service.dart';
+import '../../core/providers/database_providers.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/toast_utils.dart';
 
 /// 创建/编辑大纲页面
 /// 支持AI生成大纲和手动编辑
-class CreateOutlineScreen extends StatefulWidget {
+class CreateOutlineScreen extends ConsumerStatefulWidget {
   final String novelUrl;
   final String novelTitle;
   final String? backgroundSetting; // 小说背景设定
@@ -21,12 +22,12 @@ class CreateOutlineScreen extends StatefulWidget {
   });
 
   @override
-  State<CreateOutlineScreen> createState() => _CreateOutlineScreenState();
+  ConsumerState<CreateOutlineScreen> createState() =>
+      _CreateOutlineScreenState();
 }
 
-class _CreateOutlineScreenState extends State<CreateOutlineScreen>
+class _CreateOutlineScreenState extends ConsumerState<CreateOutlineScreen>
     with DifyStreamingMixin {
-  final OutlineService _outlineService = OutlineService();
   final _requirementController = TextEditingController();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
@@ -183,11 +184,16 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
     setState(() => _saving = true);
 
     try {
-      await _outlineService.saveOutline(
+      final repository = ref.read(outlineRepositoryProvider);
+      final outline = Outline(
         novelUrl: widget.novelUrl,
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
+
+      await repository.saveOutline(outline);
 
       if (mounted) {
         Navigator.pop(context, true); // 返回true表示保存成功
@@ -291,8 +297,10 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                         onPressed: cancelStreaming,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
-                          foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.secondary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSecondary,
                         ),
                       ),
                     ),
@@ -349,7 +357,11 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,13 +404,19 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                     Icon(
                       Icons.edit_note,
                       size: 48,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       '输入大纲要求并点击"生成大纲"',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
                           ),
                     ),
                   ],

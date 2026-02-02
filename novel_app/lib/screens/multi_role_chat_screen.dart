@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
 import '../models/chat_message.dart';
 import '../services/dify_service.dart';
@@ -7,6 +8,8 @@ import '../services/character_avatar_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/role_color_manager.dart';
 import '../utils/toast_utils.dart';
+import '../screens/providers/dify_provider.dart';
+import '../screens/providers/character_avatar_provider.dart';
 
 /// 暗色主题颜色常量
 class _DarkThemeColors {
@@ -34,14 +37,14 @@ class _DarkThemeColors {
   static const Color buttonDisabled = Color(0xFF3C3C3C);
 }
 
-/// 多角色聊天屏幕
+/// 多角色聊天屏幕 (Riverpod版本)
 ///
 /// 功能：
 /// - 支持与多个角色同时对话
 /// - AI扮演所有角色进行互动
 /// - 流式显示旁白和角色对话
 /// - 历史记录管理
-class MultiRoleChatScreen extends StatefulWidget {
+class MultiRoleChatScreen extends ConsumerStatefulWidget {
   final List<Character> characters; // 多个角色
   final String play; // 剧本内容
   final List<Map<String, dynamic>> roleStrategy; // 角色策略
@@ -56,10 +59,11 @@ class MultiRoleChatScreen extends StatefulWidget {
   });
 
   @override
-  State<MultiRoleChatScreen> createState() => _MultiRoleChatScreenState();
+  ConsumerState<MultiRoleChatScreen> createState() =>
+      _MultiRoleChatScreenState();
 }
 
-class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
+class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
   // 消息列表
   List<ChatMessage> _messages = [];
 
@@ -87,9 +91,9 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   final FocusNode _actionFocusNode = FocusNode();
   final FocusNode _speechFocusNode = FocusNode();
 
-  // 服务
-  final DifyService _difyService = DifyService();
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
+  // 通过Provider获取服务实例
+  late DifyService _difyService;
+  late CharacterAvatarService _avatarService;
 
   // 角色颜色映射
   late Map<String, Color> _roleColors;
@@ -98,7 +102,12 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   void initState() {
     super.initState();
     _roleColors = RoleColorManager.assignColors(widget.characters);
-    _startInitialChat();
+    // 延迟初始化聊天，确保服务已加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _difyService = ref.read(difyServiceProvider);
+      _avatarService = ref.read(characterAvatarServiceProvider);
+      _startInitialChat();
+    });
   }
 
   @override
@@ -187,7 +196,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
       if (character.bodyType != null && character.bodyType!.isNotEmpty) {
         buffer.writeln('体型：${character.bodyType}');
       }
-      if (character.appearanceFeatures != null && character.appearanceFeatures!.isNotEmpty) {
+      if (character.appearanceFeatures != null &&
+          character.appearanceFeatures!.isNotEmpty) {
         buffer.writeln('外貌：${character.appearanceFeatures}');
       }
 
@@ -210,7 +220,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     // 累积原始AI响应（用于历史记录）
     _currentAiResponse += chunk;
 
-    final displayChunk = chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
+    final displayChunk =
+        chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
     debugPrint('📦 收到chunk: "$displayChunk"');
     debugPrint('🏷️ 标签状态: ${_tagParserState.toString()}');
 
@@ -281,9 +292,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     // 获取当前文本和光标位置
     final text = controller.text;
     final selection = controller.selection;
-    final cursorPosition = selection.baseOffset >= 0
-        ? selection.baseOffset
-        : text.length;
+    final cursorPosition =
+        selection.baseOffset >= 0 ? selection.baseOffset : text.length;
 
     // 在光标位置插入角色名
     final newText = text.replaceRange(
@@ -340,9 +350,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         children: [
           // 聊天消息列表
           Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : _buildMessageList(),
+            child: _messages.isEmpty ? _buildEmptyState() : _buildMessageList(),
           ),
 
           // 用户输入区域
@@ -428,8 +436,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   /// 构建角色对话气泡
   Widget _buildDialogueBubble(ChatMessage message) {
     final character = message.character!;
-    final color = _roleColors[character.name] ??
-        _DarkThemeColors.roleBubbleBackground;
+    final color =
+        _roleColors[character.name] ?? _DarkThemeColors.roleBubbleBackground;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -611,10 +619,10 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         children: [
           // 角色选择提示
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: _DarkThemeColors.roleBubbleBackground.withValues(alpha: 0.1),
+              color:
+                  _DarkThemeColors.roleBubbleBackground.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: _DarkThemeColors.divider,

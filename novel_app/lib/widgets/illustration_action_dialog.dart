@@ -66,8 +66,7 @@ class IllustrationActionDialog extends StatelessWidget {
               _PromptsDisplayCard(prompts: prompts!),
 
             // 如果没有提示词，添加间距，如果有则由_PromptsDisplayCard处理间距
-            if (prompts == null || prompts!.isEmpty)
-              const SizedBox(height: 20),
+            if (prompts == null || prompts!.isEmpty) const SizedBox(height: 20),
 
             // 功能选项
             Column(
@@ -184,7 +183,10 @@ class _ActionCard extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -266,7 +268,8 @@ class _PromptsDisplayCard extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.brown,
                 backgroundColor: Colors.amber.withValues(alpha: 0.1),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
             ),
           ),

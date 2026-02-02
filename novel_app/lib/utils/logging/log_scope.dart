@@ -78,9 +78,8 @@ class LogScope {
   void _logSuccess([dynamic result]) {
     final duration = DateTime.now().difference(startTime);
 
-    final message = _context.isNotEmpty
-        ? '$name 完成 (${_formatContext()})'
-        : '$name 完成';
+    final message =
+        _context.isNotEmpty ? '$name 完成 (${_formatContext()})' : '$name 完成';
 
     // 如果耗时超过1秒，在消息中显示
     final finalMessage = duration.inSeconds >= 1
@@ -116,9 +115,8 @@ class LogScope {
   String _formatContext() {
     if (_context.isEmpty) return '';
 
-    final entries = _context.entries
-        .map((e) => '${e.key}=${e.value}')
-        .join(', ');
+    final entries =
+        _context.entries.map((e) => '${e.key}=${e.value}').join(', ');
     return entries;
   }
 }

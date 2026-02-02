@@ -109,7 +109,8 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
     try {
       final apiService = ApiServiceWrapper();
       final videoStatus = await apiService.checkVideoStatus(widget.imgName);
-      debugPrint('📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
+      debugPrint(
+          '📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
 
       if (videoStatus.hasVideo == true) {
         // 有视频，获取视频URL并准备播放
@@ -271,7 +272,10 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3),
                     borderRadius: widget.borderRadius,
                   ),
                   child: Center(

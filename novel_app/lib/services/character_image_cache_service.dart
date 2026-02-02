@@ -7,6 +7,10 @@ import '../utils/format_utils.dart';
 /// 角色图片缓存管理器
 ///
 /// 负责管理角色图片的本地缓存，包括存储、检索和清理
+///
+/// 支持两种使用方式:
+/// 1. 单例模式: CharacterImageCacheService.instance (用于生产环境)
+/// 2. 依赖注入: CharacterImageCacheService() (用于测试环境)
 class CharacterImageCacheService {
   static CharacterImageCacheService? _instance;
   static CharacterImageCacheService get instance {
@@ -14,7 +18,13 @@ class CharacterImageCacheService {
     return _instance!;
   }
 
+  // 私有构造函数用于单例模式
   CharacterImageCacheService._();
+
+  // 公共工厂构造函数，支持依赖注入
+  factory CharacterImageCacheService() {
+    return CharacterImageCacheService._();
+  }
 
   late Directory _cacheDir;
   bool _initialized = false;

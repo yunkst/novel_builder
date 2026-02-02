@@ -545,7 +545,8 @@ class ApiServiceWrapper {
         _ensureInitialized();
         final token = await getToken();
 
-        final response = await _api.getRoleCardGalleryApiRoleCardGalleryRoleIdGet(
+        final response =
+            await _api.getRoleCardGalleryApiRoleCardGalleryRoleIdGet(
           roleId: roleId,
           X_API_TOKEN: token,
         );
@@ -830,8 +831,8 @@ class ApiServiceWrapper {
 
     return {
       'task_id': response.taskId,
-      'images': imagesList,  // 改为对象列表
-      'model_name': response.modelName,  // 保留用于兼容
+      'images': imagesList, // 改为对象列表
+      'model_name': response.modelName, // 保留用于兼容
       'model_width': response.modelWidth,
       'model_height': response.modelHeight,
     };

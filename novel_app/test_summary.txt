@@ -1,0 +1,103 @@
+=== Testing test/unit/accompaniment_display_test.dart ===
+00:00 +1 -4: Some tests failed.
+=== Testing test/unit/ai_accompaniment_logic_verification_test.dart ===
+00:00 +18: All tests passed!
+=== Testing test/unit/ai_companion_auto_trigger_test.dart ===
+00:00 +12: All tests passed!
+=== Testing test/unit/chapter_manager_test.dart ===
+00:00 +14: All tests passed!
+=== Testing test/unit/dify_response_to_replace_test.dart ===
+00:00 +12: All tests passed!
+=== Testing test/unit/flutter_force_directed_graph_test.dart ===
+00:00 +19 ~2: All tests passed!
+=== Testing test/unit/paragraph_replace_logic_test.dart ===
+00:00 +17: All tests passed!
+=== Testing test/unit/preload_service_race_condition_test.dart ===
+00:03 +5: All tests passed!
+=== Testing test/unit/controllers/chapter_action_handler_test.dart ===
+00:00 +12: All tests passed!
+=== Testing test/unit/controllers/chapter_loader_test.dart ===
+00:00 +1 -8: Some tests failed.
+=== Testing test/unit/controllers/chapter_reorder_controller_test.dart ===
+00:00 +3 -3: Some tests failed.
+=== Testing test/unit/models/chapter_ai_accompaniment_test.dart ===
+00:00 +23: All tests passed!
+=== Testing test/unit/models/character_relationship_test.dart ===
+00:00 +43: All tests passed!
+=== Testing test/unit/models/character_update_test.dart ===
+00:00 +14: All tests passed!
+=== Testing test/unit/models/reading_progress_test.dart ===
+00:00 +20: All tests passed!
+=== Testing test/unit/screens/background_setting_load_test.dart ===
+00:00 +3: All tests passed!
+=== Testing test/unit/screens/character_edit_screen_auto_save_test.dart ===
+00:03 +13: All tests passed!
+=== Testing test/unit/screens/character_management_screen_test.dart ===
+00:01 +7: All tests passed!
+=== Testing test/unit/screens/unified_relationship_graph_test.dart ===
+00:00 +3: All tests passed!
+=== Testing test/unit/services/ai_accompaniment_background_test.dart ===
+00:00 +0 -14: Some tests failed.
+=== Testing test/unit/services/ai_accompaniment_data_update_test.dart ===
+00:00 +12: All tests passed!
+=== Testing test/unit/services/ai_accompaniment_database_test.dart ===
+00:00 +2 -9: Some tests failed.
+=== Testing test/unit/services/batch_chapter_loading_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/chapter_service_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_auto_save_logic_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_drop_first_last_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_extraction_bug_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_extraction_service_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_merge_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_relationship_database_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/character_relationship_schema_fix_test.dart ===
+00:00 +4: All tests passed!
+=== Testing test/unit/services/database_lock_diagnostic_test.dart ===
+00:00 +3: All tests passed!
+=== Testing test/unit/services/database_lock_fix_verification_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/database_service_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/dify_parsing_test.dart ===
+=== Testing test/unit/services/novels_view_test.dart ===
+00:00 +1 -4: Some tests failed.
+=== Testing test/unit/services/performance_optimization_test.dart ===
+00:01 +4: All tests passed!
+=== Testing test/unit/services/rate_limiter_test.dart ===
+00:04 +27: All tests passed!
+=== Testing test/unit/services/reading_chapter_log_test.dart ===
+00:00 +5: All tests passed!
+=== Testing test/unit/services/scene_illustration_bugfix_test.dart ===
+00:01 +3: All tests passed!
+=== Testing test/unit/services/scene_illustration_service_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/theme_service_test.dart ===
+00:00 +9: All tests passed!
+=== Testing test/unit/services/tts_player_service_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/services/utils_service_test.dart ===
+00:00 +40: All tests passed!
+=== Testing test/unit/widgets/chapter_list/chapter_title_test.dart ===
+00:00 +16: All tests passed!
+=== Testing test/unit/widgets/log_viewer_screen/log_viewer_screen_dialog_test.dart ===
+00:02 +9: All tests passed!
+=== Testing test/unit/widgets/log_viewer_screen/log_viewer_screen_filter_test.dart ===
+00:02 +12: All tests passed!
+=== Testing test/unit/widgets/log_viewer_screen/log_viewer_screen_interaction_test.dart ===
+00:01 +10: All tests passed!
+=== Testing test/unit/widgets/log_viewer_screen/log_viewer_screen_rendering_test.dart ===
+00:01 +11: All tests passed!
+=== Testing test/unit/widgets/character_relationship_screen_test.dart ===
+00:02 +16: All tests passed!
+=== Testing test/unit/widgets/tts_widgets_test.dart ===
+00:00 +0 -1: Some tests failed.
+=== Testing test/unit/utils/media_markup_parser_test.dart ===
+00:00 +39: All tests passed!

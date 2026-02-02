@@ -53,7 +53,9 @@ class StreamingContentDisplay extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         padding: padding ?? const EdgeInsets.all(12),
-        child: content.isEmpty ? _buildPlaceholder(context) : _buildContent(context),
+        child: content.isEmpty
+            ? _buildPlaceholder(context)
+            : _buildContent(context),
       ),
     );
   }

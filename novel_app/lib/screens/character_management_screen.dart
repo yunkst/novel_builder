@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../models/outline.dart';
-import '../services/database_service.dart';
-import '../services/character_image_cache_service.dart';
-import '../services/character_avatar_service.dart';
 import '../services/character_extraction_service.dart';
 import '../services/dify_service.dart';
 import '../services/logger_service.dart';
@@ -16,8 +14,11 @@ import '../widgets/character_preview_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import 'character_edit_screen.dart';
 import 'unified_relationship_graph_screen.dart';
+import '../core/providers/character_screen_providers.dart';
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
 
-class CharacterManagementScreen extends StatefulWidget {
+class CharacterManagementScreen extends ConsumerStatefulWidget {
   final Novel novel;
 
   const CharacterManagementScreen({
@@ -26,29 +27,15 @@ class CharacterManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<CharacterManagementScreen> createState() =>
+  ConsumerState<CharacterManagementScreen> createState() =>
       _CharacterManagementScreenState();
 }
 
-class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-  final CharacterImageCacheService _imageCacheService =
-      CharacterImageCacheService.instance;
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
-  final DifyService _difyService = DifyService();
-  List<Character> _characters = [];
-  bool _isLoading = true;
-
-  // 关系数量缓存
-  final Map<int, int> _relationshipCountCache = {};
-
-  // 大纲状态
-  Outline? _outline;
-  bool _hasOutline = false;
-
-  // 多选模式状态
-  bool _isMultiSelectMode = false;
-  final Set<int> _selectedCharacterIds = {};
+class _CharacterManagementScreenState
+    extends ConsumerState<CharacterManagementScreen> {
+  // 多选模式状态 - 从 Provider 获取
+  bool get _isMultiSelectMode => ref.watch(multiSelectModeProvider);
+  Set<int> get _selectedCharacterIds => ref.watch(selectedCharacterIdsProvider);
 
   // 常量定义
   static const double _avatarBorderRadius = 8.0;
@@ -67,102 +54,19 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeServices();
-    _loadCharacters();
-    _loadOutline();
+    // 初始化完成后，会在 build 中通过 Provider 自动加载数据
   }
 
-  /// 初始化服务
-  Future<void> _initializeServices() async {
-    try {
-      await _imageCacheService.init();
-    } catch (e) {
-      debugPrint('初始化图片缓存服务失败: $e');
-    }
-  }
-
-  /// 加载大纲状态
-  Future<void> _loadOutline() async {
-    try {
-      final outline =
-          await _databaseService.getOutlineByNovelUrl(widget.novel.url);
-      setState(() {
-        _outline = outline;
-        _hasOutline = outline != null;
-      });
-      debugPrint('大纲加载状态: $_hasOutline');
-    } catch (e) {
-      debugPrint('加载大纲失败: $e');
-      setState(() {
-        _hasOutline = false;
-      });
-    }
-  }
-
-  Future<void> _loadCharacters() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final characters = await _databaseService.getCharacters(widget.novel.url);
-
-      // 检查并清理无效的头像缓存
-      await _checkAndCleanAvatarCache(characters);
-
-      // 加载每个角色的关系数量
-      await _loadRelationshipCounts(characters);
-
-      setState(() {
-        _characters = characters;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ 加载角色失败: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ToastUtils.showError('加载角色失败: $e');
-      }
-    }
-  }
-
-  /// 加载角色关系数量
-  Future<void> _loadRelationshipCounts(List<Character> characters) async {
-    for (final character in characters) {
-      if (character.id == null) continue;
-
-      try {
-        final count =
-            await _databaseService.getRelationshipCount(character.id!);
-        _relationshipCountCache[character.id!] = count;
-      } catch (e) {
-        debugPrint('❌ 加载关系数量失败 - ${character.name}: $e');
-        _relationshipCountCache[character.id!] = 0;
-      }
-    }
-  }
-
-  /// 检查并清理无效的头像缓存
-  Future<void> _checkAndCleanAvatarCache(List<Character> characters) async {
-    for (final character in characters) {
-      if (character.id == null) continue;
-
-      try {
-        // 清理无效的头像缓存
-        await _avatarService.cleanupInvalidAvatarCache(character.id!);
-      } catch (e) {
-        debugPrint('❌ 清理头像缓存失败 - ${character.name}: $e');
-      }
-    }
-  }
-
+  /// AI创建角色
   Future<void> _aiCreateCharacter() async {
+    // 从 Provider 获取大纲状态
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+
     // 显示输入对话框，传入大纲状态和小说URL
     final result = await CharacterInputDialog.show(
       context,
-      hasOutline: _hasOutline,
+      hasOutline: hasOutline,
       novelUrl: widget.novel.url,
     );
 
@@ -190,6 +94,17 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       return;
     }
 
+    // 获取 Services
+    final difyService = ref.watch(difyServiceProvider);
+    final databaseService = ref.watch(databaseServiceProvider);
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+    Outline? outline;
+
+    if (useOutline && hasOutline) {
+      outline = await databaseService.getOutlineByNovelUrl(widget.novel.url);
+    }
+
     // 显示加载对话框
     showDialog(
       context: context,
@@ -207,15 +122,15 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
     try {
       final generatedCharacters = useOutline
-          ? await _difyService.generateCharactersFromOutline(
-              outline: _outline!.content,
+          ? await difyService.generateCharactersFromOutline(
+              outline: outline!.content,
               userInput: userInput,
               novelUrl: widget.novel.url,
             )
-          : await _difyService.generateCharacters(
+          : await difyService.generateCharacters(
               userInput: userInput,
               novelUrl: widget.novel.url,
-              backgroundSetting: (await _databaseService
+              backgroundSetting: (await databaseService
                       .getBackgroundSetting(widget.novel.url)) ??
                   '',
             );
@@ -269,6 +184,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       return;
     }
 
+    // 获取 DifyService
+    final difyService = ref.watch(difyServiceProvider);
+
     // 显示加载对话框
     showDialog(
       context: context,
@@ -317,7 +235,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           extractionService.mergeAndDeduplicateContexts(allContexts);
 
       // 调用 Dify 提取角色
-      final extractedCharacters = await _difyService.extractCharacter(
+      final extractedCharacters = await difyService.extractCharacter(
         chapterContent: mergedContent,
         roles: rolesString,
         novelUrl: widget.novel.url,
@@ -365,9 +283,11 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     List<String> failedCharacters = [];
 
     try {
+      final repository = ref.read(characterRepositoryProvider);
+
       for (final character in selectedCharacters) {
         try {
-          await _databaseService.createCharacter(character);
+          await repository.createCharacter(character);
           successCount++;
         } catch (e) {
           failCount++;
@@ -377,7 +297,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       // 重新加载角色列表
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
 
       // 显示结果
       if (mounted) {
@@ -436,31 +356,17 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
   /// 切换多选模式（长按触发）
   void _toggleMultiSelectMode(Character character) {
-    setState(() {
-      _isMultiSelectMode = true;
-      if (character.id != null) {
-        _selectedCharacterIds.add(character.id!);
-      }
-    });
+    ref.read(multiSelectModeProvider.notifier).enterMode(character.id!);
   }
 
   /// 切换角色选择状态（点击触发）
   void _toggleCharacterSelection(int characterId) {
-    setState(() {
-      if (_selectedCharacterIds.contains(characterId)) {
-        _selectedCharacterIds.remove(characterId);
-      } else {
-        _selectedCharacterIds.add(characterId);
-      }
-    });
+    ref.read(selectedCharacterIdsProvider.notifier).toggle(characterId);
   }
 
   /// 退出多选模式
   void _exitMultiSelectMode() {
-    setState(() {
-      _isMultiSelectMode = false;
-      _selectedCharacterIds.clear();
-    });
+    ref.read(multiSelectModeProvider.notifier).exitMode();
   }
 
   /// 处理卡片点击（编辑或选择）
@@ -494,10 +400,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     if (!confirmed) return;
 
     try {
+      final imageCacheService = ref.watch(characterImageCacheServiceProvider);
+      final repository = ref.read(characterRepositoryProvider);
+
       // 批量删除
       for (final characterId in _selectedCharacterIds) {
-        await _databaseService.deleteCharacter(characterId);
-        await _imageCacheService.deleteCharacterCachedImages(characterId);
+        await repository.deleteCharacter(characterId);
+        await imageCacheService.deleteCharacterCachedImages(characterId);
       }
 
       if (mounted) {
@@ -506,7 +415,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
       // 退出多选模式并重新加载
       _exitMultiSelectMode();
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
     } catch (e) {
       debugPrint('❌ 批量删除角色失败: $e');
       if (mounted) {
@@ -527,12 +436,18 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
 
     if (result == true) {
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 从 Provider 获取角色列表状态
+    final charactersAsync =
+        ref.watch(characterManagementStateProvider(widget.novel));
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isMultiSelectMode
@@ -566,19 +481,35 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                 ),
                 IconButton(
                   onPressed: _aiCreateCharacter,
-                  icon:
-                      Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
-                  tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
+                  icon: Icon(hasOutline ? Icons.menu_book : Icons.auto_awesome),
+                  tooltip: hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
                 ),
               ],
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _characters.isEmpty
+      body: charactersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text('加载失败: $error'),
+            ],
+          ),
+        ),
+        data: (characters) {
+          return characters.isEmpty
               ? _buildEmptyState()
-              : _buildCharacterList(),
+              : _buildCharacterList(characters);
+        },
+      ),
       floatingActionButton:
           _isMultiSelectMode && _selectedCharacterIds.isNotEmpty
               ? FloatingActionButton.extended(
@@ -636,7 +567,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
   }
 
-  Widget _buildCharacterList() {
+  Widget _buildCharacterList(List<Character> characters) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 响应式网格配置
@@ -680,9 +611,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             crossAxisSpacing: crossAxisSpacing,
             mainAxisSpacing: mainAxisSpacing,
           ),
-          itemCount: _characters.length,
+          itemCount: characters.length,
           itemBuilder: (context, index) {
-            final character = _characters[index];
+            final character = characters[index];
             return _buildCharacterCard(character);
           },
         );
@@ -773,38 +704,38 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                           ),
                         ),
 
-                        // 关系数量徽章
-                        if (character.id != null &&
-                            _relationshipCountCache[character.id] != null &&
-                            _relationshipCountCache[character.id]! > 0)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Material(
-                              elevation: 4,
-                              shape: const CircleBorder(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  '${_relationshipCountCache[character.id]}',
-                                  style: TextStyle(
-                                    color:
-                                        Theme.of(context).colorScheme.surface,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
+                        // 关系数量徽章 - 暂时隐藏，等待后续实现
+                        // if (character.id != null &&
+                        //     _relationshipCountCache[character.id] != null &&
+                        //     _relationshipCountCache[character.id]! > 0)
+                        //   Positioned(
+                        //     top: 8,
+                        //     right: 8,
+                        //     child: Material(
+                        //       elevation: 4,
+                        //       shape: const CircleBorder(),
+                        //       child: Container(
+                        //         padding: const EdgeInsets.symmetric(
+                        //           horizontal: 8,
+                        //           vertical: 4,
+                        //         ),
+                        //         decoration: BoxDecoration(
+                        //           color: Colors.orange,
+                        //           shape: BoxShape.circle,
+                        //         ),
+                        //         child: Text(
+                        //           '${_relationshipCountCache[character.id]}',
+                        //           style: TextStyle(
+                        //             color:
+                        //                 Theme.of(context).colorScheme.surface,
+                        //             fontSize: 12,
+                        //             fontWeight: FontWeight.bold,
+                        //           ),
+                        //           textAlign: TextAlign.center,
+                        //         ),
+                        //       ),
+                        //     ),
+                        //   ),
                       ],
                     ),
                   ),
@@ -866,13 +797,15 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
   /// 构建角色头像
   Widget _buildCharacterAvatar(Character character) {
+    final avatarService = ref.watch(characterAvatarServiceProvider);
+
     // 使用cachedImageUrl的变化来触发FutureBuilder重建
     final avatarKey =
         ValueKey('avatar_${character.id}_${character.cachedImageUrl}');
     return FutureBuilder<String?>(
       key: avatarKey,
       future: character.id != null
-          ? _avatarService.getCharacterAvatarPath(character.id!)
+          ? avatarService.getCharacterAvatarPath(character.id!)
           : Future.value(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
