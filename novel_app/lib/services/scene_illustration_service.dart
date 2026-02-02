@@ -7,8 +7,14 @@ import 'logger_service.dart';
 import 'package:novel_api/novel_api.dart';
 
 class SceneIllustrationService {
-  final DatabaseService _databaseService = DatabaseService();
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
+  final DatabaseService _databaseService;
+  final ApiServiceWrapper _apiService;
+
+  SceneIllustrationService({
+    DatabaseService? databaseService,
+    ApiServiceWrapper? apiService,
+  })  : _databaseService = databaseService ?? DatabaseService(),
+        _apiService = apiService ?? ApiServiceProvider.instance;
 
   /// 创建场景插图任务（新版本：基于段落索引插入标记）
   Future<int> createSceneIllustrationWithMarkup({

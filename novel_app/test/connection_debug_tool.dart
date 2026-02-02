@@ -133,7 +133,6 @@ class ConnectionDebugTool {
         'success_count': successCount,
         'failure_count': results.length - successCount,
       });
-
     } catch (e) {
       recordEvent('SCENARIO2_ERROR', '并发测试失败: $e');
     } finally {
@@ -142,7 +141,8 @@ class ConnectionDebugTool {
   }
 
   /// 带错误处理的请求
-  Future<bool> _makeRequestWithErrorHandling(ApiServiceWrapper apiWrapper, int requestId) async {
+  Future<bool> _makeRequestWithErrorHandling(
+      ApiServiceWrapper apiWrapper, int requestId) async {
     try {
       await apiWrapper.searchNovels('concurrent_test_$requestId');
       recordEvent('SCENARIO2_REQUEST_SUCCESS', '请求 $requestId 成功');
@@ -184,7 +184,6 @@ class ConnectionDebugTool {
           'is_connection_error': _isConnectionError(e),
         });
       }
-
     } catch (e) {
       recordEvent('SCENARIO3_ERROR', '生命周期测试失败: $e');
     } finally {
@@ -196,10 +195,10 @@ class ConnectionDebugTool {
   bool _isConnectionError(dynamic error) {
     final errorStr = error.toString().toLowerCase();
     return errorStr.contains('closed') ||
-           errorStr.contains('connection') ||
-           errorStr.contains('establish') ||
-           errorStr.contains('dio') ||
-           errorStr.contains('socket');
+        errorStr.contains('connection') ||
+        errorStr.contains('establish') ||
+        errorStr.contains('dio') ||
+        errorStr.contains('socket');
   }
 
   /// 生成分析报告
@@ -245,30 +244,30 @@ class ConnectionDebugTool {
     debugPrint('  🔍 问题模式分析:');
 
     // 检查是否有dispose后的请求
-    final disposeErrors = errors.where((e) =>
-      e.toString().contains('dispose') ||
-      e.toString().contains('closed')
-    ).length;
+    final disposeErrors = errors
+        .where((e) =>
+            e.toString().contains('dispose') || e.toString().contains('closed'))
+        .length;
 
     if (disposeErrors > 0) {
       debugPrint('    - 发现 $disposeErrors 个dispose后请求错误');
     }
 
     // 检查并发问题
-    final concurrentErrors = errors.where((e) =>
-      e.type.contains('CONCURRENT') ||
-      e.type.contains('SCENARIO2')
-    ).length;
+    final concurrentErrors = errors
+        .where((e) =>
+            e.type.contains('CONCURRENT') || e.type.contains('SCENARIO2'))
+        .length;
 
     if (concurrentErrors > 0) {
       debugPrint('    - 发现 $concurrentErrors 个并发相关错误');
     }
 
     // 检查生命周期问题
-    final lifecycleErrors = errors.where((e) =>
-      e.type.contains('LIFECYCLE') ||
-      e.type.contains('SCENARIO3')
-    ).length;
+    final lifecycleErrors = errors
+        .where(
+            (e) => e.type.contains('LIFECYCLE') || e.type.contains('SCENARIO3'))
+        .length;
 
     if (lifecycleErrors > 0) {
       debugPrint('    - 发现 $lifecycleErrors 个生命周期相关错误');
@@ -373,7 +372,6 @@ Future<void> runConnectionDebug() async {
     debugTool.generateReport();
 
     apiWrapper.dispose();
-
   } catch (e) {
     debugPrint('❌ 调试工具运行失败: $e');
   } finally {

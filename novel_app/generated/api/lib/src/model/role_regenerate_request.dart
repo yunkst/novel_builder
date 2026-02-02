@@ -13,9 +13,10 @@ part 'role_regenerate_request.g.dart';
 /// Properties:
 /// * [imgUrl] - 参考图片URL
 /// * [count] - 生成图片数量
-/// * [model] 
+/// * [model]
 @BuiltValue()
-abstract class RoleRegenerateRequest implements Built<RoleRegenerateRequest, RoleRegenerateRequestBuilder> {
+abstract class RoleRegenerateRequest
+    implements Built<RoleRegenerateRequest, RoleRegenerateRequestBuilder> {
   /// 参考图片URL
   @BuiltValueField(wireName: r'img_url')
   String get imgUrl;
@@ -29,18 +30,24 @@ abstract class RoleRegenerateRequest implements Built<RoleRegenerateRequest, Rol
 
   RoleRegenerateRequest._();
 
-  factory RoleRegenerateRequest([void updates(RoleRegenerateRequestBuilder b)]) = _$RoleRegenerateRequest;
+  factory RoleRegenerateRequest(
+      [void updates(RoleRegenerateRequestBuilder b)]) = _$RoleRegenerateRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(RoleRegenerateRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<RoleRegenerateRequest> get serializer => _$RoleRegenerateRequestSerializer();
+  static Serializer<RoleRegenerateRequest> get serializer =>
+      _$RoleRegenerateRequestSerializer();
 }
 
-class _$RoleRegenerateRequestSerializer implements PrimitiveSerializer<RoleRegenerateRequest> {
+class _$RoleRegenerateRequestSerializer
+    implements PrimitiveSerializer<RoleRegenerateRequest> {
   @override
-  final Iterable<Type> types = const [RoleRegenerateRequest, _$RoleRegenerateRequest];
+  final Iterable<Type> types = const [
+    RoleRegenerateRequest,
+    _$RoleRegenerateRequest
+  ];
 
   @override
   final String wireName = r'RoleRegenerateRequest';
@@ -75,7 +82,9 @@ class _$RoleRegenerateRequestSerializer implements PrimitiveSerializer<RoleRegen
     RoleRegenerateRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -140,4 +149,3 @@ class _$RoleRegenerateRequestSerializer implements PrimitiveSerializer<RoleRegen
     return result.build();
   }
 }
-

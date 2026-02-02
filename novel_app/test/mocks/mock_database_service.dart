@@ -142,17 +142,20 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> updateBackgroundSetting(String novelUrl, String? backgroundSetting) async {
+  Future<int> updateBackgroundSetting(
+      String novelUrl, String? backgroundSetting) async {
     final index = mockNovels.indexWhere((n) => n.url == novelUrl);
     if (index >= 0) {
-      mockNovels[index] = mockNovels[index].copyWith(backgroundSetting: backgroundSetting);
+      mockNovels[index] =
+          mockNovels[index].copyWith(backgroundSetting: backgroundSetting);
       return 1;
     }
     return 0;
   }
 
   @override
-  Future<int> appendBackgroundSetting(String novelUrl, String newBackground) async {
+  Future<int> appendBackgroundSetting(
+      String novelUrl, String newBackground) async {
     if (newBackground.trim().isEmpty) {
       return 0;
     }
@@ -163,7 +166,8 @@ class MockDatabaseService implements DatabaseService {
     }
 
     final current = mockNovels[index].backgroundSetting ?? '';
-    final updated = current.isEmpty ? newBackground : '$current\n\n$newBackground';
+    final updated =
+        current.isEmpty ? newBackground : '$current\n\n$newBackground';
     mockNovels[index] = mockNovels[index].copyWith(backgroundSetting: updated);
     return 1;
   }
@@ -187,7 +191,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<AiAccompanimentSettings> getAiAccompanimentSettings(String novelUrl) async {
+  Future<AiAccompanimentSettings> getAiAccompanimentSettings(
+      String novelUrl) async {
     return const AiAccompanimentSettings(
       autoEnabled: false,
       infoNotificationEnabled: false,
@@ -211,11 +216,14 @@ class MockDatabaseService implements DatabaseService {
 
   @override
   Future<List<String>> filterUncachedChapters(List<String> chapterUrls) async {
-    return chapterUrls.where((url) => !mockChapterContents.containsKey(url)).toList();
+    return chapterUrls
+        .where((url) => !mockChapterContents.containsKey(url))
+        .toList();
   }
 
   @override
-  Future<Map<String, bool>> getChaptersCacheStatus(List<String> chapterUrls) async {
+  Future<Map<String, bool>> getChaptersCacheStatus(
+      List<String> chapterUrls) async {
     final result = <String, bool>{};
     for (final url in chapterUrls) {
       result[url] = mockChapterContents.containsKey(url);
@@ -237,7 +245,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> cacheChapter(String novelUrl, Chapter chapter, String content) async {
+  Future<int> cacheChapter(
+      String novelUrl, Chapter chapter, String content) async {
     mockChapters[chapter.url] = chapter;
     mockChapterContents[chapter.url] = content;
     return 1;
@@ -302,17 +311,20 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<void> markChapterAsAccompanied(String novelUrl, String chapterUrl) async {
+  Future<void> markChapterAsAccompanied(
+      String novelUrl, String chapterUrl) async {
     // Mock 不需要实现
   }
 
   @override
-  Future<void> resetChapterAccompaniedFlag(String novelUrl, String chapterUrl) async {
+  Future<void> resetChapterAccompaniedFlag(
+      String novelUrl, String chapterUrl) async {
     // Mock 不需要实现
   }
 
   @override
-  Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters) async {
+  Future<void> cacheNovelChapters(
+      String novelUrl, List<Chapter> chapters) async {
     for (final chapter in chapters) {
       mockChapters[chapter.url] = chapter;
     }
@@ -330,15 +342,18 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters) async {
+  Future<void> updateChaptersOrder(
+      String novelUrl, List<Chapter> chapters) async {
     // Mock 不需要实现
   }
 
   @override
-  static bool isLocalChapter(String chapterUrl) => chapterUrl.startsWith('local://');
+  static bool isLocalChapter(String chapterUrl) =>
+      chapterUrl.startsWith('local://');
 
   @override
-  Future<int> createCustomChapter(String novelUrl, String title, String content, [int? index]) async {
+  Future<int> createCustomChapter(String novelUrl, String title, String content,
+      [int? index]) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final chapterUrl = 'local://user_chapter_$timestamp';
     final chapter = Chapter(
@@ -353,12 +368,14 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> insertUserChapter(String novelUrl, String title, String content, [int? index]) async {
+  Future<int> insertUserChapter(String novelUrl, String title, String content,
+      [int? index]) async {
     return await createCustomChapter(novelUrl, title, content, index);
   }
 
   @override
-  Future<void> updateCustomChapter(String chapterUrl, String title, String content) async {
+  Future<void> updateCustomChapter(
+      String chapterUrl, String title, String content) async {
     final chapter = mockChapters[chapterUrl];
     if (chapter != null) {
       mockChapters[chapterUrl] = chapter.copyWith(title: title);
@@ -391,7 +408,8 @@ class MockDatabaseService implements DatabaseService {
     if (!mockCharacters.containsKey(novelUrl)) {
       mockCharacters[novelUrl] = [];
     }
-    final newCharacter = character.copyWith(id: mockCharacters[novelUrl]!.length + 1);
+    final newCharacter =
+        character.copyWith(id: mockCharacters[novelUrl]!.length + 1);
     mockCharacters[novelUrl]!.add(newCharacter);
     return newCharacter.id!;
   }
@@ -420,7 +438,8 @@ class MockDatabaseService implements DatabaseService {
   Future<int> updateCharacter(Character character) async {
     final novelUrl = character.novelUrl;
     if (mockCharacters.containsKey(novelUrl)) {
-      final index = mockCharacters[novelUrl]!.indexWhere((c) => c.id == character.id);
+      final index =
+          mockCharacters[novelUrl]!.indexWhere((c) => c.id == character.id);
       if (index >= 0) {
         mockCharacters[novelUrl]![index] = character;
         return 1;
@@ -453,7 +472,8 @@ class MockDatabaseService implements DatabaseService {
 
   @override
   Future<Character> updateOrInsertCharacter(Character newCharacter) async {
-    final existing = await findCharacterByName(newCharacter.novelUrl, newCharacter.name);
+    final existing =
+        await findCharacterByName(newCharacter.novelUrl, newCharacter.name);
     if (existing != null) {
       final updated = newCharacter.copyWith(id: existing.id);
       await updateCharacter(updated);
@@ -465,7 +485,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<List<Character>> batchUpdateCharacters(List<Character> newCharacters) async {
+  Future<List<Character>> batchUpdateCharacters(
+      List<Character> newCharacters) async {
     final result = <Character>[];
     for (final character in newCharacters) {
       final updated = await updateOrInsertCharacter(character);
@@ -505,7 +526,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> updateCharacterCachedImage(int characterId, String? imageUrl) async {
+  Future<int> updateCharacterCachedImage(
+      int characterId, String? imageUrl) async {
     return 1; // Mock 返回成功
   }
 
@@ -540,7 +562,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> batchUpdateOrInsertCharacters(String novelUrl, List<AICompanionRole> aiRoles) async {
+  Future<int> batchUpdateOrInsertCharacters(
+      String novelUrl, List<AICompanionRole> aiRoles) async {
     return aiRoles.length; // Mock 返回成功数量
   }
 
@@ -565,12 +588,14 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<List<CharacterRelationship>> getOutgoingRelationships(int characterId) async {
+  Future<List<CharacterRelationship>> getOutgoingRelationships(
+      int characterId) async {
     return mockRelationships[characterId] ?? [];
   }
 
   @override
-  Future<List<CharacterRelationship>> getIncomingRelationships(int characterId) async {
+  Future<List<CharacterRelationship>> getIncomingRelationships(
+      int characterId) async {
     final result = <CharacterRelationship>[];
     for (final relationships in mockRelationships.values) {
       result.addAll(
@@ -584,7 +609,8 @@ class MockDatabaseService implements DatabaseService {
   Future<int> updateRelationship(CharacterRelationship relationship) async {
     final sourceId = relationship.sourceCharacterId;
     if (mockRelationships.containsKey(sourceId)) {
-      final index = mockRelationships[sourceId]!.indexWhere((r) => r.id == relationship.id);
+      final index = mockRelationships[sourceId]!
+          .indexWhere((r) => r.id == relationship.id);
       if (index >= 0) {
         mockRelationships[sourceId]![index] = relationship;
         return 1;
@@ -596,7 +622,8 @@ class MockDatabaseService implements DatabaseService {
   @override
   Future<int> deleteRelationship(int relationshipId) async {
     for (final sourceId in mockRelationships.keys) {
-      final index = mockRelationships[sourceId]!.indexWhere((r) => r.id == relationshipId);
+      final index = mockRelationships[sourceId]!
+          .indexWhere((r) => r.id == relationshipId);
       if (index >= 0) {
         mockRelationships[sourceId]!.removeAt(index);
         return 1;
@@ -606,12 +633,11 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<bool> relationshipExists(int sourceId, int targetId, String type) async {
+  Future<bool> relationshipExists(
+      int sourceId, int targetId, String type) async {
     final relationships = mockRelationships[sourceId] ?? [];
-    return relationships.any((r) =>
-      r.targetCharacterId == targetId &&
-      r.relationshipType == type
-    );
+    return relationships.any(
+        (r) => r.targetCharacterId == targetId && r.relationshipType == type);
   }
 
   @override
@@ -630,7 +656,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<List<CharacterRelationship>> getAllRelationships(String novelUrl) async {
+  Future<List<CharacterRelationship>> getAllRelationships(
+      String novelUrl) async {
     final result = <CharacterRelationship>[];
     for (final relationships in mockRelationships.values) {
       result.addAll(relationships);
@@ -690,7 +717,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> deleteSceneIllustrationsByChapter(String novelUrl, String chapterId) async {
+  Future<int> deleteSceneIllustrationsByChapter(
+      String novelUrl, String chapterId) async {
     if (!mockIllustrations.containsKey(novelUrl)) {
       return 0;
     }
@@ -750,7 +778,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> batchUpdateSceneIllustrations(List<int> ids, String status) async {
+  Future<int> batchUpdateSceneIllustrations(
+      List<int> ids, String status) async {
     return ids.length; // Mock 返回成功数量
   }
 
@@ -760,12 +789,12 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> getCompletedIllustrationCount(String novelUrl, String chapterId) async {
+  Future<int> getCompletedIllustrationCount(
+      String novelUrl, String chapterId) async {
     final illustrations = mockIllustrations[novelUrl] ?? [];
-    return illustrations.where((i) =>
-      i.chapterId == chapterId &&
-      i.status == 'completed'
-    ).length;
+    return illustrations
+        .where((i) => i.chapterId == chapterId && i.status == 'completed')
+        .length;
   }
 
   @override
@@ -798,7 +827,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<int> updateOutlineContent(String novelUrl, String title, String content) async {
+  Future<int> updateOutlineContent(
+      String novelUrl, String title, String content) async {
     if (mockOutlines.containsKey(novelUrl)) {
       final outline = mockOutlines[novelUrl]!;
       mockOutlines[novelUrl] = Outline(
@@ -893,7 +923,8 @@ class MockDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<bool> removeNovelFromBookshelf(String novelUrl, int bookshelfId) async {
+  Future<bool> removeNovelFromBookshelf(
+      String novelUrl, int bookshelfId) async {
     if (mockNovelBookshelves.containsKey(novelUrl)) {
       return mockNovelBookshelves[novelUrl]!.remove(bookshelfId);
     }

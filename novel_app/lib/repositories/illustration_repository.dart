@@ -1,8 +1,7 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' show join;
 import '../models/scene_illustration.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
+import '../core/interfaces/repositories/i_illustration_repository.dart';
 
 /// 插图数据仓库
 ///
@@ -11,26 +10,10 @@ import 'base_repository.dart';
 /// - 插图路径管理
 /// - 插图查询和搜索
 /// - 章节插图关联
-class IllustrationRepository extends BaseRepository {
-  Database? _sharedDatabase;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (_sharedDatabase != null) return _sharedDatabase!;
-    if (isWebPlatform) {
-      throw Exception('Database is not supported on web platform');
-    }
-
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'novel_reader.db');
-
-    _sharedDatabase = await openDatabase(
-      path,
-      version: 21,
-    );
-
-    return _sharedDatabase!;
-  }
+class IllustrationRepository extends BaseRepository
+    implements IIllustrationRepository {
+  /// 构造函数 - 接受数据库连接实例
+  IllustrationRepository({required super.dbConnection});
 
   // ========== CRUD操作 ==========
 
@@ -42,6 +25,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [illustration] 场景插图对象，包含任务信息
   ///
   /// 返回: 新插入记录的ID
+  @override
   Future<int> insertSceneIllustration(SceneIllustration illustration) async {
     try {
       final db = await database;
@@ -79,6 +63,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [prompts] 可选，生成提示词
   ///
   /// 返回: 受影响的行数
+  @override
   Future<int> updateSceneIllustrationStatus(
     int id,
     String status, {
@@ -134,6 +119,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [id] 插图记录ID
   ///
   /// 返回: 受影响的行数
+  @override
   Future<int> deleteSceneIllustration(int id) async {
     try {
       final db = await database;
@@ -170,6 +156,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [chapterId] 章节ID
   ///
   /// 返回: 受影响的行数
+  @override
   Future<int> deleteSceneIllustrationsByChapter(
     String novelUrl,
     String chapterId,
@@ -211,6 +198,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [chapterId] 章节ID
   ///
   /// 返回: 插图列表
+  @override
   Future<List<SceneIllustration>> getSceneIllustrationsByChapter(
     String novelUrl,
     String chapterId,
@@ -246,6 +234,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [taskId] 任务ID
   ///
   /// 返回: 插图对象，不存在时返回null
+  @override
   Future<SceneIllustration?> getSceneIllustrationByTaskId(
     String taskId,
   ) async {
@@ -282,6 +271,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [limit] 每页数量
   ///
   /// 返回: 包含items、total、totalPages的Map
+  @override
   Future<Map<String, dynamic>> getSceneIllustrationsPaginated({
     required int page,
     required int limit,
@@ -330,6 +320,7 @@ class IllustrationRepository extends BaseRepository {
   /// 查询所有pending和processing状态的插图，用于任务队列处理
   ///
   /// 返回: 待处理插图列表
+  @override
   Future<List<SceneIllustration>> getPendingSceneIllustrations() async {
     try {
       final db = await database;
@@ -365,6 +356,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [status] 新状态
   ///
   /// 返回: 受影响的行数
+  @override
   Future<int> batchUpdateSceneIllustrations(
     List<int> ids,
     String status,
@@ -412,6 +404,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [novelUrl] 小说URL
   ///
   /// 返回: 插图总数
+  @override
   Future<int> getIllustrationCount(String novelUrl) async {
     try {
       final db = await database;
@@ -438,6 +431,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [chapterId] 章节ID
   ///
   /// 返回: 已完成的插图数量
+  @override
   Future<int> getCompletedIllustrationCount(
     String novelUrl,
     String chapterId,
@@ -468,6 +462,7 @@ class IllustrationRepository extends BaseRepository {
   /// - [taskId] 任务ID
   ///
   /// 返回: true表示已存在，false表示不存在
+  @override
   Future<bool> taskExists(String taskId) async {
     try {
       final result = await getSceneIllustrationByTaskId(taskId);

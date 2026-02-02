@@ -1,33 +1,19 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' show join;
 import '../models/character_relationship.dart';
+import '../models/ai_companion_response.dart';
 import '../services/logger_service.dart';
+import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import 'base_repository.dart';
+import '../models/character.dart';
 
 /// 人物关系数据仓库
 ///
 /// 负责角色关系（CharacterRelationship）的数据库操作
 /// 包括关系的创建、查询、更新、删除以及关系图数据管理
-class CharacterRelationRepository extends BaseRepository {
-  Database? _sharedDatabase;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (_sharedDatabase != null) return _sharedDatabase!;
-    if (isWebPlatform) {
-      throw Exception('Database is not supported on web platform');
-    }
-
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'novel_reader.db');
-
-    _sharedDatabase = await openDatabase(
-      path,
-      version: 21,
-    );
-
-    return _sharedDatabase!;
-  }
+class CharacterRelationRepository extends BaseRepository
+    implements ICharacterRelationRepository {
+  /// 构造函数 - 接受数据库连接实例
+  CharacterRelationRepository({required super.dbConnection});
 
   // ========== 基础CRUD操作 ==========
 
@@ -35,6 +21,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [relationship] 要创建的关系对象
   /// 返回新插入记录的ID，如果关系已存在则抛出异常
+  @override
   Future<int> createRelationship(CharacterRelationship relationship) async {
     try {
       final db = await database;
@@ -66,6 +53,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [relationship] 要更新的关系对象（必须包含id）
   /// 返回受影响的行数
+  @override
   Future<int> updateRelationship(CharacterRelationship relationship) async {
     if (relationship.id == null) {
       throw ArgumentError('关系ID不能为空');
@@ -102,6 +90,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [relationshipId] 关系ID
   /// 返回受影响的行数
+  @override
   Future<int> deleteRelationship(int relationshipId) async {
     try {
       final db = await database;
@@ -135,6 +124,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [characterId] 角色ID
   /// 返回该角色相关的所有关系列表
+  @override
   Future<List<CharacterRelationship>> getRelationships(int characterId) async {
     final db = await database;
 
@@ -151,6 +141,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [characterId] 角色ID
   /// 返回该角色发起的所有关系列表
+  @override
   Future<List<CharacterRelationship>> getOutgoingRelationships(
     int characterId,
   ) async {
@@ -170,6 +161,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [characterId] 角色ID
   /// 返回指向该角色的所有关系列表
+  @override
   Future<List<CharacterRelationship>> getIncomingRelationships(
     int characterId,
   ) async {
@@ -190,6 +182,7 @@ class CharacterRelationRepository extends BaseRepository {
   /// [sourceId] 源角色ID
   /// [targetId] 目标角色ID
   /// 返回匹配的关系列表
+  @override
   Future<List<CharacterRelationship>> getRelationshipsByCharacterIds(
     int sourceId,
     int targetId,
@@ -209,6 +202,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [novelUrl] 小说URL
   /// 返回该小说的所有角色关系
+  @override
   Future<List<CharacterRelationship>> getAllRelationships(
       String novelUrl) async {
     if (isWebPlatform) {
@@ -257,6 +251,7 @@ class CharacterRelationRepository extends BaseRepository {
   /// [targetId] 目标角色ID
   /// [type] 关系类型
   /// 返回关系是否存在
+  @override
   Future<bool> relationshipExists(
     int sourceId,
     int targetId,
@@ -279,6 +274,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [characterId] 角色ID
   /// 返回该角色的关系总数（出度 + 入度）
+  @override
   Future<int> getRelationshipCount(int characterId) async {
     final db = await database;
 
@@ -294,6 +290,7 @@ class CharacterRelationRepository extends BaseRepository {
   ///
   /// [characterId] 角色ID
   /// 返回相关角色的ID列表
+  @override
   Future<List<int>> getRelatedCharacterIds(int characterId) async {
     final db = await database;
 
@@ -308,5 +305,119 @@ class CharacterRelationRepository extends BaseRepository {
     ''', [characterId, characterId, characterId]);
 
     return result.map((row) => row['related_id'] as int).toList();
+  }
+
+  // ========== AI伴读批量操作 ==========
+
+  /// 批量更新或插入关系（用于AI伴读）
+  ///
+  /// [novelUrl] 小说URL
+  /// [aiRelations] AI返回的关系更新列表
+  /// [getCharactersFn] 获取小说所有角色的函数
+  /// 返回成功更新的关系数量
+  Future<int> batchUpdateOrInsertRelationships(
+    String novelUrl,
+    List<AICompanionRelation> aiRelations,
+    Future<List<Character>> Function(String) getCharactersFn,
+  ) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    if (aiRelations.isEmpty) {
+      LoggerService.instance.w(
+        'AI返回关系列表为空，跳过更新',
+        category: LogCategory.ai,
+        tags: ['relationship', 'batch', 'empty'],
+      );
+      return 0;
+    }
+
+    // 获取小说的所有角色，建立名称到ID的映射
+    final allCharacters = await getCharactersFn(novelUrl);
+    final Map<String, int> characterNameToId = {
+      for (var c in allCharacters)
+        if (c.id != null) c.name: c.id!,
+    };
+
+    int successCount = 0;
+
+    for (final aiRelation in aiRelations) {
+      try {
+        // 查找source和target的角色ID
+        final sourceId = characterNameToId[aiRelation.source];
+        final targetId = characterNameToId[aiRelation.target];
+
+        if (sourceId == null) {
+          LoggerService.instance.w(
+            '未找到source角色: ${aiRelation.source}，跳过关系: $aiRelation',
+            category: LogCategory.ai,
+            tags: ['relationship', 'character_not_found'],
+          );
+          continue;
+        }
+
+        if (targetId == null) {
+          LoggerService.instance.w(
+            '未找到target角色: ${aiRelation.target}，跳过关系: $aiRelation',
+            category: LogCategory.ai,
+            tags: ['relationship', 'character_not_found'],
+          );
+          continue;
+        }
+
+        // 查找是否已存在相同source和target的关系
+        final existingRelations =
+            await getRelationshipsByCharacterIds(sourceId, targetId);
+
+        if (existingRelations.isNotEmpty) {
+          // 更新现有关系的type
+          final existingRelation = existingRelations.first;
+          final updatedRelation = existingRelation.copyWith(
+            relationshipType: aiRelation.type,
+            updatedAt: DateTime.now(),
+          );
+
+          await updateRelationship(updatedRelation);
+          successCount++;
+          LoggerService.instance.i(
+            '更新关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
+            category: LogCategory.ai,
+            tags: ['relationship', 'update', 'success'],
+          );
+        } else {
+          // 创建新关系
+          final newRelation = CharacterRelationship(
+            sourceCharacterId: sourceId,
+            targetCharacterId: targetId,
+            relationshipType: aiRelation.type,
+          );
+
+          await createRelationship(newRelation);
+          successCount++;
+          LoggerService.instance.i(
+            '新增关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
+            category: LogCategory.ai,
+            tags: ['relationship', 'create', 'success'],
+          );
+        }
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '更新/插入关系失败: ${aiRelation.source} -> ${aiRelation.target} - $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.ai,
+          tags: ['relationship', 'error'],
+        );
+        // 继续处理其他关系
+        continue;
+      }
+    }
+
+    LoggerService.instance.i(
+      '批量更新关系完成: $successCount/${aiRelations.length}',
+      category: LogCategory.ai,
+      tags: ['relationship', 'batch', 'success'],
+    );
+    return successCount;
   }
 }

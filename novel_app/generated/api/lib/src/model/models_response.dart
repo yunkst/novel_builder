@@ -16,7 +16,8 @@ part 'models_response.g.dart';
 /// * [text2img] - 文生图模型列表
 /// * [img2video] - 图生视频模型列表
 @BuiltValue()
-abstract class ModelsResponse implements Built<ModelsResponse, ModelsResponseBuilder> {
+abstract class ModelsResponse
+    implements Built<ModelsResponse, ModelsResponseBuilder> {
   /// 文生图模型列表
   @BuiltValueField(wireName: r'text2img')
   BuiltList<WorkflowInfo>? get text2img;
@@ -27,18 +28,21 @@ abstract class ModelsResponse implements Built<ModelsResponse, ModelsResponseBui
 
   ModelsResponse._();
 
-  factory ModelsResponse([void updates(ModelsResponseBuilder b)]) = _$ModelsResponse;
+  factory ModelsResponse([void updates(ModelsResponseBuilder b)]) =
+      _$ModelsResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(ModelsResponseBuilder b) => b
-      ..text2img = ListBuilder()
-      ..img2video = ListBuilder();
+    ..text2img = ListBuilder()
+    ..img2video = ListBuilder();
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<ModelsResponse> get serializer => _$ModelsResponseSerializer();
+  static Serializer<ModelsResponse> get serializer =>
+      _$ModelsResponseSerializer();
 }
 
-class _$ModelsResponseSerializer implements PrimitiveSerializer<ModelsResponse> {
+class _$ModelsResponseSerializer
+    implements PrimitiveSerializer<ModelsResponse> {
   @override
   final Iterable<Type> types = const [ModelsResponse, _$ModelsResponse];
 
@@ -72,7 +76,9 @@ class _$ModelsResponseSerializer implements PrimitiveSerializer<ModelsResponse> 
     ModelsResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -129,4 +135,3 @@ class _$ModelsResponseSerializer implements PrimitiveSerializer<ModelsResponse> 
     return result.build();
   }
 }
-

@@ -1,16 +1,14 @@
 import 'package:flutter/foundation.dart';
 import '../models/search_result.dart';
-import '../services/database_service.dart';
+import 'database_service.dart';
 
 /// 章节搜索服务类
 class ChapterSearchService {
-  final DatabaseService? _databaseService;
+  final DatabaseService _databaseService;
 
   /// 构造函数 - 支持依赖注入
-  const ChapterSearchService([this._databaseService]);
-
-  /// 获取数据库服务实例（使用注入的或创建默认的）
-  DatabaseService get _db => _databaseService ?? DatabaseService();
+  ChapterSearchService({DatabaseService? databaseService})
+      : _databaseService = databaseService ?? DatabaseService();
 
   /// 在指定小说的缓存内容中搜索关键词
   ///
@@ -27,7 +25,7 @@ class ChapterSearchService {
     }
 
     try {
-      final results = await _db.searchInCachedContent(
+      final results = await _databaseService.searchInCachedContent(
         keyword.trim(),
         novelUrl: novelUrl,
       );
@@ -55,7 +53,7 @@ class ChapterSearchService {
     }
 
     try {
-      final results = await _db.searchInCachedContent(
+      final results = await _databaseService.searchInCachedContent(
         keyword.trim(),
         novelUrl: null, // 不限制小说范围
       );

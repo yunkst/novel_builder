@@ -119,9 +119,9 @@ void test4_BoundaryIndexCheck() {
   print('⚠️ 索引100超出范围');
 
   // 过滤有效索引
-  final validIndices = selectedIndices.where((index) =>
-    index >= 0 && index < paragraphs.length
-  ).toList();
+  final validIndices = selectedIndices
+      .where((index) => index >= 0 && index < paragraphs.length)
+      .toList();
 
   print('有效索引: $validIndices');
 

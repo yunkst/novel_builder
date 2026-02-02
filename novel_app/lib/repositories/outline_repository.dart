@@ -1,59 +1,17 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/outline.dart';
 import 'base_repository.dart';
+import '../core/interfaces/repositories/i_outline_repository.dart';
 
 /// 大纲数据仓库
 ///
 /// 负责管理小说大纲的数据库操作，包括大纲的创建、更新、查询和删除。
 /// 每本小说对应一个大纲记录，通过 novelUrl 进行关联。
-class OutlineRepository extends BaseRepository {
-  /// 数据库文件名
-  static const String _databaseName = 'novel_reader.db';
-
-  /// 数据库版本
-  static const int _databaseVersion = 20;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (isWebPlatform) {
-      throw UnsupportedError('OutlineRepository 不支持 Web 平台');
-    }
-
-    final db = await openDatabase(
-      _databaseName,
-      version: _databaseVersion,
-      onCreate: (db, version) async {
-        // 创建大纲表
-        await db.execute('''
-          CREATE TABLE outlines (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            novel_url TEXT NOT NULL UNIQUE,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-          )
-        ''');
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        // 数据库升级逻辑
-        if (oldVersion < 16) {
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS outlines (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              novel_url TEXT NOT NULL UNIQUE,
-              title TEXT NOT NULL,
-              content TEXT NOT NULL,
-              created_at INTEGER NOT NULL,
-              updated_at INTEGER NOT NULL
-            )
-          ''');
-        }
-      },
-    );
-
-    return db;
-  }
+///
+/// 注意：此Repository现在使用统一的数据库版本v21，不再有独立的数据库版本管理。
+class OutlineRepository extends BaseRepository implements IOutlineRepository {
+  /// 构造函数 - 接受数据库连接实例
+  OutlineRepository({required super.dbConnection});
 
   /// 创建或更新大纲
   ///
@@ -76,6 +34,7 @@ class OutlineRepository extends BaseRepository {
   /// );
   /// final result = await repository.saveOutline(outline);
   /// ```
+  @override
   Future<int> saveOutline(Outline outline) async {
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -126,6 +85,7 @@ class OutlineRepository extends BaseRepository {
   ///   print('找到大纲：${outline.title}');
   /// }
   /// ```
+  @override
   Future<Outline?> getOutlineByNovelUrl(String novelUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -152,6 +112,7 @@ class OutlineRepository extends BaseRepository {
   ///   print('${outline.title} - ${outline.updatedAt}');
   /// }
   /// ```
+  @override
   Future<List<Outline>> getAllOutlines() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -179,6 +140,7 @@ class OutlineRepository extends BaseRepository {
   ///   print('大纲已删除');
   /// }
   /// ```
+  @override
   Future<int> deleteOutline(String novelUrl) async {
     final db = await database;
     return await db.delete(
@@ -208,6 +170,7 @@ class OutlineRepository extends BaseRepository {
   ///   '更新后的大纲内容...',
   /// );
   /// ```
+  @override
   Future<int> updateOutlineContent(
     String novelUrl,
     String title,

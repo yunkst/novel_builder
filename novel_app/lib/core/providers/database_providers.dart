@@ -1,3 +1,4 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/database_service.dart';
 import '../../repositories/character_repository.dart';
@@ -8,80 +9,116 @@ import '../../repositories/illustration_repository.dart';
 import '../../repositories/outline_repository.dart';
 import '../../repositories/chat_scene_repository.dart';
 import '../../repositories/bookshelf_repository.dart';
+import '../database/database_connection.dart';
+import '../interfaces/i_database_connection.dart';
+import '../interfaces/repositories/i_novel_repository.dart';
+import '../interfaces/repositories/i_chapter_repository.dart';
+import '../interfaces/repositories/i_character_repository.dart';
+import '../interfaces/repositories/i_character_relation_repository.dart';
+import '../interfaces/repositories/i_bookshelf_repository.dart';
+import '../interfaces/repositories/i_illustration_repository.dart';
+import '../interfaces/repositories/i_outline_repository.dart';
+import '../interfaces/repositories/i_chat_scene_repository.dart';
+
+part 'database_providers.g.dart';
+
+/// 数据库连接Provider
+///
+/// 提供全局单例 DatabaseConnection 实例
+/// 使用 keepAlive: true 确保数据库连接不会因为没有监听者而被销毁
+@Riverpod(keepAlive: true)
+DatabaseConnection databaseConnection(Ref ref) {
+  final connection = DatabaseConnection();
+  ref.onDispose(() => connection.close());
+  return connection;
+}
+
+/// IDatabaseConnection接口Provider
+///
+/// 提供接口类型的数据库连接，便于依赖注入和测试
+@riverpod
+IDatabaseConnection iDatabaseConnection(Ref ref) {
+  return ref.watch(databaseConnectionProvider);
+}
 
 /// DatabaseService Provider
 ///
-/// 提供全局单例 DatabaseService 实例
+/// 提供全局单例 DatabaseService 实例（向后兼容）
+/// 注意：新代码建议使用 databaseConnectionProvider
 final databaseServiceProvider = Provider<DatabaseService>((ref) {
   return DatabaseService();
 });
 
 /// NovelRepository Provider
-final novelRepositoryProvider = Provider<NovelRepository>((ref) {
-  return NovelRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+INovelRepository novelRepository(Ref ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return NovelRepository(dbConnection: dbConnection);
+}
 
 /// ChapterRepository Provider
-final chapterRepositoryProvider = Provider<ChapterRepository>((ref) {
-  return ChapterRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+IChapterRepository chapterRepository(ChapterRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return ChapterRepository(dbConnection: dbConnection);
+}
 
 /// CharacterRepository Provider
 ///
-/// 依赖 DatabaseService,自动共享数据库实例
-final characterRepositoryProvider = Provider<CharacterRepository>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  final repository = CharacterRepository();
-
-  // 使用Future来异步设置共享数据库
-  ref.onDispose(() {
-    // DatabaseService 管理数据库生命周期,这里不需要关闭
-  });
-
-  // 设置共享数据库实例
-  dbService.database.then((db) {
-    repository.setSharedDatabase(db);
-  });
-
-  return repository;
-});
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+ICharacterRepository characterRepository(CharacterRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return CharacterRepository(dbConnection: dbConnection);
+}
 
 /// CharacterRelationRepository Provider
 ///
-/// 依赖 DatabaseService,自动共享数据库实例
-final characterRelationRepositoryProvider =
-    Provider<CharacterRelationRepository>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  final repository = CharacterRelationRepository();
-
-  // 设置共享的数据库实例
-  ref.onDispose(() {
-    // DatabaseService 管理数据库生命周期,这里不需要关闭
-  });
-
-  dbService.database.then((db) {
-    repository.setSharedDatabase(db);
-  });
-
-  return repository;
-});
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+ICharacterRelationRepository characterRelationRepository(
+  CharacterRelationRepositoryRef ref,
+) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return CharacterRelationRepository(dbConnection: dbConnection);
+}
 
 /// IllustrationRepository Provider
-final illustrationRepositoryProvider = Provider<IllustrationRepository>((ref) {
-  return IllustrationRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+IIllustrationRepository illustrationRepository(IllustrationRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return IllustrationRepository(dbConnection: dbConnection);
+}
 
 /// OutlineRepository Provider
-final outlineRepositoryProvider = Provider<OutlineRepository>((ref) {
-  return OutlineRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+IOutlineRepository outlineRepository(OutlineRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return OutlineRepository(dbConnection: dbConnection);
+}
 
 /// ChatSceneRepository Provider
-final chatSceneRepositoryProvider = Provider<ChatSceneRepository>((ref) {
-  return ChatSceneRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+IChatSceneRepository chatSceneRepository(ChatSceneRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return ChatSceneRepository(dbConnection: dbConnection);
+}
 
 /// BookshelfRepository Provider
-final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
-  return BookshelfRepository();
-});
+///
+/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+@riverpod
+IBookshelfRepository bookshelfRepository(BookshelfRepositoryRef ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return BookshelfRepository(dbConnection: dbConnection);
+}

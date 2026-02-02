@@ -21,6 +21,8 @@ import '../repositories/illustration_repository.dart';
 import '../repositories/outline_repository.dart';
 import '../repositories/chat_scene_repository.dart';
 import '../repositories/bookshelf_repository.dart';
+import '../core/database/database_connection.dart';
+import '../core/interfaces/i_database_connection.dart';
 
 /// 本地数据库服务 - Repository 模式门面类
 ///
@@ -44,42 +46,14 @@ import '../repositories/bookshelf_repository.dart';
 /// - 协调各个 Repository 的数据库实例
 /// - 处理数据库迁移
 ///
-/// ## 数据库表结构说明
+/// @Deprecated 新代码应该直接使用 Repository Providers:
+/// - 使用 `ref.watch(novelRepositoryProvider)` 替代 `databaseService.novelRepository`
+/// - 使用 `ref.watch(chapterRepositoryProvider)` 替代 `databaseService.chapterRepository`
+/// - 使用 `ref.watch(characterRepositoryProvider)` 替代 `databaseService.characterRepository`
 ///
-/// ### 物理表
-/// - `bookshelf`: 存储小说元数据和阅读进度（历史遗留命名，实际是小说表）
-/// - `chapter_cache`: 章节内容缓存
-/// - `novel_chapters`: 章节列表元数据
-/// - `bookshelves`: 书架分类表（注意复数形式，与Bookshelf模型对应）
-/// - `novel_bookshelves`: 小说与书架的多对多关联表
-/// - `characters`: 角色信息表
-/// - `character_relationships`: 角色关系表
-/// - `scene_illustrations`: 场景插图表
-/// - `outlines`: 大纲表
-/// - `chat_scenes`: 聊天场景表
-///
-/// ### 逻辑视图
-/// - `novels`: bookshelf表的别名视图，提供更清晰的语义
-///
-/// ## 重要命名说明
-///
-/// 由于历史原因，存储小说数据的物理表名为 `bookshelf`，
-/// 这容易与 `Bookshelf` 模型（书架分类功能）混淆。
-///
-/// ### 混淆澄清
-/// - `Bookshelf` 模型: 书架分类功能（id, name, icon, color）
-/// - `bookshelf` 表: 物理表，存储的是小说数据（应该叫novels）
-/// - `novels` 视图: bookshelf表的别名，语义更清晰
-/// - `bookshelves` 表: 书架分类表（复数，与Bookshelf模型对应）
-///
-/// ### 推荐用法
-/// - **读取小说**: 优先使用 `novels` 视图或 `getNovels()` 方法
-/// - **修改数据**: 使用 `bookshelf` 物理表（视图不支持修改）
-/// - **新代码**: 使用语义化方法名（如 `getNovels()` 而非 `getBookshelf()`）
-///
-/// ## 迁移路径
-/// 未来可以考虑将 `bookshelf` 物理表重命名为 `novels`，
-/// 当前使用视图作为过渡方案，既保持数据兼容，又提供清晰语义。
+/// 此类保留用于向后兼容，将在未来版本中移除。
+@Deprecated(
+    'Use individual Repository Providers instead. See lib/core/providers/database_providers.dart')
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
@@ -117,34 +91,67 @@ class DatabaseService {
   late final ChatSceneRepository _chatSceneRepository;
   late final BookshelfRepository _bookshelfRepository;
 
+  /// 数据库连接实例（用于初始化Repository）
+  IDatabaseConnection? _dbConnection;
+
   /// 初始化所有 Repository 实例
   void _initRepositories() {
-    _novelRepository = NovelRepository();
-    _chapterRepository = ChapterRepository();
-    _characterRepository = CharacterRepository();
-    _characterRelationRepository = CharacterRelationRepository();
-    _illustrationRepository = IllustrationRepository();
-    _outlineRepository = OutlineRepository();
-    _chatSceneRepository = ChatSceneRepository();
-    _bookshelfRepository = BookshelfRepository();
+    _dbConnection = DatabaseConnection();
+    _novelRepository = NovelRepository(dbConnection: _dbConnection!);
+    _chapterRepository = ChapterRepository(dbConnection: _dbConnection!);
+    _characterRepository = CharacterRepository(dbConnection: _dbConnection!);
+    _characterRelationRepository =
+        CharacterRelationRepository(dbConnection: _dbConnection!);
+    _illustrationRepository =
+        IllustrationRepository(dbConnection: _dbConnection!);
+    _outlineRepository = OutlineRepository(dbConnection: _dbConnection!);
+    _chatSceneRepository = ChatSceneRepository(dbConnection: _dbConnection!);
+    _bookshelfRepository = BookshelfRepository(dbConnection: _dbConnection!);
   }
 
   /// 共享数据库实例给所有 Repository
+  /// @Deprecated: 新架构不再使用 setSharedDatabase，Repository 通过构造函数注入 DatabaseConnection
   Future<void> _shareDatabaseWithRepositories() async {
-    final db = await database;
-
-    // 将数据库实例传递给各个 Repository
-    _novelRepository.setSharedDatabase(db);
-    _chapterRepository.setSharedDatabase(db);
-    _characterRepository.setSharedDatabase(db);
-    _characterRelationRepository.setSharedDatabase(db);
-    _illustrationRepository.setSharedDatabase(db);
-    _outlineRepository.setSharedDatabase(db);
-    _chatSceneRepository.setSharedDatabase(db);
-    _bookshelfRepository.setSharedDatabase(db);
+    // 暂时禁用，等待Repository迁移到新架构
+    // final db = await database;
+    // _novelRepository.setSharedDatabase(db);
+    // _chapterRepository.setSharedDatabase(db);
+    // _characterRepository.setSharedDatabase(db);
+    // _characterRelationRepository.setSharedDatabase(db);
+    // _illustrationRepository.setSharedDatabase(db);
+    // _outlineRepository.setSharedDatabase(db);
+    // _chatSceneRepository.setSharedDatabase(db);
+    // _bookshelfRepository.setSharedDatabase(db);
   }
 
   bool get isWebPlatform => kIsWeb;
+
+  // ==================== Repository Getters ====================
+
+  /// 获取 NovelRepository 实例
+  NovelRepository get novelRepository => _novelRepository;
+
+  /// 获取 ChapterRepository 实例
+  ChapterRepository get chapterRepository => _chapterRepository;
+
+  /// 获取 CharacterRepository 实例
+  CharacterRepository get characterRepository => _characterRepository;
+
+  /// 获取 CharacterRelationRepository 实例
+  CharacterRelationRepository get characterRelationRepository =>
+      _characterRelationRepository;
+
+  /// 获取 IllustrationRepository 实例
+  IllustrationRepository get illustrationRepository => _illustrationRepository;
+
+  /// 获取 OutlineRepository 实例
+  OutlineRepository get outlineRepository => _outlineRepository;
+
+  /// 获取 ChatSceneRepository 实例
+  ChatSceneRepository get chatSceneRepository => _chatSceneRepository;
+
+  /// 获取 BookshelfRepository 实例
+  BookshelfRepository get bookshelfRepository => _bookshelfRepository;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -1271,8 +1278,8 @@ class DatabaseService {
   /// 批量更新或插入关系（用于AI伴读）
   Future<int> batchUpdateOrInsertRelationships(
           String novelUrl, List<AICompanionRelation> aiRelations) =>
-      _characterRepository.batchUpdateOrInsertRelationships(
-          novelUrl, aiRelations);
+      _characterRelationRepository.batchUpdateOrInsertRelationships(
+          novelUrl, aiRelations, _characterRepository.getCharacters);
 
   // ========== 场景插图操作 (委托给 IllustrationRepository) ==========
 

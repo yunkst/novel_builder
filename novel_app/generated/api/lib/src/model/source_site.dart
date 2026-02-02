@@ -11,12 +11,12 @@ part 'source_site.g.dart';
 /// Source site information schema.
 ///
 /// Properties:
-/// * [id] 
-/// * [name] 
-/// * [baseUrl] 
-/// * [description] 
-/// * [enabled] 
-/// * [searchEnabled] 
+/// * [id]
+/// * [name]
+/// * [baseUrl]
+/// * [description]
+/// * [enabled]
+/// * [searchEnabled]
 @BuiltValue()
 abstract class SourceSite implements Built<SourceSite, SourceSiteBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -98,7 +98,9 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
     SourceSite object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -183,4 +185,3 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
     return result.build();
   }
 }
-

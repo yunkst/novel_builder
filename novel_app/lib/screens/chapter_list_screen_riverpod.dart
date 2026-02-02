@@ -73,7 +73,8 @@ class _ChapterListScreenRiverpodState
           data: (update) {
             if (update.chapterUrl != null) {
               // 更新特定章节的缓存状态
-              ref.read(chapterListProvider(widget.novel).notifier)
+              ref
+                  .read(chapterListProvider(widget.novel).notifier)
                   .updateChapterCacheStatus(update.chapterUrl!, true);
             }
           },
@@ -270,7 +271,9 @@ class _ChapterListScreenRiverpodState
             value: 'toggle_bookmark',
             child: Row(
               children: [
-                Icon(state.isInBookshelf ? Icons.bookmark : Icons.bookmark_border),
+                Icon(state.isInBookshelf
+                    ? Icons.bookmark
+                    : Icons.bookmark_border),
                 const SizedBox(width: 8),
                 Text(state.isInBookshelf ? '移出书架' : '加入书架'),
               ],
@@ -355,9 +358,9 @@ class _ChapterListScreenRiverpodState
           isRead: chapter.isRead,
           isAccompanied: chapter.isAccompanied,
           onTap: () => _navigateToReader(chapter, state),
-          onLongPress: () =>
-              ref.read(chapterListProvider(widget.novel).notifier)
-                  .toggleReorderingMode(),
+          onLongPress: () => ref
+              .read(chapterListProvider(widget.novel).notifier)
+              .toggleReorderingMode(),
           onInsert: () => _showInsertChapterDialog(index),
           onDelete: chapter.isUserInserted
               ? () => _showDeleteChapterDialog(chapter, index)
@@ -467,8 +470,7 @@ class _ChapterListScreenRiverpodState
       await notifier.toggleBookshelf();
       if (mounted) {
         final newState = ref.read(chapterListProvider(widget.novel));
-        ToastUtils.show(
-            newState.isInBookshelf ? '已添加到书架' : '已从书架移除');
+        ToastUtils.show(newState.isInBookshelf ? '已添加到书架' : '已从书架移除');
       }
     } catch (e) {
       if (mounted) {
@@ -533,7 +535,8 @@ class _ChapterListScreenRiverpodState
   }
 
   /// 导航到阅读页面
-  Future<void> _navigateToReader(Chapter chapter, ChapterListState state) async {
+  Future<void> _navigateToReader(
+      Chapter chapter, ChapterListState state) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -547,7 +550,9 @@ class _ChapterListScreenRiverpodState
 
     // 返回时重新加载上次阅读位置并跳转
     if (mounted) {
-      await ref.read(chapterListProvider(widget.novel).notifier).reloadLastReadChapter();
+      await ref
+          .read(chapterListProvider(widget.novel).notifier)
+          .reloadLastReadChapter();
       // 滚动到上次阅读位置
       _scrollToLastReadChapter();
     }
@@ -572,9 +577,8 @@ class _ChapterListScreenRiverpodState
 
             // 获取可视区域高度
             final viewportHeight = _scrollController.position.viewportDimension;
-            final adjustedOffset =
-                (targetOffset - viewportHeight * 0.25)
-                    .clamp(0.0, _scrollController.position.maxScrollExtent);
+            final adjustedOffset = (targetOffset - viewportHeight * 0.25)
+                .clamp(0.0, _scrollController.position.maxScrollExtent);
 
             _scrollController.animateTo(
               adjustedOffset,
@@ -788,10 +792,10 @@ class _ChapterListScreenRiverpodState
               Navigator.pop(context);
               await _deleteChapter(chapter);
             },
-            child: const Text('删除'),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
+            child: const Text('删除'),
           ),
         ],
       ),

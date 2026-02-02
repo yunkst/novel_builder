@@ -1,35 +1,19 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' show join;
 import '../models/novel.dart';
 import '../models/ai_accompaniment_settings.dart';
 import '../services/logger_service.dart';
+import '../core/interfaces/repositories/i_novel_repository.dart';
 import 'base_repository.dart';
 
 /// 小说数据仓库
 ///
 /// 负责小说元数据、阅读进度和AI伴读设置的数据库操作
-class NovelRepository extends BaseRepository {
-  Database? _sharedDatabase;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (_sharedDatabase != null) return _sharedDatabase!;
-    if (isWebPlatform) {
-      throw Exception('Database is not supported on web platform');
-    }
-
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'novel_reader.db');
-
-    _sharedDatabase = await openDatabase(
-      path,
-      version: 21,
-    );
-
-    return _sharedDatabase!;
-  }
+class NovelRepository extends BaseRepository implements INovelRepository {
+  /// 构造函数 - 接受数据库连接实例
+  NovelRepository({required super.dbConnection});
 
   /// 添加小说到书架
+  @override
   Future<int> addToBookshelf(Novel novel) async {
     try {
       final db = await database;
@@ -66,6 +50,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 从书架移除小说
+  @override
   Future<int> removeFromBookshelf(String novelUrl) async {
     try {
       final db = await database;
@@ -94,6 +79,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 获取所有小说
+  @override
   Future<List<Novel>> getNovels() async {
     if (isWebPlatform) {
       return [];
@@ -119,6 +105,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 检查小说是否在书架中
+  @override
   Future<bool> isInBookshelf(String novelUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -130,6 +117,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 更新最后阅读章节
+  @override
   Future<int> updateLastReadChapter(String novelUrl, int chapterIndex) async {
     final db = await database;
     return await db.update(
@@ -144,6 +132,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 更新小说背景设定
+  @override
   Future<int> updateBackgroundSetting(
       String novelUrl, String? backgroundSetting) async {
     if (isWebPlatform) {
@@ -160,6 +149,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 获取小说背景设定
+  @override
   Future<String?> getBackgroundSetting(String novelUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -176,6 +166,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 获取上次阅读的章节索引
+  @override
   Future<int> getLastReadChapter(String novelUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -192,6 +183,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 获取小说的AI伴读设置
+  @override
   Future<AiAccompanimentSettings> getAiAccompanimentSettings(
       String novelUrl) async {
     if (isWebPlatform) {
@@ -218,6 +210,7 @@ class NovelRepository extends BaseRepository {
   }
 
   /// 更新小说的AI伴读设置
+  @override
   Future<int> updateAiAccompanimentSettings(
       String novelUrl, AiAccompanimentSettings settings) async {
     if (isWebPlatform) {

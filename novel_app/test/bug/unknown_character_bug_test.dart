@@ -50,10 +50,8 @@ void main() {
       ];
 
       // === 模拟关系筛选逻辑（实际代码中会这样筛选）===
-      final characterIds = chapterCharacters
-          .map((c) => c.id)
-          .whereType<int>()
-          .toSet();
+      final characterIds =
+          chapterCharacters.map((c) => c.id).whereType<int>().toSet();
 
       final chapterRelationships = allRelationships.where((rel) {
         return characterIds.contains(rel.sourceCharacterId) ||
@@ -63,12 +61,14 @@ void main() {
       print('=== 测试场景 ===');
       print('本章出现角色: ${chapterCharacters.map((c) => c.name).join(", ")}');
       print('涉及关系数量: ${chapterRelationships.length}');
-      print('关系详情: ${chapterRelationships.map((r) => "${r.sourceCharacterId} → ${r.relationshipType} → ${r.targetCharacterId}").join("\n")}');
+      print(
+          '关系详情: ${chapterRelationships.map((r) => "${r.sourceCharacterId} → ${r.relationshipType} → ${r.targetCharacterId}").join("\n")}');
 
       // === 问题出现 ===
       // 调用实际的格式化方法（使用修复后的过滤逻辑）
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       print('\n=== 构建的角色映射 ===');
@@ -124,10 +124,8 @@ void main() {
       // 本章两个角色都出现了
       final chapterCharacters = allCharacters;
 
-      final characterIds = chapterCharacters
-          .map((c) => c.id)
-          .whereType<int>()
-          .toSet();
+      final characterIds =
+          chapterCharacters.map((c) => c.id).whereType<int>().toSet();
 
       final chapterRelationships = allRelationships.where((rel) {
         return characterIds.contains(rel.sourceCharacterId) ||
@@ -135,7 +133,8 @@ void main() {
       }).toList();
 
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       // 使用修复后的过滤逻辑
@@ -188,10 +187,8 @@ void main() {
         allCharacters[1], // 师父
       ];
 
-      final characterIds = chapterCharacters
-          .map((c) => c.id)
-          .whereType<int>()
-          .toSet();
+      final characterIds =
+          chapterCharacters.map((c) => c.id).whereType<int>().toSet();
 
       final chapterRelationships = allRelationships.where((rel) {
         return characterIds.contains(rel.sourceCharacterId) ||
@@ -203,7 +200,8 @@ void main() {
       print('涉及关系数: ${chapterRelationships.length}');
 
       final Map<int, String> characterIdToName = {
-        for (var c in chapterCharacters) if (c.id != null) c.id!: c.name,
+        for (var c in chapterCharacters)
+          if (c.id != null) c.id!: c.name,
       };
 
       // 使用修复后的过滤逻辑

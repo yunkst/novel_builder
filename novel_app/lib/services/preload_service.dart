@@ -96,9 +96,10 @@ class PreloadService {
     }
 
     // 查找当前章节在过滤后列表中的索引
-    final currentChapterUrl = currentIndex >= 0 && currentIndex < chapterUrls.length
-        ? chapterUrls[currentIndex]
-        : null;
+    final currentChapterUrl =
+        currentIndex >= 0 && currentIndex < chapterUrls.length
+            ? chapterUrls[currentIndex]
+            : null;
     final filteredIndex = currentChapterUrl != null
         ? uncachedUrls.indexOf(currentChapterUrl)
         : -1;

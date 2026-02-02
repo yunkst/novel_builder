@@ -55,6 +55,10 @@ import '../../services/role_gallery_cache_service.dart';
 import '../../services/character_avatar_sync_service.dart';
 import '../../services/character_avatar_service.dart';
 import '../../services/chapter_search_service.dart';
+import '../../services/cache_search_service.dart';
+import '../../services/character_card_service.dart';
+import '../../services/character_extraction_service.dart';
+import '../../services/outline_service.dart';
 import '../../controllers/chapter_list/chapter_loader.dart';
 import '../../controllers/chapter_list/chapter_action_handler.dart';
 import '../../controllers/chapter_list/chapter_reorder_controller.dart';
@@ -394,7 +398,7 @@ ChapterReorderController chapterReorderController(
 /// - 图片 URL 处理
 ///
 /// **依赖**:
-/// - [illustrationRepositoryProvider] - 插图数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [apiServiceWrapperProvider] - API 服务
 ///
 /// **使用示例**:
@@ -408,12 +412,17 @@ ChapterReorderController chapterReorderController(
 /// - 插图生成是异步操作
 ///
 /// **相关 Providers**:
-/// - [illustrationRepositoryProvider] - 插图数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [apiServiceWrapperProvider] - API 服务
 @riverpod
 SceneIllustrationService sceneIllustrationService(
     SceneIllustrationServiceRef ref) {
-  return SceneIllustrationService();
+  final databaseService = ref.watch(databaseServiceProvider);
+  final apiService = ref.watch(apiServiceWrapperProvider);
+  return SceneIllustrationService(
+    databaseService: databaseService,
+    apiService: apiService,
+  );
 }
 
 /// RoleGalleryCacheService Provider
@@ -518,8 +527,7 @@ CharacterAvatarService characterAvatarService(CharacterAvatarServiceRef ref) {
 /// - 模糊搜索
 ///
 /// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [cacheSearchServiceProvider] - 缓存搜索
+/// - [databaseServiceProvider] - 数据库访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -532,9 +540,147 @@ CharacterAvatarService characterAvatarService(CharacterAvatarServiceRef ref) {
 /// - 搜索操作是异步的
 ///
 /// **相关 Providers**:
-/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [databaseServiceProvider] - 数据库访问
 /// - [cacheSearchServiceProvider] - 缓存搜索
 @riverpod
 ChapterSearchService chapterSearchService(ChapterSearchServiceRef ref) {
-  return ChapterSearchService();
+  final databaseService = ref.watch(databaseServiceProvider);
+  return ChapterSearchService(databaseService: databaseService);
+}
+
+/// CacheSearchService Provider
+///
+/// 提供缓存搜索服务实例，支持缓存内容的搜索和分页。
+///
+/// **功能**:
+/// - 缓存内容搜索
+/// - 搜索结果分页
+/// - 搜索建议
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final cacheSearch = ref.watch(cacheSearchServiceProvider);
+/// final results = await cacheSearch.searchInCache(keyword: '关键词');
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 搜索操作是异步的
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterSearchServiceProvider] - 章节搜索
+@riverpod
+CacheSearchService cacheSearchService(CacheSearchServiceRef ref) {
+  final databaseService = ref.watch(databaseServiceProvider);
+  return CacheSearchService(databaseService: databaseService);
+}
+
+/// CharacterCardService Provider
+///
+/// 提供角色卡片服务实例，处理角色卡片的更新和管理。
+///
+/// **功能**:
+/// - 角色卡片更新
+/// - AI生成角色信息
+/// - 角色信息保存
+///
+/// **依赖**:
+/// - [difyServiceProvider] - Dify AI服务
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final cardService = ref.watch(characterCardServiceProvider);
+/// await cardService.updateCharacterCards(
+///   novel: novel,
+///   chapterContent: content,
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - AI生成是异步操作
+///
+/// **相关 Providers**:
+/// - [difyServiceProvider] - Dify AI服务
+/// - [databaseServiceProvider] - 数据库访问
+@riverpod
+CharacterCardService characterCardService(CharacterCardServiceRef ref) {
+  final difyService = ref.watch(difyServiceProvider);
+  final databaseService = ref.watch(databaseServiceProvider);
+  return CharacterCardService(
+    difyService: difyService,
+    databaseService: databaseService,
+  );
+}
+
+/// CharacterExtractionService Provider
+///
+/// 提供角色提取服务实例，从章节内容中提取角色相关信息。
+///
+/// **功能**:
+/// - 角色名字搜索
+/// - 章节内容匹配
+/// - 上下文提取
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final extractionService = ref.watch(characterExtractionServiceProvider);
+/// final matches = await extractionService.searchChaptersByName(
+///   novelUrl: novelUrl,
+///   names: ['张三', '李四'],
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 搜索操作是异步的
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+@Riverpod(keepAlive: true)
+CharacterExtractionService characterExtractionService(
+    CharacterExtractionServiceRef ref) {
+  return CharacterExtractionService();
+}
+
+/// OutlineService Provider
+///
+/// 提供大纲服务实例，处理小说大纲的管理和生成。
+///
+/// **功能**:
+/// - 大纲CRUD操作
+/// - 大纲AI生成
+/// - 章节细纲生成
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final outlineService = ref.watch(outlineServiceProvider);
+/// await outlineService.saveOutline(
+///   novelUrl: novelUrl,
+///   title: title,
+///   content: content,
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - AI生成是异步操作
+///
+/// **相关 Providers**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [difyServiceProvider] - Dify AI服务
+@riverpod
+OutlineService outlineService(OutlineServiceRef ref) {
+  return OutlineService();
 }

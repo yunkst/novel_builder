@@ -22,7 +22,6 @@ void main() {
   sqfliteFfiInit();
 
   group('数据库隔离方案实验', () {
-
     // ==================== 方案1: DatabaseService单例 ====================
     group('方案1-DatabaseService单例', () {
       late DatabaseService dbService;
@@ -34,7 +33,8 @@ void main() {
       test('测试1-1: 连续运行第1次 - 单例模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '测试小说1',
           author: '测试作者',
           coverUrl: null,
@@ -55,7 +55,8 @@ void main() {
       test('测试1-2: 连续运行第2次 - 单例模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '测试小说2',
           author: '测试作者',
           coverUrl: null,
@@ -76,7 +77,8 @@ void main() {
       test('测试1-3: 连续运行第3次 - 单例模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '测试小说3',
           author: '测试作者',
           coverUrl: null,
@@ -111,7 +113,8 @@ void main() {
       test('测试2-1: 连续运行第1次 - 包装类模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-wrapper1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-wrapper1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '包装类测试1',
           author: '测试作者',
           coverUrl: null,
@@ -123,7 +126,8 @@ void main() {
         await testBase.databaseService.addToBookshelf(novel);
 
         // 验证
-        final isInBookshelf = await testBase.databaseService.isInBookshelf(novel.url);
+        final isInBookshelf =
+            await testBase.databaseService.isInBookshelf(novel.url);
         expect(isInBookshelf, isTrue, reason: '包装类第1次运行: 应该能成功添加小说');
 
         print('✅ 方案2-测试1成功: 包装类模式第1次运行通过');
@@ -132,7 +136,8 @@ void main() {
       test('测试2-2: 连续运行第2次 - 包装类模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-wrapper2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-wrapper2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '包装类测试2',
           author: '测试作者',
           coverUrl: null,
@@ -144,7 +149,8 @@ void main() {
         await testBase.databaseService.addToBookshelf(novel);
 
         // 验证
-        final isInBookshelf = await testBase.databaseService.isInBookshelf(novel.url);
+        final isInBookshelf =
+            await testBase.databaseService.isInBookshelf(novel.url);
         expect(isInBookshelf, isTrue, reason: '包装类第2次运行: 应该能成功添加小说');
 
         print('✅ 方案2-测试2成功: 包装类模式第2次运行通过');
@@ -153,7 +159,8 @@ void main() {
       test('测试2-3: 连续运行第3次 - 包装类模式', () async {
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-wrapper3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-wrapper3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '包装类测试3',
           author: '测试作者',
           coverUrl: null,
@@ -165,7 +172,8 @@ void main() {
         await testBase.databaseService.addToBookshelf(novel);
 
         // 验证
-        final isInBookshelf = await testBase.databaseService.isInBookshelf(novel.url);
+        final isInBookshelf =
+            await testBase.databaseService.isInBookshelf(novel.url);
         expect(isInBookshelf, isTrue, reason: '包装类第3次运行: 应该能成功添加小说');
 
         print('✅ 方案2-测试3成功: 包装类模式第3次运行通过');
@@ -174,7 +182,6 @@ void main() {
 
     // ==================== 方案3: 纯内存数据库 ====================
     group('方案3-纯内存数据库', () {
-
       test('测试3-1: 连续运行第1次 - 纯内存模式', () async {
         // 创建独立的内存数据库
         final db = await databaseFactoryFfi.openDatabase(
@@ -203,7 +210,8 @@ void main() {
         final novel = {
           'title': '纯内存测试1',
           'author': '测试作者',
-          'url': 'https://pure-memory1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          'url':
+              'https://pure-memory1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           'coverUrl': null,
           'description': '测试描述',
           'backgroundSetting': '测试背景',
@@ -255,7 +263,8 @@ void main() {
         final novel = {
           'title': '纯内存测试2',
           'author': '测试作者',
-          'url': 'https://pure-memory2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          'url':
+              'https://pure-memory2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           'coverUrl': null,
           'description': '测试描述',
           'backgroundSetting': '测试背景',
@@ -307,7 +316,8 @@ void main() {
         final novel = {
           'title': '纯内存测试3',
           'author': '测试作者',
-          'url': 'https://pure-memory3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          'url':
+              'https://pure-memory3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           'coverUrl': null,
           'description': '测试描述',
           'backgroundSetting': '测试背景',
@@ -334,7 +344,6 @@ void main() {
 
     // ==================== 方案4: 混合方案 (独立数据库实例) ====================
     group('方案4-独立数据库实例', () {
-
       test('测试4-1: 连续运行第1次 - 独立实例模式', () async {
         // 创建独立的内存数据库
         final testDatabase = await createInMemoryDatabase();
@@ -344,7 +353,8 @@ void main() {
 
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-instance1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-instance1.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '独立实例测试1',
           author: '测试作者',
           coverUrl: null,
@@ -374,7 +384,8 @@ void main() {
 
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-instance2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-instance2.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '独立实例测试2',
           author: '测试作者',
           coverUrl: null,
@@ -404,7 +415,8 @@ void main() {
 
         // 创建测试数据
         final novel = Novel(
-          url: 'https://test-instance3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://test-instance3.com/novel/${DateTime.now().millisecondsSinceEpoch}',
           title: '独立实例测试3',
           author: '测试作者',
           coverUrl: null,
@@ -425,7 +437,6 @@ void main() {
         print('✅ 方案4-测试3成功: 独立实例模式第3次运行通过');
       });
     });
-
   });
 }
 
@@ -444,7 +455,8 @@ class _TestDatabaseService implements DatabaseService {
     final map = novel.toMap();
     map.remove('isInBookshelf');
     map['addedAt'] = DateTime.now().millisecondsSinceEpoch;
-    final id = await db.insert('bookshelf', map, conflictAlgorithm: ConflictAlgorithm.replace);
+    final id = await db.insert('bookshelf', map,
+        conflictAlgorithm: ConflictAlgorithm.replace);
     return id;
   }
 

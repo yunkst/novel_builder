@@ -6,7 +6,6 @@ import '../models/character.dart';
 import '../models/character_update.dart';
 import '../models/outline.dart';
 import '../services/character_extraction_service.dart';
-import '../services/dify_service.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/character_input_dialog.dart';

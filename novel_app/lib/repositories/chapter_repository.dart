@@ -1,33 +1,16 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' show join;
 import '../models/chapter.dart';
 import '../services/invalid_markup_cleaner.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
 
 /// 章节数据仓库
 ///
 /// 负责章节内容缓存、章节列表管理和用户自定义章节的数据库操作
-class ChapterRepository extends BaseRepository {
-  Database? _sharedDatabase;
-
-  @override
-  Future<Database> initDatabase() async {
-    if (_sharedDatabase != null) return _sharedDatabase!;
-    if (isWebPlatform) {
-      throw Exception('Database is not supported on web platform');
-    }
-
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'novel_reader.db');
-
-    _sharedDatabase = await openDatabase(
-      path,
-      version: 21,
-    );
-
-    return _sharedDatabase!;
-  }
+class ChapterRepository extends BaseRepository implements IChapterRepository {
+  /// 构造函数 - 通过依赖注入接收数据库连接
+  ChapterRepository({required super.dbConnection});
 
   // 内存状态管理
   final Set<String> _cachedInMemory = <String>{};
@@ -35,6 +18,7 @@ class ChapterRepository extends BaseRepository {
   static const int _maxMemoryCacheSize = 1000;
 
   /// 检查章节是否已缓存（内存优先）
+  @override
   Future<bool> isChapterCached(String chapterUrl) async {
     if (_cachedInMemory.contains(chapterUrl)) {
       return true;
@@ -50,6 +34,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 批量检查缓存状态，返回未缓存的章节URL列表
+  @override
   Future<List<String>> filterUncachedChapters(List<String> chapterUrls) async {
     final uncached = <String>[];
 
@@ -63,6 +48,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 批量查询章节缓存状态
+  @override
   Future<Map<String, bool>> getChaptersCacheStatus(
       List<String> chapterUrls) async {
     if (chapterUrls.isEmpty) return {};
@@ -102,16 +88,19 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 标记章节正在预加载
+  @override
   void markAsPreloading(String chapterUrl) {
     _preloading.add(chapterUrl);
   }
 
   /// 检查章节是否正在预加载
+  @override
   bool isPreloading(String chapterUrl) {
     return _preloading.contains(chapterUrl);
   }
 
   /// 清理内存状态
+  @override
   void clearMemoryState() {
     _cachedInMemory.clear();
     _preloading.clear();
@@ -123,6 +112,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 缓存章节内容
+  @override
   Future<int> cacheChapter(
       String novelUrl, Chapter chapter, String content) async {
     try {
@@ -157,6 +147,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 更新章节内容
+  @override
   Future<int> updateChapterContent(String chapterUrl, String content) async {
     final db = await database;
     return await db.update(
@@ -171,6 +162,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 删除章节缓存
+  @override
   Future<int> deleteChapterCache(String chapterUrl) async {
     final db = await database;
     return await db.delete(
@@ -181,6 +173,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 获取缓存的章节内容
+  @override
   Future<String?> getCachedChapter(String chapterUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -199,6 +192,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 获取小说的所有缓存章节
+  @override
   Future<List<Chapter>> getCachedChapters(String novelUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -220,6 +214,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 删除小说的所有缓存章节
+  @override
   Future<int> deleteCachedChapters(String novelUrl) async {
     final db = await database;
     return await db.delete(
@@ -230,6 +225,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 检查章节是否已伴读
+  @override
   Future<bool> isChapterAccompanied(String novelUrl, String chapterUrl) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -246,6 +242,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 标记章节为已伴读
+  @override
   Future<void> markChapterAsAccompanied(
       String novelUrl, String chapterUrl) async {
     final db = await database;
@@ -263,6 +260,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 重置章节伴读标记
+  @override
   Future<void> resetChapterAccompaniedFlag(
       String novelUrl, String chapterUrl) async {
     final db = await database;
@@ -280,6 +278,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 缓存小说章节列表
+  @override
   Future<void> cacheNovelChapters(
       String novelUrl, List<Chapter> chapters) async {
     final db = await database;
@@ -298,6 +297,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 获取缓存的章节列表
+  @override
   Future<List<Chapter>> getCachedNovelChapters(String novelUrl) async {
     final db = await database;
 
@@ -356,6 +356,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 创建用户自定义章节
+  @override
   Future<int> createCustomChapter(String novelUrl, String title, String content,
       [int? index]) async {
     final db = await database;
@@ -406,6 +407,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 更新用户创建的章节内容
+  @override
   Future<void> updateCustomChapter(
       String chapterUrl, String title, String content) async {
     final db = await database;
@@ -429,6 +431,7 @@ class ChapterRepository extends BaseRepository {
   }
 
   /// 删除用户创建的章节
+  @override
   Future<void> deleteCustomChapter(String chapterUrl) async {
     final db = await database;
 
@@ -461,6 +464,7 @@ class ChapterRepository extends BaseRepository {
   ///
   /// [novelUrl] 小说URL
   /// [chapterUrl] 章节URL
+  @override
   Future<void> markChapterAsRead(String novelUrl, String chapterUrl) async {
     final db = await database;
 
@@ -476,6 +480,7 @@ class ChapterRepository extends BaseRepository {
   ///
   /// [novelUrl] 小说URL
   /// 返回已缓存的章节数量
+  @override
   Future<int> getCachedChaptersCount(String novelUrl) async {
     final db = await database;
 
