@@ -12,6 +12,7 @@ import '../../models/ai_accompaniment_settings.dart';
 import '../../services/preload_progress_update.dart';
 import '../../services/logger_service.dart';
 import 'service_providers.dart';
+import 'repository_providers.dart';
 import 'database_providers.dart';
 import 'package:flutter/foundation.dart';
 
@@ -253,8 +254,8 @@ class ChapterList extends _$ChapterList {
 
   /// 检查书架状态
   Future<void> _checkBookshelfStatus() async {
-    final databaseService = ref.read(databaseServiceProvider);
-    final isInBookshelf = await databaseService.isInBookshelf(novel.url);
+    final novelRepository = ref.read(novelRepositoryProvider);
+    final isInBookshelf = await novelRepository.isInBookshelf(novel.url);
     state = state.copyWith(isInBookshelf: isInBookshelf);
   }
 
@@ -271,10 +272,10 @@ class ChapterList extends _$ChapterList {
 
   /// 加载AI伴读设置
   Future<void> _loadAiSettings() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final novelRepository = ref.read(novelRepositoryProvider);
     try {
       final settings =
-          await databaseService.getAiAccompanimentSettings(novel.url);
+          await novelRepository.getAiAccompanimentSettings(novel.url);
       state = state.copyWith(aiSettings: settings);
     } catch (e) {
       debugPrint('加载AI伴读设置失败: $e');
@@ -311,12 +312,12 @@ class ChapterList extends _$ChapterList {
 
   /// 切换书架状态
   Future<void> toggleBookshelf() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final novelRepository = ref.read(novelRepositoryProvider);
 
     if (state.isInBookshelf) {
-      await databaseService.removeFromBookshelf(novel.url);
+      await novelRepository.removeFromBookshelf(novel.url);
     } else {
-      await databaseService.addToBookshelf(novel);
+      await novelRepository.addToBookshelf(novel);
     }
 
     await _checkBookshelfStatus();
@@ -324,6 +325,7 @@ class ChapterList extends _$ChapterList {
 
   /// 清除缓存
   Future<void> clearCache() async {
+    // clearNovelCache 涉及多个表的清理操作，暂时保留使用 DatabaseService
     final databaseService = ref.read(databaseServiceProvider);
     try {
       await databaseService.clearNovelCache(novel.url);

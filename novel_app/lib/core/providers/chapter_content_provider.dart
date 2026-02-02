@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import 'service_providers.dart';
-import 'database_providers.dart';
+import 'repository_providers.dart';
 
 part 'chapter_content_provider.g.dart';
 
@@ -59,17 +59,17 @@ class ChapterContent extends _$ChapterContent {
 
     try {
       final apiService = ref.read(apiServiceWrapperProvider);
-      final databaseService = ref.read(databaseServiceProvider);
+      final chapterRepository = ref.read(chapterRepositoryProvider);
 
       String content;
 
       // 强制刷新时先删除缓存
       if (forceRefresh) {
-        await databaseService.deleteChapterCache(chapter.url);
+        await chapterRepository.deleteChapterCache(chapter.url);
       }
 
       // 尝试从缓存获取
-      final cachedContent = await databaseService.getCachedChapter(chapter.url);
+      final cachedContent = await chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
       } else {
@@ -81,7 +81,7 @@ class ChapterContent extends _$ChapterContent {
 
         // 验证内容并缓存
         if (content.isNotEmpty && content.length > 50) {
-          await databaseService.cacheChapter(
+          await chapterRepository.cacheChapter(
             novel.url,
             chapter,
             content,
@@ -95,7 +95,7 @@ class ChapterContent extends _$ChapterContent {
       state = state.copyWith(content: content, isLoading: false);
 
       // 标记章节为已读
-      await databaseService.markChapterAsRead(
+      await chapterRepository.markChapterAsRead(
         novel.url,
         chapter.url,
       );
