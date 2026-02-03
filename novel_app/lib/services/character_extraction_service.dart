@@ -1,6 +1,5 @@
 import '../models/chapter.dart';
 import 'logger_service.dart';
-import '../core/providers/database_providers.dart';
 
 /// 章节匹配结果
 class ChapterMatch {

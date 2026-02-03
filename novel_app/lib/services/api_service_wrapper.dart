@@ -19,11 +19,63 @@ import 'preferences_service.dart';
 
 /// API 服务封装层
 ///
-/// 这个类封装了自动生成的 API 客户端，提供：
-/// 1. 统一的配置管理（host, token）
-/// 2. 错误处理
-/// 3. 简化的调用接口
-/// 4. 类型安全的模型转换（通过扩展方法）
+/// 本类是自动生成的 OpenAPI 客户端（novel_api）的包装器，提供统一的接口和配置管理。
+///
+/// ## 核心职责
+/// 1. **配置管理**：统一管理后端 Host 和 API Token
+/// 2. **错误处理**：网络异常的统一处理和重试机制
+/// 3. **连接管理**：自动检测连接健康状态，必要时重新初始化
+/// 4. **类型转换**：通过扩展方法将 API 模型转换为本地模型
+/// 5. **请求去重**：通过 ChapterManager 管理并发请求，避免重复获取
+///
+/// ## 架构设计
+/// - 单例模式：确保全局唯一的 API 客户端实例
+/// - 自动重试：失败请求最多重试 2 次，支持指数退避
+/// - 连接池优化：限制最大并发连接数，避免资源耗尽
+/// - 健康检查：定期检测连接状态，自动恢复不健康连接
+///
+/// ## API 分组
+/// ### 小说相关
+/// - `searchNovels()` - 搜索小说
+/// - `getChapters()` - 获取章节列表
+/// - `getChapterContent()` - 获取章节内容
+/// - `getSourceSites()` - 获取源站列表
+///
+/// ### 角色卡相关
+/// - `generateRoleCardImages()` - 生成角色卡图片
+/// - `getRoleGallery()` - 获取角色图集
+/// - `deleteRoleImage()` - 删除角色图片
+/// - `generateMoreImages()` - 生成更多相似图片
+///
+/// ### 场景插图相关
+/// - `createSceneIllustration()` - 创建场景插图任务
+/// - `getSceneIllustrationGallery()` - 获取场景插图图集
+/// - `deleteSceneIllustrationImage()` - 删除场景插图图片
+/// - `regenerateSceneIllustration()` / `regenerateSceneIllustrationImages()` - 重新生成场景插图
+///
+/// ### 图生视频相关
+/// - `generateVideoFromImage()` - 生成图生视频
+/// - `checkVideoStatus()` - 检查视频状态
+/// - `getVideoFileUrl()` - 获取视频文件 URL
+///
+/// ### 模型管理相关
+/// - `getModels()` - 获取所有可用模型列表
+/// - `getModelTitles()` - 获取指定类型的模型标题列表
+///
+/// ### 备份相关
+/// - `uploadBackup()` - 上传数据库备份
+///
+/// ## 使用示例
+/// ```dart
+/// // 1. 初始化（应用启动时调用一次）
+/// await ApiServiceWrapper().init();
+///
+/// // 2. 搜索小说
+/// final novels = await ApiServiceWrapper().searchNovels('关键字');
+///
+/// // 3. 获取章节内容（带自动去重）
+/// final content = await ApiServiceWrapper().getChapterContent(url);
+/// ```
 class ApiServiceWrapper {
   static const String _prefsHostKey = 'backend_host';
   static const String _prefsTokenKey = 'backend_token';
@@ -292,6 +344,10 @@ class ApiServiceWrapper {
     }
   }
 
+  // ========================================================================
+  // 配置管理
+  // ========================================================================
+
   /// 获取配置的 Host
   Future<String?> getHost() async {
     return await PreferencesService.instance.getString(_prefsHostKey);
@@ -313,7 +369,9 @@ class ApiServiceWrapper {
     await init();
   }
 
-  // ========== 业务方法 ==========
+  // ========================================================================
+  // 请求重试与错误处理
+  // ========================================================================
 
   /// 带自动重试的通用请求包装器
   Future<T> _withRetry<T>(
@@ -367,6 +425,10 @@ class ApiServiceWrapper {
 
     throw Exception('$operationName 重试失败');
   }
+
+  // ========================================================================
+  // 小说相关 API
+  // ========================================================================
 
   /// 搜索小说
   Future<List<local.Novel>> searchNovels(String keyword,
@@ -489,6 +551,10 @@ class ApiServiceWrapper {
     // 不再关闭Dio连接，保持单例连接可用
     // _dio.close(); // 已注释，避免关闭共享连接
   }
+
+  // ========================================================================
+  // 角色卡相关 API
+  // ========================================================================
 
   /// 生成人物卡图片
   Future<Map<String, dynamic>> generateRoleCardImages({
@@ -681,7 +747,9 @@ class ApiServiceWrapper {
   /// 获取 Dio 实例（用于构建图片URL）
   Dio get dio => _dio;
 
-  // ================= 场景插图相关API =================
+  // ========================================================================
+  // 场景插图相关 API
+  // ========================================================================
 
   /// 创建场景插图任务
   Future<Map<String, dynamic>> createSceneIllustration({
@@ -893,9 +961,9 @@ class ApiServiceWrapper {
     );
   }
 
-  // ============================================================================
-  // 图生视频功能
-  // ============================================================================
+  // ========================================================================
+  // 图生视频相关 API
+  // ========================================================================
 
   /// 生成图生视频
   Future<ImageToVideoResponse> generateVideoFromImage({
@@ -1039,6 +1107,10 @@ class ApiServiceWrapper {
     );
   }
 
+  // ========================================================================
+  // 模型管理相关 API
+  // ========================================================================
+
   /// 获取所有可用模型列表
   Future<ModelsResponse> getModels() async {
     return LogScope.capture(
@@ -1099,6 +1171,10 @@ class ApiServiceWrapper {
       throw _handleError(e);
     }
   }
+
+  // ========================================================================
+  // 备份相关 API
+  // ========================================================================
 
   /// 上传数据库备份
   ///

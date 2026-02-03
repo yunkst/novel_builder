@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/search_result.dart';
-import '../core/providers/database_providers.dart';
 
 /// 缓存内容搜索服务
 class CacheSearchService {

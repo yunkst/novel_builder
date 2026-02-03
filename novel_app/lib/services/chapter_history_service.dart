@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
-import '../core/di/api_service_provider.dart';
 
 /// ChapterHistoryService
 ///

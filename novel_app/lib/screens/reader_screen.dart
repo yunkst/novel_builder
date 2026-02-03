@@ -1,3 +1,29 @@
+/// Reader Screen - 阅读器主屏幕
+///
+/// 职责：
+/// - 章节内容加载和显示
+/// - AI伴读功能集成
+/// - 阅读进度管理
+/// - 用户交互处理
+/// - 章节导航控制
+///
+/// 架构：
+/// - 使用 ReaderContentController 处理内容加载
+/// - 使用 ReaderInteractionController 处理用户交互
+/// - 使用 AutoScrollMixin 处理自动滚动
+/// - 使用 IllustrationHandlerMixin 处理插图
+///
+/// 依赖：
+/// - ReaderContentController (lib/controllers/reader_content_controller.dart)
+/// - ReaderInteractionController (lib/controllers/reader_interaction_controller.dart)
+/// - AutoScrollMixin (lib/mixins/reader/auto_scroll_mixin.dart)
+/// - IllustrationHandlerMixin (lib/mixins/reader/illustration_handler_mixin.dart)
+///
+/// 状态管理：
+/// - 使用 Riverpod 管理全局设置（字体大小、滚动速度、编辑模式）
+/// - 使用 Controller 管理本地状态（内容、交互）
+
+library;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +89,8 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
+
+// ============ State Fields ============
 class _ReaderScreenState extends ConsumerState<ReaderScreen>
     with
         TickerProviderStateMixin,
@@ -246,6 +274,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     super.dispose();
   }
 
+
+// ============ Chapter Content Loading ============
   Future<void> _loadChapterContent(
       {bool resetScrollPosition = true, bool forceRefresh = false}) async {
     // 如果是强制刷新，重置伴读标记
@@ -314,6 +344,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   // 处理段落长按 - 显示操作菜单
+
+// ============ User Interaction Handlers ============
   void _handleLongPress(int index) {
     if (!_interactionController.shouldHandleLongPress(_isCloseupMode)) return;
 
@@ -474,6 +506,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 导航到指定章节（支持自动滚动状态保持）
   ///
   /// [targetChapter] 目标章节
+
+// ============ Chapter Navigation ============
   Future<void> _navigateToChapter(Chapter targetChapter) async {
     // 记录当前自动滚动状态
     final wasAutoScrolling = shouldAutoScroll;
@@ -544,6 +578,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // 刷新当前章节 - 删除本地缓存并重新获取最新内容
   // 注意：自动滚动相关方法已提取到 AutoScrollMixin
   // 注意：使用 startAutoScroll(), pauseAutoScroll(), stopAutoScroll(), toggleAutoScroll()
+
+// ============ Content Refresh ============
   Future<void> _refreshChapter() async {
     // 先显示确认对话框
     final shouldRefresh = await showDialog<bool>(
@@ -600,6 +636,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   // 更新角色卡功能（使用 CharacterCardService）
+
+// ============ Character Card Management ============
   Future<void> _updateCharacterCards() async {
     // 防重复点击检查
     if (_isUpdatingRoleCards) {
@@ -665,6 +703,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   /// 检查并自动触发AI伴读
+
+// ============ AI Companion ============
   Future<void> _checkAndAutoTriggerAICompanion() async {
     // 防抖检查
     if (_hasAutoTriggered || _isAutoCompanionRunning) {
@@ -1030,6 +1070,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   // 处理菜单动作
+
+// ============ Dialog Handlers ============
   void _handleMenuAction(String action) {
     switch (action) {
       case 'scroll_speed':
@@ -1059,9 +1101,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
   }
 
-  // 调整滚动速度
-  // 已弃用：直接通过滑块 onChanged 修改 _scrollSpeed
-
   // 显示滚动速度调整对话框
   void _showScrollSpeedDialog() {
     showDialog(
@@ -1080,8 +1119,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       ),
     );
   }
-
-  // 已弃用：特写输入逻辑已迁移到改写弹窗流程
 
   // ========== 辅助方法 ==========
 
@@ -1186,6 +1223,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   // 保存编辑后的章节内容
+
+// ============ Content Editing ============
   Future<void> _saveEditedContent() async {
     try {
       await _databaseService.updateChapterContent(
@@ -1628,6 +1667,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   /// 获取当前可见区域的第一段索引（基于滚动位置估算）
+
+// ============ TTS Reading ============
   int _getFirstVisibleParagraphIndex() {
     if (!_scrollController.hasClients) return 0;
 

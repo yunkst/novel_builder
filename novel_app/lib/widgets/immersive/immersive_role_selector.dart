@@ -6,7 +6,6 @@ import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/database_providers.dart';
-import '../../core/providers/services/cache_service_providers.dart';
 
 /// 沉浸体验角色选择器
 ///

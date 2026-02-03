@@ -23,9 +23,6 @@ class _DarkThemeColors {
 
   // 角色对话（深蓝色系）
   static const Color roleBubbleBackground = Color(0xFF1E3A5F);
-  // static const Color roleBubbleBorder = Color(0xFF3D5A80); // 未使用
-  // static const Color roleAvatarBorder = Color(0xFF3D5A80); // 未使用
-  // static const Color roleAvatarBackground = Color(0xFF1E3A5F); // 未使用
 
   // 用户消息（深绿色系）
   static const Color userBubbleBackground = Color(0xFF1F3D2F);
@@ -39,11 +36,39 @@ class _DarkThemeColors {
 
 /// 多角色聊天屏幕 (Riverpod版本)
 ///
-/// 功能：
-/// - 支持与多个角色同时对话
-/// - AI扮演所有角色进行互动
-/// - 流式显示旁白和角色对话
-/// - 历史记录管理
+/// 本页面实现了一个多角色对话系统，AI 会同时扮演多个角色进行互动对话。
+///
+/// ## 核心功能
+/// - **多角色支持**：一次对话可涉及多个角色，每个角色有独立的颜色标识
+/// - **流式响应**：实时显示 AI 生成的旁白和角色对话
+/// - **标签解析**：智能解析 `<旁白>`、`<角色名>` 等 XML 风格标签
+/// - **历史记录**：维护完整的对话历史，支持上下文关联
+/// - **用户参与**：用户可选择扮演某个角色，或作为旁观者
+///
+/// ## 标签格式
+/// AI 输出的流式数据使用以下标签格式：
+/// - `<旁白>内容</旁白>` - 旁白内容（灰色背景）
+/// - `<角色名>内容</角色名>` - 角色对话（彩色气泡）
+///
+/// 标签解析支持跨 chunk 的情况，例如标签开始和结束可能在不同的数据块中。
+///
+/// ## 消息类型
+/// - **用户动作**：用户输入的动作描述（蓝色气泡）
+/// - **用户对话**：用户输入的台词（绿色气泡）
+/// - **角色对话**：AI 生成的角色台词（彩色气泡）
+/// - **旁白**：AI 生成的旁白描述（灰色气泡）
+///
+/// ## 状态管理
+/// - 使用 Riverpod 管理服务依赖
+/// - 使用 StatefulWidget 管理页面状态
+/// - 使用 TagParserState 管理跨 chunk 的标签解析状态
+///
+/// ## 数据流
+/// 1. 用户输入动作/对话
+/// 2. 发送到 Dify 服务
+/// 3. 接收流式响应（SSE）
+/// 4. 解析标签并更新 UI
+/// 5. 保存到历史记录
 class MultiRoleChatScreen extends ConsumerStatefulWidget {
   final List<Character> characters; // 多个角色
   final String play; // 剧本内容
@@ -64,38 +89,58 @@ class MultiRoleChatScreen extends ConsumerStatefulWidget {
 }
 
 class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
-  // 消息列表
+  // ========================================================================
+  // 状态管理
+  // ========================================================================
+
+  /// 消息列表（包含用户消息和 AI 响应）
   List<ChatMessage> _messages = [];
 
-  // 生成状态
+  /// 是否正在生成 AI 响应
   bool _isGenerating = false;
 
-  // 解析状态
-  bool _inDialogue = false; // 是否在角色对话中
+  /// 是否在角色对话标签中（用于标签解析）
+  bool _inDialogue = false;
 
-  // 标签解析状态（用于跨chunk标签解析）
+  /// 标签解析状态（用于跨 chunk 标签解析）
   final TagParserState _tagParserState = TagParserState();
 
-  // AI响应累积（用于历史记录）
+  /// AI 响应累积（用于历史记录）
   String _currentAiResponse = '';
 
-  // 聊天历史
+  /// 聊天历史（用于发送给 AI 的上下文）
   final List<String> _chatHistory = [];
 
-  // 控制器
+  // ========================================================================
+  // 控制器和焦点
+  // ========================================================================
+
+  /// 动作输入控制器
   final TextEditingController _actionController = TextEditingController();
+
+  /// 对话输入控制器
   final TextEditingController _speechController = TextEditingController();
+
+  /// 滚动控制器
   final ScrollController _scrollController = ScrollController();
 
-  // FocusNode用于追踪输入框焦点
+  /// 动作输入焦点
   final FocusNode _actionFocusNode = FocusNode();
+
+  /// 对话输入焦点
   final FocusNode _speechFocusNode = FocusNode();
 
-  // 通过Provider获取服务实例
+  // ========================================================================
+  // 服务和颜色管理
+  // ========================================================================
+
+  /// Dify 服务实例（通过 Riverpod 获取）
   late DifyService _difyService;
+
+  /// 角色头像服务实例（通过 Riverpod 获取）
   late CharacterAvatarService _avatarService;
 
-  // 角色颜色映射
+  /// 角色颜色映射（每个角色分配独特的颜色）
   late Map<String, Color> _roleColors;
 
   @override
@@ -119,6 +164,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
     _speechFocusNode.dispose();
     super.dispose();
   }
+
+  // ========================================================================
+  // 聊天初始化
+  // ========================================================================
 
   /// 开始初始聊天
   Future<void> _startInitialChat() async {
@@ -245,6 +294,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
     // 自动滚动到底部
     _scrollToBottom();
   }
+
+  // ========================================================================
+  // UI 辅助方法
+  // ========================================================================
 
   /// 滚动到底部
   void _scrollToBottom() {
