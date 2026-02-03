@@ -100,6 +100,7 @@ class NovelRepository extends BaseRepository implements INovelRepository {
         description: maps[i]['description'],
         backgroundSetting: maps[i]['backgroundSetting'],
         isInBookshelf: true,
+        lastReadChapterIndex: maps[i]['lastReadChapter'] as int?,
       );
     });
   }

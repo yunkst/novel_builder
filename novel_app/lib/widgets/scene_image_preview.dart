@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/scene_illustration.dart';
-import '../services/api_service_wrapper.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
 import '../utils/toast_utils.dart';
@@ -172,7 +171,7 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     }
 
     try {
-      final apiService = ApiServiceWrapper();
+      final apiService = ref.read(apiServiceWrapperProvider);
       final galleryData =
           await apiService.getSceneIllustrationGallery(widget.taskId!);
 
@@ -966,7 +965,7 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     });
 
     try {
-      final apiService = ApiServiceWrapper();
+      final apiService = ref.read(apiServiceWrapperProvider);
 
       // 调用删除API
       await apiService.deleteSceneIllustrationImage(

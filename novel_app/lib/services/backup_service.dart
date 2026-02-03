@@ -48,11 +48,13 @@ class BackupService {
 
   /// 上传备份到服务器
   ///
+  /// [apiWrapper] API服务包装器实例（必须已初始化）
   /// [dbFile] 数据库文件
   /// [onProgress] 上传进度回调，参数为(已发送字节数, 总字节数)
   ///
   /// 返回BackupUploadResponse，包含上传结果信息
   Future<BackupUploadResponse> uploadBackup({
+    required ApiServiceWrapper apiWrapper,
     required File dbFile,
     ProgressCallback? onProgress,
   }) async {
@@ -66,8 +68,7 @@ class BackupService {
           '数据库文件大小: ${FormatUtils.formatFileSize(fileSize)}',
           category: LogCategory.backup);
 
-      // 使用ApiServiceWrapper上传
-      final apiWrapper = ApiServiceWrapper();
+      // 使用传入的ApiServiceWrapper上传
       final result = await apiWrapper.uploadBackup(
         dbFile: dbFile,
         onProgress: onProgress,

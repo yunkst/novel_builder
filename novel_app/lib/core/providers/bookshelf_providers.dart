@@ -9,20 +9,39 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../models/novel.dart';
 import '../../core/providers/database_providers.dart';
 import '../../core/providers/service_providers.dart';
+import '../../services/preferences_service.dart';
 
 part 'bookshelf_providers.g.dart';
 
 /// 当前选中的书架ID
 ///
 /// 默认值为 1（"全部小说"书架）
+/// 支持持久化保存用户选择，重启app后恢复上次打开的书架
 @riverpod
 class CurrentBookshelfId extends _$CurrentBookshelfId {
-  @override
-  int build() => 1;
+  static const String _key = 'current_bookshelf_id';
 
-  /// 设置当前书架ID
+  @override
+  int build() {
+    // 异步加载已保存的书架ID
+    _loadSavedBookshelfId();
+    // 立即返回默认值，避免阻塞UI渲染
+    return 1;
+  }
+
+  /// 从SharedPreferences加载保存的书架ID
+  Future<void> _loadSavedBookshelfId() async {
+    final prefsService = PreferencesService.instance;
+    final savedId = await prefsService.getInt(_key, defaultValue: 1);
+    // 更新状态为保存的值
+    state = savedId;
+  }
+
+  /// 设置当前书架ID并持久化
   void setBookshelfId(int bookshelfId) {
     state = bookshelfId;
+    // 保存到SharedPreferences
+    PreferencesService.instance.setInt(_key, bookshelfId);
   }
 }
 

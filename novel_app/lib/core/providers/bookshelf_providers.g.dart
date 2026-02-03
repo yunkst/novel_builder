@@ -51,11 +51,12 @@ final preloadProgressProvider =
 typedef PreloadProgressRef
     = AutoDisposeStreamProviderRef<Map<String, Map<String, int>>>;
 String _$currentBookshelfIdHash() =>
-    r'6ba5ab5f32450d1ab319b8fb2b0aec326a441448';
+    r'ba133ca1b1dcb0f8bef2b6514697902a2d5f2e24';
 
 /// 当前选中的书架ID
 ///
 /// 默认值为 1（"全部小说"书架）
+/// 支持持久化保存用户选择，重启app后恢复上次打开的书架
 ///
 /// Copied from [CurrentBookshelfId].
 @ProviderFor(CurrentBookshelfId)

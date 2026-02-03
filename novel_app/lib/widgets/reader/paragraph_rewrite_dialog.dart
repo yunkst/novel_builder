@@ -19,6 +19,11 @@ import '../../core/providers/reader_screen_providers.dart';
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持选择多个段落进行改写
 /// - 支持替换原文或重新改写
+///
+/// 重要说明：
+/// - 接收的 content 应该是过滤后的内容（不包含空行）
+/// - 接收的 selectedParagraphIndices 基于过滤后的内容
+/// - 这样确保索引与UI层保持一致
 class ParagraphRewriteDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
@@ -120,8 +125,8 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
 
   // 打开改写要求输入弹窗
   Future<void> _showRewriteRequirementDialog() async {
-    final paragraphs =
-        widget.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    // content 已经是过滤后的内容，直接使用
+    final paragraphs = widget.content.split('\n');
     final selectedText = _getSelectedText(paragraphs);
     if (selectedText.isEmpty) {
       Navigator.pop(context);
@@ -261,11 +266,9 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
 
   // 替换选中的段落（新逻辑：删除选中段落 + 插入AI生成内容）
   void _replaceSelectedParagraphs() {
-    // ⚠️ 重要：必须过滤空段落，与UI层保持一致
-    // UI层（reader_screen.dart）使用的是过滤后的段落列表
-    // 如果不在这里过滤，会导致索引不匹配
-    final paragraphs =
-        widget.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    // content 已经是过滤后的内容，直接使用
+    // 索引与UI层保持一致，不会出现不匹配问题
+    final paragraphs = widget.content.split('\n');
     final rewrittenParagraphs = _rewriteResult.split('\n');
 
     // 显示操作信息（可选）

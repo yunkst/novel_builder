@@ -49,7 +49,7 @@ final dioProvider = Provider<Dio>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DioRef = ProviderRef<Dio>;
-String _$apiServiceWrapperHash() => r'7cb374d4a3a39b21c3cacbcbfa5b10f324077074';
+String _$apiServiceWrapperHash() => r'ad6a9ac48976ae344df490909fe83b8b99b7e523';
 
 /// ApiServiceWrapper Provider
 ///
@@ -66,14 +66,18 @@ String _$apiServiceWrapperHash() => r'7cb374d4a3a39b21c3cacbcbfa5b10f324077074';
 ///
 /// **使用示例**:
 /// ```dart
+/// // 方式1: 直接使用（已自动初始化）
 /// final apiService = ref.watch(apiServiceWrapperProvider);
-/// await apiService.init();
 /// final novels = await apiService.searchNovels('keyword');
+///
+/// // 方式2: 仅获取 Future（异步场景）
+/// final initFuture = ref.watch(apiServiceWrapperInitProvider);
+/// await initFuture;
 /// ```
 ///
 /// **注意事项**:
 /// - 使用 `keepAlive: true` 确保实例不会被销毁
-/// - 需要先调用 `init()` 方法初始化
+/// - Provider 会自动调用 `init()`，无需手动初始化
 /// - 通过依赖注入创建实例，便于测试
 ///
 /// Copied from [apiServiceWrapper].
@@ -91,6 +95,35 @@ final apiServiceWrapperProvider = Provider<ApiServiceWrapper>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ApiServiceWrapperRef = ProviderRef<ApiServiceWrapper>;
+String _$apiServiceWrapperInitHash() =>
+    r'050646a40f43e0fadbcc7ef4dc0a888c82a7ddd7';
+
+/// ApiServiceWrapper 初始化 Provider
+///
+/// 提供 ApiServiceWrapper 的初始化 Future，用于需要等待初始化的场景。
+///
+/// **使用示例**:
+/// ```dart
+/// // 在应用启动时等待初始化
+/// final initFuture = ref.watch(apiServiceWrapperInitProvider);
+/// await initFuture;
+/// ```
+///
+/// Copied from [apiServiceWrapperInit].
+@ProviderFor(apiServiceWrapperInit)
+final apiServiceWrapperInitProvider = FutureProvider<void>.internal(
+  apiServiceWrapperInit,
+  name: r'apiServiceWrapperInitProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$apiServiceWrapperInitHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ApiServiceWrapperInitRef = FutureProviderRef<void>;
 String _$preloadServiceHash() => r'de5034b7741f37734cfb299923b88010b685931b';
 
 /// PreloadService Provider

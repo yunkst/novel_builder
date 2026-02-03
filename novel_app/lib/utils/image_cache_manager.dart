@@ -4,6 +4,11 @@ import 'format_utils.dart';
 
 /// 图片缓存管理器
 /// 用于管理插图图片的缓存和生命周期，避免重复从后端加载
+///
+/// ## 架构说明
+/// - 缓存存储：静态字段（全局共享，所有实例共用同一缓存）
+/// - API 服务：实例字段（通过依赖注入，便于测试）
+/// - 使用方式：通过 Provider 获取实例
 class ImageCacheManager {
   /// 缓存存储：key 为图片 URL/filename，value 为图片二进制数据
   static final Map<String, Uint8List> _cache = {};
@@ -14,8 +19,8 @@ class ImageCacheManager {
   /// 正在加载中的图片请求（防止重复请求）
   static final Map<String, Future<Uint8List>> _loadingRequests = {};
 
-  /// API 服务包装器
-  static ApiServiceWrapper? _apiService;
+  /// API 服务包装器（实例字段，通过构造函数注入）
+  final ApiServiceWrapper _apiService;
 
   /// 最大缓存数量
   static const int _maxCacheSize = 50;
@@ -23,13 +28,15 @@ class ImageCacheManager {
   /// 最大单张图片大小（20MB）
   static const int _maxImageSize = 20 * 1024 * 1024;
 
-  /// 初始化 API 服务
-  static void _ensureApiService() {
-    _apiService ??= ApiServiceWrapper();
-  }
+  /// 构造函数 - 接收注入的 ApiServiceWrapper
+  ///
+  /// [apiService] API 服务实例（必需）
+  const ImageCacheManager({
+    required ApiServiceWrapper apiService,
+  }) : _apiService = apiService;
 
   /// 检查缓存是否有效
-  static bool _isCacheValid(String key) {
+  bool _isCacheValid(String key) {
     return _cache.containsKey(key) &&
         _cache[key] != null &&
         _cache[key]!.isNotEmpty;
@@ -60,9 +67,7 @@ class ImageCacheManager {
   }
 
   /// 获取图片数据（带缓存）
-  static Future<Uint8List> getImage(String imageUrl) async {
-    _ensureApiService();
-
+  Future<Uint8List> getImage(String imageUrl) async {
     // 检查内存缓存
     if (_isCacheValid(imageUrl)) {
       // 更新访问时间（LRU）
@@ -91,11 +96,11 @@ class ImageCacheManager {
   }
 
   /// 从后端加载图片
-  static Future<Uint8List> _loadImageFromBackend(String imageUrl) async {
+  Future<Uint8List> _loadImageFromBackend(String imageUrl) async {
     try {
       debugPrint('📥 从后端加载图片: $imageUrl');
 
-      final data = await _apiService!.getImageProxy(imageUrl);
+      final data = await _apiService.getImageProxy(imageUrl);
 
       // 验证数据大小
       if (data.isEmpty) {
@@ -128,7 +133,7 @@ class ImageCacheManager {
   }
 
   /// 预加载图片（后台加载）
-  static Future<void> prefetchImage(String imageUrl) async {
+  Future<void> prefetchImage(String imageUrl) async {
     try {
       await getImage(imageUrl);
       debugPrint('🔄 预加载完成: $imageUrl');
@@ -138,7 +143,7 @@ class ImageCacheManager {
   }
 
   /// 批量预加载图片
-  static Future<void> prefetchImages(List<String> imageUrls) async {
+  Future<void> prefetchImages(List<String> imageUrls) async {
     debugPrint('🔄 开始批量预加载 ${imageUrls.length} 张图片');
     await Future.wait(
       imageUrls.map((url) => prefetchImage(url)),

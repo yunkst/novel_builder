@@ -9,6 +9,7 @@ import '../widgets/app_update_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/providers/service_providers.dart';
+import '../core/providers/services/network_service_providers.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../utils/format_utils.dart';
@@ -322,9 +323,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       // 显示进度对话框并执行上传
       if (!mounted) return;
+      // 获取已初始化的API服务实例
+      final apiService = ref.read(apiServiceWrapperProvider);
       final result = await BackupProgressDialog.show(
         context: context,
         uploadTask: () => backupService.uploadBackup(
+          apiWrapper: apiService,
           dbFile: dbFile,
           onProgress: (sent, total) {
             // 进度回调会在ProgressDialog内部处理

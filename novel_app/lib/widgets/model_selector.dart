@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:novel_api/novel_api.dart';
 import '../services/api_service_wrapper.dart';
+import '../core/providers/services/network_service_providers.dart';
 
 /// 统一的模型选择组件
 /// 支持从后端API动态获取模型列表并提供下拉选择功能
-class ModelSelector extends StatefulWidget {
+class ModelSelector extends ConsumerStatefulWidget {
   /// 当前选中的模型
   final String? selectedModel;
 
@@ -31,10 +33,10 @@ class ModelSelector extends StatefulWidget {
   });
 
   @override
-  State<ModelSelector> createState() => _ModelSelectorState();
+  ConsumerState<ModelSelector> createState() => _ModelSelectorState();
 }
 
-class _ModelSelectorState extends State<ModelSelector> {
+class _ModelSelectorState extends ConsumerState<ModelSelector> {
   late Future<List<WorkflowInfo>> _modelsFuture;
   String? _selectedModel;
 
@@ -58,7 +60,14 @@ class _ModelSelectorState extends State<ModelSelector> {
   /// 从后端API加载模型列表
   Future<List<WorkflowInfo>> _loadModels() async {
     try {
-      final apiService = ApiServiceWrapper();
+      // ✅ 使用Provider获取已初始化的ApiServiceWrapper实例
+      final apiService = ref.read(apiServiceWrapperProvider);
+
+      // 确保实例已初始化
+      if (!apiService.isInitialized) {
+        throw Exception('ApiServiceWrapper 尚未完成初始化，请稍后再试');
+      }
+
       final models = await apiService.getModels();
 
       // 根据 apiType 返回对应的模型列表

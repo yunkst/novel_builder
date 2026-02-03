@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../core/providers/reader_state_providers.dart';
-import 'package:riverpod/riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// ReaderInteractionController (新版本)
 ///
@@ -21,11 +21,11 @@ import 'package:riverpod/riverpod.dart';
 ///
 /// 状态变化通过Provider自动通知UI更新
 class ReaderInteractionController {
-  final Ref _ref;
+  final WidgetRef _ref;
 
   // ========== 构造函数 ==========
 
-  ReaderInteractionController({required Ref ref}) : _ref = ref;
+  ReaderInteractionController({required WidgetRef ref}) : _ref = ref;
 
   // ========== 公开方法 ==========
 
