@@ -7,7 +7,7 @@ import '../services/character_avatar_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/toast_utils.dart';
 import '../screens/providers/dify_provider.dart';
-import '../screens/providers/character_avatar_provider.dart';
+import '../core/providers/services/cache_service_providers.dart';
 import 'dart:io';
 
 /// 角色聊天屏幕 (Riverpod版本)
@@ -48,7 +48,7 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
     // 延迟初始化聊天，确保服务已加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _difyService = ref.read(difyServiceProvider);
-      _avatarService = ref.read(characterAvatarServiceProvider);
+      _avatarService = ref.watch(characterAvatarServiceProvider);
       _startInitialChat();
     });
   }

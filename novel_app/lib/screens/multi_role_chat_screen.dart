@@ -9,7 +9,7 @@ import '../utils/chat_stream_parser.dart';
 import '../utils/role_color_manager.dart';
 import '../utils/toast_utils.dart';
 import '../screens/providers/dify_provider.dart';
-import '../screens/providers/character_avatar_provider.dart';
+import '../core/providers/services/cache_service_providers.dart';
 
 /// 暗色主题颜色常量
 class _DarkThemeColors {
@@ -150,7 +150,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
     // 延迟初始化聊天，确保服务已加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _difyService = ref.read(difyServiceProvider);
-      _avatarService = ref.read(characterAvatarServiceProvider);
+      _avatarService = ref.watch(characterAvatarServiceProvider);
       _startInitialChat();
     });
   }

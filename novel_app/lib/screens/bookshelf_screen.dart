@@ -76,6 +76,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         // 刷新书架列表
         ref.invalidate(bookshelfNovelsProvider);
       } catch (e, stackTrace) {
+        if (!mounted) return;
         ErrorHelper.showErrorWithLog(
           context,
           '从书架移除失败',
@@ -187,6 +188,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         ref.invalidate(bookshelfNovelsProvider);
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '移动失败',
@@ -209,6 +211,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         // 不刷新当前书架，因为小说还在原书架
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '复制失败',
@@ -379,7 +382,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.4),
+                              .withValues(alpha: 0.4),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -488,14 +491,14 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                         color: Theme.of(context)
                                             .colorScheme
                                             .tertiary
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         borderRadius:
                                             BorderRadius.circular(10),
                                         border: Border.all(
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .tertiary
-                                                .withOpacity(0.3)),
+                                                .withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
                                         '原创',

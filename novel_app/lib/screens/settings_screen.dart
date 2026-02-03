@@ -258,46 +258,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RadioListTile<AppThemeMode>(
+                  ListTile(
                     title: const Text('亮色模式'),
                     subtitle: const Text('使用浅色主题'),
-                    value: AppThemeMode.light,
-                    groupValue: themeState.themeMode,
-                    onChanged: (AppThemeMode? value) {
-                      if (value != null) {
-                        ref
-                            .read(themeNotifierProvider.notifier)
-                            .setThemeMode(value);
-                        Navigator.pop(context);
-                      }
+                    leading: Radio<AppThemeMode>(
+                      value: AppThemeMode.light,
+                      groupValue: themeState.themeMode,
+                      onChanged: (AppThemeMode? value) {
+                        if (value != null) {
+                          ref
+                              .read(themeNotifierProvider.notifier)
+                              .setThemeMode(value);
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                    onTap: () {
+                      ref
+                          .read(themeNotifierProvider.notifier)
+                          .setThemeMode(AppThemeMode.light);
+                      Navigator.pop(context);
                     },
                   ),
-                  RadioListTile<AppThemeMode>(
+                  ListTile(
                     title: const Text('暗色模式'),
                     subtitle: const Text('使用深色主题'),
-                    value: AppThemeMode.dark,
-                    groupValue: themeState.themeMode,
-                    onChanged: (AppThemeMode? value) {
-                      if (value != null) {
-                        ref
-                            .read(themeNotifierProvider.notifier)
-                            .setThemeMode(value);
-                        Navigator.pop(context);
-                      }
+                    leading: Radio<AppThemeMode>(
+                      value: AppThemeMode.dark,
+                      groupValue: themeState.themeMode,
+                      onChanged: (AppThemeMode? value) {
+                        if (value != null) {
+                          ref
+                              .read(themeNotifierProvider.notifier)
+                              .setThemeMode(value);
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                    onTap: () {
+                      ref
+                          .read(themeNotifierProvider.notifier)
+                          .setThemeMode(AppThemeMode.dark);
+                      Navigator.pop(context);
                     },
                   ),
-                  RadioListTile<AppThemeMode>(
+                  ListTile(
                     title: const Text('跟随系统'),
                     subtitle: const Text('跟随系统设置自动切换'),
-                    value: AppThemeMode.system,
-                    groupValue: themeState.themeMode,
-                    onChanged: (AppThemeMode? value) {
-                      if (value != null) {
-                        ref
-                            .read(themeNotifierProvider.notifier)
-                            .setThemeMode(value);
-                        Navigator.pop(context);
-                      }
+                    leading: Radio<AppThemeMode>(
+                      value: AppThemeMode.system,
+                      groupValue: themeState.themeMode,
+                      onChanged: (AppThemeMode? value) {
+                        if (value != null) {
+                          ref
+                              .read(themeNotifierProvider.notifier)
+                              .setThemeMode(value);
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                    onTap: () {
+                      ref
+                          .read(themeNotifierProvider.notifier)
+                          .setThemeMode(AppThemeMode.system);
+                      Navigator.pop(context);
                     },
                   ),
                 ],
@@ -327,6 +351,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final fileSizeText = FormatUtils.formatFileSize(fileSize);
 
       // 显示确认对话框
+      if (!mounted) return;
       final confirmed = await BackupConfirmDialog.show(
         context: context,
         fileName: fileName,
@@ -336,6 +361,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!confirmed) return;
 
       // 显示进度对话框并执行上传
+      if (!mounted) return;
       final result = await BackupProgressDialog.show(
         context: context,
         uploadTask: () => backupService.uploadBackup(

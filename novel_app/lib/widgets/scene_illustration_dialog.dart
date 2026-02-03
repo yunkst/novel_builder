@@ -290,6 +290,7 @@ class _SceneIllustrationDialogState
         Navigator.of(context).pop();
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '创建插图失败',
