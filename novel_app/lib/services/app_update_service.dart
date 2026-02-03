@@ -172,7 +172,6 @@ class AppUpdateService {
     void Function(double progress)? onProgress,
     void Function(String status)? onStatus,
   }) async {
-    Dio? dio;
     try {
       LoggerService.instance.i(
         '开始下载流程',
@@ -280,15 +279,14 @@ class AppUpdateService {
 
       onStatus?.call('开始下载...');
 
-      // 使用 Dio 下载文件
+      // 使用 ApiServiceWrapper 的 Dio 实例下载文件
       LoggerService.instance.i(
         '开始执行下载',
         category: LogCategory.general,
         tags: ['update', 'download', 'execute'],
       );
-      dio = Dio();
 
-      await dio.download(
+      await _apiWrapper.dio.download(
         downloadUrl,
         filePath,
         onReceiveProgress: (received, total) {
@@ -334,8 +332,6 @@ class AppUpdateService {
       );
       onStatus?.call('下载出错: $e');
       return false;
-    } finally {
-      dio?.close();
     }
   }
 
