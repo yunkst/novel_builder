@@ -2,56 +2,46 @@ import 'package:flutter/foundation.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
-import '../services/database_service.dart';
-import '../utils/error_helper.dart';
-// import '../services/preload_service.dart'; // 暂未使用
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/providers/reader_state_providers.dart';
+import 'package:riverpod/riverpod.dart';
 
-/// ReaderContentController
+/// ReaderContentController (新版本)
 ///
 /// 职责：
 /// - 章节内容加载（从缓存或API）
 /// - 缓存管理
-/// - 预加载调度
 /// - 阅读进度更新
+/// - 通过Riverpod Provider管理状态，不使用setState回调
 ///
 /// 使用方式：
 /// ```dart
 /// final controller = ReaderContentController(
-///   onStateChanged: () => setState(() {}),
+///   ref: ref,
 ///   apiService: _apiService,
-///   databaseService: _databaseService,
-///   preloadService: _preloadService,
+///   chapterRepository: _chapterRepository,
 /// );
 ///
 /// await controller.initialize();
 /// await controller.loadChapter(chapter, novel);
 /// ```
+///
+/// 状态变化通过Provider自动通知UI更新
 class ReaderContentController {
   // ========== 依赖服务 ==========
   final ApiServiceWrapper _apiService;
-  final DatabaseService _databaseService;
-  // final PreloadService _preloadService; // 暂未使用，保留供后续扩展
-
-  // ========== UI状态回调 ==========
-  final VoidCallback _onStateChanged;
-
-  // ========== 内部状态 ==========
-  bool _isLoading = false;
-  String _content = '';
-  String _errorMessage = '';
-  Chapter? _currentChapter;
-  Novel? _currentNovel;
+  final IChapterRepository _chapterRepository;
+  final Ref _ref;
 
   // ========== 构造函数 ==========
 
   ReaderContentController({
-    required VoidCallback onStateChanged,
+    required Ref ref,
     required ApiServiceWrapper apiService,
-    required DatabaseService databaseService,
-    // required PreloadService preloadService, // 暂未使用
-  })  : _onStateChanged = onStateChanged,
+    required IChapterRepository chapterRepository,
+  })  : _ref = ref,
         _apiService = apiService,
-        _databaseService = databaseService;
+        _chapterRepository = chapterRepository;
 
   // ========== 公开方法 ==========
 
@@ -63,9 +53,7 @@ class ReaderContentController {
       await _apiService.init();
       debugPrint('✅ ReaderContentController: API初始化成功');
     } catch (e) {
-      _errorMessage = '初始化API失败: $e';
-      _isLoading = false;
-      _onStateChanged();
+      _ref.read(chapterContentStateNotifierProvider.notifier).setError('初始化API失败: $e');
       debugPrint('❌ ReaderContentController: API初始化失败 - $e');
       rethrow;
     }
@@ -83,16 +71,16 @@ class ReaderContentController {
     bool forceRefresh = false,
     bool resetScrollPosition = true,
   }) async {
-    _currentChapter = chapter;
-    _currentNovel = novel;
+    final notifier = _ref.read(chapterContentStateNotifierProvider.notifier);
+
+    // 设置当前上下文
+    notifier.setCurrentContext(chapter, novel);
 
     // 设置加载状态
-    _isLoading = true;
-    _errorMessage = '';
+    notifier.setLoading(true);
     if (resetScrollPosition) {
-      _content = '';
+      notifier.clearContent();
     }
-    _onStateChanged();
 
     try {
       debugPrint('📖 ReaderContentController: 开始加载章节 - ${chapter.title}');
@@ -101,17 +89,15 @@ class ReaderContentController {
 
       // 强制刷新时先删除缓存
       if (forceRefresh) {
-        await _databaseService.deleteChapterCache(chapter.url);
+        await _chapterRepository.deleteChapterCache(chapter.url);
         debugPrint('🗑️ ReaderContentController: 已删除缓存 - ${chapter.url}');
       }
 
       // 尝试从缓存获取
-      final cachedContent =
-          await _databaseService.getCachedChapter(chapter.url);
+      final cachedContent = await _chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
-        debugPrint(
-            '💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
+        debugPrint('💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
       } else {
         // 缓存未命中，从API获取
         debugPrint('🌐 ReaderContentController: 缓存未命中，从API获取');
@@ -122,7 +108,7 @@ class ReaderContentController {
 
         // 验证内容并缓存
         if (content.isNotEmpty && content.length > 50) {
-          await _databaseService.cacheChapter(
+          await _chapterRepository.cacheChapter(
             novel.url,
             chapter,
             content,
@@ -134,9 +120,8 @@ class ReaderContentController {
       }
 
       // 更新状态
-      _content = content;
-      _isLoading = false;
-      _onStateChanged();
+      notifier.setContent(content);
+      notifier.setLoading(false);
 
       // 更新阅读进度
       await updateReadingProgress(novel.url, chapter);
@@ -146,9 +131,8 @@ class ReaderContentController {
 
       debugPrint('✅ ReaderContentController: 章节加载完成 - ${chapter.title}');
     } catch (e) {
-      _isLoading = false;
-      _errorMessage = '加载章节失败: ${ErrorHelper.getErrorMessage(e)}';
-      _onStateChanged();
+      notifier.setLoading(false);
+      notifier.setError('加载章节失败: $e');
       debugPrint('❌ ReaderContentController: 加载失败 - $e');
       rethrow;
     }
@@ -161,33 +145,33 @@ class ReaderContentController {
   Future<void> updateReadingProgress(String novelUrl, Chapter chapter) async {
     try {
       final chapterIndex = chapter.chapterIndex ?? 0;
-      await _databaseService.updateLastReadChapter(novelUrl, chapterIndex);
+      await _chapterRepository.updateLastReadChapter(novelUrl, chapterIndex);
       debugPrint('📖 ReaderContentController: 已更新阅读进度 - 章节$chapterIndex');
     } catch (e) {
       debugPrint('❌ ReaderContentController: 更新阅读进度失败 - $e');
     }
   }
 
-  // ========== Getters ==========
-
-  /// 是否正在加载
-  bool get isLoading => _isLoading;
-
-  /// 章节内容
-  String get content => _content;
-
-  /// 设置内容（用于改写等需要直接更新内容的场景）
-  set content(String newContent) {
-    _content = newContent;
+  /// 更新内容（用于改写等需要直接更新内容的场景）
+  void setContent(String newContent) {
+    _ref.read(chapterContentStateNotifierProvider.notifier).updateContent(newContent);
     debugPrint('📝 ReaderContentController: 内容已更新 - ${newContent.length}字符');
   }
 
-  /// 错误信息
-  String get errorMessage => _errorMessage;
+  // ========== Getters ==========
 
-  /// 当前章节
-  Chapter? get currentChapter => _currentChapter;
+  /// 章节内容（从Provider获取）
+  String get content => _ref.read(chapterContentStateNotifierProvider).content;
 
-  /// 当前小说
-  Novel? get currentNovel => _currentNovel;
+  /// 是否正在加载（从Provider获取）
+  bool get isLoading => _ref.read(chapterContentStateNotifierProvider).isLoading;
+
+  /// 错误信息（从Provider获取）
+  String get errorMessage => _ref.read(chapterContentStateNotifierProvider).errorMessage;
+
+  /// 当前章节（从Provider获取）
+  Chapter? get currentChapter => _ref.read(chapterContentStateNotifierProvider).currentChapter;
+
+  /// 当前小说（从Provider获取）
+  Novel? get currentNovel => _ref.read(chapterContentStateNotifierProvider).currentNovel;
 }

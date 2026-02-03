@@ -51,6 +51,11 @@ import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
 import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
 import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
+import '../widgets/reader/reader_menu.dart'; // ReaderMenu组件
+import '../widgets/reader/reader_app_bar.dart'; // ReaderAppBar组件
+import '../widgets/reader/reader_bottom_bar.dart'; // ReaderBottomBar组件
+import '../widgets/reader/reader_content_view.dart'; // ReaderContentView组件
+import '../widgets/reader/reader_error_view.dart'; // ReaderErrorView组件
 import '../widgets/immersive/immersive_setup_dialog.dart'; // 沉浸体验配置对话框
 import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始化页面
 import '../utils/toast_utils.dart';
@@ -71,6 +76,7 @@ import '../core/providers/reader_screen_providers.dart';
 import '../core/providers/reader_screen_notifier.dart';
 import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
+import '../core/providers/reader_state_providers.dart'; // 新增：细粒度状态Provider
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -138,16 +144,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   late Chapter _currentChapter;
   double? _fontSize;
 
-  // ========== 角色卡更新状态 ==========
-  bool _isUpdatingRoleCards = false;
-
   // ========== AI伴读自动触发防抖标志 ==========
   bool _hasAutoTriggered = false;
   bool _isAutoCompanionRunning = false;
-
-  // 模型尺寸（用于插图显示）
-  int? _defaultModelWidth;
-  int? _defaultModelHeight;
 
   // 预加载相关状态
   final PreloadService _preloadService = PreloadService();
@@ -176,24 +175,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 我们通过 ref.watch 在 build 方法中获取
 
     // ========== 初始化 ReaderContentController ==========
+    // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
     _contentController = ReaderContentController(
-      onStateChanged: () {
-        if (mounted) {
-          setState(() {});
-        }
-      },
+      ref: ref,
       apiService: _apiService,
-      databaseService: _databaseService,
+      chapterRepository: ref.read(chapterRepositoryProvider),
     );
 
     // ========== 初始化 ReaderInteractionController ==========
-    _interactionController = ReaderInteractionController(
-      onStateChanged: () {
-        if (mounted) {
-          setState(() {});
-        }
-      },
-    );
+    // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
+    _interactionController = ReaderInteractionController(ref: ref);
 
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
@@ -257,13 +248,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           orElse: () => t2iModels.first,
         );
 
-        if (defaultModel.width != null &&
-            defaultModel.height != null &&
-            mounted) {
-          setState(() {
-            _defaultModelWidth = defaultModel.width;
-            _defaultModelHeight = defaultModel.height;
-          });
+        if (defaultModel.width != null && defaultModel.height != null) {
+          // 使用Provider更新模型尺寸
+          ref.read(modelSizeStateNotifierProvider.notifier).setSize(
+                defaultModel.width,
+                defaultModel.height,
+              );
           debugPrint(
               '✅ 默认模型尺寸已加载: ${defaultModel.width} × ${defaultModel.height}');
         }
@@ -277,12 +267,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
       debugPrint('⚠️ 加载默认模型尺寸失败: $e');
       // 使用默认值 704×1280
-      if (mounted) {
-        setState(() {
-          _defaultModelWidth = 704;
-          _defaultModelHeight = 1280;
-        });
-      }
+      ref.read(modelSizeStateNotifierProvider.notifier).resetToDefault();
     }
   }
 
@@ -660,8 +645,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
 // ============ Character Card Management ============
   Future<void> _updateCharacterCards() async {
+    final cardUpdateNotifier = ref.read(characterCardUpdateStateNotifierProvider.notifier);
+
     // 防重复点击检查
-    if (_isUpdatingRoleCards) {
+    if (ref.read(characterCardUpdateStateNotifierProvider).isUpdating) {
       ToastUtils.showWarning('角色卡正在更新中,请稍候...', context: context);
       return;
     }
@@ -672,9 +659,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 设置loading状态
-    setState(() {
-      _isUpdatingRoleCards = true;
-    });
+    cardUpdateNotifier.setUpdating(true);
 
     // 开始后台处理（无loading阻塞，允许用户继续阅读）
     try {
@@ -716,11 +701,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
     } finally {
       // 无论成功或失败都重置状态
-      if (mounted) {
-        setState(() {
-          _isUpdatingRoleCards = false;
-        });
-      }
+      cardUpdateNotifier.setUpdating(false);
     }
   }
 
@@ -1273,332 +1254,125 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                _currentChapter.title,
-                style: const TextStyle(fontSize: 18),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-            ),
-            // 编辑模式状态指示器
-            if (isEditMode)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.edit, size: 14),
-                    SizedBox(width: 4),
-                    Text('编辑模式', style: TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          // 编辑模式切换按钮
-          if (!isEditMode)
-            IconButton(
-              onPressed: () => ref.read(readerEditModeProvider.notifier).toggle(),
-              tooltip: '进入编辑模式',
-              icon: const Icon(Icons.edit_outlined),
-            ),
-          // 编辑完成按钮
-          if (isEditMode)
-            IconButton(
-              onPressed: () async {
-                // 保存编辑内容并退出编辑模式
-                await _saveEditedContent();
-                ref.read(readerEditModeProvider.notifier).toggle();
+      appBar: ReaderAppBar(
+        novel: widget.novel,
+        currentChapter: _currentChapter,
+        chapters: widget.chapters,
+        isEditMode: isEditMode,
+        isUpdatingRoleCards: ref.watch(characterCardUpdateStateNotifierProvider).isUpdating, // 从Provider读取
+        onToggleEditMode: () =>
+            ref.read(readerEditModeProvider.notifier).toggle(),
+        onSaveAndExitEditMode: () async {
+          await _saveEditedContent();
+          ref.read(readerEditModeProvider.notifier).toggle();
+        },
+        onShowImmersiveSetup: _showImmersiveSetup,
+        onMenuAction: _handleMenuAction,
+      ),
+      body: _buildBody(context, isEditMode, paragraphs),
+      floatingActionButton: _content.isEmpty
+          ? null
+          : ReaderActionButtons(
+              isCloseupMode: _isCloseupMode,
+              hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
+              isAutoScrolling: isAutoScrolling, // Mixin getter
+              isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
+              onRewritePressed: () {
+                _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
               },
-              tooltip: '完成编辑并保存',
-              icon: const Icon(Icons.check),
+              onToggleCloseupMode: _toggleCloseupMode,
+              onToggleAutoScroll: toggleAutoScroll, // Mixin method
             ),
-          // 沉浸体验按钮
-          if (!isEditMode)
-            IconButton(
-              onPressed: _showImmersiveSetup,
-              tooltip: '沉浸体验',
-              icon: const Icon(Icons.theater_comedy_outlined),
-            ),
-                // 更多功能菜单
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  tooltip: '更多功能',
-                  onSelected: _handleMenuAction,
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'refresh',
-                      child: Row(
-                        children: [
-                          Icon(Icons.refresh, size: 18),
-                          SizedBox(width: 12),
-                          Text('刷新章节'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'scroll_speed',
-                      child: Row(
-                        children: [
-                          Icon(Icons.speed, size: 18),
-                          SizedBox(width: 12),
-                          Text('滚动速度'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'font_size',
-                      child: Row(
-                        children: [
-                          Icon(Icons.text_fields, size: 18),
-                          SizedBox(width: 12),
-                          Text('字体大小'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'summarize',
-                      child: Row(
-                        children: [
-                          Icon(Icons.summarize, size: 18),
-                          SizedBox(width: 12),
-                          Text('总结'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'tts_read',
-                      child: Row(
-                        children: [
-                          Icon(Icons.headphones, size: 18),
-                          SizedBox(width: 12),
-                          Text('朗读'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'full_rewrite',
-                      child: Row(
-                        children: [
-                          Icon(Icons.auto_stories, size: 18),
-                          SizedBox(width: 12),
-                          Text('全文重写'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'update_character_cards',
-                      enabled: !_isUpdatingRoleCards,
-                      child: Row(
-                        children: [
-                          _isUpdatingRoleCards
-                              ? SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Theme.of(context).colorScheme.tertiary),
-                                  ),
-                                )
-                              : const Icon(Icons.person_search, size: 18),
-                          const SizedBox(width: 12),
-                          Text(_isUpdatingRoleCards ? '更新中...' : '更新角色卡'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'ai_companion',
-                      child: Row(
-                        children: [
-                          Icon(Icons.auto_stories, size: 18),
-                          SizedBox(width: 12),
-                          Text('AI伴读'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            body: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage.isNotEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _errorMessage,
-                              style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () => _loadChapterContent(
-                                  resetScrollPosition: false),
-                              child: const Text('重试'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Stack(
-                        children: [
-                          // 主要内容区域
-                          Listener(
-                            behavior: HitTestBehavior.translucent, // 不阻止事件传递到下层
-                            onPointerDown: (_) {
-                              // 手指接触屏幕，暂停自动滚动
-                              if (isAutoScrolling) {
-                                handleTouch();
-                              }
-                            },
-                            onPointerUp: (_) {
-                              // handleTouch() 已经设置了恢复定时器，所以这里不需要额外处理
-                            },
-                            child: NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                // 保留以兼容现有代码（不再处理用户滚动）
-                                return handleScrollNotification(notification);
-                              },
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.all(16.0),
-                                itemCount: paragraphs.length + 1, // +1 为了添加底部空白
-                                itemBuilder: (context, index) {
-                                  // 最后一个位置添加空白
-                                  if (index == paragraphs.length) {
-                                    return SizedBox(
-                                      height: 160, // 底部留白高度，避免被按钮遮挡
-                                      child: Container(), // 空容器只占位
-                                    );
-                                  }
+    );
+  }
 
-                                  final paragraph = paragraphs[index];
-                                  final isSelected =
-                                      _selectedParagraphIndices.contains(index);
+  /// 构建阅读器主体内容
+  Widget _buildBody(
+    BuildContext context,
+    bool isEditMode,
+    List<String> paragraphs,
+  ) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-                                  return ParagraphWidget(
-                                    paragraph: paragraph,
-                                    index: index,
-                                    fontSize: _fontSize ?? 18.0,
-                                    isCloseupMode: _isCloseupMode,
-                                    isEditMode: isEditMode, // From Riverpod Provider
-                                    isSelected: isSelected,
-                                    onTap: _handleParagraphTap,
-                                    onLongPress: (idx) => _handleLongPress(
-                                        idx), // _handleLongPress now accepts index
-                                    onContentChanged: (newContent) {
-                                      final updatedParagraphs =
-                                          List<String>.from(paragraphs);
-                                      updatedParagraphs[index] = newContent;
-                                      // 使用 addPostFrameCallback 避免在构建阶段调用 setState
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                        if (mounted) {
-                                          setState(() {
-                                            _content =
-                                                updatedParagraphs.join('\n');
-                                          });
-                                        }
-                                      });
-                                    },
-                                    onImageTap:
-                                        (taskId, imageUrl, imageIndex) =>
-                                            handleImageTap(taskId, imageUrl,
-                                                imageIndex), // Mixin方法
-                                    onImageDelete: (taskId) =>
-                                        deleteIllustrationByTaskId(
-                                            taskId), // Mixin方法
-                                    generateVideoFromIllustration:
-                                        generateVideoFromIllustration, // Mixin方法
-                                    modelWidth: _defaultModelWidth, // 传递模型宽度
-                                    modelHeight: _defaultModelHeight, // 传递模型高度
-                                  );
-                                },
-                              ),
-                            ),
-                          ), // GestureDetector 和 NotificationListener 闭合
-                          // 固定在底部的章节切换按钮
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Theme.of(context)
-                                        .shadowColor
-                                        .withValues(alpha: 0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, -2),
-                                  ),
-                                ],
-                              ),
-                              child: SafeArea(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                    vertical: 8.0,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      ElevatedButton.icon(
-                                        onPressed: hasPrevious
-                                            ? _goToPreviousChapter
-                                            : null,
-                                        icon: const Icon(Icons.arrow_back),
-                                        label: const Text('上一章'),
-                                      ),
-                                      Text(
-                                        '${currentIndex + 1}/${widget.chapters.length}',
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                      ElevatedButton.icon(
-                                        onPressed:
-                                            hasNext ? _goToNextChapter : null,
-                                        icon: const Icon(Icons.arrow_forward),
-                                        label: const Text('下一章'),
-                                        style: ElevatedButton.styleFrom(
-                                          iconAlignment: IconAlignment.end,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-            floatingActionButton: _content.isEmpty
-                ? null
-                : ReaderActionButtons(
-                    isCloseupMode: _isCloseupMode,
-                    hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
-                    isAutoScrolling: isAutoScrolling, // Mixin getter
-                    isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
-                    onRewritePressed: () {
-                      _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
-                    },
-                    onToggleCloseupMode: _toggleCloseupMode,
-                    onToggleAutoScroll: toggleAutoScroll, // Mixin method
-                  ),
-        );
+    if (_errorMessage.isNotEmpty) {
+      return ReaderErrorView(
+        errorMessage: _errorMessage,
+        onRetry: () => _loadChapterContent(resetScrollPosition: false),
+      );
+    }
+
+    final currentIndex = _currentChapterIndex;
+    final hasPrevious = currentIndex > 0;
+    final hasNext =
+        currentIndex != -1 && currentIndex < widget.chapters.length - 1;
+
+    return Stack(
+      children: [
+        // 主要内容区域
+        ReaderContentView(
+          paragraphs: paragraphs,
+          selectedParagraphIndices: _selectedParagraphIndices,
+          fontSize: _fontSize ?? 18.0,
+          isCloseupMode: _isCloseupMode,
+          isEditMode: isEditMode,
+          isAutoScrolling: isAutoScrolling,
+          onParagraphTap: _handleParagraphTap,
+          onParagraphLongPress: _handleLongPress,
+          onContentChanged: (index, newContent) {
+            final updatedParagraphs = List<String>.from(paragraphs);
+            if (index >= 0 && index < paragraphs.length) {
+              updatedParagraphs[index] = newContent;
+            }
+            // 使用 addPostFrameCallback 避免在构建阶段调用 setState
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _content = updatedParagraphs.join('\n');
+                });
+              }
+            });
+          },
+          onImageTap: (taskId, imageUrl, imageIndex) =>
+              handleImageTap(taskId, imageUrl, imageIndex), // Mixin方法
+          onImageDelete: (taskId) =>
+              deleteIllustrationByTaskId(taskId), // Mixin方法
+          generateVideoFromIllustration:
+              generateVideoFromIllustration, // Mixin方法
+          modelWidth: ref.watch(modelSizeStateNotifierProvider).width, // 从Provider读取模型宽度
+          modelHeight: ref.watch(modelSizeStateNotifierProvider).height, // 从Provider读取模型高度
+          scrollController: _scrollController,
+          onPointerDown: () {
+            // 手指接触屏幕，暂停自动滚动
+            if (isAutoScrolling) {
+              handleTouch();
+            }
+          },
+          onPointerUp: () {
+            // handleTouch() 已经设置了恢复定时器，所以这里不需要额外处理
+          },
+          onScrollNotification: (notification) {
+            // 保留以兼容现有代码（不再处理用户滚动）
+            return handleScrollNotification(notification);
+          },
+        ),
+        // 固定在底部的章节切换按钮
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: ReaderBottomBar(
+            currentIndex: currentIndex,
+            totalChapters: widget.chapters.length,
+            hasPrevious: hasPrevious,
+            hasNext: hasNext,
+            onPreviousChapter: _goToPreviousChapter,
+            onNextChapter: _goToNextChapter,
+          ),
+        ),
+      ],
+    );
   }
 
   // 注意：插图处理相关方法已提取到 IllustrationHandlerMixin
