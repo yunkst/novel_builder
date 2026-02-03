@@ -230,8 +230,9 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       // 调用 API 生成图片
       debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
       debugPrint('ApiServiceWrapper 初始化状态检查...');
-      final apiService = ApiServiceWrapper();
-      debugPrint('✅ ApiServiceWrapper 实例已创建');
+      // ✅ 使用子类提供的 apiService 访问器，而不是创建新实例
+      final apiService = this.apiService;
+      debugPrint('✅ ApiServiceWrapper 实例已获取');
       debugPrint('初始化状态: ${apiService.getInitStatus()}');
 
       debugPrint('🔄 开始API调用...');

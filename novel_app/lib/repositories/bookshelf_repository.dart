@@ -214,6 +214,7 @@ class BookshelfRepository extends BaseRepository
           description: maps[i]['description'],
           backgroundSetting: maps[i]['backgroundSetting'],
           isInBookshelf: true,
+          lastReadChapterIndex: maps[i]['lastReadChapter'] as int?,
         );
       });
     }
@@ -236,6 +237,7 @@ class BookshelfRepository extends BaseRepository
         description: maps[i]['description'],
         backgroundSetting: maps[i]['backgroundSetting'],
         isInBookshelf: true,
+        lastReadChapterIndex: maps[i]['lastReadChapter'] as int?,
       );
     });
   }

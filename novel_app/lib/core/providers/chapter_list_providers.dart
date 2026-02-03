@@ -36,7 +36,7 @@ class ChapterListState {
     this.isLoading = true,
     this.isInBookshelf = false,
     this.errorMessage = '',
-    this.lastReadChapterIndex = 0,
+    this.lastReadChapterIndex = -1,
     this.currentPage = 1,
     this.totalPages = 1,
     this.cachedStatus = const {},

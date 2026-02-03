@@ -47,12 +47,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.paragraph);
-    // 监听文本变化，但不触发重建
-    _controller.addListener(() {
-      if (widget.onContentChanged != null) {
-        widget.onContentChanged!(_controller.text);
-      }
-    });
+    // 移除 listener，改为在 TextField 的 onChanged 中处理用户输入
+    // 这样可以避免程序更新 controller.text 时触发不必要的回调
   }
 
   @override
@@ -62,7 +58,11 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
     if (oldWidget.paragraph != widget.paragraph) {
       // 检查是否是用户编辑导致的更新（避免覆盖用户输入）
       if (_controller.text != widget.paragraph) {
-        _controller.text = widget.paragraph;
+        // 使用 value 更新而不是直接设置 text，这样可以避免触发 TextField 的 onChanged
+        _controller.value = TextEditingValue(
+          text: widget.paragraph,
+          selection: TextSelection.collapsed(offset: widget.paragraph.length),
+        );
       }
     }
   }
@@ -186,6 +186,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
       ),
       child: TextField(
         controller: _controller,
+        onChanged: widget.onContentChanged, // 直接使用 onChanged 处理用户输入
         decoration: const InputDecoration(
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,

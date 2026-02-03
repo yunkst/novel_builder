@@ -100,6 +100,7 @@ class _ChapterListScreenRiverpodState
     final notifier = ref.read(chapterListProvider(widget.novel).notifier);
 
     // 首次加载完成时，自动滚动到上次阅读位置（只执行一次）
+    // 修复: 使用-1作为未加载的默认值，避免异步加载时序问题
     if (!_hasScrolledToLastRead &&
         state.chapters.isNotEmpty &&
         state.lastReadChapterIndex >= 0) {

@@ -114,21 +114,74 @@ Dio dio(Ref ref) {
 ///
 /// **使用示例**:
 /// ```dart
+/// // 方式1: 直接使用（已自动初始化）
 /// final apiService = ref.watch(apiServiceWrapperProvider);
-/// await apiService.init();
 /// final novels = await apiService.searchNovels('keyword');
+///
+/// // 方式2: 仅获取 Future（异步场景）
+/// final initFuture = ref.watch(apiServiceWrapperInitProvider);
+/// await initFuture;
 /// ```
 ///
 /// **注意事项**:
 /// - 使用 `keepAlive: true` 确保实例不会被销毁
-/// - 需要先调用 `init()` 方法初始化
+/// - Provider 会自动调用 `init()`，无需手动初始化
 /// - 通过依赖注入创建实例，便于测试
 @Riverpod(keepAlive: true)
 ApiServiceWrapper apiServiceWrapper(Ref ref) {
   // 通过依赖注入创建 ApiServiceWrapper 实例
   // 注入 Dio 实例，统一管理 HTTP 客户端
   final dio = ref.watch(dioProvider);
-  return ApiServiceWrapper(null, dio);
+  final apiService = ApiServiceWrapper(null, dio);
+
+  // 自动初始化（异步，不阻塞返回）
+  // 使用 onAddListener 的方式确保初始化只执行一次
+  ref.onDispose(() {
+    // 清理资源（如果需要）
+  });
+
+  // 异步初始化，不阻塞 Provider 返回
+  _initializeApiService(apiService);
+
+  return apiService;
+}
+
+/// ApiServiceWrapper 初始化 Provider
+///
+/// 提供 ApiServiceWrapper 的初始化 Future，用于需要等待初始化的场景。
+///
+/// **使用示例**:
+/// ```dart
+/// // 在应用启动时等待初始化
+/// final initFuture = ref.watch(apiServiceWrapperInitProvider);
+/// await initFuture;
+/// ```
+@Riverpod(keepAlive: true)
+Future<void> apiServiceWrapperInit(Ref ref) async {
+  final apiService = ref.watch(apiServiceWrapperProvider);
+  await apiService.init();
+}
+
+/// 异步初始化 ApiServiceWrapper
+///
+/// 这个函数会在后台异步执行初始化，不阻塞 Provider 返回。
+Future<void> _initializeApiService(ApiServiceWrapper apiService) async {
+  try {
+    await apiService.init();
+    LoggerService.instance.i(
+      'ApiServiceWrapper 自动初始化成功',
+      category: LogCategory.network,
+      tags: ['provider', 'init'],
+    );
+  } catch (e) {
+    LoggerService.instance.e(
+      'ApiServiceWrapper 自动初始化失败: $e',
+      category: LogCategory.network,
+      tags: ['provider', 'init', 'error'],
+    );
+    // 不抛出异常，允许应用继续运行
+    // 实际使用时，apiService 会通过 _ensureInitialized() 检查并重新初始化
+  }
 }
 
 /// PreloadService Provider

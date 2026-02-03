@@ -8,6 +8,7 @@ import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
+import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
@@ -86,6 +87,83 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
           tags: ['bookshelf', 'remove', 'failed'],
         );
       }
+    }
+  }
+
+  /// 继续阅读 - 直接打开上次阅读的章节
+  ///
+  /// [novel] 要阅读的小说
+  Future<void> _continueReading(Novel novel) async {
+    try {
+      // 1. 验证阅读进度
+      final lastChapterIndex = novel.lastReadChapterIndex;
+      if (lastChapterIndex == null || lastChapterIndex < 0) {
+        if (mounted) {
+          ToastUtils.showWarning('暂无阅读记录', context: context);
+        }
+        return;
+      }
+
+      // 2. 使用 ChapterLoader 加载章节列表
+      final chapterLoader = ref.read(chapterLoaderProvider);
+      final chapters = await chapterLoader.loadChapters(novel.url);
+
+      // 3. 检查章节列表
+      if (chapters.isEmpty) {
+        if (mounted) {
+          ToastUtils.showWarning('章节列表为空', context: context);
+        }
+        return;
+      }
+
+      // 4. 验证索引是否越界
+      if (lastChapterIndex >= chapters.length) {
+        if (mounted) {
+          ToastUtils.showWarning(
+            '上次阅读的章节不存在，已跳转到第一章',
+            context: context,
+          );
+        }
+        // 跳转到第一章
+        if (mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ReaderScreen(
+                novel: novel,
+                chapter: chapters.first,
+                chapters: chapters,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 5. 直接打开阅读器
+      final targetChapter = chapters[lastChapterIndex];
+      if (mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReaderScreen(
+              novel: novel,
+              chapter: targetChapter,
+              chapters: chapters,
+            ),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '打开章节失败',
+        error: e,
+        stackTrace: stackTrace,
+        category: LogCategory.ui,
+        tags: ['bookshelf', 'continue_reading', 'failed'],
+      );
     }
   }
 
@@ -521,52 +599,66 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                               ],
                             ],
                           ),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) {
-                              switch (value) {
-                                case 'move':
-                                  _showBookshelfSelectionDialog(novel, 'move');
-                                  break;
-                                case 'copy':
-                                  _showBookshelfSelectionDialog(novel, 'copy');
-                                  break;
-                                case 'delete':
-                                  _removeFromBookshelf(novel);
-                                  break;
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'move',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.drive_file_move_outline,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // 继续阅读按钮（仅在有阅读记录时显示）
+                              if (novel.lastReadChapterIndex != null &&
+                                  novel.lastReadChapterIndex! > 0)
+                                IconButton(
+                                  icon: const Icon(Icons.menu_book),
+                                  tooltip: '继续阅读',
+                                  onPressed: () => _continueReading(novel),
+                                ),
+                              // 原有的菜单按钮
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'move':
+                                      _showBookshelfSelectionDialog(novel, 'move');
+                                      break;
+                                    case 'copy':
+                                      _showBookshelfSelectionDialog(novel, 'copy');
+                                      break;
+                                    case 'delete':
+                                      _removeFromBookshelf(novel);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'move',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.drive_file_move_outline,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('移动到书架'),
+                                      ],
                                     ),
-                                    SizedBox(width: 8),
-                                    Text('移动到书架'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'copy',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.copy),
-                                    SizedBox(width: 8),
-                                    Text('复制到书架'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete),
-                                    SizedBox(width: 8),
-                                    Text('从书架移除'),
-                                  ],
-                                ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'copy',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.copy),
+                                        SizedBox(width: 8),
+                                        Text('复制到书架'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete),
+                                        SizedBox(width: 8),
+                                        Text('从书架移除'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

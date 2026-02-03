@@ -56,6 +56,11 @@ class _IllustrationDebugScreenState
     super.dispose();
   }
 
+  /// 公开方法：刷新列表数据（供外部调用）
+  void refreshData() {
+    _pagination.refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
