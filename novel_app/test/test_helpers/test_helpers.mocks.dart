@@ -1950,6 +1950,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i30.ApiServiceWrapper {
     required String? roleId,
     required int? count,
     String? referenceImageUrl,
+    String? modelName,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1959,6 +1960,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i30.ApiServiceWrapper {
             #roleId: roleId,
             #count: count,
             #referenceImageUrl: referenceImageUrl,
+            #modelName: modelName,
           },
         ),
         returnValue:

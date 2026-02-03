@@ -6,7 +6,7 @@ part of 'core_service_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$loggerServiceHash() => r'517b7a109d52d09f96accf83448ccbb019465e6f';
+String _$loggerServiceHash() => r'f7f42a5bf125c4aefb0d28f78e9ff7824ff70838';
 
 /// LoggerService Provider
 ///
@@ -53,7 +53,7 @@ final loggerServiceProvider = AutoDisposeProvider<LoggerService>.internal(
 // ignore: unused_element
 typedef LoggerServiceRef = AutoDisposeProviderRef<LoggerService>;
 String _$preferencesServiceHash() =>
-    r'1ea3b212d9f5520c6d39cca0036eafba0aa904e3';
+    r'082811fb7cecf997dd4fe3f88aa802ee93900402';
 
 /// PreferencesService Provider
 ///
@@ -61,7 +61,7 @@ String _$preferencesServiceHash() =>
 ///
 /// **功能**:
 /// - 持久化键值对存储
-/// - 支持多种数据类型（String、int、bool、double、List<String>等）
+/// - 支持多种数据类型（String、int、bool、double、List等）
 /// - 线程安全访问
 ///
 /// **依赖**:
@@ -95,7 +95,7 @@ final preferencesServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PreferencesServiceRef = AutoDisposeProviderRef<PreferencesService>;
-String _$backupServiceHash() => r'6562bd786fe8d1ffd05f248b3e2fad816221030f';
+String _$backupServiceHash() => r'ca2b99f7f26dceac6912129ba0d015c1f34cdbcc';
 
 /// BackupService Provider
 ///

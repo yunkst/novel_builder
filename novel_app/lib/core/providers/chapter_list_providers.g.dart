@@ -26,7 +26,7 @@ final currentNovelProvider = AutoDisposeProvider<Novel>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentNovelRef = AutoDisposeProviderRef<Novel>;
-String _$preloadProgressHash() => r'd1c9cca352e5509c5eef53f9fd1b5ce43d588fd3';
+String _$preloadProgressHash() => r'dbf149df8f45977d02fa916bbe473dd817cfbd40';
 
 /// Copied from Dart SDK
 class _SystemHash {

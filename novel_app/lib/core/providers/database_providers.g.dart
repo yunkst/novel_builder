@@ -119,7 +119,7 @@ final characterRepositoryProvider =
 // ignore: unused_element
 typedef CharacterRepositoryRef = AutoDisposeProviderRef<ICharacterRepository>;
 String _$characterRelationRepositoryHash() =>
-    r'eb2410d4a7e3db567ccdff1062885190ce3a84d9';
+    r'b74e9e2a4ae22543b30a1190bf11748c662c8370';
 
 /// CharacterRelationRepository Provider
 ///

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:novel_api/src/model/backup_upload_response.dart';
+import 'package:novel_api/novel_api.dart';
 import '../utils/format_utils.dart';
 
 /// 备份进度对话框

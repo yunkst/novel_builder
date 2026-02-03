@@ -17,6 +17,7 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod/riverpod.dart';
 import '../../../services/logger_service.dart';
 import '../../../services/preferences_service.dart';
 import '../../../services/backup_service.dart';
@@ -52,7 +53,7 @@ part 'core_service_providers.g.dart';
 /// - 日志文件位于应用文档目录
 /// - 支持异步日志写入
 @riverpod
-LoggerService loggerService(LoggerServiceRef ref) {
+LoggerService loggerService(Ref ref) {
   return LoggerService.instance;
 }
 
@@ -62,7 +63,7 @@ LoggerService loggerService(LoggerServiceRef ref) {
 ///
 /// **功能**:
 /// - 持久化键值对存储
-/// - 支持多种数据类型（String、int、bool、double、List<String>等）
+/// - 支持多种数据类型（String、int、bool、double、List等）
 /// - 线程安全访问
 ///
 /// **依赖**:
@@ -80,7 +81,7 @@ LoggerService loggerService(LoggerServiceRef ref) {
 /// - 所有操作都是异步的
 /// - 数据存储在本地 SharedPreferences
 @riverpod
-PreferencesService preferencesService(PreferencesServiceRef ref) {
+PreferencesService preferencesService(Ref ref) {
   return PreferencesService.instance;
 }
 
@@ -108,6 +109,6 @@ PreferencesService preferencesService(PreferencesServiceRef ref) {
 /// - 上传操作需要网络连接
 /// - 备份文件存储在服务器
 @riverpod
-BackupService backupService(BackupServiceRef ref) {
+BackupService backupService(Ref ref) {
   return BackupService();
 }

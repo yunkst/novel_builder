@@ -68,9 +68,7 @@ Future<List<Novel>> bookshelfNovels(Ref ref) async {
 ///
 /// 监听预加载服务的进度更新
 @riverpod
-Stream<Map<String, Map<String, int>>> preloadProgress(
-  PreloadProgressRef ref,
-) {
+Stream<Map<String, Map<String, int>>> preloadProgress(Ref ref) {
   // 获取 PreloadService
   final preloadService = ref.watch(preloadServiceProvider);
 
