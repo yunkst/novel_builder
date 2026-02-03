@@ -55,26 +55,5 @@ final novelContextBuilderProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NovelContextBuilderRef = AutoDisposeProviderRef<NovelContextBuilder>;
-String _$preloadServiceHash() => r'acec577aee64db912232979ba60e241953f3b237';
-
-/// PreloadService Provider
-///
-/// 提供预加载服务实例（单例）
-///
-/// Copied from [preloadService].
-@ProviderFor(preloadService)
-final preloadServiceProvider = AutoDisposeProvider<PreloadService>.internal(
-  preloadService,
-  name: r'preloadServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$preloadServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef PreloadServiceRef = AutoDisposeProviderRef<PreloadService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

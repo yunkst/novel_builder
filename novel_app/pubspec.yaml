@@ -55,8 +55,8 @@ dependencies:
   path_provider: ^2.1.1
   path: ^1.8.3
 
-  # 状态管理
-  provider: ^6.1.1
+  # 状态管理 (已弃用，改用 Riverpod)
+  # provider: ^6.1.1
   equatable: ^2.0.5
 
   # Riverpod 状态管理
@@ -72,8 +72,8 @@ dependencies:
   # 图片裁剪
   image_cropper: ^8.0.2
 
-  # 依赖注入
-  get_it: ^7.6.4
+  # 依赖注入 (未使用，已注释)
+  # get_it: ^7.6.4
 
   # 共享偏好设置
   shared_preferences: ^2.2.2

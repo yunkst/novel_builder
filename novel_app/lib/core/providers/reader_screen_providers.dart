@@ -8,7 +8,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../services/reader_settings_service.dart';
 import '../../services/novel_context_service.dart';
-import '../../services/preload_service.dart';
 import '../providers/database_providers.dart';
 
 part 'reader_screen_providers.g.dart';
@@ -32,10 +31,5 @@ NovelContextBuilder novelContextBuilder(Ref ref) {
   return NovelContextBuilder(novelRepository: novelRepository);
 }
 
-/// PreloadService Provider
-///
-/// 提供预加载服务实例（单例）
-@riverpod
-PreloadService preloadService(Ref ref) {
-  return PreloadService();
-}
+/// 注意：PreloadService Provider 已移至 network_service_providers.dart
+/// 请使用 preloadServiceProvider（已包含完整的依赖注入）

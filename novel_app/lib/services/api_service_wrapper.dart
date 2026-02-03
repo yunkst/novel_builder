@@ -29,67 +29,41 @@ import 'preferences_service.dart';
 /// 5. **请求去重**：通过 ChapterManager 管理并发请求，避免重复获取
 ///
 /// ## 架构设计
-/// - 单例模式：确保全局唯一的 API 客户端实例
+/// - 依赖注入模式：通过 Provider 管理生命周期
 /// - 自动重试：失败请求最多重试 2 次，支持指数退避
 /// - 连接池优化：限制最大并发连接数，避免资源耗尽
 /// - 健康检查：定期检测连接状态，自动恢复不健康连接
 ///
-/// ## API 分组
-/// ### 小说相关
-/// - `searchNovels()` - 搜索小说
-/// - `getChapters()` - 获取章节列表
-/// - `getChapterContent()` - 获取章节内容
-/// - `getSourceSites()` - 获取源站列表
-///
-/// ### 角色卡相关
-/// - `generateRoleCardImages()` - 生成角色卡图片
-/// - `getRoleGallery()` - 获取角色图集
-/// - `deleteRoleImage()` - 删除角色图片
-/// - `generateMoreImages()` - 生成更多相似图片
-///
-/// ### 场景插图相关
-/// - `createSceneIllustration()` - 创建场景插图任务
-/// - `getSceneIllustrationGallery()` - 获取场景插图图集
-/// - `deleteSceneIllustrationImage()` - 删除场景插图图片
-/// - `regenerateSceneIllustration()` / `regenerateSceneIllustrationImages()` - 重新生成场景插图
-///
-/// ### 图生视频相关
-/// - `generateVideoFromImage()` - 生成图生视频
-/// - `checkVideoStatus()` - 检查视频状态
-/// - `getVideoFileUrl()` - 获取视频文件 URL
-///
-/// ### 模型管理相关
-/// - `getModels()` - 获取所有可用模型列表
-/// - `getModelTitles()` - 获取指定类型的模型标题列表
-///
-/// ### 备份相关
-/// - `uploadBackup()` - 上传数据库备份
-///
 /// ## 使用示例
 /// ```dart
-/// // 1. 初始化（应用启动时调用一次）
-/// await ApiServiceWrapper().init();
+/// // 通过 Provider 获取实例（推荐方式）
+/// final apiService = ref.watch(apiServiceWrapperProvider);
 ///
-/// // 2. 搜索小说
-/// final novels = await ApiServiceWrapper().searchNovels('关键字');
-///
-/// // 3. 获取章节内容（带自动去重）
-/// final content = await ApiServiceWrapper().getChapterContent(url);
+/// // 直接使用（已通过 Provider 初始化）
+/// final novels = await apiService.searchNovels('关键字');
 /// ```
 class ApiServiceWrapper {
   static const String _prefsHostKey = 'backend_host';
   static const String _prefsTokenKey = 'backend_token';
 
-  // 单例模式
-  static final ApiServiceWrapper _instance = ApiServiceWrapper._internal();
-  factory ApiServiceWrapper() => _instance;
-  ApiServiceWrapper._internal();
+  /// 公共构造函数 - 通过依赖注入创建实例
+  ///
+  /// [api] OpenAPI 生成的 DefaultApi 实例（可选，用于测试）
+  /// [dio] Dio HTTP 客户端实例（可选，用于自定义配置）
+  ApiServiceWrapper([DefaultApi? api, Dio? dio])
+      : _api = api ?? DefaultApi(Dio(), standardSerializers),
+        _dio = dio ?? Dio(BaseOptions()) {
+    // 如果提供了 dio 但没有提供 api，需要创建 api
+    if (dio != null && api == null) {
+      _api = DefaultApi(dio, standardSerializers);
+    }
+  }
 
-  late Dio _dio;
-  late DefaultApi _api;
-  late Serializers _serializers;
+  final Dio _dio;
+  DefaultApi _api;
+  final Serializers _serializers = standardSerializers;
 
-  /// 章节管理器单例
+  /// 章节管理器实例
   final ChapterManager _chapterManager = ChapterManager();
 
   bool _initialized = false;
@@ -106,7 +80,7 @@ class ApiServiceWrapper {
 
   /// 初始化 API 客户端
   ///
-  /// 必须在使用前调用一次
+  /// 必须在使用前调用一次。此方法会重新配置 Dio 实例和创建 DefaultApi。
   Future<void> init() async {
     final host = await getHost();
 
@@ -125,12 +99,13 @@ class ApiServiceWrapper {
       throw Exception('后端 HOST 未配置');
     }
 
-    // 配置 Dio - 简化配置，token通过参数传递
-    _dio = Dio(BaseOptions(
+    // 重新配置 Dio - 更新 baseUrl 和配置
+    // 注意：由于 _dio 是 final，我们需要重新创建 _api 实例
+    final configuredDio = Dio(BaseOptions(
       baseUrl: host,
-      connectTimeout: Duration(seconds: 10),
-      receiveTimeout: Duration(seconds: 90),
-      sendTimeout: Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 90),
+      sendTimeout: const Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -143,13 +118,13 @@ class ApiServiceWrapper {
     ));
 
     // 配置优化的HttpClientAdapter
-    _dio.httpClientAdapter = IOHttpClientAdapter(
+    configuredDio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
         // 优化连接池配置：减少连接数避免资源耗尽
-        client.maxConnectionsPerHost = 20; // 从100减少到20
+        client.maxConnectionsPerHost = 20;
         // 设置连接空闲超时，避免长时间占用连接
-        client.idleTimeout = const Duration(seconds: 60); // 60秒空闲超时
+        client.idleTimeout = const Duration(seconds: 60);
         // 设置连接超时
         client.connectionTimeout = const Duration(seconds: 15);
         return client;
@@ -163,7 +138,7 @@ class ApiServiceWrapper {
     );
 
     // 添加日志拦截器（仅在调试模式）
-    _dio.interceptors.add(LogInterceptor(
+    configuredDio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: false, // 减少日志输出
       logPrint: (obj) => LoggerService.instance.d(
@@ -173,9 +148,8 @@ class ApiServiceWrapper {
       ),
     ));
 
-    // 初始化生成的 API 客户端
-    _serializers = standardSerializers;
-    _api = DefaultApi(_dio, _serializers);
+    // 使用配置好的 Dio 重新创建 API 客户端
+    _api = DefaultApi(configuredDio, _serializers);
 
     _initialized = true;
     _lastInitTime = DateTime.now();
@@ -540,16 +514,15 @@ class ApiServiceWrapper {
 
   /// 释放资源
   ///
-  /// 注意：由于ApiServiceWrapper使用单例模式，不应关闭共享的Dio实例
-  /// 所以此方法改为空操作，避免连接被过早关闭导致后续请求失败
+  /// 注意：ApiServiceWrapper 由 Provider 管理，不需要手动释放资源。
+  /// Provider 会自动管理实例的生命周期。
   void dispose() {
     LoggerService.instance.i(
-      'ApiServiceWrapper.dispose() called (no-op to maintain connection)',
+      'ApiServiceWrapper.dispose() called (managed by Provider)',
       category: LogCategory.network,
       tags: ['lifecycle', 'dispose'],
     );
-    // 不再关闭Dio连接，保持单例连接可用
-    // _dio.close(); // 已注释，避免关闭共享连接
+    // Provider 会管理资源生命周期，这里不需要手动释放
   }
 
   // ========================================================================

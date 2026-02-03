@@ -23,9 +23,9 @@ import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/scene_illustration_service.dart';
 import '../../../services/scene_illustration_cache_service.dart';
+import '../../../repositories/chapter_repository.dart';
 import '../repository_providers.dart';
 import '../../../services/logger_service.dart';
-import '../../../utils/logging/log_category.dart';
 
 part 'network_service_providers.g.dart';
 
@@ -93,7 +93,6 @@ Dio dio(Ref ref) {
     logPrint: (obj) => LoggerService.instance.d(
       '[Dio] $obj',
       category: LogCategory.network,
-      tags: ['interceptor'],
     ),
   ));
 
@@ -111,7 +110,7 @@ Dio dio(Ref ref) {
 /// - 支持 OpenAPI 生成的类型安全接口
 ///
 /// **依赖**:
-/// - [preferencesServiceProvider] - 用于读取 API 配置
+/// - [dioProvider] - HTTP 客户端
 ///
 /// **使用示例**:
 /// ```dart
@@ -121,14 +120,15 @@ Dio dio(Ref ref) {
 /// ```
 ///
 /// **注意事项**:
-/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 使用 `keepAlive: true` 确保实例不会被销毁
 /// - 需要先调用 `init()` 方法初始化
-/// - 内部已经是单例模式，Provider 提供统一访问方式
+/// - 通过依赖注入创建实例，便于测试
 @Riverpod(keepAlive: true)
 ApiServiceWrapper apiServiceWrapper(Ref ref) {
-  // ApiServiceWrapper 内部已经是单例模式
-  // 这里通过 Provider 提供统一的访问方式
-  return ApiServiceWrapper();
+  // 通过依赖注入创建 ApiServiceWrapper 实例
+  // 注入 Dio 实例，统一管理 HTTP 客户端
+  final dio = ref.watch(dioProvider);
+  return ApiServiceWrapper(null, dio);
 }
 
 /// PreloadService Provider
@@ -142,7 +142,8 @@ ApiServiceWrapper apiServiceWrapper(Ref ref) {
 /// - 任务队列管理
 ///
 /// **依赖**:
-/// - 无（独立服务）
+/// - [apiServiceWrapperProvider] - API 服务
+/// - [chapterRepositoryProvider] - 章节数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -154,7 +155,12 @@ ApiServiceWrapper apiServiceWrapper(Ref ref) {
 /// });
 ///
 /// // 开始预加载
-/// await preloadService.preloadNovel(novelUrl);
+/// await preloadService.enqueueTasks(
+///   novelUrl: novelUrl,
+///   novelTitle: novelTitle,
+///   chapterUrls: chapterUrls,
+///   currentIndex: currentIndex,
+/// );
 /// ```
 ///
 /// **注意事项**:
@@ -164,10 +170,17 @@ ApiServiceWrapper apiServiceWrapper(Ref ref) {
 @Riverpod(keepAlive: true)
 PreloadService preloadService(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
-  final service = PreloadService();
-  // 注入API服务
-  service.setApiService(apiService);
-  return service;
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+
+  // 类型转换：IChapterRepository -> ChapterRepository
+  // 因为 PreloadService 需要具体的 ChapterRepository 实现
+  // ignore: unnecessary_cast
+  final repository = chapterRepository as ChapterRepository;
+
+  return PreloadService(
+    apiService: apiService,
+    chapterRepository: repository,
+  );
 }
 
 /// SceneIllustrationService Provider
