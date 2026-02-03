@@ -132,6 +132,7 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
           _loadBookshelves(); // 重新加载书架列表
         }
       } catch (e, stackTrace) {
+        if (!mounted) return;
         ErrorHelper.showErrorWithLog(
           context,
           '创建失败',

@@ -270,6 +270,7 @@ class IllustrationRepository extends BaseRepository
   /// - [id] 记录ID
   ///
   /// 返回: 插图对象，不存在时返回null
+  @override
   Future<SceneIllustration?> getById(int id) async {
     try {
       final db = await database;

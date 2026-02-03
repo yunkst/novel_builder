@@ -127,6 +127,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
         ToastUtils.showSuccess('视频生成任务已创建，任务ID: ${response.taskId}');
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '生成视频失败',
@@ -249,6 +250,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
         ToastUtils.showSuccess('图片生成任务已创建，预计需要1-3分钟');
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '生成图片失败',

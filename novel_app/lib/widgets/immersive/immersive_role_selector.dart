@@ -54,7 +54,7 @@ class ImmersiveRoleSelector extends StatefulWidget {
 class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   late Set<int> _selectedRoleIds;
   late CharacterImageCacheService _imageCacheService;
-  late CharacterAvatarService _avatarService;
+  CharacterAvatarService? _avatarService;
 
   // 缓存阴影样式
   final List<BoxShadow> _avatarShadow = [
@@ -401,8 +401,12 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
     if (character.cachedImageUrl != null &&
         character.cachedImageUrl!.isNotEmpty) {
       // 显示缓存图片
+      if (_avatarService == null) {
+        return _buildPlaceholderAvatar(character);
+      }
+
       return FutureBuilder<String?>(
-        future: _avatarService.getCharacterAvatarPath(character.id!),
+        future: _avatarService!.getCharacterAvatarPath(character.id!),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data != null) {
             final avatarFile = File(snapshot.data!);

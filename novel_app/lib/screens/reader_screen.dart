@@ -685,6 +685,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         );
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '更新角色卡失败',
@@ -840,6 +841,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         }
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         'AI伴读失败',
@@ -1208,6 +1210,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               ToastUtils.showSuccess('全文重写完成并已保存', context: context);
             }
           } catch (e, stackTrace) {
+            if (!mounted) return;
             ErrorHelper.showErrorWithLog(
               context,
               '保存章节内容失败',
@@ -1234,6 +1237,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ToastUtils.showSuccess('章节内容已保存', context: context);
       }
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '保存编辑内容失败',
@@ -1655,6 +1659,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ),
       );
     } catch (e, stackTrace) {
+      if (!mounted) return;
       ErrorHelper.showErrorWithLog(
         context,
         '打开沉浸体验失败',

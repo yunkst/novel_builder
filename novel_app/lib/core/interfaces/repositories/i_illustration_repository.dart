@@ -88,6 +88,16 @@ abstract class IIllustrationRepository {
   /// 返回: 插图对象，不存在时返回null
   Future<SceneIllustration?> getSceneIllustrationByTaskId(String taskId);
 
+  /// 根据ID获取场景插图
+  ///
+  /// 通过记录ID查询单条插图记录
+  ///
+  /// 参数:
+  /// - [id] 记录ID
+  ///
+  /// 返回: 插图对象，不存在时返回null
+  Future<SceneIllustration?> getById(int id);
+
   /// 获取分页的场景插图列表（带总数）
   ///
   /// 分页查询所有插图记录，按创建时间降序排列

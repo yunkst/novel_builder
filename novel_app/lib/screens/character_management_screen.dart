@@ -151,6 +151,7 @@ class _CharacterManagementScreenState
     }
 
     // 显示加载对话框
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
