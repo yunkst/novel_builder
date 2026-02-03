@@ -7,6 +7,7 @@ import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
 import '../services/chapter_service.dart';
 import '../core/providers/database_providers.dart';
+import '../core/providers/service_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 
@@ -194,7 +195,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
 
   /// 获取前文内容（封装为独立方法，便于缓存）
   Future<List<String>> _getPreviousChapters() async {
-    final chapterService = ChapterService();
+    final chapterService = ref.watch(chapterServiceProvider);
 
     return await chapterService.getPreviousChaptersContent(
       chapters: widget.chapters,

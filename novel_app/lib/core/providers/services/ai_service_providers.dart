@@ -68,7 +68,7 @@ DifyService difyService(Ref ref) {
 ///
 /// **依赖**:
 /// - [difyServiceProvider] - Dify AI服务
-/// - [databaseServiceProvider] - 数据库访问
+/// - [characterRepositoryProvider] - 角色数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -85,10 +85,10 @@ DifyService difyService(Ref ref) {
 @riverpod
 CharacterCardService characterCardService(Ref ref) {
   final difyService = ref.watch(difyServiceProvider);
-  final databaseService = ref.watch(databaseServiceProvider);
+  final characterRepository = ref.watch(characterRepositoryProvider);
   return CharacterCardService(
     difyService: difyService,
-    databaseService: databaseService,
+    characterRepository: characterRepository,
   );
 }
 

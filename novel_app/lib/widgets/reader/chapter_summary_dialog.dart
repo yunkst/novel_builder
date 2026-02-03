@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/novel_context_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../utils/toast_utils.dart';
+import '../../core/providers/reader_screen_providers.dart';
 
 /// 章节总结对话框
 ///
@@ -14,7 +15,7 @@ import '../../utils/toast_utils.dart';
 /// - 提供章节总结功能的完整 UI
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持重新总结和复制功能
-class ChapterSummaryDialog extends StatefulWidget {
+class ChapterSummaryDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
   final Chapter currentChapter;
@@ -29,13 +30,11 @@ class ChapterSummaryDialog extends StatefulWidget {
   });
 
   @override
-  State<ChapterSummaryDialog> createState() => _ChapterSummaryDialogState();
+  ConsumerState<ChapterSummaryDialog> createState() => _ChapterSummaryDialogState();
 }
 
-class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
+class _ChapterSummaryDialogState extends ConsumerState<ChapterSummaryDialog>
     with DifyStreamingMixin {
-  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
-
   String _summaryResult = '';
   bool _showConfirmDialog = true;
 
@@ -126,8 +125,11 @@ class _ChapterSummaryDialogState extends State<ChapterSummaryDialog>
   // 生成章节总结（流式）
   Future<void> _generateSummarize() async {
     try {
+      // 使用 Provider 获取 NovelContextBuilder
+      final contextBuilder = ref.read(novelContextBuilderProvider);
+
       // 使用 NovelContextBuilder 统一获取上下文数据
-      final context = await _contextBuilder.buildContext(
+      final context = await contextBuilder.buildContext(
         widget.novel,
         widget.chapters,
         widget.currentChapter,

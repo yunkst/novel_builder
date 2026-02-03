@@ -14,6 +14,8 @@ import '../services/preload_service.dart';
 import '../services/character_card_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
 import '../mixins/reader/illustration_handler_mixin.dart';
@@ -619,7 +621,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 开始后台处理（无loading阻塞，允许用户继续阅读）
     try {
       // 使用 CharacterCardService 预览更新
-      final service = CharacterCardService();
+      final service = ref.read(characterCardServiceProvider);
       final updatedCharacters = await service.previewCharacterUpdates(
         novel: widget.novel,
         chapterContent: _content,
@@ -1573,7 +1575,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Chapter get currentChapter => _currentChapter;
 
   @override
-  DatabaseService get databaseService => _databaseService;
+  IChapterRepository get chapterRepository => ref.read(chapterRepositoryProvider);
+
+  @override
+  IIllustrationRepository get illustrationRepository =>
+      ref.read(illustrationRepositoryProvider);
 
   @override
   ApiServiceWrapper get apiService => _apiService;

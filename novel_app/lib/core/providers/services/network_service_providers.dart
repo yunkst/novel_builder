@@ -8,10 +8,10 @@
 /// - 场景插图服务
 ///
 /// **依赖**:
-/// - database_providers.dart - 数据库服务
+/// - repository_providers.dart - 数据仓库
 ///
 /// **相关 Providers**:
-/// - [database_service_providers.dart] - 数据库相关 Providers
+/// - [repository_providers.dart] - Repository 相关 Providers
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -19,7 +19,7 @@ import 'package:riverpod/riverpod.dart';
 import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/scene_illustration_service.dart';
-import '../database_providers.dart';
+import '../repository_providers.dart';
 
 part 'network_service_providers.g.dart';
 
@@ -99,7 +99,8 @@ PreloadService preloadService(Ref ref) {
 /// - 图片 URL 处理
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [illustrationRepositoryProvider] - 插图数据访问
 /// - [apiServiceWrapperProvider] - API 服务
 ///
 /// **使用示例**:
@@ -113,10 +114,12 @@ PreloadService preloadService(Ref ref) {
 /// - 插图生成是异步操作
 @riverpod
 SceneIllustrationService sceneIllustrationService(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final illustrationRepository = ref.watch(illustrationRepositoryProvider);
   final apiService = ref.watch(apiServiceWrapperProvider);
   return SceneIllustrationService(
-    databaseService: databaseService,
+    chapterRepository: chapterRepository,
+    illustrationRepository: illustrationRepository,
     apiService: apiService,
   );
 }

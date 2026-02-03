@@ -1,5 +1,6 @@
 import '../models/scene_illustration.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../core/di/api_service_provider.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/media_markup_parser.dart';
@@ -7,13 +8,16 @@ import 'logger_service.dart';
 import 'package:novel_api/novel_api.dart';
 
 class SceneIllustrationService {
-  final DatabaseService _databaseService;
+  final IChapterRepository _chapterRepository;
+  final IIllustrationRepository _illustrationRepository;
   final ApiServiceWrapper _apiService;
 
   SceneIllustrationService({
-    DatabaseService? databaseService,
+    required IChapterRepository chapterRepository,
+    required IIllustrationRepository illustrationRepository,
     ApiServiceWrapper? apiService,
-  })  : _databaseService = databaseService ?? DatabaseService(),
+  })  : _chapterRepository = chapterRepository,
+        _illustrationRepository = illustrationRepository,
         _apiService = apiService ?? ApiServiceProvider.instance;
 
   /// 创建场景插图任务（新版本：基于段落索引插入标记）
@@ -57,7 +61,7 @@ class SceneIllustrationService {
         completedAt: null,
       );
 
-      final id = await _databaseService.insertSceneIllustration(illustration);
+      final id = await _illustrationRepository.insertSceneIllustration(illustration);
 
       // 4. 调用后端API生成图片（直接传递RoleInfo列表）
       final response = await _apiService.createSceneIllustration(
@@ -135,7 +139,7 @@ class SceneIllustrationService {
       );
 
       // 插入数据库
-      final id = await _databaseService.insertSceneIllustration(illustration);
+      final id = await _illustrationRepository.insertSceneIllustration(illustration);
 
       if (id > 0) {
         return taskId; // 返回 taskId
@@ -164,7 +168,7 @@ class SceneIllustrationService {
   }) async {
     try {
       // 获取当前章节内容
-      final currentContent = await _databaseService.getCachedChapter(chapterId);
+      final currentContent = await _chapterRepository.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
         LoggerService.instance.e(
           '章节内容为空，无法插入插图标记',
@@ -227,7 +231,7 @@ class SceneIllustrationService {
 
       // 重新组合内容并保存
       final newContent = paragraphs.join('\n');
-      await _databaseService.updateChapterContent(chapterId, newContent);
+      await _chapterRepository.updateChapterContent(chapterId, newContent);
 
       LoggerService.instance.i(
         '插图标记已插入章节内容: $illustrationMarkup',
@@ -250,7 +254,7 @@ class SceneIllustrationService {
   Future<List<SceneIllustration>> getIllustrationsByChapter(
       String novelUrl, String chapterId) async {
     try {
-      final illustrations = await _databaseService
+      final illustrations = await _illustrationRepository
           .getSceneIllustrationsByChapter(novelUrl, chapterId);
       return illustrations;
     } catch (e, stackTrace) {
@@ -281,7 +285,7 @@ class SceneIllustrationService {
       );
 
       // 2. 删除本地记录（移除后端API调用）
-      await _databaseService.deleteSceneIllustration(illustrationId);
+      await _illustrationRepository.deleteSceneIllustration(illustrationId);
       return true;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
@@ -301,7 +305,7 @@ class SceneIllustrationService {
   }) async {
     try {
       // 获取当前章节内容
-      final currentContent = await _databaseService.getCachedChapter(chapterId);
+      final currentContent = await _chapterRepository.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
         LoggerService.instance.w(
           '章节内容为空，无法移除插图标记',
@@ -318,7 +322,7 @@ class SceneIllustrationService {
       final newContent = currentContent.replaceAll(targetMarkup, '');
 
       // 保存修改后的内容
-      await _databaseService.updateChapterContent(chapterId, newContent);
+      await _chapterRepository.updateChapterContent(chapterId, newContent);
 
       LoggerService.instance.i(
         '插图标记已从章节内容中移除: $targetMarkup',
@@ -362,7 +366,7 @@ class SceneIllustrationService {
           tags: ['illustration', 'regenerate', 'success'],
         );
         // 更新本地状态为处理中
-        await _databaseService.updateSceneIllustrationStatus(
+        await _illustrationRepository.updateSceneIllustrationStatus(
           illustrationId,
           'processing',
         );
@@ -389,7 +393,7 @@ class SceneIllustrationService {
   /// 编辑提示词
   Future<bool> updatePrompts(int illustrationId, String newPrompts) async {
     try {
-      await _databaseService.updateSceneIllustrationStatus(
+      await _illustrationRepository.updateSceneIllustrationStatus(
         illustrationId,
         'completed',
         prompts: newPrompts,
@@ -409,7 +413,10 @@ class SceneIllustrationService {
   /// 根据ID获取场景插图
   Future<SceneIllustration?> _getIllustrationById(int id) async {
     try {
-      final db = await _databaseService.database;
+      // IllustrationRepository没有getById方法
+      // 临时方案：使用chapterRepository的database访问（通过dynamic绕过接口限制）
+      // TODO: 在IllustrationRepository添加getById方法以提高类型安全性和性能
+      final db = await (_chapterRepository as dynamic).database;
       final List<Map<String, dynamic>> maps = await db.query(
         'scene_illustrations',
         where: 'id = ?',
@@ -437,7 +444,7 @@ class SceneIllustrationService {
       String novelUrl, String chapterId) async {
     try {
       // 仅刷新本地数据，不同步后端状态
-      await _databaseService.getSceneIllustrationsByChapter(
+      await _illustrationRepository.getSceneIllustrationsByChapter(
           novelUrl, chapterId);
     } catch (e, stackTrace) {
       LoggerService.instance.e(
@@ -453,7 +460,7 @@ class SceneIllustrationService {
   Future<List<SceneIllustration>> getPendingIllustrations() async {
     try {
       final illustrations =
-          await _databaseService.getPendingSceneIllustrations();
+          await _illustrationRepository.getPendingSceneIllustrations();
       return illustrations;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
