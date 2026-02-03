@@ -95,9 +95,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// [novel] 要阅读的小说
   Future<void> _continueReading(Novel novel) async {
     try {
-      // 1. 验证阅读进度
-      final lastChapterIndex = novel.lastReadChapterIndex;
-      if (lastChapterIndex == null || lastChapterIndex < 0) {
+      // 1. 从数据库重新查询最新的阅读进度(修复缓存问题)
+      // 不使用缓存的novel.lastReadChapterIndex,而是从数据库实时查询
+      final novelRepository = ref.read(novelRepositoryProvider);
+      final lastChapterIndex =
+          await novelRepository.getLastReadChapter(novel.url);
+
+      if (lastChapterIndex < 0) {
         if (mounted) {
           ToastUtils.showWarning('暂无阅读记录', context: context);
         }
