@@ -8,7 +8,7 @@ class GalleryActionPanel extends StatefulWidget {
   final int currentIndex;
   final int totalCount;
   final VoidCallback? onDelete;
-  final Future<void> Function(int)? onGenerateMore;
+  final Future<void> Function(int, String?)? onGenerateMore;
   final VoidCallback? onSetAsAvatar;
 
   const GalleryActionPanel({
@@ -47,8 +47,7 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
             _isProcessing = true;
           });
 
-          // TODO: 需要更新回调以支持模型参数
-          widget.onGenerateMore?.call(count).then((_) {
+          widget.onGenerateMore?.call(count, modelName).then((_) {
             if (mounted) {
               setState(() {
                 _isProcessing = false;

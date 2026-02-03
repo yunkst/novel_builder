@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import '../models/role_gallery.dart';
 import '../services/role_gallery_cache_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/database_service.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/logger_service.dart';
 
 /// 角色头像同步服务
 /// 负责将图集图片同步为角色头像
@@ -50,17 +50,29 @@ class CharacterAvatarSyncService {
   }) async {
     try {
       final targetFilename = filename ?? image.filename;
-      debugPrint('🔄 开始同步图片到角色头像: $targetFilename (角色ID: $characterId)');
+      LoggerService.instance.d(
+        '开始同步图片到角色头像: $targetFilename (角色ID: $characterId)',
+        category: LogCategory.cache,
+        tags: ['avatar', 'sync', 'start'],
+      );
 
       // 获取图片字节数据
       final imageBytes =
           await _galleryCacheService.getImageBytes(targetFilename);
       if (imageBytes == null) {
-        debugPrint('❌ 无法获取图片字节数据: $targetFilename');
+        LoggerService.instance.e(
+          '无法获取图片字节数据: $targetFilename',
+          category: LogCategory.cache,
+          tags: ['avatar', 'sync', 'error'],
+        );
         return null;
       }
 
-      debugPrint('📸 成功获取图片字节数据: ${imageBytes.length} bytes');
+      LoggerService.instance.d(
+        '成功获取图片字节数据: ${imageBytes.length} bytes',
+        category: LogCategory.cache,
+        tags: ['avatar', 'sync', 'bytes'],
+      );
 
       // 使用 CharacterImageCacheService 缓存图片作为头像
       final cachedImagePath = await _avatarCacheService.cacheCharacterImage(
@@ -76,14 +88,26 @@ class CharacterAvatarSyncService {
           cachedImagePath,
         );
 
-        debugPrint('✅ 图片同步为角色头像成功: $targetFilename -> $cachedImagePath');
+        LoggerService.instance.i(
+          '图片同步为角色头像成功: $targetFilename -> $cachedImagePath',
+          category: LogCategory.cache,
+          tags: ['avatar', 'sync', 'success'],
+        );
         return cachedImagePath;
       } else {
-        debugPrint('❌ 图片缓存失败: $targetFilename');
+        LoggerService.instance.e(
+          '图片缓存失败: $targetFilename',
+          category: LogCategory.cache,
+          tags: ['avatar', 'sync', 'error'],
+        );
         return null;
       }
     } catch (e) {
-      debugPrint('❌ 同步图片到角色头像失败: ${image.filename}, 错误: $e');
+      LoggerService.instance.e(
+        '同步图片到角色头像失败: ${image.filename}, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['avatar', 'sync', 'exception'],
+      );
       return null;
     }
   }
@@ -95,7 +119,11 @@ class CharacterAvatarSyncService {
   /// 返回同步的缓存路径，失败时返回null
   Future<String?> syncFirstImageToAvatar(int characterId) async {
     try {
-      debugPrint('🔄 开始同步角色的第一张图片为头像: 角色ID $characterId');
+      LoggerService.instance.d(
+        '开始同步角色的第一张图片为头像: 角色ID $characterId',
+        category: LogCategory.cache,
+        tags: ['avatar', 'sync', 'first'],
+      );
 
       // 获取角色图集
       final galleryData = await _apiService.getRoleGallery(characterId.toString());
@@ -104,14 +132,26 @@ class CharacterAvatarSyncService {
       // 获取第一张图片（优先取置顶图片）
       final firstImage = gallery.firstImage;
       if (firstImage != null) {
-        debugPrint('📸 找到图集第一张图片: ${firstImage.filename}');
+        LoggerService.instance.d(
+          '找到图集第一张图片: ${firstImage.filename}',
+          category: LogCategory.cache,
+          tags: ['avatar', 'sync', 'found'],
+        );
         return await syncImageToCharacterAvatar(characterId, firstImage);
       } else {
-        debugPrint('ℹ️ 角色图集为空: 角色ID $characterId');
+        LoggerService.instance.i(
+          '角色图集为空: 角色ID $characterId',
+          category: LogCategory.cache,
+          tags: ['avatar', 'sync', 'empty'],
+        );
         return null;
       }
     } catch (e) {
-      debugPrint('❌ 同步角色第一张图片失败: 角色ID $characterId, 错误: $e');
+      LoggerService.instance.e(
+        '同步角色第一张图片失败: 角色ID $characterId, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['avatar', 'sync', 'error'],
+      );
       return null;
     }
   }
@@ -149,10 +189,18 @@ class CharacterAvatarSyncService {
       // 清除数据库中的 cachedImageUrl 字段
       await _databaseService.clearCharacterCachedImage(characterId);
 
-      debugPrint('✅ 清除角色头像缓存成功: 角色ID $characterId');
+      LoggerService.instance.i(
+        '清除角色头像缓存成功: 角色ID $characterId',
+        category: LogCategory.cache,
+        tags: ['avatar', 'clear', 'success'],
+      );
       return true;
     } catch (e) {
-      debugPrint('❌ 清除角色头像缓存失败: 角色ID $characterId, 错误: $e');
+      LoggerService.instance.e(
+        '清除角色头像缓存失败: 角色ID $characterId, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['avatar', 'clear', 'error'],
+      );
       return false;
     }
   }
@@ -171,7 +219,11 @@ class CharacterAvatarSyncService {
       results[characterId] = result;
     }
 
-    debugPrint('📊 批量同步角色头像完成: ${results.length} 个角色');
+    LoggerService.instance.i(
+      '批量同步角色头像完成: ${results.length} 个角色',
+      category: LogCategory.cache,
+      tags: ['avatar', 'batch', 'complete'],
+    );
     return results;
   }
 }

@@ -681,6 +681,7 @@ class ApiServiceWrapper {
     required String roleId,
     required int count,
     String? referenceImageUrl,
+    String? modelName,
   }) async {
     return LogScope.capture(
       name: '生成更多图片',
@@ -690,6 +691,7 @@ class ApiServiceWrapper {
         'roleId': roleId,
         'count': count,
         if (referenceImageUrl != null) 'hasReference': true,
+        if (modelName != null) 'modelName': modelName,
       },
       action: () async {
         _ensureInitialized();

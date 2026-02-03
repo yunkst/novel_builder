@@ -412,24 +412,10 @@ class SceneIllustrationService {
   /// 根据ID获取场景插图
   Future<SceneIllustration?> _getIllustrationById(int id) async {
     try {
-      // IllustrationRepository没有getById方法
-      // 临时方案：使用chapterRepository的database访问（通过dynamic绕过接口限制）
-      // TODO: 在IllustrationRepository添加getById方法以提高类型安全性和性能
-      final db = await (_chapterRepository as dynamic).database;
-      final List<Map<String, dynamic>> maps = await db.query(
-        'scene_illustrations',
-        where: 'id = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-
-      if (maps.isNotEmpty) {
-        return SceneIllustration.fromMap(maps.first);
-      }
-      return null;
+      return await _illustrationRepository.getById(id);
     } catch (e, stackTrace) {
       LoggerService.instance.e(
-        '获取场景插图失败: $e',
+        '获取插图失败: id=$id - $e',
         stackTrace: stackTrace.toString(),
         category: LogCategory.ai,
         tags: ['illustration', 'get', 'error'],

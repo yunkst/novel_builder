@@ -262,6 +262,39 @@ class IllustrationRepository extends BaseRepository
     }
   }
 
+  /// 根据ID获取场景插图
+  ///
+  /// 通过记录ID查询单条插图记录
+  ///
+  /// 参数:
+  /// - [id] 记录ID
+  ///
+  /// 返回: 插图对象，不存在时返回null
+  Future<SceneIllustration?> getById(int id) async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'scene_illustrations',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+
+      if (maps.isNotEmpty) {
+        return SceneIllustration.fromMap(maps.first);
+      }
+      return null;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '查询插图失败: id=$id - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['illustration', 'query', 'failed'],
+      );
+      rethrow;
+    }
+  }
+
   /// 获取分页的场景插图列表（带总数）
   ///
   /// 分页查询所有插图记录，按创建时间降序排列

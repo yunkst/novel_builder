@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
 import '../services/role_gallery_cache_service.dart';
+import '../services/logger_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/services/network_service_providers.dart';
 
@@ -72,12 +73,20 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
         _isLoading = false;
       });
 
-      debugPrint('✓ 图集加载成功: ${_gallery?.imageCount ?? 0} 张图片');
+      LoggerService.instance.i(
+        '图集加载成功: ${_gallery?.imageCount ?? 0} 张图片',
+        category: LogCategory.ui,
+        tags: ['gallery', 'load', 'success'],
+      );
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      debugPrint('❌ 图集加载失败: $e');
+      LoggerService.instance.e(
+        '图集加载失败: $e',
+        category: LogCategory.ui,
+        tags: ['gallery', 'load', 'error'],
+      );
     }
   }
 

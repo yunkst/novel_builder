@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import '../models/chapter.dart';
 import '../utils/deque.dart';
 import 'rate_limiter.dart';
@@ -68,9 +67,21 @@ class PreloadService {
   }
 
   /// 初始化服务
+  ///
+  /// 优先级: P3 - 低（架构优化）
+  /// Issue: 迁移到Provider模式
+  ///
+  /// 当前实现: 通过setApiService手动注入
+  /// 目标实现:
+  /// 1. 使用ref.watch(apiServiceWrapperProvider)
+  /// 2. 移除setApiService方法
+  /// 3. 依赖注入由Riverpod管理
+  ///
+  /// 阻塞原因:
+  /// - 需要PreloadService也转换为Provider
+  /// - 涉及多个依赖服务的重构
   void _initServices() {
     _chapterRepository = ChapterRepository(dbConnection: DatabaseConnection());
-    // TODO: 迁移到Provider模式后使用ref.watch(apiServiceWrapperProvider)
     // API服务将通过setApiService注入
     LoggerService.instance.i(
       'PreloadService初始化完成',
@@ -358,13 +369,21 @@ class PreloadService {
     _processingCompleter = null;
     _shouldStop = false;
 
-    debugPrint('🧹 预加载队列已清空');
+    LoggerService.instance.i(
+      '预加载队列已清空',
+      category: LogCategory.cache,
+      tags: ['preload', 'clear'],
+    );
   }
 
   /// 暂停队列处理
   void pause() {
     if (isProcessing) {
-      debugPrint('⏸️ 预加载已暂停（将在当前任务完成后停止）');
+      LoggerService.instance.i(
+        '预加载已暂停（将在当前任务完成后停止）',
+        category: LogCategory.cache,
+        tags: ['preload', 'pause'],
+      );
     }
   }
 
@@ -390,7 +409,11 @@ class PreloadService {
         totalChapters: _queue.length + cachedCount, // 估算总数
       ));
     } catch (e) {
-      debugPrint('⚠️ 发送进度更新失败: $e');
+      LoggerService.instance.w(
+        '发送进度更新失败: $e',
+        category: LogCategory.cache,
+        tags: ['preload', 'notify', 'error'],
+      );
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as flutter;
 import 'package:flutter/material.dart';
 import 'preferences_service.dart';
+import 'logger_service.dart';
 
 /// 应用主题模式枚举
 enum AppThemeMode {
@@ -42,16 +43,28 @@ class ThemeService extends ChangeNotifier {
           (mode) => mode.toString() == themeModeString,
           orElse: () => AppThemeMode.dark,
         );
-        print('已加载主题模式: $_themeMode');
+        LoggerService.instance.i(
+          '已加载主题模式: $_themeMode',
+          category: LogCategory.ui,
+          tags: ['theme', 'load'],
+        );
       } else {
         // 默认暗色主题
         _themeMode = AppThemeMode.dark;
-        print('使用默认主题模式: $_themeMode');
+        LoggerService.instance.i(
+          '使用默认主题模式: $_themeMode',
+          category: LogCategory.ui,
+          tags: ['theme', 'default'],
+        );
       }
 
       notifyListeners();
     } catch (e) {
-      print('初始化主题设置失败: $e');
+      LoggerService.instance.e(
+        '初始化主题设置失败: $e',
+        category: LogCategory.ui,
+        tags: ['theme', 'init', 'error'],
+      );
       _themeMode = AppThemeMode.dark;
     }
   }
@@ -82,10 +95,18 @@ class ThemeService extends ChangeNotifier {
       await _prefs.setString(_themeModeKey, mode.toString());
 
       _themeMode = mode;
-      print('主题模式已更改: $mode');
+      LoggerService.instance.i(
+        '主题模式已更改: $mode',
+        category: LogCategory.ui,
+        tags: ['theme', 'change'],
+      );
       notifyListeners();
     } catch (e) {
-      print('保存主题模式失败: $e');
+      LoggerService.instance.e(
+        '保存主题模式失败: $e',
+        category: LogCategory.ui,
+        tags: ['theme', 'save', 'error'],
+      );
       rethrow;
     }
   }
