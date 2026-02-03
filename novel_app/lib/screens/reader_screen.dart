@@ -179,7 +179,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // ========== 初始化 ReaderContentController ==========
     // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
     _contentController = ReaderContentController(
-      ref: ref as Ref<Object?>,
+      ref: ref,
       apiService: _apiService,
       chapterRepository: ref.read(chapterRepositoryProvider),
       novelRepository: ref.read(novelRepositoryProvider),
@@ -187,8 +187,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     // ========== 初始化 ReaderInteractionController ==========
     // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
-    _interactionController =
-        ReaderInteractionController(ref: ref as Ref<Object?>);
+    _interactionController = ReaderInteractionController(ref: ref);
 
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
@@ -1125,16 +1124,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return;
     }
 
+    // ⚠️ 重要：必须传递过滤后的内容，与UI层保持一致
+    // UI层使用的是 _paragraphs（过滤空行后的列表）
+    // 用户选择的索引也是基于过滤后的列表
+    // 如果传递原始内容，会导致索引不匹配
+    final filteredContent = _paragraphs.join('\n');
+
     await showDialog(
       context: context,
       builder: (_) => ParagraphRewriteDialog(
         novel: widget.novel,
         chapters: widget.chapters,
         currentChapter: _currentChapter,
-        content: _content,
+        content: filteredContent, // 使用过滤后的内容
         selectedParagraphIndices: _selectedParagraphIndices,
         onReplace: (newContent) {
           setState(() {
+            // 新内容已经是过滤后的，直接设置即可
             _contentController.setContent(newContent);
             _interactionController.clearSelection();
             _isCloseupMode = false;
@@ -1240,6 +1246,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 使用 ref.watch 监听编辑模式状态
     final isEditMode = ref.watch(readerEditModeProvider);
 
+    // ⭐ 关键修复：监听章节内容状态变化，确保UI在内容加载完成后重建
+    final contentState = ref.watch(chapterContentStateNotifierProvider);
+
     // 监听 ReaderScreenNotifier 状态，处理对话框显示
     ref.listen<ReaderScreenState>(
       readerScreenNotifierProvider,
@@ -1309,6 +1318,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return ReaderErrorView(
         errorMessage: _errorMessage,
         onRetry: () => _loadChapterContent(resetScrollPosition: false),
+      );
+    }
+
+    // 新增：检查内容是否为空（修复空白页面问题）
+    if (!_isLoading && _content.trim().isEmpty && paragraphs.isEmpty) {
+      return ReaderErrorView(
+        errorMessage: '章节内容为空，请尝试刷新或联系开发者',
+        onRetry: () => _loadChapterContent(
+          resetScrollPosition: false,
+          forceRefresh: true,
+        ),
       );
     }
 

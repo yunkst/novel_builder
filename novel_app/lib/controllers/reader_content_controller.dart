@@ -5,7 +5,7 @@ import '../services/api_service_wrapper.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_novel_repository.dart';
 import '../core/providers/reader_state_providers.dart';
-import 'package:riverpod/riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// ReaderContentController (新版本)
 ///
@@ -33,12 +33,12 @@ class ReaderContentController {
   final ApiServiceWrapper _apiService;
   final IChapterRepository _chapterRepository;
   final INovelRepository _novelRepository;
-  final Ref _ref;
+  final WidgetRef _ref;
 
   // ========== 构造函数 ==========
 
   ReaderContentController({
-    required Ref ref,
+    required WidgetRef ref,
     required ApiServiceWrapper apiService,
     required IChapterRepository chapterRepository,
     required INovelRepository novelRepository,
@@ -102,7 +102,7 @@ class ReaderContentController {
       // 尝试从缓存获取
       final cachedContent =
           await _chapterRepository.getCachedChapter(chapter.url);
-      if (cachedContent != null && cachedContent.isNotEmpty) {
+      if (cachedContent != null && cachedContent.trim().isNotEmpty) {
         content = cachedContent;
         debugPrint(
             '💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
@@ -114,17 +114,28 @@ class ReaderContentController {
           forceRefresh: forceRefresh,
         );
 
-        // 验证内容并缓存
-        if (content.isNotEmpty && content.length > 50) {
-          await _chapterRepository.cacheChapter(
-            novel.url,
-            chapter,
-            content,
-          );
-          debugPrint('✅ ReaderContentController: 已缓存章节 - ${content.length}字符');
-        } else {
-          throw Exception('获取到的章节内容为空或过短');
+        // 改进：使用 trim() 验证内容有效性
+        final trimmedContent = content.trim();
+        if (trimmedContent.isEmpty) {
+          throw Exception('获取到的章节内容为空');
         }
+
+        if (trimmedContent.length < 50) {
+          throw Exception('获取到的章节内容过短（${trimmedContent.length}字符）');
+        }
+
+        // 验证通过，缓存章节
+        await _chapterRepository.cacheChapter(
+          novel.url,
+          chapter,
+          content,
+        );
+        debugPrint('✅ ReaderContentController: 已缓存章节 - ${content.length}字符');
+      }
+
+      // 再次验证内容是否为空（防御性编程）
+      if (content.trim().isEmpty) {
+        throw Exception('章节内容为空，无法显示');
       }
 
       // 更新状态
