@@ -5,10 +5,10 @@ import '../models/chapter.dart';
 import '../models/reading_progress.dart';
 import '../models/tts_timer_config.dart';
 import 'tts_service.dart';
-import 'database_service.dart';
 import 'api_service_wrapper.dart';
 import 'logger_service.dart';
 import 'preferences_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
 
 /// TTS播放器状态
 enum TtsPlayerState {
@@ -24,7 +24,7 @@ enum TtsPlayerState {
 class TtsPlayerService extends ChangeNotifier {
   // 依赖服务 - 通过构造函数注入
   final TtsService _tts;
-  final DatabaseService _database;
+  final IChapterRepository _chapterRepo;
   final ApiServiceWrapper _api;
 
   // 状态订阅
@@ -98,14 +98,14 @@ class TtsPlayerService extends ChangeNotifier {
   /// 创建 TTS 播放器服务实例
   ///
   /// 参数:
-  /// - [database] 数据库服务（必需）
+  /// - [chapterRepository] 章节数据仓库（必需）
   /// - [apiService] API服务（必需）
   /// - [ttsService] TTS服务（可选，默认创建新实例）
   TtsPlayerService({
-    required DatabaseService database,
+    required IChapterRepository chapterRepository,
     required ApiServiceWrapper apiService,
     TtsService? ttsService,
-  })  : _database = database,
+  })  : _chapterRepo = chapterRepository,
         _api = apiService,
         _tts = ttsService ?? TtsService() {
     _initTtsListeners();
@@ -560,7 +560,7 @@ class TtsPlayerService extends ChangeNotifier {
   Future<String?> _loadChapterContent(Chapter chapter) async {
     try {
       // 先尝试从数据库获取
-      final cached = await _database.getChapterContent(chapter.url);
+      final cached = await _chapterRepo.getCachedChapter(chapter.url);
       if (cached != null && cached.isNotEmpty) {
         LoggerService.instance.d(
           '使用缓存: ${chapter.title}',
@@ -579,7 +579,7 @@ class TtsPlayerService extends ChangeNotifier {
       final content = await _api.getChapterContent(chapter.url);
 
       // 缓存到数据库
-      await _database.updateChapterContent(chapter.url, content);
+      await _chapterRepo.updateChapterContent(chapter.url, content);
 
       return content;
     } catch (e, stackTrace) {

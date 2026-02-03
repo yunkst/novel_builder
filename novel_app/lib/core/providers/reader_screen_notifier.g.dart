@@ -7,7 +7,7 @@ part of 'reader_screen_notifier.dart';
 // **************************************************************************
 
 String _$readerScreenNotifierHash() =>
-    r'c8037c04f1fb986cc83f12b147b36923b65ac6f3';
+    r'84adb98b263fdeae67553fdbfa8d2d56a447090b';
 
 /// ReaderScreenNotifier
 ///

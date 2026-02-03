@@ -65,7 +65,8 @@ class AsyncStateWidget<T> extends StatelessWidget {
 
     // 处理错误状态
     if (snapshot.hasError) {
-      return errorBuilder?.call(snapshot.error!) ?? _buildErrorWidget(context, snapshot.error!);
+      return errorBuilder?.call(snapshot.error!) ??
+          _buildErrorWidget(context, snapshot.error!);
     }
 
     // 处理空数据状态

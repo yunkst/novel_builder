@@ -36,7 +36,6 @@ export 'services/ai_service_providers.dart'
     show
         difyServiceProvider,
         characterCardServiceProvider,
-        characterExtractionServiceProvider,
         outlineServiceProvider;
 
 // 网络服务
@@ -54,7 +53,8 @@ export 'services/database_service_providers.dart'
         chapterActionHandlerProvider,
         chapterReorderControllerProvider,
         chapterSearchServiceProvider,
-        cacheSearchServiceProvider;
+        cacheSearchServiceProvider,
+        characterExtractionServiceProvider;
 
 // 缓存服务
 export 'services/cache_service_providers.dart'

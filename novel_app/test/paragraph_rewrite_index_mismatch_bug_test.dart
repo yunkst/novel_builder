@@ -27,7 +27,8 @@ void main() {
       }
 
       // reader_screen.dart 会过滤空段落
-      final filteredParagraphs = rawParagraphs.where((p) => p.trim().isNotEmpty).toList();
+      final filteredParagraphs =
+          rawParagraphs.where((p) => p.trim().isNotEmpty).toList();
       print('\n过滤后段落（UI显示）:');
       for (int i = 0; i < filteredParagraphs.length; i++) {
         print('  [$i] "${filteredParagraphs[i]}"');
@@ -82,7 +83,8 @@ void main() {
 
       print('\n=== Bug场景：连续空行 ===');
       final rawParagraphs = rawContent.split('\n');
-      final filteredParagraphs = rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
+      final filteredParagraphs =
+          rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
       print('原始段落数: ${rawParagraphs.length}');
       print('过滤后段落数: ${filteredParagraphs.length}');
@@ -125,7 +127,8 @@ void main() {
 
       print('\n=== Bug场景：段落前有空行 ===');
       final rawParagraphs = rawContent.split('\n');
-      final filteredParagraphs = rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
+      final filteredParagraphs =
+          rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
       print('用户看到的段落（过滤空行）:');
       filteredParagraphs.asMap().forEach((i, p) => print('  [$i] $p'));
@@ -133,12 +136,14 @@ void main() {
       // 用户选择UI上的索引[1]（"这是第一段内容"）
       const uiSelectedIndex = 1;
 
-      print('\n用户选择UI索引[$uiSelectedIndex]: "${filteredParagraphs[uiSelectedIndex]}"');
+      print(
+          '\n用户选择UI索引[$uiSelectedIndex]: "${filteredParagraphs[uiSelectedIndex]}"');
 
       // 但传递给Dialog的索引是[1]
       // Dialog使用原始内容split，索引1是空行！
 
-      print('\n实际替换原始索引[$uiSelectedIndex]: "${rawParagraphs[uiSelectedIndex]}"');
+      print(
+          '\n实际替换原始索引[$uiSelectedIndex]: "${rawParagraphs[uiSelectedIndex]}"');
       print('这是一个空行！用户期望的"这是第一段内容"在原始索引2！');
 
       const selectedIndices = [1];
@@ -173,7 +178,8 @@ void main() {
       print('2. 或者 Dialog 内部使用过滤后的段落');
 
       // 模拟修复：使用过滤后的段落
-      final filteredParagraphs = rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
+      final filteredParagraphs =
+          rawContent.split('\n').where((p) => p.trim().isNotEmpty).toList();
       final filteredContent = filteredParagraphs.join('\n');
 
       print('\n过滤后内容:');

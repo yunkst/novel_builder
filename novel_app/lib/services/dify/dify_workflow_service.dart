@@ -511,8 +511,7 @@ class DifyWorkflowService {
   String _buildErrorFromResponse(int statusCode, String errorBody) {
     try {
       final errorData = jsonDecode(errorBody);
-      final errorMessage =
-          errorData['message'] ?? errorData['error'] ?? '未知错误';
+      final errorMessage = errorData['message'] ?? errorData['error'] ?? '未知错误';
       final errorCode = errorData['code'] ?? '';
       return 'Dify API 请求失败 ($statusCode)\n错误码: $errorCode\n错误信息: $errorMessage';
     } catch (e) {

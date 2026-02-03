@@ -46,7 +46,9 @@ IDatabaseConnection iDatabaseConnection(Ref ref) {
 ///
 /// 提供全局单例 DatabaseService 实例（向后兼容）
 /// 注意：新代码建议使用 databaseConnectionProvider
+// ignore: deprecated_member_use_from_same_package
 final databaseServiceProvider = Provider<DatabaseService>((ref) {
+  // ignore: deprecated_member_use_from_same_package
   return DatabaseService();
 });
 

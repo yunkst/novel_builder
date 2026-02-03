@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
 
 /// ChapterHistoryService
 ///
@@ -17,7 +17,7 @@ import '../services/database_service.dart';
 ///
 /// // 或手动指定依赖
 /// final service = ChapterHistoryService(
-///   databaseService: _databaseService,
+///   chapterRepo: _chapterRepo,
 ///   apiService: _apiService,
 /// );
 ///
@@ -28,18 +28,18 @@ import '../services/database_service.dart';
 /// );
 /// ```
 class ChapterHistoryService {
-  final DatabaseService _databaseService;
+  final IChapterRepository _chapterRepo;
   final ApiServiceWrapper _apiService;
 
   /// 创建 ChapterHistoryService 实例
   ///
   /// 参数:
-  /// - [databaseService] 数据库服务（必需）
+  /// - [chapterRepo] 章节仓库（必需）
   /// - [apiService] API服务（必需）
   ChapterHistoryService({
-    required DatabaseService databaseService,
+    required IChapterRepository chapterRepo,
     required ApiServiceWrapper apiService,
-  })  : _databaseService = databaseService,
+  })  : _chapterRepo = chapterRepo,
         _apiService = apiService;
 
   /// 获取历史章节内容（最多前N章）
@@ -75,7 +75,7 @@ class ChapterHistoryService {
 
         try {
           // 尝试从缓存获取
-          var content = await _databaseService.getCachedChapter(chapter.url);
+          var content = await _chapterRepo.getCachedChapter(chapter.url);
 
           // 如果缓存未命中，从API获取
           if (content == null || content.isEmpty) {
@@ -127,7 +127,7 @@ class ChapterHistoryService {
         final chapter = chapters[historyIndex];
 
         try {
-          var content = await _databaseService.getCachedChapter(chapter.url) ??
+          var content = await _chapterRepo.getCachedChapter(chapter.url) ??
               await _apiService.getChapterContent(chapter.url);
 
           historyContents.add(content);

@@ -57,7 +57,8 @@ class _UnifiedRelationshipGraphScreenRiverpodState
 
     // 使用 Provider 注入 Repository 接口
     _characterRepository = ref.read(characterRepositoryProvider);
-    _characterRelationRepository = ref.read(characterRelationRepositoryProvider);
+    _characterRelationRepository =
+        ref.read(characterRelationRepositoryProvider);
 
     // 修复缩放问题: 设置初始缩放为0.6,允许用户缩小和放大
     _controller = ForceDirectedGraphController<int>(
@@ -159,7 +160,8 @@ class _UnifiedRelationshipGraphScreenRiverpodState
   /// 加载全局数据
   Future<void> _loadGlobalData() async {
     // 加载所有角色
-    final allCharacters = await _characterRepository.getCharacters(widget.novelUrl);
+    final allCharacters =
+        await _characterRepository.getCharacters(widget.novelUrl);
 
     if (allCharacters.isEmpty) {
       return;
@@ -169,7 +171,8 @@ class _UnifiedRelationshipGraphScreenRiverpodState
     final Set<CharacterRelationship> allRelationships = {};
     for (final character in allCharacters) {
       if (character.id != null) {
-        final rels = await _characterRelationRepository.getRelationships(character.id!);
+        final rels =
+            await _characterRelationRepository.getRelationships(character.id!);
         allRelationships.addAll(rels);
       }
     }
@@ -388,11 +391,11 @@ class _UnifiedRelationshipGraphScreenRiverpodState
 
     // 根据度数和是否是中心节点计算大小
     // 优化：减小基础大小，增加度数权重的影响，使节点大小差异更明显
-    final baseSize = isCenter ? 60.0 : 40.0;  // 减小基础大小
-    final size = baseSize + degree * 3.0;  // 增加度数权重
-    final maxSize = 85.0;  // 减小最大尺寸
-    final minSize = 35.0;  // 设置最小尺寸，防止节点过小
-    final finalSize = size.clamp(minSize, maxSize);  // 使用clamp限制大小范围
+    final baseSize = isCenter ? 60.0 : 40.0; // 减小基础大小
+    final size = baseSize + degree * 3.0; // 增加度数权重
+    final maxSize = 85.0; // 减小最大尺寸
+    final minSize = 35.0; // 设置最小尺寸，防止节点过小
+    final finalSize = size.clamp(minSize, maxSize); // 使用clamp限制大小范围
 
     return GestureDetector(
       onTap: () {

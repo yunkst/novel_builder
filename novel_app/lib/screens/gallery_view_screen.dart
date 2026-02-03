@@ -199,7 +199,8 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
           _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
       final referenceImageUrl = currentImage?.filename;
 
-      debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName');
+      debugPrint(
+          '🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName');
 
       await apiService.generateMoreImages(
         roleId: widget.roleId,
@@ -715,7 +716,8 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
         currentIndex: _currentIndex,
         totalCount: _sortedImages.length,
         onDelete: () => _onDeleteImage(currentImage),
-        onGenerateMore: (count, modelName) => _onGenerateMoreImages(count, modelName),
+        onGenerateMore: (count, modelName) =>
+            _onGenerateMoreImages(count, modelName),
         onSetAsAvatar: () => _onSetAsAvatar(currentImage),
       ),
     );

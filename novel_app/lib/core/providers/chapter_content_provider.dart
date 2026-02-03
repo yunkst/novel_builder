@@ -69,7 +69,8 @@ class ChapterContent extends _$ChapterContent {
       }
 
       // 尝试从缓存获取
-      final cachedContent = await chapterRepository.getCachedChapter(chapter.url);
+      final cachedContent =
+          await chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
       } else {

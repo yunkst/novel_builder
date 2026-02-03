@@ -10,7 +10,8 @@ class BackendSettingsScreen extends ConsumerStatefulWidget {
   const BackendSettingsScreen({super.key});
 
   @override
-  ConsumerState<BackendSettingsScreen> createState() => _BackendSettingsScreenState();
+  ConsumerState<BackendSettingsScreen> createState() =>
+      _BackendSettingsScreenState();
 }
 
 class _BackendSettingsScreenState extends ConsumerState<BackendSettingsScreen> {

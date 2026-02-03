@@ -423,15 +423,12 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                       final stats = progress[novel.url];
                       // 注意：不再批量统计缓存状态，避免性能问题
                       // 进度条UI将依赖预加载服务的实时更新（如果有）
-                      final cached = stats != null
-                          ? (stats['cachedChapters'] ?? 0)
-                          : 0;
-                      final total = stats != null
-                          ? (stats['totalChapters'] ?? 0)
-                          : 0;
-                      final double percent = (total > 0)
-                          ? (cached / total).clamp(0.0, 1.0)
-                          : 0.0;
+                      final cached =
+                          stats != null ? (stats['cachedChapters'] ?? 0) : 0;
+                      final total =
+                          stats != null ? (stats['totalChapters'] ?? 0) : 0;
+                      final double percent =
+                          (total > 0) ? (cached / total).clamp(0.0, 1.0) : 0.0;
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -444,18 +441,16 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                             children: [
                               if (_isPreloading(novel.url))
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.only(right: 8),
                                   child: SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              Theme.of(context)
-                                                  .colorScheme
-                                                  .primary),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Theme.of(context)
+                                              .colorScheme
+                                              .primary),
                                     ),
                                   ),
                                 ),
@@ -482,8 +477,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                       maxLines: 1,
                                     ),
                                   ),
-                                  if (novel.url
-                                      .startsWith('custom://')) ...[
+                                  if (novel.url.startsWith('custom://')) ...[
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 6, vertical: 2),
@@ -492,8 +486,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                             .colorScheme
                                             .tertiary
                                             .withValues(alpha: 0.1),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                             color: Theme.of(context)
                                                 .colorScheme
@@ -532,12 +525,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                             onSelected: (value) {
                               switch (value) {
                                 case 'move':
-                                  _showBookshelfSelectionDialog(
-                                      novel, 'move');
+                                  _showBookshelfSelectionDialog(novel, 'move');
                                   break;
                                 case 'copy':
-                                  _showBookshelfSelectionDialog(
-                                      novel, 'copy');
+                                  _showBookshelfSelectionDialog(novel, 'copy');
                                   break;
                                 case 'delete':
                                   _removeFromBookshelf(novel);

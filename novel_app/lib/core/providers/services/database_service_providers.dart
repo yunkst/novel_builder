@@ -25,6 +25,7 @@ import 'package:riverpod/riverpod.dart';
 import '../../../services/chapter_service.dart';
 import '../../../services/chapter_search_service.dart';
 import '../../../services/cache_search_service.dart';
+import '../../../services/character_extraction_service.dart';
 import '../../../controllers/chapter_list/chapter_loader.dart';
 import '../../../controllers/chapter_list/chapter_action_handler.dart';
 import '../../../controllers/chapter_list/chapter_reorder_controller.dart';
@@ -102,10 +103,12 @@ ChapterService chapterService(Ref ref) {
 @riverpod
 ChapterLoader chapterLoader(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
-  final databaseService = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final novelRepository = ref.watch(novelRepositoryProvider);
   return ChapterLoader(
     api: apiService,
-    databaseService: databaseService,
+    chapterRepository: chapterRepository,
+    novelRepository: novelRepository,
   );
 }
 
@@ -134,9 +137,9 @@ ChapterLoader chapterLoader(Ref ref) {
 /// - 支持批量操作以提高性能
 @riverpod
 ChapterActionHandler chapterActionHandler(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
   return ChapterActionHandler(
-    databaseService: databaseService,
+    chapterRepository: chapterRepository,
   );
 }
 
@@ -168,9 +171,9 @@ ChapterActionHandler chapterActionHandler(Ref ref) {
 /// - 保存操作会持久化到数据库
 @riverpod
 ChapterReorderController chapterReorderController(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
   return ChapterReorderController(
-    databaseService: databaseService,
+    chapterRepository: chapterRepository,
   );
 }
 
@@ -184,7 +187,7 @@ ChapterReorderController chapterReorderController(Ref ref) {
 /// - 模糊搜索
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -197,8 +200,8 @@ ChapterReorderController chapterReorderController(Ref ref) {
 /// - 搜索操作是异步的
 @riverpod
 ChapterSearchService chapterSearchService(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
-  return ChapterSearchService(databaseService: databaseService);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  return ChapterSearchService(chapterRepository: chapterRepository);
 }
 
 /// CacheSearchService Provider
@@ -211,7 +214,8 @@ ChapterSearchService chapterSearchService(Ref ref) {
 /// - 搜索建议
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [databaseServiceProvider] - 数据库服务（用于 getCachedNovels）
 ///
 /// **使用示例**:
 /// ```dart
@@ -224,6 +228,40 @@ ChapterSearchService chapterSearchService(Ref ref) {
 /// - 搜索操作是异步的
 @riverpod
 CacheSearchService cacheSearchService(Ref ref) {
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
   final databaseService = ref.watch(databaseServiceProvider);
-  return CacheSearchService(databaseService: databaseService);
+  return CacheSearchService(
+    chapterRepository: chapterRepository,
+    databaseService: databaseService,
+  );
+}
+
+/// CharacterExtractionService Provider
+///
+/// 提供角色提取服务实例，用于从章节内容中提取角色相关的上下文。
+///
+/// **功能**:
+/// - 根据角色名搜索匹配章节
+/// - 提取匹配位置周围的上下文
+/// - 合并并去重上下文片段
+///
+/// **依赖**:
+/// - [chapterRepositoryProvider] - 章节数据访问
+///
+/// **使用示例**:
+/// ```dart
+/// final extractionService = ref.watch(characterExtractionServiceProvider);
+/// final matches = await extractionService.searchChaptersByName(
+///   novelUrl: novelUrl,
+///   names: ['角色A', '别名B'],
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 搜索操作是异步的
+@riverpod
+CharacterExtractionService characterExtractionService(Ref ref) {
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  return CharacterExtractionService(chapterRepository: chapterRepository);
 }

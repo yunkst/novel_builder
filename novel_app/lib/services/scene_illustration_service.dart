@@ -60,7 +60,8 @@ class SceneIllustrationService {
         completedAt: null,
       );
 
-      final id = await _illustrationRepository.insertSceneIllustration(illustration);
+      final id =
+          await _illustrationRepository.insertSceneIllustration(illustration);
 
       // 4. 调用后端API生成图片（直接传递RoleInfo列表）
       final response = await _apiService.createSceneIllustration(
@@ -138,7 +139,8 @@ class SceneIllustrationService {
       );
 
       // 插入数据库
-      final id = await _illustrationRepository.insertSceneIllustration(illustration);
+      final id =
+          await _illustrationRepository.insertSceneIllustration(illustration);
 
       if (id > 0) {
         return taskId; // 返回 taskId
@@ -167,7 +169,8 @@ class SceneIllustrationService {
   }) async {
     try {
       // 获取当前章节内容
-      final currentContent = await _chapterRepository.getCachedChapter(chapterId);
+      final currentContent =
+          await _chapterRepository.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
         LoggerService.instance.e(
           '章节内容为空，无法插入插图标记',
@@ -304,7 +307,8 @@ class SceneIllustrationService {
   }) async {
     try {
       // 获取当前章节内容
-      final currentContent = await _chapterRepository.getCachedChapter(chapterId);
+      final currentContent =
+          await _chapterRepository.getCachedChapter(chapterId);
       if (currentContent == null || currentContent.isEmpty) {
         LoggerService.instance.w(
           '章节内容为空，无法移除插图标记',

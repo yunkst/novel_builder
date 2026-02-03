@@ -110,12 +110,12 @@ CharacterImageCacheService characterImageCacheService(Ref ref) {
 CharacterAvatarSyncService characterAvatarSyncService(Ref ref) {
   final galleryCacheService = ref.watch(roleGalleryCacheServiceProvider);
   final avatarCacheService = ref.watch(characterImageCacheServiceProvider);
-  final databaseService = ref.watch(databaseServiceProvider);
+  final characterRepository = ref.watch(characterRepositoryProvider);
   final apiService = ref.watch(apiServiceWrapperProvider);
   return CharacterAvatarSyncService(
     galleryCacheService: galleryCacheService,
     avatarCacheService: avatarCacheService,
-    databaseService: databaseService,
+    characterRepository: characterRepository,
     apiService: apiService,
   );
 }
@@ -148,10 +148,10 @@ CharacterAvatarSyncService characterAvatarSyncService(Ref ref) {
 /// - 头像操作是异步操作
 @riverpod
 CharacterAvatarService characterAvatarService(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
+  final characterRepository = ref.watch(characterRepositoryProvider);
   final cacheService = ref.watch(characterImageCacheServiceProvider);
   return CharacterAvatarService(
-    databaseService: databaseService,
+    characterRepository: characterRepository,
     cacheService: cacheService,
   );
 }

@@ -94,51 +94,7 @@ final characterCardServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
-String _$characterExtractionServiceHash() =>
-    r'8cf110dffacc73842b7d72d5feca772d5460306e';
-
-/// CharacterExtractionService Provider
-///
-/// 提供角色提取服务实例，从章节内容中提取角色相关信息。
-///
-/// **功能**:
-/// - 角色名字搜索
-/// - 章节内容匹配
-/// - 上下文提取
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-///
-/// **使用示例**:
-/// ```dart
-/// final extractionService = ref.watch(characterExtractionServiceProvider);
-/// final matches = await extractionService.searchChaptersByName(
-///   novelUrl: novelUrl,
-///   names: ['张三', '李四'],
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
-/// - 搜索操作是异步的
-///
-/// Copied from [characterExtractionService].
-@ProviderFor(characterExtractionService)
-final characterExtractionServiceProvider =
-    Provider<CharacterExtractionService>.internal(
-  characterExtractionService,
-  name: r'characterExtractionServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$characterExtractionServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CharacterExtractionServiceRef = ProviderRef<CharacterExtractionService>;
-String _$outlineServiceHash() => r'186c050afb9c448b75294d8027c008a4452234a0';
+String _$outlineServiceHash() => r'b5fafecb21831f6a172511c4aec65c5318c19c5c';
 
 /// OutlineService Provider
 ///
@@ -182,7 +138,7 @@ final outlineServiceProvider = AutoDisposeProvider<OutlineService>.internal(
 // ignore: unused_element
 typedef OutlineServiceRef = AutoDisposeProviderRef<OutlineService>;
 String _$chapterHistoryServiceHash() =>
-    r'66ef41a49026edbd339d3ccad50766a5371058b6';
+    r'70f279098bfb6a53723cfc080a7cc4c498f3c808';
 
 /// ChapterHistoryService Provider
 ///
@@ -194,7 +150,7 @@ String _$chapterHistoryServiceHash() =>
 /// - 支持缓存和API获取
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
 /// - [apiServiceWrapperProvider] - API服务
 ///
 /// **使用示例**:
@@ -229,7 +185,7 @@ final chapterHistoryServiceProvider =
 typedef ChapterHistoryServiceRef
     = AutoDisposeProviderRef<ChapterHistoryService>;
 String _$invalidMarkupCleanerHash() =>
-    r'f5c06bc5ccb81426ea3346245c96cdb7bbb41c43';
+    r'91250692eab8f3441876c0c0d227dfb08eeb8d6e';
 
 /// InvalidMarkupCleaner Provider
 ///
@@ -241,7 +197,8 @@ String _$invalidMarkupCleanerHash() =>
 /// - 验证标记在数据库中是否存在
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [illustrationRepositoryProvider] - 插图数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -269,7 +226,7 @@ final invalidMarkupCleanerProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef InvalidMarkupCleanerRef = AutoDisposeProviderRef<InvalidMarkupCleaner>;
-String _$ttsPlayerServiceHash() => r'9f6f64b9fe4afb3008eea37f2595faa96e676ac8';
+String _$ttsPlayerServiceHash() => r'b06c4d1c1a7a7a5d770678dd6ee2332e0ba57052';
 
 /// TtsPlayerService Provider
 ///

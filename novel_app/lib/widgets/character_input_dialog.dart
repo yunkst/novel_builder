@@ -4,7 +4,7 @@ import '../models/chapter.dart';
 import '../services/character_extraction_service.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
-import '../core/providers/services/ai_service_providers.dart';
+import '../core/providers/service_providers.dart';
 
 /// 创建模式枚举
 enum CreateMode {

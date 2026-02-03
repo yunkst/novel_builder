@@ -88,10 +88,12 @@ class _CharacterRelationshipScreenState
 
     if (!mounted) return;
 
+    final relationRepository = ref.read(characterRelationRepositoryProvider);
     final result = await RelationshipEditDialog.show(
       context: context,
       currentCharacter: widget.character,
       availableCharacters: availableCharacters,
+      relationRepository: relationRepository,
     );
 
     if (result != null) {
@@ -205,9 +207,8 @@ class _CharacterRelationshipScreenState
         // 收集相关角色ID
         final characterIds = <int>{};
         for (final rel in relationships) {
-          final targetId = isOutgoing
-              ? rel.targetCharacterId
-              : rel.sourceCharacterId;
+          final targetId =
+              isOutgoing ? rel.targetCharacterId : rel.sourceCharacterId;
           characterIds.add(targetId);
         }
         characterIds.remove(widget.character.id);
@@ -395,11 +396,13 @@ class _CharacterRelationshipScreenState
 
     if (!mounted) return;
 
+    final relationRepository = ref.read(characterRelationRepositoryProvider);
     final result = await RelationshipEditDialog.show(
       context: context,
       currentCharacter: widget.character,
       availableCharacters: availableCharacters,
       relationship: relationship,
+      relationRepository: relationRepository,
     );
 
     if (result != null) {

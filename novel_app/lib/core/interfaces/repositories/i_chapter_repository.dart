@@ -1,4 +1,5 @@
 import '../../../models/chapter.dart';
+import '../../../models/search_result.dart';
 
 /// 章节数据仓库接口
 ///
@@ -163,4 +164,26 @@ abstract class IChapterRepository {
   /// [novelUrl] 小说的URL
   /// 返回已缓存的章节数量
   Future<int> getCachedChaptersCount(String novelUrl);
+
+  // ========== 章节排序 ==========
+
+  /// 更新章节顺序
+  ///
+  /// [novelUrl] 小说的URL
+  /// [chapters] 要排序的章节列表
+  ///
+  /// 批量更新章节的索引值，用于章节重排序功能
+  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters);
+
+  // ========== 章节内容搜索 ==========
+
+  /// 搜索缓存章节内容
+  ///
+  /// [keyword] 搜索关键词
+  /// [novelUrl] 可选的小说URL，用于限制搜索范围
+  /// 返回匹配的章节搜索结果列表
+  Future<List<ChapterSearchResult>> searchInCachedContent(
+    String keyword, {
+    String? novelUrl,
+  });
 }

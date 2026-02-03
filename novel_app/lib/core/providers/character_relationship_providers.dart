@@ -59,18 +59,16 @@ class RelationshipListStateNotifier
   }
 }
 
-final relationshipListStateProvider =
-    StateNotifierProvider.autoDispose<RelationshipListStateNotifier,
-        RelationshipListState>(
+final relationshipListStateProvider = StateNotifierProvider.autoDispose<
+    RelationshipListStateNotifier, RelationshipListState>(
   (ref) => RelationshipListStateNotifier(),
 );
 
 /// 添加关系操作Provider
 ///
 /// 返回成功(true)或失败(false)
-final addRelationshipProvider =
-    FutureProvider.autoDispose
-        .family<bool, CharacterRelationship>((ref, relationship) async {
+final addRelationshipProvider = FutureProvider.autoDispose
+    .family<bool, CharacterRelationship>((ref, relationship) async {
   try {
     final repository = ref.watch(characterRelationRepositoryProvider);
     await repository.createRelationship(relationship);
@@ -83,9 +81,8 @@ final addRelationshipProvider =
 /// 更新关系操作Provider
 ///
 /// 返回成功(true)或失败(false)
-final updateRelationshipProvider =
-    FutureProvider.autoDispose
-        .family<bool, CharacterRelationship>((ref, relationship) async {
+final updateRelationshipProvider = FutureProvider.autoDispose
+    .family<bool, CharacterRelationship>((ref, relationship) async {
   try {
     final repository = ref.watch(characterRelationRepositoryProvider);
     await repository.updateRelationship(relationship);
@@ -116,4 +113,3 @@ void invalidateRelationshipProviders(WidgetRef ref, int characterId) {
   ref.invalidate(outgoingRelationshipsProvider(characterId));
   ref.invalidate(incomingRelationshipsProvider(characterId));
 }
-

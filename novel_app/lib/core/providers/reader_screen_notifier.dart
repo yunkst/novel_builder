@@ -12,16 +12,30 @@ import '../../models/ai_companion_response.dart';
 import '../../models/ai_accompaniment_settings.dart';
 import '../../models/character.dart';
 import '../../models/character_relationship.dart';
-import '../../services/api_service_wrapper.dart';
-import '../../services/database_service.dart';
 import '../../services/dify_service.dart';
 import '../../services/novel_context_service.dart';
 import '../../utils/character_matcher.dart';
+import '../../core/interfaces/repositories/i_chapter_repository.dart';
+import '../../core/interfaces/repositories/i_novel_repository.dart';
+import '../../core/interfaces/repositories/i_character_repository.dart';
+import '../../core/interfaces/repositories/i_character_relation_repository.dart';
 import 'service_providers.dart';
 import 'database_providers.dart';
 import 'reader_screen_providers.dart';
 
 part 'reader_screen_notifier.g.dart';
+
+// ========== 辅助函数：获取背景设定追加内容 ==========
+Future<String> _appendBackgroundSetting(
+  INovelRepository novelRepo,
+  String novelUrl,
+  String newBackground,
+) async {
+  final currentBackground = await novelRepo.getBackgroundSetting(novelUrl);
+  return currentBackground == null || currentBackground.isEmpty
+      ? newBackground
+      : '$currentBackground\n\n$newBackground';
+}
 
 /// ReaderScreen 状态
 ///
@@ -80,7 +94,8 @@ class ReaderScreenState {
       isLoading: isLoading ?? this.isLoading,
       isUpdatingRoleCards: isUpdatingRoleCards ?? this.isUpdatingRoleCards,
       hasAutoTriggered: hasAutoTriggered ?? this.hasAutoTriggered,
-      isAutoCompanionRunning: isAutoCompanionRunning ?? this.isAutoCompanionRunning,
+      isAutoCompanionRunning:
+          isAutoCompanionRunning ?? this.isAutoCompanionRunning,
       errorMessage: errorMessage ?? this.errorMessage,
       aiCompanionData: aiCompanionData ?? this.aiCompanionData,
     );
@@ -98,15 +113,16 @@ class ReaderScreenState {
 @riverpod
 class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   // ========== 依赖服务 ==========
-  late final ApiServiceWrapper _apiService;
-  late final DatabaseService _databaseService;
+  late final IChapterRepository _chapterRepo;
+  late final INovelRepository _novelRepo;
+  late final ICharacterRepository _characterRepo;
+  late final ICharacterRelationRepository _relationRepo;
   late final DifyService _difyService;
   late final NovelContextBuilder _contextBuilder;
 
   // ========== 当前数据 ==========
   Novel? _currentNovel;
   Chapter? _currentChapter;
-  List<Chapter>? _chapters;
   String? _content;
 
   // ========== 初始化方法 ==========
@@ -114,8 +130,10 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   @override
   ReaderScreenState build() {
     // 获取依赖服务
-    _apiService = ref.read(apiServiceWrapperProvider);
-    _databaseService = ref.read(databaseServiceProvider);
+    _chapterRepo = ref.read(chapterRepositoryProvider);
+    _novelRepo = ref.read(novelRepositoryProvider);
+    _characterRepo = ref.read(characterRepositoryProvider);
+    _relationRepo = ref.read(characterRelationRepositoryProvider);
     _difyService = ref.read(difyServiceProvider);
     _contextBuilder = ref.read(novelContextBuilderProvider);
 
@@ -131,7 +149,6 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   }) {
     _currentNovel = novel;
     _currentChapter = chapter;
-    _chapters = chapters;
     _content = content;
   }
 
@@ -206,7 +223,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     }
 
     // 检查是否已伴读
-    final hasAccompanied = await _databaseService.isChapterAccompanied(
+    final hasAccompanied = await _chapterRepo.isChapterAccompanied(
       _currentNovel!.url,
       _currentChapter!.url,
     );
@@ -217,7 +234,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     }
 
     // 获取AI伴读设置
-    final settings = await _databaseService.getAiAccompanimentSettings(
+    final settings = await _novelRepo.getAiAccompanimentSettings(
       _currentNovel!.url,
     );
 
@@ -242,7 +259,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
 
     try {
       await _handleAICompanionSilent(settings);
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ 自动AI伴读失败: $e');
       // 记录错误日志
       rethrow;
@@ -265,7 +282,8 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
 
     try {
       // 获取本书的所有角色
-      final allCharacters = await _databaseService.getCharacters(_currentNovel!.url);
+      final allCharacters =
+          await _characterRepo.getCharacters(_currentNovel!.url);
 
       // 筛选当前章节出现的角色
       final chapterCharacters = await _filterCharactersInChapter(
@@ -318,14 +336,16 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   }
 
   /// 静默模式AI伴读（不显示确认对话框）
-  Future<void> _handleAICompanionSilent(AiAccompanimentSettings settings) async {
+  Future<void> _handleAICompanionSilent(
+      AiAccompanimentSettings settings) async {
     if (_currentNovel == null || _content == null) {
       throw Exception('上下文未设置');
     }
 
     try {
       // 获取本书的所有角色
-      final allCharacters = await _databaseService.getCharacters(_currentNovel!.url);
+      final allCharacters =
+          await _characterRepo.getCharacters(_currentNovel!.url);
 
       // 筛选当前章节出现的角色
       final chapterCharacters = await _filterCharactersInChapter(
@@ -371,7 +391,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       await _performAICompanionUpdates(response, isSilent: true);
 
       // 标记章节为已伴读
-      await _databaseService.markChapterAsAccompanied(
+      await _chapterRepo.markChapterAsAccompanied(
         _currentNovel!.url,
         _currentChapter!.url,
       );
@@ -402,9 +422,14 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     try {
       // 1. 追加背景设定
       if (response.background.isNotEmpty) {
-        await _databaseService.appendBackgroundSetting(
+        final updatedBackground = await _appendBackgroundSetting(
+          _novelRepo,
           _currentNovel!.url,
           response.background,
+        );
+        await _novelRepo.updateBackgroundSetting(
+          _currentNovel!.url,
+          updatedBackground,
         );
         debugPrint('✅ 背景设定追加成功');
       }
@@ -412,7 +437,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       // 2. 批量更新或插入角色
       int updatedRoles = 0;
       if (response.roles.isNotEmpty) {
-        updatedRoles = await _databaseService.batchUpdateOrInsertCharacters(
+        updatedRoles = await _characterRepo.batchUpdateOrInsertCharacters(
           _currentNovel!.url,
           response.roles,
         );
@@ -422,10 +447,10 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       // 3. 批量更新或插入关系
       int updatedRelations = 0;
       if (response.relations.isNotEmpty) {
-        updatedRelations =
-            await _databaseService.batchUpdateOrInsertRelationships(
+        updatedRelations = await _relationRepo.batchUpdateOrInsertRelationships(
           _currentNovel!.url,
           response.relations,
+          _characterRepo.getCharacters,
         );
         debugPrint('✅ 关系更新成功: $updatedRelations');
       }
@@ -443,7 +468,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       throw Exception('上下文未设置');
     }
 
-    await _databaseService.markChapterAsAccompanied(
+    await _chapterRepo.markChapterAsAccompanied(
       _currentNovel!.url,
       _currentChapter!.url,
     );
@@ -519,7 +544,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     // 获取角色ID集合
     final characterIds = characters.map((c) => c.id).whereType<int>().toSet();
 
-    final allRelationships = await _databaseService.getAllRelationships(novelUrl);
+    final allRelationships = await _relationRepo.getAllRelationships(novelUrl);
 
     // 筛选出涉及这些角色的关系
     final filteredRelationships = allRelationships.where((rel) {
@@ -540,7 +565,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       throw Exception('上下文未设置');
     }
 
-    await _databaseService.resetChapterAccompaniedFlag(
+    await _chapterRepo.resetChapterAccompaniedFlag(
       _currentNovel!.url,
       _currentChapter!.url,
     );
@@ -552,7 +577,7 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       return false;
     }
 
-    return await _databaseService.isChapterAccompanied(
+    return await _chapterRepo.isChapterAccompanied(
       _currentNovel!.url,
       _currentChapter!.url,
     );

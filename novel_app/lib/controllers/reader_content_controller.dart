@@ -3,6 +3,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_novel_repository.dart';
 import '../core/providers/reader_state_providers.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -31,6 +32,7 @@ class ReaderContentController {
   // ========== 依赖服务 ==========
   final ApiServiceWrapper _apiService;
   final IChapterRepository _chapterRepository;
+  final INovelRepository _novelRepository;
   final Ref _ref;
 
   // ========== 构造函数 ==========
@@ -39,9 +41,11 @@ class ReaderContentController {
     required Ref ref,
     required ApiServiceWrapper apiService,
     required IChapterRepository chapterRepository,
+    required INovelRepository novelRepository,
   })  : _ref = ref,
         _apiService = apiService,
-        _chapterRepository = chapterRepository;
+        _chapterRepository = chapterRepository,
+        _novelRepository = novelRepository;
 
   // ========== 公开方法 ==========
 
@@ -53,7 +57,9 @@ class ReaderContentController {
       await _apiService.init();
       debugPrint('✅ ReaderContentController: API初始化成功');
     } catch (e) {
-      _ref.read(chapterContentStateNotifierProvider.notifier).setError('初始化API失败: $e');
+      _ref
+          .read(chapterContentStateNotifierProvider.notifier)
+          .setError('初始化API失败: $e');
       debugPrint('❌ ReaderContentController: API初始化失败 - $e');
       rethrow;
     }
@@ -94,10 +100,12 @@ class ReaderContentController {
       }
 
       // 尝试从缓存获取
-      final cachedContent = await _chapterRepository.getCachedChapter(chapter.url);
+      final cachedContent =
+          await _chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
-        debugPrint('💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
+        debugPrint(
+            '💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
       } else {
         // 缓存未命中，从API获取
         debugPrint('🌐 ReaderContentController: 缓存未命中，从API获取');
@@ -145,7 +153,7 @@ class ReaderContentController {
   Future<void> updateReadingProgress(String novelUrl, Chapter chapter) async {
     try {
       final chapterIndex = chapter.chapterIndex ?? 0;
-      await _chapterRepository.updateLastReadChapter(novelUrl, chapterIndex);
+      await _novelRepository.updateLastReadChapter(novelUrl, chapterIndex);
       debugPrint('📖 ReaderContentController: 已更新阅读进度 - 章节$chapterIndex');
     } catch (e) {
       debugPrint('❌ ReaderContentController: 更新阅读进度失败 - $e');
@@ -154,7 +162,9 @@ class ReaderContentController {
 
   /// 更新内容（用于改写等需要直接更新内容的场景）
   void setContent(String newContent) {
-    _ref.read(chapterContentStateNotifierProvider.notifier).updateContent(newContent);
+    _ref
+        .read(chapterContentStateNotifierProvider.notifier)
+        .updateContent(newContent);
     debugPrint('📝 ReaderContentController: 内容已更新 - ${newContent.length}字符');
   }
 
@@ -164,14 +174,18 @@ class ReaderContentController {
   String get content => _ref.read(chapterContentStateNotifierProvider).content;
 
   /// 是否正在加载（从Provider获取）
-  bool get isLoading => _ref.read(chapterContentStateNotifierProvider).isLoading;
+  bool get isLoading =>
+      _ref.read(chapterContentStateNotifierProvider).isLoading;
 
   /// 错误信息（从Provider获取）
-  String get errorMessage => _ref.read(chapterContentStateNotifierProvider).errorMessage;
+  String get errorMessage =>
+      _ref.read(chapterContentStateNotifierProvider).errorMessage;
 
   /// 当前章节（从Provider获取）
-  Chapter? get currentChapter => _ref.read(chapterContentStateNotifierProvider).currentChapter;
+  Chapter? get currentChapter =>
+      _ref.read(chapterContentStateNotifierProvider).currentChapter;
 
   /// 当前小说（从Provider获取）
-  Novel? get currentNovel => _ref.read(chapterContentStateNotifierProvider).currentNovel;
+  Novel? get currentNovel =>
+      _ref.read(chapterContentStateNotifierProvider).currentNovel;
 }

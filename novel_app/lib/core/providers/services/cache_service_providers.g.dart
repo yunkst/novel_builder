@@ -91,7 +91,7 @@ final characterImageCacheServiceProvider =
 // ignore: unused_element
 typedef CharacterImageCacheServiceRef = ProviderRef<CharacterImageCacheService>;
 String _$characterAvatarSyncServiceHash() =>
-    r'c504af6a2fd50e5ddecb9cad16a187a010e5bede';
+    r'a659395cbf28d7d2ab51fef565c9a8677dfc2783';
 
 /// CharacterAvatarSyncService Provider
 ///
@@ -135,7 +135,7 @@ final characterAvatarSyncServiceProvider =
 // ignore: unused_element
 typedef CharacterAvatarSyncServiceRef = ProviderRef<CharacterAvatarSyncService>;
 String _$characterAvatarServiceHash() =>
-    r'3e7396e221c17e6e5827af3607cf1b05fd6d0da8';
+    r'f4dc89f92abbda37cfc9c40e7a83205ceefe88fe';
 
 /// CharacterAvatarService Provider
 ///

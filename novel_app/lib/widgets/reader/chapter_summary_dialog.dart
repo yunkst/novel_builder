@@ -30,7 +30,8 @@ class ChapterSummaryDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<ChapterSummaryDialog> createState() => _ChapterSummaryDialogState();
+  ConsumerState<ChapterSummaryDialog> createState() =>
+      _ChapterSummaryDialogState();
 }
 
 class _ChapterSummaryDialogState extends ConsumerState<ChapterSummaryDialog>

@@ -31,8 +31,7 @@ void main() {
 第四段内容
 第五段内容''';
 
-      expect(result, equals(expectedContent),
-          reason: '单段落替换应该成功');
+      expect(result, equals(expectedContent), reason: '单段落替换应该成功');
 
       // 验证段落数量
       final originalParagraphs = originalContent.split('\n');
@@ -65,12 +64,10 @@ void main() {
 第五段
 第六段''';
 
-      expect(result, equals(expectedContent),
-          reason: '多段落替换（数量相同）应该成功');
+      expect(result, equals(expectedContent), reason: '多段落替换（数量相同）应该成功');
 
       final resultParagraphs = result.split('\n');
-      expect(resultParagraphs.length, equals(6),
-          reason: '替换后应该保持6个段落');
+      expect(resultParagraphs.length, equals(6), reason: '替换后应该保持6个段落');
     });
 
     test('场景1：AI生成更多段落（扩写）', () {
@@ -96,26 +93,18 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       // 验证：5 - 1 + 3 = 7段
-      expect(resultParagraphs.length, equals(7),
-          reason: '删除1段插入3段，应该有7个段落');
+      expect(resultParagraphs.length, equals(7), reason: '删除1段插入3段，应该有7个段落');
 
       // 验证未选中段落保持不变
-      expect(resultParagraphs[0], equals('第一段'),
-          reason: '第一段应该保持不变');
-      expect(resultParagraphs[1], equals('第二段'),
-          reason: '第二段应该保持不变');
-      expect(resultParagraphs[5], equals('第四段'),
-          reason: '第四段应该保持不变');
-      expect(resultParagraphs[6], equals('第五段'),
-          reason: '第五段应该保持不变');
+      expect(resultParagraphs[0], equals('第一段'), reason: '第一段应该保持不变');
+      expect(resultParagraphs[1], equals('第二段'), reason: '第二段应该保持不变');
+      expect(resultParagraphs[5], equals('第四段'), reason: '第四段应该保持不变');
+      expect(resultParagraphs[6], equals('第五段'), reason: '第五段应该保持不变');
 
       // 验证新内容插入在正确位置
-      expect(resultParagraphs[2], equals('扩写段落1'),
-          reason: '新内容的第一段应该在索引2位置');
-      expect(resultParagraphs[3], equals('扩写段落2'),
-          reason: '新内容的第二段应该在索引3位置');
-      expect(resultParagraphs[4], equals('扩写段落3'),
-          reason: '新内容的第三段应该在索引4位置');
+      expect(resultParagraphs[2], equals('扩写段落1'), reason: '新内容的第一段应该在索引2位置');
+      expect(resultParagraphs[3], equals('扩写段落2'), reason: '新内容的第二段应该在索引3位置');
+      expect(resultParagraphs[4], equals('扩写段落3'), reason: '新内容的第三段应该在索引4位置');
     });
 
     test('场景2：AI生成更少段落（精简）', () {
@@ -137,8 +126,7 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       // 验证：5 - 3 + 1 = 3段
-      expect(resultParagraphs.length, equals(3),
-          reason: '删除3段插入1段，应该有3个段落');
+      expect(resultParagraphs.length, equals(3), reason: '删除3段插入1段，应该有3个段落');
 
       // 验证结果
       expect(resultParagraphs[0], equals('第一段'));
@@ -193,11 +181,9 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       // 验证：3 - 1 + 0 = 2段（只删除，不插入）
-      expect(resultParagraphs.length, equals(2),
-          reason: '空内容应该只删除选中段落');
+      expect(resultParagraphs.length, equals(2), reason: '空内容应该只删除选中段落');
       expect(resultParagraphs[0], equals('第一段'));
-      expect(resultParagraphs[1], equals('第三段'),
-          reason: '第二段被删除，第三段上移');
+      expect(resultParagraphs[1], equals('第三段'), reason: '第二段被删除，第三段上移');
     });
 
     test('边界测试：选中第一段', () {
@@ -217,8 +203,7 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       expect(resultParagraphs.length, equals(3));
-      expect(resultParagraphs[0], equals('新的第一段'),
-          reason: '第一段应该被替换');
+      expect(resultParagraphs[0], equals('新的第一段'), reason: '第一段应该被替换');
       expect(resultParagraphs[1], equals('第二段'));
       expect(resultParagraphs[2], equals('第三段'));
     });
@@ -242,8 +227,7 @@ void main() {
       expect(resultParagraphs.length, equals(3));
       expect(resultParagraphs[0], equals('第一段'));
       expect(resultParagraphs[1], equals('第二段'));
-      expect(resultParagraphs[2], equals('新的第三段'),
-          reason: '最后一段应该被替换');
+      expect(resultParagraphs[2], equals('新的第三段'), reason: '最后一段应该被替换');
     });
 
     test('边界测试：无效索引过滤', () {
@@ -333,8 +317,7 @@ void main() {
         selectedIndices: selectedIndices,
       );
 
-      expect(validation.isValid, isTrue,
-          reason: validation.message);
+      expect(validation.isValid, isTrue, reason: validation.message);
       expect(validation.message, contains('替换验证通过'));
     });
 
@@ -381,11 +364,13 @@ void main() {
       print('选中索引: $selectedIndices');
       print('AI生成段落数: ${aiGeneratedContent.length}');
       print('结果段落数: ${resultParagraphs.length}');
-      print('预期段落数: ${originalParagraphs.length - selectedIndices.length + aiGeneratedContent.length}');
+      print(
+          '预期段落数: ${originalParagraphs.length - selectedIndices.length + aiGeneratedContent.length}');
 
       // 验证段落数量
-      final expectedLength =
-          originalParagraphs.length - selectedIndices.length + aiGeneratedContent.length;
+      final expectedLength = originalParagraphs.length -
+          selectedIndices.length +
+          aiGeneratedContent.length;
       expect(resultParagraphs.length, equals(expectedLength),
           reason: '段落数量计算错误');
 
@@ -436,8 +421,7 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       // 应该正确处理乱序索引
-      expect(resultParagraphs.length, equals(3),
-          reason: '删除3段插入1段，应该有3个段落');
+      expect(resultParagraphs.length, equals(3), reason: '删除3段插入1段，应该有3个段落');
 
       // 验证结果
       expect(resultParagraphs[0], equals('段落1'));

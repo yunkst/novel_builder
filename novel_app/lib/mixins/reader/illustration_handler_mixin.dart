@@ -368,8 +368,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
           : false;
 
       if (confirmed == true) {
-        final success =
-            await _sceneIllustrationServiceInstance.deleteIllustration(illustration.id);
+        final success = await _sceneIllustrationServiceInstance
+            .deleteIllustration(illustration.id);
         if (success) {
           // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
           if (mounted) {

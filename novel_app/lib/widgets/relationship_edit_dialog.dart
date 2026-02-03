@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import '../utils/toast_utils.dart';
 
 /// 关系编辑对话框
@@ -11,12 +11,14 @@ class RelationshipEditDialog extends StatefulWidget {
   final Character currentCharacter; // 当前角色
   final List<Character> availableCharacters; // 可选的目标角色列表
   final CharacterRelationship? relationship; // 要编辑的关系（null表示新建）
+  final ICharacterRelationRepository relationRepository; // 角色关系仓库
 
   const RelationshipEditDialog({
     super.key,
     required this.currentCharacter,
     required this.availableCharacters,
     this.relationship,
+    required this.relationRepository,
   });
 
   /// 显示对话框并返回编辑结果
@@ -29,6 +31,7 @@ class RelationshipEditDialog extends StatefulWidget {
     required Character currentCharacter,
     required List<Character> availableCharacters,
     CharacterRelationship? relationship,
+    required ICharacterRelationRepository relationRepository,
   }) {
     return showDialog<CharacterRelationship>(
       context: context,
@@ -36,6 +39,7 @@ class RelationshipEditDialog extends StatefulWidget {
         currentCharacter: currentCharacter,
         availableCharacters: availableCharacters,
         relationship: relationship,
+        relationRepository: relationRepository,
       ),
     );
   }
@@ -114,8 +118,6 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
     });
 
     try {
-      final databaseService = DatabaseService();
-
       // 构建关系对象
       final relationship = CharacterRelationship(
         id: widget.relationship?.id,
@@ -131,7 +133,7 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
 
       // 检查关系是否已存在（仅新建时检查）
       if (widget.relationship == null) {
-        final exists = await databaseService.relationshipExists(
+        final exists = await widget.relationRepository.relationshipExists(
           widget.currentCharacter.id!,
           _selectedTargetCharacter!.id!,
           relationship.relationshipType,
@@ -148,10 +150,10 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
         }
 
         // 新建关系
-        await databaseService.createRelationship(relationship);
+        await widget.relationRepository.createRelationship(relationship);
       } else {
         // 更新关系
-        await databaseService.updateRelationship(relationship);
+        await widget.relationRepository.updateRelationship(relationship);
       }
 
       if (mounted) {

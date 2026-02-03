@@ -315,6 +315,7 @@ class CharacterRelationRepository extends BaseRepository
   /// [aiRelations] AI返回的关系更新列表
   /// [getCharactersFn] 获取小说所有角色的函数
   /// 返回成功更新的关系数量
+  @override
   Future<int> batchUpdateOrInsertRelationships(
     String novelUrl,
     List<AICompanionRelation> aiRelations,

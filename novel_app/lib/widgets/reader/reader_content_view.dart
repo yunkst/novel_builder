@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/chapter.dart';
 import '../paragraph_widget.dart';
 
 /// ReaderContentView - 阅读器内容视图
@@ -20,8 +19,8 @@ class ReaderContentView extends StatelessWidget {
   final bool isCloseupMode;
   final bool isEditMode;
   final bool isAutoScrolling;
-  final Function(int) onParagraphTap;
-  final Function(int) onParagraphLongPress;
+  final ValueChanged<int> onParagraphTap;
+  final ValueChanged<int> onParagraphLongPress;
   final Function(int, String) onContentChanged; // 修改：添加 index 参数
   final Function(String, String, int) onImageTap;
   final Function(String) onImageDelete;
@@ -31,7 +30,7 @@ class ReaderContentView extends StatelessWidget {
   final ScrollController scrollController;
   final Function() onPointerDown;
   final Function() onPointerUp;
-  final Function(ScrollNotification) onScrollNotification;
+  final bool Function(ScrollNotification) onScrollNotification;
 
   const ReaderContentView({
     super.key,
@@ -86,7 +85,7 @@ class ReaderContentView extends StatelessWidget {
               isCloseupMode: isCloseupMode,
               isEditMode: isEditMode,
               isSelected: isSelected,
-              onTap: () => onParagraphTap(index),
+              onTap: (idx) => onParagraphTap(idx),
               onLongPress: (idx) => onParagraphLongPress(idx),
               onContentChanged: (newContent) =>
                   onContentChanged(index, newContent), // 传递 index
