@@ -1,8 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
-import '../../models/character.dart';
 import '../../models/character_relationship.dart';
-import '../../repositories/character_relation_repository.dart';
 import 'database_providers.dart';
 
 /// 角色关系Screen的Riverpod Providers
