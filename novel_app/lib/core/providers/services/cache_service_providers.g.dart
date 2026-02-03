@@ -7,7 +7,7 @@ part of 'cache_service_providers.dart';
 // **************************************************************************
 
 String _$roleGalleryCacheServiceHash() =>
-    r'742305844742d717065b94ad17846198aa0bebe1';
+    r'dab640aaf5be9727aad82d6865ef766e658d1af3';
 
 /// RoleGalleryCacheService Provider
 ///
@@ -19,7 +19,7 @@ String _$roleGalleryCacheServiceHash() =>
 /// - 缓存大小管理
 ///
 /// **依赖**:
-/// - 无（独立服务）
+/// - [apiServiceWrapperProvider] - API服务
 ///
 /// **使用示例**:
 /// ```dart
@@ -48,8 +48,50 @@ final roleGalleryCacheServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef RoleGalleryCacheServiceRef = ProviderRef<RoleGalleryCacheService>;
+String _$characterImageCacheServiceHash() =>
+    r'4cfb788b12ede78f54233531ba19f52bfa4b9401';
+
+/// CharacterImageCacheService Provider
+///
+/// 提供角色图片缓存服务实例，用于管理角色图片的本地缓存。
+///
+/// **功能**:
+/// - 角色图片本地缓存
+/// - 缓存文件管理
+/// - 图片存储和检索
+///
+/// **依赖**:
+/// - 无（独立服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final cacheService = ref.watch(characterImageCacheServiceProvider);
+/// await cacheService.init();
+/// final path = await cacheService.cacheCharacterImage(id, bytes, filename);
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 需要先调用 `init()` 方法初始化
+///
+/// Copied from [characterImageCacheService].
+@ProviderFor(characterImageCacheService)
+final characterImageCacheServiceProvider =
+    Provider<CharacterImageCacheService>.internal(
+  characterImageCacheService,
+  name: r'characterImageCacheServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$characterImageCacheServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CharacterImageCacheServiceRef = ProviderRef<CharacterImageCacheService>;
 String _$characterAvatarSyncServiceHash() =>
-    r'4d4a25b156b974d6ed60a39311efe0de037899c7';
+    r'c504af6a2fd50e5ddecb9cad16a187a010e5bede';
 
 /// CharacterAvatarSyncService Provider
 ///
@@ -61,7 +103,10 @@ String _$characterAvatarSyncServiceHash() =>
 /// - 同步状态跟踪
 ///
 /// **依赖**:
-/// - 无（独立服务）
+/// - [roleGalleryCacheServiceProvider] - 图集缓存服务
+/// - [characterImageCacheServiceProvider] - 头像缓存服务
+/// - [databaseServiceProvider] - 数据库服务
+/// - [apiServiceWrapperProvider] - API服务
 ///
 /// **使用示例**:
 /// ```dart
@@ -90,7 +135,7 @@ final characterAvatarSyncServiceProvider =
 // ignore: unused_element
 typedef CharacterAvatarSyncServiceRef = ProviderRef<CharacterAvatarSyncService>;
 String _$characterAvatarServiceHash() =>
-    r'1bb251b88d1194306808ff60ac1bd2f6a704cf8c';
+    r'3e7396e221c17e6e5827af3607cf1b05fd6d0da8';
 
 /// CharacterAvatarService Provider
 ///
@@ -102,22 +147,27 @@ String _$characterAvatarServiceHash() =>
 /// - 头像 URL 管理
 ///
 /// **依赖**:
-/// - 无（独立服务）
+/// - [databaseServiceProvider] - 数据库服务
+/// - [characterImageCacheServiceProvider] - 图片缓存服务
 ///
 /// **使用示例**:
 /// ```dart
 /// final avatarService = ref.watch(characterAvatarServiceProvider);
-/// final avatarUrl = await avatarService.generateAvatar(character);
+/// final avatarUrl = await avatarService.setAvatarFromGallery(
+///   characterId,
+///   imageBytes,
+///   filename,
+/// );
 /// ```
 ///
 /// **注意事项**:
-/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
-/// - 头像生成是异步操作
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 头像操作是异步操作
 ///
 /// Copied from [characterAvatarService].
 @ProviderFor(characterAvatarService)
 final characterAvatarServiceProvider =
-    Provider<CharacterAvatarService>.internal(
+    AutoDisposeProvider<CharacterAvatarService>.internal(
   characterAvatarService,
   name: r'characterAvatarServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -129,6 +179,7 @@ final characterAvatarServiceProvider =
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CharacterAvatarServiceRef = ProviderRef<CharacterAvatarService>;
+typedef CharacterAvatarServiceRef
+    = AutoDisposeProviderRef<CharacterAvatarService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

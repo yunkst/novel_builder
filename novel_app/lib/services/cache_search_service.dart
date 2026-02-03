@@ -1,14 +1,15 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/search_result.dart';
-import 'database_service.dart';
+import '../core/providers/database_providers.dart';
 
 /// 缓存内容搜索服务
 class CacheSearchService {
-  final DatabaseService _databaseService;
+  final dynamic _databaseService;
 
   /// 构造函数 - 支持依赖注入
-  CacheSearchService({DatabaseService? databaseService})
-      : _databaseService = databaseService ?? DatabaseService();
+  /// 注意：必须通过Provider注入，不再支持直接实例化
+  CacheSearchService({required dynamic databaseService})
+      : _databaseService = databaseService;
 
   /// 搜索缓存内容
   Future<CacheSearchResult> searchInCache({

@@ -8,7 +8,6 @@ import 'preload_progress_update.dart';
 import '../repositories/chapter_repository.dart';
 import '../core/database/database_connection.dart';
 import 'api_service_wrapper.dart';
-import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
 
 /// 全局预加载服务（单例）
@@ -54,13 +53,25 @@ class PreloadService {
 
   // 服务依赖
   late final ChapterRepository _chapterRepository;
-  late final ApiServiceWrapper _apiService;
+  ApiServiceWrapper? _apiService;
+
+  /// 设置API服务（依赖注入）
+  void setApiService(ApiServiceWrapper apiService) {
+    _apiService = apiService;
+  }
+
+  /// 确保API服务已初始化
+  void _ensureApiService() {
+    if (_apiService == null) {
+      throw Exception('ApiServiceWrapper 未设置，请先调用 setApiService()');
+    }
+  }
 
   /// 初始化服务
   void _initServices() {
     _chapterRepository = ChapterRepository(dbConnection: DatabaseConnection());
     // TODO: 迁移到Provider模式后使用ref.watch(apiServiceWrapperProvider)
-    _apiService = ApiServiceProvider.instance;
+    // API服务将通过setApiService注入
     LoggerService.instance.i(
       'PreloadService初始化完成',
       category: LogCategory.cache,
@@ -240,7 +251,8 @@ class PreloadService {
           _chapterRepository.markAsPreloading(task.chapterUrl);
 
           // 获取内容
-          final content = await _apiService.getChapterContent(task.chapterUrl);
+          _ensureApiService();
+          final content = await _apiService!.getChapterContent(task.chapterUrl);
 
           // 保存到数据库
           final chapter = Chapter(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/scene_illustration.dart';
 import '../services/api_service_wrapper.dart';
-import '../core/di/api_service_provider.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
 import '../utils/toast_utils.dart';
@@ -10,8 +9,10 @@ import '../utils/error_helper.dart';
 import 'hybrid_media_widget.dart';
 import 'generate_more_dialog.dart';
 import 'common/common_widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/services/network_service_providers.dart';
 
-class SceneImagePreview extends StatefulWidget {
+class SceneImagePreview extends ConsumerStatefulWidget {
   final SceneIllustration? illustration; // 可选，用于向后兼容
   final String? taskId; // 新版本：基于 taskId 查询
   final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
@@ -35,10 +36,10 @@ class SceneImagePreview extends StatefulWidget {
         );
 
   @override
-  State<SceneImagePreview> createState() => _SceneImagePreviewState();
+  ConsumerState<SceneImagePreview> createState() => _SceneImagePreviewState();
 }
 
-class _SceneImagePreviewState extends State<SceneImagePreview> {
+class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
   bool _isLoading = false;
   bool _hasError = false;
   String? _errorMessage;
@@ -796,7 +797,7 @@ class _SceneImagePreviewState extends State<SceneImagePreview> {
       ToastUtils.showInfo('正在生成更多图片，请稍候...');
 
       // 使用ApiServiceWrapper确保正确的token认证
-      final apiService = ApiServiceProvider.instance;
+      final apiService = ref.read(apiServiceWrapperProvider);
 
       // 调用API服务包装器的方法，自动处理token认证
       await apiService.regenerateSceneIllustrationImages(

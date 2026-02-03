@@ -7,14 +7,18 @@ import 'character_image_cache_service.dart';
 /// 角色头像管理服务
 /// 负责头像的设置、获取、缓存等操作
 class CharacterAvatarService {
-  static final CharacterAvatarService _instance =
-      CharacterAvatarService._internal();
-  factory CharacterAvatarService() => _instance;
-  CharacterAvatarService._internal();
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [databaseService] 数据库服务实例
+  /// [cacheService] 图片缓存服务实例
+  CharacterAvatarService({
+    required DatabaseService databaseService,
+    required CharacterImageCacheService cacheService,
+  })  : _databaseService = databaseService,
+        _cacheService = cacheService;
 
-  final DatabaseService _databaseService = DatabaseService();
-  final CharacterImageCacheService _cacheService =
-      CharacterImageCacheService.instance;
+  final DatabaseService _databaseService;
+  final CharacterImageCacheService _cacheService;
 
   /// 设置角色头像
   /// [characterId] 角色ID

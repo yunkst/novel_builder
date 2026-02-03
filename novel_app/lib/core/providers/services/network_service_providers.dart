@@ -19,6 +19,7 @@ import 'package:riverpod/riverpod.dart';
 import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/scene_illustration_service.dart';
+import '../../../services/scene_illustration_cache_service.dart';
 import '../repository_providers.dart';
 
 part 'network_service_providers.g.dart';
@@ -86,7 +87,11 @@ ApiServiceWrapper apiServiceWrapper(Ref ref) {
 /// - 支持通过 progressStream 监听进度
 @Riverpod(keepAlive: true)
 PreloadService preloadService(Ref ref) {
-  return PreloadService();
+  final apiService = ref.watch(apiServiceWrapperProvider);
+  final service = PreloadService();
+  // 注入API服务
+  service.setApiService(apiService);
+  return service;
 }
 
 /// SceneIllustrationService Provider
@@ -122,4 +127,28 @@ SceneIllustrationService sceneIllustrationService(Ref ref) {
     illustrationRepository: illustrationRepository,
     apiService: apiService,
   );
+}
+
+/// SceneIllustrationCacheService Provider
+///
+/// 提供场景插图缓存服务实例，管理场景插图的本地缓存。
+///
+/// **功能**:
+/// - 图片内存缓存和磁盘缓存
+/// - 预加载和批量缓存
+/// - 缓存有效期管理
+///
+/// **依赖**:
+/// - [apiServiceWrapperProvider] - API服务
+///
+/// **使用示例**:
+/// ```dart
+/// final cacheService = ref.read(sceneIllustrationCacheServiceProvider);
+/// await cacheService.init();
+/// final imageBytes = await cacheService.getImageBytes(filename);
+/// ```
+@Riverpod(keepAlive: true)
+SceneIllustrationCacheService sceneIllustrationCacheService(Ref ref) {
+  final apiService = ref.watch(apiServiceWrapperProvider);
+  return SceneIllustrationCacheService(apiService: apiService);
 }

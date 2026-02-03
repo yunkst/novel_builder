@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chapter.dart';
 import '../services/character_extraction_service.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
+import '../core/providers/services/ai_service_providers.dart';
 
 /// 创建模式枚举
 enum CreateMode {
@@ -68,9 +70,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
   CreateMode _mode = CreateMode.describe;
   bool _useOutline = true;
 
-  // 提取角色相关状态
-  final CharacterExtractionService _extractionService =
-      CharacterExtractionService();
+  // 提取角色相关状态 - 使用Provider获取
+  CharacterExtractionService? _extractionService;
   int _contextLength = 500;
   bool _extractFullChapter = false;
   List<ChapterMatchItem> _matchedChapters = [];
@@ -103,6 +104,10 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // 懒加载初始化服务
+    _extractionService ??= ProviderScope.containerOf(context)
+        .read(characterExtractionServiceProvider);
+
     return AlertDialog(
       title: const Text('AI创建角色'),
       content: SizedBox(
@@ -542,9 +547,13 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
 
   /// 构建预计长度提示
   Widget _buildEstimatedLength() {
+    if (_extractionService == null) {
+      return const SizedBox.shrink();
+    }
+
     final selectedChapters =
         _matchedChapters.where((c) => c.isSelected).toList();
-    final estimated = _extractionService.estimateContentLength(
+    final estimated = _extractionService!.estimateContentLength(
       chapterMatches: selectedChapters.map((item) {
         return ChapterMatch(
           chapter: item.chapter,
@@ -676,6 +685,14 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     });
 
     try {
+      if (_extractionService == null) {
+        setState(() {
+          _searchError = '服务未初始化';
+          _isSearching = false;
+        });
+        return;
+      }
+
       // 构建名称列表
       final names = <String>[name];
       final aliasesText = _aliasesController.text.trim();
@@ -689,7 +706,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       }
 
       // 搜索章节
-      final matches = await _extractionService.searchChaptersByName(
+      final matches = await _extractionService!.searchChaptersByName(
         novelUrl: widget.novelUrl!,
         names: names,
       );

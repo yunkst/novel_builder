@@ -48,7 +48,7 @@ final apiServiceWrapperProvider = Provider<ApiServiceWrapper>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ApiServiceWrapperRef = ProviderRef<ApiServiceWrapper>;
-String _$preloadServiceHash() => r'9c9c37295abda572fd7eea1070f935534f8bc8bd';
+String _$preloadServiceHash() => r'd1f5d5de6d5a99d1797ac6fc9d49e25cc708a7f9';
 
 /// PreloadService Provider
 ///
@@ -140,5 +140,44 @@ final sceneIllustrationServiceProvider =
 // ignore: unused_element
 typedef SceneIllustrationServiceRef
     = AutoDisposeProviderRef<SceneIllustrationService>;
+String _$sceneIllustrationCacheServiceHash() =>
+    r'0a4a41925c35fee4fbc518e2e0c465de5bc35b3c';
+
+/// SceneIllustrationCacheService Provider
+///
+/// 提供场景插图缓存服务实例，管理场景插图的本地缓存。
+///
+/// **功能**:
+/// - 图片内存缓存和磁盘缓存
+/// - 预加载和批量缓存
+/// - 缓存有效期管理
+///
+/// **依赖**:
+/// - [apiServiceWrapperProvider] - API服务
+///
+/// **使用示例**:
+/// ```dart
+/// final cacheService = ref.read(sceneIllustrationCacheServiceProvider);
+/// await cacheService.init();
+/// final imageBytes = await cacheService.getImageBytes(filename);
+/// ```
+///
+/// Copied from [sceneIllustrationCacheService].
+@ProviderFor(sceneIllustrationCacheService)
+final sceneIllustrationCacheServiceProvider =
+    Provider<SceneIllustrationCacheService>.internal(
+  sceneIllustrationCacheService,
+  name: r'sceneIllustrationCacheServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$sceneIllustrationCacheServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef SceneIllustrationCacheServiceRef
+    = ProviderRef<SceneIllustrationCacheService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

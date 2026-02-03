@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
+import '../core/interfaces/repositories/i_character_relation_repository.dart';
+import '../core/providers/database_providers.dart';
 import '../utils/toast_utils.dart';
 
 /// 统一的角色关系图可视化页面 - Riverpod版本
@@ -14,14 +16,10 @@ class UnifiedRelationshipGraphScreenRiverpod extends ConsumerStatefulWidget {
   final String novelUrl;
   final Character? focusCharacter; // null = 全局模式
 
-  // 可选的依赖注入参数 - 用于测试
-  final DatabaseService? databaseService;
-
   const UnifiedRelationshipGraphScreenRiverpod({
     super.key,
     required this.novelUrl,
     this.focusCharacter,
-    this.databaseService,
   });
 
   @override
@@ -31,7 +29,9 @@ class UnifiedRelationshipGraphScreenRiverpod extends ConsumerStatefulWidget {
 
 class _UnifiedRelationshipGraphScreenRiverpodState
     extends ConsumerState<UnifiedRelationshipGraphScreenRiverpod> {
-  late final DatabaseService _databaseService;
+  // 使用Repository接口而非DatabaseService
+  late final ICharacterRepository _characterRepository;
+  late final ICharacterRelationRepository _characterRelationRepository;
 
   // 控制器
   late final ForceDirectedGraphController<int> _controller;
@@ -55,8 +55,9 @@ class _UnifiedRelationshipGraphScreenRiverpodState
   void initState() {
     super.initState();
 
-    // 使用注入的依赖或创建默认实例
-    _databaseService = widget.databaseService ?? DatabaseService();
+    // 使用 Provider 注入 Repository 接口
+    _characterRepository = ref.read(characterRepositoryProvider);
+    _characterRelationRepository = ref.read(characterRelationRepositoryProvider);
 
     // 修复缩放问题: 设置初始缩放为0.6,允许用户缩小和放大
     _controller = ForceDirectedGraphController<int>(
@@ -116,11 +117,11 @@ class _UnifiedRelationshipGraphScreenRiverpodState
   Future<void> _loadSingleCharacterData() async {
     final character = widget.focusCharacter!;
     final allCharacters =
-        await _databaseService.getCharacters(character.novelUrl);
+        await _characterRepository.getCharacters(character.novelUrl);
 
     // 加载当前角色的所有关系
     final relationships =
-        await _databaseService.getRelationships(character.id!);
+        await _characterRelationRepository.getRelationships(character.id!);
 
     // 收集相关角色ID
     final relatedCharacterIds = <int>{};
@@ -158,7 +159,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
   /// 加载全局数据
   Future<void> _loadGlobalData() async {
     // 加载所有角色
-    final allCharacters = await _databaseService.getCharacters(widget.novelUrl);
+    final allCharacters = await _characterRepository.getCharacters(widget.novelUrl);
 
     if (allCharacters.isEmpty) {
       return;
@@ -168,7 +169,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
     final Set<CharacterRelationship> allRelationships = {};
     for (final character in allCharacters) {
       if (character.id != null) {
-        final rels = await _databaseService.getRelationships(character.id!);
+        final rels = await _characterRelationRepository.getRelationships(character.id!);
         allRelationships.addAll(rels);
       }
     }

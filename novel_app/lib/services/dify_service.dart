@@ -24,24 +24,27 @@ import 'dify/dify_formatter.dart';
 ///
 /// 推荐直接使用各专用服务以获得更好的类型安全和可测试性。
 class DifyService {
-  // 单例模式
-  DifyService._internal();
-  static final DifyService _instance = DifyService._internal();
-  factory DifyService() => _instance;
-
   // 子服务实例
-  late final DifyConfigService _config = DifyConfigService();
-  late final DifyWorkflowService _workflow = DifyWorkflowService(
-    config: _config,
-  );
-  late final DifyCharacterService _character = DifyCharacterService(
-    config: _config,
-    workflow: _workflow,
-  );
-  late final DifyCreativeService _creative = DifyCreativeService(
-    config: _config,
-    workflow: _workflow,
-  );
+  final DifyConfigService _config;
+  late final DifyWorkflowService _workflow;
+  late final DifyCharacterService _character;
+  late final DifyCreativeService _creative;
+
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [config] 可选的配置服务实例，用于测试和依赖注入
+  DifyService({DifyConfigService? config})
+      : _config = config ?? DifyConfigService() {
+    _workflow = DifyWorkflowService(config: _config);
+    _character = DifyCharacterService(
+      config: _config,
+      workflow: _workflow,
+    );
+    _creative = DifyCreativeService(
+      config: _config,
+      workflow: _workflow,
+    );
+  }
 
   /// 获取配置服务（用于测试和高级用法）
   DifyConfigService get config => _config;

@@ -1,15 +1,18 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import '../core/di/api_service_provider.dart';
+import 'api_service_wrapper.dart';
 import '../utils/cache_utils.dart';
 
 /// 角色图集缓存服务
 class RoleGalleryCacheService {
-  static final RoleGalleryCacheService _instance =
-      RoleGalleryCacheService._internal();
-  factory RoleGalleryCacheService() => _instance;
-  RoleGalleryCacheService._internal();
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [apiService] 可选的API服务实例，用于测试和依赖注入
+  RoleGalleryCacheService({ApiServiceWrapper? apiService})
+      : _apiService = apiService;
+
+  ApiServiceWrapper? _apiService;
 
   Directory? _cacheDir; // 改为可空类型
   final Map<String, String> _memoryCache = {};
@@ -32,6 +35,20 @@ class RoleGalleryCacheService {
       debugPrint('缓存目录: ${_cacheDir!.path}');
     } catch (e) {
       debugPrint('❌ 角色图集缓存服务初始化失败: $e');
+    }
+  }
+
+  /// 设置API服务（依赖注入）
+  /// @deprecated 请使用构造函数注入
+  @Deprecated('请使用构造函数注入 ApiServiceWrapper')
+  void setApiService(ApiServiceWrapper apiService) {
+    _apiService = apiService;
+  }
+
+  /// 确保API服务已初始化
+  void _ensureApiService() {
+    if (_apiService == null) {
+      throw Exception('ApiServiceWrapper 未设置，请先调用 setApiService()');
     }
   }
 
@@ -71,8 +88,8 @@ class RoleGalleryCacheService {
       }
 
       // 使用ApiServiceWrapper确保正确的token认证和连接管理
-      final apiService = ApiServiceProvider.instance;
-      final bytes = await apiService.getImageProxy(filename);
+      _ensureApiService();
+      final bytes = await _apiService!.getImageProxy(filename);
 
       // ApiServiceWrapper.getImageProxy 直接返回 Uint8List
 

@@ -1,6 +1,6 @@
 import '../models/chapter.dart';
 import 'logger_service.dart';
-import 'database_service.dart';
+import '../core/providers/database_providers.dart';
 
 /// 章节匹配结果
 class ChapterMatch {
@@ -18,15 +18,12 @@ class ChapterMatch {
 /// 角色提取服务
 /// 用于从章节内容中提取角色相关的上下文
 class CharacterExtractionService {
-  static final CharacterExtractionService _instance =
-      CharacterExtractionService._internal();
-  static final DatabaseService _databaseService = DatabaseService();
+  final dynamic _databaseService;
 
-  factory CharacterExtractionService() {
-    return _instance;
-  }
-
-  CharacterExtractionService._internal();
+  /// 构造函数 - 支持依赖注入
+  /// 注意：必须通过Provider注入，不再支持单例模式
+  CharacterExtractionService({required dynamic databaseService})
+      : _databaseService = databaseService;
 
   /// 根据角色名和别名搜索匹配的章节
   ///

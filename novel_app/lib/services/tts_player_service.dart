@@ -23,10 +23,10 @@ enum TtsPlayerState {
 
 /// TTS播放器服务 - 管理播放状态、章节切换和进度保存
 class TtsPlayerService extends ChangeNotifier {
-  // 依赖服务
-  final TtsService _tts = TtsService();
-  final DatabaseService _database = DatabaseService();
-  final ApiServiceWrapper _api = ApiServiceProvider.instance;
+  // 依赖服务 - 通过构造函数注入
+  final TtsService _tts;
+  final DatabaseService _database;
+  final ApiServiceWrapper _api;
 
   // 状态订阅
   StreamSubscription<bool>? _speakingSubscription;
@@ -96,7 +96,19 @@ class TtsPlayerService extends ChangeNotifier {
       StreamController<TtsTimerConfig>.broadcast();
   Stream<TtsTimerConfig> get onTimerComplete => _timerCompleteController.stream;
 
-  TtsPlayerService() {
+  /// 创建 TTS 播放器服务实例
+  ///
+  /// 参数:
+  /// - [database] 数据库服务（必需）
+  /// - [apiService] API服务（必需）
+  /// - [ttsService] TTS服务（可选，默认创建新实例）
+  TtsPlayerService({
+    required DatabaseService database,
+    required ApiServiceWrapper apiService,
+    TtsService? ttsService,
+  })  : _database = database,
+        _api = apiService,
+        _tts = ttsService ?? TtsService() {
     _initTtsListeners();
     _loadSettings();
   }
