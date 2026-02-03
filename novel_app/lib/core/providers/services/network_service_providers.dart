@@ -16,13 +16,89 @@ library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'dart:io';
 import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/scene_illustration_service.dart';
 import '../../../services/scene_illustration_cache_service.dart';
 import '../repository_providers.dart';
+import '../../../services/logger_service.dart';
+import '../../../utils/logging/log_category.dart';
 
 part 'network_service_providers.g.dart';
+
+/// Dio Provider
+///
+/// 提供全局统一的 HTTP 客户端实例。
+///
+/// **功能**:
+/// - 统一配置超时时间、连接池
+/// - 添加日志拦截器
+/// - 优化HTTP连接管理
+///
+/// **配置**:
+/// - 连接超时: 10秒
+/// - 接收超时: 90秒
+/// - 发送超时: 30秒
+/// - 最大并发连接: 20/主机
+/// - 空闲超时: 60秒
+///
+/// **使用示例**:
+/// ```dart
+/// final dio = ref.watch(dioProvider);
+/// final response = await dio.get('/api/endpoint');
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 自动添加日志拦截器（调试模式）
+/// - 已优化的连接池配置，避免资源耗尽
+@Riverpod(keepAlive: true)
+Dio dio(Ref ref) {
+  final dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 90),
+    sendTimeout: const Duration(seconds: 30),
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      // CORS headers for web requests
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers':
+          'Content-Type, Authorization, X-API-TOKEN',
+    },
+  ));
+
+  // 配置优化的HttpClientAdapter
+  dio.httpClientAdapter = IOHttpClientAdapter(
+    createHttpClient: () {
+      final client = HttpClient();
+      // 优化连接池配置：减少连接数避免资源耗尽
+      client.maxConnectionsPerHost = 20;
+      // 设置连接空闲超时，避免长时间占用连接
+      client.idleTimeout = const Duration(seconds: 60);
+      // 设置连接超时
+      client.connectionTimeout = const Duration(seconds: 15);
+      return client;
+    },
+  );
+
+  // 添加日志拦截器
+  dio.interceptors.add(LogInterceptor(
+    requestBody: true,
+    responseBody: false, // 减少日志输出
+    logPrint: (obj) => LoggerService.instance.d(
+      '[Dio] $obj',
+      category: LogCategory.network,
+      tags: ['interceptor'],
+    ),
+  ));
+
+  return dio;
+}
 
 /// ApiServiceWrapper Provider
 ///

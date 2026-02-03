@@ -39,6 +39,7 @@ import '../services/database_service.dart';
 import '../services/preload_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
+import '../services/dialog_service.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../mixins/dify_streaming_mixin.dart';
@@ -52,7 +53,6 @@ import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/paragraph_widget.dart'; // 新增导入
 import '../widgets/immersive/immersive_setup_dialog.dart'; // 沉浸体验配置对话框
 import '../widgets/immersive/immersive_init_screen.dart'; // 沉浸体验初始化页面
-import '../widgets/reader/ai_companion_confirm_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../utils/media_markup_parser.dart';
 import '../utils/character_matcher.dart';
@@ -68,6 +68,7 @@ import '../utils/error_helper.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/reader_screen_providers.dart';
+import '../core/providers/reader_screen_notifier.dart';
 import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
 
@@ -104,6 +105,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // ========== 服务实例（通过 ref.read 获取）==========
   late final DifyService _difyService;
   late final NovelContextBuilder _contextBuilder;
+  late final DialogService _dialogService;
 
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
@@ -165,6 +167,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _databaseService = ref.read(databaseServiceProvider);
     _difyService = ref.read(difyServiceProvider);
     _contextBuilder = ref.read(novelContextBuilderProvider);
+    _dialogService = DialogService(ref);
 
     _currentChapter = widget.chapter;
 
@@ -198,7 +201,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 加载默认模型尺寸
     _loadDefaultModelSize();
 
+    // 初始化 ReaderScreenNotifier 的上下文
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _initNotifierContext();
+      }
+    });
+
     _initApiAndLoadContent();
+  }
+
+  /// 初始化 Notifier 上下文
+  void _initNotifierContext() {
+    final notifier = ref.read(readerScreenNotifierProvider.notifier);
+    notifier.setReadingContext(
+      novel: widget.novel,
+      chapter: _currentChapter,
+      chapters: widget.chapters,
+      content: _content,
+    );
   }
 
   /// 初始化API并加载内容
@@ -562,7 +583,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void _showFontSizeDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, // 禁用空白区域点击关闭
+      barrierDismissible: false,
       builder: (context) => FontSizeAdjusterDialog(
         initialFontSize: _fontSize ?? 18.0,
         onFontSizeChanged: (newSize) async {
@@ -764,81 +785,32 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // AI伴读功能
   Future<void> _handleAICompanion() async {
     if (_content.isEmpty) {
-      ToastUtils.showWarning('章节内容为空，无法进行AI伴读', context: context);
+      _dialogService.showWarning('章节内容为空，无法进行AI伴读', context: context);
       return;
     }
 
     // 显示loading提示
-    ToastUtils.showInfo('AI正在分析章节...',
-        context: context, duration: const Duration(minutes: 5));
+    _dialogService.showLoading('AI正在分析章节...', context: context);
 
     try {
-      // 获取本书的所有角色
-      final allCharacters =
-          await _databaseService.getCharacters(widget.novel.url);
+      // 使用 Notifier 处理业务逻辑
+      final notifier = ref.read(readerScreenNotifierProvider.notifier);
 
-      // 筛选当前章节出现的角色
-      final chapterCharacters = await _filterCharactersInChapter(
-        allCharacters,
-        _content,
+      // 更新 Notifier 的上下文（确保最新内容）
+      notifier.setReadingContext(
+        novel: widget.novel,
+        chapter: _currentChapter,
+        chapters: widget.chapters,
+        content: _content,
       );
 
-      // 获取这些角色的关系
-      final chapterRelationships = await _getRelationshipsForCharacters(
-        widget.novel.url,
-        chapterCharacters,
-      );
-
-      debugPrint('=== AI伴读分析开始 ===');
-      debugPrint('小说总角色数: ${allCharacters.length}');
-      debugPrint('本章出现角色数: ${chapterCharacters.length}');
-      debugPrint('相关关系数: ${chapterRelationships.length}');
-
-      // 使用 NovelContextBuilder 获取背景设定
-      final backgroundSetting = await _contextBuilder.getBackgroundSetting(
-        widget.novel.url,
-      );
-
-      // 调用DifyService
-      final response = await _difyService.generateAICompanion(
-        chaptersContent: _content,
-        backgroundSetting: backgroundSetting,
-        characters: chapterCharacters,
-        relationships: chapterRelationships,
-      );
-
-      if (response == null) {
-        throw Exception('AI伴读返回数据为空');
-      }
-
-      debugPrint('=== AI伴读分析完成 ===');
-      debugPrint('角色更新: ${response.roles.length}');
-      debugPrint('关系更新: ${response.relations.length}');
-      debugPrint('背景设定新增: ${response.background.length} 字符');
-      debugPrint('本章总结: ${response.summery.length} 字符');
+      // 调用 Notifier 的业务逻辑方法
+      // Notifier会通过状态管理触发对话框显示
+      await notifier.handleAICompanion();
 
       // 关闭loading
       if (mounted) {
-        ToastUtils.dismiss();
-      }
-
-      // 显示确认对话框
-      if (mounted) {
-        final confirmed = await showAICompanionConfirmDialog(
-          context,
-          response,
-        );
-
-        if (confirmed) {
-          // 用户确认，执行数据更新
-          await _performAICompanionUpdates(response);
-
-          // 标记章节为已伴读
-          await _databaseService.markChapterAsAccompanied(
-            widget.novel.url,
-            _currentChapter.url,
-          );
-        }
+        _dialogService.dismissToast();
       }
     } catch (e, stackTrace) {
       if (!mounted) return;
@@ -851,8 +823,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
       debugPrint('❌ AI伴读失败: $e');
       if (mounted) {
-        ToastUtils.dismiss();
+        _dialogService.dismissToast();
       }
+    }
+  }
+
+  /// 显示AI伴读确认对话框（由ref.listen触发）
+  Future<void> _showAICompanionDialogFromState(AICompanionResponse response) async {
+    final confirmed = await _dialogService.showAICompanionConfirm(
+      context,
+      response: response,
+    );
+
+    if (confirmed && mounted) {
+      // 用户确认，执行数据更新
+      await _dialogService.performAICompanionUpdates(
+        context,
+        response: response,
+        novel: widget.novel,
+      );
+
+      // 标记章节为已伴读
+      await _databaseService.markChapterAsAccompanied(
+        widget.novel.url,
+        _currentChapter.url,
+      );
     }
   }
 
@@ -924,7 +919,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         final message =
             messages.isEmpty ? 'AI伴读内容已更新' : 'AI伴读已完成: 更新${messages.join('、')}';
 
-        ToastUtils.showSuccess(message, context: context);
+        _dialogService.showSuccess(message, context: context);
       }
     } catch (e, stackTrace) {
       ErrorHelper.logError(
@@ -947,8 +942,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     try {
       // 仅在非静默模式下显示更新进度
       if (!isSilent) {
-        ToastUtils.showInfo('正在更新数据...',
-            context: context, duration: const Duration(minutes: 5));
+        _dialogService.showLoading('正在更新数据...', context: context);
       }
 
       // 1. 追加背景设定
@@ -984,7 +978,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       // 关闭进度提示
       if (mounted) {
         if (!isSilent) {
-          ToastUtils.dismiss();
+          _dialogService.dismissToast();
 
           // 仅在非静默模式下显示成功提示
           String successMessage = 'AI伴读更新完成';
@@ -1002,8 +996,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             successMessage += ' (${updates.join('、')})';
           }
 
-          ToastUtils.showSuccess(successMessage,
-              context: context, duration: const Duration(seconds: 3));
+          _dialogService.showSuccess(successMessage, context: context);
         }
       }
     } catch (e, stackTrace) {
@@ -1015,9 +1008,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
       debugPrint('❌ AI伴读数据更新失败: $e');
       if (mounted && !isSilent) {
-        ToastUtils.dismiss();
-        ToastUtils.showError('数据更新失败: $e',
-            duration: const Duration(seconds: 4), context: context);
+        _dialogService.dismissToast();
+        _dialogService.showError('数据更新失败: $e', context: context);
       }
     }
   }
@@ -1258,6 +1250,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     // 使用 ref.watch 监听编辑模式状态
     final isEditMode = ref.watch(readerEditModeProvider);
+
+    // 监听 ReaderScreenNotifier 状态，处理对话框显示
+    ref.listen<ReaderScreenState>(
+      readerScreenNotifierProvider,
+      (previous, next) {
+        // 监听AI伴读对话框显示
+        if (next.showAICompanionDialog && next.aiCompanionData != null && mounted) {
+          _showAICompanionDialogFromState(next.aiCompanionData!);
+          // 立即隐藏状态，避免重复显示
+          ref.read(readerScreenNotifierProvider.notifier).hideAICompanionDialog();
+        }
+      },
+    );
 
     final currentIndex = _currentChapterIndex;
     final hasPrevious = currentIndex > 0;

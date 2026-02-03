@@ -6,6 +6,49 @@ part of 'network_service_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+String _$dioHash() => r'5fb0d093edec90a365c078b3b4c53aa2ceb0ece1';
+
+/// Dio Provider
+///
+/// 提供全局统一的 HTTP 客户端实例。
+///
+/// **功能**:
+/// - 统一配置超时时间、连接池
+/// - 添加日志拦截器
+/// - 优化HTTP连接管理
+///
+/// **配置**:
+/// - 连接超时: 10秒
+/// - 接收超时: 90秒
+/// - 发送超时: 30秒
+/// - 最大并发连接: 20/主机
+/// - 空闲超时: 60秒
+///
+/// **使用示例**:
+/// ```dart
+/// final dio = ref.watch(dioProvider);
+/// final response = await dio.get('/api/endpoint');
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 自动添加日志拦截器（调试模式）
+/// - 已优化的连接池配置，避免资源耗尽
+///
+/// Copied from [dio].
+@ProviderFor(dio)
+final dioProvider = Provider<Dio>.internal(
+  dio,
+  name: r'dioProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$dioHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef DioRef = ProviderRef<Dio>;
 String _$apiServiceWrapperHash() => r'45715e468a5bb8cfd049e29ed2a4df08182a3bd7';
 
 /// ApiServiceWrapper Provider
