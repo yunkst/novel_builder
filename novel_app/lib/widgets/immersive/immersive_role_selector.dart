@@ -137,8 +137,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   Widget build(BuildContext context) {
     // 懒加载初始化服务
     _avatarService ??= CharacterAvatarService(
-      databaseService: ProviderScope.containerOf(context)
-          .read(databaseServiceProvider),
+      characterRepository:
+          ProviderScope.containerOf(context).read(characterRepositoryProvider),
       cacheService: _imageCacheService,
     );
 

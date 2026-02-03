@@ -1,14 +1,14 @@
 import '../../models/chapter.dart';
-import '../../services/database_service.dart';
+import '../../core/interfaces/repositories/i_chapter_repository.dart';
 
 /// 章节重排控制器
 /// 负责章节重排逻辑和保存
 class ChapterReorderController {
-  final DatabaseService _databaseService;
+  final IChapterRepository _chapterRepo;
 
   ChapterReorderController({
-    required DatabaseService databaseService,
-  }) : _databaseService = databaseService;
+    required IChapterRepository chapterRepository,
+  }) : _chapterRepo = chapterRepository;
 
   /// 处理章节重排
   /// [oldIndex] 原始索引
@@ -38,6 +38,6 @@ class ChapterReorderController {
     required String novelUrl,
     required List<Chapter> chapters,
   }) async {
-    await _databaseService.updateChaptersOrder(novelUrl, chapters);
+    await _chapterRepo.updateChaptersOrder(novelUrl, chapters);
   }
 }

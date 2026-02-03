@@ -1,14 +1,19 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/search_result.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
 
 /// 缓存内容搜索服务
 class CacheSearchService {
+  final IChapterRepository _chapterRepository;
   final dynamic _databaseService;
 
   /// 构造函数 - 支持依赖注入
   /// 注意：必须通过Provider注入，不再支持直接实例化
-  CacheSearchService({required dynamic databaseService})
-      : _databaseService = databaseService;
+  CacheSearchService({
+    required IChapterRepository chapterRepository,
+    required dynamic databaseService,
+  })  : _chapterRepository = chapterRepository,
+        _databaseService = databaseService;
 
   /// 搜索缓存内容
   Future<CacheSearchResult> searchInCache({
@@ -30,17 +35,16 @@ class CacheSearchService {
 
       debugPrint('搜索缓存内容: 关键字="$keyword", 小说URL=$novelUrl');
 
-      // 执行搜索 - 注意：searchInCachedContent方法需要在DatabaseService中实现
-      // 如果方法不存在，返回空结果
+      // 执行搜索 - 使用 ChapterRepository
       List<ChapterSearchResult> allResults = [];
 
       try {
-        allResults = await _databaseService.searchInCachedContent(
+        allResults = await _chapterRepository.searchInCachedContent(
           keyword,
           novelUrl: novelUrl,
         );
       } catch (e) {
-        debugPrint('⚠️ searchInCachedContent方法未实现或调用失败: $e');
+        debugPrint('⚠️ searchInCachedContent方法调用失败: $e');
         // 方法不存在时返回空结果
         allResults = [];
       }

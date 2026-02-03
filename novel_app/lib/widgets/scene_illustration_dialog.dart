@@ -81,7 +81,8 @@ class _SceneIllustrationDialogState
   Future<void> _loadCharacters() async {
     final characterRepository = ref.read(characterRepositoryProvider);
     try {
-      final characters = await characterRepository.getCharacters(widget.novelUrl);
+      final characters =
+          await characterRepository.getCharacters(widget.novelUrl);
       if (mounted) {
         setState(() {
           _characters = characters;

@@ -255,76 +255,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: const Text('选择主题模式'),
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    title: const Text('亮色模式'),
-                    subtitle: const Text('使用浅色主题'),
-                    leading: Radio<AppThemeMode>(
+              return RadioGroup<AppThemeMode>(
+                groupValue: themeState.themeMode,
+                onChanged: (AppThemeMode? value) {
+                  if (value != null) {
+                    ref
+                        .read(themeNotifierProvider.notifier)
+                        .setThemeMode(value);
+                    Navigator.pop(context);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<AppThemeMode>(
+                      title: const Text('亮色模式'),
+                      subtitle: const Text('使用浅色主题'),
                       value: AppThemeMode.light,
-                      groupValue: themeState.themeMode,
-                      onChanged: (AppThemeMode? value) {
-                        if (value != null) {
-                          ref
-                              .read(themeNotifierProvider.notifier)
-                              .setThemeMode(value);
-                          Navigator.pop(context);
-                        }
-                      },
                     ),
-                    onTap: () {
-                      ref
-                          .read(themeNotifierProvider.notifier)
-                          .setThemeMode(AppThemeMode.light);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('暗色模式'),
-                    subtitle: const Text('使用深色主题'),
-                    leading: Radio<AppThemeMode>(
+                    RadioListTile<AppThemeMode>(
+                      title: const Text('暗色模式'),
+                      subtitle: const Text('使用深色主题'),
                       value: AppThemeMode.dark,
-                      groupValue: themeState.themeMode,
-                      onChanged: (AppThemeMode? value) {
-                        if (value != null) {
-                          ref
-                              .read(themeNotifierProvider.notifier)
-                              .setThemeMode(value);
-                          Navigator.pop(context);
-                        }
-                      },
                     ),
-                    onTap: () {
-                      ref
-                          .read(themeNotifierProvider.notifier)
-                          .setThemeMode(AppThemeMode.dark);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('跟随系统'),
-                    subtitle: const Text('跟随系统设置自动切换'),
-                    leading: Radio<AppThemeMode>(
+                    RadioListTile<AppThemeMode>(
+                      title: const Text('跟随系统'),
+                      subtitle: const Text('跟随系统设置自动切换'),
                       value: AppThemeMode.system,
-                      groupValue: themeState.themeMode,
-                      onChanged: (AppThemeMode? value) {
-                        if (value != null) {
-                          ref
-                              .read(themeNotifierProvider.notifier)
-                              .setThemeMode(value);
-                          Navigator.pop(context);
-                        }
-                      },
                     ),
-                    onTap: () {
-                      ref
-                          .read(themeNotifierProvider.notifier)
-                          .setThemeMode(AppThemeMode.system);
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),

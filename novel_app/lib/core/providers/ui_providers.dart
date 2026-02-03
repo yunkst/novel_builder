@@ -26,18 +26,9 @@
 /// ```
 library;
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/ui_service.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-// ==================== UI Service Providers ====================
-
-/// 对话框服务Provider
-///
-/// 提供全局单例的对话框服务
-@riverpod
-DialogService dialogService(Ref ref) {
-  return DialogService();
-}
+part 'ui_providers.g.dart';
 
 // ==================== Toast State Management ====================
 

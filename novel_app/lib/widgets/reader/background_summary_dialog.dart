@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
-import '../../services/database_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/toast_utils.dart';
+import '../../core/providers/database_providers.dart';
 
 /// 背景设定总结对话框
 ///
@@ -12,7 +13,7 @@ import '../../utils/toast_utils.dart';
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持重新总结和复制功能
 /// - 总结完成后自动更新数据库
-class BackgroundSummaryDialog extends StatefulWidget {
+class BackgroundSummaryDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final String backgroundText;
 
@@ -23,14 +24,13 @@ class BackgroundSummaryDialog extends StatefulWidget {
   });
 
   @override
-  State<BackgroundSummaryDialog> createState() =>
+  ConsumerState<BackgroundSummaryDialog> createState() =>
       _BackgroundSummaryDialogState();
 }
 
-class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
+class _BackgroundSummaryDialogState
+    extends ConsumerState<BackgroundSummaryDialog>
     with TickerProviderStateMixin, DifyStreamingMixin {
-  final DatabaseService _databaseService = DatabaseService();
-
   String _summaryResult = '';
   bool _showConfirmDialog = true;
   late TabController _tabController;
@@ -161,7 +161,8 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
   /// 保存总结结果
   Future<void> _saveSummary(String summary) async {
     try {
-      await _databaseService.updateBackgroundSetting(
+      final repository = ref.read(novelRepositoryProvider);
+      await repository.updateBackgroundSetting(
         widget.novel.url,
         summary.isEmpty ? null : summary,
       );

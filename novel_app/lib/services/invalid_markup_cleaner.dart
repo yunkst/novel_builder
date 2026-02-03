@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
-import 'database_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../utils/media_markup_parser.dart';
 
 /// 无效媒体标记清理服务
@@ -16,35 +16,25 @@ import '../utils/media_markup_parser.dart';
 /// final cleaner = ref.watch(invalidMarkupCleanerProvider);
 ///
 /// // 或手动创建实例
-/// final cleaner = InvalidMarkupCleaner(databaseService: databaseService);
+/// final cleaner = InvalidMarkupCleaner(
+///   chapterRepo: chapterRepo,
+///   illustrationRepo: illustrationRepo,
+/// );
 /// ```
 class InvalidMarkupCleaner {
-  final DatabaseService? _databaseService;
-  final Future<Database> Function()? _databaseGetter;
+  final IChapterRepository _chapterRepo;
+  final IIllustrationRepository _illustrationRepo;
 
   /// 创建 InvalidMarkupCleaner 实例
   ///
   /// 参数:
-  /// - [databaseService] 数据库服务（可选，与databaseGetter二选一）
-  /// - [databaseGetter] 数据库获取函数（可选，与databaseService二选一）
+  /// - [chapterRepo] 章节数据仓库（必需）
+  /// - [illustrationRepo] 插图数据仓库（必需）
   InvalidMarkupCleaner({
-    DatabaseService? databaseService,
-    Future<Database> Function()? databaseGetter,
-  })  : _databaseService = databaseService,
-        _databaseGetter = databaseGetter {
-    assert(
-      databaseService != null || databaseGetter != null,
-      '必须提供 databaseService 或 databaseGetter 之一',
-    );
-  }
-
-  /// 获取数据库连接
-  Future<Database> get _database async {
-    if (_databaseService != null) {
-      return await _databaseService!.database;
-    }
-    return await _databaseGetter!();
-  }
+    required IChapterRepository chapterRepo,
+    required IIllustrationRepository illustrationRepo,
+  })  : _chapterRepo = chapterRepo,
+        _illustrationRepo = illustrationRepo;
 
   /// 验证媒体标记是否有效（数据库中是否存在）
   ///
@@ -55,19 +45,11 @@ class InvalidMarkupCleaner {
   /// 返回：true=有效，false=无效
   Future<bool> validateMediaMarkup(String mediaId, String mediaType) async {
     try {
-      final db = await _database;
-
       // 根据媒体类型查询不同的表
       switch (mediaType) {
         case '插图':
-          // 查询 scene_illustrations 表
-          final List<Map<String, dynamic>> maps = await db.query(
-            'scene_illustrations',
-            where: 'task_id = ?',
-            whereArgs: [mediaId],
-            limit: 1,
-          );
-          final isValid = maps.isNotEmpty;
+          // 使用插图仓库验证任务ID是否存在
+          final isValid = await _illustrationRepo.taskExists(mediaId);
           debugPrint('🔍 验证插图标记 [$mediaId]: ${isValid ? "✅ 有效" : "❌ 无效"}');
           return isValid;
 
@@ -180,12 +162,7 @@ class InvalidMarkupCleaner {
         debugPrint('💾 章节内容已清理，正在更新数据库: $chapterUrl');
 
         // 3. 更新数据库
-        await (await _database).update(
-          'chapter_cache',
-          {'content': cleanedContent},
-          where: 'chapterUrl = ?',
-          whereArgs: [chapterUrl],
-        );
+        await _chapterRepo.updateChapterContent(chapterUrl, cleanedContent);
 
         debugPrint('✅ 数据库已更新');
       } else {

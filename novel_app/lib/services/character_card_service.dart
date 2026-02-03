@@ -34,7 +34,10 @@ class CharacterCardService {
     DifyService? difyService,
     required ICharacterRepository characterRepository,
   })  : _difyService = difyService ?? DifyService(),
-        _characterRepository = characterRepository;
+        _characterRepository = characterRepository {
+    // 设置 CharacterMatcher 的依赖注入
+    CharacterMatcher.setCharacterRepository(characterRepository);
+  }
 
   /// 更新角色卡片
   ///

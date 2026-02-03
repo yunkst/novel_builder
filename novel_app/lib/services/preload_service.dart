@@ -251,7 +251,8 @@ class PreloadService {
             title: '', // 可以从API获取
             content: content,
           );
-          await _chapterRepository.cacheChapter(task.novelUrl, chapter, content);
+          await _chapterRepository.cacheChapter(
+              task.novelUrl, chapter, content);
 
           _totalProcessed++;
 

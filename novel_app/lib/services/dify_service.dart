@@ -80,18 +80,20 @@ class DifyService {
     Function(String error)? onError,
     Function()? onDone,
     bool enableDebugLog = false,
-  }) => _workflow.executeStreaming(
-    inputs: inputs,
-    onData: onData,
-    onError: onError,
-    onDone: onDone,
-    enableDebugLog: enableDebugLog,
-  );
+  }) =>
+      _workflow.executeStreaming(
+        inputs: inputs,
+        onData: onData,
+        onError: onError,
+        onDone: onDone,
+        enableDebugLog: enableDebugLog,
+      );
 
   /// 通用的阻塞式工作流执行方法
   Future<Map<String, dynamic>?> runWorkflowBlocking({
     required Map<String, dynamic> inputs,
-  }) => _workflow.executeBlocking(inputs: inputs);
+  }) =>
+      _workflow.executeBlocking(inputs: inputs);
 
   // ============================================================================
   // 角色相关方法（委托给 DifyCharacterService）
@@ -102,22 +104,24 @@ class DifyService {
     required String userInput,
     required String novelUrl,
     required String backgroundSetting,
-  }) => _character.generateCharacters(
-    userInput: userInput,
-    novelUrl: novelUrl,
-    backgroundSetting: backgroundSetting,
-  );
+  }) =>
+      _character.generateCharacters(
+        userInput: userInput,
+        novelUrl: novelUrl,
+        backgroundSetting: backgroundSetting,
+      );
 
   /// 从大纲生成角色
   Future<List<Character>> generateCharactersFromOutline({
     required String outline,
     required String userInput,
     required String novelUrl,
-  }) => _character.generateCharactersFromOutline(
-    outline: outline,
-    userInput: userInput,
-    novelUrl: novelUrl,
-  );
+  }) =>
+      _character.generateCharactersFromOutline(
+        outline: outline,
+        userInput: userInput,
+        novelUrl: novelUrl,
+      );
 
   /// 更新角色卡
   Future<List<Character>> updateCharacterCards({
@@ -125,30 +129,33 @@ class DifyService {
     required String roles,
     required String novelUrl,
     String backgroundSetting = '',
-  }) => _character.updateCharacterCards(
-    chaptersContent: chaptersContent,
-    roles: roles,
-    novelUrl: novelUrl,
-    backgroundSetting: backgroundSetting,
-  );
+  }) =>
+      _character.updateCharacterCards(
+        chaptersContent: chaptersContent,
+        roles: roles,
+        novelUrl: novelUrl,
+        backgroundSetting: backgroundSetting,
+      );
 
   /// 从章节内容提取角色
   Future<List<Character>> extractCharacter({
     required String chapterContent,
     required String roles,
     required String novelUrl,
-  }) => _character.extractCharacter(
-    chapterContent: chapterContent,
-    roles: roles,
-    novelUrl: novelUrl,
-  );
+  }) =>
+      _character.extractCharacter(
+        chapterContent: chapterContent,
+        roles: roles,
+        novelUrl: novelUrl,
+      );
 
   /// 生成角色卡提示词
   Future<Map<String, String>> generateCharacterPrompts({
     required String characterDescription,
-  }) => _character.generateCharacterPrompts(
-    characterDescription: characterDescription,
-  );
+  }) =>
+      _character.generateCharacterPrompts(
+        characterDescription: characterDescription,
+      );
 
   // ============================================================================
   // 创作相关方法（委托给 DifyCreativeService）
@@ -162,14 +169,15 @@ class DifyService {
     required String userChoiceRole,
     String? existingPlay,
     List<Map<String, dynamic>>? existingRoleStrategy,
-  }) => _creative.generateImmersiveScript(
-    chapterContent: chapterContent,
-    characters: characters,
-    userInput: userInput,
-    userChoiceRole: userChoiceRole,
-    existingPlay: existingPlay,
-    existingRoleStrategy: existingRoleStrategy,
-  );
+  }) =>
+      _creative.generateImmersiveScript(
+        chapterContent: chapterContent,
+        characters: characters,
+        userInput: userInput,
+        userChoiceRole: userChoiceRole,
+        existingPlay: existingPlay,
+        existingRoleStrategy: existingRoleStrategy,
+      );
 
   /// AI伴读功能
   Future<AICompanionResponse?> generateAICompanion({
@@ -177,21 +185,23 @@ class DifyService {
     required String backgroundSetting,
     required List<Character> characters,
     required List<CharacterRelationship> relationships,
-  }) => _creative.generateAICompanion(
-    chaptersContent: chaptersContent,
-    backgroundSetting: backgroundSetting,
-    characters: characters,
-    relationships: relationships,
-  );
+  }) =>
+      _creative.generateAICompanion(
+        chaptersContent: chaptersContent,
+        backgroundSetting: backgroundSetting,
+        characters: characters,
+        relationships: relationships,
+      );
 
   /// 格式化场景描写输入参数
   Map<String, dynamic> _formatSceneDescriptionInput({
     required String chapterContent,
     required List<Character> characters,
-  }) => _creative.formatSceneDescriptionInput(
-    chapterContent: chapterContent,
-    characters: characters,
-  );
+  }) =>
+      _creative.formatSceneDescriptionInput(
+        chapterContent: chapterContent,
+        characters: characters,
+      );
 
   // ============================================================================
   // 已弃用的方法（保留向后兼容）

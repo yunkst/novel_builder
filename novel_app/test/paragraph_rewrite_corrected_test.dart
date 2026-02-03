@@ -28,8 +28,7 @@ void main() {
 第四段内容
 第五段内容''';
 
-      expect(result, equals(expectedContent),
-          reason: '单段落替换应该成功');
+      expect(result, equals(expectedContent), reason: '单段落替换应该成功');
     });
 
     test('基础测试：连续多段落替换', () {
@@ -56,8 +55,7 @@ void main() {
 第五段
 第六段''';
 
-      expect(result, equals(expectedContent),
-          reason: '连续多段落替换应该成功');
+      expect(result, equals(expectedContent), reason: '连续多段落替换应该成功');
     });
 
     test('场景1：AI生成更多段落（扩写）', () {
@@ -83,8 +81,7 @@ void main() {
       final resultParagraphs = result.split('\n');
 
       // 验证：5 - 1 + 3 = 7段
-      expect(resultParagraphs.length, equals(7),
-          reason: '删除1段插入3段，应该有7个段落');
+      expect(resultParagraphs.length, equals(7), reason: '删除1段插入3段，应该有7个段落');
 
       // 验证未选中段落保持不变
       expect(resultParagraphs[0], equals('第一段'));
@@ -346,8 +343,7 @@ void main() {
       expect(test1.split('\n')[2], equals('新1'));
       expect(test1.split('\n')[3], equals('新2'));
       expect(test1.split('\n')[4], equals('新3'));
-      expect(test1.split('\n')[5], equals('段落4'),
-          reason: '这是关键：段落4应该在索引5位置');
+      expect(test1.split('\n')[5], equals('段落4'), reason: '这是关键：段落4应该在索引5位置');
     });
   });
 }

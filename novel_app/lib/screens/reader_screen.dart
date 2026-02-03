@@ -24,6 +24,7 @@
 /// - 使用 Controller 管理本地状态（内容、交互）
 
 library;
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,11 +36,13 @@ import '../models/ai_accompaniment_settings.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/api_service_wrapper.dart';
-import '../services/database_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
 import '../services/dialog_service.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_novel_repository.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
+import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
@@ -49,8 +52,6 @@ import '../widgets/scene_illustration_dialog.dart';
 import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
 import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
 import '../widgets/reader_action_buttons.dart'; // 新增导入
-import '../widgets/paragraph_widget.dart'; // 新增导入
-import '../widgets/reader/reader_menu.dart'; // ReaderMenu组件
 import '../widgets/reader/reader_app_bar.dart'; // ReaderAppBar组件
 import '../widgets/reader/reader_bottom_bar.dart'; // ReaderBottomBar组件
 import '../widgets/reader/reader_content_view.dart'; // ReaderContentView组件
@@ -95,7 +96,6 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-
 // ============ State Fields ============
 class _ReaderScreenState extends ConsumerState<ReaderScreen>
     with
@@ -104,7 +104,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         AutoScrollMixin,
         IllustrationHandlerMixin {
   late final ApiServiceWrapper _apiService;
-  late final DatabaseService _databaseService;
+
+  // ========== Repository Getters (替代 DatabaseService) ==========
+  INovelRepository get _novelRepo => ref.read(novelRepositoryProvider);
+  IChapterRepository get _chapterRepo => ref.read(chapterRepositoryProvider);
+  ICharacterRepository get _characterRepo =>
+      ref.read(characterRepositoryProvider);
+  ICharacterRelationRepository get _relationRepo =>
+      ref.read(characterRelationRepositoryProvider);
+
   final ScrollController _scrollController = ScrollController();
 
   // ========== 服务实例（通过 ref.read 获取）==========
@@ -120,7 +128,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   // ========== 便捷访问器（向后兼容） ==========
   String get _content => _contentController.content;
-  set _content(String value) => _contentController.content = value;
   bool get _isLoading => _contentController.isLoading;
   String get _errorMessage => _contentController.errorMessage;
 
@@ -159,7 +166,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     // 使用 Riverpod 获取依赖
     _apiService = ref.read(apiServiceWrapperProvider);
-    _databaseService = ref.read(databaseServiceProvider);
     _difyService = ref.read(difyServiceProvider);
     _contextBuilder = ref.read(novelContextBuilderProvider);
     _dialogService = DialogService(ref);
@@ -173,14 +179,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // ========== 初始化 ReaderContentController ==========
     // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
     _contentController = ReaderContentController(
-      ref: ref,
+      ref: ref as Ref<Object?>,
       apiService: _apiService,
       chapterRepository: ref.read(chapterRepositoryProvider),
+      novelRepository: ref.read(novelRepositoryProvider),
     );
 
     // ========== 初始化 ReaderInteractionController ==========
     // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
-    _interactionController = ReaderInteractionController(ref: ref);
+    _interactionController =
+        ReaderInteractionController(ref: ref as Ref<Object?>);
 
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
@@ -276,13 +284,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     super.dispose();
   }
 
-
 // ============ Chapter Content Loading ============
   Future<void> _loadChapterContent(
       {bool resetScrollPosition = true, bool forceRefresh = false}) async {
     // 如果是强制刷新，重置伴读标记
     if (forceRefresh) {
-      await _databaseService.resetChapterAccompaniedFlag(
+      await _chapterRepo.resetChapterAccompaniedFlag(
         widget.novel.url,
         _currentChapter.url,
       );
@@ -296,7 +303,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
 
     // 标记章节为已读
-    await _databaseService.markChapterAsRead(
+    await _chapterRepo.markChapterAsRead(
       widget.novel.url,
       _currentChapter.url,
     );
@@ -642,7 +649,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
 // ============ Character Card Management ============
   Future<void> _updateCharacterCards() async {
-    final cardUpdateNotifier = ref.read(characterCardUpdateStateNotifierProvider.notifier);
+    final cardUpdateNotifier =
+        ref.read(characterCardUpdateStateNotifierProvider.notifier);
 
     // 防重复点击检查
     if (ref.read(characterCardUpdateStateNotifierProvider).isUpdating) {
@@ -713,7 +721,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 检查是否已伴读
-    final hasAccompanied = await _databaseService.isChapterAccompanied(
+    final hasAccompanied = await _chapterRepo.isChapterAccompanied(
       widget.novel.url,
       _currentChapter.url,
     );
@@ -724,7 +732,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 获取AI伴读设置
-    final settings = await _databaseService.getAiAccompanimentSettings(
+    final settings = await _novelRepo.getAiAccompanimentSettings(
       widget.novel.url,
     );
 
@@ -807,7 +815,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   /// 显示AI伴读确认对话框（由ref.listen触发）
-  Future<void> _showAICompanionDialogFromState(AICompanionResponse response) async {
+  Future<void> _showAICompanionDialogFromState(
+      AICompanionResponse response) async {
     final confirmed = await _dialogService.showAICompanionConfirm(
       context,
       response: response,
@@ -822,7 +831,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
 
       // 标记章节为已伴读
-      await _databaseService.markChapterAsAccompanied(
+      await _chapterRepo.markChapterAsAccompanied(
         widget.novel.url,
         _currentChapter.url,
       );
@@ -834,7 +843,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       AiAccompanimentSettings settings) async {
     try {
       // 获取本书的所有角色
-      final allCharacters = await _databaseService.getCharacters(
+      final allCharacters = await _characterRepo.getCharacters(
         widget.novel.url,
       );
 
@@ -882,7 +891,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       await _performAICompanionUpdates(response, isSilent: true);
 
       // 标记章节为已伴读
-      await _databaseService.markChapterAsAccompanied(
+      await _chapterRepo.markChapterAsAccompanied(
         widget.novel.url,
         _currentChapter.url,
       );
@@ -925,17 +934,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
       // 1. 追加背景设定
       if (response.background.isNotEmpty) {
-        await _databaseService.appendBackgroundSetting(
-          widget.novel.url,
-          response.background,
-        );
+        final currentBackground =
+            await _novelRepo.getBackgroundSetting(widget.novel.url);
+        final updatedBackground =
+            currentBackground == null || currentBackground.isEmpty
+                ? response.background
+                : '$currentBackground\n\n${response.background}';
+        await _novelRepo.updateBackgroundSetting(
+            widget.novel.url, updatedBackground);
         debugPrint('✅ 背景设定追加成功');
       }
 
       // 2. 批量更新或插入角色
       int updatedRoles = 0;
       if (response.roles.isNotEmpty) {
-        updatedRoles = await _databaseService.batchUpdateOrInsertCharacters(
+        updatedRoles = await _characterRepo.batchUpdateOrInsertCharacters(
           widget.novel.url,
           response.roles,
         );
@@ -945,10 +958,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       // 3. 批量更新或插入关系
       int updatedRelations = 0;
       if (response.relations.isNotEmpty) {
-        updatedRelations =
-            await _databaseService.batchUpdateOrInsertRelationships(
+        updatedRelations = await _relationRepo.batchUpdateOrInsertRelationships(
           widget.novel.url,
           response.relations,
+          _characterRepo.getCharacters,
         );
         debugPrint('✅ 关系更新成功: $updatedRelations');
       }
@@ -1027,8 +1040,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 获取角色ID集合
     final characterIds = characters.map((c) => c.id).whereType<int>().toSet();
 
-    final allRelationships =
-        await _databaseService.getAllRelationships(novelUrl);
+    final allRelationships = await _relationRepo.getAllRelationships(novelUrl);
 
     // 筛选出涉及这些角色的关系
     final filteredRelationships = allRelationships.where((rel) {
@@ -1123,7 +1135,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         selectedParagraphIndices: _selectedParagraphIndices,
         onReplace: (newContent) {
           setState(() {
-            _content = newContent;
+            _contentController.setContent(newContent);
             _interactionController.clearSelection();
             _isCloseupMode = false;
           });
@@ -1168,12 +1180,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         content: _content,
         onContentReplace: (newContent) async {
           setState(() {
-            _content = newContent;
+            _contentController.setContent(newContent);
           });
 
           // 保存修改后的内容到数据库
           try {
-            await _databaseService.updateChapterContent(
+            await _chapterRepo.updateChapterContent(
                 _currentChapter.url, newContent);
 
             if (mounted) {
@@ -1200,8 +1212,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ Content Editing ============
   Future<void> _saveEditedContent() async {
     try {
-      await _databaseService.updateChapterContent(
-          _currentChapter.url, _content);
+      await _chapterRepo.updateChapterContent(_currentChapter.url, _content);
 
       if (mounted) {
         ToastUtils.showSuccess('章节内容已保存', context: context);
@@ -1234,18 +1245,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       readerScreenNotifierProvider,
       (previous, next) {
         // 监听AI伴读对话框显示
-        if (next.showAICompanionDialog && next.aiCompanionData != null && mounted) {
+        if (next.showAICompanionDialog &&
+            next.aiCompanionData != null &&
+            mounted) {
           _showAICompanionDialogFromState(next.aiCompanionData!);
           // 立即隐藏状态，避免重复显示
-          ref.read(readerScreenNotifierProvider.notifier).hideAICompanionDialog();
+          ref
+              .read(readerScreenNotifierProvider.notifier)
+              .hideAICompanionDialog();
         }
       },
     );
-
-    final currentIndex = _currentChapterIndex;
-    final hasPrevious = currentIndex > 0;
-    final hasNext =
-        currentIndex != -1 && currentIndex < widget.chapters.length - 1;
 
     final paragraphs = _paragraphs;
 
@@ -1256,7 +1266,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         currentChapter: _currentChapter,
         chapters: widget.chapters,
         isEditMode: isEditMode,
-        isUpdatingRoleCards: ref.watch(characterCardUpdateStateNotifierProvider).isUpdating, // 从Provider读取
+        isUpdatingRoleCards: ref
+            .watch(characterCardUpdateStateNotifierProvider)
+            .isUpdating, // 从Provider读取
         onToggleEditMode: () =>
             ref.read(readerEditModeProvider.notifier).toggle(),
         onSaveAndExitEditMode: () async {
@@ -1326,7 +1338,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
                 setState(() {
-                  _content = updatedParagraphs.join('\n');
+                  _contentController.setContent(updatedParagraphs.join('\n'));
                 });
               }
             });
@@ -1337,8 +1349,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               deleteIllustrationByTaskId(taskId), // Mixin方法
           generateVideoFromIllustration:
               generateVideoFromIllustration, // Mixin方法
-          modelWidth: ref.watch(modelSizeStateNotifierProvider).width, // 从Provider读取模型宽度
-          modelHeight: ref.watch(modelSizeStateNotifierProvider).height, // 从Provider读取模型高度
+          modelWidth: ref
+              .watch(modelSizeStateNotifierProvider)
+              .width, // 从Provider读取模型宽度
+          modelHeight: ref
+              .watch(modelSizeStateNotifierProvider)
+              .height, // 从Provider读取模型高度
           scrollController: _scrollController,
           onPointerDown: () {
             // 手指接触屏幕，暂停自动滚动
@@ -1393,7 +1409,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Chapter get currentChapter => _currentChapter;
 
   @override
-  IChapterRepository get chapterRepository => ref.read(chapterRepositoryProvider);
+  IChapterRepository get chapterRepository =>
+      ref.read(chapterRepositoryProvider);
 
   @override
   IIllustrationRepository get illustrationRepository =>
@@ -1407,7 +1424,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 加载所有角色
     try {
       final allCharacters =
-          await _databaseService.getCharacters(widget.novel.url);
+          await _characterRepo.getCharacters(widget.novel.url);
 
       if (!mounted) return;
 

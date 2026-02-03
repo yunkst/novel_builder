@@ -542,7 +542,8 @@ class _CharacterManagementScreenState
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => UnifiedRelationshipGraphScreenRiverpod(
+                        builder: (context) =>
+                            UnifiedRelationshipGraphScreenRiverpod(
                           novelUrl: widget.novel.url,
                           // focusCharacter 为 null,进入全局模式
                         ),

@@ -2,9 +2,9 @@ import 'dart:io';
 import '../models/role_gallery.dart';
 import '../services/role_gallery_cache_service.dart';
 import '../services/character_image_cache_service.dart';
-import '../services/database_service.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/logger_service.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 
 /// 角色头像同步服务
 /// 负责将图集图片同步为角色头像
@@ -13,21 +13,21 @@ class CharacterAvatarSyncService {
   ///
   /// [galleryCacheService] 图集缓存服务实例
   /// [avatarCacheService] 头像缓存服务实例
-  /// [databaseService] 数据库服务实例
+  /// [characterRepository] 角色数据仓库实例
   /// [apiService] API服务实例
   CharacterAvatarSyncService({
     required RoleGalleryCacheService galleryCacheService,
     required CharacterImageCacheService avatarCacheService,
-    required DatabaseService databaseService,
+    required ICharacterRepository characterRepository,
     required ApiServiceWrapper apiService,
   })  : _galleryCacheService = galleryCacheService,
         _avatarCacheService = avatarCacheService,
-        _databaseService = databaseService,
+        _characterRepo = characterRepository,
         _apiService = apiService;
 
   final RoleGalleryCacheService _galleryCacheService;
   final CharacterImageCacheService _avatarCacheService;
-  final DatabaseService _databaseService;
+  final ICharacterRepository _characterRepo;
   final ApiServiceWrapper _apiService;
 
   /// 初始化服务
@@ -83,7 +83,7 @@ class CharacterAvatarSyncService {
 
       if (cachedImagePath != null) {
         // 更新数据库中的 cachedImageUrl 字段
-        await _databaseService.updateCharacterCachedImage(
+        await _characterRepo.updateCharacterCachedImage(
           characterId,
           cachedImagePath,
         );
@@ -126,7 +126,8 @@ class CharacterAvatarSyncService {
       );
 
       // 获取角色图集
-      final galleryData = await _apiService.getRoleGallery(characterId.toString());
+      final galleryData =
+          await _apiService.getRoleGallery(characterId.toString());
       final gallery = RoleGallery.fromJson(galleryData);
 
       // 获取第一张图片（优先取置顶图片）
@@ -187,7 +188,7 @@ class CharacterAvatarSyncService {
       await _avatarCacheService.deleteCharacterCachedImages(characterId);
 
       // 清除数据库中的 cachedImageUrl 字段
-      await _databaseService.clearCharacterCachedImage(characterId);
+      await _characterRepo.clearCharacterCachedImage(characterId);
 
       LoggerService.instance.i(
         '清除角色头像缓存成功: 角色ID $characterId',

@@ -21,7 +21,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
 import '../../../services/character_card_service.dart';
-import '../../../services/character_extraction_service.dart';
 import '../../../services/outline_service.dart';
 import '../../../services/chapter_history_service.dart';
 import '../../../services/invalid_markup_cleaner.dart';
@@ -97,36 +96,6 @@ CharacterCardService characterCardService(Ref ref) {
   );
 }
 
-/// CharacterExtractionService Provider
-///
-/// 提供角色提取服务实例，从章节内容中提取角色相关信息。
-///
-/// **功能**:
-/// - 角色名字搜索
-/// - 章节内容匹配
-/// - 上下文提取
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-///
-/// **使用示例**:
-/// ```dart
-/// final extractionService = ref.watch(characterExtractionServiceProvider);
-/// final matches = await extractionService.searchChaptersByName(
-///   novelUrl: novelUrl,
-///   names: ['张三', '李四'],
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
-/// - 搜索操作是异步的
-@Riverpod(keepAlive: true)
-CharacterExtractionService characterExtractionService(Ref ref) {
-  final databaseConnection = ref.watch(databaseServiceProvider);
-  return CharacterExtractionService(databaseService: databaseConnection);
-}
-
 /// OutlineService Provider
 ///
 /// 提供大纲服务实例，处理小说大纲的管理和生成。
@@ -154,8 +123,8 @@ CharacterExtractionService characterExtractionService(Ref ref) {
 /// - AI生成是异步操作
 @riverpod
 OutlineService outlineService(Ref ref) {
-  final databaseConnection = ref.watch(databaseServiceProvider);
-  return OutlineService(databaseService: databaseConnection);
+  final outlineRepository = ref.watch(outlineRepositoryProvider);
+  return OutlineService(outlineRepo: outlineRepository);
 }
 
 /// ChapterHistoryService Provider
@@ -168,7 +137,7 @@ OutlineService outlineService(Ref ref) {
 /// - 支持缓存和API获取
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
 /// - [apiServiceWrapperProvider] - API服务
 ///
 /// **使用示例**:
@@ -186,10 +155,10 @@ OutlineService outlineService(Ref ref) {
 /// - 优先使用缓存，缓存未命中时从API获取
 @riverpod
 ChapterHistoryService chapterHistoryService(Ref ref) {
-  final databaseConnection = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
   final apiService = ref.watch(apiServiceWrapperProvider);
   return ChapterHistoryService(
-    databaseService: databaseConnection,
+    chapterRepo: chapterRepository,
     apiService: apiService,
   );
 }
@@ -204,7 +173,8 @@ ChapterHistoryService chapterHistoryService(Ref ref) {
 /// - 验证标记在数据库中是否存在
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [illustrationRepositoryProvider] - 插图数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -217,8 +187,12 @@ ChapterHistoryService chapterHistoryService(Ref ref) {
 /// - 清理失败时返回原内容，避免破坏章节内容
 @riverpod
 InvalidMarkupCleaner invalidMarkupCleaner(Ref ref) {
-  final databaseConnection = ref.watch(databaseServiceProvider);
-  return InvalidMarkupCleaner(databaseService: databaseConnection);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final illustrationRepository = ref.watch(illustrationRepositoryProvider);
+  return InvalidMarkupCleaner(
+    chapterRepo: chapterRepository,
+    illustrationRepo: illustrationRepository,
+  );
 }
 
 /// TtsPlayerService Provider
@@ -252,10 +226,10 @@ InvalidMarkupCleaner invalidMarkupCleaner(Ref ref) {
 /// - 播放器状态通过 ChangeNotifier 通知
 @riverpod
 TtsPlayerService ttsPlayerService(Ref ref) {
-  final databaseConnection = ref.watch(databaseServiceProvider);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
   final apiService = ref.watch(apiServiceWrapperProvider);
   return TtsPlayerService(
-    database: databaseConnection,
+    chapterRepository: chapterRepository,
     apiService: apiService,
   );
 }

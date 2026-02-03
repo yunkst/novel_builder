@@ -1,4 +1,6 @@
 import '../../../models/character_relationship.dart';
+import '../../../models/character.dart';
+import '../../../models/ai_companion_response.dart';
 
 /// 人物关系数据仓库接口
 ///
@@ -80,4 +82,18 @@ abstract class ICharacterRelationRepository {
   /// [characterId] 角色ID
   /// 返回相关角色的ID列表
   Future<List<int>> getRelatedCharacterIds(int characterId);
+
+  // ========== AI伴读批量操作 ==========
+
+  /// 批量更新或插入关系（用于AI伴读）
+  ///
+  /// [novelUrl] 小说URL
+  /// [aiRelations] AI返回的关系更新列表
+  /// [getCharactersFn] 获取小说所有角色的函数
+  /// 返回成功更新的关系数量
+  Future<int> batchUpdateOrInsertRelationships(
+    String novelUrl,
+    List<AICompanionRelation> aiRelations,
+    Future<List<Character>> Function(String) getCharactersFn,
+  );
 }

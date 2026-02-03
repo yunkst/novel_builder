@@ -57,8 +57,8 @@ class ErrorDisplayWidget extends StatelessWidget {
     this.onRetry,
     this.icon,
     this.retryText = '重试',
-  }) : centered = false,
-       mode = ErrorDisplayMode.card;
+  })  : centered = false,
+        mode = ErrorDisplayMode.card;
 
   /// 创建内联样式的错误显示（用于列表项等小空间）
   const ErrorDisplayWidget.inline({
@@ -68,8 +68,8 @@ class ErrorDisplayWidget extends StatelessWidget {
     this.onRetry,
     this.icon,
     this.retryText = '重试',
-  }) : centered = false,
-       mode = ErrorDisplayMode.inline;
+  })  : centered = false,
+        mode = ErrorDisplayMode.inline;
 
   @override
   Widget build(BuildContext context) {
@@ -343,8 +343,8 @@ extension ErrorHandling on Object {
   /// 判断是否为网络错误
   bool get isNetworkError {
     return toString().contains('SocketException') ||
-           toString().contains('HttpException') ||
-           toString().contains('NetworkException');
+        toString().contains('HttpException') ||
+        toString().contains('NetworkException');
   }
 
   /// 判断是否为超时错误
@@ -355,7 +355,7 @@ extension ErrorHandling on Object {
   /// 判断是否为解析错误
   bool get isParseError {
     return toString().contains('FormatException') ||
-           toString().contains('ParseException');
+        toString().contains('ParseException');
   }
 
   /// 根据错误类型获取对应的错误组件

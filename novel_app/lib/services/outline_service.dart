@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/outline.dart';
-import 'database_service.dart';
+import '../core/interfaces/repositories/i_outline_repository.dart';
 
 /// 大纲管理服务
 /// 负责大纲的业务逻辑和AI生成接口
@@ -11,18 +11,18 @@ import 'database_service.dart';
 /// final outlineService = ref.watch(outlineServiceProvider);
 ///
 /// // 或手动创建实例
-/// final outlineService = OutlineService(databaseService: databaseService);
+/// final outlineService = OutlineService(outlineRepo: outlineRepo);
 /// ```
 class OutlineService {
-  final DatabaseService _db;
+  final IOutlineRepository _outlineRepo;
 
   /// 创建 OutlineService 实例
   ///
   /// 参数:
-  /// - [databaseService] 数据库服务（必需）
+  /// - [outlineRepo] 大纲仓储接口（必需）
   OutlineService({
-    required DatabaseService databaseService,
-  }) : _db = databaseService;
+    required IOutlineRepository outlineRepo,
+  }) : _outlineRepo = outlineRepo;
 
   // ========== 大纲CRUD操作 ==========
 
@@ -39,18 +39,18 @@ class OutlineService {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await _db.saveOutline(outline);
+    await _outlineRepo.saveOutline(outline);
     debugPrint('✅ 大纲已保存: $title');
   }
 
   /// 获取小说的大纲
   Future<Outline?> getOutline(String novelUrl) async {
-    return await _db.getOutlineByNovelUrl(novelUrl);
+    return await _outlineRepo.getOutlineByNovelUrl(novelUrl);
   }
 
   /// 删除大纲
   Future<void> deleteOutline(String novelUrl) async {
-    await _db.deleteOutline(novelUrl);
+    await _outlineRepo.deleteOutline(novelUrl);
     debugPrint('🗑️ 大纲已删除: $novelUrl');
   }
 
@@ -60,7 +60,7 @@ class OutlineService {
     required String title,
     required String content,
   }) async {
-    await _db.updateOutlineContent(novelUrl, title, content);
+    await _outlineRepo.updateOutlineContent(novelUrl, title, content);
     debugPrint('✏️ 大纲已更新: $title');
   }
 

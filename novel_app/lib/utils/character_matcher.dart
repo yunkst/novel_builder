@@ -1,12 +1,26 @@
 import 'package:flutter/foundation.dart';
 import '../models/character.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 
 /// 角色名称匹配工具类
 /// 用于分析章节内容中的角色出现情况并准备角色更新数据
 class CharacterMatcher {
-  static final DatabaseService _databaseService = DatabaseService();
+  static ICharacterRepository? _characterRepository;
   CharacterMatcher._();
+
+  /// 设置角色仓库（依赖注入）
+  static void setCharacterRepository(ICharacterRepository repository) {
+    _characterRepository = repository;
+  }
+
+  /// 获取角色仓库（确保已初始化）
+  static ICharacterRepository get _repo {
+    if (_characterRepository == null) {
+      throw StateError(
+          'CharacterMatcher 需要先调用 setCharacterRepository() 设置角色仓库');
+    }
+    return _characterRepository!;
+  }
 
   /// 从章节内容中提取出现的角色ID列表（支持别名，不区分大小写）
   ///
@@ -105,7 +119,7 @@ class CharacterMatcher {
   /// 返回角色列表
   static Future<List<Character>> findExistingCharacters(String novelUrl) async {
     try {
-      return await _databaseService.getCharacters(novelUrl);
+      return await _repo.getCharacters(novelUrl);
     } catch (e) {
       debugPrint('获取现有角色失败: $e');
       return [];

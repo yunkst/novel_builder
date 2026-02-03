@@ -13,8 +13,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/ai_companion_response.dart';
-import '../../services/api_service_wrapper.dart';
-import '../interfaces/repositories/i_chapter_repository.dart';
 
 part 'reader_state_providers.g.dart';
 
@@ -49,8 +47,10 @@ class ChapterContentState {
       content: content ?? this.content,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
-      currentChapter: clearCurrentChapter ? null : (currentChapter ?? this.currentChapter),
-      currentNovel: clearCurrentNovel ? null : (currentNovel ?? this.currentNovel),
+      currentChapter:
+          clearCurrentChapter ? null : (currentChapter ?? this.currentChapter),
+      currentNovel:
+          clearCurrentNovel ? null : (currentNovel ?? this.currentNovel),
     );
   }
 }
@@ -123,7 +123,8 @@ class ReadingProgressState {
     return ReadingProgressState(
       scrollPosition: scrollPosition ?? this.scrollPosition,
       characterIndex: characterIndex ?? this.characterIndex,
-      firstVisibleParagraphIndex: firstVisibleParagraphIndex ?? this.firstVisibleParagraphIndex,
+      firstVisibleParagraphIndex:
+          firstVisibleParagraphIndex ?? this.firstVisibleParagraphIndex,
     );
   }
 }
@@ -177,7 +178,8 @@ class InteractionState {
   }) {
     return InteractionState(
       isCloseupMode: isCloseupMode ?? this.isCloseupMode,
-      selectedParagraphIndices: selectedParagraphIndices ?? this.selectedParagraphIndices,
+      selectedParagraphIndices:
+          selectedParagraphIndices ?? this.selectedParagraphIndices,
     );
   }
 
@@ -203,7 +205,8 @@ class InteractionStateNotifier extends _$InteractionStateNotifier {
     final newMode = !state.isCloseupMode;
     state = InteractionState(
       isCloseupMode: newMode,
-      selectedParagraphIndices: (!newMode && clearSelection) ? [] : state.selectedParagraphIndices,
+      selectedParagraphIndices:
+          (!newMode && clearSelection) ? [] : state.selectedParagraphIndices,
     );
   }
 
@@ -212,13 +215,15 @@ class InteractionStateNotifier extends _$InteractionStateNotifier {
     if (state.isCloseupMode != value) {
       state = InteractionState(
         isCloseupMode: value,
-        selectedParagraphIndices: (!value && clearSelection) ? [] : state.selectedParagraphIndices,
+        selectedParagraphIndices:
+            (!value && clearSelection) ? [] : state.selectedParagraphIndices,
       );
     }
   }
 
   /// 处理段落点击
-  void handleParagraphTap(int index, List<String> paragraphs, {bool isMediaMarkup = false}) {
+  void handleParagraphTap(int index, List<String> paragraphs,
+      {bool isMediaMarkup = false}) {
     if (!state.isCloseupMode) return;
 
     // 媒体标记段落不允许选择
@@ -388,7 +393,8 @@ class CharacterCardUpdateState {
 ///
 /// 管理角色卡更新状态
 @riverpod
-class CharacterCardUpdateStateNotifier extends _$CharacterCardUpdateStateNotifier {
+class CharacterCardUpdateStateNotifier
+    extends _$CharacterCardUpdateStateNotifier {
   @override
   CharacterCardUpdateState build() {
     return const CharacterCardUpdateState();

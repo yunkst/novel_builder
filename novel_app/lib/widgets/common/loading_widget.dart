@@ -49,8 +49,8 @@ class LoadingWidget extends StatelessWidget {
     this.size,
     this.color,
     this.centered = true,
-  }) : type = LoadingType.circular,
-       customChild = null;
+  })  : type = LoadingType.circular,
+        customChild = null;
 
   /// 创建线性进度指示器
   const LoadingWidget.linear({
@@ -59,19 +59,19 @@ class LoadingWidget extends StatelessWidget {
     this.size,
     this.color,
     this.centered = true,
-  }) : type = LoadingType.linear,
-       customChild = null;
+  })  : type = LoadingType.linear,
+        customChild = null;
 
   /// 创建自定义加载组件
   const LoadingWidget.custom({
     super.key,
     required Widget child,
     this.centered = true,
-  }) : type = LoadingType.custom,
-       customChild = child,
-       message = null,
-       size = null,
-       color = null;
+  })  : type = LoadingType.custom,
+        customChild = child,
+        message = null,
+        size = null,
+        color = null;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +219,8 @@ class FullScreenLoadingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bgColor = backgroundColor ?? theme.colorScheme.surface.withValues(alpha: 0.9);
+    final bgColor =
+        backgroundColor ?? theme.colorScheme.surface.withValues(alpha: 0.9);
 
     return Container(
       color: bgColor,

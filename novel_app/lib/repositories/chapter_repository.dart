@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/chapter.dart';
-import '../services/invalid_markup_cleaner.dart';
+import '../models/search_result.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
@@ -184,17 +184,57 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
     if (maps.isNotEmpty) {
       final content = maps.first['content'] as String;
-      // 使用 databaseGetter 创建 InvalidMarkupCleaner
-      final cleaner = InvalidMarkupCleaner(
-        databaseGetter: () => database,
-      );
-      final cleanedContent = await cleaner.cleanAndUpdateChapter(
-        chapterUrl,
-        content,
-      );
+
+      // 直接清理无效媒体标记（避免循环依赖）
+      final cleanedContent = await _cleanInvalidMarkups(content);
       return cleanedContent;
     }
     return null;
+  }
+
+  /// 清理章节内容中的无效媒体标记
+  ///
+  /// [content] 原始章节内容
+  /// 返回清理后的内容
+  Future<String> _cleanInvalidMarkups(String content) async {
+    // 匹配所有媒体标记：插图、视频
+    final pattern = RegExp(r'!\[(.*?)\]\{(.*?)\}');
+    final matches = pattern.allMatches(content);
+
+    if (matches.isEmpty) {
+      return content;
+    }
+
+    String cleanedContent = content;
+    final db = await database;
+
+    for (final match in matches.toList().reversed) {
+      final mediaId = match.group(2)?.trim() ?? '';
+      final fullMatch = match.group(0)!;
+
+      // 检查是否为插图标记
+      if (fullMatch.startsWith('![')) {
+        // 查询插图是否存在
+        final result = await db.query(
+          'scene_illustrations',
+          where: 'id = ?',
+          whereArgs: [mediaId],
+          limit: 1,
+        );
+
+        if (result.isEmpty) {
+          // 插图不存在，移除标记
+          cleanedContent = cleanedContent.replaceFirst(fullMatch, '');
+          LoggerService.instance.w(
+            '移除无效插图标记: $mediaId',
+            category: LogCategory.cache,
+            tags: ['invalid_markup', 'illustration'],
+          );
+        }
+      }
+    }
+
+    return cleanedContent;
   }
 
   /// 获取小说的所有缓存章节
@@ -496,5 +536,137 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     );
 
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// 更新章节顺序
+  ///
+  /// [novelUrl] 小说URL
+  /// [chapters] 要排序的章节列表
+  ///
+  /// 批量更新章节的索引值，用于章节重排序功能
+  @override
+  Future<void> updateChaptersOrder(
+      String novelUrl, List<Chapter> chapters) async {
+    final db = await database;
+
+    // 使用事务批量更新章节索引
+    await db.transaction((txn) async {
+      for (var i = 0; i < chapters.length; i++) {
+        await txn.update(
+          'novel_chapters',
+          {'chapterIndex': i},
+          where: 'novelUrl = ? AND chapterUrl = ?',
+          whereArgs: [novelUrl, chapters[i].url],
+        );
+      }
+    });
+
+    LoggerService.instance.i(
+      '章节顺序更新成功: ${chapters.length}个章节',
+      category: LogCategory.cache,
+      tags: ['chapter', 'reorder', 'success'],
+    );
+  }
+
+  /// 搜索缓存章节内容
+  ///
+  /// [keyword] 搜索关键词
+  /// [novelUrl] 可选的小说URL，用于限制搜索范围
+  /// 返回匹配的章节搜索结果列表
+  @override
+  Future<List<ChapterSearchResult>> searchInCachedContent(
+    String keyword, {
+    String? novelUrl,
+  }) async {
+    try {
+      final db = await database;
+
+      // 构建 SQL 查询
+      String sql = '''
+        SELECT
+          cc.novelUrl,
+          b.title as novelTitle,
+          b.author as novelAuthor,
+          cc.chapterUrl,
+          cc.title as chapterTitle,
+          cc.chapterIndex,
+          cc.content,
+          cc.cachedAt
+        FROM chapter_cache cc
+        LEFT JOIN bookshelf b ON cc.novelUrl = b.url
+        WHERE cc.content LIKE ?
+      ''';
+
+      List<dynamic> args = ['%$keyword%'];
+
+      // 如果提供了小说URL，添加过滤条件
+      if (novelUrl != null && novelUrl.isNotEmpty) {
+        sql += ' AND cc.novelUrl = ?';
+        args.add(novelUrl);
+      }
+
+      sql += ' ORDER BY cc.novelUrl, cc.chapterIndex ASC';
+
+      final results = await db.rawQuery(sql, args);
+
+      // 构建搜索结果列表
+      final searchResults = <ChapterSearchResult>[];
+
+      for (final row in results) {
+        final content = row['content'] as String;
+        final keywordLower = keyword.toLowerCase();
+        final contentLower = content.toLowerCase();
+
+        // 查找所有匹配位置
+        final matchPositions = <MatchPosition>[];
+        int index = 0;
+
+        while (true) {
+          final pos = contentLower.indexOf(keywordLower, index);
+          if (pos == -1) break;
+
+          matchPositions.add(MatchPosition(
+            start: pos,
+            end: pos + keyword.length,
+            matchedText: content.substring(pos, pos + keyword.length),
+          ));
+
+          index = pos + keyword.length;
+        }
+
+        if (matchPositions.isNotEmpty) {
+          searchResults.add(ChapterSearchResult(
+            novelUrl: row['novelUrl'] as String,
+            novelTitle: row['novelTitle'] as String? ?? '未知小说',
+            novelAuthor: row['novelAuthor'] as String? ?? '未知作者',
+            chapterUrl: row['chapterUrl'] as String,
+            chapterTitle: row['chapterTitle'] as String,
+            chapterIndex: row['chapterIndex'] as int,
+            content: content,
+            searchKeywords: [keyword],
+            matchPositions: matchPositions,
+            cachedAt: DateTime.fromMillisecondsSinceEpoch(
+              row['cachedAt'] as int,
+            ),
+          ));
+        }
+      }
+
+      LoggerService.instance.i(
+        '搜索缓存内容完成: 关键词="$keyword", 结果数=${searchResults.length}',
+        category: LogCategory.database,
+        tags: ['search', 'chapter_content'],
+      );
+
+      return searchResults;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '搜索缓存内容失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['search', 'failed'],
+      );
+      rethrow;
+    }
   }
 }

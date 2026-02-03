@@ -1,23 +1,23 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
-import 'database_service.dart';
 import 'character_image_cache_service.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 
 /// 角色头像管理服务
 /// 负责头像的设置、获取、缓存等操作
 class CharacterAvatarService {
   /// 构造函数 - 支持依赖注入
   ///
-  /// [databaseService] 数据库服务实例
+  /// [characterRepository] 角色数据仓库实例
   /// [cacheService] 图片缓存服务实例
   CharacterAvatarService({
-    required DatabaseService databaseService,
+    required ICharacterRepository characterRepository,
     required CharacterImageCacheService cacheService,
-  })  : _databaseService = databaseService,
+  })  : _characterRepo = characterRepository,
         _cacheService = cacheService;
 
-  final DatabaseService _databaseService;
+  final ICharacterRepository _characterRepo;
   final CharacterImageCacheService _cacheService;
 
   /// 设置角色头像
@@ -49,7 +49,7 @@ class CharacterAvatarService {
 
       if (cachedPath != null) {
         // 更新数据库
-        await _databaseService.updateCharacterAvatar(
+        await _characterRepo.updateCharacterAvatar(
           characterId,
           imageUrl: cachedPath,
           originalFilename: originalFilename,
@@ -92,7 +92,7 @@ class CharacterAvatarService {
   Future<String?> getCharacterAvatarPath(int characterId) async {
     try {
       final cachedUrl =
-          await _databaseService.getCharacterCachedImage(characterId);
+          await _characterRepo.getCharacterCachedImage(characterId);
       return cachedUrl;
     } catch (e) {
       debugPrint('❌ 获取角色头像路径失败: $e');
@@ -107,7 +107,7 @@ class CharacterAvatarService {
     try {
       // 这里可以扩展数据库服务来获取更详细的头像信息
       final cachedUrl =
-          await _databaseService.getCharacterCachedImage(characterId);
+          await _characterRepo.getCharacterCachedImage(characterId);
 
       if (cachedUrl != null) {
         return {
@@ -145,7 +145,7 @@ class CharacterAvatarService {
       }
 
       // 清空数据库中的头像信息
-      await _databaseService.updateCharacterCachedImage(characterId, null);
+      await _characterRepo.updateCharacterCachedImage(characterId, null);
 
       debugPrint('✅ 角色头像删除成功');
       return true;
@@ -211,7 +211,7 @@ class CharacterAvatarService {
         final avatarFile = File(avatarPath);
         if (!await avatarFile.exists()) {
           debugPrint('🧹 清理无效的头像缓存记录: $avatarPath');
-          await _databaseService.updateCharacterCachedImage(characterId, null);
+          await _characterRepo.updateCharacterCachedImage(characterId, null);
         }
       }
     } catch (e) {

@@ -55,7 +55,7 @@ final chapterServiceProvider = AutoDisposeProvider<ChapterService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterServiceRef = AutoDisposeProviderRef<ChapterService>;
-String _$chapterLoaderHash() => r'd7be75d342d5afb3b8fa8ed3e10909b08bc454b3';
+String _$chapterLoaderHash() => r'95ad263f74020c432fbfb4895da43f86e8d61d41';
 
 /// ChapterLoader Provider
 ///
@@ -99,7 +99,7 @@ final chapterLoaderProvider = AutoDisposeProvider<ChapterLoader>.internal(
 // ignore: unused_element
 typedef ChapterLoaderRef = AutoDisposeProviderRef<ChapterLoader>;
 String _$chapterActionHandlerHash() =>
-    r'296d1ca9c49d809fe9e6480efa31815030b3cca1';
+    r'98596d83a1f6d70366482892d0fe2f578f008f59';
 
 /// ChapterActionHandler Provider
 ///
@@ -142,7 +142,7 @@ final chapterActionHandlerProvider =
 // ignore: unused_element
 typedef ChapterActionHandlerRef = AutoDisposeProviderRef<ChapterActionHandler>;
 String _$chapterReorderControllerHash() =>
-    r'00ce9575e7624424922d6336c92bc99e1ff9d073';
+    r'0675bc842f625c14d4dc47414d7727a5a31aab2a';
 
 /// ChapterReorderController Provider
 ///
@@ -189,7 +189,7 @@ final chapterReorderControllerProvider =
 typedef ChapterReorderControllerRef
     = AutoDisposeProviderRef<ChapterReorderController>;
 String _$chapterSearchServiceHash() =>
-    r'7efda65815b3e0c5651b5cbc078ab36d1e283a6f';
+    r'205671313eef158ac893cffd1f1535f519a0d9d0';
 
 /// ChapterSearchService Provider
 ///
@@ -201,7 +201,7 @@ String _$chapterSearchServiceHash() =>
 /// - 模糊搜索
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -230,7 +230,7 @@ final chapterSearchServiceProvider =
 // ignore: unused_element
 typedef ChapterSearchServiceRef = AutoDisposeProviderRef<ChapterSearchService>;
 String _$cacheSearchServiceHash() =>
-    r'6e884daccda71277939e9619434ad3149a2dc21d';
+    r'7ce33b02bd80bfcae67f649ff478efd1b0363459';
 
 /// CacheSearchService Provider
 ///
@@ -242,7 +242,8 @@ String _$cacheSearchServiceHash() =>
 /// - 搜索建议
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [databaseServiceProvider] - 数据库服务（用于 getCachedNovels）
 ///
 /// **使用示例**:
 /// ```dart
@@ -270,5 +271,50 @@ final cacheSearchServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CacheSearchServiceRef = AutoDisposeProviderRef<CacheSearchService>;
+String _$characterExtractionServiceHash() =>
+    r'f414486f625147f4c0482a3e8ac76cff319a5d15';
+
+/// CharacterExtractionService Provider
+///
+/// 提供角色提取服务实例，用于从章节内容中提取角色相关的上下文。
+///
+/// **功能**:
+/// - 根据角色名搜索匹配章节
+/// - 提取匹配位置周围的上下文
+/// - 合并并去重上下文片段
+///
+/// **依赖**:
+/// - [chapterRepositoryProvider] - 章节数据访问
+///
+/// **使用示例**:
+/// ```dart
+/// final extractionService = ref.watch(characterExtractionServiceProvider);
+/// final matches = await extractionService.searchChaptersByName(
+///   novelUrl: novelUrl,
+///   names: ['角色A', '别名B'],
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 搜索操作是异步的
+///
+/// Copied from [characterExtractionService].
+@ProviderFor(characterExtractionService)
+final characterExtractionServiceProvider =
+    AutoDisposeProvider<CharacterExtractionService>.internal(
+  characterExtractionService,
+  name: r'characterExtractionServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$characterExtractionServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CharacterExtractionServiceRef
+    = AutoDisposeProviderRef<CharacterExtractionService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -39,9 +39,6 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentIndex =
-        chapters.indexWhere((c) => c.url == currentChapter.url);
-
     return AppBar(
       title: Row(
         children: [
