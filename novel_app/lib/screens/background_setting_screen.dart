@@ -1,34 +1,33 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/novel.dart';
-import '../services/database_service.dart';
-import '../services/logger_service.dart';
-import '../utils/error_helper.dart';
+import '../core/providers/database_providers.dart';
 import '../widgets/reader/background_summary_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 
-/// 背景设定独立页面
+/// 背景设定独立页面 - Riverpod版本
 ///
 /// 用于查看和编辑小说的背景设定内容，支持Markdown预览
-class BackgroundSettingScreen extends StatefulWidget {
+class BackgroundSettingScreen extends ConsumerStatefulWidget {
   final Novel novel;
 
-  // 可选的依赖注入参数 - 用于测试
-  final DatabaseService? databaseService;
-
-  const BackgroundSettingScreen(
-      {super.key, required this.novel, this.databaseService});
+  const BackgroundSettingScreen({
+    super.key,
+    required this.novel,
+  });
 
   @override
-  State<BackgroundSettingScreen> createState() =>
+  ConsumerState<BackgroundSettingScreen> createState() =>
       _BackgroundSettingScreenState();
 }
 
-class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
+class _BackgroundSettingScreenState extends ConsumerState<BackgroundSettingScreen>
     with SingleTickerProviderStateMixin {
-  late final DatabaseService _databaseService;
   final TextEditingController _controller = TextEditingController();
 
   bool _isSaving = false;
@@ -39,9 +38,6 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
   @override
   void initState() {
     super.initState();
-
-    // 使用注入的依赖或创建默认实例
-    _databaseService = widget.databaseService ?? DatabaseService();
 
     // 初始化为空，然后从数据库加载最新数据
     _controller.text = '';
@@ -92,7 +88,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
   /// 自动保存
   Future<void> _autoSave() async {
     try {
-      await _databaseService.updateBackgroundSetting(
+      final repository = ref.read(novelRepositoryProvider);
+      await repository.updateBackgroundSetting(
         widget.novel.url,
         _controller.text.isEmpty ? null : _controller.text,
       );
@@ -127,7 +124,8 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
     });
 
     try {
-      await _databaseService.updateBackgroundSetting(
+      final repository = ref.read(novelRepositoryProvider);
+      await repository.updateBackgroundSetting(
         widget.novel.url,
         _controller.text.isEmpty ? null : _controller.text,
       );
@@ -196,8 +194,9 @@ class _BackgroundSettingScreenState extends State<BackgroundSettingScreen>
   /// 从数据库加载背景设定
   Future<void> _loadBackgroundSetting() async {
     try {
+      final repository = ref.read(novelRepositoryProvider);
       final backgroundSetting =
-          await _databaseService.getBackgroundSetting(widget.novel.url);
+          await repository.getBackgroundSetting(widget.novel.url);
       if (mounted) {
         setState(() {
           _controller.text = backgroundSetting ?? '';

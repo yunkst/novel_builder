@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
-import '../services/database_service.dart';
 import '../widgets/relationship_edit_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
+import '../core/providers/character_relationship_providers.dart';
+import '../core/providers/database_providers.dart';
 import 'unified_relationship_graph_screen_riverpod.dart';
 
 /// 角色关系列表页面
@@ -13,44 +15,28 @@ import 'unified_relationship_graph_screen_riverpod.dart';
 /// - Tab 1: 全部关系 (出度 + 入度)
 /// - Tab 2: Ta的关系 (出度：Ta → 其他人)
 /// - Tab 3: 关系Ta的人 (入度：其他人 → Ta)
-class CharacterRelationshipScreen extends StatefulWidget {
+class CharacterRelationshipScreen extends ConsumerStatefulWidget {
   final Character character;
-  final DatabaseService? databaseService;
 
   const CharacterRelationshipScreen({
     super.key,
     required this.character,
-    this.databaseService,
   });
 
   @override
-  State<CharacterRelationshipScreen> createState() =>
+  ConsumerState<CharacterRelationshipScreen> createState() =>
       _CharacterRelationshipScreenState();
 }
 
 class _CharacterRelationshipScreenState
-    extends State<CharacterRelationshipScreen>
+    extends ConsumerState<CharacterRelationshipScreen>
     with SingleTickerProviderStateMixin {
-  late DatabaseService _databaseService;
-
   late TabController _tabController;
-
-  // 数据状态
-  List<CharacterRelationship> _outgoingRelationships = [];
-  List<CharacterRelationship> _incomingRelationships = [];
-
-  // 角色缓存（用于显示目标角色信息）
-  final Map<int, Character> _characterCache = {};
-
-  // 加载状态
-  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _databaseService = widget.databaseService ?? DatabaseService();
     _tabController = TabController(length: 2, vsync: this);
-    _loadData();
   }
 
   @override
@@ -59,78 +45,37 @@ class _CharacterRelationshipScreenState
     super.dispose();
   }
 
-  /// 加载关系数据
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
+  /// 获取角色缓存（异步加载）
+  Future<Map<int, Character>> _loadCharacterCache(
+    List<int> characterIds,
+  ) async {
+    if (characterIds.isEmpty || widget.character.id == null) return {};
 
     try {
-      // 并行加载两种关系数据
-      final results = await Future.wait([
-        _databaseService.getOutgoingRelationships(widget.character.id!),
-        _databaseService.getIncomingRelationships(widget.character.id!),
-      ]);
-
-      final outgoing = results[0];
-      final incoming = results[1];
-
-      // 收集所有相关的角色ID
-      final characterIds = <int>{};
-      for (final rel in outgoing) {
-        characterIds.add(rel.sourceCharacterId);
-        characterIds.add(rel.targetCharacterId);
-      }
-      for (final rel in incoming) {
-        characterIds.add(rel.sourceCharacterId);
-        characterIds.add(rel.targetCharacterId);
-      }
-      characterIds.remove(widget.character.id!); // 移除当前角色
-
-      // 加载相关角色信息
-      await _loadCharacters(characterIds.toList());
-
-      setState(() {
-        _outgoingRelationships = outgoing;
-        _incomingRelationships = incoming;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ 加载关系失败: $e');
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        ToastUtils.showError('加载关系失败: $e');
-      }
-    }
-  }
-
-  /// 加载角色信息
-  Future<void> _loadCharacters(List<int> characterIds) async {
-    if (characterIds.isEmpty) return;
-
-    try {
-      final novelUrl = widget.character.novelUrl;
-      final characters = await _databaseService.getCharacters(novelUrl);
+      final repository = ref.read(characterRepositoryProvider);
+      final allCharacters =
+          await repository.getCharacters(widget.character.novelUrl);
 
       // 过滤出相关的角色并缓存
-      for (final character in characters) {
+      final cache = <int, Character>{};
+      for (final character in allCharacters) {
         if (character.id != null && characterIds.contains(character.id)) {
-          _characterCache[character.id!] = character;
+          cache[character.id!] = character;
         }
       }
+      return cache;
     } catch (e) {
       debugPrint('❌ 加载角色信息失败: $e');
+      return {};
     }
   }
 
   /// 添加新关系
   Future<void> _addRelationship() async {
     // 获取所有可选角色（排除当前角色）
+    final repository = ref.read(characterRepositoryProvider);
     final allCharacters =
-        await _databaseService.getCharacters(widget.character.novelUrl);
+        await repository.getCharacters(widget.character.novelUrl);
     final availableCharacters =
         allCharacters.where((c) => c.id != widget.character.id).toList();
 
@@ -151,7 +96,7 @@ class _CharacterRelationshipScreenState
 
     if (result != null) {
       // 刷新列表
-      _loadData();
+      invalidateRelationshipProviders(ref, widget.character.id!);
       if (mounted) {
         ToastUtils.showSuccess('关系添加成功');
       }
@@ -169,13 +114,20 @@ class _CharacterRelationshipScreenState
         ),
       ),
     );
-
-    // 刷新列表
-    _loadData();
+    // 刷新会由Provider自动处理
   }
 
   @override
   Widget build(BuildContext context) {
+    // 监听出度/入度关系数据
+    final outgoingAsync =
+        ref.watch(outgoingRelationshipsProvider(widget.character.id!));
+    final incomingAsync =
+        ref.watch(incomingRelationshipsProvider(widget.character.id!));
+
+    // 计算加载状态
+    final isLoading = outgoingAsync.isLoading || incomingAsync.isLoading;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.character.name} - 人物关系'),
@@ -205,38 +157,79 @@ class _CharacterRelationshipScreenState
           ],
         ),
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildTabView(),
+          : _buildTabView(outgoingAsync, incomingAsync),
     );
   }
 
-  Widget _buildTabView() {
+  Widget _buildTabView(
+    AsyncValue<List<CharacterRelationship>> outgoingAsync,
+    AsyncValue<List<CharacterRelationship>> incomingAsync,
+  ) {
     return TabBarView(
       controller: _tabController,
       children: [
-        _buildRelationshipList(_outgoingRelationships, isOutgoing: true),
-        _buildRelationshipList(_incomingRelationships, isOutgoing: false),
+        _buildRelationshipList(outgoingAsync, isOutgoing: true),
+        _buildRelationshipList(incomingAsync, isOutgoing: false),
       ],
     );
   }
 
   /// 构建关系列表
   Widget _buildRelationshipList(
-    List<CharacterRelationship> relationships, {
-    bool isOutgoing = true,
+    AsyncValue<List<CharacterRelationship>> relationshipsAsync, {
+    required bool isOutgoing,
   }) {
-    if (relationships.isEmpty) {
-      return _buildEmptyState(isOutgoing);
-    }
+    return relationshipsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text('加载失败: $error'),
+          ],
+        ),
+      ),
+      data: (relationships) {
+        if (relationships.isEmpty) {
+          return _buildEmptyState(isOutgoing);
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: relationships.length,
-      itemBuilder: (context, index) {
-        return _buildRelationshipCard(
-          relationships[index],
-          isOutgoing: isOutgoing,
+        // 收集相关角色ID
+        final characterIds = <int>{};
+        for (final rel in relationships) {
+          final targetId = isOutgoing
+              ? rel.targetCharacterId
+              : rel.sourceCharacterId;
+          characterIds.add(targetId);
+        }
+        characterIds.remove(widget.character.id);
+
+        // 使用FutureBuilder加载角色缓存
+        return FutureBuilder<Map<int, Character>>(
+          future: _loadCharacterCache(characterIds.toList()),
+          builder: (context, snapshot) {
+            final characterCache = snapshot.data ?? {};
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: relationships.length,
+              itemBuilder: (context, index) {
+                return _buildRelationshipCard(
+                  relationships[index],
+                  isOutgoing: isOutgoing,
+                  characterCache: characterCache,
+                );
+              },
+            );
+          },
         );
       },
     );
@@ -286,13 +279,14 @@ class _CharacterRelationshipScreenState
   Widget _buildRelationshipCard(
     CharacterRelationship relationship, {
     required bool isOutgoing,
+    required Map<int, Character> characterCache,
   }) {
     // 确定显示的目标角色
     final targetCharacterId = isOutgoing
         ? relationship.targetCharacterId
         : relationship.sourceCharacterId;
 
-    final targetCharacter = _characterCache[targetCharacterId];
+    final targetCharacter = characterCache[targetCharacterId];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -393,8 +387,9 @@ class _CharacterRelationshipScreenState
     bool isOutgoing,
   ) async {
     // 获取所有可选角色（排除当前角色）
+    final repository = ref.read(characterRepositoryProvider);
     final allCharacters =
-        await _databaseService.getCharacters(widget.character.novelUrl);
+        await repository.getCharacters(widget.character.novelUrl);
     final availableCharacters =
         allCharacters.where((c) => c.id != widget.character.id).toList();
 
@@ -409,7 +404,7 @@ class _CharacterRelationshipScreenState
 
     if (result != null) {
       // 刷新列表
-      _loadData();
+      invalidateRelationshipProviders(ref, widget.character.id!);
       if (mounted) {
         ToastUtils.showSuccess('关系更新成功');
       }
@@ -431,10 +426,11 @@ class _CharacterRelationshipScreenState
     if (confirmed != true) return;
 
     try {
-      await _databaseService.deleteRelationship(relationship.id!);
+      final repository = ref.read(characterRelationRepositoryProvider);
+      await repository.deleteRelationship(relationship.id!);
 
       // 刷新列表
-      _loadData();
+      invalidateRelationshipProviders(ref, widget.character.id!);
 
       if (mounted) {
         ToastUtils.showSuccess('关系删除成功');

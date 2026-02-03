@@ -95,5 +95,46 @@ final preferencesServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PreferencesServiceRef = AutoDisposeProviderRef<PreferencesService>;
+String _$backupServiceHash() => r'6562bd786fe8d1ffd05f248b3e2fad816221030f';
+
+/// BackupService Provider
+///
+/// 提供数据库备份服务实例，用于备份和恢复数据库。
+///
+/// **功能**:
+/// - 数据库文件获取
+/// - 上传备份到服务器
+/// - 备份时间记录
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final backupService = ref.watch(backupServiceProvider);
+/// final dbFile = await backupService.getDatabaseFile();
+/// await backupService.uploadBackup(dbFile: dbFile);
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `BackupService()` 单例模式
+/// - 上传操作需要网络连接
+/// - 备份文件存储在服务器
+///
+/// Copied from [backupService].
+@ProviderFor(backupService)
+final backupServiceProvider = AutoDisposeProvider<BackupService>.internal(
+  backupService,
+  name: r'backupServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$backupServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef BackupServiceRef = AutoDisposeProviderRef<BackupService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -13,15 +13,9 @@ import '../widgets/tts_timer_complete_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
 
-/// TTS播放器服务 Provider
-///
-/// 每个 TTS 播放器实例都是独立的，不需要全局单例
-/// 使用 StateProvider 管理当前播放器实例
-final ttsPlayerServiceProvider = StateProvider<TtsPlayerService?>((ref) {
-  return null;
-});
-
 /// TTS播放器全屏页面 - Riverpod 版本
+///
+/// 每个 TTS 播放器实例都是独立的，在 State 中管理服务实例
 class TtsPlayerScreen extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
@@ -52,9 +46,6 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
 
     // 创建播放器服务
     _playerService = TtsPlayerService();
-
-    // 将播放器服务存入 provider
-    ref.read(ttsPlayerServiceProvider.notifier).state = _playerService;
 
     // 初始化播放器
     _initializePlayer();
@@ -92,10 +83,6 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
   @override
   void dispose() {
     _timerCompleteSubscription?.cancel();
-
-    // 清除 provider 中的播放器实例
-    ref.read(ttsPlayerServiceProvider.notifier).state = null;
-
     _playerService.dispose();
     super.dispose();
   }
