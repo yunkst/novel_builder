@@ -10,7 +10,56 @@ import '../core/providers/service_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 
-/// 插入模式枚举
+/// 插入章节全屏页面
+///
+/// 本页面支持两种模式向小说中插入新章节：
+/// 1. **手动模式**：用户直接输入章节标题和内容要求
+/// 2. **大纲模式**：基于小说大纲，通过 AI 生成章节细纲，分两步完成
+///
+/// ## 大纲模式流程
+/// ### Step 0: 准备阶段
+/// - 用户输入章节创作意图（可选）
+/// - 选择参与的角色（可选）
+/// - 点击"确认"后，AI 开始生成章节细纲
+/// - 生成完成后自动跳转到 Step 1
+///
+/// ### Step 1: 审核阶段
+/// - 查看 AI 生成的细纲内容
+/// - 可以手动编辑细纲
+/// - 支持重新生成（提供修改意见）
+/// - 最终确认后返回章节信息给调用方
+///
+/// ## 核心功能
+/// - **流式生成**：使用 DifyStreamingMixin 实现 AI 内容的流式输出
+/// - **并发防护**：防止重复生成请求
+/// - **前文缓存**：避免重复获取前文内容，提升性能
+/// - **角色关联**：支持选择参与章节的角色
+/// - **细纲编辑**：支持对 AI 生成的细纲进行手动调整
+///
+/// ## 状态管理
+/// - 使用 Riverpod 管理数据库和服务依赖
+/// - 使用 StatefulWidget 管理页面状态
+/// - 使用 DifyStreamingMixin 管理流式生成状态
+///
+/// ## 使用示例
+/// ```dart
+/// final result = await Navigator.push(
+///   context,
+///   MaterialPageRoute(
+///     builder: (context) => InsertChapterScreen(
+///       novel: novel,
+///       afterIndex: 5,
+///       chapters: chapters,
+///     ),
+///   ),
+/// );
+///
+/// if (result != null) {
+///   final title = result['title'];
+///   final content = result['content'];
+///   final characterIds = result['characterIds'];
+/// }
+/// ```
 enum _InsertMode { manual, outline }
 
 /// 插入章节全屏页面
@@ -38,20 +87,18 @@ class InsertChapterScreen extends ConsumerStatefulWidget {
 
 class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
     with DifyStreamingMixin {
+  // ========================================================================
   // 控制器和初始化
+  // ========================================================================
+
+  /// 章节标题控制器
   late final TextEditingController _titleController;
+
+  /// 用户输入控制器（手动模式使用）
   late final TextEditingController _userInputController;
+
+  /// AI 生成的细纲编辑控制器（大纲模式 Step 1 使用）
   late final TextEditingController _draftEditingController;
-
-  // 状态管理
-  _InsertMode _currentMode = _InsertMode.manual;
-  int _currentStep = 0;
-  List<int> _selectedCharacterIds = [];
-  Outline? _outline;
-  bool _isLoadingOutline = true;
-
-  // 前文内容缓存（避免重复获取）
-  List<String>? _cachedPreviousChapters;
 
   @override
   void initState() {
@@ -71,7 +118,33 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
     super.dispose();
   }
 
-  /// 加载大纲
+  // ========================================================================
+  // 状态管理
+  // ========================================================================
+
+  /// 当前插入模式（手动 / 大纲）
+  _InsertMode _currentMode = _InsertMode.manual;
+
+  /// 当前步骤（0: 准备阶段, 1: 审核阶段）
+  int _currentStep = 0;
+
+  /// 用户选择的参与角色 ID 列表
+  List<int> _selectedCharacterIds = [];
+
+  /// 小说大纲对象
+  Outline? _outline;
+
+  /// 是否正在加载大纲
+  bool _isLoadingOutline = true;
+
+  /// 前文内容缓存（避免重复获取）
+  List<String>? _cachedPreviousChapters;
+
+  // ========================================================================
+  // 大纲加载
+  // ========================================================================
+
+  /// 加载小说大纲
   Future<void> _loadOutline() async {
     setState(() {
       _isLoadingOutline = true;
@@ -98,6 +171,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       debugPrint('加载大纲失败: $e');
     }
   }
+
+  // ========================================================================
+  // 步骤管理
+  // ========================================================================
 
   /// 处理确认按钮点击
   void _handleConfirm() {
@@ -147,7 +224,11 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
     }
   }
 
-  /// 生成大纲细纲
+  // ========================================================================
+  // 大纲生成与流式响应
+  // ========================================================================
+
+  /// 生成大纲细纲（Step 0 -> Step 1）
   Future<void> _generateOutlineDraft() async {
     if (_outline == null) {
       ToastUtils.showError('未找到大纲，请先创建大纲');
@@ -300,6 +381,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       }
     }
   }
+
+  // ========================================================================
+  // UI 构建
+  // ========================================================================
 
   @override
   Widget build(BuildContext context) {

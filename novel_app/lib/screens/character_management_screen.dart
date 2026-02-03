@@ -5,7 +5,6 @@ import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../models/outline.dart';
-import '../services/character_extraction_service.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/character_input_dialog.dart';
@@ -17,6 +16,35 @@ import '../core/providers/character_screen_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
 
+/// 角色管理屏幕
+///
+/// 本页面提供小说角色的全生命周期管理功能。
+///
+/// ## 核心功能
+/// - **角色列表**：展示所有角色，支持网格/列表视图切换
+/// - **AI 创建**：通过 AI 生成角色，支持描述模式和大纲模式
+/// - **角色提取**：从大纲中提取角色信息
+/// - **多选管理**：批量选择角色进行操作（删除、关系图等）
+/// - **批量操作**：批量删除、批量生成关系图
+/// - **搜索过滤**：按名称搜索角色
+///
+/// ## 与 Provider 集成
+/// - `multiSelectModeProvider` - 控制多选模式状态
+/// - `selectedCharacterIdsProvider` - 管理选中的角色 ID
+/// - `hasOutlineProvider` - 检查小说是否有大纲
+/// - `characterListProvider` - 提供角色列表数据
+/// - `difyServiceProvider` - AI 服务
+/// - `databaseServiceProvider` - 数据库服务
+///
+/// ## AI 创建模式
+/// 1. **描述模式**：用户输入角色描述，AI 生成角色
+/// 2. **大纲模式**：基于小说大纲，AI 提取或生成角色
+/// 3. **提取模式**：从大纲中直接提取角色信息
+///
+/// ## 多选操作
+/// - 长按角色卡片进入多选模式
+/// - 点击角色卡片进行选择/取消
+/// - 批量删除、批量生成关系图
 class CharacterManagementScreen extends ConsumerStatefulWidget {
   final Novel novel;
 
@@ -32,16 +60,30 @@ class CharacterManagementScreen extends ConsumerStatefulWidget {
 
 class _CharacterManagementScreenState
     extends ConsumerState<CharacterManagementScreen> {
-  // 多选模式状态 - 从 Provider 获取
+  // ========================================================================
+  // 状态管理（通过 Provider）
+  // ========================================================================
+
+  /// 是否处于多选模式
   bool get _isMultiSelectMode => ref.watch(multiSelectModeProvider);
+
+  /// 选中的角色 ID 集合
   Set<int> get _selectedCharacterIds => ref.watch(selectedCharacterIdsProvider);
 
-  // 常量定义
+  // ========================================================================
+  // 常量和样式
+  // ========================================================================
+
+  /// 头像边框半径
   static const double _avatarBorderRadius = 8.0;
+
+  /// 名称底部内边距
   static const double _nameBottomPadding = 8.0;
+
+  /// 名称水平内边距
   static const double _nameHorizontalPadding = 8.0;
 
-  // 缓存阴影样式（延迟初始化）
+  /// 缓存阴影样式（延迟初始化）
   List<BoxShadow> get _avatarShadow => [
         BoxShadow(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
@@ -56,7 +98,11 @@ class _CharacterManagementScreenState
     // 初始化完成后，会在 build 中通过 Provider 自动加载数据
   }
 
-  /// AI创建角色
+  // ========================================================================
+  // AI 创建角色
+  // ========================================================================
+
+  /// AI 创建角色入口
   Future<void> _aiCreateCharacter() async {
     // 从 Provider 获取大纲状态
     final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
@@ -168,6 +214,10 @@ class _CharacterManagementScreenState
     }
   }
 
+  // ========================================================================
+  // 角色提取
+  // ========================================================================
+
   /// 提取角色
   Future<void> _extractCharacter(Map<String, dynamic> result) async {
     final name = result['name'] as String;
@@ -274,6 +324,10 @@ class _CharacterManagementScreenState
     }
   }
 
+  // ========================================================================
+  // 角色保存
+  // ========================================================================
+
   /// 保存用户选择的特定角色
   Future<void> _saveSelectedCharacters(
       List<Character> selectedCharacters) async {
@@ -353,6 +407,10 @@ class _CharacterManagementScreenState
     );
   }
 
+  // ========================================================================
+  // 多选管理
+  // ========================================================================
+
   /// 切换多选模式（长按触发）
   void _toggleMultiSelectMode(Character character) {
     ref.read(multiSelectModeProvider.notifier).enterMode(character.id!);
@@ -377,6 +435,10 @@ class _CharacterManagementScreenState
       _navigateToEdit(character: character);
     }
   }
+
+  // ========================================================================
+  // 批量操作
+  // ========================================================================
 
   /// 显示批量删除确认对话框
   Future<bool> _showBatchDeleteConfirmationDialog() async {
@@ -423,6 +485,11 @@ class _CharacterManagementScreenState
     }
   }
 
+  // ========================================================================
+  // 导航
+  // ========================================================================
+
+  /// 导航到编辑页面
   Future<void> _navigateToEdit({Character? character}) async {
     final result = await Navigator.push<bool>(
       context,
@@ -438,6 +505,10 @@ class _CharacterManagementScreenState
       ref.invalidate(characterManagementStateProvider(widget.novel));
     }
   }
+
+  // ========================================================================
+  // UI 构建
+  // ========================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -702,39 +773,6 @@ class _CharacterManagementScreenState
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-
-                        // 关系数量徽章 - 暂时隐藏，等待后续实现
-                        // if (character.id != null &&
-                        //     _relationshipCountCache[character.id] != null &&
-                        //     _relationshipCountCache[character.id]! > 0)
-                        //   Positioned(
-                        //     top: 8,
-                        //     right: 8,
-                        //     child: Material(
-                        //       elevation: 4,
-                        //       shape: const CircleBorder(),
-                        //       child: Container(
-                        //         padding: const EdgeInsets.symmetric(
-                        //           horizontal: 8,
-                        //           vertical: 4,
-                        //         ),
-                        //         decoration: BoxDecoration(
-                        //           color: Colors.orange,
-                        //           shape: BoxShape.circle,
-                        //         ),
-                        //         child: Text(
-                        //           '${_relationshipCountCache[character.id]}',
-                        //           style: TextStyle(
-                        //             color:
-                        //                 Theme.of(context).colorScheme.surface,
-                        //             fontSize: 12,
-                        //             fontWeight: FontWeight.bold,
-                        //           ),
-                        //           textAlign: TextAlign.center,
-                        //         ),
-                        //       ),
-                        //     ),
-                        //   ),
                       ],
                     ),
                   ),

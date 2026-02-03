@@ -15,8 +15,32 @@ import '../core/providers/character_screen_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
 
-/// 使用方法：RoleGalleryCacheService用于检查角色图集是否为空，在头像点击时进行验证
-/// 调用方式：在_openGallery方法中调用_checkGalleryEmpty方法检查图集状态
+/// 人物编辑界面
+///
+/// 职责：
+/// - 提供人物信息的创建和编辑表单
+/// - 管理人物的9个核心字段（姓名、年龄、性别、职业、性格、身材、穿衣风格、外貌、背景）
+/// - 支持AI生成人物提示词（面部和身材）
+/// - 支持生成人物卡图片
+/// - 管理人物图集（查看和管理AI生成的图片）
+/// - 支持别名管理（最多10个）
+/// - 提供人物关系查看和聊天功能
+///
+/// 表单字段：
+/// - 基本信息：姓名、年龄、性别、职业
+/// - 外貌特征：身材、穿衣风格、外貌特点
+/// - 性格背景：性格特点、经历简述
+/// - AI提示词：面部提示词、身材提示词
+///
+/// 使用方式：
+/// ```dart
+/// Navigator.push(context, MaterialPageRoute(
+///   builder: (context) => CharacterEditScreen(
+///     novel: novel,
+///     character: existingCharacter, // 可选，不传则为新建模式
+///   ),
+/// ));
+/// ```
 
 class CharacterEditScreen extends ConsumerStatefulWidget {
   final local_novel.Novel novel;
@@ -34,29 +58,52 @@ class CharacterEditScreen extends ConsumerStatefulWidget {
 }
 
 class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
+  // ============ Form Controllers ============
+
+  /// 基本信息控制器
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController;
+  final TextEditingController _ageController;
+  final TextEditingController _occupationController;
 
-  // 表单控制器
-  final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
-  final _occupationController = TextEditingController();
-  final _personalityController = TextEditingController();
-  final _bodyTypeController = TextEditingController();
-  final _clothingStyleController = TextEditingController();
-  final _appearanceController = TextEditingController();
-  final _backgroundController = TextEditingController();
-  final _facePromptsController = TextEditingController();
-  final _bodyPromptsController = TextEditingController();
+  /// 外貌特征控制器
+  final TextEditingController _bodyTypeController;
+  final TextEditingController _clothingStyleController;
+  final TextEditingController _appearanceController;
 
+  /// 性格背景控制器
+  final TextEditingController _personalityController;
+  final TextEditingController _backgroundController;
+
+  /// AI提示词控制器
+  final TextEditingController _facePromptsController;
+  final TextEditingController _bodyPromptsController;
+
+  /// 别名控制器
+  final TextEditingController _aliasController;
+
+  // ============ Character Data ============
+
+  /// 选中的性别
   String? _selectedGender;
+
+  /// 选中的AI模型
   String? _selectedModel;
+
+  /// 加载状态
   bool _isLoading = false;
   bool _isGeneratingPrompts = false;
   bool _isGeneratingRoleCard = false;
-  List<String> _aliases = []; // 别名列表
-  final TextEditingController _aliasController = TextEditingController();
 
+  /// 别名列表（最多10个）
+  List<String> _aliases = [];
+
+  // ============ Constants ============
+
+  /// 性别选项
   final List<String> _genderOptions = ['男', '女', '其他'];
+
+  /// 常见身材选项
   final List<String> _commonBodyTypes = [
     '瘦弱',
     '标准',
@@ -67,12 +114,33 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     '矮小'
   ];
 
+  // ============ Constructor ============
+
+  _CharacterEditScreenState()
+      : _nameController = TextEditingController(),
+        _ageController = TextEditingController(),
+        _occupationController = TextEditingController(),
+        _bodyTypeController = TextEditingController(),
+        _clothingStyleController = TextEditingController(),
+        _appearanceController = TextEditingController(),
+        _personalityController = TextEditingController(),
+        _backgroundController = TextEditingController(),
+        _facePromptsController = TextEditingController(),
+        _bodyPromptsController = TextEditingController(),
+        _aliasController = TextEditingController();
+
+  // ============ Lifecycle ============
+
   @override
   void initState() {
     super.initState();
     _initializeData();
   }
 
+  /// 初始化表单数据
+  ///
+  /// 如果是编辑模式，从传入的character对象中加载数据到各个控制器
+  /// 如果是新建模式，所有控制器保持为空
   void _initializeData() {
     if (widget.character != null) {
       final character = widget.character!;
@@ -90,14 +158,15 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       _aliases = List.from(character.aliases ?? []);
     }
 
-    // 监听姓名变化
+    // 监听姓名变化，实时更新界面上的角色名称显示
     _nameController.addListener(() {
-      setState(() {}); // 触发界面更新
+      setState(() {});
     });
   }
 
   @override
   void dispose() {
+    // 释放所有控制器
     _nameController.dispose();
     _ageController.dispose();
     _occupationController.dispose();
@@ -112,7 +181,12 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     super.dispose();
   }
 
+  // ============ Data Management ============
+
   /// 重新加载角色数据
+  ///
+  /// 通过Provider刷新角色数据，用于从图集页面返回后更新头像显示
+  /// 刷新成功后自动更新所有控制器的内容
   Future<void> _refreshCharacterData() async {
     if (widget.character?.id == null) return;
 
@@ -161,6 +235,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     }
   }
 
+  /// 保存角色数据
+  ///
+  /// 验证表单后，通过Provider保存角色数据
+  /// 成功后弹出当前页面并返回true
   Future<void> _saveCharacter() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -228,6 +306,13 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     }
   }
 
+  // ============ Image Generation ============
+
+  /// 生成角色卡图片
+  ///
+  /// 调用后端API生成角色卡图片
+  /// 需要先填写角色姓名
+  /// 支持选择不同的AI模型
   Future<void> _generateRoleCardImages() async {
     if (_nameController.text.trim().isEmpty) {
       if (mounted) {
@@ -314,6 +399,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     }
   }
 
+  /// AI生成角色提示词
+  ///
+  /// 调用Dify工作流生成面角色部的AI绘画提示词
+  /// 成功后自动保存并更新提示词字段
   Future<void> _generateCharacterPrompts() async {
     if (_nameController.text.trim().isEmpty) {
       if (mounted) {
@@ -367,6 +456,8 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       }
     }
   }
+
+  // ============ UI Building ============
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +532,9 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ UI Components - Section Headers ============
+
+  /// 构建分区标题
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
@@ -452,6 +546,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ UI Components - Basic Info Section ============
+
+  /// 构建基本信息区域
+  /// 包含：头像（编辑模式）、姓名、性别、年龄、职业、别名
   Widget _buildBasicInfoSection() {
     final isEditing = widget.character != null;
 
@@ -471,6 +569,8 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  /// 构建顶部头像行
+  /// 显示角色头像和名称，点击头像可打开图集管理
   Widget _buildTopAvatarRow() {
     return Row(
       children: [
@@ -512,6 +612,8 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  /// 构建基本信息字段
+  /// 包含：姓名、性别、年龄、职业、别名编辑
   Widget _buildBasicInfoFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,6 +705,8 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 构建别名编辑区域
+  /// 支持添加和删除别名（最多10个）
+  /// 自动检测别名冲突
   Widget _buildAliasesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,7 +816,17 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ UI Components - Alias Management ============
+
   /// 添加别名
+  ///
+  /// 验证步骤：
+  /// 1. 检查别名不为空
+  /// 2. 检查别名不重复
+  /// 3. 检查与其他角色的别名冲突
+  ///
+  /// 冲突检测：使用CharacterMatcher检查是否与其他角色姓名/别名冲突
+  /// 如果存在冲突，显示确认对话框让用户选择是否继续添加
   Future<void> _addAlias() async {
     final alias = _aliasController.text.trim();
 
@@ -761,6 +875,9 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 提示词生成后自动保存
+  ///
+  /// 在生成提示词后延迟1.5秒自动保存
+  /// 使用Provider的autoSave方法，仅保存姓名和提示词字段
   Future<void> _autoSaveAfterPromptsGeneration() async {
     final autoSaveStateNotifier = ref.read(autoSaveStateProvider.notifier);
     final isAutoSaving = ref.read(autoSaveStateProvider);
@@ -828,7 +945,13 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     return result ?? false;
   }
 
-  /// 构建角色头像（编辑页面使用，80px）
+  // ============ UI Components - Avatar ============
+
+  /// 构建角色头像
+  ///
+  /// 显示角色头像图片，如果没有则显示首字母备用头像
+  /// 点击头像可打开图集管理页面
+  /// 头像尺寸：80px
   Widget _buildCharacterAvatar() {
     return GestureDetector(
       onTap: _openGallery,
@@ -892,6 +1015,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 构建加载中头像
+  /// 显示加载动画
   Widget _buildLoadingAvatar(double size) {
     return Container(
       width: size,
@@ -919,7 +1043,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
-  /// 构建备用头像（首字母）
+  /// 构建备用头像
+  ///
+  /// 当没有头像图片时，显示角色名称首字母的圆形背景
+  /// 使用主题色作为背景色
   Widget _buildFallbackAvatar(double size) {
     final characterName = widget.character?.name ?? '';
     final initial =
@@ -949,6 +1076,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ UI Components - Appearance Section ============
+
+  /// 构建外貌特征区域
+  /// 包含：身材、穿衣风格、外貌特点、AI模型选择、生成按钮、AI提示词字段
   Widget _buildAppearanceSection() {
     return Card(
       child: Padding(
@@ -1218,6 +1349,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ UI Components - Personality Section ============
+
+  /// 构建性格与背景区域
+  /// 包含：性格特点、经历简述
   Widget _buildPersonalitySection() {
     return Card(
       child: Padding(
@@ -1252,8 +1387,15 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     );
   }
 
+  // ============ Gallery Management ============
+
   /// 检查角色图集是否为空
+  ///
+  /// 通过后端API获取角色图集数据
   /// 返回true表示图集为空，false表示图集不为空
+  ///
+  /// 使用场景：在打开图集管理页面前，检查是否有图片
+  /// 如果图集为空，显示提示对话框，避免进入空页面
   Future<bool> _checkGalleryEmpty(String characterId) async {
     try {
       final apiService = ref.read(apiServiceWrapperProvider);
@@ -1277,6 +1419,8 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 显示图集为空的对话框
+  ///
+  /// 提示用户先生成图集再点击头像
   Future<void> _showEmptyGalleryDialog() async {
     if (!mounted) return;
 
@@ -1299,6 +1443,12 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 打开图集管理页面
+  ///
+  /// 流程：
+  /// 1. 检查角色是否已保存（需要ID）
+  /// 2. 检查图集是否为空
+  /// 3. 如果图集不为空，导航到图集管理页面
+  /// 4. 从图集页面返回后，如果头像有更新，刷新角色数据
   Future<void> _openGallery() async {
     if (widget.character?.id == null) {
       if (mounted) {
@@ -1338,7 +1488,14 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
     }
   }
 
+  // ============ Navigation Actions ============
+
   /// 开始聊天
+  ///
+  /// 流程：
+  /// 1. 检查角色是否已保存（需要ID）
+  /// 2. 显示场景输入对话框
+  /// 3. 导航到角色聊天页面
   Future<void> _startChat() async {
     if (widget.character == null) {
       if (mounted) {
@@ -1367,6 +1524,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 导航到关系页面
+  ///
+  /// 流程：
+  /// 1. 先保存当前更改
+  /// 2. 导航到人物关系页面
   Future<void> _navigateToRelationships() async {
     if (widget.character == null) return;
 
@@ -1387,6 +1548,9 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   }
 
   /// 构建查看关系按钮
+  ///
+  /// 仅在编辑模式显示
+  /// 点击后保存当前更改并导航到关系页面
   Widget _buildRelationshipButton() {
     return SizedBox(
       width: double.infinity,

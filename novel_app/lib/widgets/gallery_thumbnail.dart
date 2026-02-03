@@ -3,7 +3,6 @@ import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
 import '../services/role_gallery_cache_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/providers/services/cache_service_providers.dart';
 import '../core/providers/services/network_service_providers.dart';
 
 /// 图集缩略图组件

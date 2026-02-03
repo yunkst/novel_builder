@@ -7,7 +7,6 @@ import '../models/tts_timer_config.dart';
 import 'tts_service.dart';
 import 'database_service.dart';
 import 'api_service_wrapper.dart';
-import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
 import 'preferences_service.dart';
 

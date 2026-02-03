@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../models/search_result.dart';
-import '../core/providers/database_providers.dart';
 
 /// 章节搜索服务类
 class ChapterSearchService {

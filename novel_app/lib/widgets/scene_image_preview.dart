@@ -12,6 +12,52 @@ import 'common/common_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/services/network_service_providers.dart';
 
+/// 场景插图预览组件
+///
+/// 本组件展示场景插图生成的图片集合，支持预览、删除、视频生成等功能。
+///
+/// ## 核心功能
+/// - **图片加载**：从后端 API 加载场景插图列表，支持新旧两种数据格式
+/// - **预览 UI**：全屏预览图片，支持左右滑动切换
+/// - **视频生成**：为图片生成视频，实时显示生成进度
+/// - **图片删除**：单张图片删除，带连击保护和确认对话框
+/// - **宽高比计算**：根据模型参数自动计算图片宽高比
+///
+/// ## 数据格式兼容性
+/// ### 新格式（推荐）
+/// ```json
+/// {
+///   "task_id": "xxx",
+///   "images": [
+///     {"url": "http://...", "model_name": "sd_xl_base"},
+///     {"url": "http://...", "model_name": "sdxl_t2i"}
+///   ],
+///   "model_width": 1024,
+///   "model_height": 2048
+/// }
+/// ```
+///
+/// ### 旧格式（兼容）
+/// ```json
+/// {
+///   "images": ["http://...", "http://..."]
+/// }
+/// ```
+///
+/// ## 宽高比计算逻辑
+/// 1. 优先使用从 API 获取的模型宽高（`_modelWidth`, `_modelHeight`）
+/// 2. 其次使用 widget 参数提供的宽高（`widget.modelWidth`, `widget.modelHeight`）
+/// 3. 最后使用默认比例 0.5（高是宽的2倍）
+///
+/// ## 视频生成状态管理
+/// - 使用 `VideoGenerationStateManager` 管理全局视频生成状态
+/// - 监听状态变化，实时更新 UI
+/// - 支持同时为多张图片生成视频
+///
+/// ## 删除保护
+/// - 连击保护：2次删除间隔需大于1秒
+/// - 确认对话框：删除前需要用户确认
+/// - 回调通知：删除成功后触发 `onImageDeleted` 回调
 class SceneImagePreview extends ConsumerStatefulWidget {
   final SceneIllustration? illustration; // 可选，用于向后兼容
   final String? taskId; // 新版本：基于 taskId 查询
@@ -40,48 +86,50 @@ class SceneImagePreview extends ConsumerStatefulWidget {
 }
 
 class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
+  // ========================================================================
+  // 状态管理
+  // ========================================================================
+
+  /// 是否正在加载
   bool _isLoading = false;
+
+  /// 是否发生错误
   bool _hasError = false;
+
+  /// 错误消息
   String? _errorMessage;
-  List<String> _images = []; // 图片URL列表
-  Map<int, String?> _imageModels = {}; // 索引 -> 模型名映射
-  int _currentIndex = 0; // 当前页面索引
 
-  // 删除相关状态
-  bool _isDeleting = false;
-  String? _deletingImage; // 正在删除的图片filename
-  DateTime? _lastDeleteTime; // 最后删除时间，用于连击保护
+  /// 图片URL列表
+  List<String> _images = [];
 
-  // 模型宽高信息
+  /// 索引 -> 模型名映射
+  Map<int, String?> _imageModels = {};
+
+  /// 当前页面索引
+  int _currentIndex = 0;
+
+  /// 模型宽度（从 API 获取）
   int? _modelWidth;
+
+  /// 模型高度（从 API 获取）
   int? _modelHeight;
 
-  /// 检查图片是否正在生成视频
-  bool isImageGenerating(String imageUrl) {
-    return VideoGenerationStateManager.isImageGenerating(imageUrl);
-  }
+  // ========================================================================
+  // 删除相关状态
+  // ========================================================================
 
-  /// 计算宽高比
-  double _calculateAspectRatio() {
-    // 优先使用从 API 获取的模型宽高
-    if (_modelWidth != null &&
-        _modelHeight != null &&
-        _modelWidth! > 0 &&
-        _modelHeight! > 0) {
-      return _modelWidth! / _modelHeight!;
-    }
+  /// 是否正在删除
+  bool _isDeleting = false;
 
-    // 其次使用 widget 参数提供的宽高（向后兼容）
-    if (widget.modelWidth != null &&
-        widget.modelHeight != null &&
-        widget.modelWidth! > 0 &&
-        widget.modelHeight! > 0) {
-      return widget.modelWidth! / widget.modelHeight!;
-    }
+  /// 正在删除的图片 filename
+  String? _deletingImage;
 
-    // fallback: 使用默认1:2比例 (高是宽的2倍)
-    return 0.5;
-  }
+  /// 最后删除时间（用于连击保护）
+  DateTime? _lastDeleteTime;
+
+  // ========================================================================
+  // 生命周期管理
+  // ========================================================================
 
   @override
   void initState() {
@@ -107,6 +155,11 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     }
   }
 
+  // ========================================================================
+  // 图片加载
+  // ========================================================================
+
+  /// 从后端加载场景插图图集
   Future<void> _loadIllustrationFromBackend() async {
     if (widget.taskId == null || !mounted) return;
 
@@ -178,10 +231,51 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     }
   }
 
+  /// 刷新插图
   Future<void> _refreshIllustration() async {
     debugPrint('用户点击刷新按钮，taskId: ${widget.taskId}');
     await _loadIllustrationFromBackend();
   }
+
+  // ========================================================================
+  // 宽高比计算
+  // ========================================================================
+
+  /// 检查图片是否正在生成视频
+  bool isImageGenerating(String imageUrl) {
+    return VideoGenerationStateManager.isImageGenerating(imageUrl);
+  }
+
+  /// 计算宽高比
+  ///
+  /// 优先级：
+  /// 1. 从 API 获取的模型宽高（`_modelWidth`, `_modelHeight`）
+  /// 2. widget 参数提供的宽高（`widget.modelWidth`, `widget.modelHeight`）
+  /// 3. 默认比例 0.5（高是宽的2倍）
+  double _calculateAspectRatio() {
+    // 优先使用从 API 获取的模型宽高
+    if (_modelWidth != null &&
+        _modelHeight != null &&
+        _modelWidth! > 0 &&
+        _modelHeight! > 0) {
+      return _modelWidth! / _modelHeight!;
+    }
+
+    // 其次使用 widget 参数提供的宽高（向后兼容）
+    if (widget.modelWidth != null &&
+        widget.modelHeight != null &&
+        widget.modelWidth! > 0 &&
+        widget.modelHeight! > 0) {
+      return widget.modelWidth! / widget.modelHeight!;
+    }
+
+    // fallback: 使用默认1:2比例 (高是宽的2倍)
+    return 0.5;
+  }
+
+  // ========================================================================
+  // UI 构建
+  // ========================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -764,6 +858,10 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     );
   }
 
+  // ========================================================================
+  // 操作处理
+  // ========================================================================
+
   /// 显示生成更多图片对话框
   void _showGenerateMoreDialog() {
     if (widget.taskId == null) {
@@ -779,6 +877,10 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
       ),
     );
   }
+
+  // ========================================================================
+  // 向后兼容
+  // ========================================================================
 
   /// 向后兼容的插图显示
   Widget _buildLegacyIllustration(SceneIllustration illustration) {
