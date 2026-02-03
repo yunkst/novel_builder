@@ -69,8 +69,17 @@ class OutlineService {
 
   /// AI生成章节细纲（保留供OutlineIntegrationHandler使用）
   ///
-  /// TODO: 集成Dify工作流
-  /// 当前实现：返回模拟数据
+  /// 优先级: P1 - 高
+  /// Issue: 需要集成Dify工作流以替代模拟数据
+  ///
+  /// 当前实现: 返回模拟数据
+  /// 目标实现:
+  /// 1. 使用DifyService.runWorkflowStreaming
+  /// 2. 传递细纲生成工作流ID
+  /// 3. 返回真实的AI生成内容
+  ///
+  /// 调用位置:
+  /// - OutlineIntegrationHandler.generateChapterOutline
   Future<ChapterOutlineDraft> generateChapterOutline({
     required String novelUrl,
     required String mainOutline,
@@ -127,8 +136,18 @@ class OutlineService {
 
   /// AI重新生成章节细纲（保留供OutlineIntegrationHandler使用）
   ///
-  /// TODO: 集成Dify工作流
-  /// 当前实现：返回模拟数据
+  /// 优先级: P1 - 高
+  /// Issue: 需要集成Dify工作流以替代模拟数据
+  ///
+  /// 当前实现: 返回模拟数据
+  /// 目标实现:
+  /// 1. 使用DifyService.runWorkflowStreaming
+  /// 2. 传递细纲生成工作流ID和反馈意见
+  /// 3. 返回基于反馈优化的AI生成内容
+  ///
+  /// 调用位置:
+  /// - OutlineIntegrationHandler.regenerateChapterOutline
+  /// - ChapterOutlineDialog (重新生成按钮)
   Future<ChapterOutlineDraft> regenerateChapterOutline({
     required String novelUrl,
     required String mainOutline,

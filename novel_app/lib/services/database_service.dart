@@ -1454,21 +1454,43 @@ class DatabaseService {
   // ========== 缓存搜索操作 ==========
 
   /// 在缓存内容中搜索关键字
+  ///
+  /// 优先级: P2 - 中等
+  /// Issue: 需要实现缓存内容搜索功能
+  ///
+  /// 功能说明:
+  /// - 在ChapterRepository中实现全文搜索
+  /// - 支持按小说URL过滤搜索结果
+  /// - 返回匹配的章节和上下文
+  ///
+  /// 实现要点:
+  /// 1. 使用SQLite的LIKE或FTS全文搜索
+  /// 2. 返回ChapterSearchResult列表
+  /// 3. 考虑性能优化（添加索引）
   Future<List<ChapterSearchResult>> searchInCachedContent(
     String keyword, {
     String? novelUrl,
   }) async {
-    // TODO: 实现缓存内容搜索功能
-    // 这个方法应该在ChapterRepository中实现
-    // 目前返回空列表以避免编译错误
+    // 暂时返回空列表，等待功能实现
     return [];
   }
 
   /// 获取已缓存小说列表
+  ///
+  /// 优先级: P2 - 中等
+  /// Issue: 需要实现获取已缓存小说列表功能
+  ///
+  /// 功能说明:
+  /// - 在ChapterRepository中实现统计查询
+  /// - 返回所有有缓存章节的小说信息
+  /// - 包含缓存章节数量、总大小等统计
+  ///
+  /// 实现要点:
+  /// 1. 使用GROUP BY查询novel_url
+  /// 2. 统计每个小说的缓存章节数
+  /// 3. 计算缓存内容总大小
   Future<List<CachedNovelInfo>> getCachedNovels() async {
-    // TODO: 实现获取已缓存小说列表功能
-    // 这个方法应该在ChapterRepository中实现
-    // 目前返回空列表以避免编译错误
+    // 暂时返回空列表，等待功能实现
     return [];
   }
 }

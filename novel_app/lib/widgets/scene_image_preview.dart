@@ -210,8 +210,11 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
           _modelHeight = galleryData['model_height'];
           _isLoading = false;
 
-          debugPrint(
-              '✅ 加载插图信息: ${_images.length} 张图片, 模型尺寸: ${_modelWidth}x$_modelHeight');
+          LoggerService.instance.i(
+            '加载插图信息: ${_images.length} 张图片, 模型尺寸: ${_modelWidth}x$_modelHeight',
+            category: LogCategory.ui,
+            tags: ['illustration', 'load', 'success'],
+          );
         });
       }
     } catch (e, stackTrace) {
@@ -223,17 +226,22 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
           _images = [];
         });
       }
-      debugPrint('从后端加载插图失败: $e');
       LoggerService.instance.e(
-        '从后端加载插图失败',
+        '从后端加载插图失败: $e',
         stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['illustration', 'load', 'error'],
       );
     }
   }
 
   /// 刷新插图
   Future<void> _refreshIllustration() async {
-    debugPrint('用户点击刷新按钮，taskId: ${widget.taskId}');
+    LoggerService.instance.d(
+      '用户点击刷新按钮，taskId: ${widget.taskId}',
+      category: LogCategory.ui,
+      tags: ['illustration', 'refresh'],
+    );
     await _loadIllustrationFromBackend();
   }
 
@@ -915,7 +923,12 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
         ToastUtils.showSuccess('图片生成完成');
       }
     } catch (e, stackTrace) {
-      debugPrint('生成更多图片失败: $e');
+      LoggerService.instance.e(
+        '生成更多图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'regenerate', 'error'],
+      );
 
       if (mounted) {
         ErrorHelper.showErrorWithLog(
@@ -938,7 +951,11 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
     if (_lastDeleteTime != null &&
         now.difference(_lastDeleteTime!).inSeconds < 2 &&
         _deletingImage == imageUrl) {
-      debugPrint('连击保护：2秒内不允许重复删除同一张图片');
+      LoggerService.instance.d(
+        '连击保护：2秒内不允许重复删除同一张图片',
+        category: LogCategory.ui,
+        tags: ['illustration', 'delete', 'protection'],
+      );
       return;
     }
 
@@ -959,7 +976,11 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
 
       // 删除成功后，清除图片缓存
       ImageCacheManager.removeCache(imageUrl);
-      debugPrint('🗑️ 已删除图片缓存: $imageUrl');
+      LoggerService.instance.d(
+        '已删除图片缓存: $imageUrl',
+        category: LogCategory.ui,
+        tags: ['illustration', 'delete', 'cache'],
+      );
 
       // 删除成功，更新图片列表
       if (mounted) {
@@ -984,7 +1005,12 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
         }
       }
     } catch (e, stackTrace) {
-      debugPrint('删除图片失败: $e');
+      LoggerService.instance.e(
+        '删除图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['illustration', 'delete', 'error'],
+      );
 
       if (mounted) {
         ErrorHelper.showErrorWithLog(

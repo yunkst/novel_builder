@@ -190,7 +190,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
     }
   }
 
-  Future<void> _onGenerateMoreImages(int count) async {
+  Future<void> _onGenerateMoreImages(int count, String? modelName) async {
     try {
       final apiService = ref.read(apiServiceWrapperProvider);
 
@@ -199,12 +199,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
           _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
       final referenceImageUrl = currentImage?.filename;
 
-      debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl');
+      debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName');
 
       await apiService.generateMoreImages(
         roleId: widget.roleId,
         count: count,
         referenceImageUrl: referenceImageUrl,
+        modelName: modelName,
       );
 
       if (mounted) {
@@ -714,7 +715,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
         currentIndex: _currentIndex,
         totalCount: _sortedImages.length,
         onDelete: () => _onDeleteImage(currentImage),
-        onGenerateMore: (count) => _onGenerateMoreImages(count),
+        onGenerateMore: (count, modelName) => _onGenerateMoreImages(count, modelName),
         onSetAsAvatar: () => _onSetAsAvatar(currentImage),
       ),
     );
