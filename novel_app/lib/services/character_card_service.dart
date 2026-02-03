@@ -2,7 +2,8 @@ import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../services/dify_service.dart';
-import '../services/database_service.dart';
+import '../repositories/character_repository.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 import '../utils/character_matcher.dart';
 import 'logger_service.dart';
 
@@ -28,13 +29,13 @@ import 'logger_service.dart';
 /// ```
 class CharacterCardService {
   final DifyService _difyService;
-  final DatabaseService _databaseService;
+  final ICharacterRepository _characterRepository;
 
   CharacterCardService({
     DifyService? difyService,
-    DatabaseService? databaseService,
+    required ICharacterRepository characterRepository,
   })  : _difyService = difyService ?? DifyService(),
-        _databaseService = databaseService ?? DatabaseService();
+        _characterRepository = characterRepository;
 
   /// 更新角色卡片
   ///
@@ -102,7 +103,7 @@ class CharacterCardService {
       // 自动保存所有角色（不显示预览对话框，让UI层决定是否需要预览）
       onProgress?.call('正在保存角色信息...');
       final savedCharacters =
-          await _databaseService.batchUpdateCharacters(updatedCharacters);
+          await _characterRepository.batchUpdateCharacters(updatedCharacters);
 
       onProgress?.call('成功更新 ${savedCharacters.length} 个角色卡');
       onSuccess?.call(savedCharacters);
@@ -140,7 +141,7 @@ class CharacterCardService {
 
       // 获取现有角色用于对比
       final existingCharacters =
-          await _databaseService.getCharacters(novel.url);
+          await _characterRepository.getCharacters(novel.url);
 
       final updateData = await CharacterMatcher.prepareUpdateData(
         novel.url,
@@ -240,7 +241,7 @@ class CharacterCardService {
         tags: ['card', 'save', 'start'],
       );
       final savedCharacters =
-          await _databaseService.batchUpdateCharacters(characters);
+          await _characterRepository.batchUpdateCharacters(characters);
       LoggerService.instance.i(
         '保存完成',
         category: LogCategory.character,

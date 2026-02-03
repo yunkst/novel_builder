@@ -32,11 +32,12 @@ final readerSettingsServiceProvider =
 typedef ReaderSettingsServiceRef
     = AutoDisposeProviderRef<ReaderSettingsService>;
 String _$novelContextBuilderHash() =>
-    r'9b148ed3ba0bcdbe8f8eb2bc2685385b7a0c04a5';
+    r'1b52c461768c7e5914b0ba58fa14af7319eea280';
 
 /// NovelContextBuilder Provider
 ///
-/// 提供小说上下文构建服务实例（单例）
+/// 提供小说上下文构建服务实例
+/// 依赖NovelRepository进行背景设定等数据获取
 ///
 /// Copied from [novelContextBuilder].
 @ProviderFor(novelContextBuilder)
@@ -54,30 +55,6 @@ final novelContextBuilderProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NovelContextBuilderRef = AutoDisposeProviderRef<NovelContextBuilder>;
-String _$characterCardServiceHash() =>
-    r'ac43ab78c5e4fb62d573d1d16ae59e851fc9dcc9';
-
-/// CharacterCardService Provider
-///
-/// 提供角色卡服务实例
-/// 注意：这个服务每次访问都创建新实例，因为它的使用场景是临时性的
-///
-/// Copied from [characterCardService].
-@ProviderFor(characterCardService)
-final characterCardServiceProvider =
-    AutoDisposeProvider<CharacterCardService>.internal(
-  characterCardService,
-  name: r'characterCardServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$characterCardServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
 String _$preloadServiceHash() => r'acec577aee64db912232979ba60e241953f3b237';
 
 /// PreloadService Provider

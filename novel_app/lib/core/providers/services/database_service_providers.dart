@@ -41,24 +41,37 @@ part 'database_service_providers.g.dart';
 /// - 章节 CRUD 操作
 /// - 章节索引管理
 /// - 用户插入章节保护
+/// - 历史章节查询和处理
+/// - 角色信息格式化
+/// - AI请求参数构建
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [characterRepositoryProvider] - 角色数据访问
 ///
 /// **使用示例**:
 /// ```dart
 /// final chapterService = ref.watch(chapterServiceProvider);
-/// await chapterService.insertChapter(novelUrl, chapter);
-/// final chapters = await chapterService.getChapters(novelUrl);
+/// final inputs = await chapterService.buildChapterGenerationInputs(
+///   novel: novel,
+///   chapters: chapters,
+///   afterIndex: 0,
+///   userInput: '要求',
+///   characterIds: [1, 2],
+/// );
 /// ```
 ///
 /// **注意事项**:
 /// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 依赖 DatabaseService，自动注入
+/// - 依赖 Repository 接口，支持测试和依赖替换
 @riverpod
 ChapterService chapterService(Ref ref) {
-  final databaseService = ref.watch(databaseServiceProvider);
-  return ChapterService(databaseService: databaseService);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final characterRepository = ref.watch(characterRepositoryProvider);
+  return ChapterService(
+    chapterRepository: chapterRepository,
+    characterRepository: characterRepository,
+  );
 }
 
 /// ChapterLoader Provider

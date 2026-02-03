@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../services/api_service_wrapper.dart';
-import '../../services/database_service.dart';
+import '../../core/interfaces/repositories/i_chapter_repository.dart';
+import '../../core/interfaces/repositories/i_illustration_repository.dart';
 import '../../services/scene_illustration_service.dart';
 import '../../services/logger_service.dart';
 import '../../utils/error_helper.dart';
@@ -31,13 +32,13 @@ import '../../utils/toast_utils.dart';
 /// 需要子类提供的字段和方法：
 /// - `Novel get novel` - 小说信息
 /// - `Chapter get currentChapter` - 当前章节
-/// - `DatabaseService get databaseService` - 数据库服务
+/// - `IChapterRepository get chapterRepository` - 章节数据仓库
+/// - `IIllustrationRepository get illustrationRepository` - 插图数据仓库
 /// - `ApiServiceWrapper get apiService` - API 服务
 mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   // ========== 字段 ==========
 
-  final SceneIllustrationService _sceneIllustrationService =
-      SceneIllustrationService();
+  SceneIllustrationService? _sceneIllustrationService;
 
   // ========== 抽象访问器（子类必须实现）==========
 
@@ -47,11 +48,26 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   /// 当前章节（子类提供）
   Chapter get currentChapter;
 
-  /// 数据库服务（子类提供）
-  DatabaseService get databaseService;
+  /// 章节数据仓库（子类提供）
+  IChapterRepository get chapterRepository;
+
+  /// 插图数据仓库（子类提供）
+  IIllustrationRepository get illustrationRepository;
 
   /// API 服务（子类提供）
   ApiServiceWrapper get apiService;
+
+  // ========== 私有方法 ==========
+
+  /// 获取SceneIllustrationService实例（延迟初始化）
+  SceneIllustrationService get _sceneIllustrationServiceInstance {
+    _sceneIllustrationService ??= SceneIllustrationService(
+      chapterRepository: chapterRepository,
+      illustrationRepository: illustrationRepository,
+      apiService: apiService,
+    );
+    return _sceneIllustrationService!;
+  }
 
   // ========== 公开方法 ==========
 
@@ -60,7 +76,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     try {
       // 根据 taskId 获取插图信息
       final illustrations =
-          await databaseService.getSceneIllustrationsByChapter(
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -128,7 +144,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     String? prompts;
     try {
       final illustrations =
-          await databaseService.getSceneIllustrationsByChapter(
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -315,7 +331,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     try {
       // 根据 taskId 获取插图信息
       final illustrations =
-          await databaseService.getSceneIllustrationsByChapter(
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -351,7 +367,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
 
       if (confirmed == true) {
         final success =
-            await _sceneIllustrationService.deleteIllustration(illustration.id);
+            await _sceneIllustrationServiceInstance.deleteIllustration(illustration.id);
         if (success) {
           // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
           if (mounted) {

@@ -5,7 +5,8 @@ import '../utils/deque.dart';
 import 'rate_limiter.dart';
 import 'preload_task.dart';
 import 'preload_progress_update.dart';
-import 'database_service.dart';
+import '../repositories/chapter_repository.dart';
+import '../core/database/database_connection.dart';
 import 'api_service_wrapper.dart';
 import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
@@ -52,12 +53,13 @@ class PreloadService {
   int _totalFailed = 0;
 
   // 服务依赖
-  late final DatabaseService _databaseService;
+  late final ChapterRepository _chapterRepository;
   late final ApiServiceWrapper _apiService;
 
   /// 初始化服务
   void _initServices() {
-    _databaseService = DatabaseService();
+    _chapterRepository = ChapterRepository(dbConnection: DatabaseConnection());
+    // TODO: 迁移到Provider模式后使用ref.watch(apiServiceWrapperProvider)
     _apiService = ApiServiceProvider.instance;
     LoggerService.instance.i(
       'PreloadService初始化完成',
@@ -82,9 +84,9 @@ class PreloadService {
     _novelCurrentIndex[novelUrl] = currentIndex;
     _lastActiveNovel = novelUrl;
 
-    // 使用DatabaseService的批量检查方法
+    // 使用ChapterRepository的批量检查方法
     final uncachedUrls =
-        await _databaseService.filterUncachedChapters(chapterUrls);
+        await _chapterRepository.filterUncachedChapters(chapterUrls);
 
     if (uncachedUrls.isEmpty) {
       LoggerService.instance.i(
@@ -235,7 +237,7 @@ class PreloadService {
 
         try {
           // 标记正在预加载
-          _databaseService.markAsPreloading(task.chapterUrl);
+          _chapterRepository.markAsPreloading(task.chapterUrl);
 
           // 获取内容
           final content = await _apiService.getChapterContent(task.chapterUrl);
@@ -246,7 +248,7 @@ class PreloadService {
             title: '', // 可以从API获取
             content: content,
           );
-          await _databaseService.cacheChapter(task.novelUrl, chapter, content);
+          await _chapterRepository.cacheChapter(task.novelUrl, chapter, content);
 
           _totalProcessed++;
 
@@ -388,7 +390,7 @@ class PreloadService {
     }
 
     // 查询数据库
-    final count = await _databaseService.getCachedChaptersCount(novelUrl);
+    final count = await _chapterRepository.getCachedChaptersCount(novelUrl);
     _cachedCountCache[novelUrl] = count;
     return count;
   }

@@ -50,7 +50,7 @@ final difyServiceProvider = Provider<DifyService>.internal(
 // ignore: unused_element
 typedef DifyServiceRef = ProviderRef<DifyService>;
 String _$characterCardServiceHash() =>
-    r'eb8bd71ecee934ad42cf3e2e470fcc9b5ee09407';
+    r'828f0c7a640794330fa6c941f600abce0c23c7c8';
 
 /// CharacterCardService Provider
 ///
@@ -63,7 +63,7 @@ String _$characterCardServiceHash() =>
 ///
 /// **依赖**:
 /// - [difyServiceProvider] - Dify AI服务
-/// - [databaseServiceProvider] - 数据库访问
+/// - [characterRepositoryProvider] - 角色数据访问
 ///
 /// **使用示例**:
 /// ```dart

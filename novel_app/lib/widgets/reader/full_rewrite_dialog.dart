@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/novel_context_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
+import '../../core/providers/reader_screen_providers.dart';
 
 /// 全文重写对话框
 ///
@@ -13,7 +14,7 @@ import '../../widgets/streaming_content_display.dart';
 /// - 支持用户输入重写要求
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持替换全文、重新生成功能
-class FullRewriteDialog extends StatefulWidget {
+class FullRewriteDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
   final Chapter currentChapter;
@@ -30,13 +31,11 @@ class FullRewriteDialog extends StatefulWidget {
   });
 
   @override
-  State<FullRewriteDialog> createState() => _FullRewriteDialogState();
+  ConsumerState<FullRewriteDialog> createState() => _FullRewriteDialogState();
 }
 
-class _FullRewriteDialogState extends State<FullRewriteDialog>
+class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
     with DifyStreamingMixin {
-  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
-
   final ValueNotifier<String> _rewriteResultNotifier =
       ValueNotifier<String>('');
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
@@ -141,8 +140,11 @@ class _FullRewriteDialogState extends State<FullRewriteDialog>
     _isGeneratingNotifier.value = true;
 
     try {
+      // 使用 Provider 获取 NovelContextBuilder
+      final contextBuilder = ref.read(novelContextBuilderProvider);
+
       // 使用 NovelContextBuilder 统一获取上下文数据
-      final context = await _contextBuilder.buildContext(
+      final context = await contextBuilder.buildContext(
         widget.novel,
         widget.chapters,
         widget.currentChapter,

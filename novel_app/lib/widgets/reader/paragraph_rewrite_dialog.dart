@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/novel_context_service.dart';
 import '../../services/rewrite_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
@@ -10,6 +10,7 @@ import '../../utils/paragraph_replace_helper.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../utils/toast_utils.dart';
+import '../../core/providers/reader_screen_providers.dart';
 
 /// 段落改写对话框
 ///
@@ -18,7 +19,7 @@ import '../../utils/toast_utils.dart';
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持选择多个段落进行改写
 /// - 支持替换原文或重新改写
-class ParagraphRewriteDialog extends StatefulWidget {
+class ParagraphRewriteDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
   final Chapter currentChapter;
@@ -37,12 +38,11 @@ class ParagraphRewriteDialog extends StatefulWidget {
   });
 
   @override
-  State<ParagraphRewriteDialog> createState() => _ParagraphRewriteDialogState();
+  ConsumerState<ParagraphRewriteDialog> createState() => _ParagraphRewriteDialogState();
 }
 
-class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
+class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
     with TickerProviderStateMixin, DifyStreamingMixin {
-  final NovelContextBuilder _contextBuilder = NovelContextBuilder();
   final RewriteService _rewriteService = RewriteService();
 
   // 光标动画控制器
@@ -189,8 +189,11 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
   // 生成改写内容（流式）
   Future<void> _generateRewrite(String selectedText, String userInput) async {
     try {
+      // 使用 Provider 获取 NovelContextBuilder
+      final contextBuilder = ref.read(novelContextBuilderProvider);
+
       // 使用 NovelContextBuilder 统一获取上下文数据
-      final novelContext = await _contextBuilder.buildContext(
+      final novelContext = await contextBuilder.buildContext(
         widget.novel,
         widget.chapters,
         widget.currentChapter,

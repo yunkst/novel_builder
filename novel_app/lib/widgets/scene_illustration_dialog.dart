@@ -10,7 +10,8 @@ import '../utils/error_helper.dart';
 import '../utils/character_matcher.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
-import '../core/providers/database_providers.dart';
+import '../core/providers/repository_providers.dart';
+import '../core/providers/service_providers.dart';
 
 class SceneIllustrationDialog extends ConsumerStatefulWidget {
   final String paragraphText;
@@ -39,14 +40,30 @@ class _SceneIllustrationDialogState
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
 
-  final SceneIllustrationService _sceneIllustrationService =
-      SceneIllustrationService();
+  late final SceneIllustrationService _sceneIllustrationService;
   List<int> _selectedCharacterIds = [];
   List<Character> _characters = [];
   int _imageCount = 1;
   String? _selectedModel;
   bool _isGenerating = false;
   String? _sceneGenerationError;
+
+  @override
+  void initState() {
+    super.initState();
+    // 从Provider获取Service实例
+    _sceneIllustrationService = ref.read(sceneIllustrationServiceProvider);
+    // 删除默认文本，让用户从空白开始
+    _contentController.text = '';
+    _loadCharacters();
+
+    // 移除自动AI生成逻辑，改为用户手动触发
+    // Future.delayed(const Duration(milliseconds: 500), () {
+    //   if (mounted) {
+    //     _startSceneDescriptionGeneration();
+    //   }
+    // });
+  }
 
   /// 滚动到文本末尾
   void _scrollToBottom() {
@@ -61,25 +78,10 @@ class _SceneIllustrationDialogState
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // 删除默认文本，让用户从空白开始
-    _contentController.text = '';
-    _loadCharacters();
-
-    // 移除自动AI生成逻辑，改为用户手动触发
-    // Future.delayed(const Duration(milliseconds: 500), () {
-    //   if (mounted) {
-    //     _startSceneDescriptionGeneration();
-    //   }
-    // });
-  }
-
   Future<void> _loadCharacters() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final characterRepository = ref.read(characterRepositoryProvider);
     try {
-      final characters = await databaseService.getCharacters(widget.novelUrl);
+      final characters = await characterRepository.getCharacters(widget.novelUrl);
       if (mounted) {
         setState(() {
           _characters = characters;
@@ -117,11 +119,11 @@ class _SceneIllustrationDialogState
 
   /// 预选章节中出现的角色
   Future<void> _preselectAppearingCharacters() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final chapterRepository = ref.read(chapterRepositoryProvider);
     try {
       // 获取当前章节内容
       final chapterContent =
-          await databaseService.getCachedChapter(widget.chapterId);
+          await chapterRepository.getCachedChapter(widget.chapterId);
       if (chapterContent == null || chapterContent.isEmpty) {
         debugPrint('章节内容为空，跳过角色预选');
         return;

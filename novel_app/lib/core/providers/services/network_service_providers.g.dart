@@ -97,7 +97,7 @@ final preloadServiceProvider = Provider<PreloadService>.internal(
 // ignore: unused_element
 typedef PreloadServiceRef = ProviderRef<PreloadService>;
 String _$sceneIllustrationServiceHash() =>
-    r'63ce725f7bb7dc4d1c10022b3dc6136bb60d3039';
+    r'7f60bc634b8c313ac540eaa0d11a7c96193bd800';
 
 /// SceneIllustrationService Provider
 ///
@@ -109,7 +109,8 @@ String _$sceneIllustrationServiceHash() =>
 /// - 图片 URL 处理
 ///
 /// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
+/// - [chapterRepositoryProvider] - 章节数据访问
+/// - [illustrationRepositoryProvider] - 插图数据访问
 /// - [apiServiceWrapperProvider] - API 服务
 ///
 /// **使用示例**:

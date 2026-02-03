@@ -1,7 +1,7 @@
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/chapter_history_service.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_novel_repository.dart';
 
 /// 小说上下文数据
 ///
@@ -67,13 +67,13 @@ class NovelContext {
 /// 消除多个Dialog中重复的数据获取逻辑
 class NovelContextBuilder {
   final ChapterHistoryService _historyService;
-  final DatabaseService _databaseService;
+  final INovelRepository _novelRepository;
 
   NovelContextBuilder({
     ChapterHistoryService? historyService,
-    DatabaseService? databaseService,
+    required INovelRepository novelRepository,
   })  : _historyService = historyService ?? ChapterHistoryService.create(),
-        _databaseService = databaseService ?? DatabaseService();
+        _novelRepository = novelRepository;
 
   /// 构建小说上下文
   ///
@@ -96,7 +96,7 @@ class NovelContextBuilder {
         currentChapter: currentChapter,
         maxHistoryCount: maxHistoryCount,
       ),
-      _databaseService.getBackgroundSetting(novel.url),
+      _novelRepository.getBackgroundSetting(novel.url),
     ]);
 
     final historyContent = results[0] as String;
@@ -113,7 +113,7 @@ class NovelContextBuilder {
   /// 仅获取背景设定（用于只需更新背景的场景）
   Future<String> getBackgroundSetting(String novelUrl) async {
     final backgroundSetting =
-        await _databaseService.getBackgroundSetting(novelUrl);
+        await _novelRepository.getBackgroundSetting(novelUrl);
     return backgroundSetting ?? '';
   }
 
@@ -135,7 +135,7 @@ class NovelContextBuilder {
     );
 
     final backgroundSetting =
-        await _databaseService.getBackgroundSetting(novelUrl) ?? '';
+        await _novelRepository.getBackgroundSetting(novelUrl) ?? '';
 
     return NovelContext(
       backgroundSetting: backgroundSetting,

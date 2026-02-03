@@ -8,8 +8,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../services/reader_settings_service.dart';
 import '../../services/novel_context_service.dart';
-import '../../services/character_card_service.dart';
 import '../../services/preload_service.dart';
+import '../providers/database_providers.dart';
 
 part 'reader_screen_providers.g.dart';
 
@@ -24,19 +24,12 @@ ReaderSettingsService readerSettingsService(Ref ref) {
 
 /// NovelContextBuilder Provider
 ///
-/// 提供小说上下文构建服务实例（单例）
+/// 提供小说上下文构建服务实例
+/// 依赖NovelRepository进行背景设定等数据获取
 @riverpod
 NovelContextBuilder novelContextBuilder(Ref ref) {
-  return NovelContextBuilder();
-}
-
-/// CharacterCardService Provider
-///
-/// 提供角色卡服务实例
-/// 注意：这个服务每次访问都创建新实例，因为它的使用场景是临时性的
-@riverpod
-CharacterCardService characterCardService(Ref ref) {
-  return CharacterCardService();
+  final novelRepository = ref.watch(novelRepositoryProvider);
+  return NovelContextBuilder(novelRepository: novelRepository);
 }
 
 /// PreloadService Provider
