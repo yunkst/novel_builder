@@ -1,127 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/toast_utils.dart';
 import '../models/novel.dart';
 import '../models/bookshelf.dart';
-import '../services/database_service.dart';
-import '../services/preload_service.dart';
-import '../services/preload_progress_update.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
-import '../repositories/bookshelf_repository.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import '../core/providers/bookshelf_providers.dart';
+import '../core/providers/database_providers.dart';
+import '../core/providers/service_providers.dart';
 import 'dart:async';
 
-class BookshelfScreen extends StatefulWidget {
-  /// 可选的依赖注入参数 - 用于测试
-  final BookshelfRepository? bookshelfRepository;
-  final DatabaseService? databaseService;
-  final PreloadService? preloadService;
-
-  const BookshelfScreen({
-    super.key,
-    this.bookshelfRepository,
-    this.databaseService,
-    this.preloadService,
-  });
+class BookshelfScreen extends ConsumerStatefulWidget {
+  const BookshelfScreen({super.key});
 
   @override
-  State<BookshelfScreen> createState() => _BookshelfScreenState();
+  ConsumerState<BookshelfScreen> createState() => _BookshelfScreenState();
 }
 
-class _BookshelfScreenState extends State<BookshelfScreen> {
-  late final BookshelfRepository _bookshelfRepository;
-  late final DatabaseService _databaseService;
-  late final PreloadService _preloadService;
-  List<Novel> _bookshelf = [];
-  bool _isLoading = true;
-  final Map<String, Map<String, int>> _progress = {}; // novelUrl -> stats
-
-  // 当前选中的书架ID
-  int _currentBookshelfId = 1; // 默认显示"全部小说"
-
+class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   // 预加载监听
-  StreamSubscription<PreloadProgressUpdate>? _preloadSubscription;
+  StreamSubscription? _preloadSubscription;
 
   @override
   void initState() {
     super.initState();
 
-    // 使用注入的依赖或创建默认实例
-    _databaseService = widget.databaseService ?? DatabaseService();
-    _bookshelfRepository =
-        widget.bookshelfRepository ?? _databaseService.bookshelfRepository;
-    _preloadService = widget.preloadService ?? PreloadService();
-
-    _loadBookshelf();
-
     // 监听预加载进度
-    _preloadSubscription = _preloadService.progressStream.listen((update) {
+    final preloadService = ref.read(preloadServiceProvider);
+    _preloadSubscription = preloadService.progressStream.listen((update) {
       if (mounted) {
-        setState(() {
-          _progress[update.novelUrl] = {
-            'cachedChapters': update.cachedChapters,
-            'totalChapters': update.totalChapters,
-          };
-        });
+        // 进度会通过 preloadProgressMapProvider 自动更新
+        // 这里只需要确保监听器处于活动状态
       }
     });
-  }
-
-  Future<void> _loadBookshelf() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      if (kIsWeb) {
-        // 在Web环境中，模拟一些测试数据
-        final mockNovels = [
-          Novel(
-            title: '测试小说1',
-            author: '测试作者1',
-            url: 'https://example.com/novel1',
-            coverUrl: '',
-            description: '这是一个测试小说描述',
-          ),
-          Novel(
-            title: '测试小说2',
-            author: '测试作者2',
-            url: 'https://example.com/novel2',
-            coverUrl: '',
-            description: '这是另一个测试小说描述',
-          ),
-        ];
-
-        if (mounted) {
-          setState(() {
-            _bookshelf = mockNovels;
-            _isLoading = false;
-          });
-        }
-      } else {
-        // 使用Repository方法获取书架中的小说
-        final novels = await _bookshelfRepository.getNovelsByBookshelf(
-          _currentBookshelfId,
-        );
-        if (mounted) {
-          setState(() {
-            _bookshelf = novels;
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('加载书架失败: $e');
-      if (mounted) {
-        setState(() {
-          _bookshelf = [];
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   @override
@@ -132,17 +46,15 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
   /// 判断小说是否正在预加载
   bool _isPreloading(String novelUrl) {
-    final stats = _preloadService.getStatistics();
+    final preloadService = ref.read(preloadServiceProvider);
+    final stats = preloadService.getStatistics();
     return stats['is_processing'] == true &&
         stats['last_active_novel'] == novelUrl;
   }
 
   /// 书架切换回调
   void _onBookshelfChanged(int bookshelfId) {
-    setState(() {
-      _currentBookshelfId = bookshelfId;
-    });
-    _loadBookshelf();
+    ref.read(currentBookshelfIdProvider.notifier).setBookshelfId(bookshelfId);
   }
 
   Future<void> _removeFromBookshelf(Novel novel) async {
@@ -156,11 +68,13 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     if (confirmed == true) {
       try {
         // 从数据库中删除小说（这会删除bookshelf表中的记录）
-        await _databaseService.removeFromBookshelf(novel.url);
+        final databaseService = ref.read(databaseServiceProvider);
+        await databaseService.removeFromBookshelf(novel.url);
         if (mounted) {
           ToastUtils.showSuccess('已从书架移除', context: context);
         }
-        _loadBookshelf();
+        // 刷新书架列表
+        ref.invalidate(bookshelfNovelsProvider);
       } catch (e, stackTrace) {
         ErrorHelper.showErrorWithLog(
           context,
@@ -183,11 +97,15 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
     String mode,
   ) async {
     // 使用Repository获取书架列表
-    final bookshelves = await _bookshelfRepository.getBookshelves();
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+    final bookshelves = await bookshelfRepository.getBookshelves();
+
+    // 获取当前书架ID
+    final currentBookshelfId = ref.read(currentBookshelfIdProvider);
 
     // 过滤掉当前书架和"全部小说"书架
     final availableBookshelves = bookshelves
-        .where((b) => b.id != _currentBookshelfId && b.id != 1)
+        .where((b) => b.id != currentBookshelfId && b.id != 1)
         .toList();
 
     if (availableBookshelves.isEmpty) {
@@ -252,16 +170,21 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   /// 移动小说到指定书架
   Future<void> _moveNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
+      // 获取当前书架ID和Repository
+      final currentBookshelfId = ref.read(currentBookshelfIdProvider);
+      final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+
       // 使用Repository移动小说
-      await _bookshelfRepository.moveNovelToBookshelf(
+      await bookshelfRepository.moveNovelToBookshelf(
         novel.url,
-        _currentBookshelfId,
+        currentBookshelfId,
         toBookshelfId,
       );
 
       if (mounted) {
         ToastUtils.showSuccess('已移动到目标书架', context: context);
-        _loadBookshelf(); // 刷新当前书架
+        // 刷新当前书架
+        ref.invalidate(bookshelfNovelsProvider);
       }
     } catch (e, stackTrace) {
       ErrorHelper.showErrorWithLog(
@@ -278,7 +201,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
   Future<void> _copyNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
       // 使用Repository复制小说
-      await _bookshelfRepository.addNovelToBookshelf(novel.url, toBookshelfId);
+      final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+      await bookshelfRepository.addNovelToBookshelf(novel.url, toBookshelfId);
 
       if (mounted) {
         ToastUtils.showSuccess('已复制到目标书架', context: context);
@@ -389,7 +313,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
     if (result != null) {
       try {
-        await _databaseService.createCustomNovel(
+        final databaseService = ref.read(databaseServiceProvider);
+        await databaseService.createCustomNovel(
           result['title']!,
           result['author']!,
           description: result['description'],
@@ -397,7 +322,8 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         if (mounted) {
           ToastUtils.showSuccess('小说创建成功！', context: context);
         }
-        _loadBookshelf(); // 重新加载书架
+        // 刷新书架列表
+        ref.invalidate(bookshelfNovelsProvider);
       } catch (e) {
         if (mounted) {
           ToastUtils.showError('创建失败: $e', context: context);
@@ -408,6 +334,9 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentBookshelfId = ref.watch(currentBookshelfIdProvider);
+    final bookshelfAsync = ref.watch(bookshelfNovelsProvider);
+    final progress = ref.watch(preloadProgressMapProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的书架'),
@@ -417,230 +346,254 @@ class _BookshelfScreenState extends State<BookshelfScreen> {
         children: [
           // 书架选择器
           BookshelfSelector(
-            currentBookshelfId: _currentBookshelfId,
+            currentBookshelfId: currentBookshelfId,
             onBookshelfChanged: _onBookshelfChanged,
           ),
           // 书架内容
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _bookshelf.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.library_books,
-                              size: 64,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.4),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              '书架是空的',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text('你可以去搜索添加小说，或点击右下角按钮创建自己的小说'),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _showCreateNovelDialog,
-                              icon: const Icon(Icons.create),
-                              label: const Text('创建新小说'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                                foregroundColor:
-                                    Theme.of(context).colorScheme.onPrimary,
-                              ),
-                            ),
-                          ],
+            child: bookshelfAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('加载失败: $error'),
+                  ],
+                ),
+              ),
+              data: (bookshelf) {
+                if (bookshelf.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.library_books,
+                          size: 64,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.4),
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadBookshelf,
-                        child: ListView.builder(
-                          itemCount: _bookshelf.length,
-                          itemBuilder: (context, index) {
-                            final novel = _bookshelf[index];
-                            final stats = _progress[novel.url];
-                            // 注意：不再批量统计缓存状态，避免性能问题
-                            // 进度条UI将依赖预加载服务的实时更新（如果有）
-                            final cached = stats != null
-                                ? (stats['cachedChapters'] ?? 0)
-                                : 0;
-                            final total = stats != null
-                                ? (stats['totalChapters'] ?? 0)
-                                : 0;
-                            final double percent = (total > 0)
-                                ? (cached / total).clamp(0.0, 1.0)
-                                : 0.0;
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                title: Row(
-                                  children: [
-                                    if (_isPreloading(novel.url))
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(right: 8),
-                                        child: SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                    Theme.of(context)
-                                                        .colorScheme
-                                                        .primary),
-                                          ),
-                                        ),
-                                      ),
-                                    Expanded(
-                                      child: Text(
-                                        novel.title,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '作者: ${novel.author}',
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        ),
-                                        if (novel.url
-                                            .startsWith('custom://')) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context)
+                        const SizedBox(height: 16),
+                        const Text(
+                          '书架是空的',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('你可以去搜索添加小说，或点击右下角按钮创建自己的小说'),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _showCreateNovelDialog,
+                          icon: const Icon(Icons.create),
+                          label: const Text('创建新小说'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(bookshelfNovelsProvider);
+                    await Future.delayed(const Duration(milliseconds: 100));
+                  },
+                  child: ListView.builder(
+                    itemCount: bookshelf.length,
+                    itemBuilder: (context, index) {
+                      final novel = bookshelf[index];
+                      final stats = progress[novel.url];
+                      // 注意：不再批量统计缓存状态，避免性能问题
+                      // 进度条UI将依赖预加载服务的实时更新（如果有）
+                      final cached = stats != null
+                          ? (stats['cachedChapters'] ?? 0)
+                          : 0;
+                      final total = stats != null
+                          ? (stats['totalChapters'] ?? 0)
+                          : 0;
+                      final double percent = (total > 0)
+                          ? (cached / total).clamp(0.0, 1.0)
+                          : 0.0;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          title: Row(
+                            children: [
+                              if (_isPreloading(novel.url))
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(right: 8),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                              Theme.of(context)
                                                   .colorScheme
-                                                  .tertiary
-                                                  .withValues(alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .tertiary
-                                                      .withValues(alpha: 0.3)),
-                                            ),
-                                            child: Text(
-                                              '原创',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .tertiary,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                        ],
-                                      ],
+                                                  .primary),
                                     ),
-                                    const SizedBox(height: 6),
-                                    if (total > 0) ...[
-                                      LinearProgressIndicator(value: percent),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '已缓存章节: $cached / $total',
-                                        style: const TextStyle(fontSize: 12),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ],
-                                  ],
+                                  ),
                                 ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'move':
-                                        _showBookshelfSelectionDialog(
-                                            novel, 'move');
-                                        break;
-                                      case 'copy':
-                                        _showBookshelfSelectionDialog(
-                                            novel, 'copy');
-                                        break;
-                                      case 'delete':
-                                        _removeFromBookshelf(novel);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'move',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.drive_file_move_outline,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('移动到书架'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'copy',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.copy),
-                                          SizedBox(width: 8),
-                                          Text('复制到书架'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete),
-                                          SizedBox(width: 8),
-                                          Text('从书架移除'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                              Expanded(
+                                child: Text(
+                                  novel.title,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          ChapterListScreenRiverpod(novel: novel),
-                                    ),
-                                  ).then((_) => _loadBookshelf());
-                                },
                               ),
-                            );
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '作者: ${novel.author}',
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                  if (novel.url
+                                      .startsWith('custom://')) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .tertiary
+                                            .withOpacity(0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .tertiary
+                                                .withOpacity(0.3)),
+                                      ),
+                                      child: Text(
+                                        '原创',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .tertiary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              if (total > 0) ...[
+                                LinearProgressIndicator(value: percent),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '已缓存章节: $cached / $total',
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'move':
+                                  _showBookshelfSelectionDialog(
+                                      novel, 'move');
+                                  break;
+                                case 'copy':
+                                  _showBookshelfSelectionDialog(
+                                      novel, 'copy');
+                                  break;
+                                case 'delete':
+                                  _removeFromBookshelf(novel);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'move',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.drive_file_move_outline,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('移动到书架'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'copy',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.copy),
+                                    SizedBox(width: 8),
+                                    Text('复制到书架'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete),
+                                    SizedBox(width: 8),
+                                    Text('从书架移除'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ChapterListScreenRiverpod(novel: novel),
+                              ),
+                            ).then((_) {
+                              // 书架列表会通过Riverpod自动刷新，无需手动刷新
+                            });
                           },
                         ),
-                      ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

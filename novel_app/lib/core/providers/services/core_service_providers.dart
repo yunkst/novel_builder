@@ -19,6 +19,7 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../services/logger_service.dart';
 import '../../../services/preferences_service.dart';
+import '../../../services/backup_service.dart';
 
 part 'core_service_providers.g.dart';
 
@@ -81,4 +82,32 @@ LoggerService loggerService(LoggerServiceRef ref) {
 @riverpod
 PreferencesService preferencesService(PreferencesServiceRef ref) {
   return PreferencesService.instance;
+}
+
+/// BackupService Provider
+///
+/// 提供数据库备份服务实例，用于备份和恢复数据库。
+///
+/// **功能**:
+/// - 数据库文件获取
+/// - 上传备份到服务器
+/// - 备份时间记录
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final backupService = ref.watch(backupServiceProvider);
+/// final dbFile = await backupService.getDatabaseFile();
+/// await backupService.uploadBackup(dbFile: dbFile);
+/// ```
+///
+/// **注意事项**:
+/// - 使用 `BackupService()` 单例模式
+/// - 上传操作需要网络连接
+/// - 备份文件存储在服务器
+@riverpod
+BackupService backupService(BackupServiceRef ref) {
+  return BackupService();
 }

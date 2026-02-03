@@ -5,7 +5,6 @@ import '../models/chapter.dart';
 import '../models/outline.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
-import '../services/chapter_service.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';

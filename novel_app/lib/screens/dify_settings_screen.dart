@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/toast_utils.dart';
 
-class DifySettingsScreen extends StatefulWidget {
+class DifySettingsScreen extends ConsumerWidget {
   const DifySettingsScreen({super.key});
 
   @override
-  State<DifySettingsScreen> createState() => _DifySettingsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DifySettingsContent();
+  }
 }
 
-class _DifySettingsScreenState extends State<DifySettingsScreen> {
+class DifySettingsContent extends StatefulWidget {
+  const DifySettingsContent({super.key});
+
+  @override
+  State<DifySettingsContent> createState() => _DifySettingsContentState();
+}
+
+class _DifySettingsContentState extends State<DifySettingsContent> {
   final _formKey = GlobalKey<FormState>();
   final _difyUrlController = TextEditingController();
   final _flowTokenController = TextEditingController();

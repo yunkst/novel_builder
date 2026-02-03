@@ -28,7 +28,8 @@ library;
 export 'services/core_service_providers.dart'
     show
         loggerServiceProvider,
-        preferencesServiceProvider;
+        preferencesServiceProvider,
+        backupServiceProvider;
 
 // AI服务
 export 'services/ai_service_providers.dart'

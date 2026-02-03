@@ -6,10 +6,9 @@ import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import '../services/app_update_service.dart';
 import '../widgets/app_update_dialog.dart';
-import '../services/api_service_wrapper.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
-import '../services/backup_service.dart';
+import '../core/providers/service_providers.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../utils/format_utils.dart';
@@ -44,7 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   /// 加载上次备份时间
   Future<void> _loadLastBackupTime() async {
-    final backupService = BackupService();
+    final backupService = ref.read(backupServiceProvider);
     final timeText = await backupService.getLastBackupTimeText();
     if (mounted) {
       setState(() {
@@ -59,7 +58,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     try {
-      final apiWrapper = ApiServiceWrapper();
+      final apiWrapper = ref.read(apiServiceWrapperProvider);
       final updateService = AppUpdateService(apiWrapper: apiWrapper);
 
       final latestVersion =
@@ -319,7 +318,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 处理数据备份
   Future<void> _handleBackup() async {
     try {
-      final backupService = BackupService();
+      final backupService = ref.read(backupServiceProvider);
 
       // 获取数据库文件
       final dbFile = await backupService.getDatabaseFile();

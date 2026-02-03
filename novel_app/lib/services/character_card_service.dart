@@ -2,7 +2,6 @@ import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../services/dify_service.dart';
-import '../repositories/character_repository.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
 import '../utils/character_matcher.dart';
 import 'logger_service.dart';

@@ -11,7 +11,6 @@ import '../models/character_relationship.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
 import '../services/preload_service.dart';
-import '../services/character_card_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
