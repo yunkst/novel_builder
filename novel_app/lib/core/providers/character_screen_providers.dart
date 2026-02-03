@@ -18,9 +18,7 @@ part 'character_screen_providers.g.dart';
 /// 提供角色图片缓存服务实例
 /// 使用 keepAlive: true 确保实例不会被销毁（单例模式）
 @Riverpod(keepAlive: true)
-CharacterImageCacheService characterImageCacheService(
-  CharacterImageCacheServiceRef ref,
-) {
+CharacterImageCacheService characterImageCacheService(Ref ref) {
   final service = CharacterImageCacheService();
 
   // 注意：初始化需要在首次使用时手动调用，或在外部初始化
@@ -106,7 +104,7 @@ Map<int, int> relationshipCountCache(Ref ref) {
 ///
 /// 检查小说是否有大纲
 @riverpod
-Future<bool?> hasOutline(HasOutlineRef ref, String novelUrl) async {
+Future<bool?> hasOutline(Ref ref, String novelUrl) async {
   final repository = ref.watch(outlineRepositoryProvider);
   final outline = await repository.getOutlineByNovelUrl(novelUrl);
   return outline != null;

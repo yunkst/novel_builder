@@ -27,7 +27,7 @@ final bookshelfNovelsProvider = AutoDisposeFutureProvider<List<Novel>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BookshelfNovelsRef = AutoDisposeFutureProviderRef<List<Novel>>;
-String _$preloadProgressHash() => r'b7afde9f0050f5443f1d55a6db329a6a246f26dc';
+String _$preloadProgressHash() => r'6ae0c777069b4bb2a5b3b4c9bb70f9e1667adf1d';
 
 /// 预加载进度流
 ///

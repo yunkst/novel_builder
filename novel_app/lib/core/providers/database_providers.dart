@@ -81,9 +81,7 @@ ICharacterRepository characterRepository(Ref ref) {
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
 @riverpod
-ICharacterRelationRepository characterRelationRepository(
-  CharacterRelationRepositoryRef ref,
-) {
+ICharacterRelationRepository characterRelationRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return CharacterRelationRepository(dbConnection: dbConnection);
 }

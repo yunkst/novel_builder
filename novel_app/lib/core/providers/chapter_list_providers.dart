@@ -450,8 +450,7 @@ class GeneratedContent extends _$GeneratedContent {
 ///
 /// 监听 PreloadService 的进度更新
 @riverpod
-Stream<PreloadProgressUpdate> preloadProgress(
-    PreloadProgressRef ref, Novel novel) {
+Stream<PreloadProgressUpdate> preloadProgress(Ref ref, Novel novel) {
   final preloadService = ref.watch(preloadServiceProvider);
 
   return preloadService.progressStream

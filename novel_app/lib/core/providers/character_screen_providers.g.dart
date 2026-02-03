@@ -7,7 +7,7 @@ part of 'character_screen_providers.dart';
 // **************************************************************************
 
 String _$characterImageCacheServiceHash() =>
-    r'826d760c0454e2d354fef2812570d540353a281c';
+    r'a0922279449db6986f2d33ed5209a360c1b526dc';
 
 /// CharacterImageCacheService Provider
 ///
@@ -53,7 +53,7 @@ final relationshipCountCacheProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef RelationshipCountCacheRef = AutoDisposeProviderRef<Map<int, int>>;
-String _$hasOutlineHash() => r'dfe6c74eb6671651ddb6d646737d4c190fb099eb';
+String _$hasOutlineHash() => r'6070a65f9ce0f6838c29a0a86a422d91f84c01a8';
 
 /// Copied from Dart SDK
 class _SystemHash {
