@@ -4,21 +4,31 @@ import '../models/role_gallery.dart';
 import '../services/role_gallery_cache_service.dart';
 import '../services/character_image_cache_service.dart';
 import '../services/database_service.dart';
-import '../core/di/api_service_provider.dart';
+import '../services/api_service_wrapper.dart';
 
 /// 角色头像同步服务
 /// 负责将图集图片同步为角色头像
 class CharacterAvatarSyncService {
-  static final CharacterAvatarSyncService _instance =
-      CharacterAvatarSyncService._internal();
-  factory CharacterAvatarSyncService() => _instance;
-  CharacterAvatarSyncService._internal();
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [galleryCacheService] 图集缓存服务实例
+  /// [avatarCacheService] 头像缓存服务实例
+  /// [databaseService] 数据库服务实例
+  /// [apiService] API服务实例
+  CharacterAvatarSyncService({
+    required RoleGalleryCacheService galleryCacheService,
+    required CharacterImageCacheService avatarCacheService,
+    required DatabaseService databaseService,
+    required ApiServiceWrapper apiService,
+  })  : _galleryCacheService = galleryCacheService,
+        _avatarCacheService = avatarCacheService,
+        _databaseService = databaseService,
+        _apiService = apiService;
 
-  final RoleGalleryCacheService _galleryCacheService =
-      RoleGalleryCacheService();
-  final CharacterImageCacheService _avatarCacheService =
-      CharacterImageCacheService.instance;
-  final DatabaseService _databaseService = DatabaseService();
+  final RoleGalleryCacheService _galleryCacheService;
+  final CharacterImageCacheService _avatarCacheService;
+  final DatabaseService _databaseService;
+  final ApiServiceWrapper _apiService;
 
   /// 初始化服务
   Future<void> init() async {
@@ -88,9 +98,7 @@ class CharacterAvatarSyncService {
       debugPrint('🔄 开始同步角色的第一张图片为头像: 角色ID $characterId');
 
       // 获取角色图集
-      final apiService = ApiServiceProvider.instance;
-      final galleryData =
-          await apiService.getRoleGallery(characterId.toString());
+      final galleryData = await _apiService.getRoleGallery(characterId.toString());
       final gallery = RoleGallery.fromJson(galleryData);
 
       // 获取第一张图片（优先取置顶图片）

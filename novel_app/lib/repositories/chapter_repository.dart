@@ -184,8 +184,14 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
     if (maps.isNotEmpty) {
       final content = maps.first['content'] as String;
-      final cleanedContent = await InvalidMarkupCleaner()
-          .cleanAndUpdateChapter(chapterUrl, content);
+      // 使用 databaseGetter 创建 InvalidMarkupCleaner
+      final cleaner = InvalidMarkupCleaner(
+        databaseGetter: () => database,
+      );
+      final cleanedContent = await cleaner.cleanAndUpdateChapter(
+        chapterUrl,
+        content,
+      );
       return cleanedContent;
     }
     return null;

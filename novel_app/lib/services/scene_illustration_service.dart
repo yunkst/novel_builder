@@ -1,7 +1,6 @@
 import '../models/scene_illustration.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_illustration_repository.dart';
-import '../core/di/api_service_provider.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/media_markup_parser.dart';
 import 'logger_service.dart';
@@ -15,10 +14,10 @@ class SceneIllustrationService {
   SceneIllustrationService({
     required IChapterRepository chapterRepository,
     required IIllustrationRepository illustrationRepository,
-    ApiServiceWrapper? apiService,
+    required ApiServiceWrapper apiService,
   })  : _chapterRepository = chapterRepository,
         _illustrationRepository = illustrationRepository,
-        _apiService = apiService ?? ApiServiceProvider.instance;
+        _apiService = apiService;
 
   /// 创建场景插图任务（新版本：基于段落索引插入标记）
   Future<int> createSceneIllustrationWithMarkup({

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
 import '../services/role_gallery_cache_service.dart';
-import '../core/di/api_service_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/services/cache_service_providers.dart';
+import '../core/providers/services/network_service_providers.dart';
 
 /// 图集缩略图组件
-class GalleryThumbnail extends StatefulWidget {
+class GalleryThumbnail extends ConsumerStatefulWidget {
   final String roleId;
   final VoidCallback? onTap;
   final double? size;
@@ -24,10 +26,10 @@ class GalleryThumbnail extends StatefulWidget {
   });
 
   @override
-  State<GalleryThumbnail> createState() => _GalleryThumbnailState();
+  ConsumerState<GalleryThumbnail> createState() => _GalleryThumbnailState();
 }
 
-class _GalleryThumbnailState extends State<GalleryThumbnail>
+class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -63,7 +65,7 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
 
   Future<void> _loadGallery() async {
     try {
-      final apiService = ApiServiceProvider.instance;
+      final apiService = ref.read(apiServiceWrapperProvider);
       final galleryData = await apiService.getRoleGallery(widget.roleId);
 
       setState(() {

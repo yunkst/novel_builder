@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'database_service.dart';
 import '../utils/media_markup_parser.dart';
 
@@ -8,17 +9,42 @@ import '../utils/media_markup_parser.dart';
 /// 1. 检测章节内容中的无效媒体标记（插图、视频等）
 /// 2. 自动清理无效标记
 /// 3. 验证标记在数据库中是否存在
+///
+/// 使用方式：
+/// ```dart
+/// // 通过Provider获取（推荐）
+/// final cleaner = ref.watch(invalidMarkupCleanerProvider);
+///
+/// // 或手动创建实例
+/// final cleaner = InvalidMarkupCleaner(databaseService: databaseService);
+/// ```
 class InvalidMarkupCleaner {
-  static final InvalidMarkupCleaner _instance =
-      InvalidMarkupCleaner._internal();
+  final DatabaseService? _databaseService;
+  final Future<Database> Function()? _databaseGetter;
 
-  factory InvalidMarkupCleaner() {
-    return _instance;
+  /// 创建 InvalidMarkupCleaner 实例
+  ///
+  /// 参数:
+  /// - [databaseService] 数据库服务（可选，与databaseGetter二选一）
+  /// - [databaseGetter] 数据库获取函数（可选，与databaseService二选一）
+  InvalidMarkupCleaner({
+    DatabaseService? databaseService,
+    Future<Database> Function()? databaseGetter,
+  })  : _databaseService = databaseService,
+        _databaseGetter = databaseGetter {
+    assert(
+      databaseService != null || databaseGetter != null,
+      '必须提供 databaseService 或 databaseGetter 之一',
+    );
   }
 
-  InvalidMarkupCleaner._internal();
-
-  final DatabaseService _databaseService = DatabaseService();
+  /// 获取数据库连接
+  Future<Database> get _database async {
+    if (_databaseService != null) {
+      return await _databaseService!.database;
+    }
+    return await _databaseGetter!();
+  }
 
   /// 验证媒体标记是否有效（数据库中是否存在）
   ///
@@ -29,7 +55,7 @@ class InvalidMarkupCleaner {
   /// 返回：true=有效，false=无效
   Future<bool> validateMediaMarkup(String mediaId, String mediaType) async {
     try {
-      final db = await _databaseService.database;
+      final db = await _database;
 
       // 根据媒体类型查询不同的表
       switch (mediaType) {
@@ -141,7 +167,12 @@ class InvalidMarkupCleaner {
         debugPrint('💾 章节内容已清理，正在更新数据库: $chapterUrl');
 
         // 3. 更新数据库
-        await _databaseService.updateChapterContent(chapterUrl, cleanedContent);
+        await (await _database).update(
+          'chapter_cache',
+          {'content': cleanedContent},
+          where: 'chapterUrl = ?',
+          whereArgs: [chapterUrl],
+        );
 
         debugPrint('✅ 数据库已更新');
       } else {

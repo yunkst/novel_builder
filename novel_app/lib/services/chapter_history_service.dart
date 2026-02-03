@@ -13,8 +13,8 @@ import '../core/di/api_service_provider.dart';
 ///
 /// 使用方式：
 /// ```dart
-/// // 使用默认依赖（推荐）
-/// final service = ChapterHistoryService.create();
+/// // 通过Provider获取（推荐）
+/// final service = ref.watch(chapterHistoryServiceProvider);
 ///
 /// // 或手动指定依赖
 /// final service = ChapterHistoryService(
@@ -32,14 +32,11 @@ class ChapterHistoryService {
   final DatabaseService _databaseService;
   final ApiServiceWrapper _apiService;
 
-  /// 使用默认依赖创建实例（推荐）
-  factory ChapterHistoryService.create() {
-    return ChapterHistoryService(
-      databaseService: DatabaseService(),
-      apiService: ApiServiceProvider.instance,
-    );
-  }
-
+  /// 创建 ChapterHistoryService 实例
+  ///
+  /// 参数:
+  /// - [databaseService] 数据库服务（必需）
+  /// - [apiService] API服务（必需）
   ChapterHistoryService({
     required DatabaseService databaseService,
     required ApiServiceWrapper apiService,

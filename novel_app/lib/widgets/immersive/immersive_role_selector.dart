@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/character.dart';
 import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
 import '../../utils/toast_utils.dart';
+import '../../core/providers/database_providers.dart';
+import '../../core/providers/services/cache_service_providers.dart';
 
 /// 沉浸体验角色选择器
 ///
@@ -72,8 +75,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   void initState() {
     super.initState();
     _selectedRoleIds = widget.initialSelection;
-    _imageCacheService = CharacterImageCacheService.instance;
-    _avatarService = CharacterAvatarService();
+    _imageCacheService = CharacterImageCacheService();
+    // _avatarService 将在 build 方法中懒加载
     _initializeServices();
   }
 
@@ -133,6 +136,13 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
 
   @override
   Widget build(BuildContext context) {
+    // 懒加载初始化服务
+    _avatarService ??= CharacterAvatarService(
+      databaseService: ProviderScope.containerOf(context)
+          .read(databaseServiceProvider),
+      cacheService: _imageCacheService,
+    );
+
     final theme = Theme.of(context);
 
     return Scaffold(

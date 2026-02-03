@@ -95,7 +95,7 @@ final characterCardServiceProvider =
 // ignore: unused_element
 typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
 String _$characterExtractionServiceHash() =>
-    r'0bcd5b3902fa1b6ffa5e6d880dca313b6cb11a77';
+    r'8cf110dffacc73842b7d72d5feca772d5460306e';
 
 /// CharacterExtractionService Provider
 ///
@@ -138,7 +138,7 @@ final characterExtractionServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CharacterExtractionServiceRef = ProviderRef<CharacterExtractionService>;
-String _$outlineServiceHash() => r'acf4a41da39f6680ca29292c9f25f4216ff08ae6';
+String _$outlineServiceHash() => r'186c050afb9c448b75294d8027c008a4452234a0';
 
 /// OutlineService Provider
 ///
@@ -181,5 +181,140 @@ final outlineServiceProvider = AutoDisposeProvider<OutlineService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef OutlineServiceRef = AutoDisposeProviderRef<OutlineService>;
+String _$chapterHistoryServiceHash() =>
+    r'66ef41a49026edbd339d3ccad50766a5371058b6';
+
+/// ChapterHistoryService Provider
+///
+/// 提供章节历史服务实例，用于获取历史章节内容（AI生成上下文）。
+///
+/// **功能**:
+/// - 获取历史章节内容
+/// - 统一历史章节加载逻辑
+/// - 支持缓存和API获取
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [apiServiceWrapperProvider] - API服务
+///
+/// **使用示例**:
+/// ```dart
+/// final historyService = ref.watch(chapterHistoryServiceProvider);
+/// final historyContent = await historyService.fetchHistoryChaptersContent(
+///   chapters: widget.chapters,
+///   currentChapter: widget.currentChapter,
+///   maxHistoryCount: 2,
+/// );
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 优先使用缓存，缓存未命中时从API获取
+///
+/// Copied from [chapterHistoryService].
+@ProviderFor(chapterHistoryService)
+final chapterHistoryServiceProvider =
+    AutoDisposeProvider<ChapterHistoryService>.internal(
+  chapterHistoryService,
+  name: r'chapterHistoryServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$chapterHistoryServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ChapterHistoryServiceRef
+    = AutoDisposeProviderRef<ChapterHistoryService>;
+String _$invalidMarkupCleanerHash() =>
+    r'f5c06bc5ccb81426ea3346245c96cdb7bbb41c43';
+
+/// InvalidMarkupCleaner Provider
+///
+/// 提供无效媒体标记清理服务实例，用于清理章节内容中的无效标记。
+///
+/// **功能**:
+/// - 检测无效媒体标记（插图、视频等）
+/// - 自动清理无效标记
+/// - 验证标记在数据库中是否存在
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+///
+/// **使用示例**:
+/// ```dart
+/// final cleaner = ref.watch(invalidMarkupCleanerProvider);
+/// final cleanedContent = await cleaner.cleanInvalidMarkups(chapterContent);
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每次使用时创建新实例
+/// - 清理失败时返回原内容，避免破坏章节内容
+///
+/// Copied from [invalidMarkupCleaner].
+@ProviderFor(invalidMarkupCleaner)
+final invalidMarkupCleanerProvider =
+    AutoDisposeProvider<InvalidMarkupCleaner>.internal(
+  invalidMarkupCleaner,
+  name: r'invalidMarkupCleanerProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$invalidMarkupCleanerHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef InvalidMarkupCleanerRef = AutoDisposeProviderRef<InvalidMarkupCleaner>;
+String _$ttsPlayerServiceHash() => r'9f6f64b9fe4afb3008eea37f2595faa96e676ac8';
+
+/// TtsPlayerService Provider
+///
+/// 提供TTS播放器服务实例，管理TTS播放状态、章节切换和进度保存。
+///
+/// **功能**:
+/// - TTS播放控制（播放、暂停、停止）
+/// - 章节切换和段落导航
+/// - 播放进度保存和恢复
+/// - 定时播放功能
+///
+/// **依赖**:
+/// - [databaseServiceProvider] - 数据库访问
+/// - [apiServiceWrapperProvider] - API服务
+///
+/// **使用示例**:
+/// ```dart
+/// final playerService = ref.watch(ttsPlayerServiceProvider);
+/// await playerService.initializeWithNovel(
+///   novel: novel,
+///   chapters: chapters,
+///   startChapter: startChapter,
+/// );
+/// await playerService.play();
+/// ```
+///
+/// **注意事项**:
+/// - 不使用 `keepAlive`，每个播放器实例独立
+/// - 需要正确调用 dispose() 释放资源
+/// - 播放器状态通过 ChangeNotifier 通知
+///
+/// Copied from [ttsPlayerService].
+@ProviderFor(ttsPlayerService)
+final ttsPlayerServiceProvider = AutoDisposeProvider<TtsPlayerService>.internal(
+  ttsPlayerService,
+  name: r'ttsPlayerServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$ttsPlayerServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TtsPlayerServiceRef = AutoDisposeProviderRef<TtsPlayerService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

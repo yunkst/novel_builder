@@ -207,7 +207,7 @@ class _CharacterManagementScreenState
       final rolesString = rolesList.join('、');
 
       // 提取并合并上下文
-      final extractionService = CharacterExtractionService();
+      final extractionService = ref.read(characterExtractionServiceProvider);
       final allContexts = <String>[];
 
       for (final item in selectedChapters) {

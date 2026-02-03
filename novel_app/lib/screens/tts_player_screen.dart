@@ -12,6 +12,7 @@ import '../widgets/tts_timer_settings_sheet.dart';
 import '../widgets/tts_timer_complete_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
+import '../core/providers/services/ai_service_providers.dart';
 
 /// TTS播放器全屏页面 - Riverpod 版本
 ///
@@ -44,11 +45,15 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
   void initState() {
     super.initState();
 
-    // 创建播放器服务
-    _playerService = TtsPlayerService();
-
     // 初始化播放器
     _initializePlayer();
+
+    // 监听定时完成事件将在 _initializePlayer 中设置
+  }
+
+  Future<void> _initializePlayer() async {
+    // 通过Provider创建播放器服务
+    _playerService = ref.read(ttsPlayerServiceProvider);
 
     // 监听定时完成事件
     _timerCompleteSubscription =
@@ -57,9 +62,7 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
         _showTimerCompleteDialog(config);
       }
     });
-  }
 
-  Future<void> _initializePlayer() async {
     final success = await _playerService.initializeWithNovel(
       novel: widget.novel,
       chapters: widget.chapters,

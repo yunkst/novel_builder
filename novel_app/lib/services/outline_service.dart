@@ -4,8 +4,25 @@ import 'database_service.dart';
 
 /// 大纲管理服务
 /// 负责大纲的业务逻辑和AI生成接口
+///
+/// 使用方式：
+/// ```dart
+/// // 通过Provider获取（推荐）
+/// final outlineService = ref.watch(outlineServiceProvider);
+///
+/// // 或手动创建实例
+/// final outlineService = OutlineService(databaseService: databaseService);
+/// ```
 class OutlineService {
-  final DatabaseService _db = DatabaseService();
+  final DatabaseService _db;
+
+  /// 创建 OutlineService 实例
+  ///
+  /// 参数:
+  /// - [databaseService] 数据库服务（必需）
+  OutlineService({
+    required DatabaseService databaseService,
+  }) : _db = databaseService;
 
   // ========== 大纲CRUD操作 ==========
 

@@ -66,13 +66,13 @@ class NovelContext {
 /// 负责从各种数据源收集并构建 NovelContext
 /// 消除多个Dialog中重复的数据获取逻辑
 class NovelContextBuilder {
-  final ChapterHistoryService _historyService;
+  final ChapterHistoryService? _historyService;
   final INovelRepository _novelRepository;
 
   NovelContextBuilder({
     ChapterHistoryService? historyService,
     required INovelRepository novelRepository,
-  })  : _historyService = historyService ?? ChapterHistoryService.create(),
+  })  : _historyService = historyService,
         _novelRepository = novelRepository;
 
   /// 构建小说上下文
@@ -89,18 +89,18 @@ class NovelContextBuilder {
     String currentContent, {
     int maxHistoryCount = 2,
   }) async {
-    // 并行获取历史章节内容和背景设定，提升性能
-    final results = await Future.wait([
-      _historyService.fetchHistoryChaptersContent(
-        chapters: chapters,
-        currentChapter: currentChapter,
-        maxHistoryCount: maxHistoryCount,
-      ),
-      _novelRepository.getBackgroundSetting(novel.url),
-    ]);
+    // 获取背景设定
+    final backgroundSetting =
+        await _novelRepository.getBackgroundSetting(novel.url) ?? '';
 
-    final historyContent = results[0] as String;
-    final backgroundSetting = results[1] ?? '';
+    // 获取历史章节内容（如果提供了 historyService）
+    final historyContent = _historyService != null
+        ? await _historyService!.fetchHistoryChaptersContent(
+            chapters: chapters,
+            currentChapter: currentChapter,
+            maxHistoryCount: maxHistoryCount,
+          )
+        : '';
 
     return NovelContext(
       backgroundSetting: backgroundSetting,
@@ -128,11 +128,14 @@ class NovelContextBuilder {
     String currentContent, {
     int maxHistoryCount = 2,
   }) async {
-    final historyContent = await _historyService.fetchHistoryChaptersContent(
-      chapters: chapters,
-      currentChapter: currentChapter,
-      maxHistoryCount: maxHistoryCount,
-    );
+    // 获取历史章节内容（如果提供了 historyService）
+    final historyContent = _historyService != null
+        ? await _historyService!.fetchHistoryChaptersContent(
+            chapters: chapters,
+            currentChapter: currentChapter,
+            maxHistoryCount: maxHistoryCount,
+          )
+        : '';
 
     final backgroundSetting =
         await _novelRepository.getBackgroundSetting(novelUrl) ?? '';
