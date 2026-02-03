@@ -6,7 +6,7 @@ part of 'network_service_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dioHash() => r'5fb0d093edec90a365c078b3b4c53aa2ceb0ece1';
+String _$dioHash() => r'e29c612f910d2ebaae7bae655d0da68d54468bf2';
 
 /// Dio Provider
 ///
@@ -49,7 +49,7 @@ final dioProvider = Provider<Dio>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DioRef = ProviderRef<Dio>;
-String _$apiServiceWrapperHash() => r'45715e468a5bb8cfd049e29ed2a4df08182a3bd7';
+String _$apiServiceWrapperHash() => r'7cb374d4a3a39b21c3cacbcbfa5b10f324077074';
 
 /// ApiServiceWrapper Provider
 ///
@@ -62,7 +62,7 @@ String _$apiServiceWrapperHash() => r'45715e468a5bb8cfd049e29ed2a4df08182a3bd7';
 /// - 支持 OpenAPI 生成的类型安全接口
 ///
 /// **依赖**:
-/// - [preferencesServiceProvider] - 用于读取 API 配置
+/// - [dioProvider] - HTTP 客户端
 ///
 /// **使用示例**:
 /// ```dart
@@ -72,9 +72,9 @@ String _$apiServiceWrapperHash() => r'45715e468a5bb8cfd049e29ed2a4df08182a3bd7';
 /// ```
 ///
 /// **注意事项**:
-/// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
+/// - 使用 `keepAlive: true` 确保实例不会被销毁
 /// - 需要先调用 `init()` 方法初始化
-/// - 内部已经是单例模式，Provider 提供统一访问方式
+/// - 通过依赖注入创建实例，便于测试
 ///
 /// Copied from [apiServiceWrapper].
 @ProviderFor(apiServiceWrapper)
@@ -91,7 +91,7 @@ final apiServiceWrapperProvider = Provider<ApiServiceWrapper>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ApiServiceWrapperRef = ProviderRef<ApiServiceWrapper>;
-String _$preloadServiceHash() => r'd1f5d5de6d5a99d1797ac6fc9d49e25cc708a7f9';
+String _$preloadServiceHash() => r'de5034b7741f37734cfb299923b88010b685931b';
 
 /// PreloadService Provider
 ///
@@ -104,7 +104,8 @@ String _$preloadServiceHash() => r'd1f5d5de6d5a99d1797ac6fc9d49e25cc708a7f9';
 /// - 任务队列管理
 ///
 /// **依赖**:
-/// - 无（独立服务）
+/// - [apiServiceWrapperProvider] - API 服务
+/// - [chapterRepositoryProvider] - 章节数据访问
 ///
 /// **使用示例**:
 /// ```dart
@@ -116,7 +117,12 @@ String _$preloadServiceHash() => r'd1f5d5de6d5a99d1797ac6fc9d49e25cc708a7f9';
 /// });
 ///
 /// // 开始预加载
-/// await preloadService.preloadNovel(novelUrl);
+/// await preloadService.enqueueTasks(
+///   novelUrl: novelUrl,
+///   novelTitle: novelTitle,
+///   chapterUrls: chapterUrls,
+///   currentIndex: currentIndex,
+/// );
 /// ```
 ///
 /// **注意事项**:

@@ -36,7 +36,6 @@ import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/database_service.dart';
-import '../services/preload_service.dart';
 import '../services/dify_service.dart';
 import '../services/novel_context_service.dart';
 import '../services/dialog_service.dart';
@@ -147,9 +146,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // ========== AI伴读自动触发防抖标志 ==========
   bool _hasAutoTriggered = false;
   bool _isAutoCompanionRunning = false;
-
-  // 预加载相关状态
-  final PreloadService _preloadService = PreloadService();
 
   // 注意：自动滚动相关的字段和方法已提取到 AutoScrollMixin
   // 注意：插图处理相关的方法已提取到 IllustrationHandlerMixin
@@ -331,8 +327,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       debugPrint('当前章节: ${_currentChapter.title}');
       debugPrint('总章节数: ${widget.chapters.length}');
 
-      // 使用PreloadService进行预加载
-      await _preloadService.enqueueTasks(
+      // 使用PreloadService进行预加载（通过Provider获取）
+      final preloadService = ref.read(preloadServiceProvider);
+      await preloadService.enqueueTasks(
         novelUrl: widget.novel.url,
         novelTitle: widget.novel.title,
         chapterUrls: chapterUrls,

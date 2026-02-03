@@ -5,11 +5,10 @@ import 'rate_limiter.dart';
 import 'preload_task.dart';
 import 'preload_progress_update.dart';
 import '../repositories/chapter_repository.dart';
-import '../core/database/database_connection.dart';
 import 'api_service_wrapper.dart';
 import 'logger_service.dart';
 
-/// 全局预加载服务（单例）
+/// 全局预加载服务
 ///
 /// 负责管理章节预加载任务队列，支持：
 /// - 智能插队：当前小说的章节插入队列开头
@@ -17,14 +16,12 @@ import 'logger_service.dart';
 /// - 串行执行：全局唯一执行点
 /// - 去重机制：自动过滤重复和已缓存章节
 /// - 内存队列：App关闭自动清空
+///
+/// 架构说明：
+/// - 使用依赖注入，通过 Riverpod Provider 管理
+/// - ApiServiceWrapper 和 ChapterRepository 通过构造函数注入
+/// - 不再使用单例模式，每次通过 Provider 获取实例
 class PreloadService {
-  // 单例模式
-  static final PreloadService _instance = PreloadService._internal();
-  factory PreloadService() => _instance;
-  PreloadService._internal() {
-    _initServices();
-  }
-
   // 核心组件
   final RateLimiter _rateLimiter = RateLimiter(interval: Duration(seconds: 30));
   final Deque<PreloadTask> _queue = Deque<PreloadTask>();
@@ -50,39 +47,23 @@ class PreloadService {
   int _totalProcessed = 0;
   int _totalFailed = 0;
 
-  // 服务依赖
-  late final ChapterRepository _chapterRepository;
-  ApiServiceWrapper? _apiService;
+  // 服务依赖（通过构造函数注入）
+  final ApiServiceWrapper _apiService;
+  final ChapterRepository _chapterRepository;
 
-  /// 设置API服务（依赖注入）
-  void setApiService(ApiServiceWrapper apiService) {
-    _apiService = apiService;
+  /// 构造函数
+  ///
+  /// 通过依赖注入接收 ApiServiceWrapper 和 ChapterRepository
+  PreloadService({
+    required ApiServiceWrapper apiService,
+    required ChapterRepository chapterRepository,
+  })  : _apiService = apiService,
+        _chapterRepository = chapterRepository {
+    _logInitialization();
   }
 
-  /// 确保API服务已初始化
-  void _ensureApiService() {
-    if (_apiService == null) {
-      throw Exception('ApiServiceWrapper 未设置，请先调用 setApiService()');
-    }
-  }
-
-  /// 初始化服务
-  ///
-  /// 优先级: P3 - 低（架构优化）
-  /// Issue: 迁移到Provider模式
-  ///
-  /// 当前实现: 通过setApiService手动注入
-  /// 目标实现:
-  /// 1. 使用ref.watch(apiServiceWrapperProvider)
-  /// 2. 移除setApiService方法
-  /// 3. 依赖注入由Riverpod管理
-  ///
-  /// 阻塞原因:
-  /// - 需要PreloadService也转换为Provider
-  /// - 涉及多个依赖服务的重构
-  void _initServices() {
-    _chapterRepository = ChapterRepository(dbConnection: DatabaseConnection());
-    // API服务将通过setApiService注入
+  /// 记录初始化日志
+  void _logInitialization() {
     LoggerService.instance.i(
       'PreloadService初始化完成',
       category: LogCategory.cache,
@@ -261,9 +242,8 @@ class PreloadService {
           // 标记正在预加载
           _chapterRepository.markAsPreloading(task.chapterUrl);
 
-          // 获取内容
-          _ensureApiService();
-          final content = await _apiService!.getChapterContent(task.chapterUrl);
+          // 获取内容（API服务已通过构造函数注入）
+          final content = await _apiService.getChapterContent(task.chapterUrl);
 
           // 保存到数据库
           final chapter = Chapter(

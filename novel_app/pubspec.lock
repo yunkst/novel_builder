@@ -410,14 +410,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  get_it:
-    dependency: "direct main"
-    description:
-      name: get_it
-      sha256: d85128a5dae4ea777324730dc65edd9c9f43155c109d5cc0a69cab74139fbac1
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "7.7.0"
   glob:
     dependency: transitive
     description:
@@ -623,14 +615,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "5.4.6"
-  nested:
-    dependency: transitive
-    description:
-      name: nested
-      sha256: "03bac4c528c64c95c722ec99280375a6f2fc708eec17c7b3f07253b626cd2a20"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.0.0"
   novel_api:
     dependency: "direct main"
     description:
@@ -814,14 +798,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "5.0.5"
-  provider:
-    dependency: "direct main"
-    description:
-      name: provider
-      sha256: "4e82183fa20e5ca25703ead7e05de9e4cceed1fbd1eadc1ac3cb6f565a09f272"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "6.1.5+1"
   pub_semver:
     dependency: transitive
     description:
