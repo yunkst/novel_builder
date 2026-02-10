@@ -220,4 +220,29 @@ ch1.txt
 
 # Logs (already defined above, keeping for reference)
 logs/
-dev-debug.log 
+dev-debug.log
+
+# 临时报告和文档（避免提交测试报告、修复报告等）
+*_report.md
+*_REPORT.md
+*_FIX_REPORT.md
+*_COMPLETION_REPORT.md
+*_ANALYSIS.md
+*_SUMMARY.md
+TEST_*.md
+baseline_analysis.txt
+test_failures_detailed.log
+
+# 临时测试脚本
+test_*.py
+replace_*.py
+upload_apk_now.py
+
+# 临时配置文件
+pubspec_fixed.yaml
+devtools_options.yaml
+openapi-config.yaml
+openapitools.json
+playwright.config.ts
+run-e2e-tests.bat
+test_debug.dart
