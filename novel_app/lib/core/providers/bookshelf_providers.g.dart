@@ -51,7 +51,7 @@ final preloadProgressProvider =
 typedef PreloadProgressRef
     = AutoDisposeStreamProviderRef<Map<String, Map<String, int>>>;
 String _$currentBookshelfIdHash() =>
-    r'ba133ca1b1dcb0f8bef2b6514697902a2d5f2e24';
+    r'69e605f13545e51eef895abca5dcce883765886f';
 
 /// 当前选中的书架ID
 ///

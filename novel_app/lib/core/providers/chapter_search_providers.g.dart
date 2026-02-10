@@ -26,7 +26,7 @@ final chaptersListProvider = AutoDisposeFutureProvider<List<Chapter>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChaptersListRef = AutoDisposeFutureProviderRef<List<Chapter>>;
-String _$searchResultsHash() => r'f3000ed1fd333865a943aaa9217123be7e98c75f';
+String _$searchResultsHash() => r'00dcc21f4e08805756bdd135648ad24cea111908';
 
 /// Search Results Provider
 ///
@@ -49,7 +49,7 @@ final searchResultsProvider =
 // ignore: unused_element
 typedef SearchResultsRef
     = AutoDisposeFutureProviderRef<List<ChapterSearchResult>>;
-String _$novelParamHash() => r'a0d85c3b5e57bdc3164e2d522222b094f902f3ef';
+String _$novelParamHash() => r'91e6ac33d7c09bfdfe8bd2df0ddba78552a327fd';
 
 /// Novel Parameter Provider
 ///
