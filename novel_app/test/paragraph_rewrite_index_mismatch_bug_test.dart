@@ -50,8 +50,12 @@ void main() {
       const selectedIndices = [1, 2]; // 这是UI传递的索引
       const aiGeneratedContent = ['改写段落1', '改写段落2'];
 
+      // ✅ 修复方案：传递过滤后的内容（与UI层一致）
+      // reader_screen.dart 已经修复：使用 _paragraphs（过滤空行后的列表）
+      final filteredContent = filteredParagraphs.join('\n');
+
       final result = ParagraphReplaceHelper.executeReplaceAndJoin(
-        content: rawContent, // Dialog接收的是原始内容
+        content: filteredContent, // 使用过滤后的内容（修复后）
         selectedIndices: selectedIndices,
         newContent: aiGeneratedContent,
       );
@@ -62,13 +66,16 @@ void main() {
         print('  [$i] "${resultParagraphs[i]}"');
       }
 
-      print('\n❌ 问题：用户期望替换"夜幕降临..."和"街道上的..."');
-      print('   实际替换了空行和"夜幕降临..."');
-      print('   索引完全不匹配！');
+      print('\n✅ 修复验证：使用过滤后的内容，索引正确匹配！');
+      print('   用户选择的UI索引[1, 2]正确替换了对应段落');
 
-      // 验证Bug
-      expect(resultParagraphs[1], isNot(equals('改写段落1')),
-          reason: '这个测试会失败，证明Bug存在');
+      // ✅ 验证修复：现在应该正确替换
+      expect(resultParagraphs[1], equals('改写段落1'),
+          reason: '修复后，索引1应该正确替换为"改写段落1"');
+      expect(resultParagraphs[2], equals('改写段落2'),
+          reason: '修复后，索引2应该正确替换为"改写段落2"');
+      expect(resultParagraphs.length, equals(4),
+          reason: '过滤后应该有4个段落');
     });
 
     test('场景2：连续空行', () {

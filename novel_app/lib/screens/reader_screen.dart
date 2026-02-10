@@ -127,21 +127,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   late ReaderInteractionController _interactionController;
 
   // ========== 便捷访问器（向后兼容） ==========
-  String get _content => _contentController.content;
+  // ⚠️ 注意：这些 getter 使用 ref.read()，不会触发 UI 重建
+  // 在 build() 方法中应该使用 ref.watch() 直接监听 Provider
   bool get _isLoading => _contentController.isLoading;
   String get _errorMessage => _contentController.errorMessage;
-
-  // ========== 特写模式便捷访问器 ==========
-  bool get _isCloseupMode => _interactionController.isCloseupMode;
-  set _isCloseupMode(bool value) =>
-      _interactionController.setCloseupMode(value);
-  List<int> get _selectedParagraphIndices =>
-      _interactionController.selectedParagraphIndices;
 
   // ========== 计算属性 ==========
   /// 段落列表（缓存分割结果，提升性能）
   List<String> get _paragraphs =>
-      _content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+      _contentController.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
   /// 当前章节索引（避免重复查找）
   int get _currentChapterIndex =>
@@ -212,7 +206,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       novel: widget.novel,
       chapter: _currentChapter,
       chapters: widget.chapters,
-      content: _content,
+      content: _contentController.content,
     );
   }
 
@@ -356,7 +350,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
 // ============ User Interaction Handlers ============
   void _handleLongPress(int index) {
-    if (!_interactionController.shouldHandleLongPress(_isCloseupMode)) return;
+    final interactionState = ref.read(interactionStateNotifierProvider);
+    if (!_interactionController.shouldHandleLongPress(interactionState.isCloseupMode)) return;
 
     final paragraphs = _paragraphs;
 
@@ -657,7 +652,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return;
     }
 
-    if (_content.isEmpty) {
+    if (_contentController.content.isEmpty) {
       ToastUtils.showWarning('章节内容为空，无法更新角色卡', context: context);
       return;
     }
@@ -671,7 +666,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       final service = ref.read(characterCardServiceProvider);
       final updatedCharacters = await service.previewCharacterUpdates(
         novel: widget.novel,
-        chapterContent: _content,
+        chapterContent: _contentController.content,
         onProgress: (message) {
           debugPrint(message); // 保留日志输出便于调试
         },
@@ -741,7 +736,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 检查章节内容
-    if (_content.isEmpty) {
+    if (_contentController.content.isEmpty) {
       debugPrint('章节内容为空，跳过AI伴读');
       return;
     }
@@ -769,7 +764,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   // AI伴读功能
   Future<void> _handleAICompanion() async {
-    if (_content.isEmpty) {
+    if (_contentController.content.isEmpty) {
       _dialogService.showWarning('章节内容为空，无法进行AI伴读', context: context);
       return;
     }
@@ -786,7 +781,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         novel: widget.novel,
         chapter: _currentChapter,
         chapters: widget.chapters,
-        content: _content,
+        content: _contentController.content,
       );
 
       // 调用 Notifier 的业务逻辑方法
@@ -849,7 +844,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       // 筛选当前章节出现的角色
       final chapterCharacters = await _filterCharactersInChapter(
         allCharacters,
-        _content,
+        _contentController.content,
       );
 
       // 获取这些角色的关系
@@ -870,7 +865,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
       // 调用DifyService
       final response = await _difyService.generateAICompanion(
-        chaptersContent: _content,
+        chaptersContent: _contentController.content,
         backgroundSetting: backgroundSetting,
         characters: chapterCharacters,
         relationships: chapterRelationships,
@@ -1119,7 +1114,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   /// 显示段落改写对话框
   Future<void> _showParagraphRewriteDialog() async {
-    if (_selectedParagraphIndices.isEmpty) {
+    final interactionState = ref.read(interactionStateNotifierProvider);
+    if (interactionState.selectedParagraphIndices.isEmpty) {
       ToastUtils.showWarning('请先选择要改写的段落', context: context);
       return;
     }
@@ -1137,14 +1133,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         chapters: widget.chapters,
         currentChapter: _currentChapter,
         content: filteredContent, // 使用过滤后的内容
-        selectedParagraphIndices: _selectedParagraphIndices,
-        onReplace: (newContent) {
+        selectedParagraphIndices: interactionState.selectedParagraphIndices,
+        onReplace: (newContent) async {
+          // 1. 立即更新 Provider（触发 UI 重建）
           setState(() {
-            // 新内容已经是过滤后的，直接设置即可
             _contentController.setContent(newContent);
             _interactionController.clearSelection();
-            _isCloseupMode = false;
+            _interactionController.setCloseupMode(false);
           });
+
+          // 2. 持久化到数据库（确保关闭后重新打开仍显示新内容）
+          try {
+            await _chapterRepo.updateChapterContent(
+              _currentChapter.url,
+              newContent,
+            );
+            debugPrint('✅ 替换内容已保存到数据库 - ${newContent.length}字符');
+          } catch (e) {
+            debugPrint('❌ 保存替换内容失败: $e');
+            // 即使保存失败，UI 已更新，用户可以看到新内容
+            // 但重新打开后会丢失更改
+            if (mounted) {
+              ToastUtils.showError(
+                '替换成功但保存失败：$e',
+                context: context,
+              );
+            }
+          }
         },
       ),
     );
@@ -1160,7 +1175,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         novel: widget.novel,
         chapters: widget.chapters,
         currentChapter: _currentChapter,
-        content: _content,
+        content: _contentController.content,
       ),
     );
   }
@@ -1183,7 +1198,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         novel: widget.novel,
         chapters: widget.chapters,
         currentChapter: _currentChapter,
-        content: _content,
+        content: _contentController.content,
         onContentReplace: (newContent) async {
           setState(() {
             _contentController.setContent(newContent);
@@ -1218,7 +1233,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ Content Editing ============
   Future<void> _saveEditedContent() async {
     try {
-      await _chapterRepo.updateChapterContent(_currentChapter.url, _content);
+      await _chapterRepo.updateChapterContent(_currentChapter.url, _contentController.content);
 
       if (mounted) {
         ToastUtils.showSuccess('章节内容已保存', context: context);
@@ -1246,7 +1261,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 使用 ref.watch 监听编辑模式状态
     final isEditMode = ref.watch(readerEditModeProvider);
 
-    // ⭐ 关键修复：监听章节内容状态变化，确保UI在内容加载完成后重建
+    // ⭐ 关键修复：监听交互状态变化（特写模式、段落选择），确保UI在状态变化时重建
+    final interactionState = ref.watch(interactionStateNotifierProvider);
+
+    // ⭐ 关键修复：监听章节内容状态，确保内容加载后UI重建（修复空白页面问题）
     final contentState = ref.watch(chapterContentStateNotifierProvider);
 
     // 监听 ReaderScreenNotifier 状态，处理对话框显示
@@ -1266,7 +1284,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       },
     );
 
-    final paragraphs = _paragraphs;
+    // ⭐ 关键修复：直接使用 contentState.content，而不是 _content getter
+    // _content getter 内部使用 ref.read()，不会触发 UI 重建
+    // 这里已经通过 ref.watch(chapterContentStateNotifierProvider) 建立了响应式依赖
+    final content = contentState.content;
+    final paragraphs = content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
     // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
     return Scaffold(
@@ -1287,12 +1309,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         onShowImmersiveSetup: _showImmersiveSetup,
         onMenuAction: _handleMenuAction,
       ),
-      body: _buildBody(context, isEditMode, paragraphs),
-      floatingActionButton: _content.isEmpty
+      body: _buildBody(context, isEditMode, paragraphs, interactionState),
+      floatingActionButton: _contentController.content.isEmpty
           ? null
           : ReaderActionButtons(
-              isCloseupMode: _isCloseupMode,
-              hasSelectedParagraphs: _selectedParagraphIndices.isNotEmpty,
+              isCloseupMode: interactionState.isCloseupMode,
+              hasSelectedParagraphs: interactionState.selectedParagraphIndices.isNotEmpty,
               isAutoScrolling: isAutoScrolling, // Mixin getter
               isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
               onRewritePressed: () {
@@ -1309,6 +1331,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BuildContext context,
     bool isEditMode,
     List<String> paragraphs,
+    InteractionState interactionState,
   ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -1322,7 +1345,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 新增：检查内容是否为空（修复空白页面问题）
-    if (!_isLoading && _content.trim().isEmpty && paragraphs.isEmpty) {
+    if (!_isLoading && _contentController.content.trim().isEmpty && paragraphs.isEmpty) {
       return ReaderErrorView(
         errorMessage: '章节内容为空，请尝试刷新或联系开发者',
         onRetry: () => _loadChapterContent(
@@ -1342,25 +1365,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         // 主要内容区域
         ReaderContentView(
           paragraphs: paragraphs,
-          selectedParagraphIndices: _selectedParagraphIndices,
+          selectedParagraphIndices: interactionState.selectedParagraphIndices,
           fontSize: _fontSize ?? 18.0,
-          isCloseupMode: _isCloseupMode,
+          isCloseupMode: interactionState.isCloseupMode,
           isEditMode: isEditMode,
           isAutoScrolling: isAutoScrolling,
           onParagraphTap: _handleParagraphTap,
           onParagraphLongPress: _handleLongPress,
           onContentChanged: (index, newContent) {
-            final updatedParagraphs = List<String>.from(paragraphs);
-            if (index >= 0 && index < paragraphs.length) {
-              updatedParagraphs[index] = newContent;
-            }
+            // 仅支持全文编辑模式（index=-1）
+            assert(index == -1, '只支持全文编辑模式，段落编辑模式已废弃');
             // 使用 addPostFrameCallback 避免在构建阶段调用 setState
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _contentController.setContent(updatedParagraphs.join('\n'));
-                });
-              }
+              if (!mounted) return;
+              setState(() {
+                _contentController.setContent(newContent);
+              });
             });
           },
           onImageTap: (taskId, imageUrl, imageIndex) =>
@@ -1451,7 +1471,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       // 显示配置对话框
       final config = await ImmersiveSetupDialog.show(
         context,
-        chapterContent: _content,
+        chapterContent: _contentController.content,
         allCharacters: allCharacters,
       );
 
@@ -1466,7 +1486,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           builder: (context) => ImmersiveInitScreen(
             novel: widget.novel,
             chapter: _currentChapter,
-            chapterContent: _content,
+            chapterContent: _contentController.content,
             config: config,
           ),
         ),
@@ -1519,7 +1539,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           novel: widget.novel,
           chapters: widget.chapters,
           startChapter: _currentChapter,
-          startContent: _content,
+          startContent: _contentController.content,
           startParagraphIndex: startParagraphIndex,
         ),
       ),

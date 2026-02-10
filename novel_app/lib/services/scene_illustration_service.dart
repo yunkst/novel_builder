@@ -29,20 +29,23 @@ class SceneIllustrationService {
     String? modelName,
     required String insertionPosition, // 'before' | 'after' | 'replace'
     required int paragraphIndex, // 段落索引，用于直接定位
+    bool skipMarkupInsertion = false, // 调试模式：跳过章节内容修改
   }) async {
     try {
       // 1. 预生成 taskId
       final taskId = SceneIllustration.generateTaskId();
 
-      // 2. 先在章节内容中插入插图标记
-      await _insertIllustrationMarkup(
-        novelUrl: novelUrl,
-        chapterId: chapterId,
-        taskId: taskId,
-        paragraphText: paragraphText,
-        insertionPosition: insertionPosition,
-        paragraphIndex: paragraphIndex, // 传递段落索引
-      );
+      // 2. 先在章节内容中插入插图标记（调试模式下可跳过）
+      if (!skipMarkupInsertion) {
+        await _insertIllustrationMarkup(
+          novelUrl: novelUrl,
+          chapterId: chapterId,
+          taskId: taskId,
+          paragraphText: paragraphText,
+          insertionPosition: insertionPosition,
+          paragraphIndex: paragraphIndex, // 传递段落索引
+        );
+      }
 
       // 3. 创建本地记录
       final illustration = SceneIllustration(

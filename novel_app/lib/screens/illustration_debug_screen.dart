@@ -300,7 +300,7 @@ class _IllustrationDebugScreenState
       // 创建空的角色列表，调试模式下不需要角色信息
       final List<RoleInfo> emptyRoles = [];
 
-      // 调用SceneIllustrationService的API，这会自动保存到数据库
+      // 调用SceneIllustrationService的API，调试模式跳过章节内容修改
       await sceneIllustrationService.createSceneIllustrationWithMarkup(
         novelUrl: 'debug_novel_url', // 调试用的小说URL
         chapterId: 'debug_chapter_id', // 调试用的章节ID
@@ -310,6 +310,7 @@ class _IllustrationDebugScreenState
         modelName: modelName, // 生图模型
         insertionPosition: 'after', // 插入位置
         paragraphIndex: 0, // 段落索引
+        skipMarkupInsertion: true, // 🔧 调试模式：跳过章节内容修改
       );
 
       // 刷新列表以显示新创建的任务

@@ -37,33 +37,56 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
     // 设置 Novel 参数
     ref.read(novelParamProvider.notifier).setNovel(widget.novel);
 
-    // 监听搜索框输入
-    _searchController.addListener(_onSearchChanged);
+    // 移除自动搜索监听器 - 改为仅在用户按回车时搜索
+    // _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    // 实时更新搜索查询
-    ref.read(searchQueryProvider.notifier).update(_searchController.text);
-  }
+  // _onSearchChanged已移除 - 不再需要实时搜索
 
   Future<void> _performSearch(String keyword) async {
     if (keyword.trim().isEmpty) {
+      LoggerService.instance.i(
+        '搜索关键词为空，清除搜索状态',
+        category: LogCategory.ui,
+        tags: ['search', 'chapter', 'clear'],
+      );
+      ref.read(searchQueryProvider.notifier).clear();
       ref.read(searchStateProvider.notifier).reset();
       return;
     }
 
-    ref.read(searchStateProvider.notifier).setIsLoading(true);
+    LoggerService.instance.i(
+      '开始章节搜索: "$keyword"',
+      category: LogCategory.ui,
+      tags: ['search', 'chapter', 'start'],
+    );
+
+    // 更新searchQueryProvider以触发searchResultsProvider执行搜索
+    // isLoading状态由build方法中的ref.listen自动管理
+    ref.read(searchQueryProvider.notifier).update(keyword);
     ref.read(searchStateProvider.notifier).setHasSearched(true);
+    ref.read(searchStateProvider.notifier).setIsLoading(true);
+
+    LoggerService.instance.d(
+      '搜索状态已更新: isLoading=true, hasSearched=true',
+      category: LogCategory.ui,
+      tags: ['search', 'state'],
+    );
   }
 
   void _clearSearch() {
+    LoggerService.instance.i(
+      '清除搜索',
+      category: LogCategory.ui,
+      tags: ['search', 'chapter', 'clear'],
+    );
+
     _searchController.clear();
     ref.read(searchQueryProvider.notifier).clear();
     ref.read(searchStateProvider.notifier).reset();
@@ -122,6 +145,41 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
 
     // 监听章节列表
     final chaptersAsync = ref.watch(chaptersListProvider);
+
+    // 当searchQuery更新且不为空时，自动开始搜索并设置loading
+    // 当searchResultsProvider完成时，自动清除loading
+    ref.listen<AsyncValue<List<ChapterSearchResult>>>(
+      searchResultsProvider,
+      (previous, next) {
+        // 如果搜索完成（无论是成功还是失败），都清除loading状态
+        if (searchState.isLoading) {
+          if (next.hasValue || next.hasError) {
+            LoggerService.instance.i(
+              '章节搜索完成，清除loading状态',
+              category: LogCategory.ui,
+              tags: ['search', 'chapter', 'complete'],
+            );
+
+            if (next.hasError) {
+              LoggerService.instance.e(
+                '章节搜索失败: ${next.error}',
+                stackTrace: next.stackTrace?.toString(),
+                category: LogCategory.ui,
+                tags: ['search', 'chapter', 'error'],
+              );
+            } else if (next.value != null) {
+              LoggerService.instance.i(
+                '章节搜索成功，找到 ${next.value!.length} 个结果',
+                category: LogCategory.ui,
+                tags: ['search', 'chapter', 'success'],
+              );
+            }
+
+            ref.read(searchStateProvider.notifier).setIsLoading(false);
+          }
+        }
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(

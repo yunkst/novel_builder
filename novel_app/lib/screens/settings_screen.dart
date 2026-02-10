@@ -9,7 +9,6 @@ import '../widgets/app_update_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/providers/service_providers.dart';
-import '../core/providers/services/network_service_providers.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../utils/format_utils.dart';

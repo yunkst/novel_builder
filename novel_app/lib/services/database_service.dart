@@ -898,7 +898,7 @@ class DatabaseService {
     final novel = Novel(
       title: title,
       author: author,
-      url: 'local://custom_novel_${DateTime.now().millisecondsSinceEpoch}',
+      url: 'custom://custom_novel_${DateTime.now().millisecondsSinceEpoch}',
       coverUrl: null,
       description: description,
       backgroundSetting: null,

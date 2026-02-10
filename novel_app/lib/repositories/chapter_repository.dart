@@ -641,7 +641,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
             novelAuthor: row['novelAuthor'] as String? ?? '未知作者',
             chapterUrl: row['chapterUrl'] as String,
             chapterTitle: row['chapterTitle'] as String,
-            chapterIndex: row['chapterIndex'] as int,
+            chapterIndex: row['chapterIndex'] as int? ?? -1,
             content: content,
             searchKeywords: [keyword],
             matchPositions: matchPositions,

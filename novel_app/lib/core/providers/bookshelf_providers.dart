@@ -24,14 +24,15 @@ class CurrentBookshelfId extends _$CurrentBookshelfId {
   @override
   int build() {
     // 异步加载已保存的书架ID
-    _loadSavedBookshelfId();
+    // 使用ref.read访问PreferencesService以支持测试
+    final prefsService = ref.watch(preferencesServiceProvider);
+    _loadSavedBookshelfId(prefsService);
     // 立即返回默认值，避免阻塞UI渲染
     return 1;
   }
 
   /// 从SharedPreferences加载保存的书架ID
-  Future<void> _loadSavedBookshelfId() async {
-    final prefsService = PreferencesService.instance;
+  Future<void> _loadSavedBookshelfId(PreferencesService prefsService) async {
     final savedId = await prefsService.getInt(_key, defaultValue: 1);
     // 更新状态为保存的值
     state = savedId;
@@ -40,8 +41,9 @@ class CurrentBookshelfId extends _$CurrentBookshelfId {
   /// 设置当前书架ID并持久化
   void setBookshelfId(int bookshelfId) {
     state = bookshelfId;
-    // 保存到SharedPreferences
-    PreferencesService.instance.setInt(_key, bookshelfId);
+    // 保存到SharedPreferences（使用Provider以支持测试）
+    final prefsService = ref.read(preferencesServiceProvider);
+    prefsService.setInt(_key, bookshelfId);
   }
 }
 

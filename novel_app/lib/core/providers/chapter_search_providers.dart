@@ -19,17 +19,15 @@ part 'chapter_search_providers.g.dart';
 /// 提供 ChapterSearchScreen 所需的 Novel 参数
 @riverpod
 class NovelParam extends _$NovelParam {
-  Novel? _novel;
-
-  Novel? get novel => _novel;
-
   void setNovel(Novel novel) {
-    _novel = novel;
+    // 修复: 必须更新state以触发Riverpod通知
+    state = novel;
   }
 
   @override
   Novel? build() {
-    return _novel;
+    // 初始状态为null，等待setNovel调用
+    return null;
   }
 }
 
@@ -88,8 +86,19 @@ Future<List<ChapterSearchResult>> searchResults(Ref ref) async {
   final query = ref.watch(searchQueryProvider);
 
   if (novelParam == null || query.trim().isEmpty) {
+    LoggerService.instance.d(
+      '搜索参数无效，返回空结果',
+      category: LogCategory.database,
+      tags: ['search', 'provider', 'empty'],
+    );
     return [];
   }
+
+  LoggerService.instance.i(
+    '开始执行搜索: "$query"',
+    category: LogCategory.database,
+    tags: ['search', 'provider', 'start'],
+  );
 
   final searchService = ref.watch(chapterSearchServiceProvider);
 
@@ -98,13 +107,20 @@ Future<List<ChapterSearchResult>> searchResults(Ref ref) async {
       novelParam.url,
       query.trim(),
     );
+
+    LoggerService.instance.i(
+      '搜索完成: 找到 ${results.length} 个结果',
+      category: LogCategory.database,
+      tags: ['search', 'provider', 'success'],
+    );
+
     return results;
   } catch (e, stackTrace) {
     LoggerService.instance.e(
-      '搜索章节失败',
+      '搜索章节失败: $e',
       stackTrace: stackTrace.toString(),
       category: LogCategory.database,
-      tags: ['chapter', 'search', 'failed'],
+      tags: ['search', 'provider', 'failed'],
     );
     rethrow;
   }
