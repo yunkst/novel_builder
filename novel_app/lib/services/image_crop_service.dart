@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path/path.dart' as path;
+import '../utils/format_utils.dart';
 
 /// 图片裁剪服务
 class ImageCropService {
@@ -145,22 +146,11 @@ class ImageCropService {
         'filePath': imageFile.path,
         'fileSize': fileSize,
         'lastModified': lastModified,
-        'fileSizeFormatted': _formatFileSize(fileSize),
+        'fileSizeFormatted': FormatUtils.formatFileSize(fileSize),
       };
     } catch (e) {
       debugPrint('$_serviceTag ❌ 获取图片信息失败: $e');
       return null;
-    }
-  }
-
-  /// 格式化文件大小
-  static String _formatFileSize(int bytes) {
-    if (bytes < 1024) {
-      return '$bytes B';
-    } else if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    } else {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
   }
 }

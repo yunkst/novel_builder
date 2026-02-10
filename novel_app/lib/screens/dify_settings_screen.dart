@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/toast_utils.dart';
 
-class DifySettingsScreen extends StatefulWidget {
+class DifySettingsScreen extends ConsumerWidget {
   const DifySettingsScreen({super.key});
 
   @override
-  State<DifySettingsScreen> createState() => _DifySettingsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DifySettingsContent();
+  }
 }
 
-class _DifySettingsScreenState extends State<DifySettingsScreen> {
+class DifySettingsContent extends StatefulWidget {
+  const DifySettingsContent({super.key});
+
+  @override
+  State<DifySettingsContent> createState() => _DifySettingsContentState();
+}
+
+class _DifySettingsContentState extends State<DifySettingsContent> {
   final _formKey = GlobalKey<FormState>();
   final _difyUrlController = TextEditingController();
   final _flowTokenController = TextEditingController();
@@ -95,9 +106,7 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
           int.tryParse(_maxHistoryLengthController.text) ?? 3000);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dify 设置已保存')),
-        );
+        ToastUtils.showSuccess('Dify 设置已保存');
         Navigator.pop(context);
       }
     }
@@ -108,6 +117,7 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dify 配置'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

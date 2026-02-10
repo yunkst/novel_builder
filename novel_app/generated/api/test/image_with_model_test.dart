@@ -17,6 +17,5 @@ void main() {
     test('to test the property `modelName`', () async {
       // TODO
     });
-
   });
 }

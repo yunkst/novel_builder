@@ -1,11 +1,28 @@
 import 'package:flutter/foundation.dart';
 import '../models/outline.dart';
-import 'database_service.dart';
+import '../core/interfaces/repositories/i_outline_repository.dart';
 
 /// 大纲管理服务
 /// 负责大纲的业务逻辑和AI生成接口
+///
+/// 使用方式：
+/// ```dart
+/// // 通过Provider获取（推荐）
+/// final outlineService = ref.watch(outlineServiceProvider);
+///
+/// // 或手动创建实例
+/// final outlineService = OutlineService(outlineRepo: outlineRepo);
+/// ```
 class OutlineService {
-  final DatabaseService _db = DatabaseService();
+  final IOutlineRepository _outlineRepo;
+
+  /// 创建 OutlineService 实例
+  ///
+  /// 参数:
+  /// - [outlineRepo] 大纲仓储接口（必需）
+  OutlineService({
+    required IOutlineRepository outlineRepo,
+  }) : _outlineRepo = outlineRepo;
 
   // ========== 大纲CRUD操作 ==========
 
@@ -22,18 +39,18 @@ class OutlineService {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await _db.saveOutline(outline);
+    await _outlineRepo.saveOutline(outline);
     debugPrint('✅ 大纲已保存: $title');
   }
 
   /// 获取小说的大纲
   Future<Outline?> getOutline(String novelUrl) async {
-    return await _db.getOutlineByNovelUrl(novelUrl);
+    return await _outlineRepo.getOutlineByNovelUrl(novelUrl);
   }
 
   /// 删除大纲
   Future<void> deleteOutline(String novelUrl) async {
-    await _db.deleteOutline(novelUrl);
+    await _outlineRepo.deleteOutline(novelUrl);
     debugPrint('🗑️ 大纲已删除: $novelUrl');
   }
 
@@ -43,7 +60,7 @@ class OutlineService {
     required String title,
     required String content,
   }) async {
-    await _db.updateOutlineContent(novelUrl, title, content);
+    await _outlineRepo.updateOutlineContent(novelUrl, title, content);
     debugPrint('✏️ 大纲已更新: $title');
   }
 
@@ -52,8 +69,17 @@ class OutlineService {
 
   /// AI生成章节细纲（保留供OutlineIntegrationHandler使用）
   ///
-  /// TODO: 集成Dify工作流
-  /// 当前实现：返回模拟数据
+  /// 优先级: P1 - 高
+  /// Issue: 需要集成Dify工作流以替代模拟数据
+  ///
+  /// 当前实现: 返回模拟数据
+  /// 目标实现:
+  /// 1. 使用DifyService.runWorkflowStreaming
+  /// 2. 传递细纲生成工作流ID
+  /// 3. 返回真实的AI生成内容
+  ///
+  /// 调用位置:
+  /// - OutlineIntegrationHandler.generateChapterOutline
   Future<ChapterOutlineDraft> generateChapterOutline({
     required String novelUrl,
     required String mainOutline,
@@ -110,8 +136,18 @@ class OutlineService {
 
   /// AI重新生成章节细纲（保留供OutlineIntegrationHandler使用）
   ///
-  /// TODO: 集成Dify工作流
-  /// 当前实现：返回模拟数据
+  /// 优先级: P1 - 高
+  /// Issue: 需要集成Dify工作流以替代模拟数据
+  ///
+  /// 当前实现: 返回模拟数据
+  /// 目标实现:
+  /// 1. 使用DifyService.runWorkflowStreaming
+  /// 2. 传递细纲生成工作流ID和反馈意见
+  /// 3. 返回基于反馈优化的AI生成内容
+  ///
+  /// 调用位置:
+  /// - OutlineIntegrationHandler.regenerateChapterOutline
+  /// - ChapterOutlineDialog (重新生成按钮)
   Future<ChapterOutlineDraft> regenerateChapterOutline({
     required String novelUrl,
     required String mainOutline,

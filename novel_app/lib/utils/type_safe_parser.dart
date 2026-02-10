@@ -69,9 +69,7 @@ class TypeSafeParser {
     if (value is! List) return null;
 
     try {
-      return value
-          .map((e) => converter?.call(e) ?? e as T)
-          .toList();
+      return value.map((e) => converter?.call(e) ?? e as T).toList();
     } catch (e) {
       debugPrint('⚠️ List<$T> 解析失败: $e');
       return null;

@@ -1,6 +1,24 @@
-/// 书架模型
+/// 书架模型（分类功能）
 ///
-/// 用于多书架管理功能，支持用户创建自定义书架对小说进行分类
+/// 重要：不要与数据库表混淆！
+///
+/// 正确的理解：
+/// - Bookshelf 类（本类）：表示书架分类，如"我的收藏"、"玄幻小说"
+/// - bookshelf 表：数据库物理表，存储的是小说数据（历史遗留命名）
+/// - novels 视图：bookshelf表的别名视图，提供更清晰的语义
+/// - bookshelves 表：数据库表，存储书架分类（复数形式）
+///
+/// 命名对照：
+/// Bookshelf 模型 = 书架分类功能（id, name, icon, color）
+/// bookshelf 表 = 存储小说元数据（命名不当）
+/// novels 视图 = bookshelf表的别名（语义清晰）
+/// bookshelves 表 = 存储书架分类（正确命名）
+/// novel_bookshelves 表 = 小说与书架的多对多关系
+///
+/// 推荐用法：
+/// getNovels() - 获取所有小说（语义清晰）
+/// getBookshelf() - 获取所有小说（命名有误导性）
+///
 class Bookshelf {
   /// 书架唯一ID
   final int id;
@@ -29,7 +47,7 @@ class Bookshelf {
   /// 用户创建的书架：isSystem=false，可以编辑和删除
   final bool isSystem;
 
-  Bookshelf({
+  const Bookshelf({
     required this.id,
     required this.name,
     required this.createdAt,

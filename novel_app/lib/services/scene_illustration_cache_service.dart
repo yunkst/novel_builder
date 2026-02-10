@@ -1,28 +1,42 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
-import '../core/di/api_service_provider.dart';
 import 'logger_service.dart';
 import 'api_service_wrapper.dart';
+import '../utils/cache_utils.dart';
+import '../utils/format_utils.dart';
 
 /// 场景插图缓存服务
 /// 参考RoleGalleryCacheService的实现模式
 class SceneIllustrationCacheService {
-  static final SceneIllustrationCacheService _instance =
-      SceneIllustrationCacheService._internal();
-  factory SceneIllustrationCacheService() => _instance;
-  SceneIllustrationCacheService._internal();
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [apiService] 可选的API服务实例，用于测试和依赖注入
+  SceneIllustrationCacheService({ApiServiceWrapper? apiService})
+      : _apiService = apiService;
+
+  ApiServiceWrapper? _apiService;
 
   Directory? _cacheDir;
   final Map<String, Uint8List> _memoryCache = {};
   final int _maxMemoryCacheSize = 30; // 场景插图内存缓存数量
   // final int _maxDiskCacheSizeMB = 100; // 场景插图磁盘缓存大小（MB） - 暂未使用
 
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
+  /// 设置API服务（依赖注入）
+  /// @deprecated 请使用构造函数注入
+  @Deprecated('请使用构造函数注入 ApiServiceWrapper')
+  void setApiService(ApiServiceWrapper apiService) {
+    _apiService = apiService;
+  }
+
+  /// 确保API服务已初始化
+  void _ensureApiService() {
+    if (_apiService == null) {
+      throw Exception('ApiServiceWrapper 未设置，请先调用 setApiService()');
+    }
+  }
 
   /// 初始化缓存服务
   Future<void> init() async {
@@ -68,8 +82,7 @@ class SceneIllustrationCacheService {
   /// 获取缓存文件路径
   String _getCacheFilePath(String filename) {
     _ensureInitialized();
-    // 使用MD5哈希作为文件名，避免特殊字符问题
-    final hash = md5.convert(utf8.encode(filename)).toString();
+    final hash = CacheUtils.generateHashFilename(filename);
     return '${_cacheDir!.path}/$hash.jpg';
   }
 
@@ -141,7 +154,8 @@ class SceneIllustrationCacheService {
     }
 
     // 否则构建后端URL
-    final host = await _apiService.getHost();
+    _ensureApiService();
+    final host = await _apiService!.getHost();
     if (host == null) {
       throw Exception('后端HOST未配置');
     }
@@ -368,7 +382,7 @@ class SceneIllustrationCacheService {
         'memoryCacheCount': _memoryCache.length,
         'diskCacheCount': fileCount,
         'diskCacheSize': totalSize,
-        'diskCacheSizeFormatted': _formatBytes(totalSize),
+        'diskCacheSizeFormatted': FormatUtils.formatFileSize(totalSize),
         'cacheDir': _cacheDir!.path,
       };
     } catch (e) {
@@ -379,15 +393,5 @@ class SceneIllustrationCacheService {
       );
       return {};
     }
-  }
-
-  /// 格式化字节数
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

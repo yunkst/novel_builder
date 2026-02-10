@@ -69,12 +69,9 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCount =
-        _selectedUpdates.where((selected) => selected).length;
-    final newCount =
-        widget.characterUpdates.where((u) => u.isNew).length;
-    final updateCount =
-        widget.characterUpdates.where((u) => u.isUpdate).length;
+    final selectedCount = _selectedUpdates.where((selected) => selected).length;
+    final newCount = widget.characterUpdates.where((u) => u.isNew).length;
+    final updateCount = widget.characterUpdates.where((u) => u.isUpdate).length;
 
     return Dialog(
       child: Container(
@@ -87,7 +84,8 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
             // 标题栏
             Row(
               children: [
-                const Icon(Icons.person, color: Colors.blue, size: 24),
+                Icon(Icons.person,
+                    color: Theme.of(context).colorScheme.primary, size: 24),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -102,9 +100,12 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
                       ),
                       Text(
                         '新增 $newCount 个, 更新 $updateCount 个',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFFB0B0B0), // 暗灰-适合暗黑模式
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -130,7 +131,12 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
                 Text(
                   '已选择: $selectedCount个',
                   style: TextStyle(
-                    color: selectedCount > 0 ? const Color(0xFF4CAF50) : const Color(0xFFB0B0B0), // 绿色/暗灰
+                    color: selectedCount > 0
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -141,12 +147,15 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
             // 角色列表
             Expanded(
               child: widget.characterUpdates.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'AI未生成任何角色',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                     )
@@ -182,8 +191,8 @@ class _CharacterPreviewDialogState extends State<CharacterPreviewDialog> {
                       Navigator.of(context).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
                     child: Text('保存选中的$selectedCount个角色'),
                   ),
@@ -216,7 +225,9 @@ class CharacterPreviewCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: isSelected ? 4 : 1,
-      color: isSelected ? Colors.blue.withValues(alpha: 0.1) : null,
+      color: isSelected
+          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+          : null,
       child: InkWell(
         onTap: onToggle,
         borderRadius: BorderRadius.circular(8),
@@ -252,26 +263,34 @@ class CharacterPreviewCard extends StatelessWidget {
                                     .titleMedium
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: isSelected ? Colors.blue : null,
+                                      color: isSelected
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                          : null,
                                     ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _buildStatusBadge(),
+                            _buildStatusBadge(context),
                             const SizedBox(width: 8),
                             if (character.gender != null)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF424242), // 深灰背景
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   character.gender!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFFE0E0E0), // 浅灰文字
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -281,14 +300,20 @@ class CharacterPreviewCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF3E2723), // 深棕背景
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   '${character.age}岁',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFFFFCC80), // 浅橙文字
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.87),
                                   ),
                                 ),
                               ),
@@ -300,9 +325,12 @@ class CharacterPreviewCard extends StatelessWidget {
                         if (character.occupation != null)
                           Text(
                             character.occupation!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              color: Color(0xFFB0BEC5), // 浅蓝灰
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                           ),
 
@@ -310,20 +338,21 @@ class CharacterPreviewCard extends StatelessWidget {
 
                         // 详细信息(仅显示新值)
                         _buildInfoSection(
+                            context,
                             '外貌特征',
                             [
-                              if (character.bodyType != null) character.bodyType!,
+                              if (character.bodyType != null)
+                                character.bodyType!,
                               if (character.appearanceFeatures != null)
                                 character.appearanceFeatures!,
                               if (character.clothingStyle != null)
                                 character.clothingStyle!,
-                            ]
-                                .where((text) => text.isNotEmpty)
-                                .toList()),
+                            ].where((text) => text.isNotEmpty).toList()),
 
                         const SizedBox(height: 4),
 
                         _buildInfoSection(
+                            context,
                             '性格特点',
                             [
                               if (character.personality != null)
@@ -333,6 +362,7 @@ class CharacterPreviewCard extends StatelessWidget {
                         const SizedBox(height: 4),
 
                         _buildInfoSection(
+                            context,
                             '背景故事',
                             [
                               if (character.backgroundStory != null)
@@ -347,19 +377,25 @@ class CharacterPreviewCard extends StatelessWidget {
               // 差异对比区(仅更新角色且有差异时显示)
               if (update.isUpdate && diffs.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Divider(color: Color(0xFF424242)), // 深灰分割线
+                Divider(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 ExpansionTile(
                   title: Text(
                     '查看变更 (${diffs.length}项)',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF64B5F6), // 浅蓝
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   childrenPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  children: diffs.map((diff) => _buildDiffField(diff)).toList(),
+                  children: diffs
+                      .map((diff) => _buildDiffField(context, diff))
+                      .toList(),
                 ),
               ],
             ],
@@ -369,40 +405,42 @@ class CharacterPreviewCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge() {
+  Widget _buildStatusBadge(BuildContext context) {
     if (update.isNew) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.green,
+          color: Theme.of(context).colorScheme.primary,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text(
+        child: Text(
           '新增',
-          style: TextStyle(color: Colors.white, fontSize: 12),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary, fontSize: 12),
         ),
       );
     } else {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.blue,
+          color: Theme.of(context).colorScheme.secondary,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text(
+        child: Text(
           '更新',
-          style: TextStyle(color: Colors.white, fontSize: 12),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSecondary, fontSize: 12),
         ),
       );
     }
   }
 
-  Widget _buildDiffField(FieldDiff diff) {
+  Widget _buildDiffField(BuildContext context, FieldDiff diff) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFF2C2C2C), // 深灰背景-适合暗黑模式
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -412,10 +450,10 @@ class CharacterPreviewCard extends StatelessWidget {
             width: 60,
             child: Text(
               '${diff.label}:',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFE0E0E0), // 浅灰文字
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -426,22 +464,26 @@ class CharacterPreviewCard extends StatelessWidget {
                 if (diff.oldValue != null) ...[
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         '旧: ',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFFFF9800), // 橙色
+                          color: Theme.of(context).colorScheme.error,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Expanded(
                         child: Text(
                           diff.oldValue!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF909090), // 中灰文字
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.5),
                             decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFFFF9800), // 橙色删除线
+                            decorationColor:
+                                Theme.of(context).colorScheme.error,
                           ),
                         ),
                       ),
@@ -452,20 +494,20 @@ class CharacterPreviewCard extends StatelessWidget {
                 if (diff.newValue != null)
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         '新: ',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF69F0AE), // 绿色
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Expanded(
                         child: Text(
                           diff.newValue!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF69F0AE), // 绿色粗体
+                            color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -473,13 +515,13 @@ class CharacterPreviewCard extends StatelessWidget {
                     ],
                   )
                 else
-                  const Row(
+                  Row(
                     children: [
                       Text(
                         '新: ',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFFEF5350), // 红色
+                          color: Theme.of(context).colorScheme.error,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -487,7 +529,7 @@ class CharacterPreviewCard extends StatelessWidget {
                         '已删除',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFFEF5350), // 红色粗体
+                          color: Theme.of(context).colorScheme.error,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -501,7 +543,8 @@ class CharacterPreviewCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoSection(String title, List<String> items) {
+  Widget _buildInfoSection(
+      BuildContext context, String title, List<String> items) {
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -509,10 +552,11 @@ class CharacterPreviewCard extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF9E9E9E), // 浅灰标题
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 2),
@@ -520,9 +564,9 @@ class CharacterPreviewCard extends StatelessWidget {
               padding: const EdgeInsets.only(left: 8, bottom: 2),
               child: Text(
                 item,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFFE0E0E0), // 浅灰文字
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             )),

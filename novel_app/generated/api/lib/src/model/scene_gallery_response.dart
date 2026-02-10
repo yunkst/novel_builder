@@ -15,11 +15,12 @@ part 'scene_gallery_response.g.dart';
 /// Properties:
 /// * [taskId] - 场面绘制任务ID
 /// * [images] - 图片列表（带模型信息）
-/// * [modelName] 
-/// * [modelWidth] 
-/// * [modelHeight] 
+/// * [modelName]
+/// * [modelWidth]
+/// * [modelHeight]
 @BuiltValue()
-abstract class SceneGalleryResponse implements Built<SceneGalleryResponse, SceneGalleryResponseBuilder> {
+abstract class SceneGalleryResponse
+    implements Built<SceneGalleryResponse, SceneGalleryResponseBuilder> {
   /// 场面绘制任务ID
   @BuiltValueField(wireName: r'task_id')
   String get taskId;
@@ -39,18 +40,24 @@ abstract class SceneGalleryResponse implements Built<SceneGalleryResponse, Scene
 
   SceneGalleryResponse._();
 
-  factory SceneGalleryResponse([void updates(SceneGalleryResponseBuilder b)]) = _$SceneGalleryResponse;
+  factory SceneGalleryResponse([void updates(SceneGalleryResponseBuilder b)]) =
+      _$SceneGalleryResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SceneGalleryResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<SceneGalleryResponse> get serializer => _$SceneGalleryResponseSerializer();
+  static Serializer<SceneGalleryResponse> get serializer =>
+      _$SceneGalleryResponseSerializer();
 }
 
-class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalleryResponse> {
+class _$SceneGalleryResponseSerializer
+    implements PrimitiveSerializer<SceneGalleryResponse> {
   @override
-  final Iterable<Type> types = const [SceneGalleryResponse, _$SceneGalleryResponse];
+  final Iterable<Type> types = const [
+    SceneGalleryResponse,
+    _$SceneGalleryResponse
+  ];
 
   @override
   final String wireName = r'SceneGalleryResponse';
@@ -99,7 +106,9 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
     SceneGalleryResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -124,7 +133,8 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
         case r'images':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltList, [FullType(ImageWithModel)]),
+            specifiedType:
+                const FullType(BuiltList, [FullType(ImageWithModel)]),
           ) as BuiltList<ImageWithModel>;
           result.images.replace(valueDes);
           break;
@@ -180,4 +190,3 @@ class _$SceneGalleryResponseSerializer implements PrimitiveSerializer<SceneGalle
     return result.build();
   }
 }
-

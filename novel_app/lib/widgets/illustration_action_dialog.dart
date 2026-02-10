@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/toast_utils.dart';
 
 /// 插图功能选择对话框
 /// 让用户选择【再来几张】或【生成视频】
@@ -65,8 +66,7 @@ class IllustrationActionDialog extends StatelessWidget {
               _PromptsDisplayCard(prompts: prompts!),
 
             // 如果没有提示词，添加间距，如果有则由_PromptsDisplayCard处理间距
-            if (prompts == null || prompts!.isEmpty)
-              const SizedBox(height: 20),
+            if (prompts == null || prompts!.isEmpty) const SizedBox(height: 20),
 
             // 功能选项
             Column(
@@ -183,7 +183,10 @@ class _ActionCard extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -246,12 +249,17 @@ class _PromptsDisplayCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // 提示词内容
-          SelectableText(
-            prompts,
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.grey[900],
-              height: 1.5,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                prompts,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -265,7 +273,8 @@ class _PromptsDisplayCard extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.brown,
                 backgroundColor: Colors.amber.withValues(alpha: 0.1),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
             ),
           ),
@@ -279,23 +288,11 @@ class _PromptsDisplayCard extends StatelessWidget {
     try {
       await Clipboard.setData(ClipboardData(text: text));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('提示词已复制到剪贴板'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('提示词已复制到剪贴板');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('复制失败: $e'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('复制失败: $e');
       }
     }
   }

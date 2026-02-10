@@ -70,7 +70,8 @@ class ParagraphReplaceHelper {
       final index = validIndices[i];
       if (index < updatedParagraphs.length) {
         final removedContent = updatedParagraphs.removeAt(index);
-        debugPrint('🗑️ 删除段落 $index: "${removedContent.substring(0, removedContent.length > 20 ? 20 : removedContent.length)}..."');
+        debugPrint(
+            '🗑️ 删除段落 $index: "${removedContent.substring(0, removedContent.length > 20 ? 20 : removedContent.length)}..."');
       }
     }
 
@@ -147,7 +148,8 @@ class ParagraphReplaceHelper {
     required List<int> selectedIndices,
   }) {
     // 检查是否有内容丢失（除了选中的段落）
-    final validIndices = filterValidIndices(selectedIndices, originalParagraphs.length);
+    final validIndices =
+        filterValidIndices(selectedIndices, originalParagraphs.length);
 
     // 计算应该保留的段落
     final expectedRetained = <String>[];

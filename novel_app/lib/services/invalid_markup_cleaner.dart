@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'database_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_illustration_repository.dart';
 import '../utils/media_markup_parser.dart';
 
 /// 无效媒体标记清理服务
@@ -8,17 +9,32 @@ import '../utils/media_markup_parser.dart';
 /// 1. 检测章节内容中的无效媒体标记（插图、视频等）
 /// 2. 自动清理无效标记
 /// 3. 验证标记在数据库中是否存在
+///
+/// 使用方式：
+/// ```dart
+/// // 通过Provider获取（推荐）
+/// final cleaner = ref.watch(invalidMarkupCleanerProvider);
+///
+/// // 或手动创建实例
+/// final cleaner = InvalidMarkupCleaner(
+///   chapterRepo: chapterRepo,
+///   illustrationRepo: illustrationRepo,
+/// );
+/// ```
 class InvalidMarkupCleaner {
-  static final InvalidMarkupCleaner _instance =
-      InvalidMarkupCleaner._internal();
+  final IChapterRepository _chapterRepo;
+  final IIllustrationRepository _illustrationRepo;
 
-  factory InvalidMarkupCleaner() {
-    return _instance;
-  }
-
-  InvalidMarkupCleaner._internal();
-
-  final DatabaseService _databaseService = DatabaseService();
+  /// 创建 InvalidMarkupCleaner 实例
+  ///
+  /// 参数:
+  /// - [chapterRepo] 章节数据仓库（必需）
+  /// - [illustrationRepo] 插图数据仓库（必需）
+  InvalidMarkupCleaner({
+    required IChapterRepository chapterRepo,
+    required IIllustrationRepository illustrationRepo,
+  })  : _chapterRepo = chapterRepo,
+        _illustrationRepo = illustrationRepo;
 
   /// 验证媒体标记是否有效（数据库中是否存在）
   ///
@@ -29,25 +45,30 @@ class InvalidMarkupCleaner {
   /// 返回：true=有效，false=无效
   Future<bool> validateMediaMarkup(String mediaId, String mediaType) async {
     try {
-      final db = await _databaseService.database;
-
       // 根据媒体类型查询不同的表
       switch (mediaType) {
         case '插图':
-          // 查询 scene_illustrations 表
-          final List<Map<String, dynamic>> maps = await db.query(
-            'scene_illustrations',
-            where: 'task_id = ?',
-            whereArgs: [mediaId],
-            limit: 1,
-          );
-          final isValid = maps.isNotEmpty;
+          // 使用插图仓库验证任务ID是否存在
+          final isValid = await _illustrationRepo.taskExists(mediaId);
           debugPrint('🔍 验证插图标记 [$mediaId]: ${isValid ? "✅ 有效" : "❌ 无效"}');
           return isValid;
 
         case '视频':
           // 查询视频相关的表（根据实际表名调整）
-          // TODO: 实现视频标记的验证逻辑
+          //
+          // 优先级: P2 - 中等
+          // Issue: 实现视频标记的验证逻辑
+          //
+          // 当前实现: 默认返回true以避免误删
+          // 目标实现:
+          // 1. 确定视频相关的数据库表名
+          // 2. 实现视频ID查询验证
+          // 3. 验证视频任务状态
+          //
+          // 注意事项:
+          // - 需要了解视频功能的表结构
+          // - 验证失败时应返回true避免误删
+          // - 参考插图验证的实现方式
           debugPrint('⚠️ 视频标记验证暂未实现: $mediaId');
           return true; // 暂时返回true，避免误删
 
@@ -141,7 +162,7 @@ class InvalidMarkupCleaner {
         debugPrint('💾 章节内容已清理，正在更新数据库: $chapterUrl');
 
         // 3. 更新数据库
-        await _databaseService.updateChapterContent(chapterUrl, cleanedContent);
+        await _chapterRepo.updateChapterContent(chapterUrl, cleanedContent);
 
         debugPrint('✅ 数据库已更新');
       } else {

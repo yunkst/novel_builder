@@ -2,10 +2,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import '../utils/format_utils.dart';
 
 /// 角色图片缓存管理器
 ///
 /// 负责管理角色图片的本地缓存，包括存储、检索和清理
+///
+/// 支持两种使用方式:
+/// 1. 单例模式: CharacterImageCacheService.instance (用于生产环境)
+/// 2. 依赖注入: CharacterImageCacheService() (用于测试环境)
 class CharacterImageCacheService {
   static CharacterImageCacheService? _instance;
   static CharacterImageCacheService get instance {
@@ -13,7 +18,13 @@ class CharacterImageCacheService {
     return _instance!;
   }
 
+  // 私有构造函数用于单例模式
   CharacterImageCacheService._();
+
+  // 公共工厂构造函数，支持依赖注入
+  factory CharacterImageCacheService() {
+    return CharacterImageCacheService._();
+  }
 
   late Directory _cacheDir;
   bool _initialized = false;
@@ -296,17 +307,7 @@ class CharacterImageCacheService {
       'totalSize': size,
       'fileCount': count,
       'cacheDir': _cacheDir.path,
-      'sizeFormatted': _formatBytes(size),
+      'sizeFormatted': FormatUtils.formatFileSize(size),
     };
-  }
-
-  /// 格式化字节数为可读格式
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

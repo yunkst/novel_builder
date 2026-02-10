@@ -11,9 +11,9 @@ part 'novel.g.dart';
 /// Novel metadata schema.
 ///
 /// Properties:
-/// * [title] 
-/// * [author] 
-/// * [url] 
+/// * [title]
+/// * [author]
+/// * [url]
 @BuiltValue()
 abstract class Novel implements Built<Novel, NovelBuilder> {
   @BuiltValueField(wireName: r'title')
@@ -71,7 +71,9 @@ class _$NovelSerializer implements PrimitiveSerializer<Novel> {
     Novel object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -135,4 +137,3 @@ class _$NovelSerializer implements PrimitiveSerializer<Novel> {
     return result.build();
   }
 }
-

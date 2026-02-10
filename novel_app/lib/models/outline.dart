@@ -8,7 +8,7 @@ class Outline {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  Outline({
+  const Outline({
     this.id,
     required this.novelUrl,
     required this.title,
@@ -74,7 +74,7 @@ class ChapterOutlineDraft {
   final String content;
   final List<String> keyPoints;
 
-  ChapterOutlineDraft({
+  const ChapterOutlineDraft({
     required this.title,
     required this.content,
     required this.keyPoints,

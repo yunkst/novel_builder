@@ -38,7 +38,8 @@ class TtsControlPanel extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -4),
           ),
@@ -56,12 +57,16 @@ class TtsControlPanel extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      const Icon(Icons.graphic_eq, size: 16, color: Colors.blue),
+                      const Icon(Icons.graphic_eq,
+                          size: 16, color: Color(0xFF2196F3)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: LinearProgressIndicator(
                           value: null, // 无限动画
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.1),
                           minHeight: 3,
                         ),
                       ),
@@ -142,7 +147,7 @@ class TtsControlPanel extends StatelessWidget {
             onPressed: onStop,
             icon: const Icon(Icons.stop_circle),
             iconSize: 40,
-            color: Colors.red,
+            color: Theme.of(context).colorScheme.error,
           ),
         ],
       );
@@ -162,7 +167,7 @@ class TtsControlPanel extends StatelessWidget {
               onPressed: onStop,
               icon: const Icon(Icons.stop_circle),
               iconSize: 40,
-              color: Colors.red,
+              color: Theme.of(context).colorScheme.error,
             ),
         ],
       );

@@ -178,9 +178,12 @@ enum TestStatus {
 
 /// 测试总结报告
 String generateTestReport() {
-  final passed = testScenarios.where((s) => s.status == TestStatus.passed).length;
-  final manual = testScenarios.where((s) => s.status == TestStatus.manual).length;
-  final integration = testScenarios.where((s) => s.status == TestStatus.integration).length;
+  final passed =
+      testScenarios.where((s) => s.status == TestStatus.passed).length;
+  final manual =
+      testScenarios.where((s) => s.status == TestStatus.manual).length;
+  final integration =
+      testScenarios.where((s) => s.status == TestStatus.integration).length;
 
   return '''
 # 角色关系功能测试报告

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../services/database_service.dart';
-import '../../services/chapter_history_service.dart';
 import '../../services/rewrite_service.dart';
-import '../../core/di/api_service_provider.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
 import '../../utils/paragraph_replace_helper.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
+import '../../utils/toast_utils.dart';
+import '../../core/providers/reader_screen_providers.dart';
 
 /// 段落改写对话框
 ///
@@ -19,7 +19,12 @@ import '../../widgets/streaming_content_display.dart';
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持选择多个段落进行改写
 /// - 支持替换原文或重新改写
-class ParagraphRewriteDialog extends StatefulWidget {
+///
+/// 重要说明：
+/// - 接收的 content 应该是过滤后的内容（不包含空行）
+/// - 接收的 selectedParagraphIndices 基于过滤后的内容
+/// - 这样确保索引与UI层保持一致
+class ParagraphRewriteDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
   final Chapter currentChapter;
@@ -38,15 +43,12 @@ class ParagraphRewriteDialog extends StatefulWidget {
   });
 
   @override
-  State<ParagraphRewriteDialog> createState() => _ParagraphRewriteDialogState();
+  ConsumerState<ParagraphRewriteDialog> createState() =>
+      _ParagraphRewriteDialogState();
 }
 
-class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
+class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
     with TickerProviderStateMixin, DifyStreamingMixin {
-  final ChapterHistoryService _historyService = ChapterHistoryService(
-    databaseService: DatabaseService(),
-    apiService: ApiServiceProvider.instance,
-  );
   final RewriteService _rewriteService = RewriteService();
 
   // 光标动画控制器
@@ -123,8 +125,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
   // 打开改写要求输入弹窗
   Future<void> _showRewriteRequirementDialog() async {
-    final paragraphs =
-        widget.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    // content 已经是过滤后的内容，直接使用
+    final paragraphs = widget.content.split('\n');
     final selectedText = _getSelectedText(paragraphs);
     if (selectedText.isEmpty) {
       Navigator.pop(context);
@@ -146,7 +148,10 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
                 '已选择 ${widget.selectedParagraphIndices.length} 个段落',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 12),
@@ -190,12 +195,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
   // 生成改写内容（流式）
   Future<void> _generateRewrite(String selectedText, String userInput) async {
     try {
-      // 使用 ChapterHistoryService 获取历史章节内容
-      final historyChaptersContent =
-          await _historyService.fetchHistoryChaptersContent(
-        chapters: widget.chapters,
-        currentChapter: widget.currentChapter,
-        maxHistoryCount: 2,
+      // 使用 Provider 获取 NovelContextBuilder
+      final contextBuilder = ref.read(novelContextBuilderProvider);
+
+      // 使用 NovelContextBuilder 统一获取上下文数据
+      final novelContext = await contextBuilder.buildContext(
+        widget.novel,
+        widget.chapters,
+        widget.currentChapter,
+        widget.content,
       );
 
       // 特写功能不使用角色选择
@@ -209,9 +217,9 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
       final inputs = _rewriteService.buildRewriteInputsWithHistory(
         selectedText: selectedText,
         userInput: userInput,
-        currentChapterContent: widget.content,
-        historyChaptersContent: historyChaptersContent,
-        backgroundSetting: widget.novel.backgroundSetting ?? '',
+        currentChapterContent: novelContext.currentChapterContent,
+        historyChaptersContent: novelContext.historyChaptersContent,
+        backgroundSetting: novelContext.backgroundSetting,
         aiWriterSetting: aiWriterSetting,
         rolesInfo: rolesInfo,
       );
@@ -231,13 +239,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     } catch (e) {
       debugPrint('❌ 准备改写内容时发生异常: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('操作失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showError('操作失败: $e');
       }
     }
   }
@@ -253,7 +255,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             width: 2,
             height: 16,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(1),
             ),
           ),
@@ -264,6 +266,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
   // 替换选中的段落（新逻辑：删除选中段落 + 插入AI生成内容）
   void _replaceSelectedParagraphs() {
+    // content 已经是过滤后的内容，直接使用
+    // 索引与UI层保持一致，不会出现不匹配问题
     final paragraphs = widget.content.split('\n');
     final rewrittenParagraphs = _rewriteResult.split('\n');
 
@@ -343,14 +347,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
     widget.onReplace(newContent);
     Navigator.pop(context); // 关闭改写对话框
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '已删除 ${indicesToDelete.length} 段，插入 ${contentToInsert.length} 段（章节长度: $originalLength → $newLength）'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ToastUtils.showSuccess(
+        '已删除 ${indicesToDelete.length} 段，插入 ${contentToInsert.length} 段（章节长度: $originalLength → $newLength）');
   }
 
   // 显示插图替换确认对话框（适配新逻辑：删除+插入）
@@ -389,8 +387,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                border: Border.all(color: Colors.orange.shade300),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.3),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(
@@ -413,8 +418,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                border: Border.all(color: Colors.blue.shade300),
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer
+                    .withValues(alpha: 0.3),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .secondary
+                        .withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -436,12 +448,7 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
               if (nonIllustrationIndices.isEmpty) {
                 // 如果全部都是插图，提示用户
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('所有选中的段落都是插图，已取消操作'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+                ToastUtils.showWarning('所有选中的段落都是插图，已取消操作');
                 return;
               }
 
@@ -460,8 +467,8 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
                   widget.selectedParagraphIndices, rewrittenParagraphs);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('删除插图并替换'),
           ),
@@ -487,11 +494,12 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
 
   Widget _buildRewriteResultView() {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.auto_awesome, color: Colors.blue),
-          SizedBox(width: 8),
-          Text('改写结果'),
+          Icon(Icons.auto_awesome,
+              color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          const Text('改写结果'),
         ],
       ),
       content: SizedBox(
@@ -503,8 +511,15 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             Container(
               constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
-                color: Colors.grey[800],
-                border: Border.all(color: Colors.grey[700]!),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.08),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.all(12),
@@ -537,12 +552,22 @@ class _ParagraphRewriteDialogState extends State<ParagraphRewriteDialog>
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '你可以选择替换原文、重新改写或关闭',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)),
                   ),
                 ),
               ],

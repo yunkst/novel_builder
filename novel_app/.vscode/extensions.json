@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "codecov.codecov-coverage",
+    "dbscode.vscode-coverage-gutters",
+    "ryanluker.vscode-coverage-gutters"
+  ]
+}

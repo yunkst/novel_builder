@@ -473,3 +473,18 @@ class AppVersionResponse(BaseModel):
     changelog: str | None = Field(None, description="更新日志")
     force_update: bool = Field(False, description="是否强制更新")
     created_at: str = Field(..., description="发布时间")
+
+
+# ============================================================================
+# 数据库备份相关API模式
+# ============================================================================
+
+
+class BackupUploadResponse(BaseModel):
+    """数据库备份上传响应模式."""
+
+    filename: str = Field(..., description="原始文件名")
+    stored_path: str = Field(..., description="存储路径")
+    file_size: int = Field(..., description="文件大小(字节)")
+    uploaded_at: str = Field(..., description="上传时间(ISO格式)")
+    stored_name: str = Field(..., description="存储文件名")

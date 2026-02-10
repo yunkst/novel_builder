@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:novel_api/novel_api.dart';
-import '../services/api_service_wrapper.dart';
+import '../core/providers/services/network_service_providers.dart';
 
 /// 统一的模型选择组件
 /// 支持从后端API动态获取模型列表并提供下拉选择功能
-class ModelSelector extends StatefulWidget {
+class ModelSelector extends ConsumerStatefulWidget {
   /// 当前选中的模型
   final String? selectedModel;
 
@@ -31,10 +32,10 @@ class ModelSelector extends StatefulWidget {
   });
 
   @override
-  State<ModelSelector> createState() => _ModelSelectorState();
+  ConsumerState<ModelSelector> createState() => _ModelSelectorState();
 }
 
-class _ModelSelectorState extends State<ModelSelector> {
+class _ModelSelectorState extends ConsumerState<ModelSelector> {
   late Future<List<WorkflowInfo>> _modelsFuture;
   String? _selectedModel;
 
@@ -58,7 +59,14 @@ class _ModelSelectorState extends State<ModelSelector> {
   /// 从后端API加载模型列表
   Future<List<WorkflowInfo>> _loadModels() async {
     try {
-      final apiService = ApiServiceWrapper();
+      // ✅ 使用Provider获取已初始化的ApiServiceWrapper实例
+      final apiService = ref.read(apiServiceWrapperProvider);
+
+      // 确保实例已初始化
+      if (!apiService.isInitialized) {
+        throw Exception('ApiServiceWrapper 尚未完成初始化，请稍后再试');
+      }
+
       final models = await apiService.getModels();
 
       // 根据 apiType 返回对应的模型列表
@@ -136,8 +144,12 @@ class _ModelSelectorState extends State<ModelSelector> {
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.warning_amber),
               helperText: '请检查后端连接',
-              helperStyle:
-                  TextStyle(color: Colors.orange.shade700, fontSize: 12),
+              helperStyle: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .tertiary
+                      .withValues(alpha: 0.7),
+                  fontSize: 12),
             ),
             items: const [],
             onChanged: null,
@@ -164,7 +176,12 @@ class _ModelSelectorState extends State<ModelSelector> {
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.model_training),
             filled: true,
-            fillColor: widget.enabled ? null : Colors.grey.shade100,
+            fillColor: widget.enabled
+                ? null
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.1),
           ),
           items: models.map((model) {
             return DropdownMenuItem<String>(
@@ -185,16 +202,26 @@ class _ModelSelectorState extends State<ModelSelector> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                                color: Colors.blue.shade200, width: 1),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.3),
+                                width: 1),
                           ),
                           child: Text(
                             '默认',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.blue.shade700,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.7),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -207,7 +234,10 @@ class _ModelSelectorState extends State<ModelSelector> {
                       '${model.width!} × ${model.height!}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
                       ),
                     ),
                 ],

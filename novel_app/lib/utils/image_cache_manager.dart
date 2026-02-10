@@ -1,8 +1,14 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service_wrapper.dart';
+import 'format_utils.dart';
 
 /// 图片缓存管理器
 /// 用于管理插图图片的缓存和生命周期，避免重复从后端加载
+///
+/// ## 架构说明
+/// - 缓存存储：静态字段（全局共享，所有实例共用同一缓存）
+/// - API 服务：实例字段（通过依赖注入，便于测试）
+/// - 使用方式：通过 Provider 获取实例
 class ImageCacheManager {
   /// 缓存存储：key 为图片 URL/filename，value 为图片二进制数据
   static final Map<String, Uint8List> _cache = {};
@@ -13,8 +19,8 @@ class ImageCacheManager {
   /// 正在加载中的图片请求（防止重复请求）
   static final Map<String, Future<Uint8List>> _loadingRequests = {};
 
-  /// API 服务包装器
-  static ApiServiceWrapper? _apiService;
+  /// API 服务包装器（实例字段，通过构造函数注入）
+  final ApiServiceWrapper _apiService;
 
   /// 最大缓存数量
   static const int _maxCacheSize = 50;
@@ -22,13 +28,15 @@ class ImageCacheManager {
   /// 最大单张图片大小（20MB）
   static const int _maxImageSize = 20 * 1024 * 1024;
 
-  /// 初始化 API 服务
-  static void _ensureApiService() {
-    _apiService ??= ApiServiceWrapper();
-  }
+  /// 构造函数 - 接收注入的 ApiServiceWrapper
+  ///
+  /// [apiService] API 服务实例（必需）
+  const ImageCacheManager({
+    required ApiServiceWrapper apiService,
+  }) : _apiService = apiService;
 
   /// 检查缓存是否有效
-  static bool _isCacheValid(String key) {
+  bool _isCacheValid(String key) {
     return _cache.containsKey(key) &&
         _cache[key] != null &&
         _cache[key]!.isNotEmpty;
@@ -53,21 +61,13 @@ class ImageCacheManager {
       final removed = _cache.remove(oldestKey);
       _cacheTime.remove(oldestKey);
       final size = removed?.length ?? 0;
-      debugPrint('🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${_formatBytes(size)}');
+      debugPrint(
+          '🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}');
     }
   }
 
-  /// 格式化字节大小
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
   /// 获取图片数据（带缓存）
-  static Future<Uint8List> getImage(String imageUrl) async {
-    _ensureApiService();
-
+  Future<Uint8List> getImage(String imageUrl) async {
     // 检查内存缓存
     if (_isCacheValid(imageUrl)) {
       // 更新访问时间（LRU）
@@ -96,11 +96,11 @@ class ImageCacheManager {
   }
 
   /// 从后端加载图片
-  static Future<Uint8List> _loadImageFromBackend(String imageUrl) async {
+  Future<Uint8List> _loadImageFromBackend(String imageUrl) async {
     try {
       debugPrint('📥 从后端加载图片: $imageUrl');
 
-      final data = await _apiService!.getImageProxy(imageUrl);
+      final data = await _apiService.getImageProxy(imageUrl);
 
       // 验证数据大小
       if (data.isEmpty) {
@@ -108,7 +108,7 @@ class ImageCacheManager {
       }
 
       if (data.length > _maxImageSize) {
-        debugPrint('⚠️ 图片过大，跳过缓存: ${_formatBytes(data.length)}');
+        debugPrint('⚠️ 图片过大，跳过缓存: ${FormatUtils.formatFileSize(data.length)}');
         return data;
       }
 
@@ -121,7 +121,8 @@ class ImageCacheManager {
       _cache[imageUrl] = data;
       _cacheTime[imageUrl] = DateTime.now();
 
-      debugPrint('✅ 图片已缓存: $imageUrl, 大小: ${_formatBytes(data.length)}, '
+      debugPrint(
+          '✅ 图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
           '缓存数量: ${_cache.length}/$_maxCacheSize');
 
       return data;
@@ -132,7 +133,7 @@ class ImageCacheManager {
   }
 
   /// 预加载图片（后台加载）
-  static Future<void> prefetchImage(String imageUrl) async {
+  Future<void> prefetchImage(String imageUrl) async {
     try {
       await getImage(imageUrl);
       debugPrint('🔄 预加载完成: $imageUrl');
@@ -142,7 +143,7 @@ class ImageCacheManager {
   }
 
   /// 批量预加载图片
-  static Future<void> prefetchImages(List<String> imageUrls) async {
+  Future<void> prefetchImages(List<String> imageUrls) async {
     debugPrint('🔄 开始批量预加载 ${imageUrls.length} 张图片');
     await Future.wait(
       imageUrls.map((url) => prefetchImage(url)),
@@ -164,22 +165,25 @@ class ImageCacheManager {
 
   /// 清除所有缓存
   static void clearAll() {
-    final totalSize = _cache.values.fold<int>(0, (sum, data) => sum + data.length);
+    final totalSize =
+        _cache.values.fold<int>(0, (sum, data) => sum + data.length);
     final count = _cache.length;
     _cache.clear();
     _cacheTime.clear();
     _loadingRequests.clear();
-    debugPrint('🗑️ 清除所有图片缓存: $count 张, 总大小: ${_formatBytes(totalSize)}');
+    debugPrint(
+        '🗑️ 清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}');
   }
 
   /// 获取缓存统计信息
   static Map<String, dynamic> getCacheInfo() {
-    final totalSize = _cache.values.fold<int>(0, (sum, data) => sum + data.length);
+    final totalSize =
+        _cache.values.fold<int>(0, (sum, data) => sum + data.length);
 
     return {
       'cachedCount': _cache.length,
       'maxCacheSize': _maxCacheSize,
-      'totalSize': _formatBytes(totalSize),
+      'totalSize': FormatUtils.formatFileSize(totalSize),
       'totalSizeBytes': totalSize,
       'loadingCount': _loadingRequests.length,
       'cachedUrls': _cache.keys.toList(),

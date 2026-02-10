@@ -12,9 +12,10 @@ part 'image_with_model.g.dart';
 ///
 /// Properties:
 /// * [url] - 图片URL
-/// * [modelName] 
+/// * [modelName]
 @BuiltValue()
-abstract class ImageWithModel implements Built<ImageWithModel, ImageWithModelBuilder> {
+abstract class ImageWithModel
+    implements Built<ImageWithModel, ImageWithModelBuilder> {
   /// 图片URL
   @BuiltValueField(wireName: r'url')
   String get url;
@@ -24,16 +25,19 @@ abstract class ImageWithModel implements Built<ImageWithModel, ImageWithModelBui
 
   ImageWithModel._();
 
-  factory ImageWithModel([void updates(ImageWithModelBuilder b)]) = _$ImageWithModel;
+  factory ImageWithModel([void updates(ImageWithModelBuilder b)]) =
+      _$ImageWithModel;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(ImageWithModelBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<ImageWithModel> get serializer => _$ImageWithModelSerializer();
+  static Serializer<ImageWithModel> get serializer =>
+      _$ImageWithModelSerializer();
 }
 
-class _$ImageWithModelSerializer implements PrimitiveSerializer<ImageWithModel> {
+class _$ImageWithModelSerializer
+    implements PrimitiveSerializer<ImageWithModel> {
   @override
   final Iterable<Type> types = const [ImageWithModel, _$ImageWithModel];
 
@@ -65,7 +69,9 @@ class _$ImageWithModelSerializer implements PrimitiveSerializer<ImageWithModel> 
     ImageWithModel object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -123,4 +129,3 @@ class _$ImageWithModelSerializer implements PrimitiveSerializer<ImageWithModel> 
     return result.build();
   }
 }
-

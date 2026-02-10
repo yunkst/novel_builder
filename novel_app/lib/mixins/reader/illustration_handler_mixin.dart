@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../services/api_service_wrapper.dart';
-import '../../services/database_service.dart';
+import '../../core/interfaces/repositories/i_chapter_repository.dart';
+import '../../core/interfaces/repositories/i_illustration_repository.dart';
 import '../../services/scene_illustration_service.dart';
+import '../../services/logger_service.dart';
+import '../../utils/error_helper.dart';
 import '../../widgets/illustration_action_dialog.dart';
 import '../../widgets/generate_more_dialog.dart';
 import '../../widgets/video_input_dialog.dart';
 import '../../utils/video_generation_state_manager.dart';
+import '../../utils/toast_utils.dart';
 
 /// 插图处理功能 Mixin
 ///
@@ -28,13 +32,13 @@ import '../../utils/video_generation_state_manager.dart';
 /// 需要子类提供的字段和方法：
 /// - `Novel get novel` - 小说信息
 /// - `Chapter get currentChapter` - 当前章节
-/// - `DatabaseService get databaseService` - 数据库服务
+/// - `IChapterRepository get chapterRepository` - 章节数据仓库
+/// - `IIllustrationRepository get illustrationRepository` - 插图数据仓库
 /// - `ApiServiceWrapper get apiService` - API 服务
 mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   // ========== 字段 ==========
 
-  final SceneIllustrationService _sceneIllustrationService =
-      SceneIllustrationService();
+  SceneIllustrationService? _sceneIllustrationService;
 
   // ========== 抽象访问器（子类必须实现）==========
 
@@ -44,11 +48,26 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
   /// 当前章节（子类提供）
   Chapter get currentChapter;
 
-  /// 数据库服务（子类提供）
-  DatabaseService get databaseService;
+  /// 章节数据仓库（子类提供）
+  IChapterRepository get chapterRepository;
+
+  /// 插图数据仓库（子类提供）
+  IIllustrationRepository get illustrationRepository;
 
   /// API 服务（子类提供）
   ApiServiceWrapper get apiService;
+
+  // ========== 私有方法 ==========
+
+  /// 获取SceneIllustrationService实例（延迟初始化）
+  SceneIllustrationService get _sceneIllustrationServiceInstance {
+    _sceneIllustrationService ??= SceneIllustrationService(
+      chapterRepository: chapterRepository,
+      illustrationRepository: illustrationRepository,
+      apiService: apiService,
+    );
+    return _sceneIllustrationService!;
+  }
 
   // ========== 公开方法 ==========
 
@@ -57,7 +76,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     try {
       // 根据 taskId 获取插图信息
       final illustrations =
-          await databaseService.getSceneIllustrationsByChapter(
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -69,9 +88,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
 
       if (illustration.images.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('图片正在生成中，请稍后查看')),
-          );
+          ToastUtils.showInfo('图片正在生成中，请稍后查看');
         }
         return;
       }
@@ -96,12 +113,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
 
       // 显示加载提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在创建视频生成任务...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        ToastUtils.showInfo('正在创建视频生成任务...');
       }
 
       // 调用API生成视频
@@ -112,20 +124,17 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showSuccess('视频生成任务已创建，任务ID: ${response.taskId}');
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成视频失败: $e')),
-        );
-      }
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '生成视频失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['video', 'generate', 'failed'],
+      );
     }
   }
 
@@ -135,7 +144,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     // 查询数据库获取插图信息（使用用户输入的场景描述）
     String? prompts;
     try {
-      final illustrations = await databaseService.getSceneIllustrationsByChapter(
+      final illustrations =
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -144,8 +154,13 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
         orElse: () => throw Exception('插图不存在'),
       );
       prompts = illustration.content;
-    } catch (e) {
-      debugPrint('获取插图信息失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '获取插图信息失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['illustration', 'info', 'failed'],
+      );
       prompts = null;
     }
 
@@ -209,20 +224,15 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       // 显示加载提示
       if (mounted) {
         debugPrint('📢 显示加载提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('正在生成 $count 张图片...'),
-            backgroundColor: Colors.blue,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        ToastUtils.showInfo('正在生成 $count 张图片...');
       }
 
       // 调用 API 生成图片
       debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
       debugPrint('ApiServiceWrapper 初始化状态检查...');
-      final apiService = ApiServiceWrapper();
-      debugPrint('✅ ApiServiceWrapper 实例已创建');
+      // ✅ 使用子类提供的 apiService 访问器，而不是创建新实例
+      final apiService = this.apiService;
+      debugPrint('✅ ApiServiceWrapper 实例已获取');
       debugPrint('初始化状态: ${apiService.getInitStatus()}');
 
       debugPrint('🔄 开始API调用...');
@@ -238,30 +248,17 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       // 显示成功提示（不刷新列表，按需求）
       if (mounted) {
         debugPrint('📢 显示成功提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('图片生成任务已创建，预计需要1-3分钟'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showSuccess('图片生成任务已创建，预计需要1-3分钟');
       }
     } catch (e, stackTrace) {
-      debugPrint('❌❌❌ regenerateMoreImages 异常 ❌❌❌');
-      debugPrint('异常类型: ${e.runtimeType}');
-      debugPrint('异常信息: $e');
-      debugPrint('堆栈跟踪:\n$stackTrace');
-
-      if (mounted) {
-        debugPrint('📢 显示错误提示');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成图片失败: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '生成图片失败',
+        stackTrace: stackTrace,
+        category: LogCategory.ai,
+        tags: ['illustration', 'regenerate', 'failed'],
+      );
     }
 
     debugPrint('=== regenerateMoreImages 结束 ===');
@@ -274,12 +271,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       // 检查图片是否正在生成视频
       if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('该图片正在生成视频，请稍后再试'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          ToastUtils.showWarning('该图片正在生成视频，请稍后再试');
         }
         return;
       }
@@ -305,12 +297,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
 
       // 显示加载提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在为选中图片创建视频生成任务...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        ToastUtils.showInfo('正在为选中图片创建视频生成任务...');
       }
 
       // 调用API生成视频
@@ -324,22 +311,14 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       setImageGeneratingStatus(imageUrl, false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showSuccess('视频生成任务已创建，任务ID: ${response.taskId}');
       }
     } catch (e) {
       // 清除生成状态
       setImageGeneratingStatus(imageUrl, false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成视频失败: $e')),
-        );
+        ToastUtils.showError('生成视频失败: $e');
       }
     }
   }
@@ -355,7 +334,7 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
     try {
       // 根据 taskId 获取插图信息
       final illustrations =
-          await databaseService.getSceneIllustrationsByChapter(
+          await illustrationRepository.getSceneIllustrationsByChapter(
         novel.url,
         currentChapter.url,
       );
@@ -390,35 +369,23 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
           : false;
 
       if (confirmed == true) {
-        final success =
-            await _sceneIllustrationService.deleteIllustration(illustration.id);
+        final success = await _sceneIllustrationServiceInstance
+            .deleteIllustration(illustration.id);
         if (success) {
           // 插图删除成功，内容会通过_illustrationsUpdatedCallback自动刷新
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('插图已删除'),
-                backgroundColor: Colors.green,
-              ),
-            );
+            ToastUtils.showSuccess('插图已删除');
           }
         } else {
           debugPrint('删除插图失败: 服务返回false');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('删除插图失败'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            ToastUtils.showError('删除插图失败');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除插图失败: $e')),
-        );
+        ToastUtils.showError('删除插图失败: $e');
       }
     }
   }

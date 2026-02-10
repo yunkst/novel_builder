@@ -14,7 +14,8 @@ part 'role_image_delete_request.g.dart';
 /// * [roleId] - 人物卡ID
 /// * [imgUrl] - 要删除的图片URL
 @BuiltValue()
-abstract class RoleImageDeleteRequest implements Built<RoleImageDeleteRequest, RoleImageDeleteRequestBuilder> {
+abstract class RoleImageDeleteRequest
+    implements Built<RoleImageDeleteRequest, RoleImageDeleteRequestBuilder> {
   /// 人物卡ID
   @BuiltValueField(wireName: r'role_id')
   String get roleId;
@@ -25,18 +26,25 @@ abstract class RoleImageDeleteRequest implements Built<RoleImageDeleteRequest, R
 
   RoleImageDeleteRequest._();
 
-  factory RoleImageDeleteRequest([void updates(RoleImageDeleteRequestBuilder b)]) = _$RoleImageDeleteRequest;
+  factory RoleImageDeleteRequest(
+          [void updates(RoleImageDeleteRequestBuilder b)]) =
+      _$RoleImageDeleteRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(RoleImageDeleteRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<RoleImageDeleteRequest> get serializer => _$RoleImageDeleteRequestSerializer();
+  static Serializer<RoleImageDeleteRequest> get serializer =>
+      _$RoleImageDeleteRequestSerializer();
 }
 
-class _$RoleImageDeleteRequestSerializer implements PrimitiveSerializer<RoleImageDeleteRequest> {
+class _$RoleImageDeleteRequestSerializer
+    implements PrimitiveSerializer<RoleImageDeleteRequest> {
   @override
-  final Iterable<Type> types = const [RoleImageDeleteRequest, _$RoleImageDeleteRequest];
+  final Iterable<Type> types = const [
+    RoleImageDeleteRequest,
+    _$RoleImageDeleteRequest
+  ];
 
   @override
   final String wireName = r'RoleImageDeleteRequest';
@@ -64,7 +72,9 @@ class _$RoleImageDeleteRequestSerializer implements PrimitiveSerializer<RoleImag
     RoleImageDeleteRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -121,4 +131,3 @@ class _$RoleImageDeleteRequestSerializer implements PrimitiveSerializer<RoleImag
     return result.build();
   }
 }
-

@@ -70,13 +70,13 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
               TextFormField(
                 controller: _promptController,
                 maxLines: 3,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(
+                style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(8)),
                   ),
                   filled: true,
-                  fillColor: Colors.black,
+                  fillColor: Theme.of(context).colorScheme.onSurface,
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -106,7 +106,12 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: DropdownButtonHideUnderline(
@@ -181,7 +186,7 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                     onPressed: _submitForm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.surface,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(

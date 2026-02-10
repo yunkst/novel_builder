@@ -8,7 +8,7 @@ class GalleryActionPanel extends StatefulWidget {
   final int currentIndex;
   final int totalCount;
   final VoidCallback? onDelete;
-  final Future<void> Function(int)? onGenerateMore;
+  final Future<void> Function(int, String?)? onGenerateMore;
   final VoidCallback? onSetAsAvatar;
 
   const GalleryActionPanel({
@@ -47,8 +47,7 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
             _isProcessing = true;
           });
 
-          // TODO: 需要更新回调以支持模型参数
-          widget.onGenerateMore?.call(count).then((_) {
+          widget.onGenerateMore?.call(count, modelName).then((_) {
             if (mounted) {
               setState(() {
                 _isProcessing = false;
@@ -82,7 +81,7 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.7),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             Colors.transparent,
           ],
         ),
@@ -104,8 +103,11 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: index == widget.currentIndex
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.4),
+                          ? Theme.of(context).colorScheme.surface
+                          : Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.4),
                     ),
                   ),
                 ),
@@ -202,7 +204,7 @@ class _ActionButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

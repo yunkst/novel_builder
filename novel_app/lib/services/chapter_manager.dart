@@ -13,8 +13,26 @@ import 'package:flutter/foundation.dart';
 /// 注意：预加载功能已迁移到 PreloadService
 class ChapterManager {
   /// 单例实例
-  static final ChapterManager _instance = ChapterManager._internal();
-  factory ChapterManager() => _instance;
+  static ChapterManager? _instance;
+  static ChapterManager get instance {
+    _instance ??= ChapterManager._internal();
+    return _instance!;
+  }
+
+  factory ChapterManager() => instance;
+
+  /// 测试模式标志(用于禁用定时器)
+  static bool _isTestMode = false;
+
+  /// 设置测试模式(必须在首次访问instance之前调用)
+  static void setTestMode(bool enabled) {
+    if (_instance != null) {
+      debugPrint('⚠️  ChapterManager: 实例已创建,无法更改测试模式');
+      return;
+    }
+    _isTestMode = enabled;
+  }
+
   ChapterManager._internal() {
     _initializeCleanupTimer();
   }
@@ -149,6 +167,12 @@ class ChapterManager {
 
   /// 初始化清理定时器
   void _initializeCleanupTimer() {
+    // 在测试模式中不启动定时器,避免"Pending timers"错误
+    if (_isTestMode) {
+      debugPrint('⚠️  ChapterManager: 测试模式中跳过定时器初始化');
+      return;
+    }
+
     _cleanupTimer = Timer.periodic(Duration(minutes: 1), (_) {
       cleanupExpiredStates();
     });

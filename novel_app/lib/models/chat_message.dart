@@ -1,5 +1,13 @@
 import 'character.dart';
 
+/// 用于copyWith方法的标记,表示保留原值
+class _Preserve {
+  const _Preserve();
+}
+
+/// 保留原值的标记常量
+const _preserve = _Preserve();
+
 /// 聊天消息模型
 class ChatMessage {
   /// 消息类型
@@ -70,30 +78,27 @@ class ChatMessage {
   }
 
   /// 复制消息并更新部分字段
+  ///
+  /// 对于nullable字段(character):
+  /// - 不传character参数: 保留原值
+  /// - 传null: 设置为null
+  /// - 传Character实例: 设置为新值
   ChatMessage copyWith({
     String? type,
     String? content,
-    Character? character,
+    Object? character = _preserve,
     bool? isUser,
     DateTime? timestamp,
   }) {
     return ChatMessage(
       type: type ?? this.type,
       content: content ?? this.content,
-      character: character ?? this.character,
+      character:
+          character == _preserve ? this.character : character as Character?,
       isUser: isUser ?? this.isUser,
       timestamp: timestamp ?? this.timestamp,
     );
   }
-
-  /// 判断消息是否为对话类型
-  bool get isDialogue => type == 'dialogue';
-
-  /// 判断消息是否为旁白类型
-  bool get isNarration => type == 'narration';
-
-  /// 判断消息是否为用户消息
-  bool get isUserMessage => isUser;
 
   @override
   String toString() {

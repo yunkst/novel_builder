@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 import 'dart:io';
 
 /// 自动化生成 API 客户端代码的脚本
@@ -19,7 +20,8 @@ Future<void> main() async {
 
   // 检测操作系统并选择正确的命令
   final isWindows = Platform.isWindows;
-  final generatorCmd = isWindows ? 'openapi-generator-cli.cmd' : 'openapi-generator-cli';
+  final generatorCmd =
+      isWindows ? 'openapi-generator-cli.cmd' : 'openapi-generator-cli';
 
   // 检查 openapi-generator-cli 是否安装
   stdout.writeln('📋 检查 openapi-generator-cli 是否已安装...');
@@ -34,7 +36,8 @@ Future<void> main() async {
   // 检查后端服务是否运行
   stdout.writeln('📋 检查后端服务 (localhost:3800) 是否运行...');
   try {
-    final socket = await Socket.connect('localhost', 3800, timeout: Duration(seconds: 3));
+    final socket =
+        await Socket.connect('localhost', 3800, timeout: Duration(seconds: 3));
     socket.destroy();
     stdout.writeln('✅ 后端服务运行正常\n');
   } catch (e) {
@@ -73,10 +76,12 @@ Future<void> main() async {
   // 步骤 2: 运行 flutter pub get 安装依赖
   stdout.writeln('📦 安装生成的依赖包...');
   try {
-    final pubGetResult = await Process.run('flutter', ['pub', 'get'], workingDirectory: 'generated/api');
+    final pubGetResult = await Process.run('flutter', ['pub', 'get'],
+        workingDirectory: 'generated/api');
     if (pubGetResult.exitCode != 0) {
       stdout.writeln('❌ pub get 失败，尝试使用 dart pub get...');
-      final dartPubGetResult = await Process.run('dart', ['pub', 'get'], workingDirectory: 'generated/api');
+      final dartPubGetResult = await Process.run('dart', ['pub', 'get'],
+          workingDirectory: 'generated/api');
       if (dartPubGetResult.exitCode != 0) {
         stdout.writeln('❌ dart pub get 也失败:');
         stdout.writeln(dartPubGetResult.stderr);
@@ -115,13 +120,13 @@ Future<void> main() async {
   // 验证 .g.dart 文件是否生成
   final modelDir = Directory('generated/api/lib/src/model');
   if (await modelDir.exists()) {
-    final dartFiles = await modelDir.list().where((entity) =>
-      entity is File && entity.path.endsWith('.dart')
-    ).toList();
+    final dartFiles = await modelDir
+        .list()
+        .where((entity) => entity is File && entity.path.endsWith('.dart'))
+        .toList();
 
-    final gFiles = dartFiles.where((file) =>
-      file.path.endsWith('.g.dart')
-    ).toList();
+    final gFiles =
+        dartFiles.where((file) => file.path.endsWith('.g.dart')).toList();
 
     stdout.writeln('📊 文件统计:');
     stdout.writeln('   - 模型文件: ${dartFiles.length - gFiles.length}');
@@ -137,5 +142,6 @@ Future<void> main() async {
   stdout.writeln('📝 下一步操作:');
   stdout.writeln('1. 查看生成的代码: generated/api/');
   stdout.writeln('2. 使用 ApiServiceWrapper 封装调用');
-  stdout.writeln('3. 如果需要，运行: flutter packages pub run build_runner build --delete-conflicting-outputs');
+  stdout.writeln(
+      '3. 如果需要，运行: flutter packages pub run build_runner build --delete-conflicting-outputs');
 }

@@ -64,7 +64,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                 title: '📖 本章总结',
                 icon: Icons.summarize,
                 isExpanded: _summeryExpanded,
-                onTap: () => setState(() => _summeryExpanded = !_summeryExpanded),
+                onTap: () =>
+                    setState(() => _summeryExpanded = !_summeryExpanded),
                 child: _buildTextContent(widget.response.summery),
               ),
 
@@ -76,8 +77,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                   title: '🌍 新增背景设定',
                   icon: Icons.landscape,
                   isExpanded: _backgroundExpanded,
-                  onTap: () =>
-                      setState(() => _backgroundExpanded = !_backgroundExpanded),
+                  onTap: () => setState(
+                      () => _backgroundExpanded = !_backgroundExpanded),
                   child: _buildTextContent(widget.response.background),
                 ),
 
@@ -90,13 +91,11 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                   title: '👥 角色更新 (${widget.response.roles.length})',
                   icon: Icons.people,
                   isExpanded: _rolesExpanded,
-                  onTap: () =>
-                      setState(() => _rolesExpanded = !_rolesExpanded),
+                  onTap: () => setState(() => _rolesExpanded = !_rolesExpanded),
                   child: _buildRolesList(),
                 ),
 
-              if (widget.response.roles.isNotEmpty)
-                const SizedBox(height: 12),
+              if (widget.response.roles.isNotEmpty) const SizedBox(height: 12),
 
               // 关系更新
               if (widget.response.relations.isNotEmpty)
@@ -161,9 +160,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                     ),
                   ),
                   Icon(
-                    isExpanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
                     size: 20,
                   ),
                 ],
@@ -212,7 +209,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             title: Row(
               children: [
                 const Icon(Icons.person, size: 20, color: Colors.blue),
@@ -228,8 +226,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                 ),
                 if (role.gender != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(4),
@@ -242,8 +240,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                 if (role.age != null)
                   Container(
                     margin: const EdgeInsets.only(left: 4),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.orange[100],
                       borderRadius: BorderRadius.circular(4),
@@ -265,7 +263,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                       _buildInfoRow('职业', role.occupation!),
                       const SizedBox(height: 8),
                     ],
-                    if (role.personality != null && role.personality!.isNotEmpty) ...[
+                    if (role.personality != null &&
+                        role.personality!.isNotEmpty) ...[
                       _buildInfoRow('性格', role.personality!),
                       const SizedBox(height: 8),
                     ],
@@ -273,15 +272,18 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                       _buildInfoRow('身材', role.bodyType!),
                       const SizedBox(height: 8),
                     ],
-                    if (role.clothingStyle != null && role.clothingStyle!.isNotEmpty) ...[
+                    if (role.clothingStyle != null &&
+                        role.clothingStyle!.isNotEmpty) ...[
                       _buildInfoRow('穿衣风格', role.clothingStyle!),
                       const SizedBox(height: 8),
                     ],
-                    if (role.appearanceFeatures != null && role.appearanceFeatures!.isNotEmpty) ...[
+                    if (role.appearanceFeatures != null &&
+                        role.appearanceFeatures!.isNotEmpty) ...[
                       _buildInfoRow('外貌特点', role.appearanceFeatures!),
                       const SizedBox(height: 8),
                     ],
-                    if (role.backgroundStory != null && role.backgroundStory!.isNotEmpty)
+                    if (role.backgroundStory != null &&
+                        role.backgroundStory!.isNotEmpty)
                       _buildInfoRow('背景经历', role.backgroundStory!),
                   ],
                 ),
@@ -344,7 +346,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
 
                 // 箭头和关系类型
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
@@ -362,7 +365,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward, size: 16, color: Colors.orange),
+                      const Icon(Icons.arrow_forward,
+                          size: 16, color: Colors.orange),
                     ],
                   ),
                 ),

@@ -174,18 +174,20 @@ ${i + 1}. ${char.name}
   static String toJsonArray(List<Character> characters) {
     if (characters.isEmpty) return '[]';
 
-    final jsonList = characters.map((c) => {
-      'name': c.name,
-      'gender': c.gender,
-      'age': c.age,
-      'occupation': c.occupation,
-      'personality': c.personality,
-      'bodyType': c.bodyType,
-      'clothingStyle': c.clothingStyle,
-      'appearanceFeatures': c.appearanceFeatures,
-      'backgroundStory': c.backgroundStory,
-      'aliases': c.aliases,
-    }).toList();
+    final jsonList = characters
+        .map((c) => {
+              'name': c.name,
+              'gender': c.gender,
+              'age': c.age,
+              'occupation': c.occupation,
+              'personality': c.personality,
+              'bodyType': c.bodyType,
+              'clothingStyle': c.clothingStyle,
+              'appearanceFeatures': c.appearanceFeatures,
+              'backgroundStory': c.backgroundStory,
+              'aliases': c.aliases,
+            })
+        .toList();
 
     return jsonEncode(jsonList);
   }

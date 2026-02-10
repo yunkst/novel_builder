@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'common/common_widgets.dart';
 
 /// Live图效果的循环视频播放器
 /// 5秒循环播放，无控制条，类似Live Photo效果
@@ -182,19 +183,19 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
                     color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.videocam,
                         size: 12,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                       ),
-                      SizedBox(width: 2),
+                      const SizedBox(width: 2),
                       Text(
                         'LIVE',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -207,10 +208,15 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
             // 加载指示器（缓冲时显示）
             if (_controller!.value.isBuffering)
               Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: const Center(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
+                child: Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.surface,
+                    ),
                     strokeWidth: 2,
                   ),
                 ),
@@ -235,27 +241,13 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       height: widget.height,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.shade200,
+          color:
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '加载视频中...',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+        child: const LoadingStateWidget(
+          message: '加载视频中...',
+          centered: true,
         ),
       ),
     );
@@ -267,51 +259,21 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       height: widget.height,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: Colors.red.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.red.shade200),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: Colors.red.shade400,
-                size: 24,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '视频加载失败',
-                style: TextStyle(
-                  color: Colors.red.shade600,
-                  fontSize: 12,
-                ),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(
-                    color: Colors.red.shade400,
-                    fontSize: 10,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                  _disposeController();
-                  _initializeVideo();
-                },
-                child: const Text(
-                  '重试',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
+          border: Border.all(
+            color: Colors.red.withValues(alpha: 0.2),
           ),
+        ),
+        child: ErrorStateWidget(
+          message: _errorMessage ?? '视频加载失败',
+          icon: Icons.error_outline,
+          onRetry: () {
+            _disposeController();
+            _initializeVideo();
+          },
+          retryText: '重试',
+          centered: true,
         ),
       ),
     );
@@ -377,7 +339,10 @@ class _LiveVideoPlayerWithThumbnailState
               width: widget.width,
               height: widget.height,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
@@ -387,7 +352,12 @@ class _LiveVideoPlayerWithThumbnailState
                           loadingProgress.expectedTotalBytes!
                       : null,
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             );
@@ -397,11 +367,20 @@ class _LiveVideoPlayerWithThumbnailState
               width: widget.width,
               height: widget.height,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Center(
-                child: Icon(Icons.error_outline, color: Colors.grey),
+              child: Center(
+                child: Icon(
+                  Icons.error_outline,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
+                ),
               ),
             );
           },

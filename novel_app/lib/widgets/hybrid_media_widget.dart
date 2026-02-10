@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:typed_data';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:video_player/video_player.dart';
@@ -6,6 +7,9 @@ import '../services/api_service_wrapper.dart';
 import '../utils/video_cache_manager.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
+import 'common/common_widgets.dart';
+import '../core/providers/services/network_service_providers.dart';
+import '../core/providers/services/cache_service_providers.dart';
 
 /// 媒体类型枚举
 enum MediaType {
@@ -17,7 +21,9 @@ enum MediaType {
 
 /// 混合媒体组件
 /// 智能显示图片或视频，支持Live Photo式循环播放
-class HybridMediaWidget extends StatefulWidget {
+///
+/// 使用 Riverpod 依赖注入获取 ApiServiceWrapper
+class HybridMediaWidget extends ConsumerStatefulWidget {
   final String imageUrl;
   final String imgName;
   final double? height;
@@ -40,10 +46,64 @@ class HybridMediaWidget extends StatefulWidget {
   });
 
   @override
-  State<HybridMediaWidget> createState() => _HybridMediaWidgetState();
+  ConsumerState<HybridMediaWidget> createState() => _HybridMediaWidgetState();
 }
 
-class _HybridMediaWidgetState extends State<HybridMediaWidget> {
+class _HybridMediaWidgetState extends ConsumerState<HybridMediaWidget> {
+  @override
+  Widget build(BuildContext context) {
+    // 从 Provider 获取 ApiServiceWrapper 和 ImageCacheManager
+    final apiService = ref.watch(apiServiceWrapperProvider);
+    final imageCacheManager = ref.watch(imageCacheManagerProvider);
+
+    // 传递给内层组件
+    return _HybridMediaWidgetContent(
+      apiService: apiService,
+      imageCacheManager: imageCacheManager,
+      imageUrl: widget.imageUrl,
+      imgName: widget.imgName,
+      height: widget.height,
+      width: widget.width,
+      overlay: widget.overlay,
+      fit: widget.fit,
+      borderRadius: widget.borderRadius,
+      showControls: widget.showControls,
+    );
+  }
+}
+
+/// 内层组件 - 负责实际的状态管理和UI渲染
+class _HybridMediaWidgetContent extends StatefulWidget {
+  final ApiServiceWrapper apiService;
+  final ImageCacheManager imageCacheManager;
+  final String imageUrl;
+  final String imgName;
+  final double? height;
+  final double? width;
+  final Widget? overlay;
+  final BoxFit fit;
+  final BorderRadius borderRadius;
+  final bool showControls;
+
+  const _HybridMediaWidgetContent({
+    required this.apiService,
+    required this.imageCacheManager,
+    required this.imageUrl,
+    required this.imgName,
+    this.height,
+    this.width,
+    this.overlay,
+    required this.fit,
+    required this.borderRadius,
+    required this.showControls,
+  });
+
+  @override
+  State<_HybridMediaWidgetContent> createState() =>
+      _HybridMediaWidgetContentState();
+}
+
+class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
   MediaType _mediaType = MediaType.loading;
   VideoPlayerController? _videoController;
   String? _videoUrl;
@@ -82,7 +142,7 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
   Future<void> _loadImageWithCache() async {
     try {
       debugPrint('📥 使用缓存加载图片: ${widget.imgName}');
-      final data = await ImageCacheManager.getImage(widget.imageUrl);
+      final data = await widget.imageCacheManager.getImage(widget.imageUrl);
       if (mounted) {
         setState(() {
           _imageData = data;
@@ -106,9 +166,10 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
 
     debugPrint('🔍 检查视频状态: ${widget.imgName}');
     try {
-      final apiService = ApiServiceWrapper();
+      final apiService = widget.apiService;
       final videoStatus = await apiService.checkVideoStatus(widget.imgName);
-      debugPrint('📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
+      debugPrint(
+          '📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
 
       if (videoStatus.hasVideo == true) {
         // 有视频，获取视频URL并准备播放
@@ -171,12 +232,14 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
       height: widget.height,
       width: widget.width,
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         borderRadius: widget.borderRadius,
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+        ),
       ),
-      child: const Center(
-        child: CircularProgressIndicator(),
+      child: const LoadingStateWidget(
+        centered: true,
       ),
     );
   }
@@ -187,19 +250,16 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
       height: widget.height,
       width: widget.width,
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: Colors.red.withValues(alpha: 0.05),
         borderRadius: widget.borderRadius,
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(height: 8),
-            Text('媒体加载失败', style: TextStyle(color: Colors.red)),
-          ],
+        border: Border.all(
+          color: Colors.red.withValues(alpha: 0.2),
         ),
+      ),
+      child: const ErrorStateWidget(
+        message: '媒体加载失败',
+        icon: Icons.error_outline,
+        centered: true,
       ),
     );
   }
@@ -271,22 +331,26 @@ class _HybridMediaWidgetState extends State<HybridMediaWidget> {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3),
                     borderRadius: widget.borderRadius,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.surface,
+                          ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           '正在生成视频...',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.surface,
                             fontSize: 14,
                           ),
                         ),

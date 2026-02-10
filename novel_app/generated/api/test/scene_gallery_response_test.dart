@@ -33,6 +33,5 @@ void main() {
     test('to test the property `modelHeight`', () async {
       // TODO
     });
-
   });
 }

@@ -69,7 +69,10 @@ class _TtsChapterSelectorState extends State<TtsChapterSelector> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -82,7 +85,8 @@ class _TtsChapterSelectorState extends State<TtsChapterSelector> {
                   children: [
                     const Text(
                       '选择章节',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
                     IconButton(
@@ -95,7 +99,8 @@ class _TtsChapterSelectorState extends State<TtsChapterSelector> {
 
               // 搜索框
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -130,7 +135,8 @@ class _TtsChapterSelectorState extends State<TtsChapterSelector> {
                       title: Text(
                         chapter.title,
                         style: TextStyle(
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isCurrent ? FontWeight.bold : FontWeight.normal,
                           color: isCurrent
                               ? Theme.of(context).colorScheme.primary
                               : null,

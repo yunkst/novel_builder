@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/character.dart';
 import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
+import '../../utils/toast_utils.dart';
+import '../../core/providers/database_providers.dart';
 
 /// 沉浸体验角色选择器
 ///
@@ -51,7 +54,7 @@ class ImmersiveRoleSelector extends StatefulWidget {
 class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   late Set<int> _selectedRoleIds;
   late CharacterImageCacheService _imageCacheService;
-  late CharacterAvatarService _avatarService;
+  CharacterAvatarService? _avatarService;
 
   // 缓存阴影样式
   final List<BoxShadow> _avatarShadow = [
@@ -71,8 +74,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   void initState() {
     super.initState();
     _selectedRoleIds = widget.initialSelection;
-    _imageCacheService = CharacterImageCacheService.instance;
-    _avatarService = CharacterAvatarService();
+    _imageCacheService = CharacterImageCacheService();
+    // _avatarService 将在 build 方法中懒加载
     _initializeServices();
   }
 
@@ -122,12 +125,7 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   /// 确认选择
   void _confirmSelection() {
     if (_selectedRoleIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个角色'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      ToastUtils.showWarning('请至少选择一个角色');
       return;
     }
 
@@ -137,6 +135,13 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
 
   @override
   Widget build(BuildContext context) {
+    // 懒加载初始化服务
+    _avatarService ??= CharacterAvatarService(
+      characterRepository:
+          ProviderScope.containerOf(context).read(characterRepositoryProvider),
+      cacheService: _imageCacheService,
+    );
+
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -192,19 +197,23 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.person_off,
-                            size: 64, color: Colors.grey.shade400),
+                            size: 64,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
                         Text(
                           '暂无角色',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.grey,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '请先在角色管理中创建角色',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -219,8 +228,8 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
               onPressed: _confirmSelection,
               icon: const Icon(Icons.check),
               label: Text('确认 (${_selectedRoleIds.length})'),
-              backgroundColor: Colors.purple,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
             )
           : null,
     );
@@ -285,16 +294,17 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   Widget _buildCharacterCard(Character character) {
     final isSelected =
         character.id != null && _selectedRoleIds.contains(character.id!);
+    final theme = Theme.of(context);
 
     return GestureDetector(
       onTap: () => _toggleRole(character),
       child: Card(
         elevation: isSelected ? 12 : 6,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: isSelected
-              ? BorderSide(color: Colors.purple, width: 2)
+              ? BorderSide(color: theme.colorScheme.primary, width: 2)
               : BorderSide.none,
         ),
         child: Stack(
@@ -307,7 +317,7 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                   flex: 3,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(12),
                       ),
@@ -337,9 +347,10 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                         if (character.occupation != null)
                           Text(
                             character.occupation!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -347,9 +358,10 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                         if (character.personality != null)
                           Text(
                             character.personality!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -367,13 +379,13 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                 right: 8,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.purple,
+                    color: theme.colorScheme.primary,
                     shape: BoxShape.circle,
                     boxShadow: _avatarShadow,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check,
-                    color: Colors.white,
+                    color: theme.colorScheme.onPrimary,
                     size: 20,
                   ),
                 ),
@@ -389,8 +401,12 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
     if (character.cachedImageUrl != null &&
         character.cachedImageUrl!.isNotEmpty) {
       // 显示缓存图片
+      if (_avatarService == null) {
+        return _buildPlaceholderAvatar(character);
+      }
+
       return FutureBuilder<String?>(
-        future: _avatarService.getCharacterAvatarPath(character.id!),
+        future: _avatarService!.getCharacterAvatarPath(character.id!),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data != null) {
             final avatarFile = File(snapshot.data!);
@@ -420,13 +436,15 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
 
   /// 构建占位符头像
   Widget _buildPlaceholderAvatar(Character character) {
+    final theme = Theme.of(context);
+
     return Container(
-      color: Colors.purple.withValues(alpha: 0.1),
+      color: theme.colorScheme.primary.withValues(alpha: 0.1),
       child: Center(
         child: Icon(
           Icons.person,
           size: 48,
-          color: Colors.purple.withValues(alpha: 0.5),
+          color: theme.colorScheme.primary.withValues(alpha: 0.5),
         ),
       ),
     );

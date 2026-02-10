@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'common/common_widgets.dart';
 
 /// TTS内容显示组件
 class TtsContentDisplay extends StatefulWidget {
@@ -21,8 +22,8 @@ class _TtsContentDisplayState extends State<TtsContentDisplay> {
   @override
   Widget build(BuildContext context) {
     if (widget.paragraphs.isEmpty) {
-      return const Center(
-        child: Text('暂无内容'),
+      return const EmptyStateWidget(
+        message: '暂无内容',
       );
     }
 
@@ -44,7 +45,10 @@ class _TtsContentDisplayState extends State<TtsContentDisplay> {
               color: isCurrent
                   ? Theme.of(context).colorScheme.primaryContainer
                   : isPast
-                      ? Colors.grey.shade100
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.06)
                       : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: isCurrent
@@ -62,7 +66,10 @@ class _TtsContentDisplayState extends State<TtsContentDisplay> {
                 color: isCurrent
                     ? Theme.of(context).colorScheme.onPrimaryContainer
                     : isPast
-                        ? Colors.grey.shade600
+                        ? Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)
                         : Theme.of(context).colorScheme.onSurface,
                 fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
               ),

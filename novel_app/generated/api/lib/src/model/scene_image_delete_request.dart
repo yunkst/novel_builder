@@ -14,7 +14,8 @@ part 'scene_image_delete_request.g.dart';
 /// * [taskId] - 场面绘制任务ID
 /// * [filename] - 要删除的图片文件名
 @BuiltValue()
-abstract class SceneImageDeleteRequest implements Built<SceneImageDeleteRequest, SceneImageDeleteRequestBuilder> {
+abstract class SceneImageDeleteRequest
+    implements Built<SceneImageDeleteRequest, SceneImageDeleteRequestBuilder> {
   /// 场面绘制任务ID
   @BuiltValueField(wireName: r'task_id')
   String get taskId;
@@ -25,18 +26,25 @@ abstract class SceneImageDeleteRequest implements Built<SceneImageDeleteRequest,
 
   SceneImageDeleteRequest._();
 
-  factory SceneImageDeleteRequest([void updates(SceneImageDeleteRequestBuilder b)]) = _$SceneImageDeleteRequest;
+  factory SceneImageDeleteRequest(
+          [void updates(SceneImageDeleteRequestBuilder b)]) =
+      _$SceneImageDeleteRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SceneImageDeleteRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<SceneImageDeleteRequest> get serializer => _$SceneImageDeleteRequestSerializer();
+  static Serializer<SceneImageDeleteRequest> get serializer =>
+      _$SceneImageDeleteRequestSerializer();
 }
 
-class _$SceneImageDeleteRequestSerializer implements PrimitiveSerializer<SceneImageDeleteRequest> {
+class _$SceneImageDeleteRequestSerializer
+    implements PrimitiveSerializer<SceneImageDeleteRequest> {
   @override
-  final Iterable<Type> types = const [SceneImageDeleteRequest, _$SceneImageDeleteRequest];
+  final Iterable<Type> types = const [
+    SceneImageDeleteRequest,
+    _$SceneImageDeleteRequest
+  ];
 
   @override
   final String wireName = r'SceneImageDeleteRequest';
@@ -64,7 +72,9 @@ class _$SceneImageDeleteRequestSerializer implements PrimitiveSerializer<SceneIm
     SceneImageDeleteRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -121,4 +131,3 @@ class _$SceneImageDeleteRequestSerializer implements PrimitiveSerializer<SceneIm
     return result.build();
   }
 }
-

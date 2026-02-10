@@ -1,54 +1,64 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/scene_illustration.dart';
 import '../widgets/illustration_request_dialog.dart';
 import '../widgets/illustration_action_dialog.dart';
 import '../widgets/scene_image_preview.dart';
 import '../widgets/video_input_dialog.dart';
 import '../widgets/generate_more_dialog.dart';
-import '../services/scene_illustration_service.dart';
-import '../services/database_service.dart';
-import '../services/api_service_wrapper.dart';
-import '../core/di/api_service_provider.dart';
+import '../widgets/common/common_widgets.dart';
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
+import '../utils/toast_utils.dart';
 import '../utils/video_generation_state_manager.dart';
+import '../controllers/pagination_controller.dart';
 import 'package:novel_api/novel_api.dart';
 
-class IllustrationDebugScreen extends StatefulWidget {
+/// 场景插图调试屏幕 - Riverpod 版本
+class IllustrationDebugScreen extends ConsumerStatefulWidget {
   const IllustrationDebugScreen({super.key});
 
   @override
-  State<IllustrationDebugScreen> createState() =>
+  ConsumerState<IllustrationDebugScreen> createState() =>
       _IllustrationDebugScreenState();
 }
 
-class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
-  final List<SceneIllustration> _sceneIllustrations = [];
-  final SceneIllustrationService _sceneIllustrationService =
-      SceneIllustrationService();
-  final DatabaseService _databaseService = DatabaseService();
-
-  // 分页状态
-  int _currentPage = 0;
-  bool _isLoading = false;
-  int _totalPages = 0; // 总页数
-  int _totalItems = 0; // 总条目数
+class _IllustrationDebugScreenState
+    extends ConsumerState<IllustrationDebugScreen> {
+  late final PaginationController<SceneIllustration> _pagination;
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 10; // 每页10条
-
-  // 性能优化：防止重复请求
-  DateTime _lastLoadTime = DateTime.now();
-  static const Duration _minLoadInterval = Duration(milliseconds: 500);
 
   @override
   void initState() {
     super.initState();
-    _loadIllustrations();
+
+    _pagination = PaginationController<SceneIllustration>(
+      fetchPage: (page, pageSize) async {
+        final databaseService = ref.read(databaseServiceProvider);
+        final result = await databaseService.getSceneIllustrationsPaginated(
+          page: page - 1, // PaginationController页码从1开始，API从0开始
+          limit: pageSize,
+        );
+        _pagination.setTotalItems(result['total'] as int);
+        return result['items'] as List<SceneIllustration>;
+      },
+      pageSize: _pageSize,
+      initialPage: 1,
+    );
+    _pagination.refresh();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _pagination.dispose();
     super.dispose();
+  }
+
+  /// 公开方法：刷新列表数据（供外部调用）
+  void refreshData() {
+    _pagination.refresh();
   }
 
   @override
@@ -58,18 +68,23 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         title: const Text('生图调试'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshIllustrations,
-        child: Column(
-          children: [
-            Expanded(
-              child: _sceneIllustrations.isEmpty && !_isLoading
-                  ? _buildEmptyState()
-                  : _buildIllustrationList(),
+      body: AnimatedBuilder(
+        animation: _pagination,
+        builder: (context, child) {
+          return RefreshIndicator(
+            onRefresh: () => _pagination.refresh(),
+            child: Column(
+              children: [
+                Expanded(
+                  child: _pagination.isEmpty && !_pagination.isLoading
+                      ? _buildEmptyState()
+                      : _buildIllustrationList(),
+                ),
+                _buildPaginationControl(),
+              ],
             ),
-            _buildPaginationControl(),
-          ],
-        ),
+          );
+        },
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80), // 向上移动，避免遮挡翻页按钮
@@ -111,8 +126,9 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
           const SizedBox(height: 24),
           // 添加刷新按钮
           ElevatedButton.icon(
-            onPressed: _isLoading ? null : () => _refreshIllustrations(),
-            icon: _isLoading
+            onPressed:
+                _pagination.isLoading ? null : () => _pagination.refresh(),
+            icon: _pagination.isLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,
@@ -122,10 +138,10 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
                     ),
                   )
                 : const Icon(Icons.refresh),
-            label: Text(_isLoading ? '刷新中...' : '刷新列表'),
+            label: Text(_pagination.isLoading ? '刷新中...' : '刷新列表'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -141,9 +157,9 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _sceneIllustrations.length,
+      itemCount: _pagination.items.length,
       itemBuilder: (context, index) {
-        final illustration = _sceneIllustrations[index];
+        final illustration = _pagination.items[index];
         return _buildIllustrationCard(illustration, index);
       },
       // 性能优化：添加cacheExtent和addAutomaticKeepAlives
@@ -156,16 +172,23 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
 
   /// 构建底部页码控制组件
   Widget _buildPaginationControl() {
-    if (_totalPages == 0) {
+    if (_pagination.totalPages == 0) {
       return const SizedBox.shrink();
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.1),
         border: Border(
-          top: BorderSide(color: Colors.grey.shade300),
+          top: BorderSide(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.3)),
         ),
       ),
       child: Row(
@@ -173,43 +196,58 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         children: [
           // 页码信息
           Text(
-            '第 ${_currentPage + 1}/$_totalPages 页',
+            '第 ${_pagination.currentPage}/${_pagination.totalPages} 页',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
             ),
           ),
-          if (_totalItems > 0) ...[
+          if (_pagination.totalItems != null &&
+              _pagination.totalItems! > 0) ...[
             const SizedBox(width: 8),
             Text(
-              '（共 $_totalItems 条）',
+              '（共 ${_pagination.totalItems} 条）',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
           ],
           const SizedBox(width: 16),
           // 上一页按钮
           ElevatedButton(
-            onPressed:
-                _currentPage > 0 && !_isLoading ? _goToPreviousPage : null,
+            onPressed: _pagination.currentPage > 1 && !_pagination.isLoading
+                ? _goToPreviousPage
+                : null,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(80, 36),
-              disabledBackgroundColor: Colors.grey.shade300,
+              disabledBackgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.3),
             ),
             child: const Text('上一页'),
           ),
           const SizedBox(width: 12),
           // 下一页按钮
           ElevatedButton(
-            onPressed: _currentPage < _totalPages - 1 && !_isLoading
+            onPressed: _pagination.currentPage < _pagination.totalPages &&
+                    !_pagination.isLoading
                 ? _goToNextPage
                 : null,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(80, 36),
-              disabledBackgroundColor: Colors.grey.shade300,
+              disabledBackgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.3),
             ),
             child: const Text('下一页'),
           ),
@@ -231,7 +269,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         onDelete: (taskId) => _deleteIllustration(illustration.id),
         onImageDeleted: () {
           // 删除成功后刷新列表
-          _refreshIllustrations();
+          _pagination.refresh();
         },
       ),
     );
@@ -252,6 +290,9 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   Future<void> _createDebugIllustration(
       Map<String, dynamic> requestData) async {
     try {
+      final sceneIllustrationService =
+          ref.read(sceneIllustrationServiceProvider);
+
       final prompt = requestData['prompt'] as String;
       final imageCount = requestData['imageCount'] as int;
       final modelName = requestData['modelName'] as String?;
@@ -259,8 +300,8 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       // 创建空的角色列表，调试模式下不需要角色信息
       final List<RoleInfo> emptyRoles = [];
 
-      // 调用SceneIllustrationService的API，这会自动保存到数据库
-      await _sceneIllustrationService.createSceneIllustrationWithMarkup(
+      // 调用SceneIllustrationService的API，调试模式跳过章节内容修改
+      await sceneIllustrationService.createSceneIllustrationWithMarkup(
         novelUrl: 'debug_novel_url', // 调试用的小说URL
         chapterId: 'debug_chapter_id', // 调试用的章节ID
         paragraphText: prompt, // 使用prompt作为段落文本
@@ -269,109 +310,37 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
         modelName: modelName, // 生图模型
         insertionPosition: 'after', // 插入位置
         paragraphIndex: 0, // 段落索引
+        skipMarkupInsertion: true, // 🔧 调试模式：跳过章节内容修改
       );
 
       // 刷新列表以显示新创建的任务
-      await _refreshIllustrations();
+      await _pagination.refresh();
 
-      _showErrorSnackBar('调试任务已创建', isSuccess: true);
+      ToastUtils.showSuccess('调试任务已创建');
     } catch (e) {
       debugPrint('创建调试生图请求失败: $e');
-      _showErrorSnackBar('创建生图请求失败: $e');
+      ToastUtils.showError('创建生图请求失败: $e');
     }
-  }
-
-  // 分页加载核心方法
-  Future<void> _loadIllustrations({bool isRefresh = false}) async {
-    // 性能优化：防止重复请求
-    final now = DateTime.now();
-    if (_isLoading ||
-        !isRefresh && now.difference(_lastLoadTime) < _minLoadInterval) {
-      return;
-    }
-    _lastLoadTime = now;
-
-    setState(() {
-      _isLoading = true;
-      if (isRefresh) {
-        _currentPage = 0;
-        _sceneIllustrations.clear();
-      }
-    });
-
-    try {
-      final result = await _databaseService.getSceneIllustrationsPaginated(
-        page: _currentPage,
-        limit: _pageSize,
-      );
-
-      if (mounted) {
-        setState(() {
-          if (isRefresh) {
-            _sceneIllustrations.clear();
-          }
-          _sceneIllustrations
-              .addAll(result['items'] as List<SceneIllustration>);
-          _totalItems = result['total'] as int;
-          _totalPages = result['totalPages'] as int;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      debugPrint('加载插图失败: $e');
-      if (mounted) {
-        _showErrorSnackBar('加载数据失败: $e');
-      }
-    }
-  }
-
-  /// 刷新插图列表（公开方法，供外部调用）
-  Future<void> refreshData() async {
-    await _loadIllustrations(isRefresh: true);
-  }
-
-  Future<void> _refreshIllustrations() async {
-    await _loadIllustrations(isRefresh: true);
-  }
-
-  /// 手动翻页方法
-  Future<void> _goToPage(int page) async {
-    if (page < 0 || page >= _totalPages) return;
-    if (_isLoading) return;
-
-    // 翻页时先清空列表，避免数据累加
-    setState(() {
-      _currentPage = page;
-      _sceneIllustrations.clear();
-    });
-
-    await _loadIllustrations();
   }
 
   Future<void> _goToPreviousPage() async {
-    if (_currentPage > 0) {
-      await _goToPage(_currentPage - 1);
+    if (_pagination.currentPage > 1) {
+      await _pagination.loadPage(_pagination.currentPage - 1, replace: true);
     }
   }
 
   Future<void> _goToNextPage() async {
-    if (_currentPage < _totalPages - 1) {
-      await _goToPage(_currentPage + 1);
+    if (_pagination.currentPage < _pagination.totalPages) {
+      await _pagination.loadPage(_pagination.currentPage + 1, replace: true);
     }
   }
 
   void _showErrorSnackBar(String message, {bool isSuccess = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isSuccess ? Colors.green : Colors.red,
-      ),
-    );
+    if (isSuccess) {
+      ToastUtils.showSuccess(message);
+    } else {
+      ToastUtils.showError(message);
+    }
   }
 
   /// 处理图片点击事件 - 显示功能选择对话框
@@ -380,10 +349,11 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
     // 从已有列表中查找插图信息（使用用户输入的场景描述）
     String? prompts;
     try {
-      final illustration = _sceneIllustrations.cast<SceneIllustration?>().firstWhere(
-        (ill) => ill?.taskId == taskId,
-        orElse: () => null,
-      );
+      final illustration =
+          _pagination.items.cast<SceneIllustration?>().firstWhere(
+                (ill) => ill?.taskId == taskId,
+                orElse: () => null,
+              );
       prompts = illustration?.content;
     } catch (e) {
       debugPrint('获取插图信息失败: $e');
@@ -450,15 +420,13 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       // 显示加载提示
       if (mounted) {
         debugPrint('📢 显示加载提示');
-        _showErrorSnackBar('正在生成 $count 张图片...', isSuccess: true);
+        ToastUtils.showSuccess('正在生成 $count 张图片...');
       }
 
       // 调用 API 生成图片
       debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
-      debugPrint('ApiServiceWrapper 初始化状态检查...');
-      final apiService = ApiServiceWrapper();
-      debugPrint('✅ ApiServiceWrapper 实例已创建');
-      debugPrint('初始化状态: ${apiService.getInitStatus()}');
+      final apiService = ref.read(apiServiceWrapperProvider);
+      debugPrint('✅ ApiServiceWrapper 实例已获取');
 
       debugPrint('🔄 开始API调用...');
       final response = await apiService.regenerateSceneIllustrationImages(
@@ -497,12 +465,7 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       // 检查图片是否正在生成视频
       if (VideoGenerationStateManager.isImageGenerating(imageUrl)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('该图片正在生成视频，请稍后再试'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          ToastUtils.showWarning('该图片正在生成视频，请稍后再试');
         }
         return;
       }
@@ -528,18 +491,11 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
 
       // 显示加载提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('正在为选中图片创建视频生成任务...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        ToastUtils.showInfo('正在为选中图片创建视频生成任务...');
       }
 
-      // 获取 API 服务实例
-      final apiService = ApiServiceProvider.instance;
-
       // 调用API生成视频
+      final apiService = ref.read(apiServiceWrapperProvider);
       final response = await apiService.generateVideoFromImage(
         imgName: fileName,
         userInput: userInput,
@@ -550,22 +506,14 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
       _setImageGeneratingStatus(imageUrl, false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('视频生成任务已创建，任务ID: ${response.taskId}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ToastUtils.showSuccess('视频生成任务已创建，任务ID: ${response.taskId}');
       }
     } catch (e) {
       // 清除生成状态
       _setImageGeneratingStatus(imageUrl, false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成视频失败: $e')),
-        );
+        ToastUtils.showError('生成视频失败: $e');
       }
     }
   }
@@ -578,56 +526,36 @@ class _IllustrationDebugScreenState extends State<IllustrationDebugScreen> {
   /// 删除插图
   Future<void> _deleteIllustration(int illustrationId) async {
     try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认删除'),
-          content: const Text('确定要删除这个插图吗？此操作无法撤销。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('删除'),
-            ),
-          ],
-        ),
+      final confirmed = await ConfirmDialog.show(
+        context,
+        title: '确认删除',
+        message: '确定要删除这个插图吗？此操作无法撤销。',
+        confirmText: '删除',
+        icon: Icons.delete,
       );
 
       if (confirmed == true) {
+        final sceneIllustrationService =
+            ref.read(sceneIllustrationServiceProvider);
         final success =
-            await _sceneIllustrationService.deleteIllustration(illustrationId);
+            await sceneIllustrationService.deleteIllustration(illustrationId);
         if (success) {
           // 删除成功后刷新列表，让被删除的项立即消失
-          await _refreshIllustrations();
+          await _pagination.refresh();
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('插图已删除'),
-                backgroundColor: Colors.green,
-              ),
-            );
+            ToastUtils.showSuccess('插图已删除');
           }
         } else {
           debugPrint('删除插图失败: 服务返回false');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('删除插图失败'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            ToastUtils.showError('删除插图失败');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除插图失败: $e')),
-        );
+        ToastUtils.showError('删除插图失败: $e');
       }
     }
   }

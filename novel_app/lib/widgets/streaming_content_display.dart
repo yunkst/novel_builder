@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'common/common_widgets.dart';
 
 /// StreamingContentDisplay
 ///
@@ -39,76 +40,78 @@ class StreamingContentDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.grey[800],
+        color: backgroundColor ?? colorScheme.surfaceContainerHighest,
         border: Border.all(
-          color: borderColor ?? Colors.grey[700]!,
+          color: borderColor ?? colorScheme.outline.withValues(alpha: 0.5),
           width: 1,
         ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: SingleChildScrollView(
         padding: padding ?? const EdgeInsets.all(12),
-        child: content.isEmpty ? _buildPlaceholder() : _buildContent(),
+        child: content.isEmpty
+            ? _buildPlaceholder(context)
+            : _buildContent(context),
       ),
     );
   }
 
-  /// 构建占位符（空状态或加载状态）
-  Widget _buildPlaceholder() {
-    return Center(
-      child: Column(
+  /// 构建占位符(空状态或加载状态)
+  Widget _buildPlaceholder(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (isStreaming) {
+      return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (isStreaming) ...[
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Colors.grey.shade400,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
+          const LoadingStateWidget(
+            message: '加载中...',
+            centered: false,
+          ),
+          const SizedBox(height: 16),
           Icon(
-            isStreaming ? Icons.timer_outlined : Icons.content_paste_outlined,
+            Icons.timer_outlined,
             size: 48,
-            color: Colors.grey.shade600,
+            color: colorScheme.onSurface.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 12),
           Text(
-            isStreaming ? '等待AI生成内容...' : '暂无内容',
+            '等待AI生成内容...',
             style: TextStyle(
-              color: Colors.grey.shade400,
+              color: colorScheme.onSurface.withValues(alpha: 0.4),
               fontSize: 14,
             ),
           ),
-          if (isStreaming) ...[
-            const SizedBox(height: 8),
-            Text(
-              'AI正在思考并生成内容，请稍候...',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 12,
-              ),
+          const SizedBox(height: 8),
+          Text(
+            'AI正在思考并生成内容，请稍候...',
+            style: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+              fontSize: 12,
             ),
-          ],
+          ),
         ],
-      ),
+      );
+    }
+
+    return EmptyStateWidget(
+      message: '暂无内容',
+      icon: Icons.content_paste_outlined,
+      centered: false,
     );
   }
 
   /// 构建内容显示
-  Widget _buildContent() {
+  Widget _buildContent(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final textStyle = TextStyle(
       fontSize: 14,
       height: 1.6,
-      color: Colors.white,
+      color: colorScheme.onSurface,
     );
 
     // 如果有光标Widget，使用 TextSpan

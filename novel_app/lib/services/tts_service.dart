@@ -43,12 +43,14 @@ class TtsException implements Exception {
   TtsException(this.message, [this.cause]);
 
   @override
-  String toString() => 'TtsException: $message${cause != null ? ' (Cause: $cause)' : ''}';
+  String toString() =>
+      'TtsException: $message${cause != null ? ' (Cause: $cause)' : ''}';
 }
 
 /// TTS核心服务 - 封装Platform Channel调用原生TTS引擎
 class TtsService {
-  static const MethodChannel _channel = MethodChannel('com.example.novel_app/tts');
+  static const MethodChannel _channel =
+      MethodChannel('com.example.novel_app/tts');
 
   // 单例模式
   TtsService._internal() {
@@ -58,10 +60,14 @@ class TtsService {
   factory TtsService() => _instance;
 
   // 状态流控制器
-  final StreamController<bool> _isSpeakingController = StreamController<bool>.broadcast();
-  final StreamController<String> _speakCompleteController = StreamController<String>.broadcast();
-  final StreamController<String> _speakStartController = StreamController<String>.broadcast();
-  final StreamController<String> _errorController = StreamController<String>.broadcast();
+  final StreamController<bool> _isSpeakingController =
+      StreamController<bool>.broadcast();
+  final StreamController<String> _speakCompleteController =
+      StreamController<String>.broadcast();
+  final StreamController<String> _speakStartController =
+      StreamController<String>.broadcast();
+  final StreamController<String> _errorController =
+      StreamController<String>.broadcast();
 
   // 公开流
   Stream<bool> get isSpeaking => _isSpeakingController.stream;
@@ -75,7 +81,8 @@ class TtsService {
 
   /// 处理原生层回调
   Future<dynamic> _handleMethodCall(MethodCall call) async {
-    debugPrint('[TtsService] 🔔 收到原生回调: ${call.method} (args: ${call.arguments})');
+    debugPrint(
+        '[TtsService] 🔔 收到原生回调: ${call.method} (args: ${call.arguments})');
     switch (call.method) {
       case 'onSpeakStart':
         final utteranceId = call.arguments as String?;
@@ -141,8 +148,10 @@ class TtsService {
     }
 
     try {
-      debugPrint('[TtsService] 开始朗读: ${text.substring(0, text.length > 50 ? 50 : text.length)}...');
-      final utteranceId = await _channel.invokeMethod<String>('speak', {'text': text});
+      debugPrint(
+          '[TtsService] 开始朗读: ${text.substring(0, text.length > 50 ? 50 : text.length)}...');
+      final utteranceId =
+          await _channel.invokeMethod<String>('speak', {'text': text});
       return utteranceId ?? DateTime.now().millisecondsSinceEpoch.toString();
     } on PlatformException catch (e) {
       debugPrint('[TtsService] ❌ 朗读失败: ${e.message}');
@@ -254,7 +263,8 @@ class TtsService {
 
     try {
       debugPrint('[TtsService] 获取可用语音列表');
-      final result = await _channel.invokeListMethod<Map<Object?, Object?>>('getVoices');
+      final result =
+          await _channel.invokeListMethod<Map<Object?, Object?>>('getVoices');
       if (result == null) return [];
 
       return result

@@ -2,8 +2,8 @@ import '../models/chapter.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../constants/chapter_constants.dart';
-import 'logger_service.dart';
-import 'database_service.dart';
+import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 
 /// 章节生成相关的业务逻辑服务
 ///
@@ -13,11 +13,15 @@ import 'database_service.dart';
 /// - 提供角色信息格式化
 /// - 构建完整的 AI 请求参数
 class ChapterService {
-  final DatabaseService _databaseService;
+  final IChapterRepository _chapterRepository;
+  final ICharacterRepository _characterRepository;
 
-  /// 构造函数
-  ChapterService({DatabaseService? databaseService})
-      : _databaseService = databaseService ?? DatabaseService();
+  /// 构造函数 - 通过依赖注入接收Repository实例
+  ChapterService({
+    required IChapterRepository chapterRepository,
+    required ICharacterRepository characterRepository,
+  })  : _chapterRepository = chapterRepository,
+        _characterRepository = characterRepository;
 
   /// 获取历史章节内容（用于生成上下文）
   ///
@@ -49,7 +53,7 @@ class ChapterService {
 
       // 遍历并拼接历史章节内容
       for (int i = startIndex; i <= afterIndex; i++) {
-        final content = await _databaseService.getCachedChapter(
+        final content = await _chapterRepository.getCachedChapter(
           chapters[i].url,
         );
         if (content != null && content.isNotEmpty) {
@@ -94,7 +98,7 @@ class ChapterService {
     for (int i = startIndex; i <= afterIndex && i < chapters.length; i++) {
       final chapter = chapters[i];
       // 优先从缓存获取
-      final content = await _databaseService.getCachedChapter(chapter.url);
+      final content = await _chapterRepository.getCachedChapter(chapter.url);
       if (content != null && content.isNotEmpty) {
         previousChapters.add('第${i + 1}章 ${chapter.title}\n$content');
       } else {
@@ -121,7 +125,7 @@ class ChapterService {
     }
 
     final selectedCharacters =
-        await _databaseService.getCharactersByIds(characterIds);
+        await _characterRepository.getCharactersByIds(characterIds);
     return Character.formatForAI(selectedCharacters);
   }
 
