@@ -470,10 +470,19 @@ class _ChapterListScreenRiverpodState
   List<Chapter> _getCurrentPageChapters(ChapterListState state) {
     if (state.chapters.isEmpty) return [];
 
+    // 修复：计算最大页数，确保 currentPage 不超过实际页数
+    final maxPage = (state.chapters.length / ChapterConstants.chaptersPerPage).ceil();
+    final currentPage = state.currentPage.clamp(1, maxPage);
+
     final startIndex =
-        (state.currentPage - 1) * ChapterConstants.chaptersPerPage;
+        (currentPage - 1) * ChapterConstants.chaptersPerPage;
     final endIndex = (startIndex + ChapterConstants.chaptersPerPage)
         .clamp(0, state.chapters.length);
+
+    // 防御性检查：确保 startIndex < endIndex
+    if (startIndex >= endIndex) {
+      return [];
+    }
 
     return state.chapters.sublist(startIndex, endIndex);
   }
@@ -575,34 +584,45 @@ class _ChapterListScreenRiverpodState
   /// 滚动到上次阅读章节
   void _scrollToLastReadChapter() {
     final state = ref.read(chapterListProvider(widget.novel));
-    if (state.lastReadChapterIndex >= 0 && state.chapters.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // 延迟执行滚动，确保ListView已经重建完成
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            // 计算目标章节在当前页中的索引
-            final startIndex =
-                (state.currentPage - 1) * ChapterConstants.chaptersPerPage;
-            final indexInPage = state.lastReadChapterIndex - startIndex;
-
-            // 使用简单的滚动方法
-            final itemHeight = ChapterConstants.listItemHeight;
-            final targetOffset = indexInPage * itemHeight;
-
-            // 获取可视区域高度
-            final viewportHeight = _scrollController.position.viewportDimension;
-            final adjustedOffset = (targetOffset - viewportHeight * 0.25)
-                .clamp(0.0, _scrollController.position.maxScrollExtent);
-
-            _scrollController.animateTo(
-              adjustedOffset,
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOutCubic,
-            );
-          }
-        });
-      });
+    if (state.lastReadChapterIndex < 0 || state.chapters.isEmpty) {
+      return;
     }
+
+    // 1. 计算目标页码
+    const chaptersPerPage = ChapterConstants.chaptersPerPage;
+    final targetPage = (state.lastReadChapterIndex ~/ chaptersPerPage) + 1;
+
+    // 2. 如果目标页不是当前页，先跳转到目标页
+    if (targetPage != state.currentPage) {
+      ref.read(chapterListProvider(widget.novel).notifier).goToPage(targetPage);
+    }
+
+    // 3. 延迟滚动，确保页面跳转和ListView重建完成
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+
+        // 4. 计算目标章节在目标页中的索引
+        final startIndex = (targetPage - 1) * chaptersPerPage;
+        final indexInPage = state.lastReadChapterIndex - startIndex;
+
+        // 5. 计算滚动位置
+        final itemHeight = ChapterConstants.listItemHeight;
+        final targetOffset = indexInPage * itemHeight;
+
+        // 获取可视区域高度
+        final viewportHeight = _scrollController.position.viewportDimension;
+        final adjustedOffset = (targetOffset - viewportHeight * 0.25)
+            .clamp(0.0, _scrollController.position.maxScrollExtent);
+
+        // 6. 执行滚动动画
+        _scrollController.animateTo(
+          adjustedOffset,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    });
   }
 
   /// 显示插入章节对话框

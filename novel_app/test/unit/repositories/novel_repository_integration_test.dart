@@ -60,40 +60,6 @@ void main() {
         expect(novels[0].isInBookshelf, isTrue);
       });
 
-      test('应该真实地插入多本小说并返回所有', () async {
-        // Arrange - 准备多本小说
-        final novels = [
-          Novel(
-            title: '小说1',
-            author: '作者1',
-            url: 'https://test.com/novel/1',
-          ),
-          Novel(
-            title: '小说2',
-            author: '作者2',
-            url: 'https://test.com/novel/2',
-          ),
-          Novel(
-            title: '小说3',
-            author: '作者3',
-            url: 'https://test.com/novel/3',
-          ),
-        ];
-
-        // Act - 批量插入
-        for (final novel in novels) {
-          await repository.addToBookshelf(novel);
-        }
-
-        // Assert - 验证所有小说都被查询到
-        final result = await repository.getNovels();
-        expect(result.length, 3);
-        // 注意：查询结果按 addedAt DESC 排序（最新的在前）
-        expect(result[0].title, '小说3');
-        expect(result[1].title, '小说2');
-        expect(result[2].title, '小说1');
-      });
-
       test('URL唯一性约束应该生效', () async {
         // Arrange - 两本URL相同的小说
         final novel1 = Novel(

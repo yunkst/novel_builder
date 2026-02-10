@@ -249,12 +249,17 @@ class _PromptsDisplayCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // 提示词内容
-          SelectableText(
-            prompts,
-            style: TextStyle(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurface,
-              height: 1.5,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                prompts,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),

@@ -11,6 +11,7 @@ import '../../models/chapter.dart';
 import '../../models/ai_accompaniment_settings.dart';
 import '../../services/preload_progress_update.dart';
 import '../../services/logger_service.dart';
+import '../../constants/chapter_constants.dart';
 import 'service_providers.dart';
 import 'repository_providers.dart';
 import 'database_providers.dart';
@@ -164,17 +165,18 @@ class ChapterList extends _$ChapterList {
         _updateTotalPages();
         await _refreshChaptersFromBackend();
       } else {
-        // 没有缓存时，从后端获取
-        await _refreshChaptersFromBackend();
-
-        // 对于本地创建的小说，如果刷新后仍然没有章节，需要结束loading状态
-        if (novel.url.startsWith('custom://')) {
+        // 没有缓存时，检查是否为自定义小说
+        if (cachedChapters.isEmpty && novel.url.startsWith('custom://')) {
+          // 自定义小说没有章节时，直接设置空状态，结束loading
           state = state.copyWith(
             chapters: [],
             isLoading: false,
           );
           _updateTotalPages();
+          return;
         }
+        // 从后端获取
+        await _refreshChaptersFromBackend();
       }
     } catch (e) {
       debugPrint('❌ 加载章节列表失败: $e');
@@ -191,6 +193,8 @@ class ChapterList extends _$ChapterList {
 
     // 对于本地创建的小说，不需要从后端获取
     if (novel.url.startsWith('custom://')) {
+      // 确保结束loading状态，避免无限加载
+      state = state.copyWith(isLoading: false);
       return;
     }
 
@@ -287,8 +291,7 @@ class ChapterList extends _$ChapterList {
     if (state.chapters.isEmpty) {
       state = state.copyWith(totalPages: 1);
     } else {
-      final totalPages = (state.chapters.length / 20)
-          .ceil(); // ChapterConstants.chaptersPerPage
+      final totalPages = (state.chapters.length / ChapterConstants.chaptersPerPage).ceil();
       state = state.copyWith(totalPages: totalPages);
     }
   }
@@ -297,7 +300,7 @@ class ChapterList extends _$ChapterList {
   List<Chapter> _getCurrentPageChapters() {
     if (state.chapters.isEmpty) return [];
 
-    const chaptersPerPage = 20; // ChapterConstants.chaptersPerPage
+    final chaptersPerPage = ChapterConstants.chaptersPerPage;
     final startIndex = (state.currentPage - 1) * chaptersPerPage;
     final endIndex =
         (startIndex + chaptersPerPage).clamp(0, state.chapters.length);

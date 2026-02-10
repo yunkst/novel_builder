@@ -387,7 +387,25 @@ class _BackgroundSettingScreenState
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('背景设定'),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('背景设定'),
+                Text(
+                  widget.novel.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7),
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
             backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             actions: [
               // 总结按钮
@@ -419,26 +437,6 @@ class _BackgroundSettingScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 小说标题
-                Text(
-                  widget.novel.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                // 提示文本
-                Text(
-                  '请输入小说的背景设定，包括世界观、时代背景、地理环境等信息（支持Markdown格式）',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
-                      ),
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
                 // TabBar
                 TabBar(
                   tabs: const [

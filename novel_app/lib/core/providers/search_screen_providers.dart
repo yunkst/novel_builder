@@ -87,11 +87,22 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
 
   /// 开始初始化 API
   Future<void> initialize(ApiServiceWrapper api) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
     try {
       await api.init();
-      state = state.copyWith(isInitialized: true);
+      state = state.copyWith(
+        isLoading: false,
+        isInitialized: true,
+        errorMessage: null,
+      );
     } catch (e) {
-      state = state.copyWith(isInitialized: false);
+      state = state.copyWith(
+        isLoading: false,
+        isInitialized: false,
+        errorMessage: '后端服务连接失败: ${e.toString()}',
+      );
+      rethrow; // 让调用者知道初始化失败
     }
   }
 
@@ -106,8 +117,9 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
     }
 
     if (!state.isInitialized) {
+      // 如果状态中已有错误信息（来自初始化失败），保留它；否则使用默认消息
       state = state.copyWith(
-        errorMessage: '请先配置后端服务地址',
+        errorMessage: state.errorMessage ?? '请先配置后端服务地址',
       );
       return;
     }
@@ -165,7 +177,13 @@ class SourceSitesNotifier extends _$SourceSitesNotifier {
         selectedSiteIds: sites.map((site) => site['id'] as String).toSet(),
       );
     } catch (e) {
-      // 加载失败，保持空列表
+      // 加载失败，保持空列表，但记录错误以便调试
+      // 如果sites已经不为空，说明之前加载过，那么保持之前的数据
+      if (state.sites.isEmpty) {
+        // 首次加载失败，sites保持空列表
+        // 不更新状态，保持默认值
+      }
+      // 如果之前有数据，保持之前的数据不变
     }
   }
 

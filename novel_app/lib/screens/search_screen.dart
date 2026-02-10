@@ -16,6 +16,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _hasAttemptedInitialization = false;
 
   @override
   void dispose() {
@@ -29,14 +30,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final sourceSitesState = ref.watch(sourceSitesNotifierProvider);
     final apiService = ref.watch(apiServiceWrapperProvider);
 
-    // 初始化 API 和源站列表（仅在第一次加载时执行）
-    ref.listen<SearchState>(searchScreenNotifierProvider, (previous, next) {
-      if (previous == null ||
-          (!previous.isInitialized && !next.isInitialized)) {
-        // 首次初始化
-        _initializeApiAndSites(apiService);
-      }
-    });
+    // 只在首次build时尝试初始化
+    if (!_hasAttemptedInitialization) {
+      _hasAttemptedInitialization = true;
+      _initializeApiAndSites(apiService);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -207,7 +205,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         category: LogCategory.network,
         tags: ['search', 'backend', 'not-configured'],
       );
-      ToastUtils.showError('请先配置后端服务地址', context: context);
+
+      // 使用状态中的错误信息，如果有的话
+      String errorMsg = searchState.errorMessage ?? '请先配置后端服务地址';
+      ToastUtils.showError(errorMsg, context: context);
       return;
     }
 
