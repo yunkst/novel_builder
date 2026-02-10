@@ -1,9 +1,8 @@
-import 'package:flutter/foundation.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../services/dify_service.dart';
-import '../services/database_service.dart';
+import '../core/interfaces/repositories/i_character_repository.dart';
 import '../utils/character_matcher.dart';
 import 'logger_service.dart';
 
@@ -28,8 +27,17 @@ import 'logger_service.dart';
 /// );
 /// ```
 class CharacterCardService {
-  final DifyService _difyService = DifyService();
-  final DatabaseService _databaseService = DatabaseService();
+  final DifyService _difyService;
+  final ICharacterRepository _characterRepository;
+
+  CharacterCardService({
+    DifyService? difyService,
+    required ICharacterRepository characterRepository,
+  })  : _difyService = difyService ?? DifyService(),
+        _characterRepository = characterRepository {
+    // 设置 CharacterMatcher 的依赖注入
+    CharacterMatcher.setCharacterRepository(characterRepository);
+  }
 
   /// 更新角色卡片
   ///
@@ -97,7 +105,7 @@ class CharacterCardService {
       // 自动保存所有角色（不显示预览对话框，让UI层决定是否需要预览）
       onProgress?.call('正在保存角色信息...');
       final savedCharacters =
-          await _databaseService.batchUpdateCharacters(updatedCharacters);
+          await _characterRepository.batchUpdateCharacters(updatedCharacters);
 
       onProgress?.call('成功更新 ${savedCharacters.length} 个角色卡');
       onSuccess?.call(savedCharacters);
@@ -134,7 +142,8 @@ class CharacterCardService {
       onProgress?.call('正在分析章节内容...');
 
       // 获取现有角色用于对比
-      final existingCharacters = await _databaseService.getCharacters(novel.url);
+      final existingCharacters =
+          await _characterRepository.getCharacters(novel.url);
 
       final updateData = await CharacterMatcher.prepareUpdateData(
         novel.url,
@@ -204,7 +213,8 @@ class CharacterCardService {
 
     // 2. 包含匹配(如"张三"匹配"张三丰")
     for (final char in existingChars) {
-      if (char.name.contains(newChar.name) || newChar.name.contains(char.name)) {
+      if (char.name.contains(newChar.name) ||
+          newChar.name.contains(char.name)) {
         LoggerService.instance.d(
           '角色匹配: 包含匹配 "${newChar.name}" -> "${char.name}"',
           category: LogCategory.character,
@@ -233,7 +243,7 @@ class CharacterCardService {
         tags: ['card', 'save', 'start'],
       );
       final savedCharacters =
-          await _databaseService.batchUpdateCharacters(characters);
+          await _characterRepository.batchUpdateCharacters(characters);
       LoggerService.instance.i(
         '保存完成',
         category: LogCategory.character,

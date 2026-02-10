@@ -1,16 +1,19 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
-import '../core/di/api_service_provider.dart';
+import 'api_service_wrapper.dart';
+import '../utils/cache_utils.dart';
+import 'logger_service.dart';
 
 /// 角色图集缓存服务
 class RoleGalleryCacheService {
-  static final RoleGalleryCacheService _instance =
-      RoleGalleryCacheService._internal();
-  factory RoleGalleryCacheService() => _instance;
-  RoleGalleryCacheService._internal();
+  /// 构造函数 - 支持依赖注入
+  ///
+  /// [apiService] 可选的API服务实例，用于测试和依赖注入
+  RoleGalleryCacheService({ApiServiceWrapper? apiService})
+      : _apiService = apiService;
+
+  ApiServiceWrapper? _apiService;
 
   Directory? _cacheDir; // 改为可空类型
   final Map<String, String> _memoryCache = {};
@@ -29,10 +32,36 @@ class RoleGalleryCacheService {
       // 清理过期的缓存文件
       await _cleanExpiredCache();
 
-      debugPrint('✓ 角色图集缓存服务初始化完成');
-      debugPrint('缓存目录: ${_cacheDir!.path}');
+      LoggerService.instance.i(
+        '角色图集缓存服务初始化完成',
+        category: LogCategory.cache,
+        tags: ['gallery', 'init', 'success'],
+      );
+      LoggerService.instance.d(
+        '缓存目录: ${_cacheDir!.path}',
+        category: LogCategory.cache,
+        tags: ['gallery', 'path'],
+      );
     } catch (e) {
-      debugPrint('❌ 角色图集缓存服务初始化失败: $e');
+      LoggerService.instance.e(
+        '角色图集缓存服务初始化失败: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'init', 'error'],
+      );
+    }
+  }
+
+  /// 设置API服务（依赖注入）
+  /// @deprecated 请使用构造函数注入
+  @Deprecated('请使用构造函数注入 ApiServiceWrapper')
+  void setApiService(ApiServiceWrapper apiService) {
+    _apiService = apiService;
+  }
+
+  /// 确保API服务已初始化
+  void _ensureApiService() {
+    if (_apiService == null) {
+      throw Exception('ApiServiceWrapper 未设置，请先调用 setApiService()');
     }
   }
 
@@ -49,7 +78,7 @@ class RoleGalleryCacheService {
   /// 获取缓存文件路径
   String _getCacheFilePath(String filename) {
     _ensureInitialized();
-    final hash = md5.convert(utf8.encode(filename)).toString();
+    final hash = CacheUtils.generateHashFilename(filename);
     return '${_cacheDir!.path}/$hash.jpg';
   }
 
@@ -72,20 +101,28 @@ class RoleGalleryCacheService {
       }
 
       // 使用ApiServiceWrapper确保正确的token认证和连接管理
-      final apiService = ApiServiceProvider.instance;
-      final bytes = await apiService.getImageProxy(filename);
+      _ensureApiService();
+      final bytes = await _apiService!.getImageProxy(filename);
 
       // ApiServiceWrapper.getImageProxy 直接返回 Uint8List
 
       // 验证图片数据有效性
       if (bytes.isEmpty) {
-        debugPrint('❌ 图片数据为空: $filename');
+        LoggerService.instance.w(
+          '图片数据为空: $filename',
+          category: LogCategory.cache,
+          tags: ['gallery', 'cache', 'empty'],
+        );
         return null;
       }
 
       // 检查图片头部标识
       if (!_isValidImageData(bytes)) {
-        debugPrint('❌ 无效的图片数据格式: $filename');
+        LoggerService.instance.w(
+          '无效的图片数据格式: $filename',
+          category: LogCategory.cache,
+          tags: ['gallery', 'cache', 'invalid'],
+        );
         return null;
       }
 
@@ -95,10 +132,18 @@ class RoleGalleryCacheService {
       await file.writeAsBytes(bytes);
 
       _addToMemoryCache(filename, filePath);
-      debugPrint('✓ 图片缓存成功: $filename, 大小: ${bytes.length} bytes');
+      LoggerService.instance.d(
+        '图片缓存成功: $filename, 大小: ${bytes.length} bytes',
+        category: LogCategory.cache,
+        tags: ['gallery', 'cache', 'success'],
+      );
       return file;
     } catch (e) {
-      debugPrint('❌ 图片缓存异常: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '图片缓存异常: $filename, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'cache', 'error'],
+      );
       return null;
     }
   }
@@ -147,7 +192,11 @@ class RoleGalleryCacheService {
 
       return null;
     } catch (e) {
-      debugPrint('获取图片字节数据失败: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '获取图片字节数据失败: $filename, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'bytes', 'error'],
+      );
       return null;
     }
   }
@@ -163,12 +212,20 @@ class RoleGalleryCacheService {
       final file = File(filePath);
       if (await file.exists()) {
         await file.delete();
-        debugPrint('✓ 图片缓存删除成功: $filename');
+        LoggerService.instance.d(
+          '图片缓存删除成功: $filename',
+          category: LogCategory.cache,
+          tags: ['gallery', 'delete', 'success'],
+        );
         return true;
       }
       return false;
     } catch (e) {
-      debugPrint('❌ 图片缓存删除失败: $filename, 错误: $e');
+      LoggerService.instance.e(
+        '图片缓存删除失败: $filename, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'delete', 'error'],
+      );
       return false;
     }
   }
@@ -190,7 +247,11 @@ class RoleGalleryCacheService {
 
       return totalSize / (1024 * 1024); // 转换为MB
     } catch (e) {
-      debugPrint('❌ 获取缓存大小失败: $e');
+      LoggerService.instance.e(
+        '获取缓存大小失败: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'size', 'error'],
+      );
       return 0.0;
     }
   }
@@ -211,12 +272,20 @@ class RoleGalleryCacheService {
 
           if (age > maxAge) {
             await file.delete();
-            debugPrint('🗑️  删除过期缓存文件: ${file.path}');
+            LoggerService.instance.d(
+              '删除过期缓存文件: ${file.path}',
+              category: LogCategory.cache,
+              tags: ['gallery', 'cleanup', 'expired'],
+            );
           }
         }
       }
     } catch (e) {
-      debugPrint('❌ 清理过期缓存失败: $e');
+      LoggerService.instance.e(
+        '清理过期缓存失败: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'cleanup', 'error'],
+      );
     }
   }
 
@@ -228,9 +297,17 @@ class RoleGalleryCacheService {
         await _cacheDir!.create(recursive: true);
       }
       _memoryCache.clear();
-      debugPrint('✓ 所有角色图集缓存已清理');
+      LoggerService.instance.i(
+        '所有角色图集缓存已清理',
+        category: LogCategory.cache,
+        tags: ['gallery', 'clear', 'all'],
+      );
     } catch (e) {
-      debugPrint('❌ 清理缓存失败: $e');
+      LoggerService.instance.e(
+        '清理缓存失败: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'clear', 'error'],
+      );
     }
   }
 
@@ -240,8 +317,11 @@ class RoleGalleryCacheService {
       final currentSize = await getCacheSize();
 
       if (currentSize > _maxDiskCacheSizeMB) {
-        debugPrint(
-            '⚠️  缓存大小超限 (${currentSize.toStringAsFixed(2)}MB > $_maxDiskCacheSizeMB MB)，开始清理');
+        LoggerService.instance.w(
+          '缓存大小超限 (${currentSize.toStringAsFixed(2)}MB > $_maxDiskCacheSizeMB MB)，开始清理',
+          category: LogCategory.cache,
+          tags: ['gallery', 'cleanup', 'oversize'],
+        );
 
         final files = await _cacheDir!.list().toList();
         List<File> fileStats = [];
@@ -271,10 +351,18 @@ class RoleGalleryCacheService {
           deletedCount++;
         }
 
-        debugPrint('✓ 缓存清理完成，删除了 $deletedCount 个文件');
+        LoggerService.instance.i(
+          '缓存清理完成，删除了 $deletedCount 个文件',
+          category: LogCategory.cache,
+          tags: ['gallery', 'cleanup', 'done'],
+        );
       }
     } catch (e) {
-      debugPrint('❌ 检查和清理缓存失败: $e');
+      LoggerService.instance.e(
+        '检查和清理缓存失败: $e',
+        category: LogCategory.cache,
+        tags: ['gallery', 'cleanup', 'error'],
+      );
     }
   }
 
@@ -285,7 +373,11 @@ class RoleGalleryCacheService {
       try {
         await cacheImage(filename);
       } catch (e) {
-        debugPrint('⚠️  预加载图片失败: $filename, 错误: $e');
+        LoggerService.instance.w(
+          '预加载图片失败: $filename, 错误: $e',
+          category: LogCategory.cache,
+          tags: ['gallery', 'preload', 'error'],
+        );
       }
     }
   }
@@ -303,7 +395,11 @@ class RoleGalleryCacheService {
   /// 释放内存缓存
   void clearMemoryCache() {
     _memoryCache.clear();
-    debugPrint('✓ 内存缓存已清理');
+    LoggerService.instance.i(
+      '内存缓存已清理',
+      category: LogCategory.cache,
+      tags: ['gallery', 'memory', 'clear'],
+    );
   }
 
   /// 验证图片数据是否有效

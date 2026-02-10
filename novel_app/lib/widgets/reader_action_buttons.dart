@@ -58,11 +58,9 @@ class ReaderActionButtons extends StatelessWidget {
                 : '开始自动滚动',
             heroTag: 'auto_scroll',
             backgroundColor: Colors.transparent,
-            child: Icon(
-              isAutoScrolling
-                  ? (isAutoScrollPaused ? Icons.play_arrow : Icons.pause)
-                  : Icons.play_arrow
-            ),
+            child: Icon(isAutoScrolling
+                ? (isAutoScrollPaused ? Icons.play_arrow : Icons.pause)
+                : Icons.play_arrow),
           ),
         ],
       ),

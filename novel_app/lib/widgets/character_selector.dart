@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
-import '../services/database_service.dart';
+import '../core/providers/database_providers.dart';
 
-class CharacterSelector extends StatefulWidget {
+class CharacterSelector extends ConsumerStatefulWidget {
   final String novelUrl;
   final List<int> initialSelectedIds;
   final Function(List<int>) onSelectionChanged;
@@ -15,11 +16,10 @@ class CharacterSelector extends StatefulWidget {
   });
 
   @override
-  State<CharacterSelector> createState() => _CharacterSelectorState();
+  ConsumerState<CharacterSelector> createState() => _CharacterSelectorState();
 }
 
-class _CharacterSelectorState extends State<CharacterSelector> {
-  final DatabaseService _databaseService = DatabaseService();
+class _CharacterSelectorState extends ConsumerState<CharacterSelector> {
   List<Character> _characters = [];
   Set<int> _selectedIds = {};
   List<Character> _filteredCharacters = [];
@@ -39,8 +39,9 @@ class _CharacterSelectorState extends State<CharacterSelector> {
   }
 
   Future<void> _loadCharacters() async {
+    final databaseService = ref.read(databaseServiceProvider);
     try {
-      final characters = await _databaseService.getCharacters(widget.novelUrl);
+      final characters = await databaseService.getCharacters(widget.novelUrl);
       if (mounted) {
         setState(() {
           _characters = characters;
@@ -114,26 +115,41 @@ class _CharacterSelectorState extends State<CharacterSelector> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(8),
-              color: Colors.grey.shade50,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.05),
             ),
             child: Row(
               children: [
-                Icon(Icons.people, color: Colors.blue.shade700),
+                Icon(Icons.people,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _getSelectedNames(),
                     style: TextStyle(
                       color: _selectedIds.isEmpty
-                          ? Colors.grey.shade600
-                          : Colors.black87,
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6)
+                          : Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                     ),
                   ),
                 ),
-                Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                Icon(Icons.arrow_drop_down,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6)),
               ],
             ),
           ),
@@ -183,13 +199,21 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.search_off,
-                                  size: 48, color: Colors.grey.shade400),
+                                  size: 48,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.4)),
                               const SizedBox(height: 8),
                               Text(
                                 _searchController.text.isNotEmpty
                                     ? '未找到匹配的人物'
                                     : '还没有创建人物',
-                                style: TextStyle(color: Colors.grey.shade600),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6)),
                               ),
                             ],
                           ),
@@ -223,7 +247,10 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                     Text(
                                       character.occupation!,
                                       style: TextStyle(
-                                        color: Colors.grey.shade600,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.6),
                                         fontSize: 12,
                                       ),
                                     ),
@@ -233,7 +260,10 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                         Text(
                                           '${character.age}岁',
                                           style: TextStyle(
-                                            color: Colors.grey.shade500,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5),
                                             fontSize: 11,
                                           ),
                                         ),
@@ -244,7 +274,10 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                         Text(
                                           character.gender!,
                                           style: TextStyle(
-                                            color: Colors.grey.shade500,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5),
                                             fontSize: 11,
                                           ),
                                         ),
@@ -258,14 +291,16 @@ class _CharacterSelectorState extends State<CharacterSelector> {
                                     _getGenderColor(character.gender),
                                 child: Text(
                                   _getAvatarText(character.name),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
                                 ),
                               ),
-                              activeColor: Colors.blue,
+                              activeColor:
+                                  Theme.of(context).colorScheme.primary,
                             );
                           },
                         ),
@@ -293,11 +328,11 @@ class _CharacterSelectorState extends State<CharacterSelector> {
   Color _getGenderColor(String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue;
+        return Theme.of(context).colorScheme.primary;
       case '女':
-        return Colors.pink;
+        return Theme.of(context).colorScheme.secondary;
       default:
-        return Colors.purple;
+        return Theme.of(context).colorScheme.tertiary;
     }
   }
 }

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:core';
 
 /// TTS朗读进度模型
 class ReadingProgress {
@@ -27,7 +26,7 @@ class ReadingProgress {
   /// 保存时间戳
   final DateTime timestamp;
 
-  ReadingProgress({
+  const ReadingProgress({
     required this.novelUrl,
     required this.novelTitle,
     required this.chapterUrl,
@@ -82,13 +81,13 @@ class ReadingProgress {
     return jsonEncode(toJson());
   }
 
-  /// 格式化的进度文本
-  String get positionText => '$chapterTitle (第${paragraphIndex + 1}段)';
-
   /// 检查进度是否过期
   bool isExpired({int days = 7}) {
     return DateTime.now().difference(timestamp).inDays > days;
   }
+
+  /// 获取位置文本描述
+  String get positionText => '$chapterTitle (第${paragraphIndex + 1}段)';
 
   /// 复制并修改部分字段
   ReadingProgress copyWith({

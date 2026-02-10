@@ -53,7 +53,8 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
           // 标题
           Row(
             children: [
-              const Icon(Icons.timer_outlined, size: 24, color: Colors.orange),
+              Icon(Icons.timer_outlined,
+                  size: 24, color: Theme.of(context).colorScheme.tertiary),
               const SizedBox(width: 8),
               const Text(
                 '定时结束设置',
@@ -79,7 +80,12 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                 IconButton(
                   icon: const Icon(Icons.remove_circle_outline),
                   iconSize: 40,
-                  color: _chapterCount > 1 ? Colors.orange : Colors.grey,
+                  color: _chapterCount > 1
+                      ? Theme.of(context).colorScheme.tertiary
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                   onPressed: _chapterCount > 1
                       ? () => setState(() => _chapterCount--)
                       : null,
@@ -88,18 +94,21 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
 
                 // 数字显示
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.orange, width: 2),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.tertiary,
+                        width: 2),
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.orange[50],
+                    color: Theme.of(context).colorScheme.tertiaryContainer,
                   ),
                   child: Text(
                     '$_chapterCount',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                      color: Theme.of(context).colorScheme.onTertiaryContainer,
                     ),
                   ),
                 ),
@@ -109,7 +118,12 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline),
                   iconSize: 40,
-                  color: _chapterCount < 99 ? Colors.orange : Colors.grey,
+                  color: _chapterCount < 99
+                      ? Theme.of(context).colorScheme.tertiary
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                   onPressed: _chapterCount < 99
                       ? () => setState(() => _chapterCount++)
                       : null,
@@ -123,7 +137,7 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
           const Center(
             child: Text(
               '章',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: Color(0xFF9E9E9E)),
             ),
           ),
           const SizedBox(height: 24),
@@ -132,10 +146,23 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isOverflow ? Colors.orange[100] : Colors.grey[100],
+              color: isOverflow
+                  ? Theme.of(context)
+                      .colorScheme
+                      .tertiaryContainer
+                      .withValues(alpha: 0.5)
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isOverflow ? Colors.orange : Colors.grey[300]!,
+                color: isOverflow
+                    ? Theme.of(context).colorScheme.tertiary
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.2),
                 width: isOverflow ? 2 : 1,
               ),
             ),
@@ -147,7 +174,12 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                     Icon(
                       Icons.info_outline,
                       size: 20,
-                      color: isOverflow ? Colors.orange : Colors.grey[700],
+                      color: isOverflow
+                          ? Theme.of(context).colorScheme.tertiary
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.7),
                     ),
                     const SizedBox(width: 8),
                     const Text(
@@ -167,14 +199,16 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
+                      Icon(Icons.warning_amber,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.tertiary),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           '⚠️ 将超出小说总章节数（共${widget.totalChapters}章）',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.orange,
+                            color: Theme.of(context).colorScheme.tertiary,
                           ),
                         ),
                       ),
@@ -194,7 +228,11 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: Colors.grey),
+                    side: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.2)),
                   ),
                   child: const Text('取消'),
                 ),
@@ -206,8 +244,8 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
                     widget.onConfirm(_chapterCount);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.tertiary,
+                    foregroundColor: Theme.of(context).colorScheme.onTertiary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
@@ -232,7 +270,8 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[700],
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         Text(

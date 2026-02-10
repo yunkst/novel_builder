@@ -1,0 +1,95 @@
+Analyzing novel_app...                                          
+
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_action_handler.dart:6:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_action_handler.dart:9:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_loader.dart:9:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_loader.dart:13:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_reorder_controller.dart:7:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\chapter_list\chapter_reorder_controller.dart:10:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\reader_content_controller.dart:32:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\controllers\reader_content_controller.dart:50:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\core\providers\database_providers.dart:49:42 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\core\providers\database_providers.dart:50:10 - deprecated_member_use_from_same_package
+   info - Don't use 'BuildContext's across async gaps - lib\mixins\reader\illustration_handler_mixin.dart:131:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\mixins\reader\illustration_handler_mixin.dart:253:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\bookshelf_screen.dart:80:11 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\bookshelf_screen.dart:191:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\bookshelf_screen.dart:213:9 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\bookshelf_screen.dart:382:32 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\bookshelf_screen.dart:491:46 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\bookshelf_screen.dart:498:50 - deprecated_member_use
+   info - 'characterAvatarServiceProvider' is deprecated and shouldn't be used. 请使用 cache_service_providers.dart 中的 characterAvatarServiceProvider - lib\screens\character_chat_screen.dart:51:33 - deprecated_member_use_from_same_package
+   info - Don't use 'BuildContext's across async gaps - lib\screens\character_management_screen.dart:155:7 - use_build_context_synchronously
+   info - 'characterAvatarServiceProvider' is deprecated and shouldn't be used. 请使用 cache_service_providers.dart 中的 characterAvatarServiceProvider - lib\screens\multi_role_chat_screen.dart:153:33 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\screens\reader_screen.dart:101:14 - deprecated_member_use_from_same_package
+   info - Don't use 'BuildContext's across async gaps - lib\screens\reader_screen.dart:689:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\reader_screen.dart:844:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\reader_screen.dart:1212:15 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\reader_screen.dart:1238:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\reader_screen.dart:1659:9 - use_build_context_synchronously
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:265:21 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:266:21 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:279:21 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:280:21 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:293:21 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\settings_screen.dart:294:21 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\screens\settings_screen.dart:331:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\settings_screen.dart:340:9 - use_build_context_synchronously
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\chapter_history_service.dart:31:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\chapter_history_service.dart:40:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\character_avatar_service.dart:15:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\character_avatar_service.dart:20:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\character_avatar_sync_service.dart:21:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\character_avatar_sync_service.dart:30:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\invalid_markup_cleaner.dart:22:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\invalid_markup_cleaner.dart:31:5 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\outline_service.dart:17:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\outline_service.dart:24:14 - deprecated_member_use_from_same_package
+  error - The method 'getById' isn't defined for the type 'IIllustrationRepository' - lib\services\scene_illustration_service.dart:415:44 - undefined_method
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\tts_player_service.dart:27:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\services\tts_player_service.dart:105:14 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\utils\character_matcher.dart:8:16 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\utils\character_matcher.dart:8:51 - deprecated_member_use_from_same_package
+   info - Don't use 'BuildContext's across async gaps - lib\widgets\bookshelf_selector.dart:136:11 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\widgets\immersive\immersive_role_selector.dart:139:24 - dead_null_aware_expression
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\widgets\reader\background_summary_dialog.dart:32:9 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\widgets\reader\background_summary_dialog.dart:32:44 - deprecated_member_use_from_same_package
+   info - 'DatabaseService' is deprecated and shouldn't be used. Use individual Repository Providers instead. See lib/core/providers/database_providers.dart - lib\widgets\relationship_edit_dialog.dart:117:31 - deprecated_member_use_from_same_package
+   info - Don't use 'BuildContext's across async gaps - lib\widgets\scene_illustration_dialog.dart:294:9 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:20:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:32:11 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:35:9 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:40:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:41:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:43:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:46:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:58:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:66:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:78:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:86:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:87:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:89:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:94:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:99:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:101:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:104:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:107:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:108:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\clean_test_database.dart:109:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:11:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:19:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:32:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:37:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:41:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:45:5 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:52:11 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:56:9 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:57:9 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:61:11 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:68:7 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:73:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:74:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:75:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:76:3 - avoid_print
+   info - Don't invoke 'print' in production code - tool\force_rebuild_database.dart:77:3 - avoid_print
+

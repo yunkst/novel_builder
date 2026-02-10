@@ -6,6 +6,5 @@ void main() {
   final instance = ValidationErrorLocInnerBuilder();
   // TODO add properties to the builder and call build()
 
-  group(ValidationErrorLocInner, () {
-  });
+  group(ValidationErrorLocInner, () {});
 }

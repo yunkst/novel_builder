@@ -1,19 +1,14 @@
 import '../../models/outline.dart';
-import '../../models/chapter.dart';
 import '../../services/outline_service.dart';
-import '../../services/chapter_service.dart';
 
 /// 大纲集成处理器
 /// 负责大纲相关的业务逻辑
 class OutlineIntegrationHandler {
   final OutlineService _outlineService;
-  final ChapterService _chapterService;
 
   OutlineIntegrationHandler({
     required OutlineService outlineService,
-    ChapterService? chapterService,
-  })  : _outlineService = outlineService,
-        _chapterService = chapterService ?? ChapterService();
+  }) : _outlineService = outlineService;
 
   /// 检查大纲是否存在
   Future<Outline?> getOutline(String novelUrl) async {
@@ -57,19 +52,6 @@ class OutlineIntegrationHandler {
       previousChapters: previousChapters,
       feedback: feedback,
       currentDraft: currentDraft,
-    );
-  }
-
-  /// 获取前文章节内容（用于上下文）
-  ///
-  /// 委托给 [ChapterService.getPreviousChaptersContent] 处理
-  Future<List<String>> getPreviousChaptersContent({
-    required List<Chapter> chapters,
-    required int afterIndex,
-  }) async {
-    return await _chapterService.getPreviousChaptersContent(
-      chapters: chapters,
-      afterIndex: afterIndex,
     );
   }
 }

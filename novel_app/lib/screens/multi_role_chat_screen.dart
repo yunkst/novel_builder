@@ -1,11 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
 import '../models/chat_message.dart';
 import '../services/dify_service.dart';
 import '../services/character_avatar_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/role_color_manager.dart';
+import '../utils/toast_utils.dart';
+import '../screens/providers/dify_provider.dart';
+import '../core/providers/services/cache_service_providers.dart';
 
 /// 暗色主题颜色常量
 class _DarkThemeColors {
@@ -19,9 +23,6 @@ class _DarkThemeColors {
 
   // 角色对话（深蓝色系）
   static const Color roleBubbleBackground = Color(0xFF1E3A5F);
-  // static const Color roleBubbleBorder = Color(0xFF3D5A80); // 未使用
-  // static const Color roleAvatarBorder = Color(0xFF3D5A80); // 未使用
-  // static const Color roleAvatarBackground = Color(0xFF1E3A5F); // 未使用
 
   // 用户消息（深绿色系）
   static const Color userBubbleBackground = Color(0xFF1F3D2F);
@@ -31,17 +32,44 @@ class _DarkThemeColors {
   static const Color divider = Color(0xFF3C3C3C);
   static const Color buttonPrimary = Color(0xFF2196F3);
   static const Color buttonDisabled = Color(0xFF3C3C3C);
-  static const Color errorBackground = Color(0xFFB71C1C);
 }
 
-/// 多角色聊天屏幕
+/// 多角色聊天屏幕 (Riverpod版本)
 ///
-/// 功能：
-/// - 支持与多个角色同时对话
-/// - AI扮演所有角色进行互动
-/// - 流式显示旁白和角色对话
-/// - 历史记录管理
-class MultiRoleChatScreen extends StatefulWidget {
+/// 本页面实现了一个多角色对话系统，AI 会同时扮演多个角色进行互动对话。
+///
+/// ## 核心功能
+/// - **多角色支持**：一次对话可涉及多个角色，每个角色有独立的颜色标识
+/// - **流式响应**：实时显示 AI 生成的旁白和角色对话
+/// - **标签解析**：智能解析 `<旁白>`、`<角色名>` 等 XML 风格标签
+/// - **历史记录**：维护完整的对话历史，支持上下文关联
+/// - **用户参与**：用户可选择扮演某个角色，或作为旁观者
+///
+/// ## 标签格式
+/// AI 输出的流式数据使用以下标签格式：
+/// - `<旁白>内容</旁白>` - 旁白内容（灰色背景）
+/// - `<角色名>内容</角色名>` - 角色对话（彩色气泡）
+///
+/// 标签解析支持跨 chunk 的情况，例如标签开始和结束可能在不同的数据块中。
+///
+/// ## 消息类型
+/// - **用户动作**：用户输入的动作描述（蓝色气泡）
+/// - **用户对话**：用户输入的台词（绿色气泡）
+/// - **角色对话**：AI 生成的角色台词（彩色气泡）
+/// - **旁白**：AI 生成的旁白描述（灰色气泡）
+///
+/// ## 状态管理
+/// - 使用 Riverpod 管理服务依赖
+/// - 使用 StatefulWidget 管理页面状态
+/// - 使用 TagParserState 管理跨 chunk 的标签解析状态
+///
+/// ## 数据流
+/// 1. 用户输入动作/对话
+/// 2. 发送到 Dify 服务
+/// 3. 接收流式响应（SSE）
+/// 4. 解析标签并更新 UI
+/// 5. 保存到历史记录
+class MultiRoleChatScreen extends ConsumerStatefulWidget {
   final List<Character> characters; // 多个角色
   final String play; // 剧本内容
   final List<Map<String, dynamic>> roleStrategy; // 角色策略
@@ -56,49 +84,75 @@ class MultiRoleChatScreen extends StatefulWidget {
   });
 
   @override
-  State<MultiRoleChatScreen> createState() => _MultiRoleChatScreenState();
+  ConsumerState<MultiRoleChatScreen> createState() =>
+      _MultiRoleChatScreenState();
 }
 
-class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
-  // 消息列表
+class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
+  // ========================================================================
+  // 状态管理
+  // ========================================================================
+
+  /// 消息列表（包含用户消息和 AI 响应）
   List<ChatMessage> _messages = [];
 
-  // 生成状态
+  /// 是否正在生成 AI 响应
   bool _isGenerating = false;
 
-  // 解析状态
-  bool _inDialogue = false; // 是否在角色对话中
+  /// 是否在角色对话标签中（用于标签解析）
+  bool _inDialogue = false;
 
-  // 标签解析状态（用于跨chunk标签解析）
+  /// 标签解析状态（用于跨 chunk 标签解析）
   final TagParserState _tagParserState = TagParserState();
 
-  // AI响应累积（用于历史记录）
+  /// AI 响应累积（用于历史记录）
   String _currentAiResponse = '';
 
-  // 聊天历史
+  /// 聊天历史（用于发送给 AI 的上下文）
   final List<String> _chatHistory = [];
 
-  // 控制器
+  // ========================================================================
+  // 控制器和焦点
+  // ========================================================================
+
+  /// 动作输入控制器
   final TextEditingController _actionController = TextEditingController();
+
+  /// 对话输入控制器
   final TextEditingController _speechController = TextEditingController();
+
+  /// 滚动控制器
   final ScrollController _scrollController = ScrollController();
 
-  // FocusNode用于追踪输入框焦点
+  /// 动作输入焦点
   final FocusNode _actionFocusNode = FocusNode();
+
+  /// 对话输入焦点
   final FocusNode _speechFocusNode = FocusNode();
 
-  // 服务
-  final DifyService _difyService = DifyService();
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
+  // ========================================================================
+  // 服务和颜色管理
+  // ========================================================================
 
-  // 角色颜色映射
+  /// Dify 服务实例（通过 Riverpod 获取）
+  late DifyService _difyService;
+
+  /// 角色头像服务实例（通过 Riverpod 获取）
+  late CharacterAvatarService _avatarService;
+
+  /// 角色颜色映射（每个角色分配独特的颜色）
   late Map<String, Color> _roleColors;
 
   @override
   void initState() {
     super.initState();
     _roleColors = RoleColorManager.assignColors(widget.characters);
-    _startInitialChat();
+    // 延迟初始化聊天，确保服务已加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _difyService = ref.read(difyServiceProvider);
+      _avatarService = ref.watch(characterAvatarServiceProvider);
+      _startInitialChat();
+    });
   }
 
   @override
@@ -110,6 +164,10 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     _speechFocusNode.dispose();
     super.dispose();
   }
+
+  // ========================================================================
+  // 聊天初始化
+  // ========================================================================
 
   /// 开始初始聊天
   Future<void> _startInitialChat() async {
@@ -187,7 +245,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
       if (character.bodyType != null && character.bodyType!.isNotEmpty) {
         buffer.writeln('体型：${character.bodyType}');
       }
-      if (character.appearanceFeatures != null && character.appearanceFeatures!.isNotEmpty) {
+      if (character.appearanceFeatures != null &&
+          character.appearanceFeatures!.isNotEmpty) {
         buffer.writeln('外貌：${character.appearanceFeatures}');
       }
 
@@ -210,7 +269,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     // 累积原始AI响应（用于历史记录）
     _currentAiResponse += chunk;
 
-    final displayChunk = chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
+    final displayChunk =
+        chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
     debugPrint('📦 收到chunk: "$displayChunk"');
     debugPrint('🏷️ 标签状态: ${_tagParserState.toString()}');
 
@@ -235,6 +295,10 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     _scrollToBottom();
   }
 
+  // ========================================================================
+  // UI 辅助方法
+  // ========================================================================
+
   /// 滚动到底部
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
@@ -253,12 +317,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   /// 显示错误提示
   void _showErrorSnackBar(String error) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('生成失败: $error'),
-          backgroundColor: _DarkThemeColors.errorBackground,
-        ),
-      );
+      ToastUtils.showError('生成失败: $error');
     }
   }
 
@@ -286,9 +345,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
     // 获取当前文本和光标位置
     final text = controller.text;
     final selection = controller.selection;
-    final cursorPosition = selection.baseOffset >= 0
-        ? selection.baseOffset
-        : text.length;
+    final cursorPosition =
+        selection.baseOffset >= 0 ? selection.baseOffset : text.length;
 
     // 在光标位置插入角色名
     final newText = text.replaceRange(
@@ -305,13 +363,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
 
     // 显示插入成功提示
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已插入: $characterName'),
-          duration: const Duration(milliseconds: 800),
-          backgroundColor: _DarkThemeColors.buttonPrimary,
-        ),
-      );
+      ToastUtils.showInfo('已插入: $characterName');
     }
 
     setState(() {});
@@ -351,9 +403,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         children: [
           // 聊天消息列表
           Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : _buildMessageList(),
+            child: _messages.isEmpty ? _buildEmptyState() : _buildMessageList(),
           ),
 
           // 用户输入区域
@@ -439,8 +489,8 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
   /// 构建角色对话气泡
   Widget _buildDialogueBubble(ChatMessage message) {
     final character = message.character!;
-    final color = _roleColors[character.name] ??
-        _DarkThemeColors.roleBubbleBackground;
+    final color =
+        _roleColors[character.name] ?? _DarkThemeColors.roleBubbleBackground;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -622,10 +672,10 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
         children: [
           // 角色选择提示
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: _DarkThemeColors.roleBubbleBackground.withValues(alpha: 0.1),
+              color:
+                  _DarkThemeColors.roleBubbleBackground.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: _DarkThemeColors.divider,
@@ -714,7 +764,7 @@ class _MultiRoleChatScreenState extends State<MultiRoleChatScreen> {
               onPressed: _canSend() ? _sendMessage : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _DarkThemeColors.buttonPrimary,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 disabledBackgroundColor: _DarkThemeColors.buttonDisabled,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),

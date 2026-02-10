@@ -1,17 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/role_gallery.dart';
-import '../services/api_service_wrapper.dart';
-import '../services/role_gallery_cache_service.dart';
-import '../services/character_avatar_sync_service.dart';
-import '../services/character_avatar_service.dart';
-import '../services/image_crop_service.dart';
+import '../core/providers/service_providers.dart';
+import '../utils/toast_utils.dart';
 import '../widgets/api_image_widget.dart';
 import '../widgets/gallery_action_panel.dart';
-import '../core/di/api_service_provider.dart';
+import '../services/image_crop_service.dart';
 
-/// 图集浏览页面
-class GalleryViewScreen extends StatefulWidget {
+/// 图集浏览页面 - Riverpod 版本
+class GalleryViewScreen extends ConsumerStatefulWidget {
   final String roleId;
   final String? roleName;
 
@@ -22,10 +20,10 @@ class GalleryViewScreen extends StatefulWidget {
   });
 
   @override
-  State<GalleryViewScreen> createState() => _GalleryViewScreenState();
+  ConsumerState<GalleryViewScreen> createState() => _GalleryViewScreenState();
 }
 
-class _GalleryViewScreenState extends State<GalleryViewScreen>
+class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
   late AnimationController _fadeController;
@@ -36,12 +34,6 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   RoleGallery? _gallery;
   List<RoleImage> _sortedImages = [];
   bool _hasGalleryLoadError = false;
-
-  final ApiServiceWrapper _apiService = ApiServiceProvider.instance;
-  final RoleGalleryCacheService _cacheService = RoleGalleryCacheService();
-  final CharacterAvatarSyncService _avatarSyncService =
-      CharacterAvatarSyncService();
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
 
   @override
   void initState() {
@@ -62,8 +54,11 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _initializeCacheService() async {
     try {
-      await _cacheService.init();
-      await _avatarSyncService.init();
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final avatarSyncService = ref.read(characterAvatarSyncServiceProvider);
+
+      await cacheService.init();
+      await avatarSyncService.init();
       _loadGallery();
       _fadeController.forward();
     } catch (e) {
@@ -83,7 +78,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
 
   Future<void> _loadGallery() async {
     try {
-      final galleryData = await _apiService.getRoleGallery(widget.roleId);
+      final apiService = ref.read(apiServiceWrapperProvider);
+      final galleryData = await apiService.getRoleGallery(widget.roleId);
 
       setState(() {
         _gallery = RoleGallery.fromJson(galleryData);
@@ -104,17 +100,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
       debugPrint('❌ 图集加载失败: $e');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载图集失败: $e'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: '重试',
-              textColor: Colors.white,
-              onPressed: _loadGallery,
-            ),
-          ),
-        );
+        _showErrorSnackBar('加载图集失败: $e', onRetry: _loadGallery);
       }
     }
   }
@@ -122,12 +108,13 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   Future<void> _preloadImages() async {
     if (_sortedImages.isEmpty) return;
 
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
     final preloadFilenames = _sortedImages
         .take(3) // 预加载前3张
         .map((img) => img.filename)
         .toList();
 
-    await _cacheService.preloadImages(preloadFilenames);
+    await cacheService.preloadImages(preloadFilenames);
   }
 
   void _onPageChanged(int index) {
@@ -153,18 +140,22 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
     });
 
     // 清除相关缓存
-    _cacheService.clearMemoryCache();
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
+    cacheService.clearMemoryCache();
 
     await _loadGallery();
   }
 
   Future<void> _onDeleteImage(RoleImage image) async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 删除本地缓存
-      await _cacheService.deleteCachedImage(image.filename);
+      await cacheService.deleteCachedImage(image.filename);
 
       // 调用后端删除接口
-      final success = await _apiService.deleteRoleImage(
+      final success = await apiService.deleteRoleImage(
         roleId: widget.roleId,
         imageUrl: image.filename,
       );
@@ -188,40 +179,34 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('图片删除成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ToastUtils.showSuccess('图片删除成功');
         }
       }
     } catch (e) {
       debugPrint('❌ 删除图片失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('删除失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('删除失败: $e');
       }
     }
   }
 
-  Future<void> _onGenerateMoreImages(int count) async {
+  Future<void> _onGenerateMoreImages(int count, String? modelName) async {
     try {
+      final apiService = ref.read(apiServiceWrapperProvider);
+
       // 获取当前显示的图片作为参考图片
       final currentImage =
           _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
       final referenceImageUrl = currentImage?.filename;
 
-      debugPrint('🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl');
+      debugPrint(
+          '🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName');
 
-      await _apiService.generateMoreImages(
+      await apiService.generateMoreImages(
         roleId: widget.roleId,
         count: count,
         referenceImageUrl: referenceImageUrl,
+        modelName: modelName,
       );
 
       if (mounted) {
@@ -231,21 +216,10 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
             ? '已提交 $count 张相似图片的生成请求，请等待1-3分钟'
             : '已提交 $count 张新图片的生成请求，请等待1-3分钟';
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.blue,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: '查看详情',
-              textColor: Colors.white,
-              onPressed: () {
-                // 重新显示生成中对话框
-                _showGeneratingDialog();
-              },
-            ),
-          ),
-        );
+        showInfoWithAction(message, '查看详情', () {
+          // 重新显示生成中对话框
+          _showGeneratingDialog();
+        });
       }
 
       // 显示生成中提示
@@ -253,26 +227,24 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
     } catch (e) {
       debugPrint('❌ 生成图片失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('生成失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('生成失败: $e', context: context);
       }
     }
   }
 
   Future<void> _onSetAsAvatar(RoleImage image) async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+      final avatarService = ref.read(characterAvatarServiceProvider);
+
       debugPrint('🎨 开始设置图片为头像: ${image.filename}');
 
       // 获取图片字节数据
-      final imageBytes = await _cacheService.getImageBytes(image.filename);
+      final imageBytes = await cacheService.getImageBytes(image.filename);
       if (imageBytes == null) {
         debugPrint('❌ 无法获取图片数据: ${image.filename}');
         if (mounted) {
-          _showErrorSnackBar('无法获取图片数据');
+          ToastUtils.showError('无法获取图片数据');
         }
         return;
       }
@@ -284,7 +256,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
       } catch (e) {
         debugPrint('❌ 角色ID解析失败: ${widget.roleId}, 错误: $e');
         if (mounted) {
-          _showErrorSnackBar('角色ID无效');
+          ToastUtils.showError('角色ID无效');
         }
         return;
       }
@@ -314,7 +286,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
       } catch (e) {
         debugPrint('❌ 图片准备阶段失败: $e');
         if (mounted) {
-          _showErrorSnackBar('图片准备失败: $e');
+          ToastUtils.showError('图片准备失败: $e');
         }
         // 清理资源
         await _cleanupTempFiles(tempDir, tempFile, null);
@@ -327,13 +299,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
       if (croppedFile == null) {
         debugPrint('ℹ️ 用户取消了图片裁剪');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已取消头像设置'),
-              backgroundColor: Colors.grey,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ToastUtils.showInfo('已取消头像设置');
         }
         return;
       }
@@ -343,7 +309,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         final imageBytes = await croppedFile.readAsBytes();
 
         // 直接使用CharacterAvatarService设置头像
-        final avatarPath = await _avatarService.setAvatarFromGallery(
+        final avatarPath = await avatarService.setAvatarFromGallery(
           characterId,
           imageBytes,
           'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -353,18 +319,12 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
           debugPrint('✅ 图片裁剪并设置头像成功: ${image.filename} -> $avatarPath');
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('头像设置成功'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
+            ToastUtils.showSuccess('头像设置成功');
           }
         } else {
           debugPrint('❌ 裁剪后的图片设置头像失败');
           if (mounted) {
-            _showErrorSnackBar('头像设置失败');
+            ToastUtils.showError('头像设置失败');
           }
         }
       } finally {
@@ -404,18 +364,38 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   /// 显示错误提示
-  void _showErrorSnackBar(String message) {
+  void _showErrorSnackBar(String message, {VoidCallback? onRetry}) {
+    if (onRetry != null) {
+      // 使用SnackBar显示带重试按钮的错误提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: '重试',
+            textColor: Theme.of(context).colorScheme.surface,
+            onPressed: onRetry,
+          ),
+        ),
+      );
+    } else {
+      ToastUtils.showError(message, context: context);
+    }
+  }
+
+  /// 显示带操作的信息提示（用于查看生成详情）
+  void showInfoWithAction(
+      String message, String actionLabel, VoidCallback onAction) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 5),
         action: SnackBarAction(
-          label: '重试',
-          textColor: Colors.white,
-          onPressed: () {
-            // 可以在这里添加重试逻辑
-          },
+          label: actionLabel,
+          textColor: Theme.of(context).colorScheme.surface,
+          onPressed: onAction,
         ),
       ),
     );
@@ -540,7 +520,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Stack(
         children: [
           // 主要内容区域
@@ -585,17 +565,19 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   }
 
   Widget _buildImagePage(RoleImage image, int index) {
+    final cacheService = ref.read(roleGalleryCacheServiceProvider);
+
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: Colors.black,
+      color: Theme.of(context).colorScheme.surface,
       child: ApiImageWidget(
         imageUrl: image.filename,
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.contain,
         onRetry: () => _refreshGallery(),
-        cacheService: _cacheService, // 传递已初始化的缓存服务
+        cacheService: cacheService, // 传递已初始化的缓存服务
       ),
     );
   }
@@ -609,13 +591,13 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.white70,
+              color: Color(0xB3FFFFFF),
             ),
             const SizedBox(height: 16),
             const Text(
               '图集加载失败',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFFFFFFFF),
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
@@ -624,7 +606,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
             Text(
               '请检查网络连接后重试',
               style: TextStyle(
-                color: Colors.white70,
+                color: Color(0xB3FFFFFF),
                 fontSize: 14,
               ),
             ),
@@ -635,7 +617,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               label: const Text('重试加载'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.surface,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -650,14 +632,14 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(
-            color: Colors.white,
+            color: Color(0xFFFFFFFF),
             strokeWidth: 2,
           ),
           const SizedBox(height: 16),
           Text(
             '加载图集中...',
             style: TextStyle(
-              color: Colors.white,
+              color: Color(0xFFFFFFFF),
               fontSize: 16,
             ),
           ),
@@ -680,7 +662,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withValues(alpha: 0.8),
+              Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
               Colors.transparent,
             ],
           ),
@@ -691,13 +673,14 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               IconButton(
                 onPressed: () =>
                     Navigator.of(context).pop(true), // 总是返回true以触发数据刷新
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                icon:
+                    const Icon(Icons.arrow_back_ios, color: Color(0xFFFFFFFF)),
               ),
               Expanded(
                 child: Text(
                   widget.roleName ?? '角色图集',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFFFFFFFF),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -706,7 +689,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
               ),
               IconButton(
                 onPressed: _refreshGallery,
-                icon: const Icon(Icons.refresh, color: Colors.white),
+                icon: const Icon(Icons.refresh, color: Color(0xFFFFFFFF)),
               ),
             ],
           ),
@@ -733,7 +716,8 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
         currentIndex: _currentIndex,
         totalCount: _sortedImages.length,
         onDelete: () => _onDeleteImage(currentImage),
-        onGenerateMore: (count) => _onGenerateMoreImages(count),
+        onGenerateMore: (count, modelName) =>
+            _onGenerateMoreImages(count, modelName),
         onSetAsAvatar: () => _onSetAsAvatar(currentImage),
       ),
     );
@@ -748,7 +732,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.7),
+            Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
             Colors.transparent,
           ],
         ),
@@ -809,17 +793,14 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
   /// 处理图集加载出错时的删除操作
   Future<void> _handleErrorDelete() async {
     try {
+      final cacheService = ref.read(roleGalleryCacheServiceProvider);
+
       // 由于图集加载失败，我们无法获取具体的图片信息
       // 这里只清除本地缓存，并尝试重新加载
-      _cacheService.clearMemoryCache();
+      cacheService.clearMemoryCache();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('缓存已清除，正在重新加载图集...'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        ToastUtils.showInfo('缓存已清除，正在重新加载图集...');
       }
 
       // 重新加载图集
@@ -827,12 +808,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
     } catch (e) {
       debugPrint('❌ 重新加载图集失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('重新加载失败，请稍后再试: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('重新加载失败，请稍后再试: $e');
       }
     }
   }
@@ -875,7 +851,7 @@ class _GalleryViewScreenState extends State<GalleryViewScreen>
             Text(
               label,
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFFFFFFFF),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

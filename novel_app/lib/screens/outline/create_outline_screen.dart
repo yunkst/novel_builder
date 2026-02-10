@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/outline.dart';
-import '../../services/outline_service.dart';
+import '../../core/providers/database_providers.dart';
 import '../../mixins/dify_streaming_mixin.dart';
+import '../../utils/toast_utils.dart';
 
 /// 创建/编辑大纲页面
 /// 支持AI生成大纲和手动编辑
-class CreateOutlineScreen extends StatefulWidget {
+class CreateOutlineScreen extends ConsumerStatefulWidget {
   final String novelUrl;
   final String novelTitle;
   final String? backgroundSetting; // 小说背景设定
@@ -20,12 +22,12 @@ class CreateOutlineScreen extends StatefulWidget {
   });
 
   @override
-  State<CreateOutlineScreen> createState() => _CreateOutlineScreenState();
+  ConsumerState<CreateOutlineScreen> createState() =>
+      _CreateOutlineScreenState();
 }
 
-class _CreateOutlineScreenState extends State<CreateOutlineScreen>
+class _CreateOutlineScreenState extends ConsumerState<CreateOutlineScreen>
     with DifyStreamingMixin {
-  final OutlineService _outlineService = OutlineService();
   final _requirementController = TextEditingController();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
@@ -58,9 +60,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
   /// 生成大纲（使用Dify流式API + DifyStreamingMixin）
   Future<void> _generateOutline() async {
     if (_requirementController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先输入大纲要求')),
-      );
+      ToastUtils.show('请先输入大纲要求');
       return;
     }
 
@@ -133,12 +133,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
     // 验证用户输入
     if (feedback == null || feedback.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已取消修改'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        ToastUtils.show('已取消修改');
       }
       return;
     }
@@ -177,41 +172,36 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
   /// 保存大纲
   Future<void> _saveOutline() async {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入大纲标题')),
-      );
+      ToastUtils.show('请输入大纲标题');
       return;
     }
 
     if (_contentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入或生成大纲内容')),
-      );
+      ToastUtils.show('请输入或生成大纲内容');
       return;
     }
 
     setState(() => _saving = true);
 
     try {
-      await _outlineService.saveOutline(
+      final repository = ref.read(outlineRepositoryProvider);
+      final outline = Outline(
         novelUrl: widget.novelUrl,
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
+
+      await repository.saveOutline(outline);
 
       if (mounted) {
         Navigator.pop(context, true); // 返回true表示保存成功
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isEditMode ? '大纲已更新' : '大纲已创建'),
-          ),
-        );
+        ToastUtils.showSuccess(_isEditMode ? '大纲已更新' : '大纲已创建');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
+        ToastUtils.showError('保存失败: $e');
       }
     } finally {
       if (mounted) {
@@ -307,8 +297,10 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                         onPressed: cancelStreaming,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.secondary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSecondary,
                         ),
                       ),
                     ),
@@ -363,21 +355,25 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.info_outline,
-                        color: Colors.blue.shade700, size: 20),
+                        color: Theme.of(context).colorScheme.primary, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '您可以直接编辑上方的大纲内容，点击右上角的"保存"按钮即可保存。',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.blue.shade700,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                       ),
                     ),
@@ -400,7 +396,7 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -408,13 +404,19 @@ class _CreateOutlineScreenState extends State<CreateOutlineScreen>
                     Icon(
                       Icons.edit_note,
                       size: 48,
-                      color: Colors.grey.shade400,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       '输入大纲要求并点击"生成大纲"',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
                           ),
                     ),
                   ],

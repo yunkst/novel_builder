@@ -347,7 +347,7 @@ class ImageToVideoService:
                 original_prompt = user_input if user_input else "一个美丽的场景"
 
             # 获取工作流配置中的 prompt_skill（I2V 可能有）
-            from ..workflow_config import WorkflowType
+            from ..workflow_config import WorkflowType, workflow_config_manager
 
             workflow = workflow_config_manager.get_i2v_workflow_by_title(model_name)
             prompt_skill = workflow.prompt_skill if workflow else None

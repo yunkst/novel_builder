@@ -13,10 +13,11 @@ part 'video_status_response.g.dart';
 /// Properties:
 /// * [imgName] - 图片名称
 /// * [hasVideo] - 是否存在视频
-/// * [videoStatus] 
-/// * [videoFilename] 
+/// * [videoStatus]
+/// * [videoFilename]
 @BuiltValue()
-abstract class VideoStatusResponse implements Built<VideoStatusResponse, VideoStatusResponseBuilder> {
+abstract class VideoStatusResponse
+    implements Built<VideoStatusResponse, VideoStatusResponseBuilder> {
   /// 图片名称
   @BuiltValueField(wireName: r'img_name')
   String get imgName;
@@ -33,18 +34,24 @@ abstract class VideoStatusResponse implements Built<VideoStatusResponse, VideoSt
 
   VideoStatusResponse._();
 
-  factory VideoStatusResponse([void updates(VideoStatusResponseBuilder b)]) = _$VideoStatusResponse;
+  factory VideoStatusResponse([void updates(VideoStatusResponseBuilder b)]) =
+      _$VideoStatusResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(VideoStatusResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<VideoStatusResponse> get serializer => _$VideoStatusResponseSerializer();
+  static Serializer<VideoStatusResponse> get serializer =>
+      _$VideoStatusResponseSerializer();
 }
 
-class _$VideoStatusResponseSerializer implements PrimitiveSerializer<VideoStatusResponse> {
+class _$VideoStatusResponseSerializer
+    implements PrimitiveSerializer<VideoStatusResponse> {
   @override
-  final Iterable<Type> types = const [VideoStatusResponse, _$VideoStatusResponse];
+  final Iterable<Type> types = const [
+    VideoStatusResponse,
+    _$VideoStatusResponse
+  ];
 
   @override
   final String wireName = r'VideoStatusResponse';
@@ -86,7 +93,9 @@ class _$VideoStatusResponseSerializer implements PrimitiveSerializer<VideoStatus
     VideoStatusResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -159,4 +168,3 @@ class _$VideoStatusResponseSerializer implements PrimitiveSerializer<VideoStatus
     return result.build();
   }
 }
-

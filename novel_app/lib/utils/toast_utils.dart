@@ -4,89 +4,136 @@ import 'package:fluttertoast/fluttertoast.dart';
 /// Toast提示工具类
 class ToastUtils {
   /// 显示成功提示
-  static void showSuccess(BuildContext context, String message) {
+  static void showSuccess(
+    String message, {
+    BuildContext? context,
+    Duration? duration,
+  }) {
     _showToast(
       message,
       backgroundColor: Colors.green,
+      duration: duration,
     );
   }
 
   /// 显示错误提示
-  static void showError(BuildContext context, String message) {
+  static void showError(
+    String message, {
+    BuildContext? context,
+    Duration? duration,
+  }) {
     _showToast(
       message,
       backgroundColor: Colors.red,
+      duration: duration,
     );
   }
 
   /// 显示警告提示
-  static void showWarning(BuildContext context, String message) {
+  static void showWarning(
+    String message, {
+    BuildContext? context,
+    Duration? duration,
+  }) {
     _showToast(
       message,
       backgroundColor: Colors.orange,
+      duration: duration,
     );
   }
 
   /// 显示信息提示
-  static void showInfo(BuildContext context, String message) {
+  static void showInfo(
+    String message, {
+    BuildContext? context,
+    Duration? duration,
+  }) {
     _showToast(
       message,
       backgroundColor: Colors.blue,
+      duration: duration,
     );
   }
 
   /// 显示加载提示
-  static void showLoading(BuildContext context, String message) {
+  static void showLoading(
+    String message, {
+    BuildContext? context,
+    Duration? duration,
+  }) {
     _showToast(
       message,
-      backgroundColor: Colors.grey[700]!,
+      backgroundColor: Colors.blue,
+      duration: duration,
     );
   }
 
-  /// 显示搜索状态提示
-  static void showSearchStatus(BuildContext context, String message,
-      {bool isError = false}) {
-    if (isError) {
-      showError(context, message);
-    } else {
-      showInfo(context, message);
-    }
-  }
-
-  /// 显示网络错误提示
-  static void showNetworkError(BuildContext context, {String? customMessage}) {
-    showError(
-      context,
-      customMessage ?? '网络连接失败，请检查网络设置',
+  /// 显示普通提示（默认灰色）
+  static void show(
+    String message, {
+    BuildContext? context,
+    Color? backgroundColor,
+    Duration? duration,
+  }) {
+    _showToast(
+      message,
+      backgroundColor: backgroundColor ?? const Color(0xFF616161),
+      duration: duration,
     );
   }
 
-  /// 显示爬虫失败提示
-  static void showCrawlerError(BuildContext context, String siteName,
-      {String? reason}) {
-    final message =
-        reason != null ? '$siteName 搜索失败: $reason' : '$siteName 搜索失败，正在尝试其他站点';
-    showWarning(context, message);
+  /// 关闭当前显示的Toast
+  static void dismiss() {
+    Fluttertoast.cancel();
   }
 
-  /// 显示搜索结果提示
-  static void showSearchResult(
-      BuildContext context, int totalResults, int failedSites) {
-    if (totalResults == 0) {
-      showWarning(context, '未找到相关小说，请尝试其他关键词');
-    } else if (failedSites > 0) {
-      showInfo(context, '找到 $totalResults 本小说，$failedSites 个站点搜索失败');
-    } else {
-      showSuccess(context, '找到 $totalResults 本小说');
-    }
+  /// 显示带操作的提示（用于简单场景，实际操作需要自定义对话框）
+  static void showErrorWithAction(
+    String message,
+    String actionLabel,
+    VoidCallback onAction, {
+    BuildContext? context,
+  }) {
+    // 简化实现：先显示Toast
+    showError(message, context: context);
+    // 注意：实际操作需要在调用方处理对话框
+  }
+
+  /// 显示带操作的警告提示（用于简单场景）
+  static void showWarningWithAction(
+    String message,
+    String actionLabel,
+    VoidCallback onAction, {
+    BuildContext? context,
+  }) {
+    // 简化实现：先显示Toast
+    showWarning(message, context: context);
+    // 注意：实际操作需要在调用方处理对话框
+  }
+
+  /// 显示带操作的信息提示（用于简单场景）
+  static void showInfoWithAction(
+    String message,
+    String actionLabel,
+    VoidCallback onAction, {
+    BuildContext? context,
+  }) {
+    // 简化实现：先显示Toast
+    showInfo(message, context: context);
+    // 注意：实际操作需要在调用方处理对话框
   }
 
   /// 私有方法：显示toast（使用FlutterToast插件）
   static void _showToast(
     String message, {
     required Color backgroundColor,
-    Toast toastLength = Toast.LENGTH_SHORT,
+    Duration? duration,
   }) {
+    final toastLength =
+        duration != null && (duration.inSeconds >= 3 || duration.inMinutes >= 1)
+            ? Toast.LENGTH_LONG
+            : Toast.LENGTH_SHORT;
+
     Fluttertoast.showToast(
       msg: message,
       toastLength: toastLength,

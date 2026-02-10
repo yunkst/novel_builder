@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/tts_timer_config.dart';
@@ -10,9 +10,14 @@ import '../widgets/tts_content_display.dart';
 import '../widgets/tts_chapter_selector.dart';
 import '../widgets/tts_timer_settings_sheet.dart';
 import '../widgets/tts_timer_complete_dialog.dart';
+import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
+import '../core/providers/services/ai_service_providers.dart';
 
-/// TTS播放器全屏页面
-class TtsPlayerScreen extends StatefulWidget {
+/// TTS播放器全屏页面 - Riverpod 版本
+///
+/// 每个 TTS 播放器实例都是独立的，在 State 中管理服务实例
+class TtsPlayerScreen extends ConsumerStatefulWidget {
   final Novel novel;
   final List<Chapter> chapters;
   final Chapter startChapter;
@@ -29,10 +34,10 @@ class TtsPlayerScreen extends StatefulWidget {
   });
 
   @override
-  State<TtsPlayerScreen> createState() => _TtsPlayerScreenState();
+  ConsumerState<TtsPlayerScreen> createState() => _TtsPlayerScreenState();
 }
 
-class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
+class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
   late TtsPlayerService _playerService;
   StreamSubscription<TtsTimerConfig>? _timerCompleteSubscription;
 
@@ -40,21 +45,24 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
   void initState() {
     super.initState();
 
-    // 创建播放器服务
-    _playerService = TtsPlayerService();
-
     // 初始化播放器
     _initializePlayer();
 
+    // 监听定时完成事件将在 _initializePlayer 中设置
+  }
+
+  Future<void> _initializePlayer() async {
+    // 通过Provider创建播放器服务
+    _playerService = ref.read(ttsPlayerServiceProvider);
+
     // 监听定时完成事件
-    _timerCompleteSubscription = _playerService.onTimerComplete.listen((config) {
+    _timerCompleteSubscription =
+        _playerService.onTimerComplete.listen((config) {
       if (mounted) {
         _showTimerCompleteDialog(config);
       }
     });
-  }
 
-  Future<void> _initializePlayer() async {
     final success = await _playerService.initializeWithNovel(
       novel: widget.novel,
       chapters: widget.chapters,
@@ -65,12 +73,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
     if (!success && mounted) {
       // 初始化失败，显示错误并返回
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('TTS初始化失败: ${_playerService.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        'TTS初始化失败: ${_playerService.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'initialization', 'failed'],
       );
+      ToastUtils.showError('TTS初始化失败: ${_playerService.errorMessage}');
       Navigator.pop(context);
     }
   }
@@ -84,201 +92,205 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _playerService,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Consumer<TtsPlayerService>(
-            builder: (context, player, child) {
-              final currentChapter = player.currentChapter;
-              final currentIndex = player.currentChapterIndex;
-              final totalChapters = player.allChapters.length;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.novel.title,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          currentChapter?.title ?? '加载中...',
-                          style: const TextStyle(fontSize: 16),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (totalChapters > 0)
-                        Text(
-                          ' ${currentIndex + 1}/$totalChapters',
-                          style: const TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            },
+    // 使用 ListenableBuilder 监听播放器状态变化
+    return ListenableBuilder(
+      listenable: _playerService,
+      builder: (context, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: _buildTitle(),
+            actions: [
+              // 定时按钮
+              _buildTimerButton(),
+              // 章节选择按钮
+              _buildChapterSelectorButton(),
+              // 设置按钮
+              IconButton(
+                onPressed: () => _showSettings(),
+                icon: const Icon(Icons.settings),
+                tooltip: '设置',
+              ),
+            ],
           ),
-          actions: [
-            // 定时按钮
-            Consumer<TtsPlayerService>(
-              builder: (context, player, child) {
-                final timerEnabled = player.timerConfig.enabled;
-                final timerCount = player.timerConfig.chapterCount;
+          body: _buildBody(),
+        );
+      },
+    );
+  }
 
-                return IconButton(
-                  onPressed: () => _showTimerSettings(player),
-                  icon: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        timerEnabled ? Icons.timer : Icons.timer_outlined,
-                        color: timerEnabled ? Colors.orange : null,
-                      ),
-                      if (timerEnabled)
-                        Positioned(
-                          right: -6,
-                          bottom: -6,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.orange,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              '$timerCount',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  tooltip: timerEnabled ? '定时$timerCount章' : '定时结束',
-                );
-              },
+  Widget _buildTitle() {
+    final currentChapter = _playerService.currentChapter;
+    final currentIndex = _playerService.currentChapterIndex;
+    final totalChapters = _playerService.allChapters.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.novel.title,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                currentChapter?.title ?? '加载中...',
+                style: const TextStyle(fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            // 章节选择按钮
-            Consumer<TtsPlayerService>(
-              builder: (context, player, child) {
-                return IconButton(
-                  onPressed: (player.state == TtsPlayerState.idle ||
-                             player.state == TtsPlayerState.paused)
-                      ? () => _showChapterSelector(player)
-                      : null,
-                  icon: const Icon(Icons.list),
-                  tooltip: '章节列表',
-                );
-              },
-            ),
-            // 设置按钮
-            IconButton(
-              onPressed: () => _showSettings(),
-              icon: const Icon(Icons.settings),
-              tooltip: '设置',
-            ),
+            if (totalChapters > 0)
+              Text(
+                ' ${currentIndex + 1}/$totalChapters',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+              ),
           ],
         ),
-        body: Consumer<TtsPlayerService>(
-          builder: (context, player, child) {
-            // 根据状态显示不同内容
-            switch (player.state) {
-              case TtsPlayerState.loading:
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('正在加载...'),
-                    ],
-                  ),
-                );
-
-              case TtsPlayerState.error:
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text(
-                        player.errorMessage ?? '发生错误',
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('返回'),
-                      ),
-                    ],
-                  ),
-                );
-
-              case TtsPlayerState.completed:
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
-                      const SizedBox(height: 16),
-                      const Text('朗读完成', style: TextStyle(fontSize: 18)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('返回'),
-                      ),
-                    ],
-                  ),
-                );
-
-              default:
-                // 显示播放界面
-                return Column(
-                  children: [
-                    // 内容显示区
-                    Expanded(
-                      child: TtsContentDisplay(
-                        paragraphs: player.paragraphs,
-                        currentIndex: player.currentParagraphIndex,
-                        onParagraphTap: (index) {
-                          player.jumpToParagraph(index);
-                        },
-                      ),
-                    ),
-
-                    // 控制面板
-                    TtsControlPanel(
-                      state: player.state,
-                      hasPreviousChapter: player.hasPreviousChapter,
-                      hasNextChapter: player.hasNextChapter,
-                      speechRate: player.speechRate,
-                      onPlay: () => player.play(),
-                      onPause: () => player.pause(),
-                      onStop: () => player.stop(),
-                      onPreviousChapter: () => _previousChapter(player),
-                      onNextChapter: () => _nextChapter(player),
-                      onRateChanged: (rate) => player.setSpeechRate(rate),
-                    ),
-                  ],
-                );
-            }
-          },
-        ),
-      ),
+      ],
     );
+  }
+
+  Widget _buildTimerButton() {
+    final timerEnabled = _playerService.timerConfig.enabled;
+    final timerCount = _playerService.timerConfig.chapterCount;
+
+    return IconButton(
+      onPressed: () => _showTimerSettings(_playerService),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            timerEnabled ? Icons.timer : Icons.timer_outlined,
+            color: timerEnabled ? Colors.orange : null,
+          ),
+          if (timerEnabled)
+            Positioned(
+              right: -6,
+              bottom: -6,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.orange,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  '$timerCount',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).colorScheme.surface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+      tooltip: timerEnabled ? '定时$timerCount章' : '定时结束',
+    );
+  }
+
+  Widget _buildChapterSelectorButton() {
+    return IconButton(
+      onPressed: (_playerService.state == TtsPlayerState.idle ||
+              _playerService.state == TtsPlayerState.paused)
+          ? () => _showChapterSelector(_playerService)
+          : null,
+      icon: const Icon(Icons.list),
+      tooltip: '章节列表',
+    );
+  }
+
+  Widget _buildBody() {
+    // 根据状态显示不同内容
+    switch (_playerService.state) {
+      case TtsPlayerState.loading:
+        return const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('正在加载...'),
+            ],
+          ),
+        );
+
+      case TtsPlayerState.error:
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                _playerService.errorMessage ?? '发生错误',
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('返回'),
+              ),
+            ],
+          ),
+        );
+
+      case TtsPlayerState.completed:
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle_outline,
+                  size: 64, color: Colors.green),
+              const SizedBox(height: 16),
+              const Text('朗读完成', style: TextStyle(fontSize: 18)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('返回'),
+              ),
+            ],
+          ),
+        );
+
+      default:
+        // 显示播放界面
+        return Column(
+          children: [
+            // 内容显示区
+            Expanded(
+              child: TtsContentDisplay(
+                paragraphs: _playerService.paragraphs,
+                currentIndex: _playerService.currentParagraphIndex,
+                onParagraphTap: (index) {
+                  _playerService.jumpToParagraph(index);
+                },
+              ),
+            ),
+
+            // 控制面板
+            TtsControlPanel(
+              state: _playerService.state,
+              hasPreviousChapter: _playerService.hasPreviousChapter,
+              hasNextChapter: _playerService.hasNextChapter,
+              speechRate: _playerService.speechRate,
+              onPlay: () => _playerService.play(),
+              onPause: () => _playerService.pause(),
+              onStop: () => _playerService.stop(),
+              onPreviousChapter: () => _previousChapter(_playerService),
+              onNextChapter: () => _nextChapter(_playerService),
+              onRateChanged: (rate) => _playerService.setSpeechRate(rate),
+            ),
+          ],
+        );
+    }
   }
 
   /// 显示章节选择器
@@ -293,12 +305,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
           Navigator.pop(builderContext);
           final success = await player.jumpToChapter(chapter);
           if (!success && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('跳转章节失败: ${player.errorMessage}'),
-                backgroundColor: Colors.red,
-              ),
+            LoggerService.instance.e(
+              '跳转章节失败: ${player.errorMessage}',
+              category: LogCategory.tts,
+              tags: ['player', 'chapter', 'jump', 'failed'],
             );
+            ToastUtils.showError('跳转章节失败: ${player.errorMessage}');
           }
         },
       ),
@@ -378,12 +390,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
     final prevChapter = widget.chapters[player.currentChapterIndex - 1];
     final success = await player.jumpToChapter(prevChapter);
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('跳转上一章失败: ${player.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        '跳转上一章失败: ${player.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'chapter', 'previous', 'failed'],
       );
+      ToastUtils.showError('跳转上一章失败: ${player.errorMessage}');
     }
   }
 
@@ -394,12 +406,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
     final nextChapter = widget.chapters[player.currentChapterIndex + 1];
     final success = await player.jumpToChapter(nextChapter);
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('跳转下一章失败: ${player.errorMessage}'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.e(
+        '跳转下一章失败: ${player.errorMessage}',
+        category: LogCategory.tts,
+        tags: ['player', 'chapter', 'next', 'failed'],
       );
+      ToastUtils.showError('跳转下一章失败: ${player.errorMessage}');
     }
   }
 
@@ -411,19 +423,12 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
       builder: (bottomSheetContext) => TtsTimerSettingsSheet(
         currentChapterIndex: player.currentChapterIndex,
         totalChapters: player.allChapters.length,
-        initialChapterCount: player.timerConfig.enabled
-            ? player.timerConfig.chapterCount
-            : null,
+        initialChapterCount:
+            player.timerConfig.enabled ? player.timerConfig.chapterCount : null,
         onConfirm: (chapterCount) async {
           await player.setTimer(chapterCount);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('已设置：朗读$chapterCount章后停止'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ToastUtils.showSuccess('已设置：朗读$chapterCount章后停止');
           }
         },
       ),
@@ -432,7 +437,8 @@ class _TtsPlayerScreenState extends State<TtsPlayerScreen> {
 
   /// 显示定时完成对话框
   void _showTimerCompleteDialog(TtsTimerConfig config) {
-    final completedChapters = config.getCompletedChapters(_playerService.currentChapterIndex);
+    final completedChapters =
+        config.getCompletedChapters(_playerService.currentChapterIndex);
 
     showDialog(
       context: context,

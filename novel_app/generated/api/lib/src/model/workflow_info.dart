@@ -13,12 +13,13 @@ part 'workflow_info.g.dart';
 /// Properties:
 /// * [title] - 工作流标题
 /// * [description] - 工作流描述
-/// * [path] 
-/// * [width] 
-/// * [height] 
+/// * [path]
+/// * [width]
+/// * [height]
 /// * [isDefault] - 是否为默认模型
 @BuiltValue()
-abstract class WorkflowInfo implements Built<WorkflowInfo, WorkflowInfoBuilder> {
+abstract class WorkflowInfo
+    implements Built<WorkflowInfo, WorkflowInfoBuilder> {
   /// 工作流标题
   @BuiltValueField(wireName: r'title')
   String get title;
@@ -45,8 +46,7 @@ abstract class WorkflowInfo implements Built<WorkflowInfo, WorkflowInfoBuilder> 
   factory WorkflowInfo([void updates(WorkflowInfoBuilder b)]) = _$WorkflowInfo;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(WorkflowInfoBuilder b) => b
-      ..isDefault = false;
+  static void _defaults(WorkflowInfoBuilder b) => b..isDefault = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<WorkflowInfo> get serializer => _$WorkflowInfoSerializer();
@@ -110,7 +110,9 @@ class _$WorkflowInfoSerializer implements PrimitiveSerializer<WorkflowInfo> {
     WorkflowInfo object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
+    return _serializeProperties(serializers, object,
+            specifiedType: specifiedType)
+        .toList();
   }
 
   void _deserializeProperties(
@@ -198,4 +200,3 @@ class _$WorkflowInfoSerializer implements PrimitiveSerializer<WorkflowInfo> {
     return result.build();
   }
 }
-

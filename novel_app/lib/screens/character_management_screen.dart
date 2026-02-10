@@ -1,21 +1,51 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../models/outline.dart';
-import '../services/database_service.dart';
-import '../services/character_image_cache_service.dart';
-import '../services/character_avatar_service.dart';
-import '../services/character_extraction_service.dart';
-import '../services/dify_service.dart';
 import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
 import '../widgets/character_input_dialog.dart';
 import '../widgets/character_preview_dialog.dart';
+import '../widgets/common/common_widgets.dart';
 import 'character_edit_screen.dart';
-import 'enhanced_relationship_graph_screen.dart';
+import 'unified_relationship_graph_screen_riverpod.dart';
+import '../core/providers/character_screen_providers.dart';
+import '../core/providers/service_providers.dart';
+import '../core/providers/database_providers.dart';
 
-class CharacterManagementScreen extends StatefulWidget {
+/// 角色管理屏幕
+///
+/// 本页面提供小说角色的全生命周期管理功能。
+///
+/// ## 核心功能
+/// - **角色列表**：展示所有角色，支持网格/列表视图切换
+/// - **AI 创建**：通过 AI 生成角色，支持描述模式和大纲模式
+/// - **角色提取**：从大纲中提取角色信息
+/// - **多选管理**：批量选择角色进行操作（删除、关系图等）
+/// - **批量操作**：批量删除、批量生成关系图
+/// - **搜索过滤**：按名称搜索角色
+///
+/// ## 与 Provider 集成
+/// - `multiSelectModeProvider` - 控制多选模式状态
+/// - `selectedCharacterIdsProvider` - 管理选中的角色 ID
+/// - `hasOutlineProvider` - 检查小说是否有大纲
+/// - `characterListProvider` - 提供角色列表数据
+/// - `difyServiceProvider` - AI 服务
+/// - `databaseServiceProvider` - 数据库服务
+///
+/// ## AI 创建模式
+/// 1. **描述模式**：用户输入角色描述，AI 生成角色
+/// 2. **大纲模式**：基于小说大纲，AI 提取或生成角色
+/// 3. **提取模式**：从大纲中直接提取角色信息
+///
+/// ## 多选操作
+/// - 长按角色卡片进入多选模式
+/// - 点击角色卡片进行选择/取消
+/// - 批量删除、批量生成关系图
+class CharacterManagementScreen extends ConsumerStatefulWidget {
   final Novel novel;
 
   const CharacterManagementScreen({
@@ -24,147 +54,64 @@ class CharacterManagementScreen extends StatefulWidget {
   });
 
   @override
-  State<CharacterManagementScreen> createState() =>
+  ConsumerState<CharacterManagementScreen> createState() =>
       _CharacterManagementScreenState();
 }
 
-class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-  final CharacterImageCacheService _imageCacheService =
-      CharacterImageCacheService.instance;
-  final CharacterAvatarService _avatarService = CharacterAvatarService();
-  final DifyService _difyService = DifyService();
-  List<Character> _characters = [];
-  bool _isLoading = true;
+class _CharacterManagementScreenState
+    extends ConsumerState<CharacterManagementScreen> {
+  // ========================================================================
+  // 状态管理（通过 Provider）
+  // ========================================================================
 
-  // 关系数量缓存
-  final Map<int, int> _relationshipCountCache = {};
+  /// 是否处于多选模式
+  bool get _isMultiSelectMode => ref.watch(multiSelectModeProvider);
 
-  // 大纲状态
-  Outline? _outline;
-  bool _hasOutline = false;
+  /// 选中的角色 ID 集合
+  Set<int> get _selectedCharacterIds => ref.watch(selectedCharacterIdsProvider);
 
-  // 多选模式状态
-  bool _isMultiSelectMode = false;
-  final Set<int> _selectedCharacterIds = {};
+  // ========================================================================
+  // 常量和样式
+  // ========================================================================
 
-  // 常量定义
+  /// 头像边框半径
   static const double _avatarBorderRadius = 8.0;
+
+  /// 名称底部内边距
   static const double _nameBottomPadding = 8.0;
+
+  /// 名称水平内边距
   static const double _nameHorizontalPadding = 8.0;
 
-  // 缓存阴影样式
-  final List<BoxShadow> _avatarShadow = [
-    const BoxShadow(
-      color: Color(0x4D000000), // Colors.black.withValues(alpha: 0.3)
-      blurRadius: 8,
-      offset: Offset(0, 4),
-    ),
-  ];
+  /// 缓存阴影样式（延迟初始化）
+  List<BoxShadow> get _avatarShadow => [
+        BoxShadow(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          blurRadius: 8,
+          offset: Offset(0, 4),
+        ),
+      ];
 
   @override
   void initState() {
     super.initState();
-    _initializeServices();
-    _loadCharacters();
-    _loadOutline();
+    // 初始化完成后，会在 build 中通过 Provider 自动加载数据
   }
 
-  /// 初始化服务
-  Future<void> _initializeServices() async {
-    try {
-      await _imageCacheService.init();
-    } catch (e) {
-      debugPrint('初始化图片缓存服务失败: $e');
-    }
-  }
+  // ========================================================================
+  // AI 创建角色
+  // ========================================================================
 
-  /// 加载大纲状态
-  Future<void> _loadOutline() async {
-    try {
-      final outline =
-          await _databaseService.getOutlineByNovelUrl(widget.novel.url);
-      setState(() {
-        _outline = outline;
-        _hasOutline = outline != null;
-      });
-      debugPrint('大纲加载状态: $_hasOutline');
-    } catch (e) {
-      debugPrint('加载大纲失败: $e');
-      setState(() {
-        _hasOutline = false;
-      });
-    }
-  }
-
-  Future<void> _loadCharacters() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final characters = await _databaseService.getCharacters(widget.novel.url);
-
-      // 检查并清理无效的头像缓存
-      await _checkAndCleanAvatarCache(characters);
-
-      // 加载每个角色的关系数量
-      await _loadRelationshipCounts(characters);
-
-      setState(() {
-        _characters = characters;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ 加载角色失败: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  /// 加载角色关系数量
-  Future<void> _loadRelationshipCounts(List<Character> characters) async {
-    for (final character in characters) {
-      if (character.id == null) continue;
-
-      try {
-        final count = await _databaseService.getRelationshipCount(character.id!);
-        _relationshipCountCache[character.id!] = count;
-      } catch (e) {
-        debugPrint('❌ 加载关系数量失败 - ${character.name}: $e');
-        _relationshipCountCache[character.id!] = 0;
-      }
-    }
-  }
-
-  /// 检查并清理无效的头像缓存
-  Future<void> _checkAndCleanAvatarCache(List<Character> characters) async {
-    for (final character in characters) {
-      if (character.id == null) continue;
-
-      try {
-        // 清理无效的头像缓存
-        await _avatarService.cleanupInvalidAvatarCache(character.id!);
-      } catch (e) {
-        debugPrint('❌ 清理头像缓存失败 - ${character.name}: $e');
-      }
-    }
-  }
-
+  /// AI 创建角色入口
   Future<void> _aiCreateCharacter() async {
+    // 从 Provider 获取大纲状态
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+
     // 显示输入对话框，传入大纲状态和小说URL
     final result = await CharacterInputDialog.show(
       context,
-      hasOutline: _hasOutline,
+      hasOutline: hasOutline,
       novelUrl: widget.novel.url,
     );
 
@@ -192,7 +139,19 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       return;
     }
 
+    // 获取 Services
+    final difyService = ref.watch(difyServiceProvider);
+    final databaseService = ref.watch(databaseServiceProvider);
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+    Outline? outline;
+
+    if (useOutline && hasOutline) {
+      outline = await databaseService.getOutlineByNovelUrl(widget.novel.url);
+    }
+
     // 显示加载对话框
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -209,15 +168,15 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
     try {
       final generatedCharacters = useOutline
-          ? await _difyService.generateCharactersFromOutline(
-              outline: _outline!.content,
+          ? await difyService.generateCharactersFromOutline(
+              outline: outline!.content,
               userInput: userInput,
               novelUrl: widget.novel.url,
             )
-          : await _difyService.generateCharacters(
+          : await difyService.generateCharacters(
               userInput: userInput,
               novelUrl: widget.novel.url,
-              backgroundSetting: (await _databaseService
+              backgroundSetting: (await databaseService
                       .getBackgroundSetting(widget.novel.url)) ??
                   '',
             );
@@ -251,15 +210,14 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('创建角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('创建角色失败: $e');
       }
     }
   }
+
+  // ========================================================================
+  // 角色提取
+  // ========================================================================
 
   /// 提取角色
   Future<void> _extractCharacter(Map<String, dynamic> result) async {
@@ -271,15 +229,13 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
 
     if (selectedChapters.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请至少选择一个章节'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('请至少选择一个章节');
       }
       return;
     }
+
+    // 获取 DifyService
+    final difyService = ref.watch(difyServiceProvider);
 
     // 显示加载对话框
     showDialog(
@@ -302,7 +258,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       final rolesString = rolesList.join('、');
 
       // 提取并合并上下文
-      final extractionService = CharacterExtractionService();
+      final extractionService = ref.read(characterExtractionServiceProvider);
       final allContexts = <String>[];
 
       for (final item in selectedChapters) {
@@ -325,10 +281,11 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       // 合并去重
-      final mergedContent = extractionService.mergeAndDeduplicateContexts(allContexts);
+      final mergedContent =
+          extractionService.mergeAndDeduplicateContexts(allContexts);
 
       // 调用 Dify 提取角色
-      final extractedCharacters = await _difyService.extractCharacter(
+      final extractedCharacters = await difyService.extractCharacter(
         chapterContent: mergedContent,
         roles: rolesString,
         novelUrl: widget.novel.url,
@@ -363,15 +320,14 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('提取角色失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('提取角色失败: $e');
       }
     }
   }
+
+  // ========================================================================
+  // 角色保存
+  // ========================================================================
 
   /// 保存用户选择的特定角色
   Future<void> _saveSelectedCharacters(
@@ -381,9 +337,11 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     List<String> failedCharacters = [];
 
     try {
+      final repository = ref.read(characterRepositoryProvider);
+
       for (final character in selectedCharacters) {
         try {
-          await _databaseService.createCharacter(character);
+          await repository.createCharacter(character);
           successCount++;
         } catch (e) {
           failCount++;
@@ -393,49 +351,26 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       }
 
       // 重新加载角色列表
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
 
       // 显示结果
       if (mounted) {
-        String message;
-        Color backgroundColor;
-
         if (failCount == 0) {
-          message = '成功保存选中的 $successCount 个角色';
-          backgroundColor = Colors.green;
+          ToastUtils.showSuccess('成功保存选中的 $successCount 个角色');
         } else if (successCount == 0) {
-          message = '保存失败，请检查配置或重试';
-          backgroundColor = Colors.red;
+          ToastUtils.showError('保存失败，请检查配置或重试');
         } else {
-          message = '成功保存 $successCount 个角色，$failCount 个失败';
-          backgroundColor = Colors.orange;
+          ToastUtils.showWarningWithAction(
+              '成功保存 $successCount 个角色，$failCount 个失败',
+              '查看详情',
+              () => _showFailDetails(failedCharacters));
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: backgroundColor,
-            duration: const Duration(seconds: 4),
-            action: failCount > 0
-                ? SnackBarAction(
-                    label: '查看详情',
-                    textColor: Colors.white,
-                    onPressed: () => _showFailDetails(failedCharacters),
-                  )
-                : null,
-          ),
-        );
       }
     } catch (e) {
       LoggerService.instance.e('保存角色时发生错误: ${e.toString()}');
       debugPrint('❌ 保存角色时发生错误: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存角色时发生错误: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('保存角色时发生错误: $e');
       }
     }
   }
@@ -473,33 +408,23 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
   }
 
+  // ========================================================================
+  // 多选管理
+  // ========================================================================
+
   /// 切换多选模式（长按触发）
   void _toggleMultiSelectMode(Character character) {
-    setState(() {
-      _isMultiSelectMode = true;
-      if (character.id != null) {
-        _selectedCharacterIds.add(character.id!);
-      }
-    });
+    ref.read(multiSelectModeProvider.notifier).enterMode(character.id!);
   }
 
   /// 切换角色选择状态（点击触发）
   void _toggleCharacterSelection(int characterId) {
-    setState(() {
-      if (_selectedCharacterIds.contains(characterId)) {
-        _selectedCharacterIds.remove(characterId);
-      } else {
-        _selectedCharacterIds.add(characterId);
-      }
-    });
+    ref.read(selectedCharacterIdsProvider.notifier).toggle(characterId);
   }
 
   /// 退出多选模式
   void _exitMultiSelectMode() {
-    setState(() {
-      _isMultiSelectMode = false;
-      _selectedCharacterIds.clear();
-    });
+    ref.read(multiSelectModeProvider.notifier).exitMode();
   }
 
   /// 处理卡片点击（编辑或选择）
@@ -512,30 +437,19 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     }
   }
 
+  // ========================================================================
+  // 批量操作
+  // ========================================================================
+
   /// 显示批量删除确认对话框
   Future<bool> _showBatchDeleteConfirmationDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('批量删除角色'),
-        content: Text(
-          '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final result = await ConfirmDialog.show(
+      context,
+      title: '批量删除角色',
+      message: '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
+      confirmText: '删除',
+      icon: Icons.delete,
+      confirmColor: Colors.red,
     );
     return result ?? false;
   }
@@ -548,37 +462,35 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     if (!confirmed) return;
 
     try {
+      final imageCacheService = ref.watch(characterImageCacheServiceProvider);
+      final repository = ref.read(characterRepositoryProvider);
+
       // 批量删除
       for (final characterId in _selectedCharacterIds) {
-        await _databaseService.deleteCharacter(characterId);
-        await _imageCacheService.deleteCharacterCachedImages(characterId);
+        await repository.deleteCharacter(characterId);
+        await imageCacheService.deleteCharacterCachedImages(characterId);
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('成功删除 ${_selectedCharacterIds.length} 个角色'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ToastUtils.showSuccess('成功删除 ${_selectedCharacterIds.length} 个角色');
       }
 
       // 退出多选模式并重新加载
       _exitMultiSelectMode();
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
     } catch (e) {
       debugPrint('❌ 批量删除角色失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('批量删除失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('批量删除失败: $e');
       }
     }
   }
 
+  // ========================================================================
+  // 导航
+  // ========================================================================
+
+  /// 导航到编辑页面
   Future<void> _navigateToEdit({Character? character}) async {
     final result = await Navigator.push<bool>(
       context,
@@ -591,19 +503,29 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
 
     if (result == true) {
-      _loadCharacters();
+      ref.invalidate(characterManagementStateProvider(widget.novel));
     }
   }
 
+  // ========================================================================
+  // UI 构建
+  // ========================================================================
+
   @override
   Widget build(BuildContext context) {
+    // 从 Provider 获取角色列表状态
+    final charactersAsync =
+        ref.watch(characterManagementStateProvider(widget.novel));
+    final hasOutlineAsync = ref.watch(hasOutlineProvider(widget.novel.url));
+    final hasOutline = hasOutlineAsync.value ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isMultiSelectMode
             ? '已选 (${_selectedCharacterIds.length})'
             : '人物管理'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           if (_isMultiSelectMode)
             TextButton(
@@ -620,8 +542,10 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EnhancedRelationshipGraphScreen(
+                        builder: (context) =>
+                            UnifiedRelationshipGraphScreenRiverpod(
                           novelUrl: widget.novel.url,
+                          // focusCharacter 为 null,进入全局模式
                         ),
                       ),
                     );
@@ -629,34 +553,51 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
                 ),
                 IconButton(
                   onPressed: _aiCreateCharacter,
-                  icon: Icon(_hasOutline ? Icons.menu_book : Icons.auto_awesome),
-                  tooltip: _hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
+                  icon: Icon(hasOutline ? Icons.menu_book : Icons.auto_awesome),
+                  tooltip: hasOutline ? 'AI创建角色（支持大纲）' : 'AI创建角色',
                 ),
               ],
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _characters.isEmpty
+      body: charactersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text('加载失败: $error'),
+            ],
+          ),
+        ),
+        data: (characters) {
+          return characters.isEmpty
               ? _buildEmptyState()
-              : _buildCharacterList(),
-      floatingActionButton: _isMultiSelectMode &&
-              _selectedCharacterIds.isNotEmpty
-          ? FloatingActionButton.extended(
-              heroTag: 'batch_delete_fab',
-              onPressed: _deleteSelectedCharacters,
-              icon: const Icon(Icons.delete),
-              label: Text('删除 (${_selectedCharacterIds.length})'),
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            )
-          : FloatingActionButton(
-              heroTag: 'character_management_fab',
-              onPressed: () => _navigateToEdit(),
-              tooltip: '添加人物',
-              child: const Icon(Icons.add),
-            ),
+              : _buildCharacterList(characters);
+        },
+      ),
+      floatingActionButton:
+          _isMultiSelectMode && _selectedCharacterIds.isNotEmpty
+              ? FloatingActionButton.extended(
+                  heroTag: 'batch_delete_fab',
+                  onPressed: _deleteSelectedCharacters,
+                  icon: const Icon(Icons.delete),
+                  label: Text('删除 (${_selectedCharacterIds.length})'),
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                )
+              : FloatingActionButton(
+                  heroTag: 'character_management_fab',
+                  onPressed: () => _navigateToEdit(),
+                  tooltip: '添加人物',
+                  child: const Icon(Icons.add),
+                ),
     );
   }
 
@@ -668,7 +609,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
           Icon(
             Icons.people_outline,
             size: 64,
-            color: Colors.grey[400],
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
           ),
           SizedBox(height: 16),
           Text(
@@ -676,14 +618,20 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           SizedBox(height: 8),
           Text(
             '点击右下角的 + 按钮创建第一个人物',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -691,7 +639,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
     );
   }
 
-  Widget _buildCharacterList() {
+  Widget _buildCharacterList(List<Character> characters) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 响应式网格配置
@@ -735,9 +683,9 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
             crossAxisSpacing: crossAxisSpacing,
             mainAxisSpacing: mainAxisSpacing,
           ),
-          itemCount: _characters.length,
+          itemCount: characters.length,
           itemBuilder: (context, index) {
-            final character = _characters[index];
+            final character = characters[index];
             return _buildCharacterCard(character);
           },
         );
@@ -755,7 +703,8 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       onTap: () => _handleCardTap(character),
       child: Card(
         elevation: isSelected ? 12 : 6,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor:
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: isSelected
@@ -775,150 +724,127 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
               height: cardHeight,
               child: Column(
                 children: [
-                // 头像区域
-                Expanded(
-                  flex: 3,
-                  child: Stack(
-                    children: [
-                      // 方形头像背景
-                      _buildSquareAvatarBackground(character),
-
-                      // 头像图片
-                      Positioned.fill(
-                        child: Hero(
-                          tag: 'character_${character.id ?? character.name}',
-                          child: _buildCharacterAvatar(character),
-                        ),
-                      ),
-
-                      // 底部浮动名字
-                      Positioned(
-                        bottom: _nameBottomPadding,
-                        left: _nameHorizontalPadding * 2,
-                        right: _nameHorizontalPadding * 2,
-                        child: Text(
-                          character.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black87,
-                                blurRadius: 3,
-                                offset: Offset(1, 1),
-                              ),
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-
-                      // 关系数量徽章
-                      if (character.id != null &&
-                          _relationshipCountCache[character.id] != null &&
-                          _relationshipCountCache[character.id]! > 0)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Material(
-                            elevation: 4,
-                            shape: const CircleBorder(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${_relationshipCountCache[character.id]}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // 信息区域
-                Expanded(
-                  flex: 2, // 减少flex比例，让下半部分更紧凑
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8), // 减少padding
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // 头像区域
+                  Expanded(
+                    flex: 3,
+                    child: Stack(
                       children: [
-                        // 职业标签
-                        Expanded(
-                          flex: 3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4), // 减少padding
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .primaryColor
-                                  .withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(12), // 稍微减小圆角
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .primaryColor
-                                    .withValues(alpha: 0.3),
-                                width: 1,
-                              ),
+                        // 方形头像背景
+                        _buildSquareAvatarBackground(character),
+
+                        // 头像图片
+                        Positioned.fill(
+                          child: Hero(
+                            tag: 'character_${character.id ?? character.name}',
+                            child: _buildCharacterAvatar(character),
+                          ),
+                        ),
+
+                        // 底部浮动名字
+                        Positioned(
+                          bottom: _nameBottomPadding,
+                          left: _nameHorizontalPadding * 2,
+                          right: _nameHorizontalPadding * 2,
+                          child: Text(
+                            character.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.surface,
+                              shadows: [
+                                Shadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.87),
+                                  blurRadius: 3,
+                                  offset: Offset(1, 1),
+                                ),
+                                Shadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.54),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            child: Text(
-                              character.occupation ?? '未知职业',
-                              style: const TextStyle(
-                                fontSize: 10, // 缩小职业字号
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2, // 支持换行
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+
+                  // 信息区域
+                  Expanded(
+                    flex: 2, // 减少flex比例，让下半部分更紧凑
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8), // 减少padding
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // 职业标签
+                          Expanded(
+                            flex: 3,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4), // 减少padding
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .primaryColor
+                                    .withValues(alpha: 0.8),
+                                borderRadius:
+                                    BorderRadius.circular(12), // 稍微减小圆角
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .primaryColor
+                                      .withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                character.occupation ?? '未知职业',
+                                style: TextStyle(
+                                  fontSize: 10, // 缩小职业字号
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.surface,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2, // 支持换行
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   /// 构建角色头像
   Widget _buildCharacterAvatar(Character character) {
+    final avatarService = ref.watch(characterAvatarServiceProvider);
+
     // 使用cachedImageUrl的变化来触发FutureBuilder重建
     final avatarKey =
         ValueKey('avatar_${character.id}_${character.cachedImageUrl}');
     return FutureBuilder<String?>(
       key: avatarKey,
       future: character.id != null
-          ? _avatarService.getCharacterAvatarPath(character.id!)
+          ? avatarService.getCharacterAvatarPath(character.id!)
           : Future.value(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -960,14 +886,16 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(_avatarBorderRadius),
         boxShadow: _avatarShadow,
       ),
       child: Center(
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );
@@ -979,7 +907,7 @@ class _CharacterManagementScreenState extends State<CharacterManagementScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(_avatarBorderRadius),
         boxShadow: _avatarShadow,
       ),

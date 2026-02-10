@@ -72,6 +72,7 @@ from .services.role_card_service import role_card_service
 from .services.app_version_service import AppVersionServiceError, get_app_version_service
 from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
+from .api.routes.backup import router as backup_router
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],  # 限制HTTP方法
     allow_headers=["*"],
 )
+
+# 注册API路由
+app.include_router(backup_router)
 
 
 # 应用启动事件

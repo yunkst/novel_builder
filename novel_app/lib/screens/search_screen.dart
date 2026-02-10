@@ -1,216 +1,61 @@
 import 'package:flutter/material.dart';
-import '../models/novel.dart';
-import '../services/api_service_wrapper.dart';
-import 'chapter_list_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/search_screen_providers.dart';
+import '../core/providers/service_providers.dart';
+import '../screens/chapter_list_screen_riverpod.dart';
+import '../services/logger_service.dart';
+import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
-import '../core/di/api_service_provider.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final ApiServiceWrapper _api = ApiServiceProvider.instance;
-  List<Novel> _searchResults = [];
-  bool _isLoading = false;
-  String _errorMessage = '';
-  bool _isInitialized = false;
-
-  // 源站过滤相关
-  List<Map<String, dynamic>> _sourceSites = [];
-  Set<String> _selectedSites = {};
-  bool _showSiteFilter = false;
-
-  // 异步操作控制
-  bool _isSearchDisposed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initApi();
-  }
-
-  Future<void> _initApi() async {
-    try {
-      await _api.init();
-      await _loadSourceSites();
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
-    } catch (e) {
-      // API初始化失败，可能是未配置后端地址
-      if (mounted) {
-        setState(() {
-          _isInitialized = false;
-        });
-      }
-    }
-  }
-
-  /// 加载源站列表
-  Future<void> _loadSourceSites() async {
-    try {
-      final sites = await _api.getSourceSites();
-      // 检查页面是否已被销毁
-      if (_isSearchDisposed || !mounted) return;
-
-      if (mounted) {
-        setState(() {
-          _sourceSites = sites;
-          // 默认选中所有站点 - 使用站点ID而不是站点名称
-          _selectedSites = sites.map((site) => site['id'] as String).toSet();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载源站列表失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  bool _hasAttemptedInitialization = false;
 
   @override
   void dispose() {
-    // 标记搜索已销毁，防止异步操作继续执行
-    _isSearchDisposed = true;
     _searchController.dispose();
-    // 移除 _api.dispose() 调用，避免关闭共享的Dio连接
-    // _api.dispose(); // 已移除，ApiServiceWrapper是单例，不应由Screen关闭
     super.dispose();
-  }
-
-  Future<void> _searchNovels() async {
-    final keyword = _searchController.text.trim();
-    if (keyword.isEmpty) {
-      if (mounted) {
-        ToastUtils.showWarning(context, '请输入搜索关键词');
-      }
-      return;
-    }
-
-    if (!_isInitialized) {
-      if (mounted) {
-        ToastUtils.showError(context, '请先配置后端服务地址');
-      }
-      return;
-    }
-
-    if (_selectedSites.isEmpty) {
-      if (mounted) {
-        ToastUtils.showWarning(context, '请至少选择一个搜索源站');
-      }
-      return;
-    }
-
-    // 检查页面是否已被销毁
-    if (_isSearchDisposed || !mounted) return;
-
-    // 设置加载状态
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-        _searchResults = [];
-      });
-    }
-
-    try {
-      // 构建搜索信息
-      String searchInfo = '正在搜索 "$keyword"';
-      if (_selectedSites.isNotEmpty &&
-          _selectedSites.length < _sourceSites.length) {
-        // 获取选中站点的显示名称
-        final selectedSiteNames = _sourceSites
-            .where((site) => _selectedSites.contains(site['id'] as String))
-            .map((site) => site['name'] as String)
-            .join(', ');
-        searchInfo += ' (源站: $selectedSiteNames)';
-      }
-
-      // 显示开始搜索的提示
-      if (mounted) {
-        ToastUtils.showLoading(context, searchInfo);
-      }
-
-      // 通过后端服务进行搜索，传递选中的站点
-      final results = await _api.searchNovels(
-        keyword,
-        sites: _selectedSites.toList(),
-      );
-
-      // 再次检查页面状态，确保搜索结果回来时页面还存在
-      if (_isSearchDisposed || !mounted) return;
-
-      // 更新搜索结果
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _searchResults = results;
-          if (results.isEmpty) {
-            _errorMessage = '未找到相关小说，请尝试其他关键词或调整源站筛选';
-          }
-        });
-      }
-
-      // 显示搜索结果提示
-      if (mounted) {
-        if (results.isNotEmpty) {
-          ToastUtils.showSuccess(context, '找到 ${results.length} 个相关小说');
-        } else {
-          ToastUtils.showInfo(context, '未找到相关小说，请尝试其他关键词或调整源站筛选');
-        }
-      }
-    } catch (e) {
-      // 再次检查页面状态
-      if (_isSearchDisposed || !mounted) return;
-
-      // 更新错误状态
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-
-      if (mounted) {
-        ToastUtils.showError(context, e.toString());
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final searchState = ref.watch(searchScreenNotifierProvider);
+    final sourceSitesState = ref.watch(sourceSitesNotifierProvider);
+    final apiService = ref.watch(apiServiceWrapperProvider);
+
+    // 只在首次build时尝试初始化
+    if (!_hasAttemptedInitialization) {
+      _hasAttemptedInitialization = true;
+      _initializeApiAndSites(apiService);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜索小说'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           // 源站过滤按钮
-          if (_sourceSites.isNotEmpty)
+          if (sourceSitesState.sites.isNotEmpty)
             IconButton(
               icon: Icon(
-                _showSiteFilter ? Icons.filter_list_off : Icons.filter_list,
-                color: _selectedSites.length < _sourceSites.length
-                    ? Colors.blue
+                sourceSitesState.showFilter
+                    ? Icons.filter_list_off
+                    : Icons.filter_list,
+                color: sourceSitesState.selectedSiteIds.length <
+                        sourceSitesState.sites.length
+                    ? Theme.of(context).colorScheme.primary
                     : null,
               ),
               tooltip: '源站筛选',
               onPressed: () {
-                if (mounted) {
-                  setState(() {
-                    _showSiteFilter = !_showSiteFilter;
-                  });
-                }
+                ref.read(sourceSitesNotifierProvider.notifier).toggleFilter();
               },
             ),
           const SizedBox(width: 8),
@@ -219,8 +64,8 @@ class _SearchScreenState extends State<SearchScreen> {
       body: Column(
         children: [
           // 源站过滤面板
-          if (_showSiteFilter && _sourceSites.isNotEmpty)
-            _buildSiteFilterPanel(),
+          if (sourceSitesState.showFilter && sourceSitesState.sites.isNotEmpty)
+            _buildSiteFilterPanel(sourceSitesState),
 
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -233,47 +78,60 @@ class _SearchScreenState extends State<SearchScreen> {
                       hintText: '请输入小说名称或作者',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.search),
-                      suffixText: _selectedSites.isNotEmpty &&
-                              _selectedSites.length < _sourceSites.length
-                          ? '${_selectedSites.length}个源站'
-                          : null,
+                      suffixText:
+                          sourceSitesState.getSelectedSiteNames().isNotEmpty
+                              ? '${sourceSitesState.selectedSiteIds.length}个源站'
+                              : null,
                       suffixStyle: TextStyle(
                         color: Theme.of(context).primaryColor,
                         fontSize: 12,
                       ),
                     ),
-                    onSubmitted: (_) => _searchNovels(),
+                    onSubmitted: (_) => _performSearch(
+                      apiService,
+                      _searchController.text,
+                      sourceSitesState.selectedSiteIds.toList(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _searchNovels,
+                  onPressed: searchState.isLoading
+                      ? null
+                      : () => _performSearch(
+                            apiService,
+                            _searchController.text,
+                            sourceSitesState.selectedSiteIds.toList(),
+                          ),
                   child: const Text('搜索'),
                 ),
               ],
             ),
           ),
-          if (_isLoading)
+          if (searchState.isLoading)
             const Expanded(
               child: Center(
                 child: CircularProgressIndicator(),
               ),
             )
-          else if (_errorMessage.isNotEmpty)
+          else if (searchState.errorMessage != null &&
+              searchState.errorMessage!.isNotEmpty)
             Expanded(
               child: Center(
                 child: Text(
-                  _errorMessage,
-                  style: const TextStyle(color: Colors.red),
+                  searchState.errorMessage!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
             )
-          else if (_searchResults.isNotEmpty)
+          else if (searchState.results.isNotEmpty)
             Expanded(
               child: ListView.builder(
-                itemCount: _searchResults.length,
+                itemCount: searchState.results.length,
                 itemBuilder: (context, index) {
-                  final novel = _searchResults[index];
+                  final novel = searchState.results[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -292,7 +150,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                ChapterListScreen(novel: novel),
+                                ChapterListScreenRiverpod(novel: novel),
                           ),
                         );
                       },
@@ -312,8 +170,102 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// 初始化 API 和源站列表
+  void _initializeApiAndSites(
+    dynamic apiService,
+  ) async {
+    try {
+      await ref
+          .read(searchScreenNotifierProvider.notifier)
+          .initialize(apiService);
+      await ref
+          .read(sourceSitesNotifierProvider.notifier)
+          .loadSourceSites(apiService);
+    } catch (e) {
+      // 初始化失败，保持未初始化状态
+    }
+  }
+
+  /// 执行搜索
+  Future<void> _performSearch(
+    dynamic apiService,
+    String keyword,
+    List<String> sites,
+  ) async {
+    final trimmedKeyword = keyword.trim();
+    if (trimmedKeyword.isEmpty) {
+      ToastUtils.showWarning('请输入搜索关键词', context: context);
+      return;
+    }
+
+    final searchState = ref.read(searchScreenNotifierProvider);
+    if (!searchState.isInitialized) {
+      LoggerService.instance.w(
+        '搜索前未配置后端服务',
+        category: LogCategory.network,
+        tags: ['search', 'backend', 'not-configured'],
+      );
+
+      // 使用状态中的错误信息，如果有的话
+      String errorMsg = searchState.errorMessage ?? '请先配置后端服务地址';
+      ToastUtils.showError(errorMsg, context: context);
+      return;
+    }
+
+    if (sites.isEmpty) {
+      LoggerService.instance.w(
+        '未选择搜索源站',
+        category: LogCategory.network,
+        tags: ['search', 'sites', 'none-selected'],
+      );
+      ToastUtils.showWarning('请至少选择一个搜索源站', context: context);
+      return;
+    }
+
+    // 显示开始搜索的提示
+    final sourceSitesState = ref.read(sourceSitesNotifierProvider);
+    String searchInfo = '正在搜索 "$trimmedKeyword"';
+    if (sites.isNotEmpty && sites.length < sourceSitesState.sites.length) {
+      final selectedSiteNames = sourceSitesState.sites
+          .where((site) => sites.contains(site['id'] as String))
+          .map((site) => site['name'] as String)
+          .join(', ');
+      searchInfo += ' (源站: $selectedSiteNames)';
+    }
+    ToastUtils.showLoading(searchInfo, context: context);
+
+    // 执行搜索
+    try {
+      await ref
+          .read(searchScreenNotifierProvider.notifier)
+          .searchNovels(apiService, trimmedKeyword, sites);
+
+      // 显示搜索结果提示
+      final newState = ref.read(searchScreenNotifierProvider);
+      if (!mounted) return;
+
+      if (newState.results.isNotEmpty) {
+        ToastUtils.showSuccess('找到 ${newState.results.length} 个相关小说',
+            context: context);
+      } else {
+        ToastUtils.showInfo('未找到相关小说，请尝试其他关键词或调整源站筛选', context: context);
+      }
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '搜索小说失败',
+        stackTrace: stackTrace,
+        category: LogCategory.network,
+        tags: ['search', 'api', 'failed'],
+      );
+    }
+  }
+
   /// 构建源站过滤面板
-  Widget _buildSiteFilterPanel() {
+  Widget _buildSiteFilterPanel(
+    SourceSitesState sourceSitesState,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(16.0),
@@ -338,23 +290,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   TextButton(
                     onPressed: () {
-                      if (mounted) {
-                        setState(() {
-                          _selectedSites = _sourceSites
-                              .map((site) => site['id'] as String)
-                              .toSet();
-                        });
-                      }
+                      ref
+                          .read(sourceSitesNotifierProvider.notifier)
+                          .selectAll();
                     },
                     child: const Text('全选'),
                   ),
                   TextButton(
                     onPressed: () {
-                      if (mounted) {
-                        setState(() {
-                          _selectedSites.clear();
-                        });
-                      }
+                      ref
+                          .read(sourceSitesNotifierProvider.notifier)
+                          .clearSelection();
                     },
                     child: const Text('清空'),
                   ),
@@ -366,26 +312,21 @@ class _SearchScreenState extends State<SearchScreen> {
           Wrap(
             spacing: 8.0,
             runSpacing: 4.0,
-            children: _sourceSites.map((site) {
+            children: sourceSitesState.sites.map((site) {
               final siteId = site['id'] as String;
               final siteName = site['name'] as String;
               final siteDescription =
                   site['description'] as String? ?? siteName;
-              final isSelected = _selectedSites.contains(siteId);
+              final isSelected =
+                  sourceSitesState.selectedSiteIds.contains(siteId);
 
               return FilterChip(
                 label: Text(siteName),
                 selected: isSelected,
                 onSelected: (selected) {
-                  if (mounted) {
-                    setState(() {
-                      if (selected) {
-                        _selectedSites.add(siteId);
-                      } else {
-                        _selectedSites.remove(siteId);
-                      }
-                    });
-                  }
+                  ref
+                      .read(sourceSitesNotifierProvider.notifier)
+                      .toggleSite(siteId);
                 },
                 tooltip: siteDescription,
                 backgroundColor: Theme.of(context).colorScheme.surface,
@@ -395,7 +336,7 @@ class _SearchScreenState extends State<SearchScreen> {
               );
             }).toList(),
           ),
-          if (_selectedSites.isEmpty)
+          if (sourceSitesState.selectedSiteIds.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Text(

@@ -38,7 +38,7 @@ class Novel {
       title: map['title'] as String,
       author: map['author'] as String,
       url: map['url'] as String,
-      isInBookshelf: (map['isInBookshelf'] as int) == 1,
+      isInBookshelf: (map['isInBookshelf'] as int?) == 1,
       coverUrl: map['coverUrl'] as String?,
       description: map['description'] as String?,
       backgroundSetting: map['backgroundSetting'] as String?,
@@ -53,6 +53,8 @@ class Novel {
     String? coverUrl,
     String? description,
     String? backgroundSetting,
+    int? lastReadChapterIndex,
+    double? readingProgress,
   }) {
     return Novel(
       title: title ?? this.title,
@@ -62,6 +64,8 @@ class Novel {
       coverUrl: coverUrl ?? this.coverUrl,
       description: description ?? this.description,
       backgroundSetting: backgroundSetting ?? this.backgroundSetting,
+      lastReadChapterIndex: lastReadChapterIndex ?? this.lastReadChapterIndex,
+      readingProgress: readingProgress ?? this.readingProgress,
     );
   }
 }

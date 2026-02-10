@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
-import '../../services/database_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
+import '../../utils/toast_utils.dart';
+import '../../core/providers/database_providers.dart';
 
 /// 背景设定总结对话框
 ///
@@ -11,7 +13,7 @@ import '../../mixins/dify_streaming_mixin.dart';
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持重新总结和复制功能
 /// - 总结完成后自动更新数据库
-class BackgroundSummaryDialog extends StatefulWidget {
+class BackgroundSummaryDialog extends ConsumerStatefulWidget {
   final Novel novel;
   final String backgroundText;
 
@@ -22,13 +24,13 @@ class BackgroundSummaryDialog extends StatefulWidget {
   });
 
   @override
-  State<BackgroundSummaryDialog> createState() => _BackgroundSummaryDialogState();
+  ConsumerState<BackgroundSummaryDialog> createState() =>
+      _BackgroundSummaryDialogState();
 }
 
-class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
+class _BackgroundSummaryDialogState
+    extends ConsumerState<BackgroundSummaryDialog>
     with TickerProviderStateMixin, DifyStreamingMixin {
-  final DatabaseService _databaseService = DatabaseService();
-
   String _summaryResult = '';
   bool _showConfirmDialog = true;
   late TabController _tabController;
@@ -61,11 +63,11 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.summarize, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('背景设定总结'),
+            Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('背景设定总结'),
           ],
         ),
         content: Column(
@@ -76,7 +78,10 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
               '将对当前背景设定进行AI总结',
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.grey[700],
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 12),
@@ -87,7 +92,10 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[800],
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -100,8 +108,8 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('开始总结'),
           ),
@@ -145,12 +153,7 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('总结失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('总结失败: $e');
       }
     }
   }
@@ -158,19 +161,14 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
   /// 保存总结结果
   Future<void> _saveSummary(String summary) async {
     try {
-      await _databaseService.updateBackgroundSetting(
+      final repository = ref.read(novelRepositoryProvider);
+      await repository.updateBackgroundSetting(
         widget.novel.url,
         summary.isEmpty ? null : summary,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('背景设定已更新为总结内容'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        ToastUtils.showSuccess('背景设定已更新为总结内容');
 
         // 延迟关闭对话框,让用户看到提示
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -181,12 +179,7 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastUtils.showError('保存失败: $e');
       }
     }
   }
@@ -203,12 +196,7 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
   /// 复制结果
   void _copyToClipboard() {
     Clipboard.setData(ClipboardData(text: _summaryResult));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已复制到剪贴板'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    ToastUtils.showInfo('已复制到剪贴板');
   }
 
   @override
@@ -216,11 +204,11 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
     // 显示流式生成进度
     if (isStreaming) {
       return AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.summarize, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('正在总结...'),
+            Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('正在总结...'),
           ],
         ),
         content: SizedBox(
@@ -259,7 +247,7 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.summarize, color: Colors.orange),
+          Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           const Text('总结完成'),
           const Spacer(),
@@ -278,9 +266,12 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
             // TabBar
             TabBar(
               controller: _tabController,
-              labelColor: Colors.orange,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.orange,
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
+              indicatorColor: Theme.of(context).colorScheme.primary,
               tabs: const [
                 Tab(text: '原文'),
                 Tab(text: '总结'),
@@ -322,16 +313,16 @@ class _BackgroundSummaryDialogState extends State<BackgroundSummaryDialog>
         ElevatedButton(
           onPressed: _regenerateSummarize,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: const Text('重新生成'),
         ),
         ElevatedButton(
           onPressed: () => _saveSummary(_summaryResult),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            foregroundColor: Theme.of(context).colorScheme.onSecondary,
           ),
           child: const Text('确认替换'),
         ),

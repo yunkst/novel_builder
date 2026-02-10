@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/auto_scroll_controller.dart';
+import '../../services/logger_service.dart';
 
 /// 自动滚动功能 Mixin
 ///
@@ -61,10 +62,13 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
 
   /// 开始自动滚动
   void startAutoScroll() {
-    debugPrint('🚀 [AutoScrollMixin] startAutoScroll 被调用');
+    LoggerService.instance.d(
+      'startAutoScroll 被调用',
+      category: LogCategory.ui,
+      tags: ['auto-scroll'],
+    );
 
     if (_shouldAutoScroll && _autoScrollController.isScrolling) {
-      debugPrint('⚠️ [AutoScrollMixin] 已在滚动中，直接返回');
       return;
     }
 
@@ -72,7 +76,6 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
     _autoScrollController.startAutoScroll(
       pixelsPerSecond,
       onScrollComplete: () {
-        debugPrint('🏁 [AutoScrollMixin] 滚动到底部回调触发');
         // 保持 _shouldAutoScroll 不变，以便章节切换时恢复滚动
       },
     );
@@ -80,15 +83,12 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
     setState(() {
       _shouldAutoScroll = true;
     });
-
-    debugPrint('✅ [AutoScrollMixin] 自动滚动已启动');
   }
 
   /// 暂停并设置恢复计时器（用于触摸检测）
   void handleTouch() {
     if (!_shouldAutoScroll) return;
 
-    debugPrint('👆 [AutoScrollMixin] 检测到触摸，暂停自动滚动');
     _pauseAndScheduleResume();
   }
 
@@ -112,25 +112,20 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
     _resumeTimer?.cancel();
     _autoScrollController.resumeAutoScroll();
 
-    debugPrint('🔄 [AutoScrollMixin] 恢复自动滚动');
     setState(() {}); // 触发 UI 更新
   }
 
   /// 停止自动滚动（完全停止，清除意图）
   void stopAutoScroll() {
-    debugPrint('🛑 [AutoScrollMixin] stopAutoScroll 被调用');
     _resumeTimer?.cancel();
     _autoScrollController.stopAutoScroll();
     setState(() {
       _shouldAutoScroll = false;
     });
-    debugPrint('✅ [AutoScrollMixin] 已停止');
   }
 
   /// 切换自动滚动状态
   void toggleAutoScroll() {
-    debugPrint('🔄 [AutoScrollMixin] toggleAutoScroll');
-
     if (_shouldAutoScroll && _autoScrollController.isScrolling) {
       stopAutoScroll();
     } else {
@@ -164,7 +159,6 @@ mixin AutoScrollMixin<T extends StatefulWidget> on State<T> {
 
   /// 清理资源（在子类的 dispose 中调用）
   void disposeAutoScroll() {
-    debugPrint('🧹 [AutoScrollMixin] 清理自动滚动资源');
     _resumeTimer?.cancel();
     _autoScrollController.dispose();
   }

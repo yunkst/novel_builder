@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/logger_service.dart';
+import '../core/providers/service_providers.dart';
+import '../utils/toast_utils.dart';
+import '../widgets/common/common_widgets.dart';
 
 /// 日志查看页面
 ///
 /// 提供应用日志的查看、过滤、导出和清空功能。
 /// 日志按时间倒序显示（最新日志在最上方），支持按级别过滤。
-class LogViewerScreen extends StatefulWidget {
+class LogViewerScreen extends ConsumerStatefulWidget {
   const LogViewerScreen({super.key});
 
   @override
-  State<LogViewerScreen> createState() => _LogViewerScreenState();
+  ConsumerState<LogViewerScreen> createState() => _LogViewerScreenState();
 }
 
-class _LogViewerScreenState extends State<LogViewerScreen> {
+class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   /// 当前选择的日志级别过滤器
   LogLevel? _selectedLevel;
 
@@ -48,9 +52,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
 
   /// 从LoggerService加载日志
   void _loadLogs() {
+    final loggerService = ref.read(loggerServiceProvider);
     final logs = _selectedLevel == null
-        ? LoggerService.instance.getLogs()
-        : LoggerService.instance.getLogsByLevel(_selectedLevel);
+        ? loggerService.getLogs()
+        : loggerService.getLogsByLevel(_selectedLevel);
     setState(() {
       _displayedLogs = logs;
     });
@@ -61,21 +66,19 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 将当前过滤后的所有日志格式化为纯文本后复制到剪贴板。
   void _copyAllLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('暂无日志可复制');
+      ToastUtils.show('暂无日志可复制');
       return;
     }
 
-    final text = _displayedLogs
-        .map((log) {
-          final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-          return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
-        })
-        .join('\n\n---\n\n');
+    final text = _displayedLogs.map((log) {
+      final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+      return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
+    }).join('\n\n---\n\n');
 
     await Clipboard.setData(ClipboardData(text: text));
 
     if (mounted) {
-      _showSnackBar('已复制 ${_displayedLogs.length} 条日志到剪贴板');
+      ToastUtils.showSuccess('已复制 ${_displayedLogs.length} 条日志到剪贴板');
     }
   }
 
@@ -84,7 +87,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 将当前过滤后的所有日志导出为文本文件。
   Future<void> _exportLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('暂无日志可导出');
+      ToastUtils.show('暂无日志可导出');
       return;
     }
 
@@ -94,21 +97,19 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
 
     try {
       // 使用临时方案：生成文本内容后让用户复制
-      final text = _displayedLogs
-          .map((log) {
-            final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-            return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
-          })
-          .join('\n\n---\n\n');
+      final text = _displayedLogs.map((log) {
+        final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
+        return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
+      }).join('\n\n---\n\n');
 
       await Clipboard.setData(ClipboardData(text: text));
 
       if (mounted) {
-        _showSnackBar('已复制日志内容，请粘贴到文本文件保存');
+        ToastUtils.showSuccess('已复制日志内容，请粘贴到文本文件保存');
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('导出失败: $e');
+        ToastUtils.showError('导出失败: $e');
       }
     } finally {
       if (mounted) {
@@ -124,44 +125,23 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   /// 显示确认对话框，用户确认后清空所有日志。
   Future<void> _clearLogs() async {
     if (_displayedLogs.isEmpty) {
-      _showSnackBar('日志已为空');
+      ToastUtils.show('日志已为空');
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认清空'),
-        content: const Text('确定要清空所有日志吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '清空',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认清空',
+      message: '确定要清空所有日志吗？此操作不可撤销。',
+      confirmText: '清空',
+      icon: Icons.delete_outline,
+      confirmColor: Colors.red,
     );
 
     if (confirmed == true && mounted) {
-      await LoggerService.instance.clearLogs();
+      await ref.read(loggerServiceProvider).clearLogs();
       _loadLogs();
-      _showSnackBar('日志已清空');
-    }
-  }
-
-  /// 显示SnackBar提示
-  void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-      );
+      ToastUtils.showSuccess('日志已清空');
     }
   }
 
@@ -183,7 +163,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
   Color _getLevelColor(LogLevel level) {
     switch (level) {
       case LogLevel.debug:
-        return Colors.grey;
+        return const Color(0xFF9E9E9E);
       case LogLevel.info:
         return Colors.blue;
       case LogLevel.warning:
@@ -210,8 +190,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
         return Colors.teal;
       case LogCategory.character:
         return Colors.pink;
+      case LogCategory.backup:
+        return Colors.indigo;
       case LogCategory.general:
-        return Colors.grey;
+        return const Color(0xFF9E9E9E);
     }
   }
 
@@ -287,14 +269,22 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                   Icon(
                     Icons.bug_report_outlined,
                     size: 64,
-                    color: Colors.grey[400],
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.4),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _selectedLevel == null ? '暂无日志' : '暂无${_selectedLevel!.label}级别日志',
+                    _selectedLevel == null
+                        ? '暂无日志'
+                        : '暂无${_selectedLevel!.label}级别日志',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[600],
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -307,7 +297,8 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                 if (_selectedLevel != null)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     color: Theme.of(context).colorScheme.secondaryContainer,
                     child: Row(
                       children: [
@@ -321,7 +312,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                           '仅显示 ${_selectedLevel!.label} 级别日志 (${_displayedLogs.length} 条)',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSecondaryContainer,
                           ),
                         ),
                         const Spacer(),
@@ -343,9 +336,11 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                     itemCount: _displayedLogs.length,
                     reverse: true,
                     itemBuilder: (context, index) {
-                      final log = _displayedLogs[_displayedLogs.length - 1 - index];
+                      final log =
+                          _displayedLogs[_displayedLogs.length - 1 - index];
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         child: ListTile(
                           dense: true,
                           leading: Icon(
@@ -373,21 +368,28 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                       log.category.label,
                                       style: const TextStyle(fontSize: 10),
                                     ),
-                                    backgroundColor: _getCategoryColor(log.category).withValues(alpha: 0.2),
+                                    backgroundColor:
+                                        _getCategoryColor(log.category)
+                                            .withValues(alpha: 0.2),
                                     padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     visualDensity: VisualDensity.compact,
                                   ),
                                   ...log.tags.map((tag) => Chip(
-                                    label: Text(
-                                      tag,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    backgroundColor: Colors.grey.withValues(alpha: 0.1),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                  )),
+                                        label: Text(
+                                          tag,
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.1),
+                                        padding: EdgeInsets.zero,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        visualDensity: VisualDensity.compact,
+                                      )),
                                 ],
                               ),
                             ],
@@ -399,10 +401,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                 _formatTimestamp(log.timestamp),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.6),
                                 ),
                               ),
-                              if (log.stackTrace != null && log.stackTrace!.isNotEmpty)
+                              if (log.stackTrace != null &&
+                                  log.stackTrace!.isNotEmpty)
                                 InkWell(
                                   onTap: () {
                                     _showStackTraceDialog(log);
@@ -413,7 +419,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                                       '查看堆栈信息',
                                       style: TextStyle(
                                         fontSize: 10,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
                                         decoration: TextDecoration.underline,
                                       ),
                                     ),
@@ -464,7 +472,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: log.stackTrace ?? ''));
               Navigator.pop(context);
-              _showSnackBar('已复制堆栈信息');
+              ToastUtils.showSuccess('已复制堆栈信息');
             },
             child: const Text('复制'),
           ),

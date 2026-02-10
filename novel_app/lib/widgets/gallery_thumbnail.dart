@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
 import '../services/role_gallery_cache_service.dart';
-import '../core/di/api_service_provider.dart';
+import '../services/logger_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/services/network_service_providers.dart';
 
 /// 图集缩略图组件
-class GalleryThumbnail extends StatefulWidget {
+class GalleryThumbnail extends ConsumerStatefulWidget {
   final String roleId;
   final VoidCallback? onTap;
   final double? size;
@@ -24,10 +26,10 @@ class GalleryThumbnail extends StatefulWidget {
   });
 
   @override
-  State<GalleryThumbnail> createState() => _GalleryThumbnailState();
+  ConsumerState<GalleryThumbnail> createState() => _GalleryThumbnailState();
 }
 
-class _GalleryThumbnailState extends State<GalleryThumbnail>
+class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -63,7 +65,7 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
 
   Future<void> _loadGallery() async {
     try {
-      final apiService = ApiServiceProvider.instance;
+      final apiService = ref.read(apiServiceWrapperProvider);
       final galleryData = await apiService.getRoleGallery(widget.roleId);
 
       setState(() {
@@ -71,12 +73,20 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
         _isLoading = false;
       });
 
-      debugPrint('✓ 图集加载成功: ${_gallery?.imageCount ?? 0} 张图片');
+      LoggerService.instance.i(
+        '图集加载成功: ${_gallery?.imageCount ?? 0} 张图片',
+        category: LogCategory.ui,
+        tags: ['gallery', 'load', 'success'],
+      );
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      debugPrint('❌ 图集加载失败: $e');
+      LoggerService.instance.e(
+        '图集加载失败: $e',
+        category: LogCategory.ui,
+        tags: ['gallery', 'load', 'error'],
+      );
     }
   }
 
@@ -155,17 +165,18 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.grey[400]!,
+          color:
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.16),
           width: 1,
         ),
       ),
       child: Icon(
         Icons.photo_library_outlined,
         size: size * 0.4,
-        color: Colors.grey[600],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
       ),
     );
   }
@@ -175,17 +186,17 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.red[300]!,
+          color: Colors.red.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Icon(
         Icons.broken_image_outlined,
         size: size * 0.4,
-        color: Colors.red[400],
+        color: Colors.red.withValues(alpha: 0.4),
       ),
     );
   }
@@ -204,14 +215,14 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
           color: Colors.blue,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             width: 1.5,
           ),
         ),
         child: Text(
           imageCount > 99 ? '99+' : '$imageCount',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
@@ -225,16 +236,18 @@ class _GalleryThumbnailState extends State<GalleryThumbnail>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
+      child: Center(
         child: SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.surface,
+            ),
           ),
         ),
       ),
@@ -295,7 +308,10 @@ class GalleryPreviewCard extends StatelessWidget {
                     Text(
                       '点击查看完整图集',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
                           ),
                     ),
                   ],
@@ -305,7 +321,10 @@ class GalleryPreviewCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[500],
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5),
               ),
             ],
           ),

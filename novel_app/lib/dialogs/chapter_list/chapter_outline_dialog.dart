@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/outline.dart';
 import '../../controllers/chapter_list/outline_integration_handler.dart';
+import '../../utils/toast_utils.dart';
 
 /// 章节细纲编辑对话框
 /// 显示AI生成的章节细纲，允许用户编辑或重新生成
@@ -81,9 +82,7 @@ class _ChapterOutlineDialogState extends State<ChapterOutlineDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('重新生成失败: $e')),
-        );
+        ToastUtils.showError('重新生成失败: $e', context: context);
       }
     } finally {
       if (mounted) {

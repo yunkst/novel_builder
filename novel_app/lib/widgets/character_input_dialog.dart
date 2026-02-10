@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chapter.dart';
 import '../services/character_extraction_service.dart';
 import '../services/logger_service.dart';
+import '../utils/toast_utils.dart';
+import '../core/providers/service_providers.dart';
 
 /// 创建模式枚举
 enum CreateMode {
@@ -29,6 +32,7 @@ class ChapterMatchItem {
 class CharacterInputDialog extends StatefulWidget {
   /// 是否有大纲可用于生成角色
   final bool hasOutline;
+
   /// 小说URL（用于提取角色功能）
   final String? novelUrl;
 
@@ -66,9 +70,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
   CreateMode _mode = CreateMode.describe;
   bool _useOutline = true;
 
-  // 提取角色相关状态
-  final CharacterExtractionService _extractionService =
-      CharacterExtractionService();
+  // 提取角色相关状态 - 使用Provider获取
+  CharacterExtractionService? _extractionService;
   int _contextLength = 500;
   bool _extractFullChapter = false;
   List<ChapterMatchItem> _matchedChapters = [];
@@ -96,10 +99,15 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     super.dispose();
   }
 
-  bool get _canExtract => widget.novelUrl != null && widget.novelUrl!.isNotEmpty;
+  bool get _canExtract =>
+      widget.novelUrl != null && widget.novelUrl!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
+    // 懒加载初始化服务
+    _extractionService ??= ProviderScope.containerOf(context)
+        .read(characterExtractionServiceProvider);
+
     return AlertDialog(
       title: const Text('AI创建角色'),
       content: SizedBox(
@@ -130,12 +138,13 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '选择创建方式',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Colors.grey,
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
@@ -143,8 +152,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           children: [
             _buildModeButton('AI描述', CreateMode.describe),
             const SizedBox(width: 8),
-            if (widget.hasOutline)
-              _buildModeButton('从大纲', CreateMode.outline),
+            if (widget.hasOutline) _buildModeButton('从大纲', CreateMode.outline),
             if (widget.hasOutline) const SizedBox(width: 8),
             _buildModeButton('提取角色', CreateMode.extract),
           ],
@@ -164,11 +172,18 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           });
         },
         style: OutlinedButton.styleFrom(
-          backgroundColor:
-              isSelected ? Colors.blue.withValues(alpha: 0.1) : null,
-          foregroundColor: isSelected ? Colors.blue : null,
+          backgroundColor: isSelected
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+              : null,
+          foregroundColor:
+              isSelected ? Theme.of(context).colorScheme.primary : null,
           side: BorderSide(
-            color: isSelected ? Colors.blue : Colors.grey,
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.4),
           ),
         ),
         child: Text(label),
@@ -272,18 +287,25 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              border: Border.all(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .error
+                      .withValues(alpha: 0.3)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.warning, size: 16, color: Colors.orange),
-                SizedBox(width: 8),
+                Icon(Icons.warning,
+                    size: 16, color: Theme.of(context).colorScheme.error),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '提取角色功能需要先在书架中打开该小说',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.error),
                   ),
                 ),
               ],
@@ -402,20 +424,20 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
           ElevatedButton.icon(
             onPressed: _isSearching ? null : _searchChapters,
             icon: _isSearching
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          Theme.of(context).colorScheme.onPrimary),
                     ),
                   )
                 : const Icon(Icons.search),
             label: Text(_isSearching ? '搜索中...' : '搜索章节'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size.fromHeight(40),
             ),
           ),
@@ -427,18 +449,26 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color:
+                    Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .error
+                        .withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error, size: 16, color: Colors.red),
+                  Icon(Icons.error,
+                      size: 16, color: Theme.of(context).colorScheme.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _searchError!,
-                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.error),
                     ),
                   ),
                 ],
@@ -477,7 +507,11 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
             Container(
               constraints: const BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.builder(
@@ -513,9 +547,13 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
 
   /// 构建预计长度提示
   Widget _buildEstimatedLength() {
+    if (_extractionService == null) {
+      return const SizedBox.shrink();
+    }
+
     final selectedChapters =
         _matchedChapters.where((c) => c.isSelected).toList();
-    final estimated = _extractionService.estimateContentLength(
+    final estimated = _extractionService!.estimateContentLength(
       chapterMatches: selectedChapters.map((item) {
         return ChapterMatch(
           chapter: item.chapter,
@@ -528,7 +566,9 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     );
 
     final isOverLimit = estimated > _maxTotalContentLength;
-    final color = isOverLimit ? Colors.red : Colors.grey;
+    final color = isOverLimit
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -559,11 +599,12 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
             ],
           ),
           if (isOverLimit)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '内容过长可能导致处理失败，建议减少选中章节或缩短上下文长度',
-                style: TextStyle(fontSize: 11, color: Colors.red),
+                style: TextStyle(
+                    fontSize: 11, color: Theme.of(context).colorScheme.error),
               ),
             ),
         ],
@@ -584,20 +625,23 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.1),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+        border: Border.all(
+            color:
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.lightbulb, size: 16, color: Colors.blue),
+          Icon(Icons.lightbulb,
+              size: 16, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.blue.shade700,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
@@ -616,8 +660,8 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       ElevatedButton(
         onPressed: _onConfirm,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
         ),
         child: Text(_mode == CreateMode.extract ? '开始提取' : 'AI生成'),
       ),
@@ -641,6 +685,14 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
     });
 
     try {
+      if (_extractionService == null) {
+        setState(() {
+          _searchError = '服务未初始化';
+          _isSearching = false;
+        });
+        return;
+      }
+
       // 构建名称列表
       final names = <String>[name];
       final aliasesText = _aliasesController.text.trim();
@@ -654,7 +706,7 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       }
 
       // 搜索章节
-      final matches = await _extractionService.searchChaptersByName(
+      final matches = await _extractionService!.searchChaptersByName(
         novelUrl: widget.novelUrl!,
         names: names,
       );
@@ -700,12 +752,12 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
   void _onDescribeConfirm() {
     final input = _descriptionController.text.trim();
     if (input.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入角色描述'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.w(
+        '角色描述为空',
+        category: LogCategory.ui,
+        tags: ['character', 'validation', 'empty-description'],
       );
+      ToastUtils.showError('请输入角色描述');
       return;
     }
 
@@ -720,24 +772,19 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
   void _onExtractConfirm() {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入角色正式名称'),
-          backgroundColor: Colors.red,
-        ),
+      LoggerService.instance.w(
+        '角色正式名称为空',
+        category: LogCategory.ui,
+        tags: ['character', 'validation', 'empty-name'],
       );
+      ToastUtils.showError('请输入角色正式名称');
       return;
     }
 
     final selectedChapters =
         _matchedChapters.where((c) => c.isSelected).toList();
     if (selectedChapters.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请至少选择一个章节'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastUtils.showError('请至少选择一个章节');
       return;
     }
 

@@ -47,12 +47,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.paragraph);
-    // 监听文本变化，但不触发重建
-    _controller.addListener(() {
-      if (widget.onContentChanged != null) {
-        widget.onContentChanged!(_controller.text);
-      }
-    });
+    // 移除 listener，改为在 TextField 的 onChanged 中处理用户输入
+    // 这样可以避免程序更新 controller.text 时触发不必要的回调
   }
 
   @override
@@ -62,7 +58,11 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
     if (oldWidget.paragraph != widget.paragraph) {
       // 检查是否是用户编辑导致的更新（避免覆盖用户输入）
       if (_controller.text != widget.paragraph) {
-        _controller.text = widget.paragraph;
+        // 使用 value 更新而不是直接设置 text，这样可以避免触发 TextField 的 onChanged
+        _controller.value = TextEditingValue(
+          text: widget.paragraph,
+          selection: TextSelection.collapsed(offset: widget.paragraph.length),
+        );
       }
     }
   }
@@ -110,7 +110,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
         '插图 ${widget.index + 1}',
         style: TextStyle(
           fontSize: widget.fontSize * 0.8,
-          color: Colors.grey[600],
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -139,8 +139,13 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -148,7 +153,10 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
             style: TextStyle(
               fontSize: widget.fontSize * 0.9,
               fontFamily: 'monospace',
-              color: Colors.grey[700],
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -169,12 +177,16 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.1),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.3), width: 1),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+        border: Border.all(
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            width: 1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: TextField(
         controller: _controller,
+        onChanged: widget.onContentChanged, // 直接使用 onChanged 处理用户输入
         decoration: const InputDecoration(
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
@@ -204,13 +216,19 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
             decoration: BoxDecoration(
-              color:
-                  widget.isSelected ? Colors.blue.withValues(alpha: 0.2) : null,
+              color: widget.isSelected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                  : null,
               border: widget.isSelected
-                  ? Border.all(color: Colors.blue, width: 2)
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary, width: 2)
                   : widget.isCloseupMode
                       ? Border.all(
-                          color: Colors.blue.withValues(alpha: 0.3), width: 1)
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.3),
+                          width: 1)
                       : null,
               borderRadius: BorderRadius.circular(8),
             ),

@@ -1,0 +1,34 @@
+# Flutter 测试覆盖率配置
+
+# 排除的文件/目录 (glob 模式)
+exclude:
+  - "**/*.g.dart"
+  - "**/*.freezed.dart"
+  - "**/generated/**"
+  - "**/lib/generated/**"
+  - "**/lib/models/**"  # 模型类通常通过JSON序列化库生成
+  - "**/lib/main.dart" # 主入口文件通常不需要测试
+  - "**/test/**"        # 测试文件本身
+  - "**/mocks/**"       # Mock 文件
+
+# 最低覆盖率要求 (百分比)
+minimum_coverage:
+  lines: 70      # 行覆盖率
+  functions: 70  # 函数覆盖率
+  branches: 60   # 分支覆盖率
+
+# 覆盖率报告格式
+report_formats:
+  - lcov
+  - html
+  - console
+
+# 是否在 CI 中失败 (当覆盖率未达标时)
+fail_on_under_coverage: true
+
+# 包含的文件 (如果设置,则只检查这些文件)
+include:
+  - "**/lib/services/**"
+  - "**/lib/widgets/**"
+  - "**/lib/screens/**"
+  - "**/lib/utils/**"
