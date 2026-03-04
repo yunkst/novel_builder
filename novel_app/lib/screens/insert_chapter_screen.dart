@@ -9,6 +9,7 @@ import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
+import '../services/preferences_service.dart';
 
 /// 插入章节全屏页面
 ///
@@ -254,7 +255,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       });
 
       // 构建Dify输入参数
-      final inputs = _buildDifyInputs(
+      final inputs = await _buildDifyInputs(
         userInput: _userInputController.text,
       );
 
@@ -284,11 +285,13 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   }
 
   /// 构建 Dify 输入参数
-  Map<String, dynamic> _buildDifyInputs({
+  Future<Map<String, dynamic>> _buildDifyInputs({
     required String userInput,
     String? existingDraft,
-  }) {
+  }) async {
     final historyContent = (_cachedPreviousChapters ?? []).join('\n\n');
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
 
     return {
       'cmd': '生成细纲',
@@ -296,6 +299,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       'history_chapters_content': historyContent,
       'outline_item': existingDraft ?? '',
       'user_input': userInput.trim(),
+      'ai_writer_setting': aiWriterSetting,
     };
   }
 
@@ -362,7 +366,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       _draftEditingController.clear();
 
       // 构建Dify输入参数
-      final inputs = _buildDifyInputs(
+      final inputs = await _buildDifyInputs(
         userInput: feedback,
         existingDraft: currentDraft,
       );
