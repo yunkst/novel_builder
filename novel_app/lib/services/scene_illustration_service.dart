@@ -76,7 +76,8 @@ class SceneIllustrationService {
       );
 
       if (response['status'] == 'pending' ||
-          response['status'] == 'processing') {
+          response['status'] == 'processing' ||
+          response['status'] == 'submitted') {
         LoggerService.instance.i(
           '场景插图任务创建成功: $taskId',
           category: LogCategory.ai,

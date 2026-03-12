@@ -6,6 +6,7 @@ import '../screens/chapter_list_screen_riverpod.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/url_input_dialog.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -41,6 +42,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         title: const Text('搜索小说'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 添加URL按钮
+          IconButton(
+            icon: const Icon(Icons.link),
+            tooltip: '通过URL添加小说',
+            onPressed: () => _showUrlInputDialog(apiService),
+          ),
+          const SizedBox(width: 8),
           // 源站过滤按钮
           if (sourceSitesState.sites.isNotEmpty)
             IconButton(
@@ -350,5 +358,80 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
       ),
     );
+  }
+
+  /// 显示URL输入对话框
+  Future<void> _showUrlInputDialog(dynamic apiService) async {
+    final url = await showUrlInputDialog(
+      context,
+      title: '通过URL添加小说',
+      hint: '请输入小说详情页URL',
+      confirmText: '确认',
+      cancelText: '取消',
+      validator: (url) {
+        // 验证URL格式和是否为支持的站点
+        final uri = Uri.tryParse(url);
+        if (uri == null) return false;
+        if (!uri.hasScheme) return false;
+
+        // 使用动态站点列表
+        final sourceSitesState = ref.read(sourceSitesNotifierProvider);
+        if (sourceSitesState.sites.isEmpty) {
+          // 如果站点列表未加载，暂时接受（让后端判断）
+          return uri.scheme == 'http' || uri.scheme == 'https';
+        }
+
+        final host = uri.host;
+        return sourceSitesState.sites.any((site) {
+          final baseUrl = site['base_url'] as String;
+          final baseUri = Uri.tryParse(baseUrl);
+          return baseUri != null && host.contains(baseUri.host);
+        });
+      },
+    );
+
+    if (url == null) return;
+
+    // 加载小说信息
+    if (!mounted) return;
+    final contextRef = context;
+    ToastUtils.showLoading('正在获取小说信息...');
+
+    try {
+      final searchState = ref.read(searchScreenNotifierProvider);
+      if (!searchState.isInitialized) {
+        ToastUtils.dismiss();
+        ToastUtils.showError('请先配置后端服务');
+        return;
+      }
+
+      final (novel, chapters) = await apiService.getNovelByUrl(url);
+
+      if (!mounted) return;
+      ToastUtils.dismiss();
+
+      // 导航到章节列表 - 检查widget是否仍然mounted
+      if (mounted && context.mounted) {
+        Navigator.push(
+          contextRef,
+          MaterialPageRoute(
+            builder: (context) => ChapterListScreenRiverpod(
+              novel: novel,
+            ),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      ToastUtils.dismiss();
+      LoggerService.instance.e(
+        '获取小说信息失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['url-add', 'api', 'failed'],
+      );
+
+      if (!mounted) return;
+      ToastUtils.showError('获取小说信息失败');
+    }
   }
 }

@@ -59,7 +59,7 @@ class ApiServiceWrapper {
     }
   }
 
-  final Dio _dio;
+  Dio _dio;
   DefaultApi _api;
   final Serializers _serializers = standardSerializers;
 
@@ -150,6 +150,8 @@ class ApiServiceWrapper {
 
     // 使用配置好的 Dio 重新创建 API 客户端
     _api = DefaultApi(configuredDio, _serializers);
+    // 更新 _dio 字段，确保 dio getter 返回正确配置的实例
+    _dio = configuredDio;
 
     _initialized = true;
     _lastInitTime = DateTime.now();
@@ -466,6 +468,52 @@ class ApiServiceWrapper {
     }, '获取章节列表');
   }
 
+  /// 通过URL获取小说信息和章节列表
+  ///
+  /// [url] 小说详情页URL
+  /// 返回包含小说信息和章节列表的元组
+  Future<(local.Novel, List<local.Chapter>)> getNovelByUrl(String url) async {
+    return _withRetry<(local.Novel, List<local.Chapter>)>(() async {
+      final token = await getToken();
+
+      // 使用生成的API方法
+      final response = await _api.novelByUrlNovelByUrlGet(
+        url: url,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final novelWithChapters = response.data!;
+        final novelData = novelWithChapters.novel;
+        final chaptersData = novelWithChapters.chapters;
+
+        // 构建Novel对象
+        final novel = local.Novel(
+          title: novelData.title ?? '未知小说',
+          author: novelData.author ?? '未知作者',
+          url: url,
+          coverUrl: null,  // 后端暂不返回此字段
+          description: null,  // 后端暂不返回此字段
+        );
+
+        // 构建Chapter列表
+        final chapters = chaptersData.asMap().entries.map((entry) {
+          final index = entry.key;
+          final chapterData = entry.value;
+          return local.Chapter(
+            title: chapterData.title ?? '未知章节',
+            url: chapterData.url ?? '',
+            chapterIndex: index,
+          );
+        }).toList();
+
+        return (novel, chapters);
+      } else {
+        throw Exception('获取小说信息失败: ${response.statusCode?.toString()}');
+      }
+    }, '获取小说信息');
+  }
+
   /// 获取章节内容
   ///
   /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
@@ -719,8 +767,19 @@ class ApiServiceWrapper {
     );
   }
 
-  /// 获取 Dio 实例（用于构建图片URL）
-  Dio get dio => _dio;
+  /// 获取 Dio 实例（用于构建图片URL和下载）
+  Dio get dio {
+    // 允许在未初始化时访问，因为有些测试需要这样做
+    // 但在实际使用中应该先调用 init()
+    if (!_initialized) {
+      LoggerService.instance.d(
+        'Dio 实例访问时 ApiServiceWrapper 尚未初始化',
+        category: LogCategory.network,
+        tags: ['debug', 'api', 'dio'],
+      );
+    }
+    return _dio;
+  }
 
   // ========================================================================
   // 场景插图相关 API
@@ -754,8 +813,13 @@ class ApiServiceWrapper {
       );
 
       if (response.data != null) {
-        // 简单返回，让调用方处理 JsonObject
-        return {'data': response.data.toString()};
+        // 使用生成的SceneIllustrationResponse类型
+        final sceneResponse = response.data!;
+        return {
+          'task_id': sceneResponse.taskId,
+          'status': sceneResponse.status,
+          'message': sceneResponse.message,
+        };
       } else {
         throw Exception('操作失败：响应为空');
       }
@@ -803,8 +867,8 @@ class ApiServiceWrapper {
       );
 
       if (response.data != null) {
-        // 简单返回，让调用方处理 JsonObject
-        return {'data': response.data.toString()};
+        // 删除图片响应没有特定模型，直接返回成功
+        return {'success': true, 'message': '删除成功'};
       } else {
         throw Exception('删除场景插图图片失败：响应为空');
       }
@@ -833,28 +897,13 @@ class ApiServiceWrapper {
       );
 
       if (response.data != null) {
-        final data = response.data;
-        if (data != null) {
-          // 安全地创建新Map
-          final result = <String, dynamic>{};
-          // 尝试将其作为Map处理
-          try {
-            final map = data as Map;
-            for (final entry in map.entries) {
-              result[entry.key.toString()] = entry.value;
-            }
-          } catch (e, stackTrace) {
-            LoggerService.instance.e(
-              '解析场景插图响应数据失败',
-              stackTrace: stackTrace.toString(),
-              category: LogCategory.network,
-              tags: ['error', 'api', 'parse', 'failed'],
-            );
-            throw Exception('重新生成场景插图图片失败：无法解析响应数据');
-          }
-          return result;
-        }
-        throw Exception('重新生成场景插图图片失败：响应格式错误');
+        // 使用生成的SceneRegenerateResponse类型
+        final sceneResponse = response.data!;
+        return {
+          'task_id': sceneResponse.taskId,
+          'total_prompts': sceneResponse.totalPrompts,
+          'message': sceneResponse.message,
+        };
       } else {
         throw Exception('重新生成场景插图图片失败：响应为空');
       }
