@@ -26,6 +26,13 @@ class Chapter(BaseModel):
     url: str
 
 
+class NovelWithChapters(BaseModel):
+    """Novel with chapters response schema."""
+
+    novel: Novel
+    chapters: list[Chapter]
+
+
 class ChapterContent(BaseModel):
     """Chapter content schema."""
 

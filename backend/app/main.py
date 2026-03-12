@@ -40,6 +40,7 @@ from .models.cache import ChapterCache as Cache
 from .schemas import (
     AppVersionResponse,
     AppVersionUploadRequest,
+    BackupUploadResponse,
     Chapter,
     ChapterContent,
     EnhancedSceneIllustrationRequest,
@@ -47,11 +48,13 @@ from .schemas import (
     ImageToVideoResponse,
     ModelsResponse,
     Novel,
+    NovelWithChapters,
     RoleCardGenerateRequest,
     RoleCardTaskStatusResponse,
     RoleGalleryResponse,
     RoleImageDeleteRequest,
     RoleRegenerateRequest,
+    SceneIllustrationResponse,
     SceneGalleryResponse,
     SceneImageDeleteRequest,
     SceneRegenerateRequest,
@@ -243,6 +246,47 @@ async def chapters(
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
     chapters = await crawler.get_chapter_list(url)
     return chapters
+
+
+@app.get(
+    "/novel-by-url", response_model=NovelWithChapters, dependencies=[Depends(verify_token)]
+)
+async def novel_by_url(
+    url: str = Query(..., description="小说详情页URL")
+) -> dict[str, Any]:
+    """
+    通过URL获取小说信息和章节列表
+
+    - **url**: 小说详情页URL
+
+    返回小说的完整信息，包括：
+    - novel: 小说基本信息（标题、作者、封面、简介）
+    - chapters: 章节列表
+    """
+    crawler = get_crawler_for_url(url)
+    if not crawler:
+        raise HTTPException(status_code=400, detail="不支持该URL的站点")
+
+    # 调用爬虫的get_novel_info方法
+    novel_info = await crawler.get_novel_info(url)
+
+    # 清理标题中的冗余信息
+    title = novel_info.get("title", "")
+    if " - " in title:
+        title = title.split(" - ")[0]
+
+    # 构建Novel对象
+    novel_data = {
+        "title": title,
+        "author": novel_info.get("author", "未知作者"),
+        "url": url,
+    }
+
+    # 返回结果
+    return {
+        "novel": novel_data,
+        "chapters": novel_info.get("chapters", []),
+    }
 
 
 @app.get(
@@ -559,7 +603,11 @@ async def role_card_health_check():
 # ================= 场面绘制 API =================
 
 
-@app.post("/api/scene-illustration/generate", dependencies=[Depends(verify_token)])
+@app.post(
+    "/api/scene-illustration/generate",
+    response_model=SceneIllustrationResponse,
+    dependencies=[Depends(verify_token)],
+)
 async def generate_scene_images(
     request: EnhancedSceneIllustrationRequest, db: Session = Depends(get_db)
 ):
