@@ -24,9 +24,8 @@ classifiers = [
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    "requests>=2.31.0",
-    "beautifulsoup4>=4.12.0",
-    "lxml>=4.9.0",
+    # Scrapling for web scraping (replaces requests, beautifulsoup4, playwright)
+    "scrapling[all]>=1.0.0",
     "urllib3>=2.0.0",
     "pydantic>=2.4.0",
     "pydantic-settings>=2.0.0",
@@ -35,8 +34,6 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
     "alembic>=1.12.0",
-    # Playwright for advanced web scraping
-    "playwright>=1.55.0",
     # Traditional Chinese to Simplified Chinese conversion
     "opencc>=1.1.2",
     # App version management
