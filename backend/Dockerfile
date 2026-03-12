@@ -44,7 +44,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     # curl_cffi runtime dependencies (Scrapling)
     libcurl4 \
-    libcurl3t64-gnutls \
     # Base dependencies
     ca-certificates \
     build-essential \
@@ -98,7 +97,8 @@ COPY ./alembic.ini ./
 COPY ./alembic ./alembic
 
 # Install Playwright browsers (required by Scrapling Dynamic/Stealth sessions)
-RUN python -m playwright install chromium
+# 使用国内镜像源加速下载
+RUN PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright python -m playwright install chromium
 RUN python -m playwright install-deps chromium
 
 # Create non-root user for security (optional for development)
