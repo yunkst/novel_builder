@@ -11,8 +11,11 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Install system dependencies for building
+# Include libcurl4-openssl-dev for curl_cffi (Scrapling dependency)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libcurl4-openssl-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure PyPI to use Aliyun mirror
@@ -34,16 +37,19 @@ ENV PYTHONUNBUFFERED=1
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
-# Install runtime system dependencies for Playwright
-# Use the official Playwright recommended dependencies
+# Install runtime system dependencies
+# Include libcurl4 for curl_cffi (Scrapling dependency) and Playwright browsers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
+    # curl_cffi runtime dependencies (Scrapling)
+    libcurl4 \
+    libcurl3t64-gnutls \
     # Base dependencies
     ca-certificates \
     build-essential \
     pkg-config \
-    # Playwright browser dependencies (minimal working set)
+    # Playwright browser dependencies (Scrapling Dynamic/Stealth sessions)
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -59,7 +65,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libxss1 \
     libgtk-3-0 \
-    # Additional libraries that are commonly available
+    # Additional libraries
     libglib2.0-0 \
     libdbus-1-3 \
     libx11-6 \
@@ -91,7 +97,7 @@ COPY ./app ./app
 COPY ./alembic.ini ./
 COPY ./alembic ./alembic
 
-# Install Playwright browsers and system dependencies
+# Install Playwright browsers (required by Scrapling Dynamic/Stealth sessions)
 RUN python -m playwright install chromium
 RUN python -m playwright install-deps chromium
 
