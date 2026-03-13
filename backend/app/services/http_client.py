@@ -126,20 +126,25 @@ class RequestsClient(IHttpClient):
         from requests.adapters import HTTPAdapter
         from urllib3.util.retry import Retry
 
-        # 创建SSL上下文
+        # 创建SSL上下文 - 禁用验证
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
-        # 设置适配器
+        # 设置适配器，并关联SSL上下文
         adapter = HTTPAdapter(
             max_retries=Retry(
                 total=5,
                 backoff_factor=0.5,
                 status_forcelist=[500, 502, 503, 504],
                 allowed_methods=["GET", "POST"],
-            )
+            ),
+            pool_connections=10,
+            pool_maxsize=10,
         )
+
+        # 为 session 设置 SSL 上下文
+        self.session.verify = False
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
@@ -173,8 +178,8 @@ class RequestsClient(IHttpClient):
         """执行HTTP请求"""
         loop = asyncio.get_event_loop()
 
-        # 准备请求头
-        headers = {}
+        # 准备请求头 - 合并session headers和custom headers
+        headers = self.session.headers.copy()
         if config.custom_headers:
             headers.update(config.custom_headers)
         if config.headers:
@@ -532,28 +537,28 @@ class HybridHttpClient(IHttpClient):
         await self.playwright_client.close()
 
 
-# 全局客户端实例
-_default_client: IHttpClient | None = None
+# 全局客户端实例缓存
+_client_cache: dict[RequestStrategy, IHttpClient] = {}
 
 
 def get_http_client(strategy: RequestStrategy = RequestStrategy.HYBRID) -> IHttpClient:
-    """获取HTTP客户端实例"""
-    global _default_client
-
-    if _default_client is None:
+    """获取HTTP客户端实例，支持多种策略"""
+    # 如果缓存中没有该策略的客户端，创建一个
+    if strategy not in _client_cache:
         if strategy in [RequestStrategy.BROWSER, RequestStrategy.STEALTH]:
-            _default_client = PlaywrightClient()
+            _client_cache[strategy] = PlaywrightClient()
         elif strategy == RequestStrategy.HYBRID:
-            _default_client = HybridHttpClient()
-        else:
-            _default_client = RequestsClient()
+            _client_cache[strategy] = HybridHttpClient()
+        else:  # SIMPLE
+            _client_cache[strategy] = RequestsClient()
 
-    return _default_client
+    return _client_cache[strategy]
 
 
 async def http_get(url: str, config: RequestConfig | None = None) -> Response:
     """便捷的GET请求函数"""
-    client = get_http_client()
+    config = config or RequestConfig()
+    client = get_http_client(config.strategy)
     return await client.get(url, config)
 
 
@@ -561,5 +566,6 @@ async def http_post(
     url: str, data: dict | None = None, config: RequestConfig | None = None
 ) -> Response:
     """便捷的POST请求函数"""
-    client = get_http_client()
+    config = config or RequestConfig()
+    client = get_http_client(config.strategy)
     return await client.post(url, data, config)

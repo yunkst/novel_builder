@@ -9,8 +9,7 @@ import re
 import urllib.parse
 from typing import Any
 
-from .base_crawler import BaseCrawler
-from .http_client import RequestStrategy
+from .base_crawler import BaseCrawler, RequestStrategy
 
 
 class WdscwCrawlerRefactored(BaseCrawler):
@@ -353,6 +352,161 @@ class WdscwCrawlerRefactored(BaseCrawler):
         except Exception as e:
             print(f"获取章节内容失败: {e}")
             return {"title": "", "content": ""}
+
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 获取小说详情页
+            response = await self.get_page(
+                novel_url, custom_headers=self.custom_headers, timeout=30
+            )
+            if response.status_code != 200:
+                return {
+                    "title": "未知小说",
+                    "author": "未知作者",
+                    "url": novel_url,
+                    "cover_url": "",
+                    "description": "",
+                    "chapters": [],
+                }
+
+            soup = response.soup()
+
+            # 提取小说基本信息
+            title = self._extract_novel_title(soup)
+            author = self._extract_novel_author(soup)
+            cover_url = self._extract_novel_cover(soup)
+            description = self._extract_novel_description(soup)
+
+            # 获取章节列表（复用现有方法）
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except Exception as e:
+            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
+
+    def _extract_novel_title(self, soup) -> str:
+        """提取小说标题"""
+        title_elem = soup.find("h1")
+        if title_elem:
+            title = title_elem.get_text(strip=True)
+            if title:
+                # 清理标题中的网站名称等后缀
+                title = re.sub(r"_.*$", "", title).strip()
+                title = re.sub(r"-.*$", "", title).strip()
+                return title
+        return "未知小说"
+
+    def _extract_novel_author(self, soup) -> str:
+        """提取小说作者"""
+        # 尝试从页面文本中提取作者信息
+        text = soup.get_text()
+
+        # 优先查找"作者XXX希望您"模式（5dscw特有格式）
+        author_match = re.search(r"作者([^\s]{2,10})希望您", text)
+        if author_match:
+            return author_match.group(1).strip()
+
+        # 尝试查找"作者：XXX"或"作者:XXX"格式
+        author_match = re.search(r"作者[：:]\s*([^\s\n\r<>/]+)", text)
+        if author_match:
+            return author_match.group(1).strip()
+
+        # 尝试查找作者链接或元素
+        author_elem = soup.find("a", href=re.compile(r"/author/"))
+        if author_elem:
+            return author_elem.get_text(strip=True)
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup) -> str:
+        """提取小说封面URL"""
+        # 尝试查找封面图片
+        cover_selectors = [
+            "img.book-cover",
+            "img.cover",
+            ".book-img img",
+            "#bookimg img",
+        ]
+
+        for selector in cover_selectors:
+            cover_elem = soup.select_one(selector)
+            if cover_elem:
+                cover_src = cover_elem.get("src", "") or cover_elem.get("data-src", "")
+                if cover_src:
+                    # 转换为绝对URL
+                    if cover_src.startswith("/"):
+                        return urllib.parse.urljoin(self.base_url, cover_src)
+                    elif cover_src.startswith("http"):
+                        return cover_src
+
+        # 5dscw特有：查找所有img标签，找到包含.jpg的封面图
+        all_imgs = soup.find_all("img")
+        for img in all_imgs:
+            src = img.get("src", "") or img.get("data-src", "")
+            if src and ".jpg" in src.lower():
+                # 转换为绝对URL
+                if src.startswith("/"):
+                    return urllib.parse.urljoin(self.base_url, src)
+                elif src.startswith("http"):
+                    return src
+
+        return ""
+
+    def _extract_novel_description(self, soup) -> str:
+        """提取小说简介"""
+        # 尝试多种简介选择器
+        desc_selectors = [
+            "div.book-intro",
+            "div.intro",
+            "div.description",
+            "div#bookintro",
+            "p.intro",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if desc and len(desc) > 10:
+                    # 清理简介文本
+                    desc = re.sub(r"\s+", " ", desc)
+                    return desc[:500]
+
+        # 5dscw特有：从页面文本中提取"小说简介："后面的内容
+        text = soup.get_text()
+        intro_match = re.search(r"小说简介[：:]\s*(.{30,500}?)(?=本站提示|各位书友|$)", text)
+        if intro_match:
+            desc = intro_match.group(1).strip()
+            # 清理简介文本
+            desc = re.sub(r"\s+", " ", desc)
+            return desc[:500]
+
+        return ""
 
     def _extract_chapter_content(self, soup) -> str:
         """提取章节内容的辅助方法"""

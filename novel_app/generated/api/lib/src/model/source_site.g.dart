@@ -19,6 +19,10 @@ class _$SourceSite extends SourceSite {
   final bool enabled;
   @override
   final bool searchEnabled;
+  @override
+  final String? searchReason;
+  @override
+  final String? searchHint;
 
   factory _$SourceSite([void Function(SourceSiteBuilder)? updates]) =>
       (SourceSiteBuilder()..update(updates))._build();
@@ -29,7 +33,9 @@ class _$SourceSite extends SourceSite {
       required this.baseUrl,
       required this.description,
       required this.enabled,
-      required this.searchEnabled})
+      required this.searchEnabled,
+      this.searchReason,
+      this.searchHint})
       : super._();
   @override
   SourceSite rebuild(void Function(SourceSiteBuilder) updates) =>
@@ -47,7 +53,9 @@ class _$SourceSite extends SourceSite {
         baseUrl == other.baseUrl &&
         description == other.description &&
         enabled == other.enabled &&
-        searchEnabled == other.searchEnabled;
+        searchEnabled == other.searchEnabled &&
+        searchReason == other.searchReason &&
+        searchHint == other.searchHint;
   }
 
   @override
@@ -59,6 +67,8 @@ class _$SourceSite extends SourceSite {
     _$hash = $jc(_$hash, description.hashCode);
     _$hash = $jc(_$hash, enabled.hashCode);
     _$hash = $jc(_$hash, searchEnabled.hashCode);
+    _$hash = $jc(_$hash, searchReason.hashCode);
+    _$hash = $jc(_$hash, searchHint.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -71,7 +81,9 @@ class _$SourceSite extends SourceSite {
           ..add('baseUrl', baseUrl)
           ..add('description', description)
           ..add('enabled', enabled)
-          ..add('searchEnabled', searchEnabled))
+          ..add('searchEnabled', searchEnabled)
+          ..add('searchReason', searchReason)
+          ..add('searchHint', searchHint))
         .toString();
   }
 }
@@ -104,6 +116,14 @@ class SourceSiteBuilder implements Builder<SourceSite, SourceSiteBuilder> {
   set searchEnabled(bool? searchEnabled) =>
       _$this._searchEnabled = searchEnabled;
 
+  String? _searchReason;
+  String? get searchReason => _$this._searchReason;
+  set searchReason(String? searchReason) => _$this._searchReason = searchReason;
+
+  String? _searchHint;
+  String? get searchHint => _$this._searchHint;
+  set searchHint(String? searchHint) => _$this._searchHint = searchHint;
+
   SourceSiteBuilder() {
     SourceSite._defaults(this);
   }
@@ -117,6 +137,8 @@ class SourceSiteBuilder implements Builder<SourceSite, SourceSiteBuilder> {
       _description = $v.description;
       _enabled = $v.enabled;
       _searchEnabled = $v.searchEnabled;
+      _searchReason = $v.searchReason;
+      _searchHint = $v.searchHint;
       _$v = null;
     }
     return this;
@@ -149,6 +171,8 @@ class SourceSiteBuilder implements Builder<SourceSite, SourceSiteBuilder> {
               enabled, r'SourceSite', 'enabled'),
           searchEnabled: BuiltValueNullFieldError.checkNotNull(
               searchEnabled, r'SourceSite', 'searchEnabled'),
+          searchReason: searchReason,
+          searchHint: searchHint,
         );
     replace(_$result);
     return _$result;

@@ -28,6 +28,7 @@ Method | HTTP request | Description
 [**getVideoFileApiImageToVideoVideoImgNameGet**](DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
 [**healthCheckHealthGet**](DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
 [**indexGet**](DefaultApi.md#indexget) | **GET** / | Index
+[**novelByUrlNovelByUrlGet**](DefaultApi.md#novelbyurlnovelbyurlget) | **GET** /novel-by-url | Novel By Url
 [**regenerateSceneImagesApiSceneIllustrationRegeneratePost**](DefaultApi.md#regeneratesceneimagesapisceneillustrationregeneratepost) | **POST** /api/scene-illustration/regenerate | Regenerate Scene Images
 [**regenerateSimilarImagesApiRoleCardRegeneratePost**](DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
 [**roleCardHealthCheckApiRoleCardHealthGet**](DefaultApi.md#rolecardhealthcheckapirolecardhealthget) | **GET** /api/role-card/health | Role Card Health Check
@@ -85,9 +86,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **chaptersChaptersGet**
-> BuiltList<Chapter> chaptersChaptersGet(url, X_API_TOKEN)
+> BuiltList<Chapter> chaptersChaptersGet(url, forceRefresh, X_API_TOKEN)
 
 Chapters
+
+获取章节列表  - **url**: 小说详情页或阅读页URL - **force_refresh**: 是否强制刷新（默认 False）   - False: 优先从缓存获取，缓存不存在时从源站抓取   - True: 强制从源站重新获取
 
 ### Example
 ```dart
@@ -95,10 +98,11 @@ import 'package:novel_api/api.dart';
 
 final api = NovelApi().getDefaultApi();
 final String url = url_example; // String | 小说详情页或阅读页URL
+final bool forceRefresh = true; // bool | 强制刷新，从源站重新获取
 final String X_API_TOKEN = X_API_TOKEN_example; // String | 
 
 try {
-    final response = api.chaptersChaptersGet(url, X_API_TOKEN);
+    final response = api.chaptersChaptersGet(url, forceRefresh, X_API_TOKEN);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling DefaultApi->chaptersChaptersGet: $e\n');
@@ -110,6 +114,7 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **url** | **String**| 小说详情页或阅读页URL | 
+ **forceRefresh** | **bool**| 强制刷新，从源站重新获取 | [optional] [default to false]
  **X_API_TOKEN** | **String**|  | [optional] 
 
 ### Return type
@@ -351,7 +356,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **generateSceneImagesApiSceneIllustrationGeneratePost**
-> JsonObject generateSceneImagesApiSceneIllustrationGeneratePost(enhancedSceneIllustrationRequest, X_API_TOKEN)
+> SceneIllustrationResponse generateSceneImagesApiSceneIllustrationGeneratePost(enhancedSceneIllustrationRequest, X_API_TOKEN)
 
 Generate Scene Images
 
@@ -382,7 +387,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+[**SceneIllustrationResponse**](SceneIllustrationResponse.md)
 
 ### Authorization
 
@@ -864,6 +869,51 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **novelByUrlNovelByUrlGet**
+> NovelWithChapters novelByUrlNovelByUrlGet(url, X_API_TOKEN)
+
+Novel By Url
+
+通过URL获取小说信息和章节列表  - **url**: 小说详情页URL  返回小说的完整信息，包括： - novel: 小说基本信息（标题、作者、封面、简介） - chapters: 章节列表
+
+### Example
+```dart
+import 'package:novel_api/api.dart';
+
+final api = NovelApi().getDefaultApi();
+final String url = url_example; // String | 小说详情页URL
+final String X_API_TOKEN = X_API_TOKEN_example; // String | 
+
+try {
+    final response = api.novelByUrlNovelByUrlGet(url, X_API_TOKEN);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->novelByUrlNovelByUrlGet: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **url** | **String**| 小说详情页URL | 
+ **X_API_TOKEN** | **String**|  | [optional] 
+
+### Return type
+
+[**NovelWithChapters**](NovelWithChapters.md)
+
+### Authorization
+
+[HTTPBearer](../README.md#HTTPBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **regenerateSceneImagesApiSceneIllustrationRegeneratePost**
 > SceneRegenerateResponse regenerateSceneImagesApiSceneIllustrationRegeneratePost(sceneRegenerateRequest, X_API_TOKEN)
 
@@ -1138,7 +1188,7 @@ Upload App Version
 import 'package:novel_api/api.dart';
 
 final api = NovelApi().getDefaultApi();
-final MultipartFile file = BINARY_DATA_HERE; // MultipartFile | APK文件
+final String file = file_example; // String | APK文件
 final String version = version_example; // String | 版本号 (如 1.0.1)
 final int versionCode = 56; // int | 版本递增码
 final String X_API_TOKEN = X_API_TOKEN_example; // String | 
@@ -1157,7 +1207,7 @@ try {
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **file** | **MultipartFile**| APK文件 | 
+ **file** | **String**| APK文件 | 
  **version** | **String**| 版本号 (如 1.0.1) | 
  **versionCode** | **int**| 版本递增码 | 
  **X_API_TOKEN** | **String**|  | [optional] 

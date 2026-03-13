@@ -140,7 +140,7 @@ class _ChapterListScreenRiverpodState
                               onGenerateChapter: () =>
                                   _showInsertChapterDialog(0),
                               onLoadFromSource: () =>
-                                  notifier.refreshChapters(),
+                                  notifier.refreshChapters(context),
                             )
                           : state.isReorderingMode
                               ? _buildReorderableChapterList(state, notifier)
@@ -168,7 +168,7 @@ class _ChapterListScreenRiverpodState
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => notifier.refreshChapters(),
+            onPressed: () => notifier.refreshChapters(context),
             child: const Text('重试'),
           ),
         ],
@@ -251,7 +251,7 @@ class _ChapterListScreenRiverpodState
             _showClearCacheDialog(notifier);
             break;
           case 'refresh':
-            notifier.refreshChapters();
+            notifier.refreshChapters(context);
             break;
           case 'outline_management':
             Navigator.push(
@@ -768,7 +768,7 @@ class _ChapterListScreenRiverpodState
       // 重新加载章节列表
       await ref
           .read(chapterListProvider(widget.novel).notifier)
-          .refreshChapters();
+          .refreshChapters(context);
 
       if (mounted) {
         final newState = ref.read(chapterListProvider(widget.novel));
@@ -852,7 +852,7 @@ class _ChapterListScreenRiverpodState
       // 重新加载章节列表
       await ref
           .read(chapterListProvider(widget.novel).notifier)
-          .refreshChapters();
+          .refreshChapters(context);
 
       // 显示成功提示
       if (mounted) {

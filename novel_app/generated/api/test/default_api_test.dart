@@ -1,6 +1,7 @@
 import 'package:test/test.dart';
 import 'package:novel_api/novel_api.dart';
 
+
 /// tests for DefaultApi
 void main() {
   final instance = NovelApi().getDefaultApi();
@@ -17,7 +18,9 @@ void main() {
 
     // Chapters
     //
-    //Future<BuiltList<Chapter>> chaptersChaptersGet(String url, { String X_API_TOKEN }) async
+    // 获取章节列表  - **url**: 小说详情页或阅读页URL - **force_refresh**: 是否强制刷新（默认 False）   - False: 优先从缓存获取，缓存不存在时从源站抓取   - True: 强制从源站重新获取
+    //
+    //Future<BuiltList<Chapter>> chaptersChaptersGet(String url, { bool forceRefresh, String X_API_TOKEN }) async
     test('test chaptersChaptersGet', () async {
       // TODO
     });
@@ -71,7 +74,7 @@ void main() {
     //
     // 生成场面绘制图片  - **chapters_content**: 章节内容 - **task_id**: 任务标识符 - **roles**: 角色信息 - **num**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型）  返回任务ID，可通过后续接口查询和获取图片
     //
-    //Future<JsonObject> generateSceneImagesApiSceneIllustrationGeneratePost(EnhancedSceneIllustrationRequest enhancedSceneIllustrationRequest, { String X_API_TOKEN }) async
+    //Future<SceneIllustrationResponse> generateSceneImagesApiSceneIllustrationGeneratePost(EnhancedSceneIllustrationRequest enhancedSceneIllustrationRequest, { String X_API_TOKEN }) async
     test('test generateSceneImagesApiSceneIllustrationGeneratePost', () async {
       // TODO
     });
@@ -171,13 +174,21 @@ void main() {
       // TODO
     });
 
+    // Novel By Url
+    //
+    // 通过URL获取小说信息和章节列表  - **url**: 小说详情页URL  返回小说的完整信息，包括： - novel: 小说基本信息（标题、作者、封面、简介） - chapters: 章节列表
+    //
+    //Future<NovelWithChapters> novelByUrlNovelByUrlGet(String url, { String X_API_TOKEN }) async
+    test('test novelByUrlNovelByUrlGet', () async {
+      // TODO
+    });
+
     // Regenerate Scene Images
     //
     // 基于现有任务重新生成场面图片  - **task_id**: 原始任务ID - **count**: 生成图片数量 - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
     //
     //Future<SceneRegenerateResponse> regenerateSceneImagesApiSceneIllustrationRegeneratePost(SceneRegenerateRequest sceneRegenerateRequest, { String X_API_TOKEN }) async
-    test('test regenerateSceneImagesApiSceneIllustrationRegeneratePost',
-        () async {
+    test('test regenerateSceneImagesApiSceneIllustrationRegeneratePost', () async {
       // TODO
     });
 
@@ -230,9 +241,10 @@ void main() {
     //
     // 上传APP新版本  - **file**: APK文件 - **version**: 版本号（如 1.0.1） - **version_code**: 版本递增码 - **changelog**: 更新日志（可选） - **force_update**: 是否强制更新（默认false）  返回上传结果和下载URL
     //
-    //Future<JsonObject> uploadAppVersionApiAppVersionUploadPost(MultipartFile file, String version, int versionCode, { String X_API_TOKEN, String changelog, bool forceUpdate }) async
+    //Future<JsonObject> uploadAppVersionApiAppVersionUploadPost(String file, String version, int versionCode, { String X_API_TOKEN, String changelog, bool forceUpdate }) async
     test('test uploadAppVersionApiAppVersionUploadPost', () async {
       // TODO
     });
+
   });
 }

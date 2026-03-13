@@ -4,9 +4,10 @@ Novel App 自动打包并上传脚本
 
 此脚本自动化执行以下操作：
 1. 从 pubspec.yaml 读取版本信息
-2. 构建 Flutter APK (release)
-3. 上传 APK 到后端服务器
-4. 报告上传结果
+2. 分析 git diff 生成更新日志
+3. 构建 Flutter APK (release)
+4. 上传 APK 到后端服务器
+5. 自动提交代码到 git
 """
 
 import os
@@ -14,6 +15,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import requests
 
@@ -81,6 +83,154 @@ def get_flutter_version(project_root: Path) -> tuple[str, int]:
     return version_name, version_code
 
 
+def run_git_command(args: list[str], cwd: Path) -> tuple[int, str]:
+    """
+    执行 git 命令并处理 Windows 编码问题
+
+    Args:
+        args: git 命令参数列表
+        cwd: 工作目录
+
+    Returns:
+        (return_code, output) 元组
+    """
+    result = subprocess.run(
+        args,
+        cwd=cwd,
+        capture_output=True,
+        shell=True if os.name == "nt" else False,
+    )
+
+    # 尝试 UTF-8 解码，失败则使用 GBK（Windows 中文环境）
+    try:
+        stdout = result.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            stdout = result.stdout.decode("gbk", errors="ignore")
+        except:
+            stdout = ""
+
+    try:
+        stderr = result.stderr.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            stderr = result.stderr.decode("gbk", errors="ignore")
+        except:
+            stderr = ""
+
+    return result.returncode, stdout, stderr
+
+
+def analyze_git_changes(project_root: Path) -> str:
+    """
+    分析 git 变更生成更新日志
+
+    Args:
+        project_root: 项目根目录
+
+    Returns:
+        生成的更新日志
+    """
+    print("正在分析代码变更...")
+
+    # 获取 novel_app 目录的变更文件列表
+    returncode, stdout, stderr = run_git_command(
+        ["git", "diff", "--name-only", "novel_app/lib"],
+        project_root,
+    )
+
+    if returncode != 0:
+        print("无法获取 git 变更，使用默认更新日志")
+        return "Bug修复和性能优化"
+
+    changed_files = stdout.strip().split("\n") if stdout.strip() else []
+    changed_files = [f for f in changed_files if f]  # 过滤空字符串
+
+    if not changed_files:
+        return "Bug修复和性能优化"
+
+    # 按模块分类变更
+    changes_by_category = {
+        "screens": [],
+        "widgets": [],
+        "services": [],
+        "providers": [],
+        "repositories": [],
+        "models": [],
+        "其他": [],
+    }
+
+    for file_path in changed_files:
+        if "screens/" in file_path:
+            changes_by_category["screens"].append(file_path)
+        elif "widgets/" in file_path:
+            changes_by_category["widgets"].append(file_path)
+        elif "services/" in file_path:
+            changes_by_category["services"].append(file_path)
+        elif "providers/" in file_path:
+            changes_by_category["providers"].append(file_path)
+        elif "repositories/" in file_path:
+            changes_by_category["repositories"].append(file_path)
+        elif "models/" in file_path:
+            changes_by_category["models"].append(file_path)
+        else:
+            changes_by_category["其他"].append(file_path)
+
+    # 分析具体文件变更获取更详细的信息
+    change_descriptions = []
+
+    # 检查关键文件的变更
+    for file_path in changed_files:
+        # 获取该文件的 diff
+        returncode, diff_content, _ = run_git_command(
+            ["git", "diff", file_path],
+            project_root,
+        )
+
+        if returncode == 0 and diff_content:
+            # 分析 diff 内容提取关键变更
+            # 检查是否添加了新功能
+            if " Future<void> _edit" in diff_content or "Future<void> _show" in diff_content:
+                if "编辑书名" in diff_content:
+                    change_descriptions.append("新增编辑书名功能")
+                elif "刷新确认" in diff_content:
+                    change_descriptions.append("优化刷新确认对话框")
+                elif "下载" in diff_content and "Token" in diff_content:
+                    change_descriptions.append("修复应用更新下载认证问题")
+
+            # 检查 API Token 相关修复
+            if "X-API-TOKEN" in diff_content or "api_token" in diff_content.lower():
+                if "app_update_service" in file_path and "下载" in diff_content:
+                    if "修复" not in change_descriptions:
+                        change_descriptions.append("修复应用更新下载认证问题")
+
+            # 检查章节列表相关
+            if "chapter_list" in file_path.lower():
+                if "refresh" in diff_content.lower() and "context" in diff_content:
+                    if "优化刷新" not in change_descriptions:
+                        change_descriptions.append("优化章节列表刷新交互")
+
+    # 如果没有从 diff 分析出具体变更，使用基于文件分类的通用描述
+    if not change_descriptions:
+        if changes_by_category["services"]:
+            change_descriptions.append("服务层优化")
+        if changes_by_category["screens"]:
+            change_descriptions.append("界面功能增强")
+        if changes_by_category["providers"]:
+            change_descriptions.append("状态管理优化")
+
+    # 组合最终的更新日志
+    if change_descriptions:
+        # 去重并限制数量
+        unique_descriptions = list(dict.fromkeys(change_descriptions))[:4]
+        changelog = "、".join(unique_descriptions)
+    else:
+        changelog = "Bug修复和性能优化"
+
+    print(f"生成的更新日志: {changelog}")
+    return changelog
+
+
 def build_flutter_apk(project_root: Path) -> Path:
     """
     构建 Flutter APK (release)
@@ -101,14 +251,24 @@ def build_flutter_apk(project_root: Path) -> Path:
         ["flutter", "build", "apk", "--release"],
         cwd=novel_app_dir,
         capture_output=True,
-        text=True,
         shell=True if os.name == "nt" else False,
     )
 
+    # 处理输出编码
+    try:
+        stdout = result.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        stdout = result.stdout.decode("gbk", errors="ignore")
+
+    try:
+        stderr = result.stderr.decode("utf-8")
+    except UnicodeDecodeError:
+        stderr = result.stderr.decode("gbk", errors="ignore")
+
     if result.returncode != 0:
         print("构建失败!")
-        print("STDOUT:", result.stdout)
-        print("STDERR:", result.stderr)
+        print("STDOUT:", stdout)
+        print("STDERR:", stderr)
         raise RuntimeError("Flutter APK 构建失败")
 
     print("构建成功!")
@@ -204,6 +364,71 @@ def upload_to_backend(
     return result
 
 
+def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
+    """
+    提交代码变更到 git
+
+    Args:
+        project_root: 项目根目录
+        version: 版本号
+        changelog: 更新日志
+
+    Returns:
+        是否成功提交
+    """
+    print("-" * 50)
+    print("正在提交代码变更...")
+
+    try:
+        # 添加所有变更文件
+        print("添加变更文件...")
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=project_root,
+            capture_output=True,
+            shell=True if os.name == "nt" else False,
+            check=True,
+        )
+
+        # 生成 commit 消息
+        commit_msg = f"chore: 发布版本 {version}\n\n{changelog}"
+        print(f"提交消息: {commit_msg}")
+
+        # 执行提交
+        result = subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            cwd=project_root,
+            capture_output=True,
+            shell=True if os.name == "nt" else False,
+        )
+
+        # 处理输出编码
+        try:
+            stdout = result.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            stdout = result.stdout.decode("gbk", errors="ignore")
+
+        if result.returncode == 0:
+            print("代码提交成功!")
+            print(f"提交信息:\n{stdout}")
+            return True
+        else:
+            # 可能没有需要提交的变更
+            if "nothing to commit" in stdout.lower():
+                print("没有需要提交的代码变更")
+                return True
+            print("代码提交失败:")
+            print(stdout)
+            return False
+
+    except subprocess.CalledProcessError as e:
+        print(f"Git 命令执行失败: {e}")
+        return False
+    except Exception as e:
+        print(f"提交代码时出错: {e}")
+        return False
+
+
 def main():
     """主函数"""
     # 获取项目根目录
@@ -219,11 +444,21 @@ def main():
     print(f"版本: {version} (version_code: {version_code})")
     print("-" * 50)
 
-    # 2. 构建 APK
+    # 2. 分析代码变更生成更新日志
+    changelog_env = os.getenv("CHANGELOG", None)
+    if changelog_env:
+        changelog = changelog_env
+        print(f"使用环境变量中的更新日志: {changelog}")
+    else:
+        changelog = analyze_git_changes(project_root)
+    print(f"更新日志: {changelog}")
+    print("-" * 50)
+
+    # 3. 构建 APK
     apk_path = build_flutter_apk(project_root)
     print("-" * 50)
 
-    # 3. 上传到后端
+    # 4. 上传到后端
     # 从环境变量读取配置（已在load_env_file中加载.env文件）
     api_url = os.getenv("NOVEL_API_URL", "http://localhost:3800")
     api_token = os.getenv("NOVEL_API_TOKEN", "")
@@ -233,7 +468,6 @@ def main():
         print("请在项目根目录的 .env 文件中设置: NOVEL_API_TOKEN=your_token")
         sys.exit(1)
 
-    changelog = os.getenv("CHANGELOG", None)
     force_update = os.getenv("FORCE_UPDATE", "false").lower() == "true"
 
     upload_to_backend(
@@ -246,10 +480,17 @@ def main():
         force_update=force_update,
     )
 
+    # 5. 提交代码变更
+    commit_success = commit_changes(project_root, version, changelog)
+
     print("-" * 50)
     print("Complete! Release successful!")
     print(f"Version {version} (code: {version_code}) has been uploaded.")
     print(f"Download URL: {api_url}/api/app-version/download/{version}")
+
+    if commit_success:
+        print("\n提示: 代码已提交到本地仓库，如需推送到远程请执行:")
+        print(f"  git push")
 
 
 if __name__ == "__main__":

@@ -16,16 +16,14 @@ part 'role_card_task_status_response.g.dart';
 /// * [status] - 任务状态: pending/running/completed/failed
 /// * [totalPrompts] - 生成的提示词数量
 /// * [generatedImages] - 成功生成的图片数量
-/// * [resultMessage]
-/// * [errorMessage]
+/// * [resultMessage] 
+/// * [errorMessage] 
 /// * [createdAt] - 创建时间
-/// * [startedAt]
-/// * [completedAt]
+/// * [startedAt] 
+/// * [completedAt] 
 /// * [progressPercentage] - 进度百分比
 @BuiltValue()
-abstract class RoleCardTaskStatusResponse
-    implements
-        Built<RoleCardTaskStatusResponse, RoleCardTaskStatusResponseBuilder> {
+abstract class RoleCardTaskStatusResponse implements Built<RoleCardTaskStatusResponse, RoleCardTaskStatusResponseBuilder> {
   /// 任务ID
   @BuiltValueField(wireName: r'task_id')
   int get taskId;
@@ -68,25 +66,18 @@ abstract class RoleCardTaskStatusResponse
 
   RoleCardTaskStatusResponse._();
 
-  factory RoleCardTaskStatusResponse(
-          [void updates(RoleCardTaskStatusResponseBuilder b)]) =
-      _$RoleCardTaskStatusResponse;
+  factory RoleCardTaskStatusResponse([void updates(RoleCardTaskStatusResponseBuilder b)]) = _$RoleCardTaskStatusResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(RoleCardTaskStatusResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<RoleCardTaskStatusResponse> get serializer =>
-      _$RoleCardTaskStatusResponseSerializer();
+  static Serializer<RoleCardTaskStatusResponse> get serializer => _$RoleCardTaskStatusResponseSerializer();
 }
 
-class _$RoleCardTaskStatusResponseSerializer
-    implements PrimitiveSerializer<RoleCardTaskStatusResponse> {
+class _$RoleCardTaskStatusResponseSerializer implements PrimitiveSerializer<RoleCardTaskStatusResponse> {
   @override
-  final Iterable<Type> types = const [
-    RoleCardTaskStatusResponse,
-    _$RoleCardTaskStatusResponse
-  ];
+  final Iterable<Type> types = const [RoleCardTaskStatusResponse, _$RoleCardTaskStatusResponse];
 
   @override
   final String wireName = r'RoleCardTaskStatusResponse';
@@ -167,9 +158,7 @@ class _$RoleCardTaskStatusResponseSerializer
     RoleCardTaskStatusResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -293,3 +282,4 @@ class _$RoleCardTaskStatusResponseSerializer
     return result.build();
   }
 }
+

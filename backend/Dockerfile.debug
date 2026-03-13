@@ -11,14 +11,19 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Install system dependencies for development and debugging
+# Include libcurl4-openssl-dev for curl_cffi (Scrapling dependency)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libcurl4-openssl-dev \
+    libssl-dev \
     curl \
     wget \
     gdb \
     strace \
     netcat-openbsd \
     vim \
+    # curl_cffi runtime dependencies (Scrapling)
+    libcurl4 \
     # Playwright browser dependencies (minimal working set)
     libnss3 \
     libnspr4 \

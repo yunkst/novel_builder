@@ -109,6 +109,22 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
       ) as _i5.Future<int>);
 
   @override
+  _i5.Future<int> updateTitle(
+    String? novelUrl,
+    String? newTitle,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateTitle,
+          [
+            novelUrl,
+            newTitle,
+          ],
+        ),
+        returnValue: _i5.Future<int>.value(0),
+      ) as _i5.Future<int>);
+
+  @override
   _i5.Future<int> updateBackgroundSetting(
     String? novelUrl,
     String? backgroundSetting,

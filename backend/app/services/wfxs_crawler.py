@@ -38,6 +38,66 @@ class WfxsCrawler(ABC):
             # 如果转换失败，返回原文
             return text
 
+    async def get_page(self, url: str, timeout: int = 15):
+        """获取页面内容（使用Playwright）
+
+        Args:
+            url: 页面URL
+            timeout: 超时时间（秒）
+
+        Returns:
+            包含content和status_code的响应对象
+        """
+        from playwright.async_api import async_playwright
+        import os
+
+        class Response:
+            def __init__(self, content: str, status_code: int):
+                self.content = content
+                self.status_code = status_code
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                    ]
+                )
+
+                # 配置浏览器上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
+                }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
+
+                context = await browser.new_context(**context_options)
+
+                page = await context.new_page()
+                page.set_default_timeout(timeout * 1000)
+
+                response = await page.goto(url, timeout=timeout * 1000)
+
+                if response.ok:
+                    content = await page.content()
+                    await browser.close()
+                    return Response(content=content, status_code=200)
+                else:
+                    await browser.close()
+                    return Response(content="", status_code=response.status)
+
+        except Exception as e:
+            print(f"获取页面失败: {e}")
+            return Response(content="", status_code=500)
+
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说
 
@@ -140,14 +200,27 @@ class WfxsCrawler(ABC):
             章节列表
         """
         try:
-            # 从novel_url提取novel_id
-            # 格式: https://m.wfxs.tw/xiaoshuo/7840069/
-            novel_id_match = re.search(r'/xiaoshuo/(\d+)/', novel_url)
-            if not novel_id_match:
-                return []
+            # 支持两种 URL 格式:
+            # 1. https://m.wfxs.tw/xiaoshuo/7840069/ (小说详情页)
+            # 2. https://m.wfxs.tw/booklist/7840069.html (章节列表页)
+            chapter_list_url = novel_url
+            novel_id = None
 
-            novel_id = novel_id_match.group(1)
-            chapter_list_url = f"{self.base_url}/booklist/{novel_id}.html"
+            novel_id_match = re.search(r'/xiaoshuo/(\d+)/', novel_url)
+            if novel_id_match:
+                # 从小说详情页 URL 转换为章节列表 URL
+                novel_id = novel_id_match.group(1)
+                chapter_list_url = f"{self.base_url}/booklist/{novel_id}.html"
+            else:
+                # 检查是否是 booklist 格式
+                booklist_match = re.search(r'/booklist/(\d+)\.html', novel_url)
+                if not booklist_match:
+                    print(f"不支持的 URL 格式：{novel_url}")
+                    return []
+                # 从 booklist URL 中提取 novel_id
+                novel_id = booklist_match.group(1)
+                # 直接使用传入的 booklist URL
+                chapter_list_url = novel_url
 
             response = await self.get_page(chapter_list_url, timeout=15)
 
@@ -468,6 +541,174 @@ class WfxsCrawler(ABC):
                 'content': '',
                 'success': False,
             }
+
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 为每个请求创建独立的Playwright实例
+            from playwright.async_api import async_playwright
+            import os
+
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                    ]
+                )
+
+                # 配置浏览器上下文
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-TW",
+                }
+
+                # 添加代理配置(仅当明确配置且不是127.0.0.1时)
+                http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or os.environ.get("NOVEL_PROXY")
+                if http_proxy and not http_proxy.startswith("http://127.0.0.1") and not http_proxy.startswith("http://localhost"):
+                    context_options["proxy"] = {"server": http_proxy}
+
+                context = await browser.new_context(**context_options)
+
+                page = await context.new_page()
+                page.set_default_timeout(15000)
+
+                response = await page.goto(novel_url, timeout=15000)
+
+                if response.ok:
+                    content = await page.content()
+                    await browser.close()
+
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(content, 'lxml')
+
+                    # 提取小说基本信息
+                    title = self._extract_novel_title(soup)
+                    author = self._extract_novel_author(soup)
+                    cover_url = self._extract_novel_cover(soup)
+                    description = self._extract_novel_description(soup)
+                else:
+                    await browser.close()
+                    return {
+                        "title": "未知小说",
+                        "author": "未知作者",
+                        "url": novel_url,
+                        "cover_url": "",
+                        "description": "",
+                        "chapters": [],
+                    }
+
+            # 获取章节列表（复用现有方法）
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except Exception as e:
+            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
+
+    def _extract_novel_title(self, soup: BeautifulSoup) -> str:
+        """提取小说标题"""
+        title_elem = soup.find('h1')
+        if title_elem:
+            title = title_elem.get_text(strip=True)
+            if title:
+                # 清理标题中的网站名称等后缀
+                import re
+                title = re.sub(r"_.*$", "", title).strip()
+                title = re.sub(r"-.*$", "", title).strip()
+                return self.convert_to_simplified(title)
+        return "未知小说"
+
+    def _extract_novel_author(self, soup: BeautifulSoup) -> str:
+        """提取小说作者"""
+        # 尝试从页面文本中提取作者信息
+        text = soup.get_text()
+        import re
+        author_match = re.search(r"作者[：:]\s*([^\s\n\r<>/|]+)", text)
+        if author_match:
+            return self.convert_to_simplified(author_match.group(1).strip())
+
+        # 尝试查找包含作者信息的元素
+        author_elem = soup.find(string=re.compile(r"作者"))
+        if author_elem:
+            parent = author_elem.find_parent()
+            if parent:
+                author_text = parent.get_text(strip=True)
+                if '|' in author_text:
+                    author = author_text.split('|')[0].strip()
+                    return self.convert_to_simplified(author)
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup: BeautifulSoup) -> str:
+        """提取小说封面URL"""
+        # 尝试查找封面图片
+        cover_selectors = [
+            "img.book-cover",
+            "img.cover",
+            ".book-img img",
+        ]
+
+        for selector in cover_selectors:
+            cover_elem = soup.select_one(selector)
+            if cover_elem:
+                cover_src = cover_elem.get("src", "") or cover_elem.get("data-src", "")
+                if cover_src:
+                    # 转换为绝对URL
+                    if cover_src.startswith("/"):
+                        return f"{self.base_url}{cover_src}"
+                    elif cover_src.startswith("http"):
+                        return cover_src
+
+        return ""
+
+    def _extract_novel_description(self, soup: BeautifulSoup) -> str:
+        """提取小说简介"""
+        # 尝试多种简介选择器
+        desc_selectors = [
+            "div.book-intro",
+            "div.intro",
+            "div.description",
+            "p.intro",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if desc and len(desc) > 10:
+                    # 清理简介文本
+                    import re
+                    desc = re.sub(r"\s+", " ", desc)
+                    return self.convert_to_simplified(desc[:500])
+
+        return ""
 
     async def _get_next_page_content_with_playwright(self, page_url: str) -> str:
         """使用独立Playwright实例获取下一页内容"""

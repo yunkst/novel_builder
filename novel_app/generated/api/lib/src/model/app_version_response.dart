@@ -15,12 +15,11 @@ part 'app_version_response.g.dart';
 /// * [versionCode] - 版本递增码
 /// * [downloadUrl] - 下载URL
 /// * [fileSize] - 文件大小(字节)
-/// * [changelog]
+/// * [changelog] 
 /// * [forceUpdate] - 是否强制更新
 /// * [createdAt] - 发布时间
 @BuiltValue()
-abstract class AppVersionResponse
-    implements Built<AppVersionResponse, AppVersionResponseBuilder> {
+abstract class AppVersionResponse implements Built<AppVersionResponse, AppVersionResponseBuilder> {
   /// 版本号
   @BuiltValueField(wireName: r'version')
   String get version;
@@ -50,19 +49,17 @@ abstract class AppVersionResponse
 
   AppVersionResponse._();
 
-  factory AppVersionResponse([void updates(AppVersionResponseBuilder b)]) =
-      _$AppVersionResponse;
+  factory AppVersionResponse([void updates(AppVersionResponseBuilder b)]) = _$AppVersionResponse;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(AppVersionResponseBuilder b) => b..forceUpdate = false;
+  static void _defaults(AppVersionResponseBuilder b) => b
+      ..forceUpdate = false;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<AppVersionResponse> get serializer =>
-      _$AppVersionResponseSerializer();
+  static Serializer<AppVersionResponse> get serializer => _$AppVersionResponseSerializer();
 }
 
-class _$AppVersionResponseSerializer
-    implements PrimitiveSerializer<AppVersionResponse> {
+class _$AppVersionResponseSerializer implements PrimitiveSerializer<AppVersionResponse> {
   @override
   final Iterable<Type> types = const [AppVersionResponse, _$AppVersionResponse];
 
@@ -121,9 +118,7 @@ class _$AppVersionResponseSerializer
     AppVersionResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -216,3 +211,4 @@ class _$AppVersionResponseSerializer
     return result.build();
   }
 }
+

@@ -12,8 +12,7 @@ from typing import Any
 
 import requests
 
-from .base_crawler import BaseCrawler
-from .http_client import RequestConfig, RequestStrategy
+from .base_crawler import BaseCrawler, RequestStrategy
 
 
 class AliceSWCrawlerRefactored(BaseCrawler):
@@ -23,21 +22,21 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         # AliceSW需要特殊的SSL配置和浏览器参数
         super().__init__(
             base_url="https://www.alicesw.com",
-            strategy=RequestStrategy.HYBRID,  # 混合模式，优先Playwright
+            strategy=RequestStrategy.SIMPLE,  # 使用简单策略
         )
 
-        # 自定义请求头，模拟真实浏览器
+        # 自定义请求头，模拟真实浏览器 - 确保所有值都是字符串
         self.custom_headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
+            "DNT": "1",  # 字符串 "1" 而不是整数
             "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
+            "Upgrade-Insecure-Requests": "1",  # 字符串 "1" 而不是整数
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
             "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
+            "Sec-Fetch-User": "?1",  # 字符串 "?1" 而不是布尔值
             "Cache-Control": "max-age=0",
         }
 
@@ -51,19 +50,14 @@ class AliceSWCrawlerRefactored(BaseCrawler):
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """搜索小说"""
         try:
-            # 构建搜索请求配置
-            RequestConfig(
-                timeout=30,  # AliceSW响应较慢
-                max_retries=3,
-                strategy=RequestStrategy.HYBRID,  # 优先使用Playwright
-                verify_ssl=False,  # AliceSW需要禁用SSL验证
-                custom_headers=self.custom_headers,
-                browser_args=self.browser_args,
-            )
-
             # 构建搜索URL和参数
             search_url = f"{self.base_url}/search.html"
-            search_params = {"q": keyword, "f": "_all", "sort": "relevance"}
+            # 确保所有参数值都是字符串类型
+            search_params = {
+                "q": str(keyword),
+                "f": "_all",
+                "sort": "relevance"
+            }
 
             # 使用POST请求发送搜索
             response = await self.post_form(search_url, search_params, timeout=30)
@@ -80,16 +74,6 @@ class AliceSWCrawlerRefactored(BaseCrawler):
     async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
-            # 配置请求
-            RequestConfig(
-                timeout=15,
-                max_retries=3,
-                strategy=RequestStrategy.HYBRID,
-                verify_ssl=False,
-                custom_headers=self.custom_headers,
-                browser_args=self.browser_args,
-            )
-
             # 首先获取小说详情页，查找章节列表页面链接
             response = await self.get_page(novel_url, timeout=15)
             soup = response.soup()
@@ -116,16 +100,6 @@ class AliceSWCrawlerRefactored(BaseCrawler):
     async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
-            # 配置请求
-            RequestConfig(
-                timeout=15,
-                max_retries=3,
-                strategy=RequestStrategy.HYBRID,
-                verify_ssl=False,
-                custom_headers=self.custom_headers,
-                browser_args=self.browser_args,
-            )
-
             # 获取章节页面
             response = await self.get_page(chapter_url, timeout=15)
 
@@ -143,6 +117,50 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
             print(f"AliceSW获取章节内容失败: {e!s}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
+
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 获取小说详情页
+            response = await self.get_page(novel_url, timeout=15)
+            soup = response.soup()
+
+            # 提取小说基本信息
+            title = self._extract_novel_title(soup)
+            author = self._extract_novel_author(soup)
+            cover_url = self._extract_novel_cover(soup, novel_url)
+            description = self._extract_novel_description(soup)
+
+            # 获取章节列表
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
+            print(f"AliceSW获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
 
     # ==================== AliceSW专用提取方法 ====================
 
@@ -501,9 +519,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return content
 
         # 移除无关元素
-        for elem in content_elem(
-            ["script", "style", "ins", "iframe", "div[class*='ad']"]
-        ):
+        for elem in content_elem.find_all(["script", "style", "ins", "iframe", "div"], class_=re.compile(r"ad")):
             elem.decompose()
 
         # 智能提取内容，保留段落结构
@@ -571,6 +587,106 @@ class AliceSWCrawlerRefactored(BaseCrawler):
                 cleaned_paragraphs.append(cleaned_paragraph)
 
         return "\n\n".join(cleaned_paragraphs)
+
+    # ==================== 小说信息提取方法 ====================
+
+    def _extract_novel_title(self, soup) -> str:
+        """提取小说标题"""
+        title_selectors = [
+            "h1.book-title",
+            "h1.title",
+            "h1",
+            ".book-name",
+            "title",
+        ]
+
+        for selector in title_selectors:
+            title_elem = soup.select_one(selector)
+            if title_elem:
+                title = title_elem.get_text().strip()
+                if title and len(title) > 1:
+                    return title
+
+        return "未知小说"
+
+    def _extract_novel_author(self, soup) -> str:
+        """提取小说作者"""
+        # 查找包含"作者"信息的元素
+        author_patterns = [
+            r"作者[：:]\s*([^\n\r<>/,，、\[\]]+)",
+            r"文\s*/\s*([^\n\r]+)",
+        ]
+
+        # 先尝试查找带有明确作者标签的元素
+        for pattern in author_patterns:
+            author_elem = soup.find(string=re.compile(pattern))
+            if author_elem:
+                match = re.search(pattern, author_elem)
+                if match:
+                    return match.group(1).strip()
+
+        # 尝试查找作者链接
+        author_link = soup.find("a", href=re.compile(r"search\?.*author"))
+        if author_link:
+            return author_link.get_text().strip()
+
+        # 从页面文本中提取
+        page_text = soup.get_text()
+        for pattern in author_patterns:
+            match = re.search(pattern, page_text)
+            if match:
+                author = match.group(1).strip()
+                if len(author) < 50:  # 防止匹配到过长的文本
+                    return author
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup, base_url: str) -> str:
+        """提取小说封面URL"""
+        # 查找封面图片
+        cover_selectors = [
+            ".book-cover img",
+            ".cover img",
+            "img.book-cover",
+            "img[alt*='封面']",
+            "img[alt*='cover']",
+        ]
+
+        for selector in cover_selectors:
+            img = soup.select_one(selector)
+            if img:
+                src = img.get("src") or img.get("data-src")
+                if src:
+                    return urllib.parse.urljoin(base_url, src)
+
+        # 查找页面中的第一张图片
+        img = soup.find("img")
+        if img:
+            src = img.get("src") or img.get("data-src")
+            if src:
+                return urllib.parse.urljoin(base_url, src)
+
+        return ""
+
+    def _extract_novel_description(self, soup) -> str:
+        """提取小说简介"""
+        desc_selectors = [
+            ".book-description",
+            ".description",
+            ".book-intro",
+            ".intro",
+            ".summary",
+            "div[class*='desc']",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if len(desc) > 10:
+                    return self.clean_text(desc)
+
+        return ""
 
 
 # 为了向后兼容，创建别名

@@ -15,8 +15,7 @@ part 'role_gallery_response.g.dart';
 /// * [roleId] - 人物卡ID
 /// * [images] - 图片URL列表
 @BuiltValue()
-abstract class RoleGalleryResponse
-    implements Built<RoleGalleryResponse, RoleGalleryResponseBuilder> {
+abstract class RoleGalleryResponse implements Built<RoleGalleryResponse, RoleGalleryResponseBuilder> {
   /// 人物卡ID
   @BuiltValueField(wireName: r'role_id')
   String get roleId;
@@ -27,24 +26,18 @@ abstract class RoleGalleryResponse
 
   RoleGalleryResponse._();
 
-  factory RoleGalleryResponse([void updates(RoleGalleryResponseBuilder b)]) =
-      _$RoleGalleryResponse;
+  factory RoleGalleryResponse([void updates(RoleGalleryResponseBuilder b)]) = _$RoleGalleryResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(RoleGalleryResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<RoleGalleryResponse> get serializer =>
-      _$RoleGalleryResponseSerializer();
+  static Serializer<RoleGalleryResponse> get serializer => _$RoleGalleryResponseSerializer();
 }
 
-class _$RoleGalleryResponseSerializer
-    implements PrimitiveSerializer<RoleGalleryResponse> {
+class _$RoleGalleryResponseSerializer implements PrimitiveSerializer<RoleGalleryResponse> {
   @override
-  final Iterable<Type> types = const [
-    RoleGalleryResponse,
-    _$RoleGalleryResponse
-  ];
+  final Iterable<Type> types = const [RoleGalleryResponse, _$RoleGalleryResponse];
 
   @override
   final String wireName = r'RoleGalleryResponse';
@@ -72,9 +65,7 @@ class _$RoleGalleryResponseSerializer
     RoleGalleryResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -131,3 +122,4 @@ class _$RoleGalleryResponseSerializer
     return result.build();
   }
 }
+

@@ -16,6 +16,7 @@ import 'service_providers.dart';
 import 'repository_providers.dart';
 import 'database_providers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 part 'chapter_list_providers.g.dart';
 
@@ -137,7 +138,10 @@ class ChapterList extends _$ChapterList {
   }
 
   /// 加载章节列表
-  Future<void> _loadChapters({bool forceRefresh = false}) async {
+  Future<void> _loadChapters({
+    bool forceRefresh = false,
+    BuildContext? context,
+  }) async {
     final chapterLoader = ref.watch(chapterLoaderProvider);
 
     state = state.copyWith(isLoading: true, errorMessage: '');
@@ -156,14 +160,12 @@ class ChapterList extends _$ChapterList {
         return;
       }
 
-      if (cachedChapters.isNotEmpty && forceRefresh) {
-        // 有缓存但需要刷新时，先显示缓存，然后在后台更新
-        state = state.copyWith(
-          chapters: cachedChapters,
-          isLoading: false,
-        );
-        _updateTotalPages();
-        await _refreshChaptersFromBackend();
+      if (cachedChapters.isNotEmpty && forceRefresh && context == null) {
+        // 有缓存但需要刷新，且没有提供 context（如首次加载），直接刷新
+        await _refreshChaptersFromBackend(forceRefresh: true);
+      } else if (cachedChapters.isNotEmpty && forceRefresh && context != null) {
+        // 有缓存但需要刷新，且有 context（用户手动刷新）
+        await _refreshChaptersFromBackend(forceRefresh: true, context: context);
       } else {
         // 没有缓存时，检查是否为自定义小说
         if (cachedChapters.isEmpty && novel.url.startsWith('custom://')) {
@@ -176,7 +178,7 @@ class ChapterList extends _$ChapterList {
           return;
         }
         // 从后端获取
-        await _refreshChaptersFromBackend();
+        await _refreshChaptersFromBackend(forceRefresh: forceRefresh);
       }
     } catch (e) {
       debugPrint('❌ 加载章节列表失败: $e');
@@ -188,7 +190,10 @@ class ChapterList extends _$ChapterList {
   }
 
   /// 从后端刷新章节列表
-  Future<void> _refreshChaptersFromBackend() async {
+  Future<void> _refreshChaptersFromBackend({
+    bool forceRefresh = false,
+    BuildContext? context,
+  }) async {
     final chapterLoader = ref.watch(chapterLoaderProvider);
 
     // 对于本地创建的小说，不需要从后端获取
@@ -198,9 +203,42 @@ class ChapterList extends _$ChapterList {
       return;
     }
 
+    // 如果需要强制刷新且有 context，显示确认对话框
+    if (forceRefresh && context != null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('刷新章节列表'),
+          content: const Text(
+            '是否需要重新抓取最新章节信息？\n\n'
+            '选择"是"将强制从源站重新获取，可能需要较长时间。\n'
+            '选择"否"将使用缓存的章节列表。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('否'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('是'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) {
+        // 用户选择不刷新，使用缓存
+        return;
+      }
+    }
+
     try {
       // 从后端获取最新章节列表
-      final updatedChapters = await chapterLoader.refreshFromBackend(novel.url);
+      final updatedChapters = await chapterLoader.refreshFromBackend(
+        novel.url,
+        forceRefresh: forceRefresh,
+      );
 
       if (updatedChapters.isNotEmpty) {
         state = state.copyWith(
@@ -309,8 +347,9 @@ class ChapterList extends _$ChapterList {
   }
 
   /// 刷新章节列表
-  Future<void> refreshChapters() async {
-    await _loadChapters(forceRefresh: true);
+  /// [context] 可选的 BuildContext，用于显示刷新确认对话框
+  Future<void> refreshChapters(BuildContext? context) async {
+    await _loadChapters(forceRefresh: true, context: context);
   }
 
   /// 切换书架状态

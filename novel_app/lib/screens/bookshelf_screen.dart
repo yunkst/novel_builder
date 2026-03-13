@@ -12,6 +12,7 @@ import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../dialogs/novel_edit_dialog.dart';
 import 'dart:async';
 
 class BookshelfScreen extends ConsumerStatefulWidget {
@@ -88,6 +89,35 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         );
       }
     }
+  }
+
+  /// 编辑小说书名
+  Future<void> _editNovelTitle(Novel novel) async {
+    await NovelEditDialog.show(
+      context: context,
+      originalTitle: novel.title,
+      onConfirm: (newTitle) async {
+        try {
+          final novelRepository = ref.read(novelRepositoryProvider);
+          await novelRepository.updateTitle(novel.url, newTitle);
+          if (mounted) {
+            ToastUtils.showSuccess('书名修改成功', context: context);
+          }
+          // 刷新书架列表
+          ref.invalidate(bookshelfNovelsProvider);
+        } catch (e, stackTrace) {
+          if (!mounted) return;
+          ErrorHelper.showErrorWithLog(
+            context,
+            '修改书名失败',
+            error: e,
+            stackTrace: stackTrace,
+            category: LogCategory.database,
+            tags: ['bookshelf', 'edit_title', 'failed'],
+          );
+        }
+      },
+    );
   }
 
   /// 继续阅读 - 直接打开上次阅读的章节
@@ -618,6 +648,9 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                               PopupMenuButton<String>(
                                 onSelected: (value) {
                                   switch (value) {
+                                    case 'edit':
+                                      _editNovelTitle(novel);
+                                      break;
                                     case 'move':
                                       _showBookshelfSelectionDialog(novel, 'move');
                                       break;
@@ -630,6 +663,16 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                   }
                                 },
                                 itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit),
+                                        SizedBox(width: 8),
+                                        Text('编辑书名'),
+                                      ],
+                                    ),
+                                  ),
                                   const PopupMenuItem(
                                     value: 'move',
                                     child: Row(

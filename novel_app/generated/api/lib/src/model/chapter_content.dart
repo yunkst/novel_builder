@@ -11,12 +11,11 @@ part 'chapter_content.g.dart';
 /// Chapter content schema.
 ///
 /// Properties:
-/// * [title]
-/// * [content]
-/// * [fromCache]
+/// * [title] 
+/// * [content] 
+/// * [fromCache] 
 @BuiltValue()
-abstract class ChapterContent
-    implements Built<ChapterContent, ChapterContentBuilder> {
+abstract class ChapterContent implements Built<ChapterContent, ChapterContentBuilder> {
   @BuiltValueField(wireName: r'title')
   String get title;
 
@@ -28,19 +27,17 @@ abstract class ChapterContent
 
   ChapterContent._();
 
-  factory ChapterContent([void updates(ChapterContentBuilder b)]) =
-      _$ChapterContent;
+  factory ChapterContent([void updates(ChapterContentBuilder b)]) = _$ChapterContent;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(ChapterContentBuilder b) => b..fromCache = false;
+  static void _defaults(ChapterContentBuilder b) => b
+      ..fromCache = false;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<ChapterContent> get serializer =>
-      _$ChapterContentSerializer();
+  static Serializer<ChapterContent> get serializer => _$ChapterContentSerializer();
 }
 
-class _$ChapterContentSerializer
-    implements PrimitiveSerializer<ChapterContent> {
+class _$ChapterContentSerializer implements PrimitiveSerializer<ChapterContent> {
   @override
   final Iterable<Type> types = const [ChapterContent, _$ChapterContent];
 
@@ -77,9 +74,7 @@ class _$ChapterContentSerializer
     ChapterContent object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -143,3 +138,4 @@ class _$ChapterContentSerializer
     return result.build();
   }
 }
+

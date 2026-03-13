@@ -25,6 +25,7 @@ import 'package:novel_api/src/model/image_to_video_response.dart';
 import 'package:novel_api/src/model/image_with_model.dart';
 import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
+import 'package:novel_api/src/model/novel_with_chapters.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
 import 'package:novel_api/src/model/role_card_task_status_response.dart';
 import 'package:novel_api/src/model/role_gallery_response.dart';
@@ -32,6 +33,7 @@ import 'package:novel_api/src/model/role_image_delete_request.dart';
 import 'package:novel_api/src/model/role_info.dart';
 import 'package:novel_api/src/model/role_regenerate_request.dart';
 import 'package:novel_api/src/model/scene_gallery_response.dart';
+import 'package:novel_api/src/model/scene_illustration_response.dart';
 import 'package:novel_api/src/model/scene_image_delete_request.dart';
 import 'package:novel_api/src/model/scene_regenerate_request.dart';
 import 'package:novel_api/src/model/scene_regenerate_response.dart';
@@ -55,6 +57,7 @@ part 'serializers.g.dart';
   ImageWithModel,
   ModelsResponse,
   Novel,
+  NovelWithChapters,
   RoleCardGenerateRequest,
   RoleCardTaskStatusResponse,
   RoleGalleryResponse,
@@ -62,6 +65,7 @@ part 'serializers.g.dart';
   RoleInfo,
   RoleRegenerateRequest,
   SceneGalleryResponse,
+  SceneIllustrationResponse,
   SceneImageDeleteRequest,
   SceneRegenerateRequest,
   SceneRegenerateResponse,
@@ -95,8 +99,8 @@ Serializers serializers = (_$serializers.toBuilder()
       ..add(const OneOfSerializer())
       ..add(const AnyOfSerializer())
       ..add(const DateSerializer())
-      ..add(Iso8601DateTimeSerializer()))
-    .build();
+      ..add(Iso8601DateTimeSerializer())
+    ).build();
 
 Serializers standardSerializers =
     (serializers.toBuilder()..addPlugin(StandardJsonPlugin())).build();

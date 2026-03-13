@@ -10,17 +10,14 @@ import re
 import urllib.parse
 from typing import Any
 
-from bs4 import BeautifulSoup
-
-from .base_crawler import BaseCrawler
-from .http_client import RequestStrategy
+from .base_crawler import BaseCrawler, RequestStrategy
 
 
 class WodeshuchengCrawler(BaseCrawler):
     """我的书城爬虫"""
 
     def __init__(self):
-        super().__init__("https://www.wodeshucheng.net", RequestStrategy.HYBRID)
+        super().__init__("https://www.wodeshucheng.net", RequestStrategy.SIMPLE)
         self.name = "我的书城"
         self.site_id = "wodeshucheng"
 
@@ -35,7 +32,7 @@ class WodeshuchengCrawler(BaseCrawler):
 
             # 获取分类页面
             response = await self.get_page(category_url)
-            if not response.success:
+            if response.status_code != 200:
                 return []
 
             soup = response.soup()
@@ -115,7 +112,7 @@ class WodeshuchengCrawler(BaseCrawler):
                     cat_url = f"{self.base_url}/{cat.lower()}xiaoshuo/"
                     try:
                         cat_response = await self.get_page(cat_url)
-                        if cat_response.success:
+                        if cat_response.status_code == 200:
                             cat_novels = self._extract_novels_from_category(
                                 cat_response.soup(), keyword
                             )
@@ -134,7 +131,7 @@ class WodeshuchengCrawler(BaseCrawler):
         try:
             # 获取小说详情页
             response = await self.get_page(novel_url)
-            if not response.success:
+            if response.status_code != 200:
                 return []
 
             soup = response.soup()
@@ -193,7 +190,7 @@ class WodeshuchengCrawler(BaseCrawler):
         try:
             # 获取章节页面
             response = await self.get_page(chapter_url)
-            if not response.success:
+            if response.status_code != 200:
                 return {"title": "章节内容", "content": "获取失败: 无法访问页面"}
 
             soup = response.soup()
@@ -250,10 +247,180 @@ class WodeshuchengCrawler(BaseCrawler):
             print(f"获取章节内容失败: {e}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 获取小说详情页
+            response = await self.get_page(novel_url)
+            if response.status_code != 200:
+                return {
+                    "title": "未知小说",
+                    "author": "未知作者",
+                    "url": novel_url,
+                    "cover_url": "",
+                    "description": "",
+                    "chapters": [],
+                }
+
+            soup = response.soup()
+
+            # 提取小说基本信息
+            title = self._extract_novel_title(soup)
+            author = self._extract_novel_author(soup)
+            cover_url = self._extract_novel_cover(soup)
+            description = self._extract_novel_description(soup)
+
+            # 获取章节列表（复用现有方法）
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except Exception as e:
+            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
+
     # ==================== 私有辅助方法 ====================
 
+    def _extract_novel_title(self, soup) -> str:
+        """提取小说标题"""
+        # 优先使用OG元数据
+        og_title = soup.find("meta", property="og:novel:book_name")
+        if og_title and og_title.get("content"):
+            return og_title.get("content").strip()
+
+        # 备用方案：使用h1标签（排除第一个h1，通常是网站标题）
+        h1_tags = soup.find_all("h1")
+        if len(h1_tags) > 1:
+            title = h1_tags[1].get_text().strip()
+            if title and len(title) > 1:
+                # 清理标题中的网站名称等后缀
+                title = re.sub(r"_.*$", "", title).strip()
+                title = re.sub(r"-.*$", "", title).strip()
+                return title
+
+        # 最后尝试使用页面标题
+        title_tag = soup.find("title")
+        if title_tag:
+            title = title_tag.get_text().strip()
+            # 清理标题中的网站名称等后缀
+            title = re.sub(r"_.*$", "", title).strip()
+            title = re.sub(r"-.*$", "", title).strip()
+            if title and len(title) > 1:
+                return title
+
+        return "未知小说"
+
+    def _extract_novel_author(self, soup) -> str:
+        """提取小说作者"""
+        # 优先使用OG元数据
+        og_author = soup.find("meta", property="og:novel:author")
+        if og_author and og_author.get("content"):
+            return og_author.get("content").strip()
+
+        # 备用方案：从页面文本中提取作者信息
+        text = soup.get_text()
+        author_match = re.search(r"作者[：:]\s*([^\s\n\r<>/]+)", text)
+        if author_match:
+            return author_match.group(1).strip()
+
+        # 尝试查找作者元素
+        author_elem = soup.find("div", class_="author")
+        if author_elem:
+            author = author_elem.get_text().strip().replace("作者：", "")
+            if author:
+                return author
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup) -> str:
+        """提取小说封面URL"""
+        # 优先使用OG元数据
+        og_image = soup.find("meta", property="og:image")
+        if og_image and og_image.get("content"):
+            cover_src = og_image.get("content")
+            if cover_src:
+                # 转换为绝对URL
+                if cover_src.startswith("/"):
+                    return urllib.parse.urljoin(self.base_url, cover_src)
+                elif cover_src.startswith("http"):
+                    return cover_src
+
+        # 备用方案：尝试查找封面图片
+        cover_selectors = [
+            "img.book-cover",
+            "img.cover",
+            ".book-img img",
+            "#bookimg img",
+        ]
+
+        for selector in cover_selectors:
+            cover_elem = soup.select_one(selector)
+            if cover_elem:
+                cover_src = cover_elem.get("src", "") or cover_elem.get("data-src", "")
+                if cover_src:
+                    # 转换为绝对URL
+                    if cover_src.startswith("/"):
+                        return urllib.parse.urljoin(self.base_url, cover_src)
+                    elif cover_src.startswith("http"):
+                        return cover_src
+
+        return ""
+
+    def _extract_novel_description(self, soup) -> str:
+        """提取小说简介"""
+        # 优先使用OG元数据
+        og_desc = soup.find("meta", property="og:description")
+        if og_desc and og_desc.get("content"):
+            desc = og_desc.get("content").strip()
+            if desc and len(desc) > 10:
+                # 清理简介文本
+                desc = re.sub(r"\s+", " ", desc)
+                return desc[:500]
+
+        # 备用方案：尝试多种简介选择器
+        desc_selectors = [
+            "div.book-intro",
+            "div.intro",
+            "div.description",
+            "div#bookintro",
+            "p.intro",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if desc and len(desc) > 10:
+                    # 清理简介文本
+                    desc = re.sub(r"\s+", " ", desc)
+                    return desc[:500]
+
+        return ""
+
     def _extract_novels_from_category(
-        self, soup: BeautifulSoup, keyword: str
+        self, soup, keyword: str
     ) -> list[dict[str, Any]]:
         """从分类页面提取小说信息"""
         novels = []

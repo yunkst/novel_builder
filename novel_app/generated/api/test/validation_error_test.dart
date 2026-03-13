@@ -21,5 +21,16 @@ void main() {
     test('to test the property `type`', () async {
       // TODO
     });
+
+    // JsonObject input
+    test('to test the property `input`', () async {
+      // TODO
+    });
+
+    // JsonObject ctx
+    test('to test the property `ctx`', () async {
+      // TODO
+    });
+
   });
 }

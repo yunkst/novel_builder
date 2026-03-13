@@ -13,6 +13,7 @@ import 'package:novel_api/src/model/backup_upload_response.dart';
 import 'package:novel_api/src/model/http_validation_error.dart';
 
 class BackupApi {
+
   final Dio _dio;
 
   final Serializers _serializers;
@@ -24,7 +25,7 @@ class BackupApi {
   ///
   /// Parameters:
   /// * [file] - 数据库备份文件(.db)
-  /// * [X_API_TOKEN]
+  /// * [X_API_TOKEN] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -34,8 +35,8 @@ class BackupApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BackupUploadResponse] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BackupUploadResponse>> uploadBackupApiBackupUploadPost({
-    required MultipartFile file,
+  Future<Response<BackupUploadResponse>> uploadBackupApiBackupUploadPost({ 
+    required String file,
     String? X_API_TOKEN,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -69,11 +70,12 @@ class BackupApi {
 
     try {
       _bodyData = FormData.fromMap(<String, dynamic>{
-        r'file': file,
+        r'file': encodeFormParameter(_serializers, file, const FullType(String)),
       });
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(
+         requestOptions: _options.compose(
           _dio.options,
           _path,
         ),
@@ -96,12 +98,11 @@ class BackupApi {
 
     try {
       final rawResponse = _response.data;
-      _responseData = rawResponse == null
-          ? null
-          : _serializers.deserialize(
-              rawResponse,
-              specifiedType: const FullType(BackupUploadResponse),
-            ) as BackupUploadResponse;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(BackupUploadResponse),
+      ) as BackupUploadResponse;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -123,4 +124,5 @@ class BackupApi {
       extra: _response.extra,
     );
   }
+
 }

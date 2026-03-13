@@ -132,6 +132,40 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     );
   }
 
+  /// 更新小说书名
+  @override
+  Future<int> updateTitle(String novelUrl, String newTitle) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    try {
+      final db = await database;
+      final result = await db.update(
+        'bookshelf',
+        {'title': newTitle},
+        where: 'url = ?',
+        whereArgs: [novelUrl],
+      );
+
+      LoggerService.instance.i(
+        '更新小说书名: $novelUrl -> $newTitle',
+        category: LogCategory.database,
+        tags: ['novel', 'update_title', 'success'],
+      );
+
+      return result;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新小说书名失败: $novelUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'update_title', 'failed'],
+      );
+      rethrow;
+    }
+  }
+
   /// 更新小说背景设定
   @override
   Future<int> updateBackgroundSetting(

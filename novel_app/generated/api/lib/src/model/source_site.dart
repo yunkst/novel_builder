@@ -11,12 +11,14 @@ part 'source_site.g.dart';
 /// Source site information schema.
 ///
 /// Properties:
-/// * [id]
-/// * [name]
-/// * [baseUrl]
-/// * [description]
-/// * [enabled]
-/// * [searchEnabled]
+/// * [id] 
+/// * [name] 
+/// * [baseUrl] 
+/// * [description] 
+/// * [enabled] 
+/// * [searchEnabled] 
+/// * [searchReason] 
+/// * [searchHint] 
 @BuiltValue()
 abstract class SourceSite implements Built<SourceSite, SourceSiteBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -36,6 +38,12 @@ abstract class SourceSite implements Built<SourceSite, SourceSiteBuilder> {
 
   @BuiltValueField(wireName: r'search_enabled')
   bool get searchEnabled;
+
+  @BuiltValueField(wireName: r'search_reason')
+  String? get searchReason;
+
+  @BuiltValueField(wireName: r'search_hint')
+  String? get searchHint;
 
   SourceSite._();
 
@@ -90,6 +98,20 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
       object.searchEnabled,
       specifiedType: const FullType(bool),
     );
+    if (object.searchReason != null) {
+      yield r'search_reason';
+      yield serializers.serialize(
+        object.searchReason,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.searchHint != null) {
+      yield r'search_hint';
+      yield serializers.serialize(
+        object.searchHint,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
   }
 
   @override
@@ -98,9 +120,7 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
     SourceSite object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -157,6 +177,22 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
           ) as bool;
           result.searchEnabled = valueDes;
           break;
+        case r'search_reason':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.searchReason = valueDes;
+          break;
+        case r'search_hint':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.searchHint = valueDes;
+          break;
         default:
           unhandled.add(key);
           unhandled.add(value);
@@ -185,3 +221,4 @@ class _$SourceSiteSerializer implements PrimitiveSerializer<SourceSite> {
     return result.build();
   }
 }
+

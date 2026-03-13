@@ -50,20 +50,22 @@ class ChapterLoader {
     }
 
     // 没有缓存时，从后端获取
-    return await refreshFromBackend(novelUrl);
+    return await refreshFromBackend(novelUrl, forceRefresh: forceRefresh);
   }
 
   /// 从后端刷新章节列表
   /// [novelUrl] 小说URL
+  /// [forceRefresh] 是否强制刷新
   /// 返回刷新后的章节列表
-  Future<List<Chapter>> refreshFromBackend(String novelUrl) async {
+  Future<List<Chapter>> refreshFromBackend(String novelUrl,
+      {bool forceRefresh = false}) async {
     // 对于本地创建的小说，直接从数据库获取用户创建的章节
     if (novelUrl.startsWith('custom://')) {
       return await _chapterRepo.getCachedNovelChapters(novelUrl);
     }
 
     // 从后端获取最新章节列表
-    final chapters = await _api.getChapters(novelUrl);
+    final chapters = await _api.getChapters(novelUrl, forceRefresh: forceRefresh);
 
     if (chapters.isNotEmpty) {
       // 缓存章节列表

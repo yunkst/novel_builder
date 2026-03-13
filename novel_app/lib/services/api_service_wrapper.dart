@@ -447,11 +447,13 @@ class ApiServiceWrapper {
   }
 
   /// 获取章节列表
-  Future<List<local.Chapter>> getChapters(String novelUrl) async {
+  Future<List<local.Chapter>> getChapters(String novelUrl,
+      {bool forceRefresh = false}) async {
     return _withRetry<List<local.Chapter>>(() async {
       final token = await getToken();
       final response = await _api.chaptersChaptersGet(
         url: novelUrl,
+        forceRefresh: forceRefresh,
         X_API_TOKEN: token,
       );
 
@@ -1218,18 +1220,15 @@ class ApiServiceWrapper {
         throw Exception('API Token未配置');
       }
 
-      // 创建MultipartFile
-      final multipartFile = await MultipartFile.fromFile(
-        dbFile.path,
-        filename: path.basename(dbFile.path),
-      );
+      // 获取文件路径
+      final filePath = dbFile.path;
 
       // 创建BackupApi实例
       final backupApi = BackupApi(_dio, standardSerializers);
 
       // 上传文件
       final response = await backupApi.uploadBackupApiBackupUploadPost(
-        file: multipartFile,
+        file: filePath,
         X_API_TOKEN: token,
         onSendProgress: onProgress,
       );

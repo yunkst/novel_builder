@@ -99,6 +99,22 @@ class MockINovelRepository extends _i1.Mock implements _i3.INovelRepository {
       ) as _i4.Future<int>);
 
   @override
+  _i4.Future<int> updateTitle(
+    String? novelUrl,
+    String? newTitle,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateTitle,
+          [
+            novelUrl,
+            newTitle,
+          ],
+        ),
+        returnValue: _i4.Future<int>.value(0),
+      ) as _i4.Future<int>);
+
+  @override
   _i4.Future<int> updateBackgroundSetting(
     String? novelUrl,
     String? backgroundSetting,
@@ -201,11 +217,15 @@ class MockChapterLoader extends _i1.Mock implements _i6.ChapterLoader {
       ) as _i4.Future<List<_i7.Chapter>>);
 
   @override
-  _i4.Future<List<_i7.Chapter>> refreshFromBackend(String? novelUrl) =>
+  _i4.Future<List<_i7.Chapter>> refreshFromBackend(
+    String? novelUrl, {
+    bool? forceRefresh = false,
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #refreshFromBackend,
           [novelUrl],
+          {#forceRefresh: forceRefresh},
         ),
         returnValue: _i4.Future<List<_i7.Chapter>>.value(<_i7.Chapter>[]),
       ) as _i4.Future<List<_i7.Chapter>>);

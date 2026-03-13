@@ -13,12 +13,20 @@ class _$ValidationError extends ValidationError {
   final String msg;
   @override
   final String type;
+  @override
+  final JsonObject? input;
+  @override
+  final JsonObject? ctx;
 
   factory _$ValidationError([void Function(ValidationErrorBuilder)? updates]) =>
       (ValidationErrorBuilder()..update(updates))._build();
 
   _$ValidationError._(
-      {required this.loc, required this.msg, required this.type})
+      {required this.loc,
+      required this.msg,
+      required this.type,
+      this.input,
+      this.ctx})
       : super._();
   @override
   ValidationError rebuild(void Function(ValidationErrorBuilder) updates) =>
@@ -33,7 +41,9 @@ class _$ValidationError extends ValidationError {
     return other is ValidationError &&
         loc == other.loc &&
         msg == other.msg &&
-        type == other.type;
+        type == other.type &&
+        input == other.input &&
+        ctx == other.ctx;
   }
 
   @override
@@ -42,6 +52,8 @@ class _$ValidationError extends ValidationError {
     _$hash = $jc(_$hash, loc.hashCode);
     _$hash = $jc(_$hash, msg.hashCode);
     _$hash = $jc(_$hash, type.hashCode);
+    _$hash = $jc(_$hash, input.hashCode);
+    _$hash = $jc(_$hash, ctx.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -51,7 +63,9 @@ class _$ValidationError extends ValidationError {
     return (newBuiltValueToStringHelper(r'ValidationError')
           ..add('loc', loc)
           ..add('msg', msg)
-          ..add('type', type))
+          ..add('type', type)
+          ..add('input', input)
+          ..add('ctx', ctx))
         .toString();
   }
 }
@@ -73,6 +87,14 @@ class ValidationErrorBuilder
   String? get type => _$this._type;
   set type(String? type) => _$this._type = type;
 
+  JsonObject? _input;
+  JsonObject? get input => _$this._input;
+  set input(JsonObject? input) => _$this._input = input;
+
+  JsonObject? _ctx;
+  JsonObject? get ctx => _$this._ctx;
+  set ctx(JsonObject? ctx) => _$this._ctx = ctx;
+
   ValidationErrorBuilder() {
     ValidationError._defaults(this);
   }
@@ -83,6 +105,8 @@ class ValidationErrorBuilder
       _loc = $v.loc.toBuilder();
       _msg = $v.msg;
       _type = $v.type;
+      _input = $v.input;
+      _ctx = $v.ctx;
       _$v = null;
     }
     return this;
@@ -111,6 +135,8 @@ class ValidationErrorBuilder
                 msg, r'ValidationError', 'msg'),
             type: BuiltValueNullFieldError.checkNotNull(
                 type, r'ValidationError', 'type'),
+            input: input,
+            ctx: ctx,
           );
     } catch (_) {
       late String _$failedField;

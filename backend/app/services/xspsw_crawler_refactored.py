@@ -10,8 +10,7 @@ import re
 import urllib.parse
 from typing import Any
 
-from .base_crawler import BaseCrawler
-from .http_client import RequestConfig, RequestStrategy
+from .base_crawler import BaseCrawler, RequestStrategy
 
 
 class XspswCrawlerRefactored(BaseCrawler):
@@ -37,14 +36,6 @@ class XspswCrawlerRefactored(BaseCrawler):
         try:
             # 使用真实的搜索功能
             search_url = f"{self.base_url}/search.html"
-
-            # 配置请求
-            RequestConfig(
-                timeout=10,
-                max_retries=3,
-                strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers,
-            )
 
             # 准备搜索参数
             search_data = {"searchkey": keyword.strip()}
@@ -74,14 +65,6 @@ class XspswCrawlerRefactored(BaseCrawler):
 
             novel_id = novel_id_match.group(1)
             all_chapters = []
-
-            # 配置请求
-            RequestConfig(
-                timeout=10,
-                max_retries=3,
-                strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers,
-            )
 
             # 首先访问第一页获取总页数信息
             first_page_url = f"{self.base_url}/xianshishuwu/{novel_id}/"
@@ -134,15 +117,6 @@ class XspswCrawlerRefactored(BaseCrawler):
     async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
-            # 配置请求
-            RequestConfig(
-                timeout=10,
-                max_retries=3,
-                retry_delay=0.6,
-                strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers,
-            )
-
             # 获取章节页面
             response = await self.get_page(
                 chapter_url, timeout=10, custom_headers=self.custom_headers
@@ -163,7 +137,140 @@ class XspswCrawlerRefactored(BaseCrawler):
             print(f"Xspsw获取章节内容失败: {e!s}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 从小说URL提取novel_id
+            novel_id_match = re.search(r"/xianshishuwu_(\d+)\.html", novel_url)
+            if not novel_id_match:
+                return {
+                    "title": "未知小说",
+                    "author": "未知作者",
+                    "url": novel_url,
+                    "cover_url": "",
+                    "description": "",
+                    "chapters": [],
+                }
+
+            novel_id = novel_id_match.group(1)
+            detail_page_url = f"{self.base_url}/xianshishuwu/{novel_id}/"
+
+            # 获取小说详情页
+            response = await self.get_page(detail_page_url, timeout=15, custom_headers=self.custom_headers)
+            soup = response.soup()
+
+            # 提取小说基本信息
+            title = self._extract_novel_title(soup)
+            author = self._extract_novel_author_from_detail(soup)
+            cover_url = self._extract_novel_cover(soup)
+            description = self._extract_novel_description(soup)
+
+            # 获取章节列表（复用现有方法）
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except Exception as e:
+            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
+
     # ==================== Xspsw专用提取方法 ====================
+
+    def _extract_novel_title(self, soup) -> str:
+        """提取小说标题"""
+        title_selectors = ["h1", "h2", ".book-title", ".title"]
+        for selector in title_selectors:
+            title_elem = soup.select_one(selector)
+            if title_elem:
+                title = title_elem.get_text().strip()
+                if title and len(title) > 1:
+                    # 清理标题中的网站名称等后缀
+                    title = re.sub(r"_.*$", "", title).strip()
+                    title = re.sub(r"-.*$", "", title).strip()
+                    return title
+        return "未知小说"
+
+    def _extract_novel_author_from_detail(self, soup) -> str:
+        """从详情页提取小说作者"""
+        # 尝试从页面文本中提取作者信息
+        text = soup.get_text()
+        author_match = re.search(r"\n([^\n]+?)N次元", text)
+        if author_match:
+            author = author_match.group(1).strip()
+            if author and len(author) > 1:
+                return author
+
+        # 尝试其他格式
+        author_match = re.search(r"作者[：:]\s*([^\s\n]+)", text)
+        if author_match:
+            return author_match.group(1)
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup) -> str:
+        """提取小说封面URL"""
+        # 尝试查找封面图片
+        cover_selectors = [
+            "img.book-cover",
+            "img.cover",
+            ".book-img img",
+        ]
+
+        for selector in cover_selectors:
+            cover_elem = soup.select_one(selector)
+            if cover_elem:
+                cover_src = cover_elem.get("src", "") or cover_elem.get("data-src", "")
+                if cover_src:
+                    # 转换为绝对URL
+                    if cover_src.startswith("/"):
+                        return urllib.parse.urljoin(self.base_url, cover_src)
+                    elif cover_src.startswith("http"):
+                        return cover_src
+
+        return ""
+
+    def _extract_novel_description(self, soup) -> str:
+        """提取小说简介"""
+        # 尝试多种简介选择器
+        desc_selectors = [
+            "div.book-intro",
+            "div.intro",
+            "div.description",
+            "p.intro",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if desc and len(desc) > 10:
+                    # 清理简介文本
+                    desc = re.sub(r"\s+", " ", desc)
+                    return desc[:500]
+
+        return ""
 
     def _parse_xspsw_search_results(self, soup) -> list[dict[str, Any]]:
         """解析Xspsw搜索结果页面"""

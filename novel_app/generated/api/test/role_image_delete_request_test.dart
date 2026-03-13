@@ -18,5 +18,6 @@ void main() {
     test('to test the property `imgUrl`', () async {
       // TODO
     });
+
   });
 }

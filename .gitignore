@@ -246,3 +246,9 @@ openapitools.json
 playwright.config.ts
 run-e2e-tests.bat
 test_debug.dart
+
+# 外部依赖库（嵌套的 Git 仓库）
+Scrapling/
+
+# Windows 保留文件名
+nul

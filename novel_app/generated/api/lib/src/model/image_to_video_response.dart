@@ -16,8 +16,7 @@ part 'image_to_video_response.g.dart';
 /// * [status] - 任务状态: pending/running/completed/failed
 /// * [message] - 处理消息
 @BuiltValue()
-abstract class ImageToVideoResponse
-    implements Built<ImageToVideoResponse, ImageToVideoResponseBuilder> {
+abstract class ImageToVideoResponse implements Built<ImageToVideoResponse, ImageToVideoResponseBuilder> {
   /// 视频生成任务ID
   @BuiltValueField(wireName: r'task_id')
   int get taskId;
@@ -36,24 +35,18 @@ abstract class ImageToVideoResponse
 
   ImageToVideoResponse._();
 
-  factory ImageToVideoResponse([void updates(ImageToVideoResponseBuilder b)]) =
-      _$ImageToVideoResponse;
+  factory ImageToVideoResponse([void updates(ImageToVideoResponseBuilder b)]) = _$ImageToVideoResponse;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(ImageToVideoResponseBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<ImageToVideoResponse> get serializer =>
-      _$ImageToVideoResponseSerializer();
+  static Serializer<ImageToVideoResponse> get serializer => _$ImageToVideoResponseSerializer();
 }
 
-class _$ImageToVideoResponseSerializer
-    implements PrimitiveSerializer<ImageToVideoResponse> {
+class _$ImageToVideoResponseSerializer implements PrimitiveSerializer<ImageToVideoResponse> {
   @override
-  final Iterable<Type> types = const [
-    ImageToVideoResponse,
-    _$ImageToVideoResponse
-  ];
+  final Iterable<Type> types = const [ImageToVideoResponse, _$ImageToVideoResponse];
 
   @override
   final String wireName = r'ImageToVideoResponse';
@@ -91,9 +84,7 @@ class _$ImageToVideoResponseSerializer
     ImageToVideoResponse object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -164,3 +155,4 @@ class _$ImageToVideoResponseSerializer
     return result.build();
   }
 }
+

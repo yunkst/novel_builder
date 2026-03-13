@@ -9,8 +9,7 @@ import re
 import urllib.parse
 from typing import Any
 
-from .base_crawler import BaseCrawler
-from .http_client import RequestConfig, RequestStrategy
+from .base_crawler import BaseCrawler, RequestStrategy
 
 
 class ShukugeCrawlerRefactored(BaseCrawler):
@@ -42,23 +41,20 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
             for i, search_url in enumerate(search_urls):
                 try:
-                    RequestConfig(
-                        timeout=10,
-                        max_retries=2,
-                        strategy=RequestStrategy.SIMPLE,
-                        custom_headers=self.custom_headers,
-                    )
-
                     if "search.php" in search_url:
-                        # POST方式搜索
-                        data = {"searchkey": keyword, "searchtype": "all"}
-                        response = await self.post_form(search_url, data, timeout=10)
+                        # POST方式搜索 - 确保所有参数值都是字符串类型
+                        data = {"searchkey": str(keyword), "searchtype": "all"}
+                        response = await self.post_form(
+                            search_url, data, timeout=10, custom_headers=self.custom_headers
+                        )
                     else:
-                        # GET方式搜索
-                        params = {"wd": keyword}
+                        # GET方式搜索 - 确保所有参数值都是字符串类型
+                        params = {"wd": str(keyword)}
                         # 构建完整URL
                         full_url = f"{search_url}?{urllib.parse.urlencode(params)}"
-                        response = await self.get_page(full_url, timeout=10)
+                        response = await self.get_page(
+                            full_url, timeout=10, custom_headers=self.custom_headers
+                        )
 
                     # 提取搜索结果
                     novels = self._extract_shukuge_search_results(
@@ -81,16 +77,8 @@ class ShukugeCrawlerRefactored(BaseCrawler):
     async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
-            # 配置请求
-            RequestConfig(
-                timeout=10,
-                max_retries=3,
-                strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers,
-            )
-
             # 1. 访问小说详情页
-            response = await self.get_page(novel_url, timeout=10)
+            response = await self.get_page(novel_url, timeout=10, custom_headers=self.custom_headers)
 
             # 2. 尝试专用章节列表页
             chapters = await self._try_special_chapter_page(novel_url, response.soup())
@@ -112,17 +100,10 @@ class ShukugeCrawlerRefactored(BaseCrawler):
     async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
         """获取章节内容"""
         try:
-            # 配置请求
-            RequestConfig(
-                timeout=10,
-                max_retries=3,
-                retry_delay=0.8,  # Shukuge需要稍长的延迟
-                strategy=RequestStrategy.SIMPLE,
-                custom_headers=self.custom_headers,
-            )
-
             # 获取章节页面
-            response = await self.get_page(chapter_url, timeout=10)
+            response = await self.get_page(
+                chapter_url, timeout=10, custom_headers=self.custom_headers
+            )
 
             # 提取内容
             soup = response.soup()
@@ -139,7 +120,137 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             print(f"Shukuge获取章节内容失败: {e!s}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
+    async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
+        """
+        获取小说详细信息和章节列表
+
+        Args:
+            novel_url: 小说详情页URL
+
+        Returns:
+            包含小说信息和章节列表的字典
+        """
+        try:
+            # 获取小说详情页
+            response = await self.get_page(novel_url, timeout=15, custom_headers=self.custom_headers)
+            soup = response.soup()
+
+            # 提取小说基本信息
+            title = self._extract_novel_title(soup)
+            author = self._extract_novel_author(soup)
+            cover_url = self._extract_novel_cover(soup, novel_url)
+            description = self._extract_novel_description(soup)
+
+            # 获取章节列表（复用现有方法）
+            chapters = await self.get_chapter_list(novel_url)
+
+            return {
+                "title": title,
+                "author": author,
+                "url": novel_url,
+                "cover_url": cover_url,
+                "description": description,
+                "chapters": chapters,
+            }
+
+        except Exception as e:
+            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            return {
+                "title": "未知小说",
+                "author": "未知作者",
+                "url": novel_url,
+                "cover_url": "",
+                "description": "",
+                "chapters": [],
+            }
+
     # ==================== Shukuge专用提取方法 ====================
+
+    def _extract_novel_title(self, soup) -> str:
+        """提取小说标题"""
+        title_selectors = ["h1", "h2", ".book-title", ".title", "title"]
+        for selector in title_selectors:
+            title_elem = soup.select_one(selector)
+            if title_elem:
+                title = title_elem.get_text().strip()
+                if title and len(title) > 1:
+                    # 清理标题中的网站名称等后缀
+                    title = re.sub(r"_.*$", "", title).strip()
+                    title = re.sub(r"-.*$", "", title).strip()
+                    return title
+        return "未知小说"
+
+    def _extract_novel_author(self, soup) -> str:
+        """提取小说作者"""
+        # 尝试多种作者信息选择器
+        author_patterns = [
+            soup.find("span", class_=re.compile(r"author")),
+            soup.find("div", class_=re.compile(r"author")),
+            soup.find("p", class_=re.compile(r"author")),
+        ]
+
+        for pattern in author_patterns:
+            if pattern:
+                author = pattern.get_text().strip()
+                # 清理作者信息中的标签
+                author = re.sub(r"作者[：:]\s*", "", author)
+                if author:
+                    return author
+
+        # 尝试从页面文本中提取作者信息
+        text = soup.get_text()
+        author_match = re.search(r"作者[：:]\s*([^\s\n\r<>/]+)", text)
+        if author_match:
+            return author_match.group(1).strip()
+
+        return "未知作者"
+
+    def _extract_novel_cover(self, soup, novel_url: str) -> str:
+        """提取小说封面URL"""
+        # 尝试查找封面图片
+        cover_selectors = [
+            "img.book-cover",
+            "img.cover",
+            "img[alt*='封面']",
+            ".book-img img",
+            "#bookimg img",
+        ]
+
+        for selector in cover_selectors:
+            cover_elem = soup.select_one(selector)
+            if cover_elem:
+                cover_src = cover_elem.get("src", "") or cover_elem.get("data-src", "")
+                if cover_src:
+                    # 转换为绝对URL
+                    if cover_src.startswith("/"):
+                        return urllib.parse.urljoin(self.base_url, cover_src)
+                    elif cover_src.startswith("http"):
+                        return cover_src
+
+        return ""
+
+    def _extract_novel_description(self, soup) -> str:
+        """提取小说简介"""
+        # 尝试多种简介选择器
+        desc_selectors = [
+            "div.book-intro",
+            "div.intro",
+            "div.description",
+            "div.book-desc",
+            "div#bookintro",
+            "p.intro",
+        ]
+
+        for selector in desc_selectors:
+            desc_elem = soup.select_one(selector)
+            if desc_elem:
+                desc = desc_elem.get_text().strip()
+                if desc and len(desc) > 10:
+                    # 清理简介文本
+                    desc = re.sub(r"\s+", " ", desc)
+                    return desc[:500]  # 限制简介长度
+
+        return ""
 
     def _extract_shukuge_search_results(
         self, soup, keyword: str
@@ -147,13 +258,16 @@ class ShukugeCrawlerRefactored(BaseCrawler):
         """提取Shukuge搜索结果"""
         novels = []
 
-        # 查找所有可能包含小说信息的链接
-        all_links = soup.find_all("a", href=True, string=True)
+        # 使用 CSS 选择器查找所有链接
+        # soup 是 Scrapling Selector，使用 CSS 选择器语法
+        all_links = soup.css('a[href]')
 
         for link in all_links:
             try:
-                title = link.get_text().strip()
-                href = link.get("href", "")
+                # 获取链接文本
+                title = link.css('::text').get('').strip()
+                # 获取 href 属性
+                href = link.css('::attr(href)').get('')
 
                 # 过滤条件
                 if (
@@ -196,14 +310,20 @@ class ShukugeCrawlerRefactored(BaseCrawler):
     def _extract_shukuge_author(self, link) -> str:
         """提取Shukuge作者信息"""
         author = "未知"
-        parent = link.parent
 
-        if parent:
-            text = parent.get_text()
-            # Shukuge特定的作者提取模式
-            match = re.search(r"作者[：:]\s*([^\s\n\r<>/]+)", text)
-            if match:
-                author = match.group(1).strip()
+        try:
+            # Scrapling Selector 获取父元素
+            parent = link.parent
+            if parent:
+                # 获取父元素的文本内容
+                text = parent.css('::text').getall()
+                text = ''.join(text)
+                # Shukuge特定的作者提取模式
+                match = re.search(r"作者[：:]\s*([^\s\n\r<>/]+)", text)
+                if match:
+                    author = match.group(1).strip()
+        except Exception:
+            pass
 
         return author
 
@@ -218,13 +338,28 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 return []
 
             novel_id = novel_id_match.group(1)
-            chapter_list_url = f"{self.base_url}/other/chapters/id/{novel_id}.html"
 
-            # 访问专用章节页
-            response = await self.get_page(chapter_list_url, timeout=10)
-            chapters = self.extract_chapters(response.soup(), chapter_list_url)
+            # Shukuge的章节列表URL模式: /book/{novel_id}/index.html
+            chapter_list_urls = [
+                f"{self.base_url}/book/{novel_id}/index.html",
+                f"{self.base_url}/other/chapters/id/{novel_id}.html",
+            ]
 
-            return chapters
+            for chapter_list_url in chapter_list_urls:
+                try:
+                    # 访问专用章节页
+                    response = await self.get_page(
+                        chapter_list_url, timeout=10, custom_headers=self.custom_headers
+                    )
+                    chapters = self._extract_chapter_list_from_page(response.soup(), novel_url)
+
+                    if chapters:
+                        return chapters
+
+                except Exception:
+                    continue
+
+            return []
 
         except Exception:
             return []
@@ -246,7 +381,9 @@ class ShukugeCrawlerRefactored(BaseCrawler):
                 )
 
                 # 访问阅读页面
-                response = await self.get_page(read_url, timeout=10)
+                response = await self.get_page(
+                    read_url, timeout=10, custom_headers=self.custom_headers
+                )
                 chapters = self.extract_chapters(response.soup(), read_url)
 
                 return chapters
@@ -254,6 +391,62 @@ class ShukugeCrawlerRefactored(BaseCrawler):
             return []
 
         except Exception:
+            return []
+
+    def _extract_chapter_list_from_page(
+        self, soup, novel_url: str
+    ) -> list[dict[str, Any]]:
+        """从页面提取章节列表 - Shukuge专用"""
+        try:
+            chapters = []
+
+            # 查找所有链接
+            links = soup.select('a[href]')
+
+            # 提取小说ID用于过滤
+            novel_id_match = re.search(r"/book/(\d+)/", novel_url)
+            if not novel_id_match:
+                return []
+
+            novel_id = novel_id_match.group(1)
+
+            # Shukuge的章节链接模式: /book/{novel_id}/{数字}.html
+            chapter_pattern = re.compile(rf"/book/{novel_id}/\d+\.html")
+
+            for link in links:
+                try:
+                    # 获取链接文本
+                    title = link.get_text().strip()
+                    # 获取 href 属性
+                    href = link.get('href', '')
+
+                    # 检查是否是章节链接
+                    if (
+                        not href
+                        or not chapter_pattern.match(href)
+                        or len(title) < 2
+                    ):
+                        continue
+
+                    # 过滤导航链接
+                    if any(nav in title for nav in ['首页', '小说', '排行', '分类', '作者', '登录', '注册', '目录']):
+                        continue
+
+                    # 构建完整URL
+                    chapter_url = urllib.parse.urljoin(self.base_url, href)
+
+                    chapters.append({
+                        "title": title,
+                        "url": chapter_url,
+                    })
+
+                except Exception:
+                    continue
+
+            return chapters
+
+        except Exception as e:
+            print(f"Shukuge提取章节列表失败: {e!s}")
             return []
 
     def _extract_chapter_title(self, soup) -> str:
@@ -264,9 +457,9 @@ class ShukugeCrawlerRefactored(BaseCrawler):
         for selector in title_selectors:
             title_elem = soup.select_one(selector)
             if title_elem:
-                title = title_elem.get_text().strip()
-                if title and len(title) > 1:
-                    return title
+                title_text = title_elem.get_text().strip()
+                if title_text and len(title_text) > 1:
+                    return title_text
 
         return "章节内容"
 
@@ -285,34 +478,21 @@ class ShukugeCrawlerRefactored(BaseCrawler):
 
         content_elem = None
         for selector in content_selectors:
+            # 使用 select_one 而不是 css
             content_elem = soup.select_one(selector)
             if content_elem:
                 break
 
-        # 如果没找到指定容器，尝试最长div方法
+        # 如果没找到指定容器，尝试通用方法
         if not content_elem:
-            divs = soup.find_all("div")
-            longest_div = None
-            max_text_length = 0
-
-            for div in divs:
-                text_length = len(div.get_text())
-                if text_length > max_text_length:
-                    max_text_length = text_length
-                    longest_div = div
-
-            if longest_div and max_text_length > 500:
-                content_elem = longest_div
+            # 使用基类的通用内容提取方法
+            return self.extract_content(soup)
 
         if not content_elem:
             return ""
 
-        # 移除脚本和样式
-        for elem in content_elem(["script", "style"]):
-            elem.decompose()
-
-        # 获取文本内容
-        content = content_elem.get_text()
+        # 获取文本内容 - 直接使用 get_text()
+        content = content_elem.get_text(strip=True)
 
         # 清理内容
         content = self.clean_text(content)

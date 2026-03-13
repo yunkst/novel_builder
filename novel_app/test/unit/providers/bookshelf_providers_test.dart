@@ -3,17 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/bookshelf_providers.dart';
 import 'package:novel_app/core/providers/service_providers.dart';
 import 'package:novel_app/services/preferences_service.dart';
-import '../../helpers/fake_preferences_service.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// CurrentBookshelfId Provider 单元测试
-///
-/// 测试书架持久化功能的核心行为：
-/// - 默认值初始化
-/// - 状态更新
-/// - 多次设置书架ID的行为
-///
-/// 注意：由于SharedPreferences需要在Flutter环境中运行，此测试专注于Provider的状态管理逻辑。
-/// 完整的集成测试（包括SharedPreferences持久化）需要在widget测试或E2E测试中验证。
+import 'bookshelf_providers_test.mocks.dart';
+
+@GenerateMocks([SharedPreferences])
 void main() {
   // 初始化Flutter绑定以支持SharedPreferences
   setUpAll(() {
@@ -22,19 +18,20 @@ void main() {
 
   group('[CurrentBookshelfId] - Provider状态管理测试', () {
     late ProviderContainer container;
-    late FakePreferencesService fakePrefs;
+    late MockSharedPreferences mockSharedPreferences;
 
     setUp(() {
-      // 创建Fake的PreferencesService（不依赖真实的SharedPreferences）
-      fakePrefs = FakePreferencesService();
+      // 创建 SharedPreferences 的 mock
+      mockSharedPreferences = MockSharedPreferences();
 
-      // 创建ProviderContainer并覆盖preferencesServiceProvider
-      container = ProviderContainer(
-        overrides: [
-          // 覆盖preferencesServiceProvider以使用Fake实现
-          preferencesServiceProvider.overrideWithValue(fakePrefs),
-        ],
-      );
+      // 配置 mock 的行为
+      when(mockSharedPreferences.getInt('currentBookshelfId')).thenReturn(null);
+      when(mockSharedPreferences.setInt(any, any)).thenAnswer((_) async => true);
+
+      // 使用 mockito 来替换 SharedPreferences 的实际实现
+      SharedPreferences.setMockInitialValues({});
+
+      container = ProviderContainer();
     });
 
     tearDown(() {

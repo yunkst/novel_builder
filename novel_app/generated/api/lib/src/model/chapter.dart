@@ -11,8 +11,8 @@ part 'chapter.g.dart';
 /// Chapter metadata schema.
 ///
 /// Properties:
-/// * [title]
-/// * [url]
+/// * [title] 
+/// * [url] 
 @BuiltValue()
 abstract class Chapter implements Built<Chapter, ChapterBuilder> {
   @BuiltValueField(wireName: r'title')
@@ -62,9 +62,7 @@ class _$ChapterSerializer implements PrimitiveSerializer<Chapter> {
     Chapter object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -121,3 +119,4 @@ class _$ChapterSerializer implements PrimitiveSerializer<Chapter> {
     return result.build();
   }
 }
+

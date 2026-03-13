@@ -4,6 +4,7 @@ import '../models/novel.dart';
 import '../constants/chapter_constants.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
+import 'preferences_service.dart';
 
 /// 章节生成相关的业务逻辑服务
 ///
@@ -143,6 +144,7 @@ class ChapterService {
   /// 业务逻辑：
   /// - 调用 getHistoryChaptersContent() 获取历史章节
   /// - 调用 getRolesInfoForAI() 获取角色信息
+  /// - 从偏好设置获取 AI 作家设定
   /// - 组装完整的 inputs 参数
   Future<Map<String, dynamic>> buildChapterGenerationInputs({
     required Novel novel,
@@ -161,14 +163,18 @@ class ChapterService {
     // 获取选中人物信息并格式化为AI可读文本
     final rolesInfo = await getRolesInfoForAI(characterIds);
 
+    // 获取 AI 作家设定
+    final aiWriterSetting = await PreferencesService.instance
+        .getString('ai_writer_prompt', defaultValue: '');
+
     // 构建Dify请求参数
     return {
       'user_input': userInput,
       'cmd': '', // 空的cmd参数
       'current_chapter_content': '', // 空的当前章节字段
       'history_chapters_content': historyChaptersContent,
-      'background_setting': novel.description ?? '',
-      'ai_writer_setting': '', // 可以从设置中获取
+      'background_setting': novel.backgroundSetting ?? '',
+      'ai_writer_setting': aiWriterSetting,
       'next_chapter_overview': '',
       'roles': rolesInfo,
     };

@@ -68,5 +68,6 @@ void main() {
     test('to test the property `progressPercentage`', () async {
       // TODO
     });
+
   });
 }

@@ -15,10 +15,9 @@ part 'role_card_generate_request.g.dart';
 /// Properties:
 /// * [roleId] - 人物卡ID
 /// * [roles] - 人物卡设定信息列表
-/// * [model]
+/// * [model] 
 @BuiltValue()
-abstract class RoleCardGenerateRequest
-    implements Built<RoleCardGenerateRequest, RoleCardGenerateRequestBuilder> {
+abstract class RoleCardGenerateRequest implements Built<RoleCardGenerateRequest, RoleCardGenerateRequestBuilder> {
   /// 人物卡ID
   @BuiltValueField(wireName: r'role_id')
   String get roleId;
@@ -32,25 +31,18 @@ abstract class RoleCardGenerateRequest
 
   RoleCardGenerateRequest._();
 
-  factory RoleCardGenerateRequest(
-          [void updates(RoleCardGenerateRequestBuilder b)]) =
-      _$RoleCardGenerateRequest;
+  factory RoleCardGenerateRequest([void updates(RoleCardGenerateRequestBuilder b)]) = _$RoleCardGenerateRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(RoleCardGenerateRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<RoleCardGenerateRequest> get serializer =>
-      _$RoleCardGenerateRequestSerializer();
+  static Serializer<RoleCardGenerateRequest> get serializer => _$RoleCardGenerateRequestSerializer();
 }
 
-class _$RoleCardGenerateRequestSerializer
-    implements PrimitiveSerializer<RoleCardGenerateRequest> {
+class _$RoleCardGenerateRequestSerializer implements PrimitiveSerializer<RoleCardGenerateRequest> {
   @override
-  final Iterable<Type> types = const [
-    RoleCardGenerateRequest,
-    _$RoleCardGenerateRequest
-  ];
+  final Iterable<Type> types = const [RoleCardGenerateRequest, _$RoleCardGenerateRequest];
 
   @override
   final String wireName = r'RoleCardGenerateRequest';
@@ -85,9 +77,7 @@ class _$RoleCardGenerateRequestSerializer
     RoleCardGenerateRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -152,3 +142,4 @@ class _$RoleCardGenerateRequestSerializer
     return result.build();
   }
 }
+

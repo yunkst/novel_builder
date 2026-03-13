@@ -36,5 +36,16 @@ void main() {
     test('to test the property `searchEnabled`', () async {
       // TODO
     });
+
+    // String searchReason
+    test('to test the property `searchReason`', () async {
+      // TODO
+    });
+
+    // String searchHint
+    test('to test the property `searchHint`', () async {
+      // TODO
+    });
+
   });
 }

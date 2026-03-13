@@ -141,6 +141,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   /// 前文内容缓存（避免重复获取）
   List<String>? _cachedPreviousChapters;
 
+  /// 背景设定缓存（避免重复获取）
+  String? _cachedBackgroundSetting;
+
   // ========================================================================
   // 大纲加载
   // ========================================================================
@@ -170,6 +173,31 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         _currentMode = _InsertMode.manual;
       });
       debugPrint('加载大纲失败: $e');
+    }
+
+    // 同时加载背景设定
+    _loadBackgroundSetting();
+  }
+
+  /// 加载背景设定
+  Future<void> _loadBackgroundSetting() async {
+    try {
+      final repository = ref.read(novelRepositoryProvider);
+      final backgroundSetting =
+          await repository.getBackgroundSetting(widget.novel.url);
+      if (mounted) {
+        setState(() {
+          _cachedBackgroundSetting = backgroundSetting;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载背景设定失败: $e');
+      // 加载失败时使用widget中的值作为后备
+      if (mounted) {
+        setState(() {
+          _cachedBackgroundSetting = widget.novel.backgroundSetting;
+        });
+      }
     }
   }
 
@@ -300,6 +328,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       'outline_item': existingDraft ?? '',
       'user_input': userInput.trim(),
       'ai_writer_setting': aiWriterSetting,
+      'background_setting': _cachedBackgroundSetting ?? '',
     };
   }
 

@@ -24,7 +24,7 @@ Upload Backup
 import 'package:novel_api/api.dart';
 
 final api = NovelApi().getBackupApi();
-final MultipartFile file = BINARY_DATA_HERE; // MultipartFile | 数据库备份文件(.db)
+final String file = file_example; // String | 数据库备份文件(.db)
 final String X_API_TOKEN = X_API_TOKEN_example; // String | 
 
 try {
@@ -39,7 +39,7 @@ try {
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **file** | **MultipartFile**| 数据库备份文件(.db) | 
+ **file** | **String**| 数据库备份文件(.db) | 
  **X_API_TOKEN** | **String**|  | [optional] 
 
 ### Return type

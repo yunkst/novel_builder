@@ -17,26 +17,28 @@ import 'package:dio/src/response.dart' as _i6;
 import 'package:dio/src/transformer.dart' as _i4;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:novel_api/src/api/default_api.dart' as _i10;
-import 'package:novel_api/src/model/app_version_response.dart' as _i23;
+import 'package:novel_api/src/model/app_version_response.dart' as _i24;
 import 'package:novel_api/src/model/chapter.dart' as _i13;
 import 'package:novel_api/src/model/chapter_content.dart' as _i11;
 import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart'
-    as _i20;
-import 'package:novel_api/src/model/image_to_video_request.dart' as _i22;
-import 'package:novel_api/src/model/image_to_video_response.dart' as _i21;
-import 'package:novel_api/src/model/models_response.dart' as _i24;
-import 'package:novel_api/src/model/novel.dart' as _i32;
+    as _i21;
+import 'package:novel_api/src/model/image_to_video_request.dart' as _i23;
+import 'package:novel_api/src/model/image_to_video_response.dart' as _i22;
+import 'package:novel_api/src/model/models_response.dart' as _i25;
+import 'package:novel_api/src/model/novel.dart' as _i34;
+import 'package:novel_api/src/model/novel_with_chapters.dart' as _i30;
 import 'package:novel_api/src/model/role_card_generate_request.dart' as _i19;
 import 'package:novel_api/src/model/role_card_task_status_response.dart'
-    as _i26;
-import 'package:novel_api/src/model/role_gallery_response.dart' as _i25;
+    as _i27;
+import 'package:novel_api/src/model/role_gallery_response.dart' as _i26;
 import 'package:novel_api/src/model/role_image_delete_request.dart' as _i16;
-import 'package:novel_api/src/model/role_regenerate_request.dart' as _i31;
-import 'package:novel_api/src/model/scene_gallery_response.dart' as _i27;
+import 'package:novel_api/src/model/role_regenerate_request.dart' as _i33;
+import 'package:novel_api/src/model/scene_gallery_response.dart' as _i28;
+import 'package:novel_api/src/model/scene_illustration_response.dart' as _i20;
 import 'package:novel_api/src/model/scene_image_delete_request.dart' as _i17;
-import 'package:novel_api/src/model/scene_regenerate_request.dart' as _i30;
-import 'package:novel_api/src/model/scene_regenerate_response.dart' as _i29;
-import 'package:novel_api/src/model/source_site.dart' as _i28;
+import 'package:novel_api/src/model/scene_regenerate_request.dart' as _i32;
+import 'package:novel_api/src/model/scene_regenerate_response.dart' as _i31;
+import 'package:novel_api/src/model/source_site.dart' as _i29;
 import 'package:novel_api/src/model/video_status_response.dart' as _i14;
 
 // ignore_for_file: type=lint
@@ -921,6 +923,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
   @override
   _i8.Future<_i6.Response<_i12.BuiltList<_i13.Chapter>>> chaptersChaptersGet({
     required String? url,
+    bool? forceRefresh = false,
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -935,6 +938,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
           [],
           {
             #url: url,
+            #forceRefresh: forceRefresh,
             #X_API_TOKEN: X_API_TOKEN,
             #cancelToken: cancelToken,
             #headers: headers,
@@ -953,6 +957,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
             [],
             {
               #url: url,
+              #forceRefresh: forceRefresh,
               #X_API_TOKEN: X_API_TOKEN,
               #cancelToken: cancelToken,
               #headers: headers,
@@ -1199,9 +1204,9 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
           ) as _i8.Future<_i6.Response<_i15.JsonObject>>);
 
   @override
-  _i8.Future<_i6.Response<_i15.JsonObject>>
+  _i8.Future<_i6.Response<_i20.SceneIllustrationResponse>>
       generateSceneImagesApiSceneIllustrationGeneratePost({
-    required _i20.EnhancedSceneIllustrationRequest?
+    required _i21.EnhancedSceneIllustrationRequest?
         enhancedSceneIllustrationRequest,
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
@@ -1227,8 +1232,9 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i6.Response<_i15.JsonObject>>.value(
-                _FakeResponse_4<_i15.JsonObject>(
+            returnValue:
+                _i8.Future<_i6.Response<_i20.SceneIllustrationResponse>>.value(
+                    _FakeResponse_4<_i20.SceneIllustrationResponse>(
               this,
               Invocation.method(
                 #generateSceneImagesApiSceneIllustrationGeneratePost,
@@ -1246,12 +1252,12 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i15.JsonObject>>);
+          ) as _i8.Future<_i6.Response<_i20.SceneIllustrationResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i21.ImageToVideoResponse>>
+  _i8.Future<_i6.Response<_i22.ImageToVideoResponse>>
       generateVideoFromImageApiImageToVideoGeneratePost({
-    required _i22.ImageToVideoRequest? imageToVideoRequest,
+    required _i23.ImageToVideoRequest? imageToVideoRequest,
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1276,8 +1282,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i21.ImageToVideoResponse>>.value(
-                    _FakeResponse_4<_i21.ImageToVideoResponse>(
+                _i8.Future<_i6.Response<_i22.ImageToVideoResponse>>.value(
+                    _FakeResponse_4<_i22.ImageToVideoResponse>(
               this,
               Invocation.method(
                 #generateVideoFromImageApiImageToVideoGeneratePost,
@@ -1294,7 +1300,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i21.ImageToVideoResponse>>);
+          ) as _i8.Future<_i6.Response<_i22.ImageToVideoResponse>>);
 
   @override
   _i8.Future<_i6.Response<_i18.Uint8List>>
@@ -1341,7 +1347,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
           ) as _i8.Future<_i6.Response<_i18.Uint8List>>);
 
   @override
-  _i8.Future<_i6.Response<_i23.AppVersionResponse>>
+  _i8.Future<_i6.Response<_i24.AppVersionResponse>>
       getLatestAppVersionApiAppVersionLatestGet({
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
@@ -1366,8 +1372,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i23.AppVersionResponse>>.value(
-                    _FakeResponse_4<_i23.AppVersionResponse>(
+                _i8.Future<_i6.Response<_i24.AppVersionResponse>>.value(
+                    _FakeResponse_4<_i24.AppVersionResponse>(
               this,
               Invocation.method(
                 #getLatestAppVersionApiAppVersionLatestGet,
@@ -1383,10 +1389,10 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i23.AppVersionResponse>>);
+          ) as _i8.Future<_i6.Response<_i24.AppVersionResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i24.ModelsResponse>> getModelsApiModelsGet({
+  _i8.Future<_i6.Response<_i25.ModelsResponse>> getModelsApiModelsGet({
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1409,8 +1415,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
             #onReceiveProgress: onReceiveProgress,
           },
         ),
-        returnValue: _i8.Future<_i6.Response<_i24.ModelsResponse>>.value(
-            _FakeResponse_4<_i24.ModelsResponse>(
+        returnValue: _i8.Future<_i6.Response<_i25.ModelsResponse>>.value(
+            _FakeResponse_4<_i25.ModelsResponse>(
           this,
           Invocation.method(
             #getModelsApiModelsGet,
@@ -1426,10 +1432,10 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
             },
           ),
         )),
-      ) as _i8.Future<_i6.Response<_i24.ModelsResponse>>);
+      ) as _i8.Future<_i6.Response<_i25.ModelsResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i25.RoleGalleryResponse>>
+  _i8.Future<_i6.Response<_i26.RoleGalleryResponse>>
       getRoleCardGalleryApiRoleCardGalleryRoleIdGet({
     required String? roleId,
     String? X_API_TOKEN,
@@ -1456,8 +1462,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i25.RoleGalleryResponse>>.value(
-                    _FakeResponse_4<_i25.RoleGalleryResponse>(
+                _i8.Future<_i6.Response<_i26.RoleGalleryResponse>>.value(
+                    _FakeResponse_4<_i26.RoleGalleryResponse>(
               this,
               Invocation.method(
                 #getRoleCardGalleryApiRoleCardGalleryRoleIdGet,
@@ -1474,10 +1480,10 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i25.RoleGalleryResponse>>);
+          ) as _i8.Future<_i6.Response<_i26.RoleGalleryResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i26.RoleCardTaskStatusResponse>>
+  _i8.Future<_i6.Response<_i27.RoleCardTaskStatusResponse>>
       getRoleCardTaskStatusApiRoleCardStatusTaskIdGet({
     required int? taskId,
     String? X_API_TOKEN,
@@ -1504,8 +1510,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i26.RoleCardTaskStatusResponse>>.value(
-                    _FakeResponse_4<_i26.RoleCardTaskStatusResponse>(
+                _i8.Future<_i6.Response<_i27.RoleCardTaskStatusResponse>>.value(
+                    _FakeResponse_4<_i27.RoleCardTaskStatusResponse>(
               this,
               Invocation.method(
                 #getRoleCardTaskStatusApiRoleCardStatusTaskIdGet,
@@ -1522,10 +1528,10 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i26.RoleCardTaskStatusResponse>>);
+          ) as _i8.Future<_i6.Response<_i27.RoleCardTaskStatusResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i27.SceneGalleryResponse>>
+  _i8.Future<_i6.Response<_i28.SceneGalleryResponse>>
       getSceneGalleryApiSceneIllustrationGalleryTaskIdGet({
     required String? taskId,
     String? X_API_TOKEN,
@@ -1552,8 +1558,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i27.SceneGalleryResponse>>.value(
-                    _FakeResponse_4<_i27.SceneGalleryResponse>(
+                _i8.Future<_i6.Response<_i28.SceneGalleryResponse>>.value(
+                    _FakeResponse_4<_i28.SceneGalleryResponse>(
               this,
               Invocation.method(
                 #getSceneGalleryApiSceneIllustrationGalleryTaskIdGet,
@@ -1570,10 +1576,10 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i27.SceneGalleryResponse>>);
+          ) as _i8.Future<_i6.Response<_i28.SceneGalleryResponse>>);
 
   @override
-  _i8.Future<_i6.Response<_i12.BuiltList<_i28.SourceSite>>>
+  _i8.Future<_i6.Response<_i12.BuiltList<_i29.SourceSite>>>
       getSourceSitesSourceSitesGet({
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
@@ -1598,8 +1604,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i12.BuiltList<_i28.SourceSite>>>.value(
-                    _FakeResponse_4<_i12.BuiltList<_i28.SourceSite>>(
+                _i8.Future<_i6.Response<_i12.BuiltList<_i29.SourceSite>>>.value(
+                    _FakeResponse_4<_i12.BuiltList<_i29.SourceSite>>(
               this,
               Invocation.method(
                 #getSourceSitesSourceSitesGet,
@@ -1615,7 +1621,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i12.BuiltList<_i28.SourceSite>>>);
+          ) as _i8.Future<_i6.Response<_i12.BuiltList<_i29.SourceSite>>>);
 
   @override
   _i8.Future<_i6.Response<_i18.Uint8List>>
@@ -1743,9 +1749,55 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
       ) as _i8.Future<_i6.Response<_i15.JsonObject>>);
 
   @override
-  _i8.Future<_i6.Response<_i29.SceneRegenerateResponse>>
+  _i8.Future<_i6.Response<_i30.NovelWithChapters>> novelByUrlNovelByUrlGet({
+    required String? url,
+    String? X_API_TOKEN,
+    _i9.CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    _i2.ValidateStatus? validateStatus,
+    _i2.ProgressCallback? onSendProgress,
+    _i2.ProgressCallback? onReceiveProgress,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #novelByUrlNovelByUrlGet,
+          [],
+          {
+            #url: url,
+            #X_API_TOKEN: X_API_TOKEN,
+            #cancelToken: cancelToken,
+            #headers: headers,
+            #extra: extra,
+            #validateStatus: validateStatus,
+            #onSendProgress: onSendProgress,
+            #onReceiveProgress: onReceiveProgress,
+          },
+        ),
+        returnValue: _i8.Future<_i6.Response<_i30.NovelWithChapters>>.value(
+            _FakeResponse_4<_i30.NovelWithChapters>(
+          this,
+          Invocation.method(
+            #novelByUrlNovelByUrlGet,
+            [],
+            {
+              #url: url,
+              #X_API_TOKEN: X_API_TOKEN,
+              #cancelToken: cancelToken,
+              #headers: headers,
+              #extra: extra,
+              #validateStatus: validateStatus,
+              #onSendProgress: onSendProgress,
+              #onReceiveProgress: onReceiveProgress,
+            },
+          ),
+        )),
+      ) as _i8.Future<_i6.Response<_i30.NovelWithChapters>>);
+
+  @override
+  _i8.Future<_i6.Response<_i31.SceneRegenerateResponse>>
       regenerateSceneImagesApiSceneIllustrationRegeneratePost({
-    required _i30.SceneRegenerateRequest? sceneRegenerateRequest,
+    required _i32.SceneRegenerateRequest? sceneRegenerateRequest,
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1770,8 +1822,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
               },
             ),
             returnValue:
-                _i8.Future<_i6.Response<_i29.SceneRegenerateResponse>>.value(
-                    _FakeResponse_4<_i29.SceneRegenerateResponse>(
+                _i8.Future<_i6.Response<_i31.SceneRegenerateResponse>>.value(
+                    _FakeResponse_4<_i31.SceneRegenerateResponse>(
               this,
               Invocation.method(
                 #regenerateSceneImagesApiSceneIllustrationRegeneratePost,
@@ -1788,12 +1840,12 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
                 },
               ),
             )),
-          ) as _i8.Future<_i6.Response<_i29.SceneRegenerateResponse>>);
+          ) as _i8.Future<_i6.Response<_i31.SceneRegenerateResponse>>);
 
   @override
   _i8.Future<_i6.Response<_i15.JsonObject>>
       regenerateSimilarImagesApiRoleCardRegeneratePost({
-    required _i31.RoleRegenerateRequest? roleRegenerateRequest,
+    required _i33.RoleRegenerateRequest? roleRegenerateRequest,
     String? X_API_TOKEN,
     _i9.CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1882,7 +1934,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
           ) as _i8.Future<_i6.Response<_i15.JsonObject>>);
 
   @override
-  _i8.Future<_i6.Response<_i12.BuiltList<_i32.Novel>>> searchSearchGet({
+  _i8.Future<_i6.Response<_i12.BuiltList<_i34.Novel>>> searchSearchGet({
     required String? keyword,
     String? sites,
     String? X_API_TOKEN,
@@ -1909,8 +1961,8 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
             #onReceiveProgress: onReceiveProgress,
           },
         ),
-        returnValue: _i8.Future<_i6.Response<_i12.BuiltList<_i32.Novel>>>.value(
-            _FakeResponse_4<_i12.BuiltList<_i32.Novel>>(
+        returnValue: _i8.Future<_i6.Response<_i12.BuiltList<_i34.Novel>>>.value(
+            _FakeResponse_4<_i12.BuiltList<_i34.Novel>>(
           this,
           Invocation.method(
             #searchSearchGet,
@@ -1928,7 +1980,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
             },
           ),
         )),
-      ) as _i8.Future<_i6.Response<_i12.BuiltList<_i32.Novel>>>);
+      ) as _i8.Future<_i6.Response<_i12.BuiltList<_i34.Novel>>>);
 
   @override
   _i8.Future<_i6.Response<_i12.BuiltMap<String, _i15.JsonObject>>>
@@ -2020,7 +2072,7 @@ class MockDefaultApi extends _i1.Mock implements _i10.DefaultApi {
   @override
   _i8.Future<_i6.Response<_i15.JsonObject>>
       uploadAppVersionApiAppVersionUploadPost({
-    required _i7.MultipartFile? file,
+    required String? file,
     required String? version,
     required int? versionCode,
     String? X_API_TOKEN,

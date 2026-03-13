@@ -1,30 +1,37 @@
 #!/usr/bin/env python3
 """
-基础爬虫类 - 基于 Scrapling 重写
+基础爬虫类 - 基于 Scrapling 最佳实践重写
 
-使用 Scrapling 库作为底层网络请求和 HTML 解析层。
-所有爬虫继承此类，自动获得高性能、强反爬虫能力。
+使用 Scrapling 的 Session 模式，提供高性能、强反爬虫能力。
+所有爬虫继承此类，只需关注业务逻辑。
 """
 
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any
 
-from .scrapling_fetcher import ScraplingFetcher
 from .page_response import PageResponse
-from .http_client import RequestStrategy
+from .session_manager import SessionManager
+
+
+class RequestStrategy(Enum):
+    """请求策略枚举"""
+
+    SIMPLE = "simple"  # 简单 Fetcher 请求
+    STEALTH = "stealth"  # StealthyFetcher 隐蔽模式，高级反检测
 
 
 class BaseCrawler(ABC):
     """
-    基础爬虫类 - 基于 Scrapling 重写
+    基础爬虫类 - 基于 Scrapling 最佳实践
 
-    通过集成 Scrapling 库，提供：
+    通过集成 Scrapling 库的 Session 模式，提供：
     - 高性能 HTML 解析（比 BeautifulSoup4 快 784 倍）
-    - 强反爬虫能力（StealthyFetcher 自动绕过 Cloudflare）
+    - 强反爬虫能力（StealthySession 自动绕过 Cloudflare）
     - 统一的网络请求接口
-    - 会话复用和代理轮换
+    - 会话复用和 Cookie 保持
 
     所有爬虫类继承此类，只需关注业务逻辑，
     底层性能和可靠性自动升级。
@@ -33,7 +40,7 @@ class BaseCrawler(ABC):
     def __init__(
         self,
         base_url: str,
-        strategy: RequestStrategy = RequestStrategy.HYBRID,
+        strategy: RequestStrategy = RequestStrategy.SIMPLE,
     ):
         """
         初始化爬虫
@@ -42,15 +49,11 @@ class BaseCrawler(ABC):
             base_url: 站点基础 URL
             strategy: 请求策略
                 - SIMPLE: 使用 FetcherSession，简单高效的 HTTP 请求
-                - BROWSER: 使用 DynamicSession，支持 JS 渲染
-                - HYBRID: 自动选择最佳策略（默认）
-                - STEALTH: 使用 StealthySession，最强的反爬能力
+                - STEALTH: 使用 AsyncStealthySession，最强的反爬能力
         """
         self.base_url = base_url
-        self.strategy = strategy
-
-        # 使用 Scrapling 作为底层网络层
-        self.fetcher = ScraplingFetcher(strategy)
+        self.strategy = strategy.value
+        self._session_manager = SessionManager()
 
     # ==================== 核心接口（保持完全兼容）===================
 
@@ -126,16 +129,17 @@ class BaseCrawler(ABC):
     # ==================== 网络请求方法 ====================
 
     async def get_page(
-        self, url: str, timeout: int = 10, max_retries: int = 3, **kwargs
+        self, url: str, **kwargs
     ) -> PageResponse:
         """
         获取页面内容
 
         Args:
             url: 目标 URL
-            timeout: 超时时间（秒）
-            max_retries: 最大重试次数
-            **kwargs: 其他请求参数
+            **kwargs: 其他请求参数（传递给 Scrapling）
+                - headers: 自定义请求头
+                - timeout: 超时时间
+                - custom_headers: 兼容旧代码的自定义请求头（会被转换为 headers）
 
         Returns:
             PageResponse: 包含 Scrapling Selector 的响应对象
@@ -145,23 +149,21 @@ class BaseCrawler(ABC):
             >>> title = page.css('h1::text').get()
             >>> content = page.css('#content').css('p::text').getall()
         """
-        from .http_client import RequestConfig
+        # 处理 custom_headers 参数（兼容旧代码）
+        if "custom_headers" in kwargs:
+            custom_headers = kwargs.pop("custom_headers")
+            # 合并到 headers 中
+            headers = kwargs.get("headers", {})
+            headers.update(custom_headers)
+            kwargs["headers"] = headers
 
-        config = RequestConfig(
-            timeout=timeout,
-            max_retries=max_retries,
-            strategy=self.strategy,
-            **kwargs
-        )
-        response = await self.fetcher.fetch(url, config)
-        return PageResponse(response, self.fetcher)
+        result = await self._session_manager.fetch(self.strategy, url, method="GET", **kwargs)
+        return PageResponse(result)
 
     async def post_form(
         self,
         url: str,
         data: dict[str, str],
-        timeout: int = 10,
-        max_retries: int = 3,
         **kwargs,
     ) -> PageResponse:
         """
@@ -170,23 +172,26 @@ class BaseCrawler(ABC):
         Args:
             url: 目标 URL
             data: 表单数据
-            timeout: 超时时间（秒）
-            max_retries: 最大重试次数
-            **kwargs: 其他请求参数
+            **kwargs: 其他请求参数（传递给 Scrapling）
+                - headers: 自定义请求头
+                - timeout: 超时时间
+                - custom_headers: 兼容旧代码的自定义请求头（会被转换为 headers）
 
         Returns:
             PageResponse: 包含 Scrapling Selector 的响应对象
         """
-        from .http_client import RequestConfig
+        # 处理 custom_headers 参数（兼容旧代码）
+        if "custom_headers" in kwargs:
+            custom_headers = kwargs.pop("custom_headers")
+            # 合并到 headers 中
+            headers = kwargs.get("headers", {})
+            headers.update(custom_headers)
+            kwargs["headers"] = headers
 
-        config = RequestConfig(
-            timeout=timeout,
-            max_retries=max_retries,
-            strategy=self.strategy,
-            **kwargs
-        )
-        response = await self.fetcher.fetch(url, config)
-        return PageResponse(response, self.fetcher)
+        # 确保所有数据值都是字符串类型（Scrapling要求）
+        string_data = {k: str(v) if v is not None else "" for k, v in data.items()}
+        result = await self._session_manager.fetch(self.strategy, url, method="POST", data=string_data, **kwargs)
+        return PageResponse(result)
 
     # ==================== 通用工具方法 ====================
 
@@ -608,7 +613,7 @@ class BaseCrawler(ABC):
 
         清理爬虫使用的资源，关闭所有网络连接
         """
-        await self.fetcher.close()
+        await self._session_manager.close()
 
 
 # ==================== 使用示例 ====================
@@ -627,23 +632,21 @@ class ExampleCrawler(BaseCrawler):
     def __init__(self):
         super().__init__(
             base_url="https://www.example.com",
-            strategy=RequestStrategy.HYBRID,  # 混合模式，优先简单请求
+            strategy=RequestStrategy.SIMPLE,  # 简单模式
         )
 
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
         """
         搜索小说 - 只需要关注业务逻辑
 
-        不需要关心底层实现（requests vs Scrapling），
-        只需关注如何搜索和提取数据。
+        不需要关心底层实现，只需关注如何搜索和提取数据。
         """
         try:
-            # 发送搜索请求 - 不需要关心底层实现
+            # 发送搜索请求
             search_url = f"{self.base_url}/search"
             response = await self.post_form(search_url, {"keyword": keyword})
 
             # 提取搜索结果 - 使用基类提供的通用方法
-            # 注意：现在使用的是 Scrapling Selector，性能提升 784 倍
             novels = self.extract_novel_info(response, keyword)
 
             return novels[:20]  # 限制返回数量
@@ -659,11 +662,10 @@ class ExampleCrawler(BaseCrawler):
         不需要关心底层实现，只需关注如何提取章节。
         """
         try:
-            # 获取页面 - 不需要关心底层实现
+            # 获取页面
             response = await self.get_page(novel_url)
 
             # 提取章节列表 - 使用基类提供的通用方法
-            # 注意：现在使用的是 Scrapling Selector，性能提升 784 倍
             chapters = self.extract_chapters(response, novel_url)
 
             return chapters
@@ -679,19 +681,15 @@ class ExampleCrawler(BaseCrawler):
         不需要关心底层实现，只需关注如何提取内容。
         """
         try:
-            # 获取页面 - 不需要关心底层实现
+            # 获取页面
             response = await self.get_page(chapter_url)
 
-            # 提取内容 - 使用基类提供的通用方法
-            # 注意：现在使用的是 Scrapling Selector，性能提升 784 倍
-            soup = response  # PageResponse 支持直接作为 Selector 使用
-
             # 获取标题
-            title_elem = soup.css('h1').first or soup.css('title').first
+            title_elem = response.css('h1').first or response.css('title').first
             title = title_elem.css('::text').get('').strip() if title_elem else "章节内容"
 
             # 获取内容
-            content = self.extract_content(soup)
+            content = self.extract_content(response)
 
             return {"title": title, "content": content}
 
@@ -706,15 +704,14 @@ class ExampleCrawler(BaseCrawler):
         try:
             # 获取小说详情页
             response = await self.get_page(novel_url)
-            soup = response
 
             # 提取小说基本信息
-            title = soup.css('h1.book-title::text').get('').strip()
-            author = soup.css('p:contains("作者")::text').re_first(
+            title = response.css('h1.book-title::text').get('').strip()
+            author = response.css('p:contains("作者")::text').re_first(
                 r'作者[：:]\s*(.+)', default='未知作者'
             )
-            cover_url = soup.css('.book-cover img::attr(src)').get('')
-            description = soup.css('.book-description::text').get('')
+            cover_url = response.css('.book-cover img::attr(src)').get('')
+            description = response.css('.book-description::text').get('')
 
             # 获取章节列表
             chapters = await self.get_chapter_list(novel_url)

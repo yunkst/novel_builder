@@ -35,6 +35,13 @@ abstract class INovelRepository {
   /// 返回受影响的行数
   Future<int> updateLastReadChapter(String novelUrl, int chapterIndex);
 
+  /// 更新小说书名
+  ///
+  /// [novelUrl] 小说的URL
+  /// [newTitle] 新的书名
+  /// 返回受影响的行数
+  Future<int> updateTitle(String novelUrl, String newTitle);
+
   /// 更新小说背景设定
   ///
   /// [novelUrl] 小说的URL

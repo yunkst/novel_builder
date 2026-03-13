@@ -13,16 +13,16 @@ part 'role_info.g.dart';
 /// Properties:
 /// * [id] - Flutter自增ID
 /// * [name] - 角色姓名
-/// * [gender]
-/// * [age]
-/// * [occupation]
-/// * [personality]
-/// * [appearanceFeatures]
-/// * [bodyType]
-/// * [clothingStyle]
-/// * [backgroundStory]
-/// * [facePrompts]
-/// * [bodyPrompts]
+/// * [gender] 
+/// * [age] 
+/// * [occupation] 
+/// * [personality] 
+/// * [appearanceFeatures] 
+/// * [bodyType] 
+/// * [clothingStyle] 
+/// * [backgroundStory] 
+/// * [facePrompts] 
+/// * [bodyPrompts] 
 @BuiltValue()
 abstract class RoleInfo implements Built<RoleInfo, RoleInfoBuilder> {
   /// Flutter自增ID
@@ -174,9 +174,7 @@ class _$RoleInfoSerializer implements PrimitiveSerializer<RoleInfo> {
     RoleInfo object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -313,3 +311,4 @@ class _$RoleInfoSerializer implements PrimitiveSerializer<RoleInfo> {
     return result.build();
   }
 }
+

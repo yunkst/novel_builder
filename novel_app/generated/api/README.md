@@ -48,7 +48,7 @@ import 'package:novel_api/novel_api.dart';
 
 
 final api = NovelApi().getBackupApi();
-final MultipartFile file = BINARY_DATA_HERE; // MultipartFile | 数据库备份文件(.db)
+final String file = file_example; // String | 数据库备份文件(.db)
 final String X_API_TOKEN = X_API_TOKEN_example; // String | 
 
 try {
@@ -86,6 +86,7 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**getVideoFileApiImageToVideoVideoImgNameGet**](doc/DefaultApi.md#getvideofileapiimagetovideovideoimgnameget) | **GET** /api/image-to-video/video/{img_name} | Get Video File
 [*DefaultApi*](doc/DefaultApi.md) | [**healthCheckHealthGet**](doc/DefaultApi.md#healthcheckhealthget) | **GET** /health | Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**indexGet**](doc/DefaultApi.md#indexget) | **GET** / | Index
+[*DefaultApi*](doc/DefaultApi.md) | [**novelByUrlNovelByUrlGet**](doc/DefaultApi.md#novelbyurlnovelbyurlget) | **GET** /novel-by-url | Novel By Url
 [*DefaultApi*](doc/DefaultApi.md) | [**regenerateSceneImagesApiSceneIllustrationRegeneratePost**](doc/DefaultApi.md#regeneratesceneimagesapisceneillustrationregeneratepost) | **POST** /api/scene-illustration/regenerate | Regenerate Scene Images
 [*DefaultApi*](doc/DefaultApi.md) | [**regenerateSimilarImagesApiRoleCardRegeneratePost**](doc/DefaultApi.md#regeneratesimilarimagesapirolecardregeneratepost) | **POST** /api/role-card/regenerate | Regenerate Similar Images
 [*DefaultApi*](doc/DefaultApi.md) | [**roleCardHealthCheckApiRoleCardHealthGet**](doc/DefaultApi.md#rolecardhealthcheckapirolecardhealthget) | **GET** /api/role-card/health | Role Card Health Check
@@ -108,6 +109,7 @@ Class | Method | HTTP request | Description
  - [ImageWithModel](doc/ImageWithModel.md)
  - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
+ - [NovelWithChapters](doc/NovelWithChapters.md)
  - [RoleCardGenerateRequest](doc/RoleCardGenerateRequest.md)
  - [RoleCardTaskStatusResponse](doc/RoleCardTaskStatusResponse.md)
  - [RoleGalleryResponse](doc/RoleGalleryResponse.md)
@@ -115,6 +117,7 @@ Class | Method | HTTP request | Description
  - [RoleInfo](doc/RoleInfo.md)
  - [RoleRegenerateRequest](doc/RoleRegenerateRequest.md)
  - [SceneGalleryResponse](doc/SceneGalleryResponse.md)
+ - [SceneIllustrationResponse](doc/SceneIllustrationResponse.md)
  - [SceneImageDeleteRequest](doc/SceneImageDeleteRequest.md)
  - [SceneRegenerateRequest](doc/SceneRegenerateRequest.md)
  - [SceneRegenerateResponse](doc/SceneRegenerateResponse.md)

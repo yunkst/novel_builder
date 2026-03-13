@@ -50,6 +50,8 @@ class SourceSite(BaseModel):
     description: str  # 站点描述
     enabled: bool  # 是否启用
     search_enabled: bool  # 是否支持搜索功能
+    search_reason: str | None = None  # 不支持搜索的原因
+    search_hint: str | None = None  # 搜索提示或替代方案
 
 
 # ============================================================================

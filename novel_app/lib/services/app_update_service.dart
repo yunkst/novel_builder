@@ -286,9 +286,27 @@ class AppUpdateService {
         tags: ['update', 'download', 'execute'],
       );
 
-      await _apiWrapper.dio.download(
+      // 添加 API Token 到请求头
+      final token = await _apiWrapper.getToken();
+      if (token == null || token.isEmpty) {
+        LoggerService.instance.e(
+          'API Token未配置',
+          category: LogCategory.general,
+          tags: ['update', 'api', 'error'],
+        );
+        onStatus?.call('API配置不完整');
+        return false;
+      }
+
+      final response = await _apiWrapper.dio.download(
         downloadUrl,
         filePath,
+        options: Options(
+          headers: {
+            'X-API-TOKEN': token,
+          },
+          receiveTimeout: const Duration(minutes: 10), // 增加超时时间
+        ),
         onReceiveProgress: (received, total) {
           if (total > 0) {
             final progress = received / total;
@@ -298,9 +316,32 @@ class AppUpdateService {
               tags: ['update', 'download', 'progress'],
             );
             onProgress?.call(progress);
+          } else {
+            LoggerService.instance.d(
+              '下载进度: 已接收 $received 字节',
+              category: LogCategory.general,
+              tags: ['update', 'download', 'progress'],
+            );
           }
         },
       );
+
+      // 验证下载是否成功
+      if (response.statusCode == 200) {
+        LoggerService.instance.i(
+          '下载完成，状态码: ${response.statusCode}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'success'],
+        );
+      } else {
+        LoggerService.instance.e(
+          '下载响应状态码异常: ${response.statusCode}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'error'],
+        );
+        onStatus?.call('下载失败: 响应状态 ${response.statusCode}');
+        return false;
+      }
 
       LoggerService.instance.i(
         '下载完成',
@@ -318,11 +359,39 @@ class AppUpdateService {
         tags: ['update', 'download', 'error'],
       );
       LoggerService.instance.e(
-        '响应状态: ${e.response?.statusCode}',
+        'DioException类型: ${e.type}',
         category: LogCategory.general,
-        tags: ['update', 'download', 'status'],
+        tags: ['update', 'download', 'error_type'],
       );
-      onStatus?.call('下载失败: ${e.message}');
+
+      if (e.response != null) {
+        LoggerService.instance.e(
+          '响应状态: ${e.response?.statusCode}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'status'],
+        );
+        LoggerService.instance.e(
+          '响应数据: ${e.response?.data}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'response'],
+        );
+        onStatus?.call('下载失败: 服务器错误 ${e.response?.statusCode}');
+      } else if (e.error != null) {
+        LoggerService.instance.e(
+          '错误信息: ${e.error}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'error_message'],
+        );
+        onStatus?.call('下载失败: ${e.error}');
+      } else {
+        LoggerService.instance.e(
+          '无响应信息: ${e.message}',
+          category: LogCategory.general,
+          tags: ['update', 'download', 'no_response'],
+        );
+        onStatus?.call('下载失败: ${e.message}');
+      }
+
       return false;
     } catch (e) {
       LoggerService.instance.e(
@@ -330,7 +399,19 @@ class AppUpdateService {
         category: LogCategory.general,
         tags: ['update', 'download', 'exception'],
       );
-      onStatus?.call('下载出错: $e');
+      LoggerService.instance.e(
+        '异常详情: $e',
+        category: LogCategory.general,
+        tags: ['update', 'download', 'exception_detail'],
+      );
+
+      final errorMessage = e.toString();
+      if (errorMessage.contains('null')) {
+        onStatus?.call('下载失败: 服务器无响应，请检查网络连接');
+      } else {
+        onStatus?.call('下载出错: $e');
+      }
+
       return false;
     }
   }

@@ -17,12 +17,9 @@ part 'enhanced_scene_illustration_request.g.dart';
 /// * [taskId] - 任务标识符
 /// * [roles] - 角色信息列表
 /// * [num_] - 生成图片数量
-/// * [modelName]
+/// * [modelName] 
 @BuiltValue()
-abstract class EnhancedSceneIllustrationRequest
-    implements
-        Built<EnhancedSceneIllustrationRequest,
-            EnhancedSceneIllustrationRequestBuilder> {
+abstract class EnhancedSceneIllustrationRequest implements Built<EnhancedSceneIllustrationRequest, EnhancedSceneIllustrationRequestBuilder> {
   /// 章节内容
   @BuiltValueField(wireName: r'chapters_content')
   String get chaptersContent;
@@ -44,25 +41,18 @@ abstract class EnhancedSceneIllustrationRequest
 
   EnhancedSceneIllustrationRequest._();
 
-  factory EnhancedSceneIllustrationRequest(
-          [void updates(EnhancedSceneIllustrationRequestBuilder b)]) =
-      _$EnhancedSceneIllustrationRequest;
+  factory EnhancedSceneIllustrationRequest([void updates(EnhancedSceneIllustrationRequestBuilder b)]) = _$EnhancedSceneIllustrationRequest;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(EnhancedSceneIllustrationRequestBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<EnhancedSceneIllustrationRequest> get serializer =>
-      _$EnhancedSceneIllustrationRequestSerializer();
+  static Serializer<EnhancedSceneIllustrationRequest> get serializer => _$EnhancedSceneIllustrationRequestSerializer();
 }
 
-class _$EnhancedSceneIllustrationRequestSerializer
-    implements PrimitiveSerializer<EnhancedSceneIllustrationRequest> {
+class _$EnhancedSceneIllustrationRequestSerializer implements PrimitiveSerializer<EnhancedSceneIllustrationRequest> {
   @override
-  final Iterable<Type> types = const [
-    EnhancedSceneIllustrationRequest,
-    _$EnhancedSceneIllustrationRequest
-  ];
+  final Iterable<Type> types = const [EnhancedSceneIllustrationRequest, _$EnhancedSceneIllustrationRequest];
 
   @override
   final String wireName = r'EnhancedSceneIllustrationRequest';
@@ -107,9 +97,7 @@ class _$EnhancedSceneIllustrationRequestSerializer
     EnhancedSceneIllustrationRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -188,3 +176,4 @@ class _$EnhancedSceneIllustrationRequestSerializer
     return result.build();
   }
 }
+
