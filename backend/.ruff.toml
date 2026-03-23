@@ -70,7 +70,6 @@ per-file-ignores."*_crawler*.py" = ["BLE001"]
 # Ignore specific rules in specific services (intentional broad exception handling)
 per-file-ignores."scene_illustration_service.py" = ["BLE001"]
 per-file-ignores."role_card_service.py" = ["BLE001"]
-per-file-ignores."cache_service.py" = ["BLE001"]
 per-file-ignores."search_service.py" = ["BLE001"]
 per-file-ignores."model_validation.py" = ["BLE001"]
 per-file-ignores."auth.py" = ["BLE001"]
