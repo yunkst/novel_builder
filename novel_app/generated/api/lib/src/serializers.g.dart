@@ -11,6 +11,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(BackupUploadResponse.serializer)
       ..add(Chapter.serializer)
       ..add(ChapterContent.serializer)
+      ..add(ChapterSyncData.serializer)
+      ..add(CharacterRelationSyncData.serializer)
+      ..add(CharacterSyncData.serializer)
       ..add(EnhancedSceneIllustrationRequest.serializer)
       ..add(HTTPValidationError.serializer)
       ..add(ImageToVideoRequest.serializer)
@@ -18,7 +21,14 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ImageWithModel.serializer)
       ..add(ModelsResponse.serializer)
       ..add(Novel.serializer)
+      ..add(NovelSyncData.serializer)
+      ..add(NovelSyncDownloadRequest.serializer)
+      ..add(NovelSyncDownloadResponse.serializer)
+      ..add(NovelSyncListResponse.serializer)
+      ..add(NovelSyncUploadRequest.serializer)
+      ..add(NovelSyncUploadResponse.serializer)
       ..add(NovelWithChapters.serializer)
+      ..add(OutlineSyncData.serializer)
       ..add(RoleCardGenerateRequest.serializer)
       ..add(RoleCardTaskStatusResponse.serializer)
       ..add(RoleGalleryResponse.serializer)
@@ -39,8 +49,24 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(Chapter)]),
           () => ListBuilder<Chapter>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ChapterSyncData)]),
+          () => ListBuilder<ChapterSyncData>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(CharacterSyncData)]),
+          () => ListBuilder<CharacterSyncData>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(CharacterRelationSyncData)]),
+          () => ListBuilder<CharacterRelationSyncData>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(OutlineSyncData)]),
+          () => ListBuilder<OutlineSyncData>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(ImageWithModel)]),
           () => ListBuilder<ImageWithModel>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(NovelSyncData)]),
+          () => ListBuilder<NovelSyncData>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(RoleInfo)]),
           () => ListBuilder<RoleInfo>())

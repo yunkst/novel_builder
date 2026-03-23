@@ -234,5 +234,30 @@ final bookshelfRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BookshelfRepositoryRef = AutoDisposeProviderRef<IBookshelfRepository>;
+String _$novelExportRepositoryHash() =>
+    r'17f2c8cc3d25252a90358f48ae6e468122ded34d';
+
+/// NovelExportRepository Provider
+///
+/// 用于小说数据的导出和导入操作
+/// 依赖其他Repository，不直接依赖数据库连接
+///
+/// Copied from [novelExportRepository].
+@ProviderFor(novelExportRepository)
+final novelExportRepositoryProvider =
+    AutoDisposeProvider<NovelExportRepository>.internal(
+  novelExportRepository,
+  name: r'novelExportRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$novelExportRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef NovelExportRepositoryRef
+    = AutoDisposeProviderRef<NovelExportRepository>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

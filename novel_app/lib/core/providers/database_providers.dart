@@ -10,6 +10,7 @@ import '../../repositories/illustration_repository.dart';
 import '../../repositories/outline_repository.dart';
 import '../../repositories/chat_scene_repository.dart';
 import '../../repositories/bookshelf_repository.dart';
+import '../../repositories/novel_export_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/i_database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
@@ -122,4 +123,23 @@ IChatSceneRepository chatSceneRepository(Ref ref) {
 IBookshelfRepository bookshelfRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return BookshelfRepository(dbConnection: dbConnection);
+}
+
+/// NovelExportRepository Provider
+///
+/// 用于小说数据的导出和导入操作
+/// 依赖其他Repository，不直接依赖数据库连接
+@riverpod
+NovelExportRepository novelExportRepository(Ref ref) {
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final characterRepository = ref.watch(characterRepositoryProvider);
+  final characterRelationRepository = ref.watch(characterRelationRepositoryProvider);
+  final outlineRepository = ref.watch(outlineRepositoryProvider);
+
+  return NovelExportRepository(
+    chapterRepository: chapterRepository,
+    characterRepository: characterRepository,
+    characterRelationRepository: characterRelationRepository,
+    outlineRepository: outlineRepository,
+  );
 }

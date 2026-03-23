@@ -1695,7 +1695,7 @@ class DefaultApi {
   }
 
   /// Novel By Url
-  /// 通过URL获取小说信息和章节列表  - **url**: 小说详情页URL  返回小说的完整信息，包括： - novel: 小说基本信息（标题、作者、封面、简介） - chapters: 章节列表
+  /// 通过URL获取小说信息和章节列表  - **url**: 小说详情页URL  返回小说的完整信息，包括： - novel: 小说基本信息（标题、作者、封面、简介） - chapters: 章节列表（缓存由装饰器自动处理）
   ///
   /// Parameters:
   /// * [url] - 小说详情页URL

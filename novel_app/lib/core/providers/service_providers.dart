@@ -62,3 +62,8 @@ export 'services/cache_service_providers.dart'
         roleGalleryCacheServiceProvider,
         characterAvatarSyncServiceProvider,
         characterAvatarServiceProvider;
+
+// 同步服务
+export 'services/sync_service_providers.dart'
+    show
+        novelSyncServiceProvider;
