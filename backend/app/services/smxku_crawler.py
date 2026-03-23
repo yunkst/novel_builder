@@ -5,11 +5,16 @@ SMXKU 小说网站爬虫 - 基于 Scrapling 最佳实践重写
 功能: 搜索小说、获取目录、获取章节内容
 """
 
+import logging
 import re
 from typing import Any
 from urllib.parse import urljoin
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class SmxkuCrawler(BaseCrawler):
@@ -112,10 +117,16 @@ class SmxkuCrawler(BaseCrawler):
             return results[:50]  # 限制返回数量
 
         except Exception as e:
-            print(f"SMXKU搜索失败: {e!s}")
+            logger.error(f"SMXKU搜索失败: {e!s}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 从URL中提取小说ID
@@ -192,10 +203,17 @@ class SmxkuCrawler(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"SMXKU获取章节列表失败: {e!s}")
+            logger.error(f"SMXKU获取章节列表失败: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 获取章节页面
@@ -263,7 +281,7 @@ class SmxkuCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"SMXKU获取章节内容失败: {e!s}")
+            logger.error(f"SMXKU获取章节内容失败: {e!s}")
             return {
                 "title": "章节内容",
                 "content": f"获取失败: {e!s}",
@@ -328,7 +346,7 @@ class SmxkuCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            logger.error(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",
@@ -486,7 +504,7 @@ class SmxkuCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"从详情页提取小说信息失败: {e!s}")
+            logger.error(f"从详情页提取小说信息失败: {e!s}")
             # 返回基本信息
             return {
                 "id": novel_id,

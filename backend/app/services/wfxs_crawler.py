@@ -11,6 +11,7 @@ https://m.wfxs.tw
 """
 
 import asyncio
+import logging
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
@@ -18,6 +19,11 @@ from typing import Any
 
 import opencc
 from bs4 import BeautifulSoup
+
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class WfxsCrawler(ABC):
@@ -95,7 +101,7 @@ class WfxsCrawler(ABC):
                     return Response(content="", status_code=response.status)
 
         except Exception as e:
-            print(f"获取页面失败: {e}")
+            logger.error(f"获取页面失败: {e}")
             return Response(content="", status_code=500)
 
     async def search_novels(self, keyword: str) -> list[dict[str, Any]]:
@@ -126,7 +132,7 @@ class WfxsCrawler(ABC):
 
                 if response.status_code != 200:
                     if attempt < max_retries - 1:
-                        print(f"搜索失败 (状态码: {response.status_code}),重试 {attempt + 1}/{max_retries}...")
+                        logger.warning(f"搜索失败 (状态码: {response.status_code}),重试 {attempt + 1}/{max_retries}...")
                         await asyncio.sleep(retry_delay)
                         continue
                     return []
@@ -180,21 +186,28 @@ class WfxsCrawler(ABC):
             except Exception as e:
                 # 如果是最后一次重试,记录错误并返回空
                 if attempt == max_retries - 1:
-                    print(f"搜索失败: {e}")
+                    logger.error(f"搜索失败: {e}")
                     return []
                 # 否则继续重试
-                print(f"搜索失败: {e},重试 {attempt + 1}/{max_retries}...")
+                logger.warning(f"搜索失败: {e},重试 {attempt + 1}/{max_retries}...")
                 await asyncio.sleep(retry_delay)
                 continue
 
         return []  # 所有重试都失败
 
-    async def get_chapter_list(self, novel_url: str, max_pages: int = 0) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, max_pages: int = 0, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表
 
         Args:
             novel_url: 小说URL
             max_pages: 最大获取页数,默认为0(获取所有页),设置为1表示仅获取第一页
+            force_refresh: 是否强制刷新缓存（由装饰器处理）
 
         Returns:
             章节列表
@@ -215,7 +228,7 @@ class WfxsCrawler(ABC):
                 # 检查是否是 booklist 格式
                 booklist_match = re.search(r'/booklist/(\d+)\.html', novel_url)
                 if not booklist_match:
-                    print(f"不支持的 URL 格式：{novel_url}")
+                    logger.warning(f"不支持的 URL 格式：{novel_url}")
                     return []
                 # 从 booklist URL 中提取 novel_id
                 novel_id = booklist_match.group(1)
@@ -280,27 +293,27 @@ class WfxsCrawler(ABC):
                 batch_end = min(batch_start + batch_size, len(page_urls))
                 batch_urls = page_urls[batch_start:batch_end]
 
-                print(f"准备获取第 {batch_start+1}-{batch_end}/{len(page_urls)} 页...")
+                logger.debug(f"准备获取第 {batch_start+1}-{batch_end}/{len(page_urls)} 页...")
 
                 # 创建当前批次的任务
                 tasks = [self._get_chapters_from_page(url) for url in batch_urls]
 
                 # 并行执行当前批次
-                print(f"并行获取 {len(batch_urls)} 页...")
+                logger.debug(f"并行获取 {len(batch_urls)} 页...")
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 # 处理当前批次结果
                 for i, result in enumerate(results):
                     page_num = batch_start + i + 1
                     if isinstance(result, Exception):
-                        print(f"  ⚠ 第 {page_num} 页获取失败: {result}")
+                        logger.warning(f"  ⚠ 第 {page_num} 页获取失败: {result}")
                     elif result:
                         all_results.extend(result)
-                        print(f"  ✓ 第 {page_num} 页: {len(result)} 个章节")
+                        logger.debug(f"  ✓ 第 {page_num} 页: {len(result)} 个章节")
 
                 # 批次之间延迟,避免触发反爬
                 if batch_end < len(page_urls):
-                    print(f"等待2秒后继续...")
+                    logger.debug("等待2秒后继续...")
                     await asyncio.sleep(2)
 
             # 合并所有结果
@@ -308,7 +321,7 @@ class WfxsCrawler(ABC):
             return chapters
 
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
     async def _get_chapters_from_page(self, page_url: str) -> list[dict[str, Any]]:
@@ -412,14 +425,23 @@ class WfxsCrawler(ABC):
             return chapters
 
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容
 
         Args:
             chapter_url: 章节URL
+            novel_url: 小说URL（用于缓存关联，可选）
+            force_refresh: 是否强制刷新缓存（由装饰器处理）
 
         Returns:
             章节内容
@@ -506,20 +528,20 @@ class WfxsCrawler(ABC):
                                 break
 
                     if next_page_link:
-                        print(f"找到分页链接: {next_page_link.get('href', 'N/A')}")
+                        logger.debug(f"找到分页链接: {next_page_link.get('href', 'N/A')}")
                         # 如果有分页，获取下一页内容
                         next_page_url = next_page_link.get('href', '')
                         if next_page_url.startswith('/'):
                             next_page_url = urljoin(chapter_url, next_page_url)
 
-                        print(f"准备获取第2页: {next_page_url}")
+                        logger.debug(f"准备获取第2页: {next_page_url}")
                         # 使用独立的Playwright实例获取下一页
                         next_page_content = await self._get_next_page_content_with_playwright(next_page_url)
-                        print(f"第2页内容长度: {len(next_page_content) if next_page_content else 0}")
+                        logger.debug(f"第2页内容长度: {len(next_page_content) if next_page_content else 0}")
 
                         if next_page_content:
                             content = f"{content}\n\n{next_page_content}"
-                            print(f"合并后总长度: {len(content)}")
+                            logger.debug(f"合并后总长度: {len(content)}")
 
                     return {
                         'title': self.convert_to_simplified(title),
@@ -535,7 +557,7 @@ class WfxsCrawler(ABC):
                     }
 
         except Exception as e:
-            print(f"获取章节内容失败: {e}")
+            logger.error(f"获取章节内容失败: {e}")
             return {
                 'title': '',
                 'content': '',
@@ -622,7 +644,7 @@ class WfxsCrawler(ABC):
             }
 
         except Exception as e:
-            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            logger.error(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",

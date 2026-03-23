@@ -4,14 +4,20 @@
 
 使用 Scrapling 的 Session 模式，提供高性能、强反爬虫能力。
 所有爬虫继承此类，只需关注业务逻辑。
+支持统一的缓存装饰器，自动处理缓存读写。
 """
 
+import logging
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
+from .cache_decorator import cacheable
+
+logger = logging.getLogger(__name__)
+from .cache_types import CacheType
 from .page_response import PageResponse
 from .session_manager import SessionManager
 
@@ -78,12 +84,15 @@ class BaseCrawler(ABC):
         pass
 
     @abstractmethod
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """
         获取章节列表 - 必须实现
 
         Args:
             novel_url: 小说详情页 URL
+            force_refresh: 是否强制刷新缓存（由装饰器处理）
 
         Returns:
             list[dict]: 章节列表，每个字典包含：
@@ -93,12 +102,16 @@ class BaseCrawler(ABC):
         pass
 
     @abstractmethod
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """
         获取章节内容 - 必须实现
 
         Args:
             chapter_url: 章节内容 URL
+            novel_url: 小说 URL（用于缓存关联，可选）
+            force_refresh: 是否强制刷新缓存（由装饰器处理）
 
         Returns:
             dict: 章节内容字典，包含：
@@ -652,10 +665,12 @@ class ExampleCrawler(BaseCrawler):
             return novels[:20]  # 限制返回数量
 
         except Exception as e:
-            print(f"搜索失败: {e}")
+            logger.error(f"搜索失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """
         获取章节列表 - 只需要关注业务逻辑
 
@@ -671,10 +686,12 @@ class ExampleCrawler(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """
         获取章节内容 - 只需要关注业务逻辑
 
@@ -694,7 +711,7 @@ class ExampleCrawler(BaseCrawler):
             return {"title": title, "content": content}
 
         except Exception as e:
-            print(f"获取章节内容失败: {e}")
+            logger.error(f"获取章节内容失败: {e}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
@@ -726,7 +743,7 @@ class ExampleCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"获取小说信息失败: {e}")
+            logger.error(f"获取小说信息失败: {e}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",

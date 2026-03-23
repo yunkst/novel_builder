@@ -6,11 +6,16 @@
 """
 
 import asyncio
+import logging
 import re
 import urllib.parse
 from typing import Any
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class XspswCrawlerRefactored(BaseCrawler):
@@ -51,11 +56,17 @@ class XspswCrawlerRefactored(BaseCrawler):
             return novels[:10]  # 限制返回数量
 
         except Exception as e:
-            print(f"Xspsw搜索失败: {e!s}")
+            logger.error(f"Xspsw搜索失败: {e!s}")
             # 如果搜索失败，返回一些热门小说作为推荐
             return await self._get_popular_novels()
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取小说章节列表（支持分页获取完整列表）"""
         try:
             # 从小说URL提取novel_id
@@ -104,17 +115,24 @@ class XspswCrawlerRefactored(BaseCrawler):
                         await asyncio.sleep(0.5)
 
                 except Exception as e:
-                    print(f"获取第{page_num}页章节失败: {e!s}")
+                    logger.warning(f"获取第{page_num}页章节失败: {e!s}")
                     continue
 
             # 去重保持顺序
             return self._deduplicate_chapters(all_chapters)
 
         except Exception as e:
-            print(f"Xspsw获取章节列表异常: {e!s}")
+            logger.error(f"Xspsw获取章节列表异常: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 获取章节页面
@@ -134,7 +152,7 @@ class XspswCrawlerRefactored(BaseCrawler):
             return {"title": title, "content": content}
 
         except Exception as e:
-            print(f"Xspsw获取章节内容失败: {e!s}")
+            logger.error(f"Xspsw获取章节内容失败: {e!s}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
@@ -186,7 +204,7 @@ class XspswCrawlerRefactored(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            logger.error(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",
@@ -325,7 +343,7 @@ class XspswCrawlerRefactored(BaseCrawler):
                 )
 
             except Exception as e:
-                print(f"处理搜索结果项时出错: {e}")
+                logger.warning(f"处理搜索结果项时出错: {e}")
                 continue
 
         # 去重（基于URL）

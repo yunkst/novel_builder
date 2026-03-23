@@ -6,11 +6,16 @@ https://www.wodeshucheng.net/
 支持小说搜索、章节列表获取、章节内容抓取
 """
 
+import logging
 import re
 import urllib.parse
 from typing import Any
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class WodeshuchengCrawler(BaseCrawler):
@@ -123,10 +128,16 @@ class WodeshuchengCrawler(BaseCrawler):
             return novels[:20]  # 限制返回数量
 
         except Exception as e:
-            print(f"搜索小说失败: {e}")
+            logger.error(f"搜索小说失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 获取小说详情页
@@ -182,10 +193,17 @@ class WodeshuchengCrawler(BaseCrawler):
             return unique_chapters
 
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 获取章节页面
@@ -244,7 +262,7 @@ class WodeshuchengCrawler(BaseCrawler):
                 }
 
         except Exception as e:
-            print(f"获取章节内容失败: {e}")
+            logger.error(f"获取章节内容失败: {e}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
@@ -291,7 +309,7 @@ class WodeshuchengCrawler(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            logger.error(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",

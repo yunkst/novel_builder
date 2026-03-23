@@ -5,11 +5,16 @@
 使用网络请求抽象层，专注于业务逻辑实现
 """
 
+import logging
 import re
 import urllib.parse
 from typing import Any
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class WdscwCrawlerRefactored(BaseCrawler):
@@ -132,10 +137,16 @@ class WdscwCrawlerRefactored(BaseCrawler):
             return unique_novels[:20]  # 限制返回数量
 
         except Exception as e:
-            print(f"搜索小说失败: {e}")
+            logger.error(f"搜索小说失败: {e}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             response = await self.get_page(
@@ -242,10 +253,17 @@ class WdscwCrawlerRefactored(BaseCrawler):
             return chapters
 
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             all_content = []
@@ -343,14 +361,14 @@ class WdscwCrawlerRefactored(BaseCrawler):
 
                 # 安全限制，最多抓取20页
                 if page_num > 20:
-                    print(f"章节分页过多，停止在20页: {chapter_url}")
+                    logger.warning(f"章节分页过多，停止在20页: {chapter_url}")
                     break
 
             final_content = "".join(all_content)
             return {"title": title, "content": final_content}
 
         except Exception as e:
-            print(f"获取章节内容失败: {e}")
+            logger.error(f"获取章节内容失败: {e}")
             return {"title": "", "content": ""}
 
     async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
@@ -399,7 +417,7 @@ class WdscwCrawlerRefactored(BaseCrawler):
             }
 
         except Exception as e:
-            print(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
+            logger.error(f"{self.__class__.__name__}获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",

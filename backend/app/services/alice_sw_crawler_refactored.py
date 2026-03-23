@@ -6,6 +6,7 @@
 """
 
 import json
+import logging
 import re
 import urllib.parse
 from typing import Any
@@ -13,6 +14,10 @@ from typing import Any
 import requests
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class AliceSWCrawlerRefactored(BaseCrawler):
@@ -68,10 +73,16 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return novels[:20]  # 限制返回数量
 
         except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
-            print(f"AliceSW搜索失败: {e!s}")
+            logger.error(f"AliceSW搜索失败: {e!s}")
             return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表"""
         try:
             # 首先获取小说详情页，查找章节列表页面链接
@@ -94,10 +105,17 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return chapters
 
         except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
-            print(f"AliceSW获取章节列表失败: {e!s}")
+            logger.error(f"AliceSW获取章节列表失败: {e!s}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             # 获取章节页面
@@ -115,7 +133,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             return {"title": title, "content": content}
 
         except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
-            print(f"AliceSW获取章节内容失败: {e!s}")
+            logger.error(f"AliceSW获取章节内容失败: {e!s}")
             return {"title": "章节内容", "content": f"获取失败: {e!s}"}
 
     async def get_novel_info(self, novel_url: str) -> dict[str, Any]:
@@ -152,7 +170,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             }
 
         except (OSError, requests.RequestException, ValueError, json.JSONDecodeError, AttributeError) as e:
-            print(f"AliceSW获取小说信息失败: {e!s}")
+            logger.error(f"AliceSW获取小说信息失败: {e!s}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",
@@ -258,41 +276,25 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         return "未知"
 
     def _find_chapter_list_url(self, soup, novel_url: str) -> str:
-        """查找章节列表页面的URL"""
-        # AliceSW特定的章节列表链接模式
-        chapter_list_patterns = [
-            # 查找包含"查看所有章节"、"更多章节"、"目录"等关键词的链接
-            (
-                "a",
-                {
-                    "text": re.compile(
-                        r"查看所有章节|更多章节|更多|目录|查看全部|所有章节", re.I
-                    )
-                },
-            ),
-            # 查找特定格式的章节列表链接
-            ("a", {"href": re.compile(r"/other/chapters/id/\d+\.html")}),
-            # 通用章节列表链接模式
-            ("a", {"href": re.compile(r"chapter|list|index|directory", re.I)}),
-        ]
+        """查找章节列表页面的URL
 
-        for tag_name, attrs in chapter_list_patterns:
-            links = soup.find_all(tag_name, attrs)
-            for link in links:
-                href = link.get("href", "")
-                link.get_text().strip()
+        AliceSW的章节列表链接格式：
+        - 文本包含"查看所有章节"
+        - href格式: /other/chapters/id/{novel_id}.html
+        """
+        # 1. 首先尝试查找"查看所有章节"链接
+        all_links = soup.find_all("a", href=True)
+        for link in all_links:
+            href = link.get("href", "")
+            text = link.get_text().strip()
 
-                if href and not href.startswith("javascript"):
-                    full_url = urllib.parse.urljoin(self.base_url, href)
-                    # 确保URL不是当前页面本身或无效链接
-                    if (
-                        full_url != novel_url
-                        and "bookshelf" not in href
-                        and "user/" not in href
-                    ):
-                        return full_url
+            # 匹配"查看所有章节"文本和章节列表URL格式
+            if "查看所有章节" in text and re.match(
+                r"^/other/chapters/id/\d+\.html$", href
+            ):
+                return urllib.parse.urljoin(self.base_url, href)
 
-        # 如果没找到专门的链接，尝试构造章节列表URL
+        # 2. 如果没找到，尝试构造章节列表URL
         # AliceSW的章节列表URL模式: /other/chapters/id/{novel_id}.html
         novel_id_match = re.search(r"/novel/(\d+)\.html", novel_url)
         if novel_id_match:
@@ -306,75 +308,98 @@ class AliceSWCrawlerRefactored(BaseCrawler):
     def _extract_alice_sw_chapters_from_list_page(
         self, soup, chapter_list_url: str
     ) -> list[dict[str, Any]]:
-        """从章节列表页面提取章节"""
+        """从章节列表页面提取章节
+
+        基于实际页面结构分析：
+        - 章节列表页面URL格式: /other/chapters/id/{novel_id}.html
+        - 页面中有多个ul，一个是章节列表，其他是导航和推荐
+        - 策略：通过评分系统选择正确的ul
+        """
         chapters = []
 
-        # 1. 查找章节列表的主要容器
-        chapter_containers = soup.find_all("div", class_="book_newchap")
-        if not chapter_containers:
-            # 备用选择器
-            chapter_containers = soup.find_all(
-                ["div", "ul", "ol"], class_=re.compile(r"chapter|list|content", re.I)
-            )
+        # 策略：找到包含章节链接的ul
+        # 使用评分系统选择最可能是章节列表的ul
+        uls = soup.find_all("ul")
 
-        # 2. 从容器中提取章节链接
-        for container in chapter_containers:
-            # 查找章节链接，可能是不同的HTML结构
-            chapter_links = []
+        # 计算每个ul的"章节分数"
+        best_ul = None
+        best_score = -1
 
-            # AliceSW常见的章节链接结构
-            possible_selectors = [
-                "p.ti > a",  # 章节标题在p.ti中的链接
-                "li > a",  # 列表项中的链接
-                "div.chapter > a",  # 章节div中的链接
-                "a[href*='/book/']",  # 所有包含/book/的链接
-            ]
+        for ul in uls:
+            chapter_links = ul.find_all("a", href=lambda x: x and "/book/" in x)
+            if not chapter_links:
+                continue
 
-            for selector in possible_selectors:
-                chapter_links = container.select(selector)
-                if chapter_links:
+            score = 0
+            count = len(chapter_links)
+
+            # 因素1: 章节数量适中（1-100章最有可能）
+            if 1 <= count <= 100:
+                score += 30
+            elif count > 100:
+                score += 10  # 太多链接可能是推荐
+
+            # 因素2: 章节标题特征（严格的章节格式）
+            chapter_title_count = 0
+            for link in chapter_links:
+                text = link.get_text().strip()
+                # 更严格的章节标题检测
+                if re.search(r"第\s*\d+\s*章|第\s*\d+\s*节", text):
+                    chapter_title_count += 1
+
+            if count > 0:
+                # 章节标题占比高则加分
+                score += (chapter_title_count / count) * 70
+
+            # 因素3: 避免导航和推荐内容
+            ul_text = ul.get_text()
+            nav_keywords = ["推荐", "排行", "分类", "导航", "首页", "书架"]
+            for keyword in nav_keywords:
+                if keyword in ul_text:
+                    score -= 20
                     break
 
-            # 如果容器中没有找到，尝试在整个页面中查找
-            if not chapter_links:
-                chapter_links = soup.select("a[href*='/book/']")
+            # 因素4: 如果链接都是/book/格式，加分
+            all_book = all(
+                re.search(r"/book/\d+/", a.get("href", ""))
+                for a in chapter_links
+            )
+            if all_book and count > 0:
+                score += 30
 
-            for a_tag in chapter_links:
-                href = a_tag.get("href", "")
-                title = a_tag.get_text().strip()
+            if score > best_score:
+                best_score = score
+                best_ul = ul
 
+        if not best_ul:
+            # 备用：直接取第一个有/book/链接且数量合理的ul
+            for ul in uls:
+                chapter_links = ul.find_all("a", href=lambda x: x and "/book/" in x)
+                count = len(chapter_links)
+                if 1 <= count <= 100:  # 合理的章节数量
+                    best_ul = ul
+                    break
+
+        if not best_ul:
+            return []
+
+        # 从找到的 ul 中提取所有章节
+        for a_tag in best_ul.find_all("a", href=True):
+            href = a_tag.get("href", "")
+            title = a_tag.get_text().strip()
+
+            # 验证是否为有效的章节链接
+            if re.match(r"^/book/\d+/[a-f0-9\-]+\.html$", href):
                 # 构建完整URL
                 if href.startswith("/"):
                     full_url = urllib.parse.urljoin(self.base_url, href)
                 else:
                     full_url = urllib.parse.urljoin(chapter_list_url, href)
 
-                # 验证是否为有效的章节链接
                 if self._is_valid_alice_sw_chapter(title, href):
                     chapters.append({"title": title, "url": full_url})
 
-        # 3. 如果仍然没有找到章节，尝试全局搜索
-        if not chapters:
-            # 查找所有符合AliceSW章节URL模式的链接
-            for a_tag in soup.find_all("a", href=True):
-                href = a_tag.get("href", "")
-                title = a_tag.get_text().strip()
-
-                # AliceSW章节URL模式: /book/数字/字符串.html
-                if re.match(r"^/book/\d+/[a-f0-9\-]+\.html$", href):
-                    full_url = urllib.parse.urljoin(self.base_url, href)
-                    if self._is_valid_alice_sw_chapter(title, href):
-                        chapters.append({"title": title, "url": full_url})
-
-        # 4. 去重并保持顺序
-        seen = set()
-        unique_chapters = []
-        for chapter in chapters:
-            if chapter["url"] not in seen and chapter["title"].strip():
-                unique_chapters.append(chapter)
-                seen.add(chapter["url"])
-
-        return unique_chapters
+        return chapters
 
     def _extract_alice_sw_chapters(self, soup, novel_url: str) -> list[dict[str, Any]]:
         """提取AliceSW章节列表 - 基于实际HTML结构"""

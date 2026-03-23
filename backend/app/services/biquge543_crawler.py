@@ -1,8 +1,13 @@
+import logging
 import re
 import urllib.parse
 from typing import Any
 
 from .base_crawler import BaseCrawler, RequestStrategy
+from .cache_decorator import cacheable
+from .cache_types import CacheType
+
+logger = logging.getLogger(__name__)
 
 
 class Biquge543Crawler(BaseCrawler):
@@ -29,7 +34,13 @@ class Biquge543Crawler(BaseCrawler):
         # 该站点搜索功能有频率限制，暂不启用
         return []
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict[str, Any]]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_LIST,
+        key_params=["novel_url"],
+    )
+    async def get_chapter_list(
+        self, novel_url: str, force_refresh: bool = False
+    ) -> list[dict[str, Any]]:
         """获取章节列表 - 支持分页"""
         try:
             # 从 novel_url 提取小说ID
@@ -45,13 +56,13 @@ class Biquge543Crawler(BaseCrawler):
                 # 构建章节列表页面URL
                 list_url = f"{self.base_url}/shu/{novel_id}_{page_num}/"
 
-                print(f"[Biquge543] 获取第 {page_num} 页章节列表: {list_url}")
+                logger.info(f"[Biquge543] 获取第 {page_num} 页章节列表: {list_url}")
 
                 response = await self.get_page(
                     list_url, custom_headers=self.custom_headers, timeout=30
                 )
                 if response.status_code != 200:
-                    print(f"[Biquge543] 第 {page_num} 页请求失败: {response.status_code}")
+                    logger.warning(f"[Biquge543] 第 {page_num} 页请求失败: {response.status_code}")
                     break
 
                 soup = response.soup()
@@ -89,13 +100,13 @@ class Biquge543Crawler(BaseCrawler):
                             chapter_links.append(link)
 
                 if chapter_links:
-                    print(f"[Biquge543] 找到 {len(chapter_links)} 个章节链接")
+                    logger.debug(f"[Biquge543] 找到 {len(chapter_links)} 个章节链接")
 
-                print(f"[Biquge543] 第 {page_num} 页找到 {len(chapter_links)} 个章节链接")
+                logger.info(f"[Biquge543] 第 {page_num} 页找到 {len(chapter_links)} 个章节链接")
 
                 # 如果没有找到章节链接，说明没有更多页面
                 if not chapter_links:
-                    print(f"[Biquge543] 第 {page_num} 页没有章节，停止")
+                    logger.info(f"[Biquge543] 第 {page_num} 页没有章节，停止")
                     break
 
                 # 检查是否是新章节（用URL去重）
@@ -116,18 +127,18 @@ class Biquge543Crawler(BaseCrawler):
                         )
                         new_chapters = True
 
-                print(f"[Biquge543] 第 {page_num} 页新增 {len([ch for ch in chapters if new_chapters])} 章，总计 {len(chapters)} 章")
+                logger.debug(f"[Biquge543] 第 {page_num} 页新增 {len([ch for ch in chapters if new_chapters])} 章，总计 {len(chapters)} 章")
 
                 # 如果没有新章节，说明到达最后一页
                 if not new_chapters:
-                    print(f"[Biquge543] 第 {page_num} 页无新章节，停止")
+                    logger.info(f"[Biquge543] 第 {page_num} 页无新章节，停止")
                     break
 
                 # 检查是否有下一页
                 # 注意：Scrapling 的 soup 对象需要使用 text 参数而不是 string
                 next_page_link = soup.find("a", text="下一页")
                 if not next_page_link:
-                    print(f"[Biquge543] 第 {page_num} 页没有下一页链接，停止")
+                    logger.info(f"[Biquge543] 第 {page_num} 页没有下一页链接，停止")
                     break
 
                 page_num += 1
@@ -143,13 +154,20 @@ class Biquge543Crawler(BaseCrawler):
             for i, ch in enumerate(chapters, 1):
                 ch['index'] = i
 
-            print(f"[Biquge543] 总共获取 {len(chapters)} 章")
+            logger.info(f"[Biquge543] 总共获取 {len(chapters)} 章")
             return chapters
         except Exception as e:
-            print(f"获取章节列表失败: {e}")
+            logger.error(f"获取章节列表失败: {e}")
             return []
 
-    async def get_chapter_content(self, chapter_url: str) -> dict[str, Any]:
+    @cacheable(
+        cache_type=CacheType.CHAPTER_CONTENT,
+        key_params=["chapter_url", "novel_url"],
+        min_valid_length=300,
+    )
+    async def get_chapter_content(
+        self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
+    ) -> dict[str, Any]:
         """获取章节内容"""
         try:
             response = await self.get_page(
@@ -169,7 +187,7 @@ class Biquge543Crawler(BaseCrawler):
 
             return {"title": title, "content": content}
         except Exception as e:
-            print(f"获取章节内容失败: {e}")
+            logger.error(f"获取章节内容失败: {e}")
             return {"title": "", "content": ""}
 
     def _extract_chapter_content(self, soup) -> str:
@@ -258,7 +276,7 @@ class Biquge543Crawler(BaseCrawler):
                 "chapters": chapters,
             }
         except Exception as e:
-            print(f"获取小说信息失败: {e}")
+            logger.error(f"获取小说信息失败: {e}")
             return {
                 "title": "未知小说",
                 "author": "未知作者",
