@@ -8,7 +8,6 @@ for novel searching, chapter management, and caching functionality.
 
 import logging
 import secrets
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,8 +35,6 @@ from .exceptions import (
     handle_exception,
 )
 from .logging_config import setup_logging
-from .models.cache import ChapterCache as Cache
-from .models.chapter_list_cache import ChapterListCache
 from .schemas import (
     AppVersionResponse,
     AppVersionUploadRequest,
@@ -78,6 +75,7 @@ from .services.app_version_service import AppVersionServiceError, get_app_versio
 from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
 from .api.routes.backup import router as backup_router
+from .api.routes.novel_sync import router as novel_sync_router
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +108,7 @@ app.add_middleware(
 
 # 注册API路由
 app.include_router(backup_router)
+app.include_router(novel_sync_router)
 
 
 # 应用启动事件
@@ -253,7 +252,6 @@ async def search(
 async def chapters(
     url: str = Query(..., description="小说详情页或阅读页URL"),
     force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
-    db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """
     获取章节列表
@@ -263,37 +261,13 @@ async def chapters(
       - False: 优先从缓存获取，缓存不存在时从源站抓取
       - True: 强制从源站重新获取
     """
-    # 1. 如果不强制刷新，先检查缓存
-    if not force_refresh:
-        cached = db.query(ChapterListCache).filter(
-            ChapterListCache.novel_url == url
-        ).first()
-
-        if cached and cached.chapters_json:
-            logger.info(f"章节列表命中缓存: {url}")
-            return cached.chapters_json
-
-    # 2. 从源站获取内容
+    # 获取爬虫并调用（缓存由装饰器自动处理）
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
 
-    chapters = await crawler.get_chapter_list(url)
-
-    # 3. 保存到缓存（不阻塞响应）
-    if chapters:
-        try:
-            import threading
-
-            thread = threading.Thread(
-                target=_save_chapter_list_to_cache_sync,
-                args=(url, chapters),
-            )
-            thread.daemon = True
-            thread.start()
-        except (OSError, RuntimeError) as e:
-            logger.warning(f"章节列表缓存保存失败: {e}")
-
+    # 调用爬虫方法，缓存装饰器会自动处理缓存逻辑
+    chapters = await crawler.get_chapter_list(url, force_refresh=force_refresh)
     return chapters
 
 
@@ -302,7 +276,6 @@ async def chapters(
 )
 async def novel_by_url(
     url: str = Query(..., description="小说详情页URL"),
-    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """
     通过URL获取小说信息和章节列表
@@ -311,45 +284,15 @@ async def novel_by_url(
 
     返回小说的完整信息，包括：
     - novel: 小说基本信息（标题、作者、封面、简介）
-    - chapters: 章节列表（优先使用缓存）
+    - chapters: 章节列表（缓存由装饰器自动处理）
     """
-    from .models.chapter_list_cache import ChapterListCache
-
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
 
-    # 1. 先检查章节列表缓存
-    cached = db.query(ChapterListCache).filter(
-        ChapterListCache.novel_url == url
-    ).first()
-
-    if cached and cached.chapters_json:
-        # 有缓存，直接使用缓存的章节列表
-        logger.info(f"novel-by-url 章节列表命中缓存: {url}")
-        chapters = cached.chapters_json
-
-        # 只获取小说基本信息（不需要重新爬取章节）
-        novel_info = await crawler.get_novel_info(url)
-        novel_info["chapters"] = []  # 清空爬虫返回的章节，使用缓存
-    else:
-        # 无缓存，调用爬虫的 get_novel_info 方法（会同时获取章节）
-        novel_info = await crawler.get_novel_info(url)
-        chapters = novel_info.get("chapters", [])
-
-        # 保存章节列表到缓存
-        if chapters:
-            try:
-                import threading
-
-                thread = threading.Thread(
-                    target=_save_chapter_list_to_cache_sync,
-                    args=(url, chapters),
-                )
-                thread.daemon = True
-                thread.start()
-            except (OSError, RuntimeError) as e:
-                logger.warning(f"novel-by-url 章节列表缓存保存失败: {e}")
+    # 调用爬虫的 get_novel_info 方法（内部会调用 get_chapter_list，缓存由装饰器自动处理）
+    novel_info = await crawler.get_novel_info(url)
+    chapters = novel_info.get("chapters", [])
 
     # 清理标题中的冗余信息
     title = novel_info.get("title", "")
@@ -378,7 +321,6 @@ async def novel_by_url(
 async def chapter_content(
     url: str = Query(..., description="章节URL"),
     force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
-    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """
     获取章节内容
@@ -388,49 +330,18 @@ async def chapter_content(
       - False: 优先从缓存获取，缓存不存在时从源站抓取
       - True: 强制从源站重新获取（用于更新内容）
     """
-    # 1. 如果不强制刷新，先检查缓存
-    if not force_refresh:
-        cached_chapter = db.query(Cache).filter(Cache.chapter_url == url).first()
-
-        if cached_chapter:
-            # 检查缓存内容的字数，如果小于300则认为缓存无效，需要重新获取
-            if cached_chapter.word_count < 300:
-                # 缓存字数不足，标记为需要重新获取
-                pass  # 继续执行下面的源站获取逻辑
-            else:
-                return {
-                    "title": cached_chapter.chapter_title,
-                    "content": cached_chapter.chapter_content,
-                    "from_cache": True,
-                }
-
-    # 2. 从源站获取内容
+    # 获取爬虫并调用（缓存由装饰器自动处理）
     crawler = get_crawler_for_url(url)
     if not crawler:
         raise HTTPException(status_code=400, detail="不支持该URL的站点")
 
-    content_data = await crawler.get_chapter_content(url)
-
-    # 3. 保存到缓存（不阻塞响应）
-    if content_data and content_data.get("content"):
-        try:
-            # 在后台线程中保存缓存，不阻塞响应
-            import threading
-
-            thread = threading.Thread(
-                target=_save_chapter_to_cache_sync,
-                args=(url, content_data["title"], content_data["content"]),
-            )
-            thread.daemon = True
-            thread.start()
-        except (OSError, RuntimeError) as e:
-            # 缓存保存失败不影响正常响应，但记录日志
-            logger.warning(f"缓存章节保存失败: {e}")
+    # 调用爬虫方法，缓存装饰器会自动处理缓存逻辑
+    content_data = await crawler.get_chapter_content(url, force_refresh=force_refresh)
 
     return {
         "title": content_data.get("title", "章节内容"),
         "content": content_data.get("content", ""),
-        "from_cache": False,
+        "from_cache": content_data.get("from_cache", False),
     }
 
 
@@ -1039,91 +950,6 @@ async def download_app_version(
         raise
     except Exception as e:
         raise handle_service_exception(e, logger, "下载APK")
-
-
-# ================= 辅助函数 =================
-
-
-def _save_chapter_to_cache_sync(chapter_url: str, title: str, content: str):
-    """
-    同步保存章节到缓存（在后台线程中运行）
-
-    Args:
-        chapter_url: 章节URL
-        title: 章节标题
-        content: 章节内容
-    """
-    if not content or len(content) < 300:  # 跳过过短的内容，字数小于300的缓存无效
-        return
-
-    try:
-        with next(get_db()) as db:
-            # 检查是否已存在
-            existing = db.query(Cache).filter(Cache.chapter_url == chapter_url).first()
-
-            if existing:
-                # 更新现有缓存
-                existing.chapter_title = title
-                existing.chapter_content = content
-                existing.word_count = len(content)
-                existing.cached_at = datetime.now()
-            else:
-                # 创建新缓存记录（不依赖CacheTask）
-                cached_chapter = Cache(
-                    task_id=None,  # 独立章节不需要任务ID
-                    novel_url="individual_chapters",
-                    chapter_title=title,
-                    chapter_url=chapter_url,
-                    chapter_content=content,
-                    chapter_index=0,  # 独立章节索引设为0
-                    word_count=len(content),
-                    cached_at=datetime.now(),
-                )
-                db.add(cached_chapter)
-
-            db.commit()
-
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        # 缓存保存失败，记录日志但不影响主功能
-        print(f"保存章节缓存失败: {e}")
-
-
-def _save_chapter_list_to_cache_sync(novel_url: str, chapters: list[dict[str, Any]]):
-    """
-    同步保存章节列表到缓存（在后台线程中运行）
-
-    Args:
-        novel_url: 小说URL
-        chapters: 章节列表
-    """
-    if not chapters:
-        return
-
-    try:
-        with next(get_db()) as db:
-            # 检查是否已存在
-            existing = db.query(ChapterListCache).filter(
-                ChapterListCache.novel_url == novel_url
-            ).first()
-
-            if existing:
-                # 更新现有缓存
-                existing.chapters_json = chapters
-                existing.updated_at = datetime.now()
-            else:
-                # 创建新缓存记录
-                cached_list = ChapterListCache(
-                    novel_url=novel_url,
-                    chapters_json=chapters,
-                )
-                db.add(cached_list)
-
-            db.commit()
-            logger.info(f"章节列表缓存已保存: {novel_url} ({len(chapters)} 章)")
-
-    except (OSError, TypeError, AttributeError, KeyError, RuntimeError) as e:
-        # 缓存保存失败，记录日志但不影响主功能
-        logger.error(f"保存章节列表缓存失败: {e}")
 
 
 # 便于 Docker 容器启动时的提示

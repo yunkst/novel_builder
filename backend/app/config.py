@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     apk_upload_dir: str = "uploads/apk"
     apk_max_size: int = 100  # MB
 
+    # 小说同步配置
+    novel_sync_dir: str = "novel_sync"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 生成默认的secret_key（如果未设置）
