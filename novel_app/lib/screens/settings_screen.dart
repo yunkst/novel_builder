@@ -5,6 +5,7 @@ import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import '../services/app_update_service.dart';
+import '../services/logger_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
@@ -93,7 +94,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ToastUtils.show('当前已是最新版本');
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '检查更新失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['update', 'check', 'failed'],
+      );
       if (mounted) {
         setState(() {
           _isCheckingUpdate = false;

@@ -38,7 +38,7 @@ def cacheable(
     Args:
         cache_type: 缓存类型（CHAPTER_CONTENT 或 CHAPTER_LIST）
         key_params: 用于构建缓存键的参数名列表
-            - 对于 CHAPTER_CONTENT: 应包含 ["chapter_url", "novel_url"]
+            - 对于 CHAPTER_CONTENT: 应包含 ["chapter_url"]
             - 对于 CHAPTER_LIST: 应包含 ["novel_url"]
         min_valid_length: 最小有效长度
             - 对于 CHAPTER_CONTENT: 内容最小字数（默认 300）
@@ -51,7 +51,7 @@ def cacheable(
     使用示例:
         @cacheable(
             cache_type=CacheType.CHAPTER_CONTENT,
-            key_params=["chapter_url", "novel_url"],
+            key_params=["chapter_url"],
             min_valid_length=300
         )
         async def get_chapter_content(self, chapter_url: str, novel_url: str = "", force_refresh: bool = False):

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/logger_service.dart';
 
 /// 取消令牌
 ///
@@ -50,8 +51,13 @@ class CancellationToken {
     for (final callback in _callbacks) {
       try {
         callback();
-      } catch (e) {
-        debugPrint('❌ 取消回调执行失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '取消回调执行失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.general,
+          tags: ['cancellation', 'callback', 'failed'],
+        );
       }
     }
     _callbacks.clear();
@@ -73,8 +79,13 @@ class CancellationToken {
       // 立即执行回调
       try {
         callback();
-      } catch (e) {
-        debugPrint('❌ 取消回调执行失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '取消回调执行失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.general,
+          tags: ['cancellation', 'callback', 'failed'],
+        );
       }
       return () {};
     }
@@ -116,8 +127,13 @@ class CancellationToken {
     for (final callback in _callbacks) {
       try {
         callback();
-      } catch (e) {
-        debugPrint('❌ 取消回调执行失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '取消回调执行失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.general,
+          tags: ['cancellation', 'callback', 'failed'],
+        );
       }
     }
     _callbacks.clear();

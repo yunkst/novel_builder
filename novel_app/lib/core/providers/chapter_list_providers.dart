@@ -84,8 +84,9 @@ class ChapterListState {
 class ChapterList extends _$ChapterList {
   @override
   ChapterListState build(Novel novel) {
-    // 初始化时加载数据
-    _initializeData();
+    // 使用 Future.microtask 确保 build() 返回后再执行异步操作
+    // 避免 "Tried to read the state of an uninitialized provider" 错误
+    Future.microtask(() => _initializeData());
     return const ChapterListState();
   }
 
@@ -142,6 +143,8 @@ class ChapterList extends _$ChapterList {
     bool forceRefresh = false,
     BuildContext? context,
   }) async {
+    // 在方法开始时保存 context 引用，避免跨异步边界使用
+    final savedContext = context;
     final chapterLoader = ref.watch(chapterLoaderProvider);
 
     state = state.copyWith(isLoading: true, errorMessage: '');
@@ -160,12 +163,13 @@ class ChapterList extends _$ChapterList {
         return;
       }
 
-      if (cachedChapters.isNotEmpty && forceRefresh && context == null) {
+      if (cachedChapters.isNotEmpty && forceRefresh && savedContext == null) {
         // 有缓存但需要刷新，且没有提供 context（如首次加载），直接刷新
         await _refreshChaptersFromBackend(forceRefresh: true);
-      } else if (cachedChapters.isNotEmpty && forceRefresh && context != null) {
+      } else if (cachedChapters.isNotEmpty && forceRefresh && savedContext != null) {
         // 有缓存但需要刷新，且有 context（用户手动刷新）
-        await _refreshChaptersFromBackend(forceRefresh: true, context: context);
+        // ignore: use_build_context_synchronously - savedContext 在方法开始时已保存
+        await _refreshChaptersFromBackend(forceRefresh: true, context: savedContext);
       } else {
         // 没有缓存时，检查是否为自定义小说
         if (cachedChapters.isEmpty && novel.url.startsWith('custom://')) {

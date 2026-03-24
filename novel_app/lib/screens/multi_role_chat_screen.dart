@@ -5,6 +5,7 @@ import '../models/character.dart';
 import '../models/chat_message.dart';
 import '../services/dify_service.dart';
 import '../services/character_avatar_service.dart';
+import '../services/logger_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/role_color_manager.dart';
 import '../utils/toast_utils.dart';
@@ -190,6 +191,11 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           setState(() {
             _isGenerating = false;
           });
+          LoggerService.instance.e(
+            '多角色初始聊天失败: $error',
+            category: LogCategory.ai,
+            tags: ['chat', 'multi-role', 'init', 'failed'],
+          );
           _showErrorSnackBar(error);
         },
         onDone: () {
@@ -207,10 +213,16 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           });
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _isGenerating = false;
       });
+      LoggerService.instance.e(
+        '多角色初始聊天异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['chat', 'multi-role', 'init', 'error'],
+      );
       _showErrorSnackBar(e.toString());
     }
   }
@@ -944,6 +956,11 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           setState(() {
             _isGenerating = false;
           });
+          LoggerService.instance.e(
+            '多角色聊天流式响应失败: $error',
+            category: LogCategory.ai,
+            tags: ['chat', 'multi-role', 'stream', 'failed'],
+          );
           _showErrorSnackBar(error);
         },
         onDone: () {
@@ -961,10 +978,16 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           });
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _isGenerating = false;
       });
+      LoggerService.instance.e(
+        '多角色聊天流式响应异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['chat', 'multi-role', 'stream', 'error'],
+      );
       _showErrorSnackBar(e.toString());
     }
   }

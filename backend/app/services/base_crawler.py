@@ -109,8 +109,8 @@ class BaseCrawler(ABC):
         获取章节内容 - 必须实现
 
         Args:
-            chapter_url: 章节内容 URL
-            novel_url: 小说 URL（用于缓存关联，可选）
+            chapter_url: 章节内容 URL（唯一缓存键）
+            novel_url: 小说 URL（可选，仅用于元数据存储）
             force_refresh: 是否强制刷新缓存（由装饰器处理）
 
         Returns:

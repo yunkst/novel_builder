@@ -11,6 +11,7 @@ import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
 import '../constants/chapter_constants.dart';
 import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
 import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
 import 'character_management_screen.dart';
@@ -755,6 +756,11 @@ class _ChapterListScreenRiverpodState
           }
         },
         onError: (error) {
+          LoggerService.instance.e(
+            '章节生成失败: $error',
+            category: LogCategory.ai,
+            tags: ['chapter', 'generate', 'failed'],
+          );
           if (mounted) {
             ToastUtils.showError('生成失败: $error');
           }
@@ -764,8 +770,13 @@ class _ChapterListScreenRiverpodState
         },
         enableDebugLog: false,
       );
-    } catch (e) {
-      debugPrint('❌ 调用Dify生成章节失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '章节生成异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['chapter', 'generate', 'error'],
+      );
       _isGeneratingNotifier.value = false;
       if (mounted) {
         ToastUtils.showError('生成失败: $e');
@@ -795,9 +806,11 @@ class _ChapterListScreenRiverpodState
       );
 
       // 重新加载章节列表
-      await ref
-          .read(chapterListProvider(widget.novel).notifier)
-          .refreshChapters(context);
+      if (mounted) {
+        await ref
+            .read(chapterListProvider(widget.novel).notifier)
+            .refreshChapters(context);
+      }
 
       if (mounted) {
         final newState = ref.read(chapterListProvider(widget.novel));
@@ -879,9 +892,11 @@ class _ChapterListScreenRiverpodState
       await chapterActionHandler.deleteChapter(chapter.url);
 
       // 重新加载章节列表
-      await ref
-          .read(chapterListProvider(widget.novel).notifier)
-          .refreshChapters(context);
+      if (mounted) {
+        await ref
+            .read(chapterListProvider(widget.novel).notifier)
+            .refreshChapters(context);
+      }
 
       // 显示成功提示
       if (mounted) {

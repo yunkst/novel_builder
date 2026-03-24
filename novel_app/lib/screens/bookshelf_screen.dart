@@ -439,7 +439,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         }
         // 刷新书架列表
         ref.invalidate(bookshelfNovelsProvider);
-      } catch (e) {
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '创建自定义小说失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.database,
+          tags: ['novel', 'create', 'failed'],
+        );
         if (mounted) {
           ToastUtils.showError('创建失败: $e', context: context);
         }

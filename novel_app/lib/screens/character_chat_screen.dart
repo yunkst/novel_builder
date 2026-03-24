@@ -4,6 +4,7 @@ import '../models/character.dart';
 import '../models/chat_message.dart';
 import '../services/dify_service.dart';
 import '../services/character_avatar_service.dart';
+import '../services/logger_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/toast_utils.dart';
 import '../screens/providers/dify_provider.dart';
@@ -83,6 +84,11 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
           setState(() {
             _isGenerating = false;
           });
+          LoggerService.instance.e(
+            '初始聊天失败: $error',
+            category: LogCategory.ai,
+            tags: ['chat', 'character', 'init', 'failed'],
+          );
           _showErrorSnackBar(error);
         },
         onDone: () {
@@ -99,10 +105,16 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
           });
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _isGenerating = false;
       });
+      LoggerService.instance.e(
+        '初始聊天异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['chat', 'character', 'init', 'error'],
+      );
       _showErrorSnackBar(e.toString());
     }
   }
@@ -213,6 +225,11 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
           setState(() {
             _isGenerating = false;
           });
+          LoggerService.instance.e(
+            '聊天流式响应失败: $error',
+            category: LogCategory.ai,
+            tags: ['chat', 'character', 'stream', 'failed'],
+          );
           _showErrorSnackBar(error);
         },
         onDone: () {
@@ -229,10 +246,16 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
           });
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _isGenerating = false;
       });
+      LoggerService.instance.e(
+        '聊天流式响应异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['chat', 'character', 'stream', 'error'],
+      );
       _showErrorSnackBar(e.toString());
     }
   }

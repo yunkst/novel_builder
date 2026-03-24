@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/role_gallery_cache_service.dart';
+import '../services/logger_service.dart';
 import 'common/common_widgets.dart';
 
 /// 使用API客户端的图片加载组件
@@ -98,7 +99,7 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
           });
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -106,7 +107,12 @@ class _ApiImageWidgetState extends State<ApiImageWidget> {
           _isLoading = false;
         });
       }
-      debugPrint('图片加载失败: ${widget.imageUrl}, 错误: $e');
+      LoggerService.instance.e(
+        '图片加载失败: ${widget.imageUrl}',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['image', 'load', 'failed'],
+      );
     }
   }
 

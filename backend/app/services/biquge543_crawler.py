@@ -162,7 +162,7 @@ class Biquge543Crawler(BaseCrawler):
 
     @cacheable(
         cache_type=CacheType.CHAPTER_CONTENT,
-        key_params=["chapter_url", "novel_url"],
+        key_params=["chapter_url"],
         min_valid_length=300,
     )
     async def get_chapter_content(

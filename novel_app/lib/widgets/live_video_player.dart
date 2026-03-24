@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../services/logger_service.dart';
 import 'common/common_widgets.dart';
 
 /// Live图效果的循环视频播放器
@@ -80,14 +81,19 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           _isInitialized = true;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (mounted) {
         setState(() {
           _hasError = true;
           _errorMessage = e.toString();
         });
       }
-      debugPrint('视频初始化失败: $e');
+      LoggerService.instance.e(
+        '视频初始化失败: ${widget.videoUrl}',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['video', 'init', 'failed'],
+      );
     }
   }
 
@@ -119,8 +125,13 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
         }
         widget.onVideoEnd?.call();
       }
-    } catch (e) {
-      debugPrint('重启视频播放失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '重启视频播放失败: ${widget.videoUrl}',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['video', 'restart', 'failed'],
+      );
     }
   }
 

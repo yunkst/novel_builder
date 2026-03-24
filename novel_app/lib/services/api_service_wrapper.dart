@@ -5,7 +5,6 @@ import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:path/path.dart' as path;
 import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/character.dart';
@@ -491,8 +490,8 @@ class ApiServiceWrapper {
 
         // 构建Novel对象
         final novel = local.Novel(
-          title: novelData.title ?? '未知小说',
-          author: novelData.author ?? '未知作者',
+          title: novelData.title,
+          author: novelData.author,
           url: url,
           coverUrl: null,  // 后端暂不返回此字段
           description: null,  // 后端暂不返回此字段
@@ -503,8 +502,8 @@ class ApiServiceWrapper {
           final index = entry.key;
           final chapterData = entry.value;
           return local.Chapter(
-            title: chapterData.title ?? '未知章节',
-            url: chapterData.url ?? '',
+            title: chapterData.title,
+            url: chapterData.url,
             chapterIndex: index,
           );
         }).toList();

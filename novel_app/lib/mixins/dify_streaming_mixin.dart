@@ -177,6 +177,13 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
           hideStreamingProgress();
 
+          // 记录错误日志
+          LoggerService.instance.e(
+            '流式交互失败: $error',
+            category: LogCategory.ai,
+            tags: ['dify', 'streaming', 'failed'],
+          );
+
           // 调试统计
           if (enableDebugLog && _startTime != null) {
             final duration = DateTime.now().difference(_startTime!);

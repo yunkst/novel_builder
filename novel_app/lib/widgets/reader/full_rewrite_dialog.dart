@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../mixins/dify_streaming_mixin.dart';
+import '../../services/logger_service.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../core/providers/reader_screen_providers.dart';
@@ -173,9 +174,15 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
         showErrorSnackBar: true,
         errorMessagePrefix: '全文重写失败',
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       _isGeneratingNotifier.value = false;
       _rewriteResultNotifier.value = '生成失败: $e';
+      LoggerService.instance.e(
+        '全文重写生成异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['rewrite', 'full', 'error'],
+      );
     }
   }
 
