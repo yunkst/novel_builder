@@ -4,14 +4,31 @@
 
 This module contains services for syncing novel data between APP and server,
 including file-based storage for novel metadata, chapters, characters, etc.
+
+存储格式:
+novel_sync/
+└── 斗破苍穹/                  # 用小说标题做目录名（需处理非法字符）
+    ├── meta.json             # 琐碎元数据（novel_id, source_url, sync_version 等）
+    ├── chapters/
+    │   ├── 001_第一章.txt     # 章节用纯文本，格式：{序号}_{标题}.txt
+    │   └── ...
+    ├── outlines/             # 大纲目录
+    │   ├── 主线大纲.txt
+    │   └── ...
+    └── characters/           # 人物卡目录
+        ├── 萧炎.json         # 每个人物单独一个 JSON
+        └── 药老.json
 """
 
-import hashlib
 import json
+import logging
 import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from ..config import settings
 from ..exceptions import NovelBuilderException
@@ -33,6 +50,9 @@ class NovelSyncServiceError(NovelBuilderException):
 class NovelSyncService:
     """小说同步服务 - 管理小说数据在JSON格式和文件系统之间的转换."""
 
+    # Windows 文件名非法字符
+    ILLEGAL_FILENAME_CHARS = r'<>:"/\|?*'
+
     def __init__(self, sync_dir: str | None = None):
         """
         初始化小说同步服务.
@@ -47,58 +67,131 @@ class NovelSyncService:
         """确保同步目录存在."""
         self.sync_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_url_hash(self, url: str) -> str:
+    def _sanitize_filename(self, name: str) -> str:
         """
-        根据URL生成唯一的目录哈希值.
+        清理文件名中的非法字符.
 
         Args:
-            url: 小说URL
+            name: 原始文件名
 
         Returns:
-            URL的MD5哈希值（前16位）
+            清理后的安全文件名
         """
-        return hashlib.md5(url.encode("utf-8")).hexdigest()[:16]
+        # 替换非法字符为下划线
+        safe_name = name
+        for char in self.ILLEGAL_FILENAME_CHARS:
+            safe_name = safe_name.replace(char, "_")
+        # 移除首尾空格和点
+        safe_name = safe_name.strip(" .")
+        # 如果清理后为空，使用默认名称
+        return safe_name or "unnamed"
 
-    def _get_novel_dir(self, url: str) -> Path:
+    def _find_novel_dir_by_url(self, source_url: str) -> Path | None:
         """
-        获取小说存储目录路径.
+        通过遍历目录查找小说目录（基于 meta.json 中的 source_url）.
 
         Args:
-            url: 小说URL
+            source_url: 小说来源 URL
 
         Returns:
-            小说存储目录路径
+            小说目录路径，如果未找到则返回 None
         """
-        url_hash = self._get_url_hash(url)
-        return self.sync_dir / url_hash
+        for novel_dir in self.sync_dir.iterdir():
+            if not novel_dir.is_dir():
+                continue
 
-    def _ensure_novel_dir(self, url: str) -> Path:
+            meta_file = novel_dir / "meta.json"
+            if not meta_file.exists():
+                continue
+
+            try:
+                meta_data = json.loads(meta_file.read_text(encoding="utf-8"))
+                if meta_data.get("source_url") == source_url:
+                    return novel_dir
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+        return None
+
+    def _find_or_create_novel_dir(self, title: str, source_url: str | None) -> Path:
         """
-        确保小说目录存在并返回路径.
+        查找或创建小说目录.
+
+        如果找到匹配 source_url 的目录则返回该目录，
+        否则根据标题创建新目录（处理标题冲突）。
 
         Args:
-            url: 小说URL
+            title: 小说标题
+            source_url: 小说来源 URL
 
         Returns:
-            小说存储目录路径
+            小说目录路径
         """
-        novel_dir = self._get_novel_dir(url)
+        # 首先尝试通过 source_url 查找已存在的目录
+        if source_url:
+            existing_dir = self._find_novel_dir_by_url(source_url)
+            if existing_dir:
+                return existing_dir
+
+        # 根据标题创建新目录
+        safe_title = self._sanitize_filename(title)
+        novel_dir = self.sync_dir / safe_title
+
+        # 处理标题冲突：如果目录已存在且不是当前小说的目录，追加数字后缀
+        if novel_dir.exists():
+            # 检查该目录是否属于当前小说（通过 meta.json 的 source_url）
+            meta_file = novel_dir / "meta.json"
+            is_same_novel = False
+            if meta_file.exists():
+                try:
+                    meta_data = json.loads(meta_file.read_text(encoding="utf-8"))
+                    if meta_data.get("source_url") == source_url:
+                        is_same_novel = True
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+            # 如果不是同一本小说，追加数字后缀
+            if not is_same_novel:
+                counter = 1
+                while novel_dir.exists():
+                    novel_dir = self.sync_dir / f"{safe_title}_{counter}"
+                    counter += 1
+
         novel_dir.mkdir(parents=True, exist_ok=True)
         return novel_dir
+
+    def _get_novel_dir(self, source_url: str) -> Path | None:
+        """
+        获取小说存储目录路径（仅查找，不创建）.
+
+        Args:
+            source_url: 小说来源 URL
+
+        Returns:
+            小说存储目录路径，如果不存在则返回 None
+        """
+        return self._find_novel_dir_by_url(source_url)
 
     def _save_meta(
         self,
         novel_dir: Path,
         novel_data: NovelSyncData,
+        chapters_info: list[dict[str, Any]] | None = None,
+        outlines_info: list[dict[str, Any]] | None = None,
         sync_version: int = 1,
-    ) -> None:
+    ) -> str:
         """
-        保存小说元数据到meta.json.
+        保存小说元数据到 meta.json.
 
         Args:
             novel_dir: 小说目录
             novel_data: 小说数据
+            chapters_info: 章节元数据列表
+            outlines_info: 大纲元数据列表
             sync_version: 同步版本号
+
+        Returns:
+            同步时间字符串
         """
         synced_at = datetime.now().isoformat()
         meta_data = {
@@ -117,6 +210,8 @@ class NovelSyncService:
             "updated_at": novel_data.updated_at,
             "sync_version": sync_version,
             "synced_at": synced_at,
+            "chapters_info": chapters_info or [],
+            "outlines_info": outlines_info or [],
         }
 
         meta_file = novel_dir / "meta.json"
@@ -125,54 +220,166 @@ class NovelSyncService:
         )
         return synced_at
 
-    def _save_chapters(self, novel_dir: Path, chapters: list[ChapterSyncData]) -> None:
+    def _save_chapters(self, novel_dir: Path, chapters: list[ChapterSyncData]) -> list[dict[str, Any]]:
         """
-        保存章节数据到chapters目录.
+        保存章节数据到 chapters 目录.
+
+        每个章节保存为一个纯文本文件，格式：{chapter_index:03d}_{title}.txt
+        元数据（如 is_user_inserted）返回并存到 meta.json。
+
+        使用临时目录写入，确认成功后再替换，确保数据安全。
 
         Args:
             novel_dir: 小说目录
             chapters: 章节列表
+
+        Returns:
+            章节元数据列表，用于存入 meta.json
         """
         chapters_dir = novel_dir / "chapters"
-        chapters_dir.mkdir(exist_ok=True)
 
-        for chapter in chapters:
-            # 使用章节ID作为文件名
-            chapter_file = chapters_dir / f"{chapter.chapter_id}.json"
-            chapter_data = {
-                "chapter_id": chapter.chapter_id,
-                "title": chapter.title,
-                "content": chapter.content,
-                "chapter_index": chapter.chapter_index,
-                "is_user_inserted": chapter.is_user_inserted,
-                "created_at": chapter.created_at,
-                "updated_at": chapter.updated_at,
-            }
-            chapter_file.write_text(
-                json.dumps(chapter_data, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
+        # 使用临时目录写入，确保数据安全
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_chapters_dir = Path(temp_dir) / "chapters"
+            temp_chapters_dir.mkdir()
+
+            chapters_info = []
+            for chapter in chapters:
+                # 文件名格式：{chapter_index:03d}_{title}.txt
+                safe_title = self._sanitize_filename(chapter.title)
+                filename = f"{chapter.chapter_index:03d}_{safe_title}.txt"
+                chapter_file = temp_chapters_dir / filename
+
+                # 文件内容：纯文本，只存章节内容
+                chapter_file.write_text(chapter.content, encoding="utf-8")
+
+                # 收集元数据
+                chapters_info.append({
+                    "chapter_id": chapter.chapter_id,
+                    "title": chapter.title,
+                    "chapter_index": chapter.chapter_index,
+                    "is_user_inserted": chapter.is_user_inserted,
+                    "url": chapter.url,
+                    "created_at": chapter.created_at,
+                    "updated_at": chapter.updated_at,
+                    "filename": filename,
+                })
+
+            # 所有文件写入成功后，删除旧目录并移动新目录
+            if chapters_dir.exists():
+                shutil.rmtree(chapters_dir)
+            shutil.move(str(temp_chapters_dir), str(chapters_dir))
+
+        return chapters_info
+
+    def _load_chapters(self, novel_dir: Path, chapters_info: list[dict[str, Any]]) -> list[ChapterSyncData]:
+        """
+        从 chapters 目录加载章节数据.
+
+        Args:
+            novel_dir: 小说目录
+            chapters_info: 从 meta.json 读取的章节元数据
+
+        Returns:
+            章节数据列表
+        """
+        chapters_dir = novel_dir / "chapters"
+        if not chapters_dir.exists():
+            return []
+
+        chapters = []
+        for info in chapters_info:
+            filename = info.get("filename")
+            if not filename:
+                continue
+
+            chapter_file = chapters_dir / filename
+            if not chapter_file.exists():
+                continue
+
+            try:
+                content = chapter_file.read_text(encoding="utf-8")
+                chapters.append(ChapterSyncData(
+                    chapter_id=info["chapter_id"],
+                    title=info["title"],
+                    content=content,
+                    chapter_index=info["chapter_index"],
+                    is_user_inserted=info.get("is_user_inserted", False),
+                    url=info.get("url"),
+                    created_at=info.get("created_at"),
+                    updated_at=info.get("updated_at"),
+                ))
+            except (OSError, IOError) as e:
+                logger.warning("读取章节文件失败: %s, 错误: %s", chapter_file, e)
+            except KeyError as e:
+                logger.warning("章节元数据缺少必要字段: %s, 缺少字段: %s", info.get("filename", "未知"), e)
+
+        # 按章节序号排序
+        chapters.sort(key=lambda x: x.chapter_index)
+        return chapters
 
     def _save_characters(
         self, novel_dir: Path, characters: list[CharacterSyncData]
     ) -> None:
         """
-        保存角色数据到characters.json.
+        保存角色数据到 characters 目录.
+
+        每个角色保存为一个独立的 JSON 文件，文件名：{name}.json。
+        使用临时目录写入，确认成功后再替换，确保数据安全。
 
         Args:
             novel_dir: 小说目录
             characters: 角色列表
         """
-        characters_data = [char.model_dump() for char in characters]
-        characters_file = novel_dir / "characters.json"
-        characters_file.write_text(
-            json.dumps(characters_data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        characters_dir = novel_dir / "characters"
+
+        # 使用临时目录写入，确保数据安全
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_characters_dir = Path(temp_dir) / "characters"
+            temp_characters_dir.mkdir()
+
+            for character in characters:
+                safe_name = self._sanitize_filename(character.name)
+                character_file = temp_characters_dir / f"{safe_name}.json"
+                character_file.write_text(
+                    json.dumps(character.model_dump(), ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+
+            # 所有文件写入成功后，删除旧目录并移动新目录
+            if characters_dir.exists():
+                shutil.rmtree(characters_dir)
+            shutil.move(str(temp_characters_dir), str(characters_dir))
+
+    def _load_characters(self, novel_dir: Path) -> list[CharacterSyncData]:
+        """
+        从 characters 目录加载角色数据.
+
+        Args:
+            novel_dir: 小说目录
+
+        Returns:
+            角色数据列表
+        """
+        characters_dir = novel_dir / "characters"
+        if not characters_dir.exists():
+            return []
+
+        characters = []
+        for character_file in characters_dir.glob("*.json"):
+            try:
+                character_data = json.loads(character_file.read_text(encoding="utf-8"))
+                characters.append(CharacterSyncData(**character_data))
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        return characters
 
     def _save_character_relations(
         self, novel_dir: Path, relations: list[CharacterRelationSyncData]
     ) -> None:
         """
-        保存角色关系数据到character_relations.json.
+        保存角色关系数据到 character_relations.json.
 
         Args:
             novel_dir: 小说目录
@@ -184,21 +391,125 @@ class NovelSyncService:
             json.dumps(relations_data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
+    def _load_character_relations(
+        self, novel_dir: Path
+    ) -> list[CharacterRelationSyncData]:
+        """
+        从 character_relations.json 加载角色关系数据.
+
+        Args:
+            novel_dir: 小说目录
+
+        Returns:
+            角色关系数据列表
+        """
+        relations_file = novel_dir / "character_relations.json"
+        if not relations_file.exists():
+            return []
+
+        try:
+            relations_data = json.loads(relations_file.read_text(encoding="utf-8"))
+            return [CharacterRelationSyncData(**rel) for rel in relations_data]
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     def _save_outlines(
         self, novel_dir: Path, outlines: list[OutlineSyncData]
-    ) -> None:
+    ) -> list[dict[str, Any]]:
         """
-        保存大纲数据到outline.json.
+        保存大纲数据到 outlines 目录.
+
+        每个大纲保存为一个纯文本文件，文件名：{title}.txt。
+        元数据返回并存到 meta.json。
+        使用临时目录写入，确认成功后再替换，确保数据安全。
 
         Args:
             novel_dir: 小说目录
             outlines: 大纲列表
+
+        Returns:
+            大纲元数据列表，用于存入 meta.json
         """
-        outlines_data = [outline.model_dump() for outline in outlines]
-        outlines_file = novel_dir / "outline.json"
-        outlines_file.write_text(
-            json.dumps(outlines_data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        outlines_dir = novel_dir / "outlines"
+
+        # 使用临时目录写入，确保数据安全
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_outlines_dir = Path(temp_dir) / "outlines"
+            temp_outlines_dir.mkdir()
+
+            outlines_info = []
+            for outline in outlines:
+                safe_title = self._sanitize_filename(outline.title)
+                filename = f"{safe_title}.txt"
+                outline_file = temp_outlines_dir / filename
+
+                # 文件内容：纯文本
+                outline_file.write_text(outline.content, encoding="utf-8")
+
+                # 收集元数据
+                outlines_info.append({
+                    "outline_id": outline.outline_id,
+                    "title": outline.title,
+                    "outline_type": outline.outline_type,
+                    "parent_id": outline.parent_id,
+                    "sort_order": outline.sort_order,
+                    "created_at": outline.created_at,
+                    "updated_at": outline.updated_at,
+                    "filename": filename,
+                })
+
+            # 所有文件写入成功后，删除旧目录并移动新目录
+            if outlines_dir.exists():
+                shutil.rmtree(outlines_dir)
+            shutil.move(str(temp_outlines_dir), str(outlines_dir))
+
+        return outlines_info
+
+    def _load_outlines(self, novel_dir: Path, outlines_info: list[dict[str, Any]]) -> list[OutlineSyncData]:
+        """
+        从 outlines 目录加载大纲数据.
+
+        Args:
+            novel_dir: 小说目录
+            outlines_info: 从 meta.json 读取的大纲元数据
+
+        Returns:
+            大纲数据列表
+        """
+        outlines_dir = novel_dir / "outlines"
+        if not outlines_dir.exists():
+            return []
+
+        outlines = []
+        for info in outlines_info:
+            filename = info.get("filename")
+            if not filename:
+                continue
+
+            outline_file = outlines_dir / filename
+            if not outline_file.exists():
+                continue
+
+            try:
+                content = outline_file.read_text(encoding="utf-8")
+                outlines.append(OutlineSyncData(
+                    outline_id=info["outline_id"],
+                    title=info["title"],
+                    content=content,
+                    outline_type=info["outline_type"],
+                    parent_id=info.get("parent_id"),
+                    sort_order=info.get("sort_order", 0),
+                    created_at=info.get("created_at"),
+                    updated_at=info.get("updated_at"),
+                ))
+            except (OSError, IOError) as e:
+                logger.warning("读取大纲文件失败: %s, 错误: %s", outline_file, e)
+            except KeyError as e:
+                logger.warning("大纲元数据缺少必要字段: %s, 缺少字段: %s", info.get("filename", "未知"), e)
+
+        # 按 sort_order 排序
+        outlines.sort(key=lambda x: x.sort_order)
+        return outlines
 
     def save_novel(
         self,
@@ -223,11 +534,13 @@ class NovelSyncService:
             NovelSyncServiceError: 保存失败
         """
         try:
-            # 使用source_url作为唯一标识
-            url = novel_data.source_url or f"local_{novel_data.novel_id}"
-            novel_dir = self._ensure_novel_dir(url)
+            # 使用 source_url 作为唯一标识，如果没有则使用本地标识
+            source_url = novel_data.source_url or f"local_{novel_data.novel_id}"
 
-            # 读取现有的meta.json获取sync_version（如果存在）
+            # 查找或创建小说目录
+            novel_dir = self._find_or_create_novel_dir(novel_data.title, source_url)
+
+            # 读取现有的 meta.json 获取 sync_version（如果存在）
             meta_file = novel_dir / "meta.json"
             sync_version = 1
             if meta_file.exists():
@@ -237,12 +550,20 @@ class NovelSyncService:
                 except (json.JSONDecodeError, KeyError):
                     pass
 
-            # 保存元数据（包含sync_version，避免重复读写）
-            synced_at = self._save_meta(novel_dir, novel_data, sync_version)
-
-            # 保存章节数据
+            # 保存章节数据，获取章节元数据
+            chapters_info = []
             if novel_data.chapters:
-                self._save_chapters(novel_dir, novel_data.chapters)
+                chapters_info = self._save_chapters(novel_dir, novel_data.chapters)
+
+            # 保存大纲数据，获取大纲元数据
+            outlines_info = []
+            if novel_data.outlines:
+                outlines_info = self._save_outlines(novel_dir, novel_data.outlines)
+
+            # 保存元数据（包含章节和大纲元数据）
+            synced_at = self._save_meta(
+                novel_dir, novel_data, chapters_info, outlines_info, sync_version
+            )
 
             # 保存角色数据
             if novel_data.characters:
@@ -251,10 +572,6 @@ class NovelSyncService:
             # 保存角色关系
             if novel_data.character_relations:
                 self._save_character_relations(novel_dir, novel_data.character_relations)
-
-            # 保存大纲数据
-            if novel_data.outlines:
-                self._save_outlines(novel_dir, novel_data.outlines)
 
             return {
                 "success": True,
@@ -271,13 +588,13 @@ class NovelSyncService:
 
     def _load_meta(self, novel_dir: Path) -> dict[str, Any] | None:
         """
-        从meta.json加载小说元数据.
+        从 meta.json 加载小说元数据.
 
         Args:
             novel_dir: 小说目录
 
         Returns:
-            元数据字典，如果文件不存在则返回None
+            元数据字典，如果文件不存在则返回 None
         """
         meta_file = novel_dir / "meta.json"
         if not meta_file.exists():
@@ -285,117 +602,37 @@ class NovelSyncService:
 
         return json.loads(meta_file.read_text(encoding="utf-8"))
 
-    def _load_chapters(self, novel_dir: Path) -> list[ChapterSyncData]:
-        """
-        从chapters目录加载章节数据.
-
-        Args:
-            novel_dir: 小说目录
-
-        Returns:
-            章节数据列表
-        """
-        chapters_dir = novel_dir / "chapters"
-        if not chapters_dir.exists():
-            return []
-
-        chapters = []
-        for chapter_file in sorted(chapters_dir.glob("*.json")):
-            try:
-                chapter_data = json.loads(chapter_file.read_text(encoding="utf-8"))
-                chapters.append(ChapterSyncData(**chapter_data))
-            except (json.JSONDecodeError, TypeError):
-                continue  # 跳过无效的章节文件
-
-        # 按章节序号排序
-        chapters.sort(key=lambda x: x.chapter_index)
-        return chapters
-
-    def _load_characters(self, novel_dir: Path) -> list[CharacterSyncData]:
-        """
-        从characters.json加载角色数据.
-
-        Args:
-            novel_dir: 小说目录
-
-        Returns:
-            角色数据列表
-        """
-        characters_file = novel_dir / "characters.json"
-        if not characters_file.exists():
-            return []
-
-        try:
-            characters_data = json.loads(characters_file.read_text(encoding="utf-8"))
-            return [CharacterSyncData(**char) for char in characters_data]
-        except (json.JSONDecodeError, TypeError):
-            return []
-
-    def _load_character_relations(
-        self, novel_dir: Path
-    ) -> list[CharacterRelationSyncData]:
-        """
-        从character_relations.json加载角色关系数据.
-
-        Args:
-            novel_dir: 小说目录
-
-        Returns:
-            角色关系数据列表
-        """
-        relations_file = novel_dir / "character_relations.json"
-        if not relations_file.exists():
-            return []
-
-        try:
-            relations_data = json.loads(relations_file.read_text(encoding="utf-8"))
-            return [CharacterRelationSyncData(**rel) for rel in relations_data]
-        except (json.JSONDecodeError, TypeError):
-            return []
-
-    def _load_outlines(self, novel_dir: Path) -> list[OutlineSyncData]:
-        """
-        从outline.json加载大纲数据.
-
-        Args:
-            novel_dir: 小说目录
-
-        Returns:
-            大纲数据列表
-        """
-        outlines_file = novel_dir / "outline.json"
-        if not outlines_file.exists():
-            return []
-
-        try:
-            outlines_data = json.loads(outlines_file.read_text(encoding="utf-8"))
-            return [OutlineSyncData(**outline) for outline in outlines_data]
-        except (json.JSONDecodeError, TypeError):
-            return []
-
     def load_novel(self, novel_url: str) -> NovelSyncData | None:
         """
         从文件系统加载小说数据.
 
         Args:
-            novel_url: 小说URL（用于定位存储目录）
+            novel_url: 小说 URL（用于定位存储目录）
 
         Returns:
-            完整的小说同步数据，如果不存在则返回None
+            完整的小说同步数据，如果不存在则返回 None
 
         Raises:
             NovelSyncServiceError: 加载失败
         """
         try:
             novel_dir = self._get_novel_dir(novel_url)
-            if not novel_dir.exists():
+            if not novel_dir or not novel_dir.exists():
                 return None
 
             meta_data = self._load_meta(novel_dir)
             if not meta_data:
                 return None
 
-            # 构建NovelSyncData
+            # 加载章节数据
+            chapters_info = meta_data.get("chapters_info", [])
+            chapters = self._load_chapters(novel_dir, chapters_info)
+
+            # 加载大纲数据
+            outlines_info = meta_data.get("outlines_info", [])
+            outlines = self._load_outlines(novel_dir, outlines_info)
+
+            # 构建 NovelSyncData
             novel_data = NovelSyncData(
                 novel_id=meta_data["novel_id"],
                 title=meta_data["title"],
@@ -410,10 +647,10 @@ class NovelSyncService:
                 is_favorite=meta_data.get("is_favorite", False),
                 created_at=meta_data.get("created_at"),
                 updated_at=meta_data.get("updated_at"),
-                chapters=self._load_chapters(novel_dir),
+                chapters=chapters,
                 characters=self._load_characters(novel_dir),
                 character_relations=self._load_character_relations(novel_dir),
-                outlines=self._load_outlines(novel_dir),
+                outlines=outlines,
             )
 
             return novel_data
@@ -482,7 +719,7 @@ class NovelSyncService:
         删除已同步的小说数据.
 
         Args:
-            novel_url: 小说URL
+            novel_url: 小说 URL
 
         Returns:
             是否成功删除
@@ -492,7 +729,7 @@ class NovelSyncService:
         """
         try:
             novel_dir = self._get_novel_dir(novel_url)
-            if not novel_dir.exists():
+            if not novel_dir or not novel_dir.exists():
                 return False
 
             shutil.rmtree(novel_dir)
@@ -509,13 +746,13 @@ class NovelSyncService:
         获取小说同步状态.
 
         Args:
-            novel_url: 小说URL
+            novel_url: 小说 URL
 
         Returns:
-            同步状态信息，如果不存在则返回None
+            同步状态信息，如果不存在则返回 None
         """
         novel_dir = self._get_novel_dir(novel_url)
-        if not novel_dir.exists():
+        if not novel_dir or not novel_dir.exists():
             return None
 
         meta_data = self._load_meta(novel_dir)
@@ -523,8 +760,8 @@ class NovelSyncService:
             return None
 
         # 统计章节数量
-        chapters_dir = novel_dir / "chapters"
-        chapter_count = len(list(chapters_dir.glob("*.json"))) if chapters_dir.exists() else 0
+        chapters_info = meta_data.get("chapters_info", [])
+        chapter_count = len(chapters_info)
 
         return {
             "novel_id": meta_data["novel_id"],
@@ -532,9 +769,9 @@ class NovelSyncService:
             "sync_version": meta_data.get("sync_version", 1),
             "synced_at": meta_data.get("synced_at"),
             "chapter_count": chapter_count,
-            "has_characters": (novel_dir / "characters.json").exists(),
+            "has_characters": (novel_dir / "characters").exists(),
             "has_character_relations": (novel_dir / "character_relations.json").exists(),
-            "has_outlines": (novel_dir / "outline.json").exists(),
+            "has_outlines": (novel_dir / "outlines").exists(),
         }
 
     def novel_exists(self, novel_url: str) -> bool:
@@ -542,13 +779,13 @@ class NovelSyncService:
         检查小说是否已同步.
 
         Args:
-            novel_url: 小说URL
+            novel_url: 小说 URL
 
         Returns:
             是否存在
         """
         novel_dir = self._get_novel_dir(novel_url)
-        return novel_dir.exists() and (novel_dir / "meta.json").exists()
+        return novel_dir is not None and novel_dir.exists() and (novel_dir / "meta.json").exists()
 
 
 # 创建单例实例

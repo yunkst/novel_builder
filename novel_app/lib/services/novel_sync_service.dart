@@ -398,6 +398,7 @@ class NovelSyncService {
         ..content = chapter.content ?? ''
         ..chapterIndex = chapter.chapterIndex ?? i
         ..isUserInserted = chapter.isUserInserted
+        ..url = chapter.url
         ..createdAt = DateTime.now().toIso8601String()
         ..updatedAt = DateTime.now().toIso8601String()));
     }
@@ -482,9 +483,12 @@ class NovelSyncService {
   NovelExportData _convertFromSyncData(NovelSyncData syncData) {
     // 转换章节数据
     final chapters = syncData.chapters?.map((chapter) {
+      // 使用原始URL，如果没有则降级为生成URL
+      final chapterUrl = chapter.url ??
+          '${syncData.sourceUrl}#chapter_${chapter.chapterIndex}';
       return ChapterExportData(
         title: chapter.title,
-        url: '${syncData.sourceUrl}#chapter_${chapter.chapterIndex}',
+        url: chapterUrl,
         content: chapter.content,
         chapterIndex: chapter.chapterIndex,
         isUserInserted: chapter.isUserInserted ?? false,

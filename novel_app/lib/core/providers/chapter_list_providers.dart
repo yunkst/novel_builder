@@ -196,10 +196,23 @@ class ChapterList extends _$ChapterList {
   }) async {
     final chapterLoader = ref.watch(chapterLoaderProvider);
 
-    // 对于本地创建的小说，不需要从后端获取
+    // 对于本地创建的小说，不需要从后端获取，直接从数据库加载
     if (novel.url.startsWith('custom://')) {
-      // 确保结束loading状态，避免无限加载
-      state = state.copyWith(isLoading: false);
+      try {
+        // 从数据库加载用户创建的章节
+        final chapters = await chapterLoader.loadChapters(novel.url);
+        state = state.copyWith(
+          chapters: chapters,
+          isLoading: false,
+        );
+        _updateTotalPages();
+      } catch (e) {
+        debugPrint('❌ 加载自定义小说章节失败: $e');
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: '加载章节失败: $e',
+        );
+      }
       return;
     }
 

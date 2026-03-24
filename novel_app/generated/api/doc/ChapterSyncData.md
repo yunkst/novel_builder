@@ -13,6 +13,7 @@ Name | Type | Description | Notes
 **content** | **String** | 章节内容 | 
 **chapterIndex** | **int** | 章节序号 | 
 **isUserInserted** | **bool** | 是否为用户插入章节 | [optional] [default to false]
+**url** | **String** |  | [optional] 
 **createdAt** | **String** |  | [optional] 
 **updatedAt** | **String** |  | [optional] 
 

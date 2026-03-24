@@ -29,6 +29,7 @@ export 'package:novel_api/src/model/image_with_model.dart';
 export 'package:novel_api/src/model/models_response.dart';
 export 'package:novel_api/src/model/novel.dart';
 export 'package:novel_api/src/model/novel_sync_data.dart';
+export 'package:novel_api/src/model/novel_sync_delete_response.dart';
 export 'package:novel_api/src/model/novel_sync_download_request.dart';
 export 'package:novel_api/src/model/novel_sync_download_response.dart';
 export 'package:novel_api/src/model/novel_sync_list_response.dart';

@@ -16,6 +16,7 @@ part 'chapter_sync_data.g.dart';
 /// * [content] - 章节内容
 /// * [chapterIndex] - 章节序号
 /// * [isUserInserted] - 是否为用户插入章节
+/// * [url] 
 /// * [createdAt] 
 /// * [updatedAt] 
 @BuiltValue()
@@ -39,6 +40,9 @@ abstract class ChapterSyncData implements Built<ChapterSyncData, ChapterSyncData
   /// 是否为用户插入章节
   @BuiltValueField(wireName: r'is_user_inserted')
   bool? get isUserInserted;
+
+  @BuiltValueField(wireName: r'url')
+  String? get url;
 
   @BuiltValueField(wireName: r'created_at')
   String? get createdAt;
@@ -95,6 +99,13 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
       yield serializers.serialize(
         object.isUserInserted,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.url != null) {
+      yield r'url';
+      yield serializers.serialize(
+        object.url,
+        specifiedType: const FullType.nullable(String),
       );
     }
     if (object.createdAt != null) {
@@ -168,6 +179,14 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
             specifiedType: const FullType(bool),
           ) as bool;
           result.isUserInserted = valueDes;
+          break;
+        case r'url':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.url = valueDes;
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(

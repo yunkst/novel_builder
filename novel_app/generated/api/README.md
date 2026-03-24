@@ -117,6 +117,7 @@ Class | Method | HTTP request | Description
  - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
  - [NovelSyncData](doc/NovelSyncData.md)
+ - [NovelSyncDeleteResponse](doc/NovelSyncDeleteResponse.md)
  - [NovelSyncDownloadRequest](doc/NovelSyncDownloadRequest.md)
  - [NovelSyncDownloadResponse](doc/NovelSyncDownloadResponse.md)
  - [NovelSyncListResponse](doc/NovelSyncListResponse.md)

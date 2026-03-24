@@ -37,6 +37,11 @@ void main() {
       // TODO
     });
 
+    // String url
+    test('to test the property `url`', () async {
+      // TODO
+    });
+
     // String createdAt
     test('to test the property `createdAt`', () async {
       // TODO

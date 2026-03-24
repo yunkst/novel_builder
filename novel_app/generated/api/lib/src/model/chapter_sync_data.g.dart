@@ -18,6 +18,8 @@ class _$ChapterSyncData extends ChapterSyncData {
   @override
   final bool? isUserInserted;
   @override
+  final String? url;
+  @override
   final String? createdAt;
   @override
   final String? updatedAt;
@@ -31,6 +33,7 @@ class _$ChapterSyncData extends ChapterSyncData {
       required this.content,
       required this.chapterIndex,
       this.isUserInserted,
+      this.url,
       this.createdAt,
       this.updatedAt})
       : super._();
@@ -50,6 +53,7 @@ class _$ChapterSyncData extends ChapterSyncData {
         content == other.content &&
         chapterIndex == other.chapterIndex &&
         isUserInserted == other.isUserInserted &&
+        url == other.url &&
         createdAt == other.createdAt &&
         updatedAt == other.updatedAt;
   }
@@ -62,6 +66,7 @@ class _$ChapterSyncData extends ChapterSyncData {
     _$hash = $jc(_$hash, content.hashCode);
     _$hash = $jc(_$hash, chapterIndex.hashCode);
     _$hash = $jc(_$hash, isUserInserted.hashCode);
+    _$hash = $jc(_$hash, url.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jf(_$hash);
@@ -76,6 +81,7 @@ class _$ChapterSyncData extends ChapterSyncData {
           ..add('content', content)
           ..add('chapterIndex', chapterIndex)
           ..add('isUserInserted', isUserInserted)
+          ..add('url', url)
           ..add('createdAt', createdAt)
           ..add('updatedAt', updatedAt))
         .toString();
@@ -107,6 +113,10 @@ class ChapterSyncDataBuilder
   set isUserInserted(bool? isUserInserted) =>
       _$this._isUserInserted = isUserInserted;
 
+  String? _url;
+  String? get url => _$this._url;
+  set url(String? url) => _$this._url = url;
+
   String? _createdAt;
   String? get createdAt => _$this._createdAt;
   set createdAt(String? createdAt) => _$this._createdAt = createdAt;
@@ -127,6 +137,7 @@ class ChapterSyncDataBuilder
       _content = $v.content;
       _chapterIndex = $v.chapterIndex;
       _isUserInserted = $v.isUserInserted;
+      _url = $v.url;
       _createdAt = $v.createdAt;
       _updatedAt = $v.updatedAt;
       _$v = null;
@@ -159,6 +170,7 @@ class ChapterSyncDataBuilder
           chapterIndex: BuiltValueNullFieldError.checkNotNull(
               chapterIndex, r'ChapterSyncData', 'chapterIndex'),
           isUserInserted: isUserInserted,
+          url: url,
           createdAt: createdAt,
           updatedAt: updatedAt,
         );

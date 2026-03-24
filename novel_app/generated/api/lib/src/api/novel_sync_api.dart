@@ -8,9 +8,9 @@ import 'package:built_value/json_object.dart';
 import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart';
 
-import 'package:built_value/json_object.dart';
 import 'package:novel_api/src/api_util.dart';
 import 'package:novel_api/src/model/http_validation_error.dart';
+import 'package:novel_api/src/model/novel_sync_delete_response.dart';
 import 'package:novel_api/src/model/novel_sync_download_request.dart';
 import 'package:novel_api/src/model/novel_sync_download_response.dart';
 import 'package:novel_api/src/model/novel_sync_list_response.dart';
@@ -38,9 +38,9 @@ class NovelSyncApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [JsonObject] as data
+  /// Returns a [Future] containing a [Response] with a [NovelSyncDeleteResponse] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<JsonObject>> deleteSyncedNovelApiNovelSyncDeleteDelete({ 
+  Future<Response<NovelSyncDeleteResponse>> deleteSyncedNovelApiNovelSyncDeleteDelete({ 
     required String novelUrl,
     String? X_API_TOKEN,
     CancelToken? cancelToken,
@@ -83,14 +83,14 @@ class NovelSyncApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    JsonObject? _responseData;
+    NovelSyncDeleteResponse? _responseData;
 
     try {
       final rawResponse = _response.data;
       _responseData = rawResponse == null ? null : _serializers.deserialize(
         rawResponse,
-        specifiedType: const FullType(JsonObject),
-      ) as JsonObject;
+        specifiedType: const FullType(NovelSyncDeleteResponse),
+      ) as NovelSyncDeleteResponse;
 
     } catch (error, stackTrace) {
       throw DioException(
@@ -102,7 +102,7 @@ class NovelSyncApi {
       );
     }
 
-    return Response<JsonObject>(
+    return Response<NovelSyncDeleteResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

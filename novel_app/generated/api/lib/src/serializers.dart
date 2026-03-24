@@ -29,6 +29,7 @@ import 'package:novel_api/src/model/image_with_model.dart';
 import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
 import 'package:novel_api/src/model/novel_sync_data.dart';
+import 'package:novel_api/src/model/novel_sync_delete_response.dart';
 import 'package:novel_api/src/model/novel_sync_download_request.dart';
 import 'package:novel_api/src/model/novel_sync_download_response.dart';
 import 'package:novel_api/src/model/novel_sync_list_response.dart';
@@ -71,6 +72,7 @@ part 'serializers.g.dart';
   ModelsResponse,
   Novel,
   NovelSyncData,
+  NovelSyncDeleteResponse,
   NovelSyncDownloadRequest,
   NovelSyncDownloadResponse,
   NovelSyncListResponse,

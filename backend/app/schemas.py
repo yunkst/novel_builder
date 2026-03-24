@@ -512,6 +512,7 @@ class ChapterSyncData(BaseModel):
     content: str = Field(..., description="章节内容")
     chapter_index: int = Field(..., description="章节序号")
     is_user_inserted: bool = Field(False, description="是否为用户插入章节")
+    url: str | None = Field(None, description="章节URL")
     created_at: str | None = Field(None, description="创建时间(ISO格式)")
     updated_at: str | None = Field(None, description="更新时间(ISO格式)")
 

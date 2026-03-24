@@ -16,7 +16,7 @@ Method | HTTP request | Description
 
 
 # **deleteSyncedNovelApiNovelSyncDeleteDelete**
-> JsonObject deleteSyncedNovelApiNovelSyncDeleteDelete(novelUrl, X_API_TOKEN)
+> NovelSyncDeleteResponse deleteSyncedNovelApiNovelSyncDeleteDelete(novelUrl, X_API_TOKEN)
 
 Delete Synced Novel
 
@@ -47,7 +47,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+[**NovelSyncDeleteResponse**](NovelSyncDeleteResponse.md)
 
 ### Authorization
 

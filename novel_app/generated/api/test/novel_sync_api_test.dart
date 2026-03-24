@@ -11,7 +11,7 @@ void main() {
     //
     // 删除已同步的小说数据.  从服务器删除指定小说的所有同步数据，包括章节、角色、关系和大纲。  **查询参数:** - **novel_url**: 小说URL（作为唯一标识）  **返回值:** - **success**: 是否成功 - **message**: 响应消息  **认证**: 需要X-API-TOKEN header  **注意:** 此操作不可逆，删除后数据无法恢复
     //
-    //Future<JsonObject> deleteSyncedNovelApiNovelSyncDeleteDelete(String novelUrl, { String X_API_TOKEN }) async
+    //Future<NovelSyncDeleteResponse> deleteSyncedNovelApiNovelSyncDeleteDelete(String novelUrl, { String X_API_TOKEN }) async
     test('test deleteSyncedNovelApiNovelSyncDeleteDelete', () async {
       // TODO
     });
