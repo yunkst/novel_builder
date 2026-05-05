@@ -173,6 +173,38 @@ class BaseCrawler(ABC):
         result = await self._session_manager.fetch(self.strategy, url, method="GET", **kwargs)
         return PageResponse(result)
 
+    async def get_page_stealth(
+        self, url: str, **kwargs
+    ) -> PageResponse:
+        """
+        使用 STEALTH 策略获取页面（浏览器渲染），适用于 JS 动态加载内容
+
+        Args:
+            url: 目标 URL
+            **kwargs: 其他请求参数（传递给 Scrapling）
+                - headers: 自定义请求头
+                - timeout: 超时时间
+                - custom_headers: 兼容旧代码的自定义请求头（会被转换为 headers）
+
+        Returns:
+            PageResponse: 包含 Scrapling Selector 的响应对象
+
+        使用示例：
+            >>> page = await crawler.get_page_stealth(url)
+            >>> title = page.css('h1::text').get()
+            >>> content = page.css('.j_chapterBox').css('p::text').getall()
+        """
+        # 处理 custom_headers 参数（兼容旧代码）
+        if "custom_headers" in kwargs:
+            custom_headers = kwargs.pop("custom_headers")
+            # 合并到 headers 中
+            headers = kwargs.get("headers", {})
+            headers.update(custom_headers)
+            kwargs["headers"] = headers
+
+        result = await self._session_manager.fetch("stealth", url, method="GET", **kwargs)
+        return PageResponse(result)
+
     async def post_form(
         self,
         url: str,

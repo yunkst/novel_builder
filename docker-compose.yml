@@ -10,6 +10,8 @@ services:
     volumes:
       # 添加这行，把本地 backend 目录挂载到容器中
       - ./backend:/app
+      # 小说同步目录映射
+      - D:/myspace/nov:/app/novel_sync
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}

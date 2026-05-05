@@ -138,25 +138,37 @@ void main() {
       expect(inputs['background_setting'], '');
     });
 
-    test('背景设定为 null 时 - 应该传递空字符串', () async {
-      // Arrange（准备）
+    test('背景设定为 null 时 - copyWith 的行为', () async {
+      // Note: Novel.copyWith 使用 backgroundSetting ?? this.backgroundSetting
+      // 传入 null 会保留原值，而不是设为 null
+      // 这是 copyWith 的标准语义：null 表示"不更新此字段"
       final novelWithNullBackground = testNovel.copyWith(
         backgroundSetting: null,
       );
+
+      // 因为 copyWith 的语义，backgroundSetting 应该保持原值
+      expect(novelWithNullBackground.backgroundSetting, testBackgroundSetting);
+
+      // 如果要测试真正的 null 行为，直接创建新的 Novel 对象
+      final novelWithExplicitNull = Novel(
+        title: testNovel.title,
+        author: testNovel.author,
+        url: testNovel.url,
+        backgroundSetting: null,
+      );
+
       const userInput = '请生成第三章内容';
 
-      // Act（执行）
       final inputs = await chapterService.buildChapterGenerationInputs(
-        novel: novelWithNullBackground,
+        novel: novelWithExplicitNull,
         chapters: testChapters,
         afterIndex: 1,
         userInput: userInput,
         characterIds: [],
       );
 
-      // Assert（断言）
-      expect(inputs, containsPair('background_setting', isNotNull));
-      expect(inputs['background_setting'], '');
+      // null 会被转换为空字符串
+      expect(inputs, containsPair('background_setting', ''));
     });
 
     test('背景设定应该使用 backgroundSetting 字段而非 description', () async {
@@ -291,7 +303,8 @@ void main() {
 
       // Assert（断言）
       expect(inputs['background_setting'], longBackgroundSetting);
-      expect(inputs['background_setting']!.length, 50000);
+      // '背景设定' 是 4 个字符，4 * 10000 = 40000
+      expect(inputs['background_setting']!.length, 40000);
     });
 
     test('afterIndex 为负数 - 应该正常工作', () async {

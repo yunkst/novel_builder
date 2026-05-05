@@ -116,10 +116,11 @@ class AliceSWCrawlerRefactored(BaseCrawler):
     async def get_chapter_content(
         self, chapter_url: str, novel_url: str = "", force_refresh: bool = False
     ) -> dict[str, Any]:
-        """获取章节内容"""
+        """获取章节内容 - 使用 STEALTH 策略（浏览器渲染）"""
         try:
-            # 获取章节页面
-            response = await self.get_page(chapter_url, timeout=15)
+            # 使用 STEALTH 策略获取页面（浏览器渲染，适用于 JS 动态加载内容）
+            # Scrapling 的 timeout 单位为毫秒，30000ms = 30秒
+            response = await self.get_page_stealth(chapter_url, timeout=30000)
 
             # 提取内容
             soup = response.soup()
@@ -127,8 +128,8 @@ class AliceSWCrawlerRefactored(BaseCrawler):
             # 获取标题
             title = self._extract_chapter_title(soup)
 
-            # 获取内容
-            content = self._extract_alice_sw_content(soup)
+            # 获取内容（使用专门的 Stealth 内容提取方法）
+            content = self._extract_chapter_content_stealth(soup)
 
             return {"title": title, "content": content}
 
@@ -507,18 +508,68 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         return any(re.search(pattern, text) for pattern in skip_patterns)
 
     def _extract_chapter_title(self, soup) -> str:
-        """提取章节标题"""
-        # 尝试多种标题选择器
+        """提取章节标题，清理冗余信息"""
+        # 优先查找包含章节特征的标题（如"第X章"）
+        for tag in ["h1", "h2", "h3", "h4"]:
+            for elem in soup.select(tag):
+                text = elem.get_text().strip()
+                if text and re.search(r"第\s*\d+\s*章|第\s*[一二三四五六七八九十百千万]+\s*章|序章|楔子|终章", text):
+                    raw_title = text
+                    cleaned_title = self._clean_chapter_title(raw_title)
+                    if len(cleaned_title) >= 2:
+                        return cleaned_title
+
+        # 回退：尝试多种标题选择器
         title_selectors = ["h1", "h2", ".chapter-title", ".title", "title"]
 
+        raw_title = "章节内容"
         for selector in title_selectors:
             title_elem = soup.select_one(selector)
             if title_elem:
                 title = title_elem.get_text().strip()
                 if title and len(title) > 1:
-                    return title
+                    raw_title = title
+                    break
 
-        return "章节内容"
+        return self._clean_chapter_title(raw_title)
+
+    def _clean_chapter_title(self, raw_title: str) -> str:
+        """清理章节标题中的网站名和冗余信息"""
+        cleaned_title = raw_title
+
+        # 1. 移除网站名后缀（如 "-爱丽丝书屋 (ALICESW.COM)" 或 "-网站名"）
+        # 使用更宽松的匹配：查找 - 或 _ 后跟网站名的部分
+        site_suffix_patterns = [
+            r"[-_]\s*爱丽丝书屋.*$",
+            r"[-_]\s*ALICESW.*$",
+            r"[-_]\s*alice.*$",
+        ]
+        for pattern in site_suffix_patterns:
+            cleaned_title = re.sub(pattern, "", cleaned_title, flags=re.IGNORECASE)
+
+        # 2. 移除末尾的括号内容（如 "(ALICESW.COM)"）
+        cleaned_title = re.sub(r"\s*\([^)]*\)\s*$", "", cleaned_title)
+
+        # 3. 移除末尾的网站名后缀（如 "- xxx小说网"）
+        cleaned_title = re.sub(r"\s*[-_]\s*[^-_]+$", "", cleaned_title)
+
+        # 4. 如果标题格式为 "小说名_章节名"，只保留章节名
+        if "_" in cleaned_title:
+            parts = cleaned_title.split("_")
+            if len(parts) >= 2:
+                # 取最后一部分，但确保不是空的
+                last_part = parts[-1].strip()
+                if last_part:
+                    cleaned_title = last_part
+
+        # 5. 移除多余的空格
+        cleaned_title = re.sub(r"\s+", " ", cleaned_title).strip()
+
+        # 6. 如果清理后标题太短，返回原始标题
+        if len(cleaned_title) < 2:
+            return raw_title
+
+        return cleaned_title
 
     def _extract_alice_sw_content(self, soup) -> str:
         """提取AliceSW章节内容"""
@@ -541,7 +592,7 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         # 如果没找到指定容器，尝试通用方法
         if not content_elem:
             content = self.extract_content(soup)
-            return content
+            return self._clean_content_text(content)
 
         # 移除无关元素
         for elem in content_elem.find_all(["script", "style", "ins", "iframe", "div"], class_=re.compile(r"ad")):
@@ -551,7 +602,82 @@ class AliceSWCrawlerRefactored(BaseCrawler):
         content = self._extract_content_with_paragraphs(content_elem)
 
         # 清理内容
-        content = self.clean_text_with_paragraphs(content)
+        content = self._clean_content_text(content)
+
+        return content
+
+    def _extract_chapter_content_stealth(self, soup) -> str:
+        """提取 AliceSW 章节内容（Stealth 模式专用）
+
+        Stealth 模式使用浏览器渲染，JS 已执行完毕，内容已解密加载到 DOM 中。
+        优先使用 .j_chapterBox 选择器提取已渲染的章节内容。
+        """
+        # 浏览器渲染后，JS 已执行，内容已加载到 .j_chapterBox 中
+        content_selectors = [
+            ".j_chapterBox",  # AliceSW JS 解密后的内容容器
+            "#content",
+            ".content",
+            ".chapter-content",
+        ]
+
+        content_elem = None
+        for selector in content_selectors:
+            content_elem = soup.select_one(selector)
+            if content_elem:
+                text = content_elem.get_text().strip()
+                # 确保找到的元素确实包含实质内容，而非占位符
+                if text and len(text) > 50 and "加载中" not in text:
+                    break
+                content_elem = None
+
+        if not content_elem:
+            # 回退到通用提取方法
+            content = self._extract_alice_sw_content(soup)
+            return self._clean_content_text(content)
+
+        # 移除无关元素
+        for elem in content_elem.find_all(["script", "style", "ins", "iframe", "div"], class_=re.compile(r"ad")):
+            elem.decompose()
+
+        # 提取内容
+        content = self._extract_content_with_paragraphs(content_elem)
+        content = self._clean_content_text(content)
+
+        return content
+
+    def _clean_content_text(self, content: str) -> str:
+        """清理内容文本，移除HTML标签和多余空格"""
+        if not content:
+            return ""
+
+        # 1. 移除HTML标签（如果有的话）
+        content = re.sub(r"<[^>]+>", "", content)
+
+        # 2. 移除全角空格（　）- 段落开头的缩进
+        content = re.sub(r"^[\u3000\s]+", "", content, flags=re.MULTILINE)
+
+        # 3. 移除多余的空行（超过2个连续换行符）
+        content = re.sub(r"\n{3,}", "\n\n", content)
+
+        # 4. 移除每行开头和结尾的多余空格
+        lines = content.split("\n")
+        cleaned_lines = [line.strip() for line in lines]
+
+        # 5. 移除段落内部的连续空格
+        cleaned_paragraphs = []
+        for line in cleaned_lines:
+            # 移除连续空格，但保留单个空格
+            cleaned_line = re.sub(r"[ \t]+", " ", line)
+            # 移除全角空格
+            cleaned_line = re.sub(r"\u3000+", "", cleaned_line)
+            if cleaned_line.strip():
+                cleaned_paragraphs.append(cleaned_line.strip())
+
+        # 6. 重新组合，保持双换行符作为段落分隔
+        content = "\n\n".join(cleaned_paragraphs)
+
+        # 7. 最终清理：移除首尾空白
+        content = content.strip()
 
         return content
 

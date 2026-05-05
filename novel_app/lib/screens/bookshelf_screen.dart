@@ -13,7 +13,6 @@ import '../core/providers/bookshelf_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../dialogs/novel_edit_dialog.dart';
-import 'dart:async';
 
 class BookshelfScreen extends ConsumerStatefulWidget {
   const BookshelfScreen({super.key});
@@ -23,37 +22,6 @@ class BookshelfScreen extends ConsumerStatefulWidget {
 }
 
 class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
-  // 预加载监听
-  StreamSubscription? _preloadSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // 监听预加载进度
-    final preloadService = ref.read(preloadServiceProvider);
-    _preloadSubscription = preloadService.progressStream.listen((update) {
-      if (mounted) {
-        // 进度会通过 preloadProgressMapProvider 自动更新
-        // 这里只需要确保监听器处于活动状态
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _preloadSubscription?.cancel();
-    super.dispose();
-  }
-
-  /// 判断小说是否正在预加载
-  bool _isPreloading(String novelUrl) {
-    final preloadService = ref.read(preloadServiceProvider);
-    final stats = preloadService.getStatistics();
-    return stats['is_processing'] == true &&
-        stats['last_active_novel'] == novelUrl;
-  }
-
   /// 书架切换回调
   void _onBookshelfChanged(int bookshelfId) {
     ref.read(currentBookshelfIdProvider.notifier).setBookshelfId(bookshelfId);
@@ -457,7 +425,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   Widget build(BuildContext context) {
     final currentBookshelfId = ref.watch(currentBookshelfIdProvider);
     final bookshelfAsync = ref.watch(bookshelfNovelsProvider);
-    final progress = ref.watch(preloadProgressMapProvider);
+    final cacheStats = ref.watch(bookshelfCacheStatsProvider).valueOrNull;
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的书架'),
@@ -532,21 +500,16 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(bookshelfNovelsProvider);
-                    await Future.delayed(const Duration(milliseconds: 100));
+                    ref.invalidate(bookshelfCacheStatsProvider);
                   },
                   child: ListView.builder(
                     itemCount: bookshelf.length,
                     itemBuilder: (context, index) {
                       final novel = bookshelf[index];
-                      final stats = progress[novel.url];
-                      // 注意：不再批量统计缓存状态，避免性能问题
-                      // 进度条UI将依赖预加载服务的实时更新（如果有）
-                      final cached =
-                          stats != null ? (stats['cachedChapters'] ?? 0) : 0;
-                      final total =
-                          stats != null ? (stats['totalChapters'] ?? 0) : 0;
-                      final double percent =
-                          (total > 0) ? (cached / total).clamp(0.0, 1.0) : 0.0;
+                      final stats = cacheStats?[novel.url];
+                      final cached = stats?.cached ?? 0;
+                      final total = stats?.total ?? 0;
+                      final double percent = stats?.percent ?? 0.0;
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -557,21 +520,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                               horizontal: 16, vertical: 8),
                           title: Row(
                             children: [
-                              if (_isPreloading(novel.url))
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .primary),
-                                    ),
-                                  ),
-                                ),
                               Expanded(
                                 child: Text(
                                   novel.title,

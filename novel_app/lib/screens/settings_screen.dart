@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
+import 'preload_queue_debug_screen.dart';
 import '../services/app_update_service.dart';
 import '../services/logger_service.dart';
 import '../widgets/app_update_dialog.dart';
@@ -219,6 +220,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LogViewerScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+
+          // 预加载队列入口
+          ListTile(
+            leading: const Icon(Icons.downloading),
+            title: const Text('预加载队列'),
+            subtitle: const Text('查看和管理预加载任务'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PreloadQueueDebugScreen(),
                 ),
               );
             },

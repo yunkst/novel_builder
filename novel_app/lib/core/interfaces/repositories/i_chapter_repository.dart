@@ -159,11 +159,17 @@ abstract class IChapterRepository {
   /// [chapterUrl] 章节的URL
   Future<void> markChapterAsRead(String novelUrl, String chapterUrl);
 
-  /// 获取已缓存的章节数量
+  /// 获取已缓存的章节数量（实际有内容的章节）
   ///
   /// [novelUrl] 小说的URL
-  /// 返回已缓存的章节数量
+  /// 返回 chapter_cache 表中已缓存的章节数量
   Future<int> getCachedChaptersCount(String novelUrl);
+
+  /// 获取小说的总章节数
+  ///
+  /// [novelUrl] 小说的URL
+  /// 返回 novel_chapters 表中的章节总数
+  Future<int> getTotalChaptersCount(String novelUrl);
 
   // ========== 章节排序 ==========
 

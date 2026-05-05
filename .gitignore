@@ -218,6 +218,9 @@ build/
 # Project specific
 ch1.txt
 
+# 小说同步数据（用户上传的小说文件）
+backend/novel_sync/
+
 # Logs (already defined above, keeping for reference)
 logs/
 dev-debug.log

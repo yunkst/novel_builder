@@ -27,15 +27,12 @@ class PreloadService {
   final Deque<PreloadTask> _queue = Deque<PreloadTask>();
   final Set<String> _enqueuedUrls = {}; // 去重：已加入队列的URL
 
-  // 进度通知
+  // 进度通知（供章节列表页面实时更新缓存状态）
   final StreamController<PreloadProgressUpdate> _progressController =
       StreamController<PreloadProgressUpdate>.broadcast();
 
   Stream<PreloadProgressUpdate> get progressStream =>
       _progressController.stream;
-
-  // 缓存计数缓存（避免频繁查询数据库）
-  final Map<String, int> _cachedCountCache = {};
 
   // 小说状态跟踪
   final Map<String, int> _novelCurrentIndex = {}; // novelUrl -> 当前阅读章节索引
@@ -122,8 +119,7 @@ class PreloadService {
     int addedCount = 0;
     for (final task in tasks) {
       if (!_enqueuedUrls.contains(task.chapterUrl)) {
-        // 智能插队：当前活跃的小说插入队列开头
-        _queue.addFirst(task);
+        _queue.addLast(task);
         _enqueuedUrls.add(task.chapterUrl);
         addedCount++;
       }
@@ -209,26 +205,6 @@ class PreloadService {
 
     final startTime = DateTime.now();
 
-    // 发送开始通知（不包含具体章节URL）
-    if (_lastActiveNovel != null) {
-      try {
-        final cachedCount = await _getCachedChapterCount(_lastActiveNovel!);
-        _progressController.add(PreloadProgressUpdate(
-          novelUrl: _lastActiveNovel!,
-          chapterUrl: null, // 队列开始时没有具体章节
-          isPreloading: true,
-          cachedChapters: cachedCount,
-          totalChapters: _queue.length + cachedCount,
-        ));
-      } catch (e) {
-        LoggerService.instance.w(
-          '发送开始通知失败: $e',
-          category: LogCategory.cache,
-          tags: ['preload', 'notify'],
-        );
-      }
-    }
-
     try {
       while (_queue.isNotEmpty && !_shouldStop) {
         // 速率限制:等待30秒
@@ -265,8 +241,14 @@ class PreloadService {
             );
           }
 
-          // 发送进度更新（包含具体章节URL）
-          await _notifyProgressUpdate(task.novelUrl, task.chapterUrl);
+          // 通知章节缓存完成（供章节列表页面更新UI）
+          _progressController.add(PreloadProgressUpdate(
+            novelUrl: task.novelUrl,
+            chapterUrl: task.chapterUrl,
+            isPreloading: _processingCompleter != null,
+            cachedChapters: 0,
+            totalChapters: 0,
+          ));
         } catch (e) {
           _totalFailed++;
           // 失败不中断，继续下一个
@@ -279,17 +261,6 @@ class PreloadService {
         category: LogCategory.cache,
         tags: ['preload', 'complete'],
       );
-
-      // 发送完成通知
-      if (_lastActiveNovel != null) {
-        final cachedCount = await _getCachedChapterCount(_lastActiveNovel!);
-        _progressController.add(PreloadProgressUpdate(
-          novelUrl: _lastActiveNovel!,
-          isPreloading: false,
-          cachedChapters: cachedCount,
-          totalChapters: cachedCount,
-        ));
-      }
 
       completer.complete(); // ✅ 标记完成
     } catch (e) {
@@ -373,43 +344,6 @@ class PreloadService {
 
   /// 是否正在处理队列
   bool get isProcessing => _processingCompleter != null;
-
-  /// 通知进度更新
-  Future<void> _notifyProgressUpdate(String novelUrl, String chapterUrl) async {
-    try {
-      // 从缓存获取计数（避免频繁查询）
-      final cachedCount = await _getCachedChapterCount(novelUrl);
-      _cachedCountCache[novelUrl] = cachedCount;
-
-      // 发送进度更新（包含具体章节URL）
-      _progressController.add(PreloadProgressUpdate(
-        novelUrl: novelUrl,
-        chapterUrl: chapterUrl, // ← 新增：具体章节URL
-        isPreloading: _processingCompleter != null,
-        cachedChapters: cachedCount,
-        totalChapters: _queue.length + cachedCount, // 估算总数
-      ));
-    } catch (e) {
-      LoggerService.instance.w(
-        '发送进度更新失败: $e',
-        category: LogCategory.cache,
-        tags: ['preload', 'notify', 'error'],
-      );
-    }
-  }
-
-  /// 获取已缓存章节数（带缓存）
-  Future<int> _getCachedChapterCount(String novelUrl) async {
-    // 优先使用缓存
-    if (_cachedCountCache.containsKey(novelUrl)) {
-      return _cachedCountCache[novelUrl]!;
-    }
-
-    // 查询数据库
-    final count = await _chapterRepository.getCachedChaptersCount(novelUrl);
-    _cachedCountCache[novelUrl] = count;
-    return count;
-  }
 
   /// 释放资源
   void dispose() {

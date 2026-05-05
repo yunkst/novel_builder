@@ -27,29 +27,30 @@ final bookshelfNovelsProvider = AutoDisposeFutureProvider<List<Novel>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BookshelfNovelsRef = AutoDisposeFutureProviderRef<List<Novel>>;
-String _$preloadProgressHash() => r'6ae0c777069b4bb2a5b3b4c9bb70f9e1667adf1d';
+String _$bookshelfCacheStatsHash() =>
+    r'1cea465bf551de9d4de4e2863c2e85556ce25400';
 
-/// 预加载进度流
+/// 书架小说列表缓存统计
 ///
-/// 监听预加载服务的进度更新
+/// 刷新时从数据库查询已缓存章节数和总章节数
 ///
-/// Copied from [preloadProgress].
-@ProviderFor(preloadProgress)
-final preloadProgressProvider =
-    AutoDisposeStreamProvider<Map<String, Map<String, int>>>.internal(
-  preloadProgress,
-  name: r'preloadProgressProvider',
+/// Copied from [bookshelfCacheStats].
+@ProviderFor(bookshelfCacheStats)
+final bookshelfCacheStatsProvider =
+    AutoDisposeFutureProvider<Map<String, CacheStats>>.internal(
+  bookshelfCacheStats,
+  name: r'bookshelfCacheStatsProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$preloadProgressHash,
+      : _$bookshelfCacheStatsHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef PreloadProgressRef
-    = AutoDisposeStreamProviderRef<Map<String, Map<String, int>>>;
+typedef BookshelfCacheStatsRef
+    = AutoDisposeFutureProviderRef<Map<String, CacheStats>>;
 String _$currentBookshelfIdHash() =>
     r'69e605f13545e51eef895abca5dcce883765886f';
 
@@ -72,28 +73,5 @@ final currentBookshelfIdProvider =
 );
 
 typedef _$CurrentBookshelfId = AutoDisposeNotifier<int>;
-String _$preloadProgressMapHash() =>
-    r'372034ccd7fbc68485a7266bc56360e643315c20';
-
-/// 合并的预加载进度
-///
-/// 将所有进度更新合并到一个 Map 中
-/// 使用 StateProvider 在 UI 中方便地访问
-///
-/// Copied from [PreloadProgressMap].
-@ProviderFor(PreloadProgressMap)
-final preloadProgressMapProvider = AutoDisposeNotifierProvider<
-    PreloadProgressMap, Map<String, Map<String, int>>>.internal(
-  PreloadProgressMap.new,
-  name: r'preloadProgressMapProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$preloadProgressMapHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$PreloadProgressMap
-    = AutoDisposeNotifier<Map<String, Map<String, int>>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

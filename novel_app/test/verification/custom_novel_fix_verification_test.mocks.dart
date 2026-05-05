@@ -880,6 +880,16 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i7.Future<int>);
 
   @override
+  _i7.Future<int> getTotalChaptersCount(String? novelUrl) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getTotalChaptersCount,
+          [novelUrl],
+        ),
+        returnValue: _i7.Future<int>.value(0),
+      ) as _i7.Future<int>);
+
+  @override
   _i7.Future<void> updateChaptersOrder(
     String? novelUrl,
     List<_i8.Chapter>? chapters,

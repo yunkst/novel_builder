@@ -113,6 +113,22 @@ class NovelSyncService:
 
         return None
 
+    def _find_novel_dir_by_name(self, name: str) -> Path | None:
+        """
+        通过目录名查找小说目录.
+
+        Args:
+            name: 小说目录名（即小说标题）
+
+        Returns:
+            小说目录路径，如果未找到则返回 None
+        """
+        safe_name = self._sanitize_filename(name)
+        novel_dir = self.sync_dir / safe_name
+        if novel_dir.exists() and novel_dir.is_dir():
+            return novel_dir
+        return None
+
     def _find_or_create_novel_dir(self, title: str, source_url: str | None) -> Path:
         """
         查找或创建小说目录.
@@ -164,13 +180,22 @@ class NovelSyncService:
         """
         获取小说存储目录路径（仅查找，不创建）.
 
+        优先通过 meta.json 中的 source_url 查找，
+        如果找不到则尝试通过目录名（即小说标题）查找。
+
         Args:
-            source_url: 小说来源 URL
+            source_url: 小说来源 URL 或小说标题
 
         Returns:
             小说存储目录路径，如果不存在则返回 None
         """
-        return self._find_novel_dir_by_url(source_url)
+        # 首先尝试通过 URL 查找
+        novel_dir = self._find_novel_dir_by_url(source_url)
+        if novel_dir:
+            return novel_dir
+
+        # 如果通过 URL 找不到，尝试通过目录名查找
+        return self._find_novel_dir_by_name(source_url)
 
     def _save_meta(
         self,
@@ -272,13 +297,58 @@ class NovelSyncService:
 
         return chapters_info
 
-    def _load_chapters(self, novel_dir: Path, chapters_info: list[dict[str, Any]]) -> list[ChapterSyncData]:
+    def _parse_chapter_filename(self, filename: str) -> tuple[int, str] | None:
+        """
+        解析章节文件名.
+
+        格式: {chapter_index:03d}_{title}.txt
+        示例: 001_第一章.txt → (1, "第一章")
+
+        Args:
+            filename: 章节文件名
+
+        Returns:
+            (chapter_index, title) 元组，解析失败返回 None
+        """
+        if not filename.endswith(".txt"):
+            return None
+
+        name_without_ext = filename[:-4]  # 移除 .txt
+        parts = name_without_ext.split("_", 1)
+
+        if len(parts) != 2:
+            return None
+
+        try:
+            chapter_index = int(parts[0])
+            title = parts[1]
+            return chapter_index, title
+        except ValueError:
+            return None
+
+    def _get_file_created_time(self, file_path: Path) -> str:
+        """
+        获取文件创建时间的 ISO 格式字符串.
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            ISO 格式的时间字符串
+        """
+        stat = file_path.stat()
+        return datetime.fromtimestamp(stat.st_ctime).isoformat()
+
+    def _load_chapters(self, novel_dir: Path, chapters_info: list[dict[str, Any]] | None = None) -> list[ChapterSyncData]:
         """
         从 chapters 目录加载章节数据.
 
+        优先扫描目录文件，再合并 meta.json 中的元数据。
+        支持直接插入章节文件，无需修改 meta.json。
+
         Args:
             novel_dir: 小说目录
-            chapters_info: 从 meta.json 读取的章节元数据
+            chapters_info: 从 meta.json 读取的章节元数据（可选）
 
         Returns:
             章节数据列表
@@ -287,32 +357,52 @@ class NovelSyncService:
         if not chapters_dir.exists():
             return []
 
-        chapters = []
+        chapters_info = chapters_info or []
+
+        # 构建 chapter_index -> meta_info 的映射
+        meta_map: dict[int, dict[str, Any]] = {}
         for info in chapters_info:
-            filename = info.get("filename")
-            if not filename:
+            chapter_index = info.get("chapter_index")
+            if chapter_index is not None:
+                meta_map[chapter_index] = info
+
+        chapters = []
+
+        # 扫描目录下的所有 .txt 文件
+        for chapter_file in chapters_dir.glob("*.txt"):
+            filename = chapter_file.name
+
+            # 从文件名解析 chapter_index 和 title
+            parsed = self._parse_chapter_filename(filename)
+            if not parsed:
+                logger.warning("无法解析章节文件名: %s", filename)
                 continue
 
-            chapter_file = chapters_dir / filename
-            if not chapter_file.exists():
-                continue
+            chapter_index, title = parsed
 
+            # 读取内容
             try:
                 content = chapter_file.read_text(encoding="utf-8")
-                chapters.append(ChapterSyncData(
-                    chapter_id=info["chapter_id"],
-                    title=info["title"],
-                    content=content,
-                    chapter_index=info["chapter_index"],
-                    is_user_inserted=info.get("is_user_inserted", False),
-                    url=info.get("url"),
-                    created_at=info.get("created_at"),
-                    updated_at=info.get("updated_at"),
-                ))
             except (OSError, IOError) as e:
                 logger.warning("读取章节文件失败: %s, 错误: %s", chapter_file, e)
-            except KeyError as e:
-                logger.warning("章节元数据缺少必要字段: %s, 缺少字段: %s", info.get("filename", "未知"), e)
+                continue
+
+            # 从 meta.json 合并元数据（如果存在）
+            meta = meta_map.get(chapter_index, {})
+
+            # 构建章节数据
+            # 新文件（不在 meta.json 中）默认为用户插入
+            is_new_file = chapter_index not in meta_map
+            chapters.append(ChapterSyncData(
+                chapter_id=meta.get("chapter_id", chapter_index),
+                title=title,
+                content=content,
+                chapter_index=chapter_index,
+                is_user_inserted=meta.get("is_user_inserted", is_new_file),
+                url=meta.get("url"),
+                created_at=meta.get("created_at") or self._get_file_created_time(chapter_file),
+                updated_at=meta.get("updated_at"),
+            ))
 
         # 按章节序号排序
         chapters.sort(key=lambda x: x.chapter_index)
@@ -465,13 +555,16 @@ class NovelSyncService:
 
         return outlines_info
 
-    def _load_outlines(self, novel_dir: Path, outlines_info: list[dict[str, Any]]) -> list[OutlineSyncData]:
+    def _load_outlines(self, novel_dir: Path, outlines_info: list[dict[str, Any]] | None = None) -> list[OutlineSyncData]:
         """
         从 outlines 目录加载大纲数据.
 
+        优先扫描目录文件，再合并 meta.json 中的元数据。
+        支持无 meta.json 的情况下加载大纲。
+
         Args:
             novel_dir: 小说目录
-            outlines_info: 从 meta.json 读取的大纲元数据
+            outlines_info: 从 meta.json 读取的大纲元数据（可选）
 
         Returns:
             大纲数据列表
@@ -480,32 +573,47 @@ class NovelSyncService:
         if not outlines_dir.exists():
             return []
 
-        outlines = []
+        outlines_info = outlines_info or []
+
+        # 构建 title -> meta_info 的映射
+        meta_map: dict[str, dict[str, Any]] = {}
         for info in outlines_info:
-            filename = info.get("filename")
-            if not filename:
+            title = info.get("title")
+            if title:
+                meta_map[title] = info
+
+        outlines = []
+
+        # 扫描目录下的所有 .txt 文件
+        for outline_file in outlines_dir.glob("*.txt"):
+            filename = outline_file.name
+            # 大纲文件名格式: {title}.txt
+            title = filename[:-4] if filename.endswith(".txt") else filename  # 移除 .txt
+
+            if not title:
                 continue
 
-            outline_file = outlines_dir / filename
-            if not outline_file.exists():
-                continue
-
+            # 读取内容
             try:
                 content = outline_file.read_text(encoding="utf-8")
-                outlines.append(OutlineSyncData(
-                    outline_id=info["outline_id"],
-                    title=info["title"],
-                    content=content,
-                    outline_type=info["outline_type"],
-                    parent_id=info.get("parent_id"),
-                    sort_order=info.get("sort_order", 0),
-                    created_at=info.get("created_at"),
-                    updated_at=info.get("updated_at"),
-                ))
             except (OSError, IOError) as e:
                 logger.warning("读取大纲文件失败: %s, 错误: %s", outline_file, e)
-            except KeyError as e:
-                logger.warning("大纲元数据缺少必要字段: %s, 缺少字段: %s", info.get("filename", "未知"), e)
+                continue
+
+            # 从 meta.json 合并元数据（如果存在）
+            meta = meta_map.get(title, {})
+
+            # 构建大纲数据
+            outlines.append(OutlineSyncData(
+                outline_id=meta.get("outline_id", hash(title) % 1000000),
+                title=title,
+                content=content,
+                outline_type=meta.get("outline_type", "main"),
+                parent_id=meta.get("parent_id"),
+                sort_order=meta.get("sort_order", 0),
+                created_at=meta.get("created_at"),
+                updated_at=meta.get("updated_at"),
+            ))
 
         # 按 sort_order 排序
         outlines.sort(key=lambda x: x.sort_order)
@@ -606,8 +714,12 @@ class NovelSyncService:
         """
         从文件系统加载小说数据.
 
+        支持：
+        1. 通过 meta.json 加载完整信息
+        2. 无 meta.json 时，从目录名推断标题并加载章节
+
         Args:
-            novel_url: 小说 URL（用于定位存储目录）
+            novel_url: 小说 URL 或小说标题（用于定位存储目录）
 
         Returns:
             完整的小说同步数据，如果不存在则返回 None
@@ -621,9 +733,38 @@ class NovelSyncService:
                 return None
 
             meta_data = self._load_meta(novel_dir)
-            if not meta_data:
-                return None
 
+            # 如果没有 meta.json，检查是否有章节目录
+            if not meta_data:
+                chapters_dir = novel_dir / "chapters"
+                if not chapters_dir.exists() or not list(chapters_dir.glob("*.txt")):
+                    return None
+
+                # 从目录名推断标题，使用默认值构建基本数据
+                title = novel_dir.name
+                chapters = self._load_chapters(novel_dir)
+
+                return NovelSyncData(
+                    novel_id=hash(title) % 1000000,  # 生成一个基于标题的 ID
+                    title=title,
+                    author=None,
+                    description=None,
+                    cover_url=None,
+                    source_url=None,
+                    total_chapters=len(chapters),
+                    total_words=sum(len(c.content) for c in chapters),
+                    last_read_chapter_id=None,
+                    last_read_position=0,
+                    is_favorite=False,
+                    created_at=None,
+                    updated_at=None,
+                    chapters=chapters,
+                    characters=self._load_characters(novel_dir),
+                    character_relations=self._load_character_relations(novel_dir),
+                    outlines=self._load_outlines(novel_dir),
+                )
+
+            # 有 meta.json，正常加载
             # 加载章节数据
             chapters_info = meta_data.get("chapters_info", [])
             chapters = self._load_chapters(novel_dir, chapters_info)
@@ -667,6 +808,10 @@ class NovelSyncService:
         """
         列出已同步的小说列表.
 
+        支持：
+        1. 有 meta.json 的小说：返回完整元数据
+        2. 无 meta.json 但有章节目录的小说：从目录名推断标题
+
         Args:
             page: 页码（从1开始）
             page_size: 每页数量
@@ -687,7 +832,7 @@ class NovelSyncService:
 
             meta_data = self._load_meta(novel_dir)
             if meta_data:
-                # 只返回基本信息，不包含章节内容
+                # 有 meta.json，返回完整元数据
                 novels.append({
                     "novel_id": meta_data["novel_id"],
                     "title": meta_data["title"],
@@ -696,9 +841,27 @@ class NovelSyncService:
                     "total_chapters": meta_data.get("total_chapters", 0),
                     "sync_version": meta_data.get("sync_version", 1),
                     "synced_at": meta_data.get("synced_at"),
+                    "has_meta": True,
                 })
+            else:
+                # 无 meta.json，检查是否有章节目录
+                chapters_dir = novel_dir / "chapters"
+                if chapters_dir.exists():
+                    chapter_files = list(chapters_dir.glob("*.txt"))
+                    if chapter_files:
+                        # 从目录名推断标题
+                        novels.append({
+                            "novel_id": hash(novel_dir.name) % 1000000,
+                            "title": novel_dir.name,
+                            "author": None,
+                            "source_url": None,
+                            "total_chapters": len(chapter_files),
+                            "sync_version": 0,
+                            "synced_at": None,
+                            "has_meta": False,
+                        })
 
-        # 按同步时间倒序排列
+        # 按同步时间倒序排列（无同步时间的排最后）
         novels.sort(key=lambda x: x.get("synced_at") or "", reverse=True)
 
         # 分页
@@ -745,8 +908,12 @@ class NovelSyncService:
         """
         获取小说同步状态.
 
+        支持：
+        1. 有 meta.json 的小说：返回完整状态
+        2. 无 meta.json 但有章节目录的小说：返回基本状态
+
         Args:
-            novel_url: 小说 URL
+            novel_url: 小说 URL 或小说标题
 
         Returns:
             同步状态信息，如果不存在则返回 None
@@ -756,9 +923,30 @@ class NovelSyncService:
             return None
 
         meta_data = self._load_meta(novel_dir)
-        if not meta_data:
-            return None
 
+        # 无 meta.json，从章节目录推断
+        if not meta_data:
+            chapters_dir = novel_dir / "chapters"
+            if not chapters_dir.exists():
+                return None
+
+            chapter_files = list(chapters_dir.glob("*.txt"))
+            if not chapter_files:
+                return None
+
+            return {
+                "novel_id": hash(novel_dir.name) % 1000000,
+                "title": novel_dir.name,
+                "sync_version": 0,
+                "synced_at": None,
+                "chapter_count": len(chapter_files),
+                "has_characters": (novel_dir / "characters").exists(),
+                "has_character_relations": (novel_dir / "character_relations.json").exists(),
+                "has_outlines": (novel_dir / "outlines").exists(),
+                "has_meta": False,
+            }
+
+        # 有 meta.json，正常返回
         # 统计章节数量
         chapters_info = meta_data.get("chapters_info", [])
         chapter_count = len(chapters_info)
@@ -772,20 +960,33 @@ class NovelSyncService:
             "has_characters": (novel_dir / "characters").exists(),
             "has_character_relations": (novel_dir / "character_relations.json").exists(),
             "has_outlines": (novel_dir / "outlines").exists(),
+            "has_meta": True,
         }
 
     def novel_exists(self, novel_url: str) -> bool:
         """
         检查小说是否已同步.
 
+        支持：
+        1. 有 meta.json 的小说
+        2. 无 meta.json 但有章节目录的小说
+
         Args:
-            novel_url: 小说 URL
+            novel_url: 小说 URL 或小说标题
 
         Returns:
             是否存在
         """
         novel_dir = self._get_novel_dir(novel_url)
-        return novel_dir is not None and novel_dir.exists() and (novel_dir / "meta.json").exists()
+        if novel_dir is None or not novel_dir.exists():
+            return False
+
+        # 有 meta.json 或有章节目录都算存在
+        if (novel_dir / "meta.json").exists():
+            return True
+
+        chapters_dir = novel_dir / "chapters"
+        return chapters_dir.exists() and bool(list(chapters_dir.glob("*.txt")))
 
 
 # 创建单例实例

@@ -85,45 +85,31 @@ Future<List<Novel>> bookshelfNovels(Ref ref) async {
   return novels;
 }
 
-/// 预加载进度流
+/// 书架小说列表缓存统计
 ///
-/// 监听预加载服务的进度更新
+/// 刷新时从数据库查询已缓存章节数和总章节数
 @riverpod
-Stream<Map<String, Map<String, int>>> preloadProgress(Ref ref) {
-  // 获取 PreloadService
-  final preloadService = ref.watch(preloadServiceProvider);
+Future<Map<String, CacheStats>> bookshelfCacheStats(Ref ref) async {
+  final novels = await ref.watch(bookshelfNovelsProvider.future);
+  final chapterRepo = ref.watch(chapterRepositoryProvider);
 
-  // 返回进度流
-  return preloadService.progressStream.map((update) {
-    return {
-      update.novelUrl: {
-        'cachedChapters': update.cachedChapters,
-        'totalChapters': update.totalChapters,
-      },
-    };
-  });
+  final stats = <String, CacheStats>{};
+  for (final novel in novels) {
+    final cached = await chapterRepo.getCachedChaptersCount(novel.url);
+    final total = await chapterRepo.getTotalChaptersCount(novel.url);
+    if (total > 0) {
+      stats[novel.url] = CacheStats(cached: cached, total: total);
+    }
+  }
+  return stats;
 }
 
-/// 合并的预加载进度
-///
-/// 将所有进度更新合并到一个 Map 中
-/// 使用 StateProvider 在 UI 中方便地访问
-@riverpod
-class PreloadProgressMap extends _$PreloadProgressMap {
-  @override
-  Map<String, Map<String, int>> build() {
-    // 监听进度流并更新状态
-    ref.listen(preloadProgressProvider, (previous, next) {
-      next.when(
-        data: (progressMap) {
-          // 合并进度数据
-          state = {...state, ...progressMap};
-        },
-        loading: () {},
-        error: (error, stack) {},
-      );
-    });
+/// 缓存统计
+class CacheStats {
+  final int cached;
+  final int total;
 
-    return {};
-  }
+  const CacheStats({required this.cached, required this.total});
+
+  double get percent => total > 0 ? (cached / total).clamp(0.0, 1.0) : 0.0;
 }

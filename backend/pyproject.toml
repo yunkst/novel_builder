@@ -24,7 +24,9 @@ classifiers = [
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    # Scrapling for web scraping (replaces requests, beautifulsoup4, playwright)
+    # HTTP client
+    "requests>=2.31.0",
+    # Scrapling for web scraping
     "scrapling[all]>=0.4.0",
     "urllib3>=2.0.0",
     "pydantic>=2.4.0",

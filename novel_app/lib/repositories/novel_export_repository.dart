@@ -284,19 +284,25 @@ class NovelExportRepository {
   }
 
   /// 导入章节数据
+  ///
+  /// 一次性批量导入所有章节，确保章节索引正确。
+  /// 修复：逐个导入会导致所有章节的 chapterIndex 都为 0，造成排序不稳定。
   Future<int> _importChapters(
     String novelUrl,
     List<ChapterExportData> chapters,
   ) async {
-    int count = 0;
+    if (chapters.isEmpty) {
+      return 0;
+    }
 
+    // 1. 批量导入章节列表元数据（一次性，确保 chapterIndex 正确）
+    final chapterList = chapters.map((data) => data.toChapter()).toList();
+    await _chapterRepository.cacheNovelChapters(novelUrl, chapterList);
+
+    // 2. 逐个处理章节内容和其他状态
+    int count = 0;
     for (final chapterData in chapters) {
       final chapter = chapterData.toChapter();
-
-      // 导入章节列表元数据
-      if (chapter.chapterIndex != null) {
-        await _chapterRepository.cacheNovelChapters(novelUrl, [chapter]);
-      }
 
       // 如果有内容，缓存章节内容
       if (chapterData.content != null && chapterData.content!.isNotEmpty) {

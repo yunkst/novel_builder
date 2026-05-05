@@ -324,19 +324,25 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 缓存小说章节列表
+  ///
+  /// 批量导入章节列表元数据到 novel_chapters 表。
+  /// - 如果章节有 chapterIndex，使用章节自身的索引
+  /// - 如果没有，使用列表顺序作为备用索引
   @override
   Future<void> cacheNovelChapters(
       String novelUrl, List<Chapter> chapters) async {
     final db = await database;
 
     for (var i = 0; i < chapters.length; i++) {
+      // 优先使用章节自身的 chapterIndex，否则使用列表顺序
+      final chapterIndex = chapters[i].chapterIndex ?? i;
       await db.rawInsert('''
         INSERT INTO novel_chapters (novelUrl, chapterUrl, title, chapterIndex, isUserInserted)
-        VALUES (?, ?, ?, ?, 0)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(novelUrl, chapterUrl) DO UPDATE SET
           title = excluded.title,
           chapterIndex = excluded.chapterIndex
-      ''', [novelUrl, chapters[i].url, chapters[i].title, i]);
+      ''', [novelUrl, chapters[i].url, chapters[i].title, chapterIndex, chapters[i].isUserInserted ? 1 : 0]);
     }
 
     await _reorderChapters(novelUrl);
@@ -522,12 +528,28 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     );
   }
 
-  /// 获取已缓存的章节数量
+  /// 获取已缓存的章节数量（实际有内容的章节）
   ///
   /// [novelUrl] 小说URL
-  /// 返回已缓存的章节数量
+  /// 返回 chapter_cache 表中已缓存的章节数量
   @override
   Future<int> getCachedChaptersCount(String novelUrl) async {
+    final db = await database;
+
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM chapter_cache WHERE novelUrl = ?',
+      [novelUrl],
+    );
+
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// 获取小说的总章节数
+  ///
+  /// [novelUrl] 小说URL
+  /// 返回 novel_chapters 表中的章节总数
+  @override
+  Future<int> getTotalChaptersCount(String novelUrl) async {
     final db = await database;
 
     final result = await db.rawQuery(

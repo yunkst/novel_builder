@@ -245,7 +245,9 @@ void main() {
       final uri = Uri.tryParse(url);
 
       // Assert
-      expect(uri, isNull, reason: '空字符串应该返回 null');
+      // Uri.tryParse('') 返回空 Uri，不返回 null
+      // 空字符串在业务层应视为无效 URL
+      expect(uri?.hasScheme ?? false, isFalse, reason: '空字符串不应该有 scheme');
     });
 
     test('应该拒绝无效的 URL', () {
@@ -256,7 +258,9 @@ void main() {
       final uri = Uri.tryParse(url);
 
       // Assert
-      expect(uri, isNull, reason: '无效的 URL 应该返回 null');
+      // Uri.tryParse 对无 scheme 的字符串不会返回 null
+      // 有效性应在业务层通过检查 scheme 判断
+      expect(uri?.hasScheme ?? false, isFalse, reason: '无效 URL 不应该有 scheme');
     });
 
     test('应该拒绝没有 host 的 URL', () {

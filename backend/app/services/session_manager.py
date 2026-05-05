@@ -90,7 +90,7 @@ class SessionManager:
         获取或创建隐蔽会话
 
         Returns:
-            AsyncStealthySession 实例
+            AsyncStealthySession 实例（已启动）
         """
         async with self._lock:
             if self._stealth_session is None:
@@ -101,6 +101,8 @@ class SessionManager:
                     network_idle=True,  # 等待网络空闲
                     max_pages=3,  # 页面池大小
                 )
+                # 必须调用 start() 启动浏览器实例
+                await self._stealth_session.start()
             return self._stealth_session
 
     async def close(self):
