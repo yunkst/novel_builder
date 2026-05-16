@@ -186,6 +186,9 @@ logs/
 *.backup
 *~
 
+# 备份目录
+backups/
+
 # Sensitive data
 secrets/
 credentials/
@@ -255,3 +258,19 @@ Scrapling/
 
 # Windows 保留文件名
 nul
+
+# 大文件类型
+*.exe
+*.dll
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# 文本文件（小说、日志、测试结果）
+*.txt
+!README*
+!CHANGELOG*
+!LICENSE*
+!TODO*
+!.gitkeep
