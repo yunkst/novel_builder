@@ -19,7 +19,6 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
   bool _isFullscreen = false;
-  bool _isInputExpanded = false;
 
   @override
   void dispose() {
@@ -245,48 +244,28 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 第一行：展开按钮 + 多行输入框
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: Icon(
-                  _isInputExpanded ? Icons.close_fullscreen : Icons.open_in_full,
-                  size: 20,
-                ),
-                onPressed: () => setState(() => _isInputExpanded = !_isInputExpanded),
-                tooltip: _isInputExpanded ? '收起输入' : '展开输入',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          TextField(
+            controller: _inputController,
+            focusNode: _focusNode,
+            enabled: !chatState.isLoading,
+            maxLines: 5,
+            minLines: 1,
+            decoration: InputDecoration(
+              hintText: chatState.isLoading ? '等待回复...' : '输入消息...（Enter 换行，点击发送）',
+              hintStyle: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: TextField(
-                  controller: _inputController,
-                  focusNode: _focusNode,
-                  enabled: !chatState.isLoading,
-                  maxLines: _isInputExpanded ? 12 : 5,
-                  minLines: 1,
-                  decoration: InputDecoration(
-                    hintText: chatState.isLoading ? '等待回复...' : '输入消息...（Enter 换行，点击发送）',
-                    hintStyle: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                    ),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  textInputAction: TextInputAction.newline,
-                ),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
-            ],
+            ),
+            textInputAction: TextInputAction.newline,
           ),
           const SizedBox(height: 8),
-          // 第二行：发送按钮
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
