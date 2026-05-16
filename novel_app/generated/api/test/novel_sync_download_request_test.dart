@@ -7,15 +7,9 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(NovelSyncDownloadRequest, () {
-    // 设备标识
-    // String deviceId
-    test('to test the property `deviceId`', () async {
-      // TODO
-    });
-
-    // 小说来源URL（作为唯一标识）
-    // String sourceUrl
-    test('to test the property `sourceUrl`', () async {
+    // 小说标题（作为唯一标识）
+    // String title
+    test('to test the property `title`', () async {
       // TODO
     });
 

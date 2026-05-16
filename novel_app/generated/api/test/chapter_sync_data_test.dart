@@ -7,12 +7,6 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(ChapterSyncData, () {
-    // 章节ID
-    // int chapterId
-    test('to test the property `chapterId`', () async {
-      // TODO
-    });
-
     // 章节标题
     // String title
     test('to test the property `title`', () async {
@@ -39,16 +33,6 @@ void main() {
 
     // String url
     test('to test the property `url`', () async {
-      // TODO
-    });
-
-    // String createdAt
-    test('to test the property `createdAt`', () async {
-      // TODO
-    });
-
-    // String updatedAt
-    test('to test the property `updatedAt`', () async {
       // TODO
     });
 

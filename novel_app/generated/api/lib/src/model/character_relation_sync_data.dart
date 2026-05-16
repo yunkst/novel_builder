@@ -8,29 +8,22 @@ import 'package:built_value/serializer.dart';
 
 part 'character_relation_sync_data.g.dart';
 
-/// 角色关系同步数据模式.
+/// 角色关系同步数据模式 - 使用角色名称而非ID.
 ///
 /// Properties:
-/// * [relationId] - 关系ID
-/// * [character1Id] - 角色1的ID
-/// * [character2Id] - 角色2的ID
+/// * [character1] - 角色1名称
+/// * [character2] - 角色2名称
 /// * [relationType] - 关系类型
 /// * [description] 
-/// * [createdAt] 
-/// * [updatedAt] 
 @BuiltValue()
 abstract class CharacterRelationSyncData implements Built<CharacterRelationSyncData, CharacterRelationSyncDataBuilder> {
-  /// 关系ID
-  @BuiltValueField(wireName: r'relation_id')
-  int get relationId;
+  /// 角色1名称
+  @BuiltValueField(wireName: r'character1')
+  String get character1;
 
-  /// 角色1的ID
-  @BuiltValueField(wireName: r'character1_id')
-  int get character1Id;
-
-  /// 角色2的ID
-  @BuiltValueField(wireName: r'character2_id')
-  int get character2Id;
+  /// 角色2名称
+  @BuiltValueField(wireName: r'character2')
+  String get character2;
 
   /// 关系类型
   @BuiltValueField(wireName: r'relation_type')
@@ -38,12 +31,6 @@ abstract class CharacterRelationSyncData implements Built<CharacterRelationSyncD
 
   @BuiltValueField(wireName: r'description')
   String? get description;
-
-  @BuiltValueField(wireName: r'created_at')
-  String? get createdAt;
-
-  @BuiltValueField(wireName: r'updated_at')
-  String? get updatedAt;
 
   CharacterRelationSyncData._();
 
@@ -68,20 +55,15 @@ class _$CharacterRelationSyncDataSerializer implements PrimitiveSerializer<Chara
     CharacterRelationSyncData object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'relation_id';
+    yield r'character1';
     yield serializers.serialize(
-      object.relationId,
-      specifiedType: const FullType(int),
+      object.character1,
+      specifiedType: const FullType(String),
     );
-    yield r'character1_id';
+    yield r'character2';
     yield serializers.serialize(
-      object.character1Id,
-      specifiedType: const FullType(int),
-    );
-    yield r'character2_id';
-    yield serializers.serialize(
-      object.character2Id,
-      specifiedType: const FullType(int),
+      object.character2,
+      specifiedType: const FullType(String),
     );
     yield r'relation_type';
     yield serializers.serialize(
@@ -92,20 +74,6 @@ class _$CharacterRelationSyncDataSerializer implements PrimitiveSerializer<Chara
       yield r'description';
       yield serializers.serialize(
         object.description,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.createdAt != null) {
-      yield r'created_at';
-      yield serializers.serialize(
-        object.createdAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.updatedAt != null) {
-      yield r'updated_at';
-      yield serializers.serialize(
-        object.updatedAt,
         specifiedType: const FullType.nullable(String),
       );
     }
@@ -132,26 +100,19 @@ class _$CharacterRelationSyncDataSerializer implements PrimitiveSerializer<Chara
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'relation_id':
+        case r'character1':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.relationId = valueDes;
+            specifiedType: const FullType(String),
+          ) as String;
+          result.character1 = valueDes;
           break;
-        case r'character1_id':
+        case r'character2':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.character1Id = valueDes;
-          break;
-        case r'character2_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.character2Id = valueDes;
+            specifiedType: const FullType(String),
+          ) as String;
+          result.character2 = valueDes;
           break;
         case r'relation_type':
           final valueDes = serializers.deserialize(
@@ -167,22 +128,6 @@ class _$CharacterRelationSyncDataSerializer implements PrimitiveSerializer<Chara
           ) as String?;
           if (valueDes == null) continue;
           result.description = valueDes;
-          break;
-        case r'created_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.createdAt = valueDes;
-          break;
-        case r'updated_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.updatedAt = valueDes;
           break;
         default:
           unhandled.add(key);

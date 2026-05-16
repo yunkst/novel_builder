@@ -12,7 +12,7 @@ class _$NovelSyncUploadResponse extends NovelSyncUploadResponse {
   @override
   final String message;
   @override
-  final int novelId;
+  final String title;
   @override
   final int syncVersion;
   @override
@@ -25,7 +25,7 @@ class _$NovelSyncUploadResponse extends NovelSyncUploadResponse {
   _$NovelSyncUploadResponse._(
       {required this.success,
       required this.message,
-      required this.novelId,
+      required this.title,
       required this.syncVersion,
       required this.syncedAt})
       : super._();
@@ -44,7 +44,7 @@ class _$NovelSyncUploadResponse extends NovelSyncUploadResponse {
     return other is NovelSyncUploadResponse &&
         success == other.success &&
         message == other.message &&
-        novelId == other.novelId &&
+        title == other.title &&
         syncVersion == other.syncVersion &&
         syncedAt == other.syncedAt;
   }
@@ -54,7 +54,7 @@ class _$NovelSyncUploadResponse extends NovelSyncUploadResponse {
     var _$hash = 0;
     _$hash = $jc(_$hash, success.hashCode);
     _$hash = $jc(_$hash, message.hashCode);
-    _$hash = $jc(_$hash, novelId.hashCode);
+    _$hash = $jc(_$hash, title.hashCode);
     _$hash = $jc(_$hash, syncVersion.hashCode);
     _$hash = $jc(_$hash, syncedAt.hashCode);
     _$hash = $jf(_$hash);
@@ -66,7 +66,7 @@ class _$NovelSyncUploadResponse extends NovelSyncUploadResponse {
     return (newBuiltValueToStringHelper(r'NovelSyncUploadResponse')
           ..add('success', success)
           ..add('message', message)
-          ..add('novelId', novelId)
+          ..add('title', title)
           ..add('syncVersion', syncVersion)
           ..add('syncedAt', syncedAt))
         .toString();
@@ -86,9 +86,9 @@ class NovelSyncUploadResponseBuilder
   String? get message => _$this._message;
   set message(String? message) => _$this._message = message;
 
-  int? _novelId;
-  int? get novelId => _$this._novelId;
-  set novelId(int? novelId) => _$this._novelId = novelId;
+  String? _title;
+  String? get title => _$this._title;
+  set title(String? title) => _$this._title = title;
 
   int? _syncVersion;
   int? get syncVersion => _$this._syncVersion;
@@ -107,7 +107,7 @@ class NovelSyncUploadResponseBuilder
     if ($v != null) {
       _success = $v.success;
       _message = $v.message;
-      _novelId = $v.novelId;
+      _title = $v.title;
       _syncVersion = $v.syncVersion;
       _syncedAt = $v.syncedAt;
       _$v = null;
@@ -135,8 +135,8 @@ class NovelSyncUploadResponseBuilder
               success, r'NovelSyncUploadResponse', 'success'),
           message: BuiltValueNullFieldError.checkNotNull(
               message, r'NovelSyncUploadResponse', 'message'),
-          novelId: BuiltValueNullFieldError.checkNotNull(
-              novelId, r'NovelSyncUploadResponse', 'novelId'),
+          title: BuiltValueNullFieldError.checkNotNull(
+              title, r'NovelSyncUploadResponse', 'title'),
           syncVersion: BuiltValueNullFieldError.checkNotNull(
               syncVersion, r'NovelSyncUploadResponse', 'syncVersion'),
           syncedAt: BuiltValueNullFieldError.checkNotNull(

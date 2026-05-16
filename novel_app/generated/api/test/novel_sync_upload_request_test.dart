@@ -7,12 +7,6 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(NovelSyncUploadRequest, () {
-    // 设备标识
-    // String deviceId
-    test('to test the property `deviceId`', () async {
-      // TODO
-    });
-
     // 小说数据
     // NovelSyncData novelData
     test('to test the property `novelData`', () async {

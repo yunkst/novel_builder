@@ -13,7 +13,7 @@ part 'novel_sync_upload_response.g.dart';
 /// Properties:
 /// * [success] - 是否成功
 /// * [message] - 响应消息
-/// * [novelId] - 小说ID
+/// * [title] - 小说标题
 /// * [syncVersion] - 同步版本号
 /// * [syncedAt] - 同步时间(ISO格式)
 @BuiltValue()
@@ -26,9 +26,9 @@ abstract class NovelSyncUploadResponse implements Built<NovelSyncUploadResponse,
   @BuiltValueField(wireName: r'message')
   String get message;
 
-  /// 小说ID
-  @BuiltValueField(wireName: r'novel_id')
-  int get novelId;
+  /// 小说标题
+  @BuiltValueField(wireName: r'title')
+  String get title;
 
   /// 同步版本号
   @BuiltValueField(wireName: r'sync_version')
@@ -71,10 +71,10 @@ class _$NovelSyncUploadResponseSerializer implements PrimitiveSerializer<NovelSy
       object.message,
       specifiedType: const FullType(String),
     );
-    yield r'novel_id';
+    yield r'title';
     yield serializers.serialize(
-      object.novelId,
-      specifiedType: const FullType(int),
+      object.title,
+      specifiedType: const FullType(String),
     );
     yield r'sync_version';
     yield serializers.serialize(
@@ -123,12 +123,12 @@ class _$NovelSyncUploadResponseSerializer implements PrimitiveSerializer<NovelSy
           ) as String;
           result.message = valueDes;
           break;
-        case r'novel_id':
+        case r'title':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.novelId = valueDes;
+            specifiedType: const FullType(String),
+          ) as String;
+          result.title = valueDes;
           break;
         case r'sync_version':
           final valueDes = serializers.deserialize(

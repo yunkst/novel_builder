@@ -11,6 +11,7 @@ import 'package:novel_api/src/auth/bearer_auth.dart';
 import 'package:novel_api/src/auth/oauth.dart';
 import 'package:novel_api/src/api/backup_api.dart';
 import 'package:novel_api/src/api/default_api.dart';
+import 'package:novel_api/src/api/hermes_api.dart';
 import 'package:novel_api/src/api/novel_sync_api.dart';
 
 class NovelApi {
@@ -77,6 +78,12 @@ class NovelApi {
   /// by doing that all interceptors will not be executed
   DefaultApi getDefaultApi() {
     return DefaultApi(dio, serializers);
+  }
+
+  /// Get HermesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  HermesApi getHermesApi() {
+    return HermesApi(dio, serializers);
   }
 
   /// Get NovelSyncApi instance, base route and serializer can be overridden by a given but be careful,

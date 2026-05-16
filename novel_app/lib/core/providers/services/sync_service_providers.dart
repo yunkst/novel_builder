@@ -67,9 +67,11 @@ part 'sync_service_providers.g.dart';
 NovelSyncService novelSyncService(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
   final exportRepository = ref.watch(novelExportRepositoryProvider);
+  final novelRepository = ref.watch(novelRepositoryProvider);
 
   return NovelSyncService(
     apiServiceWrapper: apiService,
     exportRepository: exportRepository,
+    novelRepository: novelRepository,
   );
 }

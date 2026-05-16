@@ -11,7 +11,6 @@ part 'character_sync_data.g.dart';
 /// 角色同步数据模式.
 ///
 /// Properties:
-/// * [characterId] - 角色ID
 /// * [name] - 角色名称
 /// * [gender] 
 /// * [age] 
@@ -23,14 +22,8 @@ part 'character_sync_data.g.dart';
 /// * [backgroundStory] 
 /// * [facePrompts] 
 /// * [bodyPrompts] 
-/// * [createdAt] 
-/// * [updatedAt] 
 @BuiltValue()
 abstract class CharacterSyncData implements Built<CharacterSyncData, CharacterSyncDataBuilder> {
-  /// 角色ID
-  @BuiltValueField(wireName: r'character_id')
-  int get characterId;
-
   /// 角色名称
   @BuiltValueField(wireName: r'name')
   String get name;
@@ -65,12 +58,6 @@ abstract class CharacterSyncData implements Built<CharacterSyncData, CharacterSy
   @BuiltValueField(wireName: r'body_prompts')
   String? get bodyPrompts;
 
-  @BuiltValueField(wireName: r'created_at')
-  String? get createdAt;
-
-  @BuiltValueField(wireName: r'updated_at')
-  String? get updatedAt;
-
   CharacterSyncData._();
 
   factory CharacterSyncData([void updates(CharacterSyncDataBuilder b)]) = _$CharacterSyncData;
@@ -94,11 +81,6 @@ class _$CharacterSyncDataSerializer implements PrimitiveSerializer<CharacterSync
     CharacterSyncData object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'character_id';
-    yield serializers.serialize(
-      object.characterId,
-      specifiedType: const FullType(int),
-    );
     yield r'name';
     yield serializers.serialize(
       object.name,
@@ -174,20 +156,6 @@ class _$CharacterSyncDataSerializer implements PrimitiveSerializer<CharacterSync
         specifiedType: const FullType.nullable(String),
       );
     }
-    if (object.createdAt != null) {
-      yield r'created_at';
-      yield serializers.serialize(
-        object.createdAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.updatedAt != null) {
-      yield r'updated_at';
-      yield serializers.serialize(
-        object.updatedAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
   }
 
   @override
@@ -211,13 +179,6 @@ class _$CharacterSyncDataSerializer implements PrimitiveSerializer<CharacterSync
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'character_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.characterId = valueDes;
-          break;
         case r'name':
           final valueDes = serializers.deserialize(
             value,
@@ -304,22 +265,6 @@ class _$CharacterSyncDataSerializer implements PrimitiveSerializer<CharacterSync
           ) as String?;
           if (valueDes == null) continue;
           result.bodyPrompts = valueDes;
-          break;
-        case r'created_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.createdAt = valueDes;
-          break;
-        case r'updated_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.updatedAt = valueDes;
           break;
         default:
           unhandled.add(key);

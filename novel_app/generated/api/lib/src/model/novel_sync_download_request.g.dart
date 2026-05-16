@@ -8,9 +8,7 @@ part of 'novel_sync_download_request.dart';
 
 class _$NovelSyncDownloadRequest extends NovelSyncDownloadRequest {
   @override
-  final String deviceId;
-  @override
-  final String sourceUrl;
+  final String title;
   @override
   final bool? includeChapters;
   @override
@@ -23,8 +21,7 @@ class _$NovelSyncDownloadRequest extends NovelSyncDownloadRequest {
       (NovelSyncDownloadRequestBuilder()..update(updates))._build();
 
   _$NovelSyncDownloadRequest._(
-      {required this.deviceId,
-      required this.sourceUrl,
+      {required this.title,
       this.includeChapters,
       this.includeCharacters,
       this.includeOutlines})
@@ -42,8 +39,7 @@ class _$NovelSyncDownloadRequest extends NovelSyncDownloadRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is NovelSyncDownloadRequest &&
-        deviceId == other.deviceId &&
-        sourceUrl == other.sourceUrl &&
+        title == other.title &&
         includeChapters == other.includeChapters &&
         includeCharacters == other.includeCharacters &&
         includeOutlines == other.includeOutlines;
@@ -52,8 +48,7 @@ class _$NovelSyncDownloadRequest extends NovelSyncDownloadRequest {
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, deviceId.hashCode);
-    _$hash = $jc(_$hash, sourceUrl.hashCode);
+    _$hash = $jc(_$hash, title.hashCode);
     _$hash = $jc(_$hash, includeChapters.hashCode);
     _$hash = $jc(_$hash, includeCharacters.hashCode);
     _$hash = $jc(_$hash, includeOutlines.hashCode);
@@ -64,8 +59,7 @@ class _$NovelSyncDownloadRequest extends NovelSyncDownloadRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'NovelSyncDownloadRequest')
-          ..add('deviceId', deviceId)
-          ..add('sourceUrl', sourceUrl)
+          ..add('title', title)
           ..add('includeChapters', includeChapters)
           ..add('includeCharacters', includeCharacters)
           ..add('includeOutlines', includeOutlines))
@@ -78,13 +72,9 @@ class NovelSyncDownloadRequestBuilder
         Builder<NovelSyncDownloadRequest, NovelSyncDownloadRequestBuilder> {
   _$NovelSyncDownloadRequest? _$v;
 
-  String? _deviceId;
-  String? get deviceId => _$this._deviceId;
-  set deviceId(String? deviceId) => _$this._deviceId = deviceId;
-
-  String? _sourceUrl;
-  String? get sourceUrl => _$this._sourceUrl;
-  set sourceUrl(String? sourceUrl) => _$this._sourceUrl = sourceUrl;
+  String? _title;
+  String? get title => _$this._title;
+  set title(String? title) => _$this._title = title;
 
   bool? _includeChapters;
   bool? get includeChapters => _$this._includeChapters;
@@ -108,8 +98,7 @@ class NovelSyncDownloadRequestBuilder
   NovelSyncDownloadRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _deviceId = $v.deviceId;
-      _sourceUrl = $v.sourceUrl;
+      _title = $v.title;
       _includeChapters = $v.includeChapters;
       _includeCharacters = $v.includeCharacters;
       _includeOutlines = $v.includeOutlines;
@@ -134,10 +123,8 @@ class NovelSyncDownloadRequestBuilder
   _$NovelSyncDownloadRequest _build() {
     final _$result = _$v ??
         _$NovelSyncDownloadRequest._(
-          deviceId: BuiltValueNullFieldError.checkNotNull(
-              deviceId, r'NovelSyncDownloadRequest', 'deviceId'),
-          sourceUrl: BuiltValueNullFieldError.checkNotNull(
-              sourceUrl, r'NovelSyncDownloadRequest', 'sourceUrl'),
+          title: BuiltValueNullFieldError.checkNotNull(
+              title, r'NovelSyncDownloadRequest', 'title'),
           includeChapters: includeChapters,
           includeCharacters: includeCharacters,
           includeOutlines: includeOutlines,

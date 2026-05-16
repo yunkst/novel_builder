@@ -19,9 +19,9 @@ void main() {
       // TODO
     });
 
-    // 小说ID
-    // int novelId
-    test('to test the property `novelId`', () async {
+    // 小说标题
+    // String title
+    test('to test the property `title`', () async {
       // TODO
     });
 

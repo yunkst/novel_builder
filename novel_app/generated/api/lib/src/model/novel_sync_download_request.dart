@@ -11,20 +11,15 @@ part 'novel_sync_download_request.g.dart';
 /// 小说同步下载请求模式.
 ///
 /// Properties:
-/// * [deviceId] - 设备标识
-/// * [sourceUrl] - 小说来源URL（作为唯一标识）
+/// * [title] - 小说标题（作为唯一标识）
 /// * [includeChapters] - 是否包含章节内容
 /// * [includeCharacters] - 是否包含角色数据
 /// * [includeOutlines] - 是否包含大纲数据
 @BuiltValue()
 abstract class NovelSyncDownloadRequest implements Built<NovelSyncDownloadRequest, NovelSyncDownloadRequestBuilder> {
-  /// 设备标识
-  @BuiltValueField(wireName: r'device_id')
-  String get deviceId;
-
-  /// 小说来源URL（作为唯一标识）
-  @BuiltValueField(wireName: r'source_url')
-  String get sourceUrl;
+  /// 小说标题（作为唯一标识）
+  @BuiltValueField(wireName: r'title')
+  String get title;
 
   /// 是否包含章节内容
   @BuiltValueField(wireName: r'include_chapters')
@@ -64,14 +59,9 @@ class _$NovelSyncDownloadRequestSerializer implements PrimitiveSerializer<NovelS
     NovelSyncDownloadRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'device_id';
+    yield r'title';
     yield serializers.serialize(
-      object.deviceId,
-      specifiedType: const FullType(String),
-    );
-    yield r'source_url';
-    yield serializers.serialize(
-      object.sourceUrl,
+      object.title,
       specifiedType: const FullType(String),
     );
     if (object.includeChapters != null) {
@@ -118,19 +108,12 @@ class _$NovelSyncDownloadRequestSerializer implements PrimitiveSerializer<NovelS
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'device_id':
+        case r'title':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(String),
           ) as String;
-          result.deviceId = valueDes;
-          break;
-        case r'source_url':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(String),
-          ) as String;
-          result.sourceUrl = valueDes;
+          result.title = valueDes;
           break;
         case r'include_chapters':
           final valueDes = serializers.deserialize(

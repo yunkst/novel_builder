@@ -77,6 +77,7 @@ import '../core/providers/reader_screen_notifier.dart';
 import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
 import '../core/providers/reader_state_providers.dart'; // 新增：细粒度状态Provider
+import '../core/providers/reading_context_providers.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -196,6 +197,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       }
     });
 
+    // 设置 Hermes 阅读上下文（小说 + 章节）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(readingContextProvider.notifier).state = ReadingContext(
+          novelTitle: widget.novel.title,
+          chapterTitle: widget.chapter.title,
+          novelUrl: widget.novel.url,
+        );
+      }
+    });
+
     _initApiAndLoadContent();
   }
 
@@ -274,6 +286,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void dispose() {
     disposeAutoScroll(); // 清理自动滚动资源（AutoScrollMixin）
     _scrollController.dispose();
+    // 清除 Hermes 阅读上下文
+    ref.read(readingContextProvider.notifier).state = const ReadingContext();
     super.dispose();
   }
 
@@ -522,6 +536,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         setState(() {
           _currentChapter = targetChapter;
         });
+        // 更新 Hermes 阅读上下文中的章节信息
+        ref.read(readingContextProvider.notifier).state = ReadingContext(
+          novelTitle: widget.novel.title,
+          chapterTitle: targetChapter.title,
+          novelUrl: widget.novel.url,
+        );
       }
     });
 

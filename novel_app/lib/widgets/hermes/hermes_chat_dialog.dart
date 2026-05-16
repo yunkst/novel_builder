@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/hermes_providers.dart';
+import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import 'package:novel_app/widgets/hermes/hermes_settings_dialog.dart';
@@ -45,6 +46,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               _buildHeader(notifier),
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null) _buildErrorBar(chatState.error!),
+              _buildContextTag(),
               _buildInputBar(chatState, notifier),
             ],
           ),
@@ -180,6 +182,35 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextTag() {
+    final readingContext = ref.watch(readingContextProvider);
+    if (!readingContext.hasContext) return const SizedBox.shrink();
+
+    final label = readingContext.displayLabel;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, right: 12, top: 8, bottom: 0),
+      child: Wrap(
+        spacing: 6,
+        children: [
+          ActionChip(
+            avatar: const Icon(Icons.book, size: 14),
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            onPressed: () {
+              final current = _inputController.text;
+              final sep = current.isEmpty ? '' : ' ';
+              _inputController.text = current + sep + label;
+              _inputController.selection = TextSelection.collapsed(
+                offset: _inputController.text.length,
+              );
+              _focusNode.requestFocus();
+            },
           ),
         ],
       ),

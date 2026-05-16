@@ -8,8 +8,6 @@ part of 'novel_sync_upload_request.dart';
 
 class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
   @override
-  final String deviceId;
-  @override
   final NovelSyncData novelData;
   @override
   final bool? forceOverwrite;
@@ -18,8 +16,7 @@ class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
           [void Function(NovelSyncUploadRequestBuilder)? updates]) =>
       (NovelSyncUploadRequestBuilder()..update(updates))._build();
 
-  _$NovelSyncUploadRequest._(
-      {required this.deviceId, required this.novelData, this.forceOverwrite})
+  _$NovelSyncUploadRequest._({required this.novelData, this.forceOverwrite})
       : super._();
   @override
   NovelSyncUploadRequest rebuild(
@@ -34,7 +31,6 @@ class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is NovelSyncUploadRequest &&
-        deviceId == other.deviceId &&
         novelData == other.novelData &&
         forceOverwrite == other.forceOverwrite;
   }
@@ -42,7 +38,6 @@ class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, deviceId.hashCode);
     _$hash = $jc(_$hash, novelData.hashCode);
     _$hash = $jc(_$hash, forceOverwrite.hashCode);
     _$hash = $jf(_$hash);
@@ -52,7 +47,6 @@ class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'NovelSyncUploadRequest')
-          ..add('deviceId', deviceId)
           ..add('novelData', novelData)
           ..add('forceOverwrite', forceOverwrite))
         .toString();
@@ -62,10 +56,6 @@ class _$NovelSyncUploadRequest extends NovelSyncUploadRequest {
 class NovelSyncUploadRequestBuilder
     implements Builder<NovelSyncUploadRequest, NovelSyncUploadRequestBuilder> {
   _$NovelSyncUploadRequest? _$v;
-
-  String? _deviceId;
-  String? get deviceId => _$this._deviceId;
-  set deviceId(String? deviceId) => _$this._deviceId = deviceId;
 
   NovelSyncDataBuilder? _novelData;
   NovelSyncDataBuilder get novelData =>
@@ -85,7 +75,6 @@ class NovelSyncUploadRequestBuilder
   NovelSyncUploadRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _deviceId = $v.deviceId;
       _novelData = $v.novelData.toBuilder();
       _forceOverwrite = $v.forceOverwrite;
       _$v = null;
@@ -111,8 +100,6 @@ class NovelSyncUploadRequestBuilder
     try {
       _$result = _$v ??
           _$NovelSyncUploadRequest._(
-            deviceId: BuiltValueNullFieldError.checkNotNull(
-                deviceId, r'NovelSyncUploadRequest', 'deviceId'),
             novelData: novelData.build(),
             forceOverwrite: forceOverwrite,
           );

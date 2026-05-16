@@ -10,7 +10,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **success** | **bool** | 是否成功 | 
 **message** | **String** | 响应消息 | 
-**novelId** | **int** | 小说ID | 
+**title** | **String** | 小说标题 | 
 **syncVersion** | **int** | 同步版本号 | 
 **syncedAt** | **String** | 同步时间(ISO格式) | 
 

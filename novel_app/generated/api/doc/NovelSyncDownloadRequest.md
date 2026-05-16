@@ -8,8 +8,7 @@ import 'package:novel_api/api.dart';
 ## Properties
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**deviceId** | **String** | 设备标识 | 
-**sourceUrl** | **String** | 小说来源URL（作为唯一标识） | 
+**title** | **String** | 小说标题（作为唯一标识） | 
 **includeChapters** | **bool** | 是否包含章节内容 | [optional] [default to true]
 **includeCharacters** | **bool** | 是否包含角色数据 | [optional] [default to true]
 **includeOutlines** | **bool** | 是否包含大纲数据 | [optional] [default to true]

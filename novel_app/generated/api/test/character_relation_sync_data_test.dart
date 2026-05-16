@@ -7,21 +7,15 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(CharacterRelationSyncData, () {
-    // 关系ID
-    // int relationId
-    test('to test the property `relationId`', () async {
+    // 角色1名称
+    // String character1
+    test('to test the property `character1`', () async {
       // TODO
     });
 
-    // 角色1的ID
-    // int character1Id
-    test('to test the property `character1Id`', () async {
-      // TODO
-    });
-
-    // 角色2的ID
-    // int character2Id
-    test('to test the property `character2Id`', () async {
+    // 角色2名称
+    // String character2
+    test('to test the property `character2`', () async {
       // TODO
     });
 
@@ -33,16 +27,6 @@ void main() {
 
     // String description
     test('to test the property `description`', () async {
-      // TODO
-    });
-
-    // String createdAt
-    test('to test the property `createdAt`', () async {
-      // TODO
-    });
-
-    // String updatedAt
-    test('to test the property `updatedAt`', () async {
       // TODO
     });
 

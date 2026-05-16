@@ -13,32 +13,20 @@ import 'package:built_value/serializer.dart';
 
 part 'novel_sync_data.g.dart';
 
-/// 小说同步数据模式 - 包含完整的小说数据.
+/// 小说同步数据模式 - 仅保留创作编辑相关字段.
 ///
 /// Properties:
-/// * [novelId] - 小说ID
 /// * [title] - 小说标题
 /// * [author] 
 /// * [description] 
 /// * [coverUrl] 
-/// * [sourceUrl] 
-/// * [totalChapters] - 总章节数
-/// * [totalWords] - 总字数
-/// * [lastReadChapterId] 
-/// * [lastReadPosition] - 最后阅读位置
-/// * [isFavorite] - 是否收藏
-/// * [createdAt] 
-/// * [updatedAt] 
+/// * [backgroundSetting] 
 /// * [chapters] - 章节列表
 /// * [characters] - 角色列表
 /// * [characterRelations] - 角色关系列表
 /// * [outlines] - 大纲列表
 @BuiltValue()
 abstract class NovelSyncData implements Built<NovelSyncData, NovelSyncDataBuilder> {
-  /// 小说ID
-  @BuiltValueField(wireName: r'novel_id')
-  int get novelId;
-
   /// 小说标题
   @BuiltValueField(wireName: r'title')
   String get title;
@@ -52,33 +40,8 @@ abstract class NovelSyncData implements Built<NovelSyncData, NovelSyncDataBuilde
   @BuiltValueField(wireName: r'cover_url')
   String? get coverUrl;
 
-  @BuiltValueField(wireName: r'source_url')
-  String? get sourceUrl;
-
-  /// 总章节数
-  @BuiltValueField(wireName: r'total_chapters')
-  int? get totalChapters;
-
-  /// 总字数
-  @BuiltValueField(wireName: r'total_words')
-  int? get totalWords;
-
-  @BuiltValueField(wireName: r'last_read_chapter_id')
-  int? get lastReadChapterId;
-
-  /// 最后阅读位置
-  @BuiltValueField(wireName: r'last_read_position')
-  int? get lastReadPosition;
-
-  /// 是否收藏
-  @BuiltValueField(wireName: r'is_favorite')
-  bool? get isFavorite;
-
-  @BuiltValueField(wireName: r'created_at')
-  String? get createdAt;
-
-  @BuiltValueField(wireName: r'updated_at')
-  String? get updatedAt;
+  @BuiltValueField(wireName: r'background_setting')
+  String? get backgroundSetting;
 
   /// 章节列表
   @BuiltValueField(wireName: r'chapters')
@@ -102,10 +65,6 @@ abstract class NovelSyncData implements Built<NovelSyncData, NovelSyncDataBuilde
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(NovelSyncDataBuilder b) => b
-      ..totalChapters = 0
-      ..totalWords = 0
-      ..lastReadPosition = 0
-      ..isFavorite = false
       ..chapters = ListBuilder()
       ..characters = ListBuilder()
       ..characterRelations = ListBuilder()
@@ -127,11 +86,6 @@ class _$NovelSyncDataSerializer implements PrimitiveSerializer<NovelSyncData> {
     NovelSyncData object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'novel_id';
-    yield serializers.serialize(
-      object.novelId,
-      specifiedType: const FullType(int),
-    );
     yield r'title';
     yield serializers.serialize(
       object.title,
@@ -158,59 +112,10 @@ class _$NovelSyncDataSerializer implements PrimitiveSerializer<NovelSyncData> {
         specifiedType: const FullType.nullable(String),
       );
     }
-    if (object.sourceUrl != null) {
-      yield r'source_url';
+    if (object.backgroundSetting != null) {
+      yield r'background_setting';
       yield serializers.serialize(
-        object.sourceUrl,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.totalChapters != null) {
-      yield r'total_chapters';
-      yield serializers.serialize(
-        object.totalChapters,
-        specifiedType: const FullType(int),
-      );
-    }
-    if (object.totalWords != null) {
-      yield r'total_words';
-      yield serializers.serialize(
-        object.totalWords,
-        specifiedType: const FullType(int),
-      );
-    }
-    if (object.lastReadChapterId != null) {
-      yield r'last_read_chapter_id';
-      yield serializers.serialize(
-        object.lastReadChapterId,
-        specifiedType: const FullType.nullable(int),
-      );
-    }
-    if (object.lastReadPosition != null) {
-      yield r'last_read_position';
-      yield serializers.serialize(
-        object.lastReadPosition,
-        specifiedType: const FullType(int),
-      );
-    }
-    if (object.isFavorite != null) {
-      yield r'is_favorite';
-      yield serializers.serialize(
-        object.isFavorite,
-        specifiedType: const FullType(bool),
-      );
-    }
-    if (object.createdAt != null) {
-      yield r'created_at';
-      yield serializers.serialize(
-        object.createdAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.updatedAt != null) {
-      yield r'updated_at';
-      yield serializers.serialize(
-        object.updatedAt,
+        object.backgroundSetting,
         specifiedType: const FullType.nullable(String),
       );
     }
@@ -265,13 +170,6 @@ class _$NovelSyncDataSerializer implements PrimitiveSerializer<NovelSyncData> {
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'novel_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.novelId = valueDes;
-          break;
         case r'title':
           final valueDes = serializers.deserialize(
             value,
@@ -303,65 +201,13 @@ class _$NovelSyncDataSerializer implements PrimitiveSerializer<NovelSyncData> {
           if (valueDes == null) continue;
           result.coverUrl = valueDes;
           break;
-        case r'source_url':
+        case r'background_setting':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType.nullable(String),
           ) as String?;
           if (valueDes == null) continue;
-          result.sourceUrl = valueDes;
-          break;
-        case r'total_chapters':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.totalChapters = valueDes;
-          break;
-        case r'total_words':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.totalWords = valueDes;
-          break;
-        case r'last_read_chapter_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(int),
-          ) as int?;
-          if (valueDes == null) continue;
-          result.lastReadChapterId = valueDes;
-          break;
-        case r'last_read_position':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.lastReadPosition = valueDes;
-          break;
-        case r'is_favorite':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(bool),
-          ) as bool;
-          result.isFavorite = valueDes;
-          break;
-        case r'created_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.createdAt = valueDes;
-          break;
-        case r'updated_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.updatedAt = valueDes;
+          result.backgroundSetting = valueDes;
           break;
         case r'chapters':
           final valueDes = serializers.deserialize(

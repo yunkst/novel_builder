@@ -94,6 +94,8 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**securityCheckSecurityCheckGet**](doc/DefaultApi.md#securitychecksecuritycheckget) | **GET** /security-check | Security Check
 [*DefaultApi*](doc/DefaultApi.md) | [**text2imgHealthCheckText2imgHealthGet**](doc/DefaultApi.md#text2imghealthchecktext2imghealthget) | **GET** /text2img/health | Text2Img Health Check
 [*DefaultApi*](doc/DefaultApi.md) | [**uploadAppVersionApiAppVersionUploadPost**](doc/DefaultApi.md#uploadappversionapiappversionuploadpost) | **POST** /api/app-version/upload | Upload App Version
+[*HermesApi*](doc/HermesApi.md) | [**chatCompletionsHermesChatCompletionsPost**](doc/HermesApi.md#chatcompletionshermeschatcompletionspost) | **POST** /hermes/chat/completions | Chat Completions
+[*HermesApi*](doc/HermesApi.md) | [**hermesHealthCheckHermesHealthGet**](doc/HermesApi.md#hermeshealthcheckhermeshealthget) | **GET** /hermes/health | Hermes Health Check
 [*NovelSyncApi*](doc/NovelSyncApi.md) | [**deleteSyncedNovelApiNovelSyncDeleteDelete**](doc/NovelSyncApi.md#deletesyncednovelapinovelsyncdeletedelete) | **DELETE** /api/novel/sync/delete | Delete Synced Novel
 [*NovelSyncApi*](doc/NovelSyncApi.md) | [**downloadNovelApiNovelSyncDownloadPost**](doc/NovelSyncApi.md#downloadnovelapinovelsyncdownloadpost) | **POST** /api/novel/sync/download | Download Novel
 [*NovelSyncApi*](doc/NovelSyncApi.md) | [**listSyncedNovelsApiNovelSyncListGet**](doc/NovelSyncApi.md#listsyncednovelsapinovelsynclistget) | **GET** /api/novel/sync/list | List Synced Novels

@@ -7,12 +7,6 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(NovelSyncData, () {
-    // 小说ID
-    // int novelId
-    test('to test the property `novelId`', () async {
-      // TODO
-    });
-
     // 小说标题
     // String title
     test('to test the property `title`', () async {
@@ -34,47 +28,8 @@ void main() {
       // TODO
     });
 
-    // String sourceUrl
-    test('to test the property `sourceUrl`', () async {
-      // TODO
-    });
-
-    // 总章节数
-    // int totalChapters (default value: 0)
-    test('to test the property `totalChapters`', () async {
-      // TODO
-    });
-
-    // 总字数
-    // int totalWords (default value: 0)
-    test('to test the property `totalWords`', () async {
-      // TODO
-    });
-
-    // int lastReadChapterId
-    test('to test the property `lastReadChapterId`', () async {
-      // TODO
-    });
-
-    // 最后阅读位置
-    // int lastReadPosition (default value: 0)
-    test('to test the property `lastReadPosition`', () async {
-      // TODO
-    });
-
-    // 是否收藏
-    // bool isFavorite (default value: false)
-    test('to test the property `isFavorite`', () async {
-      // TODO
-    });
-
-    // String createdAt
-    test('to test the property `createdAt`', () async {
-      // TODO
-    });
-
-    // String updatedAt
-    test('to test the property `updatedAt`', () async {
+    // String backgroundSetting
+    test('to test the property `backgroundSetting`', () async {
       // TODO
     });
 

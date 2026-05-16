@@ -1219,26 +1219,38 @@ class ApiServiceWrapper {
         throw Exception('API Token未配置');
       }
 
-      // 获取文件路径
-      final filePath = dbFile.path;
+      // 直接用 Dio 构造 multipart 请求，绕过生成的 BackupApi
+      // （生成的 BackupApi 的 encodeFormParameter 处理文件路径时格式不正确，导致 422）
+      final fileName = dbFile.path.split(Platform.pathSeparator).last;
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          dbFile.path,
+          filename: fileName,
+        ),
+      });
 
-      // 创建BackupApi实例
-      final backupApi = BackupApi(_dio, standardSerializers);
-
-      // 上传文件
-      final response = await backupApi.uploadBackupApiBackupUploadPost(
-        file: filePath,
-        X_API_TOKEN: token,
+      final response = await _dio.post(
+        '/api/backup/upload',
+        data: formData,
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+          contentType: 'multipart/form-data',
+        ),
         onSendProgress: onProgress,
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && response.data != null) {
+        final result = standardSerializers.deserialize(
+          response.data,
+          specifiedType: const FullType(BackupUploadResponse),
+        ) as BackupUploadResponse;
+
         LoggerService.instance.i(
-          '备份上传成功: ${response.data?.storedPath}',
+          '备份上传成功: ${result.storedPath}',
           category: LogCategory.network,
           tags: ['backup', 'success'],
         );
-        return response.data!;
+        return result;
       } else {
         throw Exception('备份上传失败：${response.statusCode}');
       }

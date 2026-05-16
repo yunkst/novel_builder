@@ -12,15 +12,10 @@ part 'novel_sync_upload_request.g.dart';
 /// 小说同步上传请求模式.
 ///
 /// Properties:
-/// * [deviceId] - 设备标识
 /// * [novelData] - 小说数据
 /// * [forceOverwrite] - 是否强制覆盖服务器数据
 @BuiltValue()
 abstract class NovelSyncUploadRequest implements Built<NovelSyncUploadRequest, NovelSyncUploadRequestBuilder> {
-  /// 设备标识
-  @BuiltValueField(wireName: r'device_id')
-  String get deviceId;
-
   /// 小说数据
   @BuiltValueField(wireName: r'novel_data')
   NovelSyncData get novelData;
@@ -53,11 +48,6 @@ class _$NovelSyncUploadRequestSerializer implements PrimitiveSerializer<NovelSyn
     NovelSyncUploadRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'device_id';
-    yield serializers.serialize(
-      object.deviceId,
-      specifiedType: const FullType(String),
-    );
     yield r'novel_data';
     yield serializers.serialize(
       object.novelData,
@@ -93,13 +83,6 @@ class _$NovelSyncUploadRequestSerializer implements PrimitiveSerializer<NovelSyn
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'device_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(String),
-          ) as String;
-          result.deviceId = valueDes;
-          break;
         case r'novel_data':
           final valueDes = serializers.deserialize(
             value,

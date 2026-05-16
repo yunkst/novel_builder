@@ -263,4 +263,56 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       whereArgs: [novelUrl],
     );
   }
+
+  /// 根据 title 查找小说
+  @override
+  Future<Novel?> getNovelByTitle(String title) async {
+    if (isWebPlatform) {
+      return null;
+    }
+
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      where: 'title = ?',
+      whereArgs: [title],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return Novel(
+      title: maps[0]['title'],
+      author: maps[0]['author'],
+      url: maps[0]['url'],
+      isInBookshelf: true,
+      coverUrl: maps[0]['coverUrl'] as String?,
+      description: maps[0]['description'] as String?,
+      backgroundSetting: maps[0]['backgroundSetting'] as String?,
+      lastReadChapterIndex: maps[0]['lastReadChapter'] as int?,
+    );
+  }
+
+  /// 创建新小说（用于同步下载时创建不存在的书）
+  @override
+  Future<Novel> createNovel({
+    required String title,
+    required String author,
+    String? description,
+    String? coverUrl,
+    String? backgroundSetting,
+  }) async {
+    final novel = Novel(
+      title: title,
+      author: author,
+      url: title, // 使用 title 作为 url（同步匹配用）
+      coverUrl: coverUrl,
+      description: description,
+      backgroundSetting: backgroundSetting,
+    );
+    await addToBookshelf(novel);
+    return novel;
+  }
 }

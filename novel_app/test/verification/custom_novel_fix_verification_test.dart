@@ -152,8 +152,17 @@ void main() {
             .thenAnswer((_) async => normalChapters);
         when(mockChapterRepo.cacheNovelChapters(normalNovelUrl, normalChapters))
             .thenAnswer((_) async {});
+
+        // getCachedNovelChapters 被调用两次：
+        // 1. loadChapters 中首次查询缓存 -> 返回空
+        // 2. refreshFromBackend 中缓存后重新获取 -> 返回章节
+        int getCachedCallCount = 0;
         when(mockChapterRepo.getCachedNovelChapters(normalNovelUrl))
-            .thenAnswer((_) async => []);
+            .thenAnswer((_) async {
+              getCachedCallCount++;
+              if (getCachedCallCount == 1) return <Chapter>[];
+              return normalChapters;
+            });
 
         // Act
         await chapterLoader.initApi();

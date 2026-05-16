@@ -11,20 +11,13 @@ part 'chapter_sync_data.g.dart';
 /// 章节同步数据模式.
 ///
 /// Properties:
-/// * [chapterId] - 章节ID
 /// * [title] - 章节标题
 /// * [content] - 章节内容
 /// * [chapterIndex] - 章节序号
 /// * [isUserInserted] - 是否为用户插入章节
 /// * [url] 
-/// * [createdAt] 
-/// * [updatedAt] 
 @BuiltValue()
 abstract class ChapterSyncData implements Built<ChapterSyncData, ChapterSyncDataBuilder> {
-  /// 章节ID
-  @BuiltValueField(wireName: r'chapter_id')
-  int get chapterId;
-
   /// 章节标题
   @BuiltValueField(wireName: r'title')
   String get title;
@@ -43,12 +36,6 @@ abstract class ChapterSyncData implements Built<ChapterSyncData, ChapterSyncData
 
   @BuiltValueField(wireName: r'url')
   String? get url;
-
-  @BuiltValueField(wireName: r'created_at')
-  String? get createdAt;
-
-  @BuiltValueField(wireName: r'updated_at')
-  String? get updatedAt;
 
   ChapterSyncData._();
 
@@ -74,11 +61,6 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
     ChapterSyncData object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'chapter_id';
-    yield serializers.serialize(
-      object.chapterId,
-      specifiedType: const FullType(int),
-    );
     yield r'title';
     yield serializers.serialize(
       object.title,
@@ -108,20 +90,6 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
         specifiedType: const FullType.nullable(String),
       );
     }
-    if (object.createdAt != null) {
-      yield r'created_at';
-      yield serializers.serialize(
-        object.createdAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
-    if (object.updatedAt != null) {
-      yield r'updated_at';
-      yield serializers.serialize(
-        object.updatedAt,
-        specifiedType: const FullType.nullable(String),
-      );
-    }
   }
 
   @override
@@ -145,13 +113,6 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'chapter_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.chapterId = valueDes;
-          break;
         case r'title':
           final valueDes = serializers.deserialize(
             value,
@@ -187,22 +148,6 @@ class _$ChapterSyncDataSerializer implements PrimitiveSerializer<ChapterSyncData
           ) as String?;
           if (valueDes == null) continue;
           result.url = valueDes;
-          break;
-        case r'created_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.createdAt = valueDes;
-          break;
-        case r'updated_at':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.updatedAt = valueDes;
           break;
         default:
           unhandled.add(key);

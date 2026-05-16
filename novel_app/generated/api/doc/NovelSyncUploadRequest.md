@@ -8,7 +8,6 @@ import 'package:novel_api/api.dart';
 ## Properties
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**deviceId** | **String** | 设备标识 | 
 **novelData** | [**NovelSyncData**](NovelSyncData.md) | 小说数据 | 
 **forceOverwrite** | **bool** | 是否强制覆盖服务器数据 | [optional] [default to false]
 

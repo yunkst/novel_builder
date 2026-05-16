@@ -7,12 +7,6 @@ void main() {
   // TODO add properties to the builder and call build()
 
   group(CharacterSyncData, () {
-    // 角色ID
-    // int characterId
-    test('to test the property `characterId`', () async {
-      // TODO
-    });
-
     // 角色名称
     // String name
     test('to test the property `name`', () async {
@@ -66,16 +60,6 @@ void main() {
 
     // String bodyPrompts
     test('to test the property `bodyPrompts`', () async {
-      // TODO
-    });
-
-    // String createdAt
-    test('to test the property `createdAt`', () async {
-      // TODO
-    });
-
-    // String updatedAt
-    test('to test the property `updatedAt`', () async {
       // TODO
     });
 

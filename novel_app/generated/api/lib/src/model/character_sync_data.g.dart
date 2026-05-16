@@ -8,8 +8,6 @@ part of 'character_sync_data.dart';
 
 class _$CharacterSyncData extends CharacterSyncData {
   @override
-  final int characterId;
-  @override
   final String name;
   @override
   final String? gender;
@@ -31,18 +29,13 @@ class _$CharacterSyncData extends CharacterSyncData {
   final String? facePrompts;
   @override
   final String? bodyPrompts;
-  @override
-  final String? createdAt;
-  @override
-  final String? updatedAt;
 
   factory _$CharacterSyncData(
           [void Function(CharacterSyncDataBuilder)? updates]) =>
       (CharacterSyncDataBuilder()..update(updates))._build();
 
   _$CharacterSyncData._(
-      {required this.characterId,
-      required this.name,
+      {required this.name,
       this.gender,
       this.age,
       this.occupation,
@@ -52,9 +45,7 @@ class _$CharacterSyncData extends CharacterSyncData {
       this.clothingStyle,
       this.backgroundStory,
       this.facePrompts,
-      this.bodyPrompts,
-      this.createdAt,
-      this.updatedAt})
+      this.bodyPrompts})
       : super._();
   @override
   CharacterSyncData rebuild(void Function(CharacterSyncDataBuilder) updates) =>
@@ -68,7 +59,6 @@ class _$CharacterSyncData extends CharacterSyncData {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is CharacterSyncData &&
-        characterId == other.characterId &&
         name == other.name &&
         gender == other.gender &&
         age == other.age &&
@@ -79,15 +69,12 @@ class _$CharacterSyncData extends CharacterSyncData {
         clothingStyle == other.clothingStyle &&
         backgroundStory == other.backgroundStory &&
         facePrompts == other.facePrompts &&
-        bodyPrompts == other.bodyPrompts &&
-        createdAt == other.createdAt &&
-        updatedAt == other.updatedAt;
+        bodyPrompts == other.bodyPrompts;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, characterId.hashCode);
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, gender.hashCode);
     _$hash = $jc(_$hash, age.hashCode);
@@ -99,8 +86,6 @@ class _$CharacterSyncData extends CharacterSyncData {
     _$hash = $jc(_$hash, backgroundStory.hashCode);
     _$hash = $jc(_$hash, facePrompts.hashCode);
     _$hash = $jc(_$hash, bodyPrompts.hashCode);
-    _$hash = $jc(_$hash, createdAt.hashCode);
-    _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -108,7 +93,6 @@ class _$CharacterSyncData extends CharacterSyncData {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'CharacterSyncData')
-          ..add('characterId', characterId)
           ..add('name', name)
           ..add('gender', gender)
           ..add('age', age)
@@ -119,9 +103,7 @@ class _$CharacterSyncData extends CharacterSyncData {
           ..add('clothingStyle', clothingStyle)
           ..add('backgroundStory', backgroundStory)
           ..add('facePrompts', facePrompts)
-          ..add('bodyPrompts', bodyPrompts)
-          ..add('createdAt', createdAt)
-          ..add('updatedAt', updatedAt))
+          ..add('bodyPrompts', bodyPrompts))
         .toString();
   }
 }
@@ -129,10 +111,6 @@ class _$CharacterSyncData extends CharacterSyncData {
 class CharacterSyncDataBuilder
     implements Builder<CharacterSyncData, CharacterSyncDataBuilder> {
   _$CharacterSyncData? _$v;
-
-  int? _characterId;
-  int? get characterId => _$this._characterId;
-  set characterId(int? characterId) => _$this._characterId = characterId;
 
   String? _name;
   String? get name => _$this._name;
@@ -181,14 +159,6 @@ class CharacterSyncDataBuilder
   String? get bodyPrompts => _$this._bodyPrompts;
   set bodyPrompts(String? bodyPrompts) => _$this._bodyPrompts = bodyPrompts;
 
-  String? _createdAt;
-  String? get createdAt => _$this._createdAt;
-  set createdAt(String? createdAt) => _$this._createdAt = createdAt;
-
-  String? _updatedAt;
-  String? get updatedAt => _$this._updatedAt;
-  set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
-
   CharacterSyncDataBuilder() {
     CharacterSyncData._defaults(this);
   }
@@ -196,7 +166,6 @@ class CharacterSyncDataBuilder
   CharacterSyncDataBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _characterId = $v.characterId;
       _name = $v.name;
       _gender = $v.gender;
       _age = $v.age;
@@ -208,8 +177,6 @@ class CharacterSyncDataBuilder
       _backgroundStory = $v.backgroundStory;
       _facePrompts = $v.facePrompts;
       _bodyPrompts = $v.bodyPrompts;
-      _createdAt = $v.createdAt;
-      _updatedAt = $v.updatedAt;
       _$v = null;
     }
     return this;
@@ -231,8 +198,6 @@ class CharacterSyncDataBuilder
   _$CharacterSyncData _build() {
     final _$result = _$v ??
         _$CharacterSyncData._(
-          characterId: BuiltValueNullFieldError.checkNotNull(
-              characterId, r'CharacterSyncData', 'characterId'),
           name: BuiltValueNullFieldError.checkNotNull(
               name, r'CharacterSyncData', 'name'),
           gender: gender,
@@ -245,8 +210,6 @@ class CharacterSyncDataBuilder
           backgroundStory: backgroundStory,
           facePrompts: facePrompts,
           bodyPrompts: bodyPrompts,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
         );
     replace(_$result);
     return _$result;

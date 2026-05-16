@@ -6,6 +6,7 @@ import '../models/bookshelf.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
+import '../widgets/batch_sync_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../screens/reader_screen.dart';
@@ -421,6 +422,50 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     }
   }
 
+  /// 显示上传所有小说对话框
+  Future<void> _showUploadDialog() async {
+    final novels = ref.read(bookshelfNovelsProvider).valueOrNull ?? [];
+    if (novels.isEmpty) {
+      ToastUtils.showWarning('书架为空，没有可上传的小说', context: context);
+      return;
+    }
+
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '上传所有小说',
+      message: '将 ${novels.length} 本小说上传到服务器？已有数据将被覆盖。',
+      confirmText: '开始上传',
+    );
+
+    if (confirmed != true) return;
+
+    final syncService = ref.read(novelSyncServiceProvider);
+    await BatchSyncDialog.showUpload(
+      context,
+      () => syncService.uploadAllNovels(novels),
+    );
+    ref.invalidate(bookshelfNovelsProvider);
+  }
+
+  /// 显示下载所有小说对话框
+  Future<void> _showDownloadDialog() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '下载所有小说',
+      message: '从服务器下载所有小说到本地？本地已有的同名小说将被覆盖。',
+      confirmText: '开始下载',
+    );
+
+    if (confirmed != true) return;
+
+    final syncService = ref.read(novelSyncServiceProvider);
+    await BatchSyncDialog.showDownload(
+      context,
+      () => syncService.downloadAllNovels(),
+    );
+    ref.invalidate(bookshelfNovelsProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentBookshelfId = ref.watch(currentBookshelfIdProvider);
@@ -430,6 +475,41 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
       appBar: AppBar(
         title: const Text('我的书架'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sync),
+            tooltip: '同步',
+            onSelected: (value) {
+              if (value == 'upload') {
+                _showUploadDialog();
+              } else if (value == 'download') {
+                _showDownloadDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'upload',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_upload, size: 20),
+                    SizedBox(width: 8),
+                    Text('上传所有小说'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'download',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_download, size: 20),
+                    SizedBox(width: 8),
+                    Text('下载所有小说'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [

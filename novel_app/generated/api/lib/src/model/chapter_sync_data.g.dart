@@ -8,8 +8,6 @@ part of 'chapter_sync_data.dart';
 
 class _$ChapterSyncData extends ChapterSyncData {
   @override
-  final int chapterId;
-  @override
   final String title;
   @override
   final String content;
@@ -19,23 +17,16 @@ class _$ChapterSyncData extends ChapterSyncData {
   final bool? isUserInserted;
   @override
   final String? url;
-  @override
-  final String? createdAt;
-  @override
-  final String? updatedAt;
 
   factory _$ChapterSyncData([void Function(ChapterSyncDataBuilder)? updates]) =>
       (ChapterSyncDataBuilder()..update(updates))._build();
 
   _$ChapterSyncData._(
-      {required this.chapterId,
-      required this.title,
+      {required this.title,
       required this.content,
       required this.chapterIndex,
       this.isUserInserted,
-      this.url,
-      this.createdAt,
-      this.updatedAt})
+      this.url})
       : super._();
   @override
   ChapterSyncData rebuild(void Function(ChapterSyncDataBuilder) updates) =>
@@ -48,27 +39,21 @@ class _$ChapterSyncData extends ChapterSyncData {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is ChapterSyncData &&
-        chapterId == other.chapterId &&
         title == other.title &&
         content == other.content &&
         chapterIndex == other.chapterIndex &&
         isUserInserted == other.isUserInserted &&
-        url == other.url &&
-        createdAt == other.createdAt &&
-        updatedAt == other.updatedAt;
+        url == other.url;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, chapterId.hashCode);
     _$hash = $jc(_$hash, title.hashCode);
     _$hash = $jc(_$hash, content.hashCode);
     _$hash = $jc(_$hash, chapterIndex.hashCode);
     _$hash = $jc(_$hash, isUserInserted.hashCode);
     _$hash = $jc(_$hash, url.hashCode);
-    _$hash = $jc(_$hash, createdAt.hashCode);
-    _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -76,14 +61,11 @@ class _$ChapterSyncData extends ChapterSyncData {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'ChapterSyncData')
-          ..add('chapterId', chapterId)
           ..add('title', title)
           ..add('content', content)
           ..add('chapterIndex', chapterIndex)
           ..add('isUserInserted', isUserInserted)
-          ..add('url', url)
-          ..add('createdAt', createdAt)
-          ..add('updatedAt', updatedAt))
+          ..add('url', url))
         .toString();
   }
 }
@@ -91,10 +73,6 @@ class _$ChapterSyncData extends ChapterSyncData {
 class ChapterSyncDataBuilder
     implements Builder<ChapterSyncData, ChapterSyncDataBuilder> {
   _$ChapterSyncData? _$v;
-
-  int? _chapterId;
-  int? get chapterId => _$this._chapterId;
-  set chapterId(int? chapterId) => _$this._chapterId = chapterId;
 
   String? _title;
   String? get title => _$this._title;
@@ -117,14 +95,6 @@ class ChapterSyncDataBuilder
   String? get url => _$this._url;
   set url(String? url) => _$this._url = url;
 
-  String? _createdAt;
-  String? get createdAt => _$this._createdAt;
-  set createdAt(String? createdAt) => _$this._createdAt = createdAt;
-
-  String? _updatedAt;
-  String? get updatedAt => _$this._updatedAt;
-  set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
-
   ChapterSyncDataBuilder() {
     ChapterSyncData._defaults(this);
   }
@@ -132,14 +102,11 @@ class ChapterSyncDataBuilder
   ChapterSyncDataBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _chapterId = $v.chapterId;
       _title = $v.title;
       _content = $v.content;
       _chapterIndex = $v.chapterIndex;
       _isUserInserted = $v.isUserInserted;
       _url = $v.url;
-      _createdAt = $v.createdAt;
-      _updatedAt = $v.updatedAt;
       _$v = null;
     }
     return this;
@@ -161,8 +128,6 @@ class ChapterSyncDataBuilder
   _$ChapterSyncData _build() {
     final _$result = _$v ??
         _$ChapterSyncData._(
-          chapterId: BuiltValueNullFieldError.checkNotNull(
-              chapterId, r'ChapterSyncData', 'chapterId'),
           title: BuiltValueNullFieldError.checkNotNull(
               title, r'ChapterSyncData', 'title'),
           content: BuiltValueNullFieldError.checkNotNull(
@@ -171,8 +136,6 @@ class ChapterSyncDataBuilder
               chapterIndex, r'ChapterSyncData', 'chapterIndex'),
           isUserInserted: isUserInserted,
           url: url,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
         );
     replace(_$result);
     return _$result;

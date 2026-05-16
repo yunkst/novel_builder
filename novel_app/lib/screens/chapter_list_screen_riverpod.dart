@@ -23,6 +23,7 @@ import '../widgets/ai_accompaniment_settings_dialog.dart';
 import '../models/ai_accompaniment_settings.dart';
 import '../widgets/novel_sync_dialog.dart';
 import '../core/providers/novel_sync_providers.dart';
+import '../core/providers/reading_context_providers.dart';
 
 /// 章节列表页面 - Riverpod版本
 ///
@@ -59,7 +60,20 @@ class _ChapterListScreenRiverpodState
   @override
   void initState() {
     super.initState();
-    // 监听预加载进度 - 延迟到 build 方法中设置
+    // 设置当前阅读上下文
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(readingContextProvider.notifier).state = ReadingContext(
+        novelTitle: widget.novel.title,
+        novelUrl: widget.novel.url,
+      );
+    });
+  }
+
+  @override
+  void deactivate() {
+    // 离开页面时清除阅读上下文
+    ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    super.deactivate();
   }
 
   @override

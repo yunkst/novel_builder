@@ -8,32 +8,23 @@ part of 'character_relation_sync_data.dart';
 
 class _$CharacterRelationSyncData extends CharacterRelationSyncData {
   @override
-  final int relationId;
+  final String character1;
   @override
-  final int character1Id;
-  @override
-  final int character2Id;
+  final String character2;
   @override
   final String relationType;
   @override
   final String? description;
-  @override
-  final String? createdAt;
-  @override
-  final String? updatedAt;
 
   factory _$CharacterRelationSyncData(
           [void Function(CharacterRelationSyncDataBuilder)? updates]) =>
       (CharacterRelationSyncDataBuilder()..update(updates))._build();
 
   _$CharacterRelationSyncData._(
-      {required this.relationId,
-      required this.character1Id,
-      required this.character2Id,
+      {required this.character1,
+      required this.character2,
       required this.relationType,
-      this.description,
-      this.createdAt,
-      this.updatedAt})
+      this.description})
       : super._();
   @override
   CharacterRelationSyncData rebuild(
@@ -48,25 +39,19 @@ class _$CharacterRelationSyncData extends CharacterRelationSyncData {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is CharacterRelationSyncData &&
-        relationId == other.relationId &&
-        character1Id == other.character1Id &&
-        character2Id == other.character2Id &&
+        character1 == other.character1 &&
+        character2 == other.character2 &&
         relationType == other.relationType &&
-        description == other.description &&
-        createdAt == other.createdAt &&
-        updatedAt == other.updatedAt;
+        description == other.description;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, relationId.hashCode);
-    _$hash = $jc(_$hash, character1Id.hashCode);
-    _$hash = $jc(_$hash, character2Id.hashCode);
+    _$hash = $jc(_$hash, character1.hashCode);
+    _$hash = $jc(_$hash, character2.hashCode);
     _$hash = $jc(_$hash, relationType.hashCode);
     _$hash = $jc(_$hash, description.hashCode);
-    _$hash = $jc(_$hash, createdAt.hashCode);
-    _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -74,13 +59,10 @@ class _$CharacterRelationSyncData extends CharacterRelationSyncData {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'CharacterRelationSyncData')
-          ..add('relationId', relationId)
-          ..add('character1Id', character1Id)
-          ..add('character2Id', character2Id)
+          ..add('character1', character1)
+          ..add('character2', character2)
           ..add('relationType', relationType)
-          ..add('description', description)
-          ..add('createdAt', createdAt)
-          ..add('updatedAt', updatedAt))
+          ..add('description', description))
         .toString();
   }
 }
@@ -90,17 +72,13 @@ class CharacterRelationSyncDataBuilder
         Builder<CharacterRelationSyncData, CharacterRelationSyncDataBuilder> {
   _$CharacterRelationSyncData? _$v;
 
-  int? _relationId;
-  int? get relationId => _$this._relationId;
-  set relationId(int? relationId) => _$this._relationId = relationId;
+  String? _character1;
+  String? get character1 => _$this._character1;
+  set character1(String? character1) => _$this._character1 = character1;
 
-  int? _character1Id;
-  int? get character1Id => _$this._character1Id;
-  set character1Id(int? character1Id) => _$this._character1Id = character1Id;
-
-  int? _character2Id;
-  int? get character2Id => _$this._character2Id;
-  set character2Id(int? character2Id) => _$this._character2Id = character2Id;
+  String? _character2;
+  String? get character2 => _$this._character2;
+  set character2(String? character2) => _$this._character2 = character2;
 
   String? _relationType;
   String? get relationType => _$this._relationType;
@@ -110,14 +88,6 @@ class CharacterRelationSyncDataBuilder
   String? get description => _$this._description;
   set description(String? description) => _$this._description = description;
 
-  String? _createdAt;
-  String? get createdAt => _$this._createdAt;
-  set createdAt(String? createdAt) => _$this._createdAt = createdAt;
-
-  String? _updatedAt;
-  String? get updatedAt => _$this._updatedAt;
-  set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
-
   CharacterRelationSyncDataBuilder() {
     CharacterRelationSyncData._defaults(this);
   }
@@ -125,13 +95,10 @@ class CharacterRelationSyncDataBuilder
   CharacterRelationSyncDataBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _relationId = $v.relationId;
-      _character1Id = $v.character1Id;
-      _character2Id = $v.character2Id;
+      _character1 = $v.character1;
+      _character2 = $v.character2;
       _relationType = $v.relationType;
       _description = $v.description;
-      _createdAt = $v.createdAt;
-      _updatedAt = $v.updatedAt;
       _$v = null;
     }
     return this;
@@ -153,17 +120,13 @@ class CharacterRelationSyncDataBuilder
   _$CharacterRelationSyncData _build() {
     final _$result = _$v ??
         _$CharacterRelationSyncData._(
-          relationId: BuiltValueNullFieldError.checkNotNull(
-              relationId, r'CharacterRelationSyncData', 'relationId'),
-          character1Id: BuiltValueNullFieldError.checkNotNull(
-              character1Id, r'CharacterRelationSyncData', 'character1Id'),
-          character2Id: BuiltValueNullFieldError.checkNotNull(
-              character2Id, r'CharacterRelationSyncData', 'character2Id'),
+          character1: BuiltValueNullFieldError.checkNotNull(
+              character1, r'CharacterRelationSyncData', 'character1'),
+          character2: BuiltValueNullFieldError.checkNotNull(
+              character2, r'CharacterRelationSyncData', 'character2'),
           relationType: BuiltValueNullFieldError.checkNotNull(
               relationType, r'CharacterRelationSyncData', 'relationType'),
           description: description,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
         );
     replace(_$result);
     return _$result;

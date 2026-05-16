@@ -4,6 +4,7 @@ import '../../models/hermes_message.dart';
 import '../../services/hermes_chat_service.dart';
 import '../../services/hermes_sse_parser.dart';
 import 'services/network_service_providers.dart';
+import 'reading_context_providers.dart';
 
 /// Hermes Chat Service Provider
 final hermesChatServiceProvider = Provider<HermesChatService>((ref) {
@@ -62,6 +63,22 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     final userMessage = HermesMessage.user(content.trim());
     final updatedMessages = [...state.messages, userMessage];
 
+    // 读取阅读上下文，注入 system prompt
+    final readingContext = _ref.read(readingContextProvider);
+    final systemPrompt = readingContext.toSystemPrompt();
+
+    // 构建消息 payload，有上下文时前置 system message
+    List<Map<String, String>> messagesPayload;
+    if (systemPrompt.isNotEmpty) {
+      final systemMessage = HermesMessage.system(systemPrompt);
+      messagesPayload = [
+        systemMessage.toMap(),
+        ...updatedMessages.map((m) => m.toMap()),
+      ];
+    } else {
+      messagesPayload = updatedMessages.map((m) => m.toMap()).toList();
+    }
+
     // 清除之前的状态
     state = state.copyWith(
       messages: updatedMessages,
@@ -74,7 +91,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     _pendingContent = '';
 
     final service = _ref.read(hermesChatServiceProvider);
-    final messagesPayload = updatedMessages.map((m) => m.toMap()).toList();
 
     await service.sendMessage(
       messages: messagesPayload,

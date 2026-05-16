@@ -75,4 +75,21 @@ abstract class INovelRepository {
   /// 返回受影响的行数
   Future<int> updateAiAccompanimentSettings(
       String novelUrl, AiAccompanimentSettings settings);
+
+  /// 根据 title 查找小说
+  ///
+  /// [title] 小说标题
+  /// 返回小说对象，如果不存在则返回null
+  Future<Novel?> getNovelByTitle(String title);
+
+  /// 创建新小说（用于同步下载时创建不存在的书）
+  ///
+  /// 返回创建后的小说对象
+  Future<Novel> createNovel({
+    required String title,
+    required String author,
+    String? description,
+    String? coverUrl,
+    String? backgroundSetting,
+  });
 }
