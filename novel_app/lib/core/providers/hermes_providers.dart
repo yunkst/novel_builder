@@ -1,8 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/hermes_message.dart';
 import '../../services/hermes_chat_service.dart';
 import '../../services/hermes_sse_parser.dart';
+import '../../services/preferences_service.dart';
 import 'services/network_service_providers.dart';
 import 'reading_context_providers.dart';
 
@@ -53,8 +56,35 @@ class HermesChatState {
 class HermesChatNotifier extends StateNotifier<HermesChatState> {
   final Ref _ref;
   String _pendingContent = '';
+  static const _sessionIdKey = 'hermes_session_id';
 
-  HermesChatNotifier(this._ref) : super(const HermesChatState());
+  HermesChatNotifier(this._ref) : super(const HermesChatState()) {
+    _loadSessionId();
+  }
+
+  Future<void> _loadSessionId() async {
+    final saved = await PreferencesService.instance.getString(_sessionIdKey);
+    if (saved.isNotEmpty) {
+      state = state.copyWith(sessionId: saved);
+    }
+  }
+
+  Future<String> _ensureSessionId() async {
+    if (state.sessionId != null && state.sessionId!.isNotEmpty) {
+      return state.sessionId!;
+    }
+    final id = _generateSessionId();
+    state = state.copyWith(sessionId: id);
+    await PreferencesService.instance.setString(_sessionIdKey, id);
+    return id;
+  }
+
+  String _generateSessionId() {
+    final rng = Random.secure();
+    final timestamp = DateTime.now().toIso8601String().substring(0, 19).replaceAll(RegExp(r'[-:]'), '');
+    final random = List.generate(8, (_) => rng.nextInt(16).toRadixString(16)).join();
+    return 'hermes-${timestamp}_$random';
+  }
 
   /// 发送消息
   Future<void> sendMessage(String content) async {
@@ -79,6 +109,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       messagesPayload = updatedMessages.map((m) => m.toMap()).toList();
     }
 
+    // 确保 session_id 存在
+    final sessionId = await _ensureSessionId();
+
     // 清除之前的状态
     state = state.copyWith(
       messages: updatedMessages,
@@ -94,7 +127,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
 
     await service.sendMessage(
       messages: messagesPayload,
-      sessionId: state.sessionId,
+      sessionId: sessionId,
       onContent: (chunk) {
         _pendingContent += chunk;
         state = state.copyWith(streamingContent: _pendingContent);
@@ -140,12 +173,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   /// 清空会话
   void clearConversation() {
     _pendingContent = '';
-    state = const HermesChatState();
-  }
-
-  /// 设置会话 ID
-  void setSessionId(String sessionId) {
-    state = state.copyWith(sessionId: sessionId);
+    final newId = _generateSessionId();
+    state = HermesChatState(sessionId: newId);
+    PreferencesService.instance.setString(_sessionIdKey, newId);
   }
 }
 

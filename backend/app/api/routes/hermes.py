@@ -35,12 +35,15 @@ async def chat_completions(request: Request):
     - **messages**: List of chat messages with role and content
     - **model**: (Optional) Model name to use
     - **stream**: (Optional) Enable streaming, defaults to true
-    - **session_id**: (Optional) Session ID for conversation continuity
     - Any other parameters supported by the Hermes API
+
+    **Headers:**
+    - **X-Hermes-Session-Id**: (Optional) Session ID for server-side
+      conversation continuity. When provided, Hermes Agent loads history
+      from its state.db instead of relying on client-side messages.
 
     **Response:**
     - SSE stream with chat completion chunks
-    - X-Hermes-Session-Id header for session tracking
     """
     try:
         body = await request.json()
@@ -61,7 +64,8 @@ async def chat_completions(request: Request):
     # Ensure stream is enabled
     body.setdefault("stream", True)
 
-    session_id = body.pop("session_id", None)
+    # 透传前端 X-Hermes-Session-Id header
+    session_id = request.headers.get("X-Hermes-Session-Id", "").strip()
     if session_id:
         body.setdefault("extra_headers", {})
         body["extra_headers"]["X-Hermes-Session-Id"] = session_id

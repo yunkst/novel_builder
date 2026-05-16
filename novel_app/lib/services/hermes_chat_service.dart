@@ -36,6 +36,9 @@ class HermesChatService {
   }
 
   /// 发送聊天消息（流式）
+  ///
+  /// [sessionId] 通过 X-Hermes-Session-Id header 传递给 Hermes Agent，
+  /// 用于服务端会话历史管理。由调用方控制生命周期。
   Future<void> sendMessage({
     required List<Map<String, String>> messages,
     String? sessionId,
@@ -53,7 +56,13 @@ class HermesChatService {
     final payload = {
       'messages': messages,
       'stream': true,
-      if (sessionId != null) 'session_id': sessionId,
+    };
+
+    final headers = <String, String>{
+      'X-API-TOKEN': cfg.apiToken,
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+      if (sessionId != null) 'X-Hermes-Session-Id': sessionId,
     };
 
     LoggerService.instance.d(
@@ -69,11 +78,7 @@ class HermesChatService {
         data: payload,
         options: Options(
           responseType: ResponseType.stream,
-          headers: {
-            'X-API-TOKEN': cfg.apiToken,
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream',
-          },
+          headers: headers,
         ),
       );
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/providers/chapter_list_providers.dart';
+import '../widgets/hermes/hermes_floating_button.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../widgets/chapter_list/chapter_list_header.dart';
@@ -127,49 +128,51 @@ class _ChapterListScreenRiverpodState
       });
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.novel.title),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          _buildReorderButton(state, notifier),
-          _buildSearchButton(),
-          _buildCharacterButton(),
-          _buildPopupMenu(state, notifier, context),
-        ],
+    return HermesFloatingShell(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.novel.title),
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          actions: [
+            _buildReorderButton(state, notifier),
+            _buildSearchButton(),
+            _buildCharacterButton(),
+            _buildPopupMenu(state, notifier, context),
+          ],
+        ),
+        body: state.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : state.errorMessage.isNotEmpty
+                ? _buildErrorView(state, notifier)
+                : Column(
+                    children: [
+                      ChapterListHeader(
+                        novel: widget.novel,
+                        chapterCount: state.chapters.length,
+                        cachedCount: state.cachedCount,
+                      ),
+                      const Divider(),
+                      Expanded(
+                        child: state.chapters.isEmpty
+                            ? EmptyChaptersView(
+                                novel: widget.novel,
+                                onGenerateChapter: () =>
+                                    _showInsertChapterDialog(0),
+                                onLoadFromSource: () =>
+                                    notifier.refreshChapters(context),
+                              )
+                            : state.isReorderingMode
+                                ? _buildReorderableChapterList(state, notifier)
+                                : _buildNormalChapterList(state),
+                      ),
+                      // 只在非重排模式、有章节且总页数大于1时显示分页控制栏
+                      if (!state.isReorderingMode &&
+                          state.chapters.isNotEmpty &&
+                          state.totalPages > 1)
+                        _buildPaginationControl(state, notifier),
+                    ],
+                  ),
       ),
-      body: state.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : state.errorMessage.isNotEmpty
-              ? _buildErrorView(state, notifier)
-              : Column(
-                  children: [
-                    ChapterListHeader(
-                      novel: widget.novel,
-                      chapterCount: state.chapters.length,
-                      cachedCount: state.cachedCount,
-                    ),
-                    const Divider(),
-                    Expanded(
-                      child: state.chapters.isEmpty
-                          ? EmptyChaptersView(
-                              novel: widget.novel,
-                              onGenerateChapter: () =>
-                                  _showInsertChapterDialog(0),
-                              onLoadFromSource: () =>
-                                  notifier.refreshChapters(context),
-                            )
-                          : state.isReorderingMode
-                              ? _buildReorderableChapterList(state, notifier)
-                              : _buildNormalChapterList(state),
-                    ),
-                    // 只在非重排模式、有章节且总页数大于1时显示分页控制栏
-                    if (!state.isReorderingMode &&
-                        state.chapters.isNotEmpty &&
-                        state.totalPages > 1)
-                      _buildPaginationControl(state, notifier),
-                  ],
-                ),
     );
   }
 

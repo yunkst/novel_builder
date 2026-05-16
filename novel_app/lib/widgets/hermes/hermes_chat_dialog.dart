@@ -18,6 +18,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
+  bool _isFullscreen = false;
 
   @override
   void dispose() {
@@ -33,12 +34,13 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     final notifier = ref.read(hermesChatProvider.notifier);
 
     return Dialog(
+      insetPadding: _isFullscreen ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(_isFullscreen ? 0 : 16),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.92,
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxWidth: _isFullscreen ? double.infinity : MediaQuery.of(context).size.width * 0.92,
+            maxHeight: _isFullscreen ? double.infinity : MediaQuery.of(context).size.height * 0.8,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -83,6 +85,15 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              color: Colors.white70,
+              size: 20,
+            ),
+            onPressed: () => setState(() => _isFullscreen = !_isFullscreen),
+            tooltip: _isFullscreen ? '退出全屏' : '全屏',
           ),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white70, size: 20),

@@ -78,6 +78,7 @@ import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
 import '../core/providers/reader_state_providers.dart'; // 新增：细粒度状态Provider
 import '../core/providers/reading_context_providers.dart';
+import '../widgets/hermes/hermes_floating_button.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -1310,9 +1311,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final content = contentState.content;
     final paragraphs = content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
-    // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
-    return Scaffold(
-      appBar: ReaderAppBar(
+    return HermesFloatingShell(
+      child: Scaffold(
+        // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
+        appBar: ReaderAppBar(
         novel: widget.novel,
         currentChapter: _currentChapter,
         chapters: widget.chapters,
@@ -1343,6 +1345,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               onToggleCloseupMode: _toggleCloseupMode,
               onToggleAutoScroll: toggleAutoScroll, // Mixin method
             ),
+      ),
     );
   }
 
