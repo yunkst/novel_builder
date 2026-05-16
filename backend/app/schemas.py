@@ -507,20 +507,16 @@ class BackupUploadResponse(BaseModel):
 class ChapterSyncData(BaseModel):
     """章节同步数据模式."""
 
-    chapter_id: int = Field(..., description="章节ID")
     title: str = Field(..., description="章节标题")
     content: str = Field(..., description="章节内容")
     chapter_index: int = Field(..., description="章节序号")
     is_user_inserted: bool = Field(False, description="是否为用户插入章节")
     url: str | None = Field(None, description="章节URL")
-    created_at: str | None = Field(None, description="创建时间(ISO格式)")
-    updated_at: str | None = Field(None, description="更新时间(ISO格式)")
 
 
 class CharacterSyncData(BaseModel):
     """角色同步数据模式."""
 
-    character_id: int = Field(..., description="角色ID")
     name: str = Field(..., description="角色名称")
     gender: str | None = Field(None, description="性别")
     age: int | None = Field(None, description="年龄")
@@ -532,51 +528,32 @@ class CharacterSyncData(BaseModel):
     background_story: str | None = Field(None, description="背景经历")
     face_prompts: str | None = Field(None, description="AI绘图专用-面部描述")
     body_prompts: str | None = Field(None, description="AI绘图专用-身材描述")
-    created_at: str | None = Field(None, description="创建时间(ISO格式)")
-    updated_at: str | None = Field(None, description="更新时间(ISO格式)")
 
 
 class CharacterRelationSyncData(BaseModel):
-    """角色关系同步数据模式."""
+    """角色关系同步数据模式 - 使用角色名称而非ID."""
 
-    relation_id: int = Field(..., description="关系ID")
-    character1_id: int = Field(..., description="角色1的ID")
-    character2_id: int = Field(..., description="角色2的ID")
+    character1: str = Field(..., description="角色1名称")
+    character2: str = Field(..., description="角色2名称")
     relation_type: str = Field(..., description="关系类型")
     description: str | None = Field(None, description="关系描述")
-    created_at: str | None = Field(None, description="创建时间(ISO格式)")
-    updated_at: str | None = Field(None, description="更新时间(ISO格式)")
 
 
 class OutlineSyncData(BaseModel):
     """大纲同步数据模式."""
 
-    outline_id: int = Field(..., description="大纲ID")
     title: str = Field(..., description="大纲标题")
     content: str = Field(..., description="大纲内容")
-    outline_type: str = Field(..., description="大纲类型(如: main, volume, chapter)")
-    parent_id: int | None = Field(None, description="父大纲ID")
-    sort_order: int = Field(0, description="排序顺序")
-    created_at: str | None = Field(None, description="创建时间(ISO格式)")
-    updated_at: str | None = Field(None, description="更新时间(ISO格式)")
 
 
 class NovelSyncData(BaseModel):
-    """小说同步数据模式 - 包含完整的小说数据."""
+    """小说同步数据模式 - 仅保留创作编辑相关字段."""
 
-    novel_id: int = Field(..., description="小说ID")
     title: str = Field(..., description="小说标题")
     author: str | None = Field(None, description="作者")
     description: str | None = Field(None, description="小说简介")
     cover_url: str | None = Field(None, description="封面URL")
-    source_url: str | None = Field(None, description="来源URL")
-    total_chapters: int = Field(0, description="总章节数")
-    total_words: int = Field(0, description="总字数")
-    last_read_chapter_id: int | None = Field(None, description="最后阅读章节ID")
-    last_read_position: int = Field(0, description="最后阅读位置")
-    is_favorite: bool = Field(False, description="是否收藏")
-    created_at: str | None = Field(None, description="创建时间(ISO格式)")
-    updated_at: str | None = Field(None, description="更新时间(ISO格式)")
+    background_setting: str | None = Field(None, description="背景设定")
     chapters: list[ChapterSyncData] = Field(default=[], description="章节列表")
     characters: list[CharacterSyncData] = Field(default=[], description="角色列表")
     character_relations: list[CharacterRelationSyncData] = Field(
@@ -588,7 +565,6 @@ class NovelSyncData(BaseModel):
 class NovelSyncUploadRequest(BaseModel):
     """小说同步上传请求模式."""
 
-    device_id: str = Field(..., min_length=1, max_length=100, description="设备标识")
     novel_data: NovelSyncData = Field(..., description="小说数据")
     force_overwrite: bool = Field(False, description="是否强制覆盖服务器数据")
 
@@ -598,7 +574,7 @@ class NovelSyncUploadResponse(BaseModel):
 
     success: bool = Field(..., description="是否成功")
     message: str = Field(..., description="响应消息")
-    novel_id: int = Field(..., description="小说ID")
+    title: str = Field(..., description="小说标题")
     sync_version: int = Field(..., description="同步版本号")
     synced_at: str = Field(..., description="同步时间(ISO格式)")
 
@@ -606,8 +582,7 @@ class NovelSyncUploadResponse(BaseModel):
 class NovelSyncDownloadRequest(BaseModel):
     """小说同步下载请求模式."""
 
-    device_id: str = Field(..., min_length=1, max_length=100, description="设备标识")
-    source_url: str = Field(..., min_length=1, max_length=2048, description="小说来源URL（作为唯一标识）")
+    title: str = Field(..., min_length=1, max_length=255, description="小说标题（作为唯一标识）")
     include_chapters: bool = Field(True, description="是否包含章节内容")
     include_characters: bool = Field(True, description="是否包含角色数据")
     include_outlines: bool = Field(True, description="是否包含大纲数据")
