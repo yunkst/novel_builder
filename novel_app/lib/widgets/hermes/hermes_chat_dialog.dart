@@ -19,6 +19,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
   bool _isFullscreen = false;
+  bool _isInputExpanded = false;
 
   @override
   void dispose() {
@@ -241,49 +242,73 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _inputController,
-              focusNode: _focusNode,
-              enabled: !chatState.isLoading,
-              decoration: InputDecoration(
-                hintText: chatState.isLoading ? '等待回复...' : '输入消息...',
-                hintStyle: TextStyle(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+          // 第一行：展开按钮 + 多行输入框
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isInputExpanded ? Icons.close_fullscreen : Icons.open_in_full,
+                  size: 20,
                 ),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
+                onPressed: () => setState(() => _isInputExpanded = !_isInputExpanded),
+                tooltip: _isInputExpanded ? '收起输入' : '展开输入',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: chatState.isLoading ? null : (_) => _sendMessage(notifier),
-            ),
-          ),
-          const SizedBox(width: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            child: chatState.isLoading
-                ? const IconButton(
-                    onPressed: null,
-                    icon: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(width: 4),
+              Expanded(
+                child: TextField(
+                  controller: _inputController,
+                  focusNode: _focusNode,
+                  enabled: !chatState.isLoading,
+                  maxLines: _isInputExpanded ? 12 : 5,
+                  minLines: 1,
+                  decoration: InputDecoration(
+                    hintText: chatState.isLoading ? '等待回复...' : '输入消息...（Enter 换行，点击发送）',
+                    hintStyle: TextStyle(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
-                  )
-                : IconButton.filled(
-                    onPressed: () => _sendMessage(notifier),
-                    icon: const Icon(Icons.send, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
+                  textInputAction: TextInputAction.newline,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 第二行：发送按钮
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                child: chatState.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : FilledButton.icon(
+                        onPressed: () => _sendMessage(notifier),
+                        icon: const Icon(Icons.send, size: 18),
+                        label: const Text('发送'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        ),
+                      ),
+              ),
+            ],
           ),
         ],
       ),

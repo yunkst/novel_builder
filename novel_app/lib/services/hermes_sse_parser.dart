@@ -80,17 +80,34 @@ class HermesEvent {
 
 /// 工具执行进度数据
 class ToolProgress {
+  /// 工具函数名
   final String toolName;
+  /// 状态: running, completed, error
   final String status;
+  /// 可读标签（如 "Searching for xxx"）
+  final String? label;
+  /// Emoji 表情
+  final String? emoji;
+  /// 工具调用 ID（用于关联）
+  final String? toolCallId;
+  /// 状态消息
   final String? message;
+  /// 进度百分比 (0-100)
   final double? progress;
-  final Map<String, dynamic>? result;
+  /// 工具调用的函数参数（JSON 字符串）
+  final String? arguments;
+  /// 工具执行结果（JSON 字符串）
+  final String? result;
 
-  ToolProgress({
+  const ToolProgress({
     required this.toolName,
     required this.status,
+    this.label,
+    this.emoji,
+    this.toolCallId,
     this.message,
     this.progress,
+    this.arguments,
     this.result,
   });
 
@@ -98,15 +115,19 @@ class ToolProgress {
     return ToolProgress(
       toolName: json['tool']?.toString() ?? json['tool_name']?.toString() ?? 'unknown',
       status: json['status']?.toString() ?? 'running',
+      label: json['label']?.toString(),
+      emoji: json['emoji']?.toString(),
+      toolCallId: json['toolCallId']?.toString(),
       message: json['message']?.toString(),
       progress: json['progress'] != null ? (json['progress'] as num).toDouble() : null,
-      result: json['result'] as Map<String, dynamic>?,
+      arguments: json['arguments']?.toString(),
+      result: json['result']?.toString(),
     );
   }
 
   @override
   String toString() {
-    return 'ToolProgress(tool: $toolName, status: $status, progress: $progress)';
+    return 'ToolProgress(tool: $toolName, status: $status, label: $label)';
   }
 }
 
