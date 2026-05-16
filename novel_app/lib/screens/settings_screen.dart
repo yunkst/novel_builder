@@ -14,6 +14,7 @@ import '../core/providers/service_providers.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../utils/format_utils.dart';
+import '../core/database/database_connection.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -26,6 +27,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   PackageInfo? _packageInfo;
   bool _isCheckingUpdate = false;
   String? _lastBackupTime;
+  bool _isRepairing = false;
 
   @override
   void initState() {
@@ -254,6 +256,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: _handleBackup,
           ),
           const Divider(),
+
+          // 修复数据库入口
+          ListTile(
+            leading: _isRepairing
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.build_outlined),
+            title: const Text('修复数据库'),
+            subtitle: const Text('补全缺失的表和列（不影响现有数据）'),
+            trailing:
+                _isRepairing ? null : const Icon(Icons.arrow_forward_ios),
+            onTap: _isRepairing ? null : _handleRepairDatabase,
+          ),
+          const Divider(),
         ],
       ),
     );
@@ -369,6 +388,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ToastUtils.show('备份失败: $e');
+      }
+    }
+  }
+
+  /// 处理数据库修复
+  Future<void> _handleRepairDatabase() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('修复数据库'),
+        content: const Text(
+            '将重新执行所有数据库迁移，补全缺失的表和列。\n此操作不会删除现有数据。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认修复'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isRepairing = true;
+    });
+
+    try {
+      final connection = DatabaseConnection();
+      await connection.repairDatabase();
+
+      if (mounted) {
+        setState(() {
+          _isRepairing = false;
+        });
+        ToastUtils.show('数据库修复完成');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRepairing = false;
+        });
+        ToastUtils.showError('数据库修复失败: $e');
       }
     }
   }
