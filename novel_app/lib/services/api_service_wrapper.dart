@@ -13,6 +13,7 @@ import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
 import 'chapter_manager.dart';
 import 'logger_service.dart';
+import '../models/chapter_content_result.dart';
 import '../utils/logging/log_scope.dart';
 import 'preferences_service.dart';
 
@@ -542,6 +543,41 @@ class ApiServiceWrapper {
 
       if (response.statusCode == 200) {
         return response.data?.content ?? '';
+      } else {
+        throw Exception('获取章节内容失败: ${response.statusCode}');
+      }
+    }, '获取章节内容');
+  }
+
+  /// 获取章节内容（包含来源标识）
+  ///
+  /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
+  Future<ChapterContentResult> getChapterContentWithSource(String chapterUrl,
+      {bool forceRefresh = false}) async {
+    return _chapterManager.getChapterContentWithSource(
+      chapterUrl,
+      forceRefresh: forceRefresh,
+      fetchFunction: () => _fetchChapterContentFromNetworkWithSource(chapterUrl,
+          forceRefresh: forceRefresh),
+    );
+  }
+
+  /// 从网络获取章节内容（包含来源标识）
+  Future<ChapterContentResult> _fetchChapterContentFromNetworkWithSource(
+      String chapterUrl, {bool forceRefresh = false}) async {
+    return _withRetry<ChapterContentResult>(() async {
+      final token = await getToken();
+      final response = await _api.chapterContentChapterContentGet(
+        url: chapterUrl,
+        forceRefresh: forceRefresh,
+        X_API_TOKEN: token,
+      );
+
+      if (response.statusCode == 200) {
+        return ChapterContentResult(
+          content: response.data?.content ?? '',
+          fromCache: response.data?.fromCache ?? false,
+        );
       } else {
         throw Exception('获取章节内容失败: ${response.statusCode}');
       }

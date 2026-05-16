@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../models/chapter_content_result.dart';
 
 /// 章节请求管理器单例
 ///
@@ -37,9 +38,9 @@ class ChapterManager {
     _initializeCleanupTimer();
   }
 
-  /// 待处理的网络请求，key为章节URL，value为Future字符串
-  final Map<String, Future<String>> _pendingRequests =
-      <String, Future<String>>{};
+  /// 待处理的网络请求，key为章节URL，value为Future<ChapterContentResult>
+  final Map<String, Future<ChapterContentResult>> _pendingRequests =
+      <String, Future<ChapterContentResult>>{};
 
   /// 请求时间戳，用于清理过期请求
   final Map<String, DateTime> _requestTimestamps = <String, DateTime>{};
@@ -78,25 +79,23 @@ class ChapterManager {
     if (_pendingRequests.containsKey(chapterUrl)) {
       _deduplicatedRequests++;
       debugPrint('🔗 请求去重: 复用现有请求 - $chapterUrl');
-      return _pendingRequests[chapterUrl]!;
+      final result = await _pendingRequests[chapterUrl]!;
+      return result.content;
     }
 
     // 创建新请求
     debugPrint('🆕 发起章节请求: $chapterUrl');
     final requestFuture = _createRequest(chapterUrl, fetchFunction);
-
-    // 存储请求
-    _pendingRequests[chapterUrl] = requestFuture;
+    _pendingRequests[chapterUrl] = requestFuture.then((r) => ChapterContentResult(content: r, fromCache: false));
     _requestTimestamps[chapterUrl] = DateTime.now();
 
     try {
-      final result = await requestFuture;
-      return result;
+      final result = await _pendingRequests[chapterUrl]!;
+      return result.content;
     } catch (e) {
       debugPrint('❌ 章节请求失败: $chapterUrl, 错误: $e');
       rethrow;
     } finally {
-      // 清理完成的请求
       _cleanupRequest(chapterUrl);
     }
   }
@@ -163,6 +162,61 @@ class ChapterManager {
   void _cleanupRequest(String chapterUrl) {
     _pendingRequests.remove(chapterUrl);
     _requestTimestamps.remove(chapterUrl);
+  }
+
+  /// 获取章节内容（带来源标识，带请求去重）
+  ///
+  /// [chapterUrl] 章节URL
+  /// [forceRefresh] 是否强制刷新，绕过所有缓存
+  /// [fetchFunction] 实际的网络获取函数
+  ///
+  /// 返回 ChapterContentResult（包含 content 和 fromCache）
+  Future<ChapterContentResult> getChapterContentWithSource(
+    String chapterUrl, {
+    bool forceRefresh = false,
+    required Future<ChapterContentResult> Function() fetchFunction,
+  }) async {
+    _totalRequests++;
+
+    if (forceRefresh) {
+      debugPrint('🔄 强制刷新章节: $chapterUrl');
+      return await fetchFunction();
+    }
+
+    // 检查是否已有相同请求在进行中
+    if (_pendingRequests.containsKey(chapterUrl)) {
+      _deduplicatedRequests++;
+      debugPrint('🔗 请求去重: 复用现有请求 - $chapterUrl');
+      return await _pendingRequests[chapterUrl]!;
+    }
+
+    debugPrint('🆕 发起章节请求: $chapterUrl');
+
+    // 创建新请求并缓存 Future
+    final requestFuture = _createRequestWithSource(chapterUrl, fetchFunction);
+    _pendingRequests[chapterUrl] = requestFuture;
+    _requestTimestamps[chapterUrl] = DateTime.now();
+
+    try {
+      final result = await requestFuture;
+      return result;
+    } catch (e) {
+      debugPrint('❌ 章节请求失败: $chapterUrl, 错误: $e');
+      rethrow;
+    } finally {
+      _cleanupRequest(chapterUrl);
+    }
+  }
+
+  /// 创建网络请求（带来源）
+  Future<ChapterContentResult> _createRequestWithSource(
+      String chapterUrl, Future<ChapterContentResult> Function() fetchFunction) async {
+    try {
+      return await fetchFunction();
+    } catch (e) {
+      debugPrint('❌ 网络请求失败: $chapterUrl, 错误: $e');
+      rethrow;
+    }
   }
 
   /// 初始化清理定时器

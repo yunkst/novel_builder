@@ -7,6 +7,7 @@ import 'package:novel_app/services/preload_progress_update.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
+import 'package:novel_app/models/chapter_content_result.dart';
 
 import '../../helpers/test_database_setup.dart';
 import 'test_helpers.mocks.dart' as test_mocks;
@@ -68,7 +69,10 @@ void main() {
   // 测试2: enqueueTasks 任务队列创建
   // ============================================================
   group('enqueueTasks 任务队列', () {
-    test('未缓存章节应该被加入队列', () async {
+    test('未缓存章节应该被加入队列并处理', () async {
+      when(mockApiService.getChapterContentWithSource(any))
+          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+
       await preloadService.enqueueTasks(
         novelUrl: testNovelUrl,
         novelTitle: '测试',
@@ -76,10 +80,16 @@ void main() {
         currentIndex: 0,
       );
 
+      // _processQueue 是 fire-and-forget，等待处理完成
+      await Future.delayed(Duration(milliseconds: 500));
+
       final stats = preloadService.getStatistics();
-      expect(stats['queue_length'], greaterThan(0));
-      expect(stats['enqueued_urls'], greaterThan(0));
-    });
+      // 入队后可能已被处理完，所以检查 total_processed 或 enqueued_urls
+      final processed = stats['total_processed'] as int;
+      final enqueued = stats['enqueued_urls'] as int;
+      expect(processed + enqueued, greaterThan(0),
+          reason: '应该有章节被入队或已处理');
+    }, timeout: Timeout(Duration(seconds: 5)));
 
     test('已缓存章节不应被加入队列', () async {
       await chapterRepository.cacheChapter(
@@ -111,8 +121,8 @@ void main() {
         'https://example.com/exec1',
         'https://example.com/exec2',
       ];
-      when(mockApiService.getChapterContent(any))
-          .thenAnswer((_) async => '执行内容');
+      when(mockApiService.getChapterContentWithSource(any))
+          .thenAnswer((_) async => ChapterContentResult(content: '执行内容'));
 
       // Act
       await preloadService.enqueueTasks(
@@ -143,8 +153,8 @@ void main() {
         'https://example.com/verify_current',
         'https://example.com/verify_mock',
       ];
-      when(mockApiService.getChapterContent(any))
-          .thenAnswer((_) async => 'mock内容');
+      when(mockApiService.getChapterContentWithSource(any))
+          .thenAnswer((_) async => ChapterContentResult(content: 'mock内容'));
 
       // Act
       await preloadService.enqueueTasks(
@@ -161,14 +171,14 @@ void main() {
       print('步骤2 stats: $stats');
 
       // 验证mock被调用
-      verify(mockApiService.getChapterContent('https://example.com/verify_mock')).called(greaterThanOrEqualTo(1));
+      verify(mockApiService.getChapterContentWithSource('https://example.com/verify_mock')).called(greaterThanOrEqualTo(1));
     }, timeout: Timeout(Duration(seconds: 5)));
 
     test('步骤3: 验证缓存是否写入数据库', () async {
       // Arrange
       final url = 'https://example.com/verify_cache';
-      when(mockApiService.getChapterContent(url))
-          .thenAnswer((_) async => '缓存验证内容');
+      when(mockApiService.getChapterContentWithSource(url))
+          .thenAnswer((_) async => ChapterContentResult(content: '缓存验证内容'));
 
       // Act - 直接通过ChapterRepository缓存，绕过PreloadService的速率限制
       // 这是更可靠的测试方式
@@ -194,8 +204,8 @@ void main() {
   group('速率限制', () {
     test('第一个任务无延迟', () async {
       final url = 'https://example.com/rate1';
-      when(mockApiService.getChapterContent(url))
-          .thenAnswer((_) async => '内容');
+      when(mockApiService.getChapterContentWithSource(url))
+          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
 
       final start = DateTime.now();
       await preloadService.enqueueTasks(
@@ -219,8 +229,8 @@ void main() {
   group('进度流', () {
     test('缓存完成后应该发出进度事件', () async {
       final url = 'https://example.com/progress1';
-      when(mockApiService.getChapterContent(url))
-          .thenAnswer((_) async => '内容');
+      when(mockApiService.getChapterContentWithSource(url))
+          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
 
       final events = <PreloadProgressUpdate>[];
       final sub = preloadService.progressStream.listen((e) => events.add(e));

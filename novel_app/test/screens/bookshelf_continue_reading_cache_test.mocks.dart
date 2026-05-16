@@ -3,15 +3,15 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i5;
+import 'dart:async' as _i6;
 
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:novel_app/core/interfaces/i_database_connection.dart' as _i7;
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart'
-    as _i4;
+    as _i5;
 import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i2;
-import 'package:novel_app/models/novel.dart' as _i6;
-import 'package:sqflite/sqflite.dart' as _i3;
+import 'package:novel_app/models/novel.dart' as _i3;
+import 'package:sqflite/sqflite.dart' as _i4;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -38,8 +38,18 @@ class _FakeAiAccompanimentSettings_0 extends _i1.SmartFake
         );
 }
 
-class _FakeDatabase_1 extends _i1.SmartFake implements _i3.Database {
-  _FakeDatabase_1(
+class _FakeNovel_1 extends _i1.SmartFake implements _i3.Novel {
+  _FakeNovel_1(
+    Object parent,
+    Invocation parentInvocation,
+  ) : super(
+          parent,
+          parentInvocation,
+        );
+}
+
+class _FakeDatabase_2 extends _i1.SmartFake implements _i4.Database {
+  _FakeDatabase_2(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -51,49 +61,49 @@ class _FakeDatabase_1 extends _i1.SmartFake implements _i3.Database {
 /// A class which mocks [INovelRepository].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
+class MockINovelRepository extends _i1.Mock implements _i5.INovelRepository {
   MockINovelRepository() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<int> addToBookshelf(_i6.Novel? novel) => (super.noSuchMethod(
+  _i6.Future<int> addToBookshelf(_i3.Novel? novel) => (super.noSuchMethod(
         Invocation.method(
           #addToBookshelf,
           [novel],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<int> removeFromBookshelf(String? novelUrl) => (super.noSuchMethod(
+  _i6.Future<int> removeFromBookshelf(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #removeFromBookshelf,
           [novelUrl],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<List<_i6.Novel>> getNovels() => (super.noSuchMethod(
+  _i6.Future<List<_i3.Novel>> getNovels() => (super.noSuchMethod(
         Invocation.method(
           #getNovels,
           [],
         ),
-        returnValue: _i5.Future<List<_i6.Novel>>.value(<_i6.Novel>[]),
-      ) as _i5.Future<List<_i6.Novel>>);
+        returnValue: _i6.Future<List<_i3.Novel>>.value(<_i3.Novel>[]),
+      ) as _i6.Future<List<_i3.Novel>>);
 
   @override
-  _i5.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
+  _i6.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #isInBookshelf,
           [novelUrl],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
-  _i5.Future<int> updateLastReadChapter(
+  _i6.Future<int> updateLastReadChapter(
     String? novelUrl,
     int? chapterIndex,
   ) =>
@@ -105,11 +115,11 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
             chapterIndex,
           ],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<int> updateTitle(
+  _i6.Future<int> updateTitle(
     String? novelUrl,
     String? newTitle,
   ) =>
@@ -121,11 +131,11 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
             newTitle,
           ],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<int> updateBackgroundSetting(
+  _i6.Future<int> updateBackgroundSetting(
     String? novelUrl,
     String? backgroundSetting,
   ) =>
@@ -137,37 +147,37 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
             backgroundSetting,
           ],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<String?> getBackgroundSetting(String? novelUrl) =>
+  _i6.Future<String?> getBackgroundSetting(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getBackgroundSetting,
           [novelUrl],
         ),
-        returnValue: _i5.Future<String?>.value(),
-      ) as _i5.Future<String?>);
+        returnValue: _i6.Future<String?>.value(),
+      ) as _i6.Future<String?>);
 
   @override
-  _i5.Future<int> getLastReadChapter(String? novelUrl) => (super.noSuchMethod(
+  _i6.Future<int> getLastReadChapter(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #getLastReadChapter,
           [novelUrl],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 
   @override
-  _i5.Future<_i2.AiAccompanimentSettings> getAiAccompanimentSettings(
+  _i6.Future<_i2.AiAccompanimentSettings> getAiAccompanimentSettings(
           String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getAiAccompanimentSettings,
           [novelUrl],
         ),
-        returnValue: _i5.Future<_i2.AiAccompanimentSettings>.value(
+        returnValue: _i6.Future<_i2.AiAccompanimentSettings>.value(
             _FakeAiAccompanimentSettings_0(
           this,
           Invocation.method(
@@ -175,10 +185,10 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
             [novelUrl],
           ),
         )),
-      ) as _i5.Future<_i2.AiAccompanimentSettings>);
+      ) as _i6.Future<_i2.AiAccompanimentSettings>);
 
   @override
-  _i5.Future<int> updateAiAccompanimentSettings(
+  _i6.Future<int> updateAiAccompanimentSettings(
     String? novelUrl,
     _i2.AiAccompanimentSettings? settings,
   ) =>
@@ -190,8 +200,53 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
             settings,
           ],
         ),
-        returnValue: _i5.Future<int>.value(0),
-      ) as _i5.Future<int>);
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
+
+  @override
+  _i6.Future<_i3.Novel?> getNovelByTitle(String? title) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelByTitle,
+          [title],
+        ),
+        returnValue: _i6.Future<_i3.Novel?>.value(),
+      ) as _i6.Future<_i3.Novel?>);
+
+  @override
+  _i6.Future<_i3.Novel> createNovel({
+    required String? title,
+    required String? author,
+    String? description,
+    String? coverUrl,
+    String? backgroundSetting,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #createNovel,
+          [],
+          {
+            #title: title,
+            #author: author,
+            #description: description,
+            #coverUrl: coverUrl,
+            #backgroundSetting: backgroundSetting,
+          },
+        ),
+        returnValue: _i6.Future<_i3.Novel>.value(_FakeNovel_1(
+          this,
+          Invocation.method(
+            #createNovel,
+            [],
+            {
+              #title: title,
+              #author: author,
+              #description: description,
+              #coverUrl: coverUrl,
+              #backgroundSetting: backgroundSetting,
+            },
+          ),
+        )),
+      ) as _i6.Future<_i3.Novel>);
 }
 
 /// A class which mocks [IDatabaseConnection].
@@ -204,13 +259,13 @@ class MockIDatabaseConnection extends _i1.Mock
   }
 
   @override
-  _i5.Future<_i3.Database> get database => (super.noSuchMethod(
+  _i6.Future<_i4.Database> get database => (super.noSuchMethod(
         Invocation.getter(#database),
-        returnValue: _i5.Future<_i3.Database>.value(_FakeDatabase_1(
+        returnValue: _i6.Future<_i4.Database>.value(_FakeDatabase_2(
           this,
           Invocation.getter(#database),
         )),
-      ) as _i5.Future<_i3.Database>);
+      ) as _i6.Future<_i4.Database>);
 
   @override
   bool get isInitialized => (super.noSuchMethod(
@@ -219,22 +274,22 @@ class MockIDatabaseConnection extends _i1.Mock
       ) as bool);
 
   @override
-  _i5.Future<void> initialize() => (super.noSuchMethod(
+  _i6.Future<void> initialize() => (super.noSuchMethod(
         Invocation.method(
           #initialize,
           [],
         ),
-        returnValue: _i5.Future<void>.value(),
-        returnValueForMissingStub: _i5.Future<void>.value(),
-      ) as _i5.Future<void>);
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
 
   @override
-  _i5.Future<void> close() => (super.noSuchMethod(
+  _i6.Future<void> close() => (super.noSuchMethod(
         Invocation.method(
           #close,
           [],
         ),
-        returnValue: _i5.Future<void>.value(),
-        returnValueForMissingStub: _i5.Future<void>.value(),
-      ) as _i5.Future<void>);
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
 }

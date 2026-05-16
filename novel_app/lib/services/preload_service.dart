@@ -190,7 +190,7 @@ class PreloadService {
     return tasks;
   }
 
-  /// 串行处理队列（全局唯一执行点，30秒速率限制）
+  /// 串行处理队列（智能速率限制：缓存章节无等待，爬虫章节30秒间隔）
   ///
   /// 🔒 并发安全: 使用 Completer 确保同一时间只有一个循环执行
   Future<void> _processQueue() async {
@@ -207,9 +207,6 @@ class PreloadService {
 
     try {
       while (_queue.isNotEmpty && !_shouldStop) {
-        // 速率限制:等待30秒
-        await _rateLimiter.acquire();
-
         // 从队列头部取出任务
         final task = _queue.removeFirst();
         _enqueuedUrls.remove(task.chapterUrl);
@@ -218,17 +215,17 @@ class PreloadService {
           // 标记正在预加载
           _chapterRepository.markAsPreloading(task.chapterUrl);
 
-          // 获取内容（API服务已通过构造函数注入）
-          final content = await _apiService.getChapterContent(task.chapterUrl);
+          // 获取内容（带来源标识）
+          final result = await _apiService.getChapterContentWithSource(task.chapterUrl);
 
           // 保存到数据库
           final chapter = Chapter(
             url: task.chapterUrl,
-            title: '', // 可以从API获取
-            content: content,
+            title: '',
+            content: result.content,
           );
           await _chapterRepository.cacheChapter(
-              task.novelUrl, chapter, content);
+              task.novelUrl, chapter, result.content);
 
           _totalProcessed++;
 
@@ -249,9 +246,19 @@ class PreloadService {
             cachedChapters: 0,
             totalChapters: 0,
           ));
+
+          // 根据来源控制速率
+          if (result.fromCache) {
+            // 缓存命中：重置速率限制器，下一条可以立即获取
+            _rateLimiter.reset();
+          } else {
+            // 爬虫抓取：等待30秒间隔后再获取下一条
+            await _rateLimiter.acquire();
+          }
         } catch (e) {
           _totalFailed++;
-          // 失败不中断，继续下一个
+          // 失败时也等待间隔
+          await _rateLimiter.acquire();
         }
       }
 

@@ -6,7 +6,7 @@ part of 'sync_service_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$novelSyncServiceHash() => r'501805cbfe2907f481a47c2a999e6c82ad2fc4f5';
+String _$novelSyncServiceHash() => r'fe21a47880410a75e20ff0593a2258841efc34ae';
 
 /// NovelSyncService Provider
 ///
