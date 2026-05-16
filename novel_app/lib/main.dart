@@ -9,6 +9,7 @@ import 'core/providers/service_providers.dart';
 import 'core/providers/theme_provider.dart';
 import 'utils/video_cache_manager.dart';
 import 'services/logger_service.dart';
+import 'widgets/hermes/hermes_floating_button.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
@@ -271,9 +272,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
+      body: HermesFloatingShell(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

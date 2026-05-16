@@ -75,6 +75,7 @@ from .services.app_version_service import AppVersionServiceError, get_app_versio
 from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
 from .api.routes.backup import router as backup_router
+from .api.routes.hermes import router as hermes_router
 from .api.routes.novel_sync import router as novel_sync_router
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,7 @@ app.add_middleware(
 
 # 注册API路由
 app.include_router(backup_router)
+app.include_router(hermes_router)
 app.include_router(novel_sync_router)
 
 

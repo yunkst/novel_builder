@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # 小说同步配置
     novel_sync_dir: str = "novel_sync"
 
+    # Hermes AI Chat 服务配置
+    hermes_api_url: str = Field(default="", alias="HERMES_API_URL")
+    hermes_api_key: str = Field(default="", alias="HERMES_API_KEY")
+    hermes_timeout: int = 300  # 5分钟超时
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 生成默认的secret_key（如果未设置）
