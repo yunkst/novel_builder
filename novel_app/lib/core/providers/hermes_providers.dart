@@ -170,12 +170,10 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     );
   }
 
-  /// 清空会话
+  /// 清空会话（保留 sessionId）
   void clearConversation() {
     _pendingContent = '';
-    final newId = _generateSessionId();
-    state = HermesChatState(sessionId: newId);
-    PreferencesService.instance.setString(_sessionIdKey, newId);
+    state = HermesChatState(sessionId: state.sessionId);
   }
 }
 

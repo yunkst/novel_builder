@@ -21,6 +21,20 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   bool _isFullscreen = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  }
+
+  @override
   void dispose() {
     _inputController.dispose();
     _scrollController.dispose();
@@ -32,6 +46,16 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   Widget build(BuildContext context) {
     final chatState = ref.watch(hermesChatProvider);
     final notifier = ref.read(hermesChatProvider.notifier);
+
+    ref.listen(hermesChatProvider, (prev, next) {
+      final prevCount = prev?.messages.length ?? 0;
+      final nextCount = next.messages.length;
+      if (nextCount > prevCount || (next.isLoading && next.streamingContent != null)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
+    });
 
     return Dialog(
       insetPadding: _isFullscreen ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -301,18 +325,6 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     _inputController.clear();
     notifier.sendMessage(text);
 
-    // 自动滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-
-    // 重新获取焦点
     _focusNode.requestFocus();
   }
 }
