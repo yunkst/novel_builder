@@ -23,6 +23,7 @@ class HermesConfig {
 /// Hermes Chat 服务
 class HermesChatService {
   final ApiServiceWrapper _apiService;
+  CancelToken? _activeCancelToken;
 
   HermesChatService({required ApiServiceWrapper apiService})
       : _apiService = apiService;
@@ -72,6 +73,9 @@ class HermesChatService {
     );
 
     try {
+      final cancelToken = CancelToken();
+      _activeCancelToken = cancelToken;
+
       final dio = _apiService.dio;
       final response = await dio.post<ResponseBody>(
         cfg.chatUrl,
@@ -80,6 +84,7 @@ class HermesChatService {
           responseType: ResponseType.stream,
           headers: headers,
         ),
+        cancelToken: cancelToken,
       );
 
       final responseStream = response.data?.stream;
@@ -118,6 +123,15 @@ class HermesChatService {
         onDone?.call();
       }
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        LoggerService.instance.i(
+          'Hermes request cancelled by user',
+          category: LogCategory.ai,
+          tags: ['hermes', 'chat', 'cancel'],
+        );
+        onError?.call('cancelled');
+        return;
+      }
       LoggerService.instance.e(
         'Hermes request failed: ${e.message}',
         category: LogCategory.ai,
@@ -131,6 +145,21 @@ class HermesChatService {
         tags: ['hermes', 'chat', 'error'],
       );
       onError?.call(e.toString());
+    }
+  }
+
+  /// 取消当前活动请求
+  ///
+  /// 当 SSE 连接断开时，Hermes Agent 会自动调用 interrupt 停止生成
+  void cancelActiveRequest() {
+    if (_activeCancelToken != null && !_activeCancelToken!.isCancelled) {
+      _activeCancelToken!.cancel('User cancelled');
+      _activeCancelToken = null;
+      LoggerService.instance.i(
+        'Hermes request cancellation triggered',
+        category: LogCategory.ai,
+        tags: ['hermes', 'chat', 'cancel'],
+      );
     }
   }
 

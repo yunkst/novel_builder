@@ -170,6 +170,30 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     );
   }
 
+  /// 停止当前生成
+  void cancelRequest() {
+    final service = _ref.read(hermesChatServiceProvider);
+    service.cancelActiveRequest();
+
+    if (_pendingContent.isNotEmpty) {
+      final assistantMessage = HermesMessage.assistant(_pendingContent);
+      final finalMessages = [...state.messages, assistantMessage];
+      state = state.copyWith(
+        messages: finalMessages,
+        isLoading: false,
+        streamingContent: null,
+        activeToolProgress: [],
+      );
+    } else {
+      state = state.copyWith(
+        isLoading: false,
+        streamingContent: null,
+        activeToolProgress: [],
+      );
+    }
+    _pendingContent = '';
+  }
+
   /// 清空会话（保留 sessionId）
   void clearConversation() {
     _pendingContent = '';

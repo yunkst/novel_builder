@@ -293,24 +293,26 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                child: chatState.isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : FilledButton.icon(
-                        onPressed: () => _sendMessage(notifier),
-                        icon: const Icon(Icons.send, size: 18),
-                        label: const Text('发送'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        ),
-                      ),
-              ),
+              if (chatState.isLoading)
+                FilledButton.icon(
+                  onPressed: () => notifier.cancelRequest(),
+                  icon: const Icon(Icons.stop, size: 18),
+                  label: const Text('停止'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: () => _sendMessage(notifier),
+                  icon: const Icon(Icons.send, size: 18),
+                  label: const Text('发送'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  ),
+                ),
             ],
           ),
         ],
