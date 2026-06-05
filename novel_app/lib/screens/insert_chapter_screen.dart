@@ -5,8 +5,13 @@ import '../models/chapter.dart';
 import '../models/outline.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
+import '../widgets/prompt_history_bottom_sheet.dart';
+import '../widgets/prompt_tag_selector_sheet.dart';
+import '../widgets/selected_tags_view.dart';
+import '../models/tag_group.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../services/prompt_tag_service.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 import '../services/preferences_service.dart';
@@ -132,6 +137,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   /// 用户选择的参与角色 ID 列表
   List<int> _selectedCharacterIds = [];
 
+  /// 选中的标签分组
+  List<TagGroup> _selectedTagGroups = [];
+
   /// 小说大纲对象
   Outline? _outline;
 
@@ -205,11 +213,81 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   // 步骤管理
   // ========================================================================
 
+  /// 弹出历史提示词面板，选择后填入 [controller]
+  Future<void> _showPromptHistory(TextEditingController controller) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: const PromptHistoryBottomSheet(),
+      ),
+    );
+    if (selected != null && selected.isNotEmpty) {
+      controller.text = selected;
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: selected.length),
+      );
+    }
+  }
+
+  /// 异步保存提示词到历史（去重 + 提升到最新）
+  void _savePromptHistory(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    Future.microtask(() async {
+      try {
+        final repo = ref.read(promptHistoryRepositoryProvider);
+        await repo.addOrUpdate(trimmed);
+      } catch (e) {
+        debugPrint('保存提示词历史失败: $e');
+      }
+    });
+  }
+
+  /// 打开标签选择面板
+  Future<void> _openTagSelector() async {
+    final result = await showModalBottomSheet<List<TagGroup>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: PromptTagSelectorSheet(
+          initialSelectedGroups: _selectedTagGroups,
+        ),
+      ),
+    );
+    if (result == null) return;
+    setState(() => _selectedTagGroups = result);
+  }
+
+  /// 移除已选标签
+  void _removeTag(TagGroup group) {
+    setState(() {
+      _selectedTagGroups = _selectedTagGroups
+          .where((g) => '${g.categoryId}:${g.name}' != '${group.categoryId}:${group.name}')
+          .toList();
+    });
+  }
+
   /// 处理确认按钮点击
-  void _handleConfirm() {
+  Future<void> _handleConfirm() async {
     // 大纲模式：生成细纲后进入下一步
     if (_currentMode == _InsertMode.outline && _currentStep == 0) {
       // 用户输入现在是可选的，不再进行必填验证
+      final mergedInput = await _mergeTagPrompt(_userInputController.text);
+      _savePromptHistory(_userInputController.text);
+      if (mergedInput != _userInputController.text) {
+        _userInputController.text = mergedInput;
+      }
       _generateOutlineDraft();
       return;
     }
@@ -221,18 +299,21 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         return;
       }
 
-      final content = _currentMode == _InsertMode.outline
+      final rawContent = _currentMode == _InsertMode.outline
           ? _draftEditingController.text.trim()
           : _userInputController.text.trim();
 
-      if (content.isEmpty) {
+      if (rawContent.isEmpty) {
         ToastUtils.showWarning('请输入章节内容要求');
         return;
       }
 
+      _savePromptHistory(rawContent);
+      final merged = await _mergeTagPrompt(rawContent);
+
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
-        'content': content,
+        'content': merged,
         'characterIds': _selectedCharacterIds,
       });
     }
@@ -245,12 +326,22 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         return;
       }
 
+      _savePromptHistory(_userInputController.text);
+      final merged = await _mergeTagPrompt(_userInputController.text);
+
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
-        'content': _userInputController.text.trim(),
+        'content': merged,
         'characterIds': _selectedCharacterIds,
       });
     }
+  }
+
+  /// 将选中标签的 prompt 拼接到输入前
+  Future<String> _mergeTagPrompt(String original) async {
+    if (_selectedTagGroups.isEmpty) return original;
+    final service = PromptTagService(ref);
+    return service.buildMergedUserInput(original, _selectedTagGroups);
   }
 
   // ========================================================================
@@ -652,14 +743,39 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _userInputController,
-                decoration: const InputDecoration(
-                  labelText: '章节内容要求',
-                  hintText: '描述你想要的故事情节、人物对话、场景描述等...',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _userInputController,
+                    decoration: InputDecoration(
+                      labelText: '章节内容要求',
+                      hintText: '描述你想要的故事情节、人物对话、场景描述等...',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.label_outline),
+                            tooltip: '选择标签',
+                            onPressed: _openTagSelector,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.history),
+                            tooltip: '历史提示词',
+                            onPressed: () =>
+                                _showPromptHistory(_userInputController),
+                          ),
+                        ],
+                      ),
+                    ),
+                    maxLines: 8,
+                  ),
+                  SelectedTagsView(
+                    groups: _selectedTagGroups,
+                    onRemove: _removeTag,
+                  ),
+                ],
               ),
             ),
           ),
@@ -769,14 +885,34 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           // 用户输入
           TextField(
             controller: _userInputController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '章节要求（可选）',
               hintText: '描述您希望这一章包含的内容、情节、冲突等，留空则完全根据大纲生成...',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.label_outline),
+                    tooltip: '选择标签',
+                    onPressed: _openTagSelector,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.history),
+                    tooltip: '历史提示词',
+                    onPressed: () => _showPromptHistory(_userInputController),
+                  ),
+                ],
+              ),
             ),
             maxLines: 5,
             autofocus: true,
             enabled: !isStreaming, // 生成时禁用输入
+          ),
+
+          SelectedTagsView(
+            groups: _selectedTagGroups,
+            onRemove: _removeTag,
           ),
 
           const SizedBox(height: 12),

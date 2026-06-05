@@ -5,6 +5,7 @@ import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'preload_queue_debug_screen.dart';
+import 'prompt_tag_management_screen.dart';
 import '../services/app_update_service.dart';
 import '../services/logger_service.dart';
 import '../widgets/app_update_dialog.dart';
@@ -208,6 +209,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: Text('主题模式'),
               subtitle: Text('加载失败'),
             ),
+          ),
+          const Divider(),
+
+          // 标签管理
+          ListTile(
+            leading: const Icon(Icons.label_outline),
+            title: const Text('标签管理'),
+            subtitle: const Text('管理章节生成时使用的提示词标签'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PromptTagManagementScreen(),
+                ),
+              );
+            },
           ),
           const Divider(),
 

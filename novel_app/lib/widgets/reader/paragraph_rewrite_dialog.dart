@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
+import '../../models/tag_group.dart';
 import '../../services/rewrite_service.dart';
+import '../../services/prompt_tag_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
 import '../../utils/paragraph_replace_helper.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
+import '../../widgets/prompt_tag_selector_sheet.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/reader_screen_providers.dart';
 
@@ -58,6 +61,9 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
   // 改写结果
   String _rewriteResult = '';
   String _lastRewriteInput = '';
+
+  // 标签选择状态
+  List<TagGroup> _selectedTagGroups = [];
 
   @override
   void initState() {
@@ -133,62 +139,41 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
       return;
     }
 
-    final userInputController = TextEditingController(text: _lastRewriteInput);
-    final result = await showDialog<String>(
+    final result = await showDialog<_RewriteInputResult>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('输入改写要求'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '已选择 ${widget.selectedParagraphIndices.length} 个段落',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
+      builder: (context) => _RewriteInputDialog(
+        initialInput: _lastRewriteInput,
+        selectedGroups: _selectedTagGroups,
+        onOpenTagSelector: () async {
+          final groups = await showModalBottomSheet<List<TagGroup>>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: userInputController,
-                decoration: const InputDecoration(
-                  hintText: '例如：增加细节描述、改变语气、加强情感表达等...',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-                maxLines: 3,
+              child: PromptTagSelectorSheet(
+                initialSelectedGroups: _selectedTagGroups,
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, userInputController.text);
-            },
-            child: const Text('确认改写'),
-          ),
-        ],
+            ),
+          );
+          return groups;
+        },
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
-      _lastRewriteInput = result;
-      _generateRewrite(selectedText, result);
+    if (result != null) {
+      _lastRewriteInput = result.text;
+      _selectedTagGroups = result.selectedGroups;
+      final service = PromptTagService(ref);
+      final mergedInput =
+          await service.buildMergedUserInput(result.text, _selectedTagGroups);
+      _generateRewrite(selectedText, mergedInput);
     } else {
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -605,6 +590,104 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
             Navigator.pop(context);
           },
           child: const Text('关闭'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 改写输入对话框的结果
+class _RewriteInputResult {
+  final String text;
+  final List<TagGroup> selectedGroups;
+  _RewriteInputResult(this.text, this.selectedGroups);
+}
+
+/// 改写要求输入对话框（支持标签选择）
+class _RewriteInputDialog extends StatefulWidget {
+  final String initialInput;
+  final List<TagGroup> selectedGroups;
+  final Future<List<TagGroup>?> Function() onOpenTagSelector;
+
+  const _RewriteInputDialog({
+    required this.initialInput,
+    required this.selectedGroups,
+    required this.onOpenTagSelector,
+  });
+
+  @override
+  State<_RewriteInputDialog> createState() => _RewriteInputDialogState();
+}
+
+class _RewriteInputDialogState extends State<_RewriteInputDialog> {
+  late TextEditingController _controller;
+  List<TagGroup> _groups = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialInput);
+    _groups = widget.selectedGroups;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('输入改写要求'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                hintText: '例如：增加细节描述、改变语气、加强情感表达等...',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.label_outline),
+                  tooltip: '选择标签',
+                  onPressed: () async {
+                    final groups = await widget.onOpenTagSelector();
+                    if (groups != null) {
+                      setState(() => _groups = groups);
+                    }
+                  },
+                ),
+              ),
+              autofocus: true,
+              maxLines: 3,
+            ),
+            if (_groups.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '已选 ${_groups.length} 个标签',
+                  style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _RewriteInputResult(_controller.text, _groups),
+            );
+          },
+          child: const Text('确认改写'),
         ),
       ],
     );

@@ -66,6 +66,7 @@ import '../controllers/reader_interaction_controller.dart';
 import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
+import '../widgets/reader/ai_prompt_tag_extract_sheet.dart';
 import 'tts_player_screen.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
@@ -1097,7 +1098,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       case 'refresh':
         _refreshChapter();
         break;
+      case 'ai_extract_tags':
+        _showAIExtractTagsSheet();
+        break;
     }
+  }
+
+  // 显示 AI 提取标签 Sheet
+  void _showAIExtractTagsSheet() {
+    if (_contentController.content.trim().isEmpty) {
+      ToastUtils.showWarning('当前章节无内容，无法提取标签', context: context);
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AIPromptTagExtractSheet(
+        chapterContent: _contentController.content,
+      ),
+    );
   }
 
   // 显示滚动速度调整对话框

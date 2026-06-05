@@ -316,5 +316,24 @@ final characterExtractionServiceProvider =
 // ignore: unused_element
 typedef CharacterExtractionServiceRef
     = AutoDisposeProviderRef<CharacterExtractionService>;
+String _$promptTagServiceHash() => r'd787cf7963d1d3cca7282f5e8ab778d361e40f82';
+
+/// PromptTagService Provider
+///
+/// Copied from [promptTagService].
+@ProviderFor(promptTagService)
+final promptTagServiceProvider = AutoDisposeProvider<PromptTagService>.internal(
+  promptTagService,
+  name: r'promptTagServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$promptTagServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PromptTagServiceRef = AutoDisposeProviderRef<PromptTagService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

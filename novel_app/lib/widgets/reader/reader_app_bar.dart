@@ -191,6 +191,16 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
+            const PopupMenuItem(
+              value: 'ai_extract_tags',
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 18),
+                  SizedBox(width: 12),
+                  Text('AI 提取标签'),
+                ],
+              ),
+            ),
           ],
         ),
       ],

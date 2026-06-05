@@ -211,6 +211,71 @@ final chatSceneRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChatSceneRepositoryRef = AutoDisposeProviderRef<IChatSceneRepository>;
+String _$promptHistoryRepositoryHash() =>
+    r'8dec5743a9b2498ec36322d0ca00d3cf7dc45e7e';
+
+/// PromptHistoryRepository Provider
+///
+/// Copied from [promptHistoryRepository].
+@ProviderFor(promptHistoryRepository)
+final promptHistoryRepositoryProvider =
+    AutoDisposeProvider<IPromptHistoryRepository>.internal(
+  promptHistoryRepository,
+  name: r'promptHistoryRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$promptHistoryRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PromptHistoryRepositoryRef
+    = AutoDisposeProviderRef<IPromptHistoryRepository>;
+String _$promptTagCategoryRepositoryHash() =>
+    r'cbc4e912675859cba31c3ec93dc79163a8597b48';
+
+/// PromptTagCategoryRepository Provider
+///
+/// Copied from [promptTagCategoryRepository].
+@ProviderFor(promptTagCategoryRepository)
+final promptTagCategoryRepositoryProvider =
+    AutoDisposeProvider<IPromptTagCategoryRepository>.internal(
+  promptTagCategoryRepository,
+  name: r'promptTagCategoryRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$promptTagCategoryRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PromptTagCategoryRepositoryRef
+    = AutoDisposeProviderRef<IPromptTagCategoryRepository>;
+String _$promptTagRepositoryHash() =>
+    r'b0ce6dabefb5203954d02130bfb6a73bcf47e687';
+
+/// PromptTagRepository Provider
+///
+/// Copied from [promptTagRepository].
+@ProviderFor(promptTagRepository)
+final promptTagRepositoryProvider =
+    AutoDisposeProvider<IPromptTagRepository>.internal(
+  promptTagRepository,
+  name: r'promptTagRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$promptTagRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PromptTagRepositoryRef = AutoDisposeProviderRef<IPromptTagRepository>;
 String _$bookshelfRepositoryHash() =>
     r'9f12c5aa18a12c4d48303b9f926256e73f2b1d7b';
 

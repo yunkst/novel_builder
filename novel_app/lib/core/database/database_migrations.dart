@@ -12,7 +12,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 21;
+  static const int currentVersion = 24;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -451,6 +451,71 @@ class DatabaseMigrations {
             db, 'idx_novel_chapters_novel_url', 'novel_chapters', 'novelUrl');
         await _createIndexIfNotExists(
             db, 'idx_novel_chapters_chapter_url', 'novel_chapters', 'chapterUrl');
+        break;
+
+      // ========== 版本 22：用户提示词历史记录表 ==========
+      case 22:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS prompt_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          prompt_text TEXT NOT NULL UNIQUE,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_prompt_history_updated_at', 'prompt_history', 'updated_at');
+        break;
+
+      // ========== 版本 23：提示词标签分类 + 标签表 ==========
+      case 23:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS prompt_tag_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS prompt_tags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          category_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          prompt_text TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_prompt_tags_category_id', 'prompt_tags', 'category_id');
+        break;
+
+      // ========== 版本 24：移除 prompt_tags 的 UNIQUE(category_id, name) 约束 ==========
+      case 24:
+        // SQLite 不支持直接删除约束，需要重建表
+        await db.execute('''
+        CREATE TABLE prompt_tags_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          category_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          prompt_text TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+        await db.execute('''
+        INSERT INTO prompt_tags_new (id, category_id, name, prompt_text, sort_order, created_at, updated_at)
+        SELECT id, category_id, name, prompt_text, sort_order, created_at, updated_at
+        FROM prompt_tags
+      ''');
+        await db.execute('DROP TABLE prompt_tags');
+        await db.execute('ALTER TABLE prompt_tags_new RENAME TO prompt_tags');
+        await _createIndexIfNotExists(
+            db, 'idx_prompt_tags_category_id', 'prompt_tags', 'category_id');
         break;
     }
   }

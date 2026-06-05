@@ -26,6 +26,7 @@ import '../../../services/chapter_service.dart';
 import '../../../services/chapter_search_service.dart';
 import '../../../services/cache_search_service.dart';
 import '../../../services/character_extraction_service.dart';
+import '../../../services/prompt_tag_service.dart';
 import '../../../controllers/chapter_list/chapter_loader.dart';
 import '../../../controllers/chapter_list/chapter_action_handler.dart';
 import '../../../controllers/chapter_list/chapter_reorder_controller.dart';
@@ -264,4 +265,10 @@ CacheSearchService cacheSearchService(Ref ref) {
 CharacterExtractionService characterExtractionService(Ref ref) {
   final chapterRepository = ref.watch(chapterRepositoryProvider);
   return CharacterExtractionService(chapterRepository: chapterRepository);
+}
+
+/// PromptTagService Provider
+@riverpod
+PromptTagService promptTagService(Ref ref) {
+  return PromptTagService(ref);
 }

@@ -10,22 +10,26 @@ from .base_crawler import BaseCrawler
 from .biquge543_crawler import Biquge543Crawler
 from .ddxsmf_crawler import DdxsmfCrawler
 from .shukuge_crawler_refactored import ShukugeCrawlerRefactored
+from .shuhaoxs_crawler import ShuhaoxsCrawler
 from .smxku_crawler import SmxkuCrawler
 from .wdscw_crawler_refactored import WdscwCrawlerRefactored
 from .wfxs_crawler import WfxsCrawler
 from .wodeshucheng_crawler import WodeshuchengCrawler
 from .xspsw_crawler_refactored import XspswCrawlerRefactored
+from .xqishen_crawler import XqishenCrawler
 
 # 为了向后兼容，创建别名
 AliceSWCrawler = AliceSWCrawlerRefactored
 Biquge543Crawler = Biquge543Crawler
 DdxsmfCrawler = DdxsmfCrawler
 ShukugeCrawler = ShukugeCrawlerRefactored
+ShuhaoxsCrawlerRefactored = ShuhaoxsCrawler
 XspswCrawler = XspswCrawlerRefactored
 WdscwCrawler = WdscwCrawlerRefactored
 WodeshuchengCrawler = WodeshuchengCrawler
 SmxkuCrawler = SmxkuCrawler
 WfxsCrawler = WfxsCrawler
+XqishenCrawler = XqishenCrawler
 
 # 源站元数据配置
 SOURCE_SITES_METADATA = {
@@ -101,6 +105,15 @@ SOURCE_SITES_METADATA = {
         "search_hint": None,
         "crawler_class": WfxsCrawler,
     },
+    "shuhaoxs": {
+        "name": "书豪小说网",
+        "base_url": "https://www.shuhaoxs.com",
+        "description": "综合小说阅读网站，包含玄幻、言情、都市等多种类型小说",
+        "search_enabled": True,
+        "search_reason": None,
+        "search_hint": None,
+        "crawler_class": ShuhaoxsCrawler,
+    },
     "biquge543": {
         "name": "笔趣阁543",
         "base_url": "https://m.biquge543.com",
@@ -109,6 +122,15 @@ SOURCE_SITES_METADATA = {
         "search_reason": "rate_limit",
         "search_hint": "该站点搜索功能有频率限制，请使用直接URL添加",
         "crawler_class": Biquge543Crawler,
+    },
+    "xqishen": {
+        "name": "齐盛小说网",
+        "base_url": "https://www.xqishen.com",
+        "description": "齐盛小说网，提供都市、玄幻、仙侠等多种类型小说",
+        "search_enabled": False,
+        "search_reason": "no_search",
+        "search_hint": "该站点不支持站内搜索，请使用直接URL添加",
+        "crawler_class": XqishenCrawler,
     },
 }
 
@@ -139,8 +161,12 @@ def get_enabled_crawlers() -> dict[str, BaseCrawler]:
         crawlers["smxku"] = SmxkuCrawler()
     if not enabled or "wfxs" in enabled:
         crawlers["wfxs"] = WfxsCrawler()
+    if not enabled or "shuhaoxs" in enabled:
+        crawlers["shuhaoxs"] = ShuhaoxsCrawler()
     if not enabled or "biquge543" in enabled:
         crawlers["biquge543"] = Biquge543Crawler()
+    if not enabled or "xqishen" in enabled:
+        crawlers["xqishen"] = XqishenCrawler()
     return crawlers
 
 
@@ -162,8 +188,12 @@ def get_crawler_for_url(url: str) -> BaseCrawler | None:
         return SmxkuCrawler()
     if "wfxs.tw" in url:
         return WfxsCrawler()
+    if "shuhaoxs.com" in url:
+        return ShuhaoxsCrawler()
     if "biquge543.com" in url:
         return Biquge543Crawler()
+    if "xqishen.com" in url:
+        return XqishenCrawler()
     # 兜底：尝试匹配 base_url
     for crawler in get_enabled_crawlers().values():
         if hasattr(crawler, "base_url") and crawler.base_url in url:

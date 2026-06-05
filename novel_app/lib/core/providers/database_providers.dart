@@ -11,6 +11,9 @@ import '../../repositories/outline_repository.dart';
 import '../../repositories/chat_scene_repository.dart';
 import '../../repositories/bookshelf_repository.dart';
 import '../../repositories/novel_export_repository.dart';
+import '../../repositories/prompt_history_repository.dart';
+import '../../repositories/prompt_tag_category_repository.dart';
+import '../../repositories/prompt_tag_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/i_database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
@@ -21,6 +24,9 @@ import '../interfaces/repositories/i_bookshelf_repository.dart';
 import '../interfaces/repositories/i_illustration_repository.dart';
 import '../interfaces/repositories/i_outline_repository.dart';
 import '../interfaces/repositories/i_chat_scene_repository.dart';
+import '../interfaces/repositories/i_prompt_history_repository.dart';
+import '../interfaces/repositories/i_prompt_tag_category_repository.dart';
+import '../interfaces/repositories/i_prompt_tag_repository.dart';
 
 part 'database_providers.g.dart';
 
@@ -114,6 +120,27 @@ IOutlineRepository outlineRepository(Ref ref) {
 IChatSceneRepository chatSceneRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return ChatSceneRepository(dbConnection: dbConnection);
+}
+
+/// PromptHistoryRepository Provider
+@riverpod
+IPromptHistoryRepository promptHistoryRepository(Ref ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return PromptHistoryRepository(dbConnection: dbConnection);
+}
+
+/// PromptTagCategoryRepository Provider
+@riverpod
+IPromptTagCategoryRepository promptTagCategoryRepository(Ref ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return PromptTagCategoryRepository(dbConnection: dbConnection);
+}
+
+/// PromptTagRepository Provider
+@riverpod
+IPromptTagRepository promptTagRepository(Ref ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return PromptTagRepository(dbConnection: dbConnection);
 }
 
 /// BookshelfRepository Provider
