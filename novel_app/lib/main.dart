@@ -7,7 +7,9 @@ import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'core/providers/service_providers.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/theme/app_colors.dart';
 import 'utils/video_cache_manager.dart';
+import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'widgets/hermes/hermes_floating_button.dart';
 

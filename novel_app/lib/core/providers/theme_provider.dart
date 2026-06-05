@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../services/preferences_service.dart';
+import '../theme/app_colors.dart';
 
 part 'theme_provider.g.dart';
 
@@ -49,6 +50,7 @@ class ThemeState {
         brightness: Brightness.light,
       ),
       useMaterial3: true,
+      extensions: const <ThemeExtension<dynamic>>[AppColors.light],
     );
   }
 
@@ -60,6 +62,7 @@ class ThemeState {
         brightness: Brightness.dark,
       ),
       useMaterial3: true,
+      extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
     );
   }
 

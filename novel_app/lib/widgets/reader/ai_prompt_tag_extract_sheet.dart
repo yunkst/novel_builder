@@ -57,20 +57,15 @@ class _AIPromptTagExtractSheetState
       final categories = await categoryRepo.getAll();
       final tagCategoriesStr = categories.map((c) => c.name).join('、');
 
-      // 调用 Dify 阻塞式接口
+      // 调用 Service 层提取标签
       final difyService = ref.read(difyServiceProvider);
-      final outputs = await difyService.runWorkflowBlocking(
-        inputs: {
-          'cmd': '提取标签',
-          'user_input': userInput,
-          'current_chapter_content': widget.chapterContent,
-          'tag_categories': tagCategoriesStr,
-        },
+      final extractedTags = await difyService.extractPromptTags(
+        userInput: userInput,
+        chapterContent: widget.chapterContent,
+        tagCategories: tagCategoriesStr,
       );
 
-      // 解析 outputs.tags[]
-      final tags = _parseOutputs(outputs);
-      if (tags.isEmpty) {
+      if (extractedTags.isEmpty) {
         setState(() {
           _isExtracting = false;
           _errorMessage = '未提取到任何标签，请调整输入后重试';
@@ -78,9 +73,18 @@ class _AIPromptTagExtractSheetState
         return;
       }
 
+      // 转换为 UI 层数据结构（默认全选）
+      final uiTags = extractedTags
+          .map((t) => _ExtractedTag(
+                tag: t.tag,
+                type: t.type,
+                promptText: t.promptText,
+              ))
+          .toList();
+
       setState(() {
         _isExtracting = false;
-        _extracted = tags;
+        _extracted = uiTags;
       });
     } catch (e, st) {
       LoggerService.instance.e(
@@ -94,25 +98,6 @@ class _AIPromptTagExtractSheetState
         _errorMessage = '提取失败: $e';
       });
     }
-  }
-
-  List<_ExtractedTag> _parseOutputs(Map<String, dynamic>? outputs) {
-    if (outputs == null) return const [];
-    final tagsRaw = outputs['tags'];
-    if (tagsRaw is! List) return const [];
-
-    return tagsRaw
-        .whereType<Map>()
-        .map((m) {
-          final map = m.cast<String, dynamic>();
-          return _ExtractedTag(
-            tag: (map['tag'] ?? '').toString().trim(),
-            type: (map['类型'] ?? map['type'] ?? '').toString().trim(),
-            promptText: (map['提示词'] ?? map['prompt'] ?? '').toString().trim(),
-          );
-        })
-        .where((t) => t.tagController.text.isNotEmpty || t.promptController.text.isNotEmpty)
-        .toList();
   }
 
   Future<void> _saveAll() async {
@@ -229,7 +214,10 @@ class _AIPromptTagExtractSheetState
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
-        return Column(
+        return Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: Column(
           children: [
             _buildHeader(),
             const Divider(height: 1),
@@ -248,6 +236,7 @@ class _AIPromptTagExtractSheetState
             ),
             _buildBottomBar(),
           ],
+        ),
         );
       },
     );

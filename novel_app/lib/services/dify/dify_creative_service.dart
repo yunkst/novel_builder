@@ -415,4 +415,70 @@ class DifyCreativeService {
       tags: ['stats', 'dify'],
     );
   }
+
+  /// AI 提取写作技巧标签
+  ///
+  /// 调用 Dify 阻塞式工作流（cmd='提取标签'），返回解析后的标签列表。
+  Future<List<ExtractedPromptTag>> extractPromptTags({
+    required String userInput,
+    required String chapterContent,
+    required String tagCategories,
+  }) async {
+    final inputs = {
+      'cmd': '提取标签',
+      'user_input': userInput,
+      'current_chapter_content': chapterContent,
+      'tag_categories': tagCategories,
+    };
+
+    final outputs = await _workflow.executeBlocking(inputs: inputs);
+    return _parseExtractedTags(outputs);
+  }
+
+  /// 解析标签提取输出
+  ///
+  /// 兼容两种 Dify 输出格式：
+  /// - 嵌套: outputs['content']['tags']
+  /// - 扁平: outputs['tags']
+  List<ExtractedPromptTag> _parseExtractedTags(Map<String, dynamic>? outputs) {
+    if (outputs == null) return const [];
+
+    // 优先取 content 嵌套结构，回退到扁平结构
+    final content = outputs['content'];
+    final tagsRaw = (content is Map) ? content['tags'] : null;
+    final List<dynamic> tagsList;
+    if (tagsRaw is List) {
+      tagsList = tagsRaw;
+    } else if (outputs['tags'] is List) {
+      tagsList = outputs['tags'] as List;
+    } else {
+      return const [];
+    }
+
+    return tagsList
+        .whereType<Map>()
+        .map((m) {
+          final map = m.cast<String, dynamic>();
+          return ExtractedPromptTag(
+            tag: (map['tag'] ?? '').toString().trim(),
+            type: (map['类型'] ?? map['type'] ?? '').toString().trim(),
+            promptText: (map['提示词'] ?? map['prompt'] ?? '').toString().trim(),
+          );
+        })
+        .where((t) => t.tag.isNotEmpty || t.promptText.isNotEmpty)
+        .toList();
+  }
+}
+
+/// Dify 标签提取结果
+class ExtractedPromptTag {
+  final String tag;
+  final String type;
+  final String promptText;
+
+  const ExtractedPromptTag({
+    required this.tag,
+    required this.type,
+    required this.promptText,
+  });
 }

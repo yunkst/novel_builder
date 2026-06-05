@@ -193,6 +193,18 @@ class DifyService {
         relationships: relationships,
       );
 
+  /// AI 提取写作技巧标签
+  Future<List<ExtractedPromptTag>> extractPromptTags({
+    required String userInput,
+    required String chapterContent,
+    required String tagCategories,
+  }) =>
+      _creative.extractPromptTags(
+        userInput: userInput,
+        chapterContent: chapterContent,
+        tagCategories: tagCategories,
+      );
+
   /// 格式化场景描写输入参数
   Map<String, dynamic> _formatSceneDescriptionInput({
     required String chapterContent,
