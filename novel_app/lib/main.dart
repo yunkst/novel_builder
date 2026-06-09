@@ -5,6 +5,7 @@ import 'screens/bookshelf_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
+import 'screens/webview_browser_screen.dart';
 import 'core/providers/service_providers.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/theme/app_colors.dart';
@@ -185,7 +186,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // 为生图调试页面创建 GlobalKey，用于调用刷新方法
   final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
 
-  // 移除静态 _pages 列表，将在 build 方法中动态创建
+  // Tab 页面缓存（不包含浏览器 Tab，浏览器按需构建避免内存占用）
+  final Map<int, Widget> _tabCache = {};
 
   void _onItemTapped(int index) {
     setState(() {
@@ -273,20 +275,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // 定义页面列表，使用 IndexedStack 保持所有页面状态
-    final List<Widget> pages = [
-      const BookshelfScreen(),
-      const SearchScreen(),
-      IllustrationDebugScreen(key: _debugScreenKey),
-      const SettingsScreen(),
-    ];
+    // 浏览器 Tab（索引3）按需构建，不放入 IndexedStack 避免内存占用
+    const int browserTabIndex = 3;
+
+    // 构建 Tab 内容
+    Widget buildTab(int index) {
+      if (index == browserTabIndex) {
+        // 浏览器 Tab 每次切换到时都重建
+        return const WebViewBrowserScreen();
+      }
+      // 其他 Tab 缓存，保持状态
+      return _tabCache.putIfAbsent(index, () {
+        switch (index) {
+          case 0:
+            return const BookshelfScreen();
+          case 1:
+            return const SearchScreen();
+          case 2:
+            return IllustrationDebugScreen(key: _debugScreenKey);
+          case 4:
+            return const SettingsScreen();
+          default:
+            return const SizedBox.shrink();
+        }
+      });
+    }
+
+    // 非 WebView 的 Tab 索引列表
+    final nonBrowserIndices = [0, 1, 2, 4];
 
     return Scaffold(
       body: HermesFloatingShell(
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: pages,
-        ),
+        child: _selectedIndex == browserTabIndex
+            ? buildTab(browserTabIndex)
+            : IndexedStack(
+                index: nonBrowserIndices.contains(_selectedIndex)
+                    ? nonBrowserIndices.indexOf(_selectedIndex)
+                    : 0,
+                children: nonBrowserIndices.map((i) => buildTab(i)).toList(),
+              ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -303,6 +330,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           NavigationDestination(
             icon: Icon(Icons.image),
             label: '生图调试',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.public),
+            label: '浏览器',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings),
