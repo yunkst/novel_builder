@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/logger_service.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
 
@@ -135,7 +136,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
       message: '确定要清空所有日志吗？此操作不可撤销。',
       confirmText: '清空',
       icon: Icons.delete_outline,
-      confirmColor: Colors.red,
+      confirmColor: context.appColors.error,
     );
 
     if (confirmed == true && mounted) {

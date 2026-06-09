@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 
 /// 插图功能选择对话框
@@ -76,7 +77,7 @@ class IllustrationActionDialog extends StatelessWidget {
                   icon: Icons.add_photo_alternate,
                   title: '再来几张',
                   description: '基于当前内容生成更多图片',
-                  color: Colors.blue,
+                  color: context.appColors.info,
                   onTap: () => Navigator.of(context).pop('regenerate'),
                 ),
 
@@ -87,7 +88,7 @@ class IllustrationActionDialog extends StatelessWidget {
                   icon: Icons.videocam,
                   title: '生成视频',
                   description: '将图片转换为动态视频',
-                  color: Colors.purple,
+                  color: context.appColors.neutral,
                   onTap: () => Navigator.of(context).pop('video'),
                 ),
               ],
@@ -218,10 +219,10 @@ class _PromptsDisplayCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.15),
+        color: context.appColors.warningContainer,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.5),
+          color: context.appColors.onWarningContainer.withValues(alpha: 0.5),
           width: 2.0,
         ),
       ),
@@ -271,8 +272,8 @@ class _PromptsDisplayCard extends StatelessWidget {
               icon: const Icon(Icons.copy, size: 18),
               label: const Text('复制', style: TextStyle(fontSize: 14)),
               style: TextButton.styleFrom(
-                foregroundColor: Colors.brown,
-                backgroundColor: Colors.amber.withValues(alpha: 0.1),
+                foregroundColor: context.appColors.onWarningContainer,
+                backgroundColor: context.appColors.warningContainer,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),

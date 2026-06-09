@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/prompt_tag.dart';
 import '../models/prompt_tag_category.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 
 /// 标签管理页面
 class PromptTagManagementScreen extends ConsumerStatefulWidget {
@@ -252,7 +253,7 @@ class _PromptTagManagementScreenState
                             _selectedCategoryId == null
                                 ? '请先创建分类'
                                 : '此分类下暂无标签，点击右下角"+"新建',
-                            style: TextStyle(color: Colors.grey.shade600),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         )
                       : ListView.separated(
@@ -313,8 +314,8 @@ class _PromptTagManagementScreenState
             },
           ),
           ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('删除', style: TextStyle(color: Colors.red)),
+            leading: Icon(Icons.delete, color: context.appColors.error),
+            title: Text('删除', style: TextStyle(color: context.appColors.error)),
             onTap: () {
               Navigator.pop(context);
               _deleteCategory(cat);

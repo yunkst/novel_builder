@@ -11,29 +11,7 @@ import '../utils/role_color_manager.dart';
 import '../utils/toast_utils.dart';
 import '../screens/providers/dify_provider.dart';
 import '../core/providers/services/cache_service_providers.dart';
-
-/// 暗色主题颜色常量
-class _DarkThemeColors {
-  // 背景色
-  static const Color inputAreaBackground = Color(0xFF1E1E1E);
-
-  // 文字色
-  static const Color primaryText = Color(0xFFE3E3E3); // 87% 白色
-  static const Color secondaryText = Color(0xFFB0B0B0); // 70% 白色
-  static const Color hintText = Color(0xFF8E8E8E); // 60% 白色
-
-  // 角色对话（深蓝色系）
-  static const Color roleBubbleBackground = Color(0xFF1E3A5F);
-
-  // 用户消息（深绿色系）
-  static const Color userBubbleBackground = Color(0xFF1F3D2F);
-  static const Color userBubbleBorder = Color(0xFF3A6B4A);
-
-  // 其他UI元素
-  static const Color divider = Color(0xFF3C3C3C);
-  static const Color buttonPrimary = Color(0xFF2196F3);
-  static const Color buttonDisabled = Color(0xFF3C3C3C);
-}
+import '../core/theme/app_colors.dart';
 
 /// 多角色聊天屏幕 (Riverpod版本)
 ///
@@ -147,6 +125,8 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
   @override
   void initState() {
     super.initState();
+    // initState 无 context，使用暗色调色板兜底；
+    // build 中将根据主题重新分配。
     _roleColors = RoleColorManager.assignColors(widget.characters);
     // 延迟初始化聊天，确保服务已加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -383,6 +363,11 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 根据当前主题重新分配角色色
+    _roleColors = RoleColorManager.assignColors(
+      widget.characters,
+      context: context,
+    );
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -393,15 +378,15 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
             const SizedBox(height: 4),
             Text(
               '角色：${widget.characters.map((c) => c.name).join('、')}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: _DarkThemeColors.secondaryText,
+                color: context.appColors.chatSecondaryText,
               ),
             ),
           ],
         ),
-        backgroundColor: _DarkThemeColors.inputAreaBackground,
-        foregroundColor: _DarkThemeColors.primaryText,
+        backgroundColor: context.appColors.chatInputBackground,
+        foregroundColor: context.appColors.chatPrimaryText,
         actions: [
           // 角色策略查看按钮
           IconButton(
@@ -437,7 +422,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
                 Text(
                   '正在建立连接...',
                   style: TextStyle(
-                    color: _DarkThemeColors.secondaryText,
+                    color: context.appColors.chatSecondaryText,
                     fontSize: 16,
                   ),
                 ),
@@ -446,7 +431,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           : Text(
               '开始你们的对话吧！',
               style: TextStyle(
-                color: _DarkThemeColors.hintText,
+                color: context.appColors.chatHintText,
                 fontSize: 18,
               ),
             ),
@@ -489,7 +474,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
       child: Text(
         message.content,
         style: TextStyle(
-          color: _DarkThemeColors.hintText,
+          color: context.appColors.chatHintText,
           fontStyle: FontStyle.italic,
           fontSize: 14,
           height: 1.5,
@@ -502,7 +487,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
   Widget _buildDialogueBubble(ChatMessage message) {
     final character = message.character!;
     final color =
-        _roleColors[character.name] ?? _DarkThemeColors.roleBubbleBackground;
+        _roleColors[character.name] ?? context.appColors.chatRoleBubble;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -528,10 +513,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
                   Expanded(
                     child: Text(
                       message.content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         height: 1.5,
-                        color: _DarkThemeColors.primaryText,
+                        color: context.appColors.chatPrimaryText,
                       ),
                     ),
                   ),
@@ -556,19 +541,19 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _DarkThemeColors.userBubbleBackground,
+            color: context.appColors.chatUserBubble,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _DarkThemeColors.userBubbleBorder,
+              color: context.appColors.chatUserBubbleBorder,
               width: 2,
             ),
           ),
           child: Text(
             message.content,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               height: 1.5,
-              color: _DarkThemeColors.primaryText,
+              color: context.appColors.chatPrimaryText,
             ),
           ),
         ),
@@ -655,15 +640,15 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
 
   /// 构建打字指示器（三个跳动的小圆点）
   Widget _buildTypingIndicator() {
-    return const Padding(
-      padding: EdgeInsets.only(left: 8),
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
       child: SizedBox(
         width: 20,
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
           valueColor:
-              AlwaysStoppedAnimation<Color>(_DarkThemeColors.buttonPrimary),
+              AlwaysStoppedAnimation<Color>(context.appColors.chatButtonPrimary),
         ),
       ),
     );
@@ -674,9 +659,9 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _DarkThemeColors.inputAreaBackground,
+        color: context.appColors.chatInputBackground,
         border: Border(
-          top: BorderSide(color: _DarkThemeColors.divider),
+          top: BorderSide(color: context.appColors.chatDivider),
         ),
       ),
       child: Column(
@@ -687,24 +672,24 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color:
-                  _DarkThemeColors.roleBubbleBackground.withValues(alpha: 0.1),
+                  context.appColors.chatRoleBubble.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _DarkThemeColors.divider,
+                color: context.appColors.chatDivider,
               ),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.people,
                   size: 16,
-                  color: _DarkThemeColors.secondaryText,
+                  color: context.appColors.chatSecondaryText,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '正在与 ${widget.characters.map((c) => c.name).join('、')} 对话',
                   style: TextStyle(
-                    color: _DarkThemeColors.secondaryText,
+                    color: context.appColors.chatSecondaryText,
                     fontSize: 12,
                   ),
                 ),
@@ -721,19 +706,19 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
               labelText: '行为（可选）',
               hintText: '例如：举起酒杯，微笑着说',
               border: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.divider),
+                borderSide: BorderSide(color: context.appColors.chatDivider),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.divider),
+                borderSide: BorderSide(color: context.appColors.chatDivider),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.buttonPrimary),
+                borderSide: BorderSide(color: context.appColors.chatButtonPrimary),
               ),
-              labelStyle: TextStyle(color: _DarkThemeColors.secondaryText),
-              hintStyle: TextStyle(color: _DarkThemeColors.hintText),
+              labelStyle: TextStyle(color: context.appColors.chatSecondaryText),
+              hintStyle: TextStyle(color: context.appColors.chatHintText),
               contentPadding: const EdgeInsets.all(12),
             ),
-            style: TextStyle(color: _DarkThemeColors.primaryText),
+            style: TextStyle(color: context.appColors.chatPrimaryText),
             maxLines: null,
             textInputAction: TextInputAction.next,
             onChanged: (_) => setState(() {}),
@@ -748,19 +733,19 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
               labelText: '对话（可选）',
               hintText: '例如：大家好，最近怎么样？',
               border: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.divider),
+                borderSide: BorderSide(color: context.appColors.chatDivider),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.divider),
+                borderSide: BorderSide(color: context.appColors.chatDivider),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: _DarkThemeColors.buttonPrimary),
+                borderSide: BorderSide(color: context.appColors.chatButtonPrimary),
               ),
-              labelStyle: TextStyle(color: _DarkThemeColors.secondaryText),
-              hintStyle: TextStyle(color: _DarkThemeColors.hintText),
+              labelStyle: TextStyle(color: context.appColors.chatSecondaryText),
+              hintStyle: TextStyle(color: context.appColors.chatHintText),
               contentPadding: const EdgeInsets.all(12),
             ),
-            style: TextStyle(color: _DarkThemeColors.primaryText),
+            style: TextStyle(color: context.appColors.chatPrimaryText),
             maxLines: 3,
             minLines: 1,
             textInputAction: TextInputAction.send,
@@ -775,9 +760,9 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
             child: ElevatedButton(
               onPressed: _canSend() ? _sendMessage : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _DarkThemeColors.buttonPrimary,
+                backgroundColor: context.appColors.chatButtonPrimary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                disabledBackgroundColor: _DarkThemeColors.buttonDisabled,
+                disabledBackgroundColor: context.appColors.chatButtonDisabled,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: Text(_isGenerating ? '生成中...' : '发送'),
@@ -800,10 +785,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.people, color: Colors.purple),
-            SizedBox(width: 8),
+            Icon(Icons.people, color: context.appColors.info),
+            const SizedBox(width: 8),
             Text('角色策略'),
           ],
         ),
@@ -817,7 +802,7 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
               final characterName = strategy['name'] as String? ?? '未知角色';
               final strategyText = strategy['strategy'] as String? ?? '';
 
-              final color = _roleColors[characterName] ?? Colors.grey;
+              final color = _roleColors[characterName] ?? Theme.of(context).colorScheme.outline;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -864,8 +849,8 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           color: strategyText.isNotEmpty
-                              ? _DarkThemeColors.primaryText
-                              : _DarkThemeColors.hintText,
+                              ? context.appColors.chatPrimaryText
+                              : context.appColors.chatHintText,
                           height: 1.5,
                         ),
                       ),

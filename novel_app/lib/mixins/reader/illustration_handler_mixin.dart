@@ -4,6 +4,7 @@ import '../../models/chapter.dart';
 import '../../services/api_service_wrapper.dart';
 import '../../core/interfaces/repositories/i_chapter_repository.dart';
 import '../../core/interfaces/repositories/i_illustration_repository.dart';
+import '../../core/theme/app_colors.dart';
 import '../../services/scene_illustration_service.dart';
 import '../../services/logger_service.dart';
 import '../../utils/error_helper.dart';
@@ -358,8 +359,8 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                      backgroundColor: context.appColors.error,
+                      foregroundColor: context.appColors.onSemantic,
                     ),
                     child: const Text('删除'),
                   ),

@@ -38,7 +38,7 @@ class ChapterManager {
     _initializeCleanupTimer();
   }
 
-  /// 待处理的网络请求，key为章节URL，value为Future<ChapterContentResult>
+  /// 待处理的网络请求，key为章节URL，value为`Future<ChapterContentResult>`
   final Map<String, Future<ChapterContentResult>> _pendingRequests =
       <String, Future<ChapterContentResult>>{};
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/tts_player_service.dart';
+import '../core/theme/app_colors.dart';
 
 /// TTS控制面板组件
 class TtsControlPanel extends StatelessWidget {
@@ -57,8 +58,8 @@ class TtsControlPanel extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      const Icon(Icons.graphic_eq,
-                          size: 16, color: Color(0xFF2196F3)),
+                      Icon(Icons.graphic_eq,
+                          size: 16, color: context.appColors.ttsAccent),
                       const SizedBox(width: 8),
                       Expanded(
                         child: LinearProgressIndicator(

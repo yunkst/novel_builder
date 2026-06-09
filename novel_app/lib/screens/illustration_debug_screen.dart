@@ -8,6 +8,7 @@ import '../widgets/video_input_dialog.dart';
 import '../widgets/generate_more_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../core/providers/database_providers.dart';
 import '../utils/toast_utils.dart';
 import '../utils/video_generation_state_manager.dart';
@@ -102,25 +103,25 @@ class _IllustrationDebugScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.image_outlined,
             size: 64,
-            color: Colors.grey,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             '暂无生成的图片',
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '点击右下角的 + 号开始生成',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 24),
@@ -129,12 +130,12 @@ class _IllustrationDebugScreenState
             onPressed:
                 _pagination.isLoading ? null : () => _pagination.refresh(),
             icon: _pagination.isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: context.appColors.onSemantic,
                     ),
                   )
                 : const Icon(Icons.refresh),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/widgets/hermes/hermes_chat_dialog.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Hermes 全局悬浮按钮
 ///
@@ -24,6 +25,7 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
+    final appColors = context.appColors;
 
     return Stack(
       children: [
@@ -70,25 +72,28 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                gradient: LinearGradient(
+                  colors: [
+                    appColors.hermesBrandStart,
+                    appColors.hermesBrandEnd,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                    color: appColors.hermesBrandStart.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: const Material(
+              child: Material(
                 color: Colors.transparent,
                 child: Icon(
                   Icons.auto_awesome,
-                  color: Colors.white,
+                  color: appColors.hermesOnBrand,
                   size: 24,
                 ),
               ),

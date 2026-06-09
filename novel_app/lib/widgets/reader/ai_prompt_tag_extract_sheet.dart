@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/database_providers.dart';
 import '../../core/providers/service_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
 import '../../services/logger_service.dart';
@@ -293,14 +294,14 @@ class _AIPromptTagExtractSheetState
   }
 
   Widget _buildLoadingState() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 32),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
       child: Center(
         child: Column(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text('正在调用 Dify 提取标签...', style: TextStyle(color: Colors.grey)),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 12),
+            Text('正在调用 Dify 提取标签...', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -312,18 +313,18 @@ class _AIPromptTagExtractSheetState
       margin: const EdgeInsets.symmetric(vertical: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: context.appColors.errorContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: context.appColors.errorContainer),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+          Icon(Icons.error_outline, color: context.appColors.onErrorContainer, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+              style: TextStyle(color: context.appColors.onErrorContainer, fontSize: 13),
             ),
           ),
         ],
@@ -344,7 +345,7 @@ class _AIPromptTagExtractSheetState
             const Spacer(),
             Text(
               '已选 ${_extracted.where((t) => t.selected).length}/${_extracted.length}',
-              style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+              style: TextStyle(fontSize: 12, color: context.appColors.onInfoContainer),
             ),
           ],
         ),
@@ -402,10 +403,11 @@ class _ExtractedTag {
     required String tag,
     required String type,
     required String promptText,
-    this.selected = true,
   })  : tagController = TextEditingController(text: tag),
         typeController = TextEditingController(text: type),
-        promptController = TextEditingController(text: promptText);
+        promptController = TextEditingController(text: promptText),
+        // 标签默认全部选中，用户可在 UI 上取消勾选
+        selected = true;
 
   void dispose() {
     tagController.dispose();
@@ -430,10 +432,14 @@ class _ExtractedTagCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: tag.selected ? Colors.blue.shade50 : Colors.grey.shade100,
+        color: tag.selected
+            ? context.appColors.infoContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: tag.selected ? Colors.blue.shade300 : Colors.grey.shade300,
+          color: tag.selected
+              ? context.appColors.onInfoContainer.withValues(alpha: 0.5)
+              : Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
       child: Column(
@@ -452,23 +458,24 @@ class _ExtractedTagCard extends StatelessWidget {
                 '#${index + 1}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          _field('类型', tag.typeController),
+          _field(context, '类型', tag.typeController),
           const SizedBox(height: 6),
-          _field('标签', tag.tagController),
+          _field(context, '标签', tag.tagController),
           const SizedBox(height: 6),
-          _field('提示词', tag.promptController, minLines: 2, maxLines: 4),
+          _field(context, '提示词', tag.promptController, minLines: 2, maxLines: 4),
         ],
       ),
     );
   }
 
   Widget _field(
+    BuildContext context,
     String label,
     TextEditingController controller, {
     int minLines = 1,
@@ -483,7 +490,7 @@ class _ExtractedTagCard extends StatelessWidget {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               label,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// TTS定时完成对话框
 ///
@@ -29,10 +30,10 @@ class TtsTimerCompleteDialog extends StatelessWidget {
     final currentChapterNum = currentChapterIndex + 1;
 
     return AlertDialog(
-      icon: const Icon(
+      icon: Icon(
         Icons.timer_outlined,
         size: 48,
-        color: Colors.orange,
+        color: context.appColors.warning,
       ),
       title: const Text(
         '定时朗读完成',
@@ -46,13 +47,13 @@ class TtsTimerCompleteDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange[50],
+              color: context.appColors.warningContainer,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange[200]!),
+              border: Border.all(color: context.appColors.warningContainer),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.orange, size: 20),
+                Icon(Icons.check_circle, color: context.appColors.onWarningContainer, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   '已完成朗读 $completedChapters 章',
@@ -67,11 +68,11 @@ class TtsTimerCompleteDialog extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+              Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 '当前: 第 $currentChapterNum 章',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -91,8 +92,8 @@ class TtsTimerCompleteDialog extends StatelessWidget {
         ElevatedButton(
           onPressed: onContinue,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
+            backgroundColor: context.appColors.warning,
+            foregroundColor: context.appColors.onSemantic,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
           child: const Text(

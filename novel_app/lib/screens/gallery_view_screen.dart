@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/role_gallery.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/api_image_widget.dart';
 import '../widgets/gallery_action_panel.dart';
@@ -370,7 +371,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
+          backgroundColor: context.appColors.error,
           duration: const Duration(seconds: 3),
           action: SnackBarAction(
             label: '重试',
@@ -390,7 +391,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.blue,
+        backgroundColor: context.appColors.info,
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
           label: actionLabel,
@@ -467,10 +468,10 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
+                color: context.appColors.warningContainer,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.3),
+                  color: context.appColors.warningContainer,
                 ),
               ),
               child: Column(
@@ -481,7 +482,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                       Icon(
                         Icons.lightbulb_outline,
                         size: 16,
-                        color: Colors.orange,
+                        color: context.appColors.onWarningContainer,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -489,7 +490,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.orange,
+                          color: context.appColors.onWarningContainer,
                         ),
                       ),
                     ],
@@ -583,21 +584,22 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
   }
 
   Widget _buildLoadingView() {
+    final appColors = context.appColors;
     if (_hasGalleryLoadError) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline,
               size: 64,
-              color: Color(0xB3FFFFFF),
+              color: appColors.galleryOverlay,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '图集加载失败',
               style: TextStyle(
-                color: Color(0xFFFFFFFF),
+                color: appColors.galleryOnDark,
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
@@ -606,7 +608,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
             Text(
               '请检查网络连接后重试',
               style: TextStyle(
-                color: Color(0xB3FFFFFF),
+                color: appColors.galleryOverlay,
                 fontSize: 14,
               ),
             ),
@@ -616,8 +618,8 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
               icon: const Icon(Icons.refresh),
               label: const Text('重试加载'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Theme.of(context).colorScheme.surface,
+                backgroundColor: context.appColors.info,
+                foregroundColor: context.appColors.onSemantic,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -631,15 +633,15 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(
-            color: Color(0xFFFFFFFF),
+          CircularProgressIndicator(
+            color: appColors.galleryOnDark,
             strokeWidth: 2,
           ),
           const SizedBox(height: 16),
           Text(
             '加载图集中...',
             style: TextStyle(
-              color: Color(0xFFFFFFFF),
+              color: appColors.galleryOnDark,
               fontSize: 16,
             ),
           ),
@@ -649,6 +651,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
   }
 
   Widget _buildTopBar() {
+    final appColors = context.appColors;
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -674,13 +677,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                 onPressed: () =>
                     Navigator.of(context).pop(true), // 总是返回true以触发数据刷新
                 icon:
-                    const Icon(Icons.arrow_back_ios, color: Color(0xFFFFFFFF)),
+                    Icon(Icons.arrow_back_ios, color: appColors.galleryOnDark),
               ),
               Expanded(
                 child: Text(
                   widget.roleName ?? '角色图集',
-                  style: const TextStyle(
-                    color: Color(0xFFFFFFFF),
+                  style: TextStyle(
+                    color: appColors.galleryOnDark,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -689,7 +692,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
               ),
               IconButton(
                 onPressed: _refreshGallery,
-                icon: const Icon(Icons.refresh, color: Color(0xFFFFFFFF)),
+                icon: Icon(Icons.refresh, color: appColors.galleryOnDark),
               ),
             ],
           ),
@@ -743,19 +746,19 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
           child: Column(
             children: [
               // 错误状态指示器
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.error_outline,
-                    color: Colors.red,
+                    color: context.appColors.error,
                     size: 16,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     '图集加载失败',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: context.appColors.error,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -772,14 +775,14 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                     icon: Icons.delete_outline,
                     label: '删除图集',
                     onPressed: _handleErrorDelete,
-                    color: Colors.red,
+                    color: context.appColors.error,
                   ),
                   // 重试按钮
                   _actionButton(
                     icon: Icons.refresh,
                     label: '重新加载',
                     onPressed: _refreshGallery,
-                    color: Colors.blue,
+                    color: context.appColors.info,
                   ),
                 ],
               ),
@@ -823,6 +826,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
     required VoidCallback? onPressed,
     required Color color,
   }) {
+    final labelColor = context.appColors.galleryOnDark;
     return GestureDetector(
       onTap: onPressed,
       child: Opacity(
@@ -850,8 +854,8 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
             const SizedBox(height: 4),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFFFFFFFF),
+              style: TextStyle(
+                color: labelColor,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

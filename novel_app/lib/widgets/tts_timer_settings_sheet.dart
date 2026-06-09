@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// TTS定时设置底部弹窗
 ///
@@ -134,10 +135,10 @@ class _TtsTimerSettingsSheetState extends State<TtsTimerSettingsSheet> {
           const SizedBox(height: 16),
 
           // 单位标签
-          const Center(
+          Center(
             child: Text(
               '章',
-              style: TextStyle(fontSize: 16, color: Color(0xFF9E9E9E)),
+              style: TextStyle(fontSize: 16, color: context.appColors.ttsHint),
             ),
           ),
           const SizedBox(height: 24),

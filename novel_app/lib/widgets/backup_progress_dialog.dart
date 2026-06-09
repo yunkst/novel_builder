@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:novel_api/novel_api.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/format_utils.dart';
 
 /// 备份进度对话框
@@ -153,9 +154,9 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
         return Icon(Icons.cloud_upload_rounded,
             color: Theme.of(context).primaryColor);
       case BackupState.completed:
-        return const Icon(Icons.check_circle, color: Colors.green);
+        return Icon(Icons.check_circle, color: context.appColors.success);
       case BackupState.failed:
-        return const Icon(Icons.error, color: Colors.red);
+        return Icon(Icons.error, color: context.appColors.error);
     }
   }
 
@@ -192,7 +193,7 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
     return Text(
       '$percentage% ($uploaded / $total)',
       style: TextStyle(
-        color: Colors.grey.shade700,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 14,
       ),
     );
@@ -200,10 +201,10 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
 
   /// 构建准备文本
   Widget _buildPreparingText() {
-    return const Text(
+    return Text(
       '正在准备上传...',
       style: TextStyle(
-        color: Colors.grey,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 14,
       ),
     );
@@ -230,21 +231,21 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: context.appColors.errorContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: context.appColors.errorContainer),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, size: 20, color: Colors.red.shade700),
+          Icon(Icons.error_outline, size: 20, color: context.appColors.onErrorContainer),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage ?? '未知错误',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.red.shade700,
+                color: context.appColors.onErrorContainer,
               ),
             ),
           ),
@@ -262,7 +263,7 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
           child: Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),

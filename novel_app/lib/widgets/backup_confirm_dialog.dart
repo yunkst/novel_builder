@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 备份确认对话框
 ///
@@ -53,28 +54,28 @@ class BackupConfirmDialog extends StatelessWidget {
         children: [
           const Text('即将上传数据库备份到服务器，请确认：'),
           const SizedBox(height: 16),
-          _buildInfoRow('文件名', fileName),
+          _buildInfoRow(context, '文件名', fileName),
           const SizedBox(height: 8),
-          _buildInfoRow('文件大小', fileSize),
+          _buildInfoRow(context, '文件大小', fileSize),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: context.appColors.infoContainer,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: context.appColors.infoContainer),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, size: 20, color: Colors.blue.shade700),
+                Icon(Icons.info_outline, size: 20, color: context.appColors.onInfoContainer),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '备份文件将保存在服务器，不会被删除。您可以随时恢复数据。',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue.shade700,
+                      color: context.appColors.onInfoContainer,
                     ),
                   ),
                 ),
@@ -96,7 +97,7 @@ class BackupConfirmDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -105,7 +106,7 @@ class BackupConfirmDialog extends StatelessWidget {
           child: Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 14,
             ),
           ),

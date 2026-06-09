@@ -13,6 +13,7 @@ import '../widgets/chat_scene_input_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../core/providers/character_screen_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../core/providers/database_providers.dart';
 
 /// 人物编辑界面
@@ -472,12 +473,12 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
           TextButton(
             onPressed: _isLoading ? null : _saveCharacter,
             child: _isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(context.appColors.onSemantic),
                     ),
                   )
                 : Text('保存',
@@ -726,7 +727,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
               style: TextStyle(
                 fontSize: 12,
                 color: _aliases.length >= 10
-                    ? Colors.red
+                    ? context.appColors.error
                     : Theme.of(context)
                         .colorScheme
                         .onSurface
@@ -761,7 +762,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               '暂无别名，可添加常用称呼',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
             ),
           ),
 
@@ -939,7 +940,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       confirmText: '仍要添加',
       cancelText: '取消',
       icon: Icons.warning,
-      confirmColor: Colors.orange,
+      confirmColor: context.appColors.warning,
     );
 
     return result ?? false;
@@ -1228,7 +1229,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                               .colorScheme
                               .onSurface
                               .withValues(alpha: 0.4)
-                          : Colors.green,
+                          : context.appColors.success,
                       foregroundColor: Theme.of(context).colorScheme.surface,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(

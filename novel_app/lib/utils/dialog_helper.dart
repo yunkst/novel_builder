@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 弹窗辅助工具类 - 统一管理弹窗行为，确保所有弹窗禁用空白区域点击关闭
 class DialogHelper {
@@ -34,7 +35,7 @@ class DialogHelper {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: isDanger
-                ? ElevatedButton.styleFrom(backgroundColor: Colors.red)
+                ? ElevatedButton.styleFrom(backgroundColor: context.appColors.error)
                 : null,
             child: Text(confirmText),
           ),

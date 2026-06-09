@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:novel_app/services/hermes_sse_parser.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 工具调用执行进度展示
 ///
@@ -59,16 +60,16 @@ class _ToolCallCardState extends State<_ToolCallCard> {
     Color statusColor;
     IconData statusIcon;
     if (isRunning) {
-      statusColor = Colors.blue;
+      statusColor = context.appColors.info;
       statusIcon = Icons.sync;
     } else if (isCompleted) {
-      statusColor = Colors.green;
+      statusColor = context.appColors.success;
       statusIcon = Icons.check_circle;
     } else if (isError) {
-      statusColor = Colors.red;
+      statusColor = context.appColors.error;
       statusIcon = Icons.error;
     } else {
-      statusColor = Colors.orange;
+      statusColor = context.appColors.warning;
       statusIcon = Icons.pending;
     }
 

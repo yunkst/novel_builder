@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/providers/chapter_list_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/hermes/hermes_floating_button.dart';
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
@@ -184,7 +185,7 @@ class _ChapterListScreenRiverpodState
         children: [
           Text(
             state.errorMessage,
-            style: const TextStyle(color: Colors.red),
+            style: TextStyle(color: context.appColors.error),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
@@ -207,7 +208,7 @@ class _ChapterListScreenRiverpodState
         },
         tooltip: '完成重排',
         style: IconButton.styleFrom(
-          backgroundColor: Colors.green,
+          backgroundColor: context.appColors.success,
           foregroundColor: Theme.of(context).colorScheme.surface,
         ),
       );
@@ -319,11 +320,11 @@ class _ChapterListScreenRiverpodState
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'clear_cache',
             child: Row(
               children: [
-                Icon(Icons.clear_all, color: Colors.orange),
+                Icon(Icons.clear_all, color: context.appColors.warning),
                 SizedBox(width: 8),
                 Text('清除缓存'),
               ],
@@ -371,21 +372,21 @@ class _ChapterListScreenRiverpodState
             ),
           ),
           const PopupMenuDivider(),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'upload_to_server',
             child: Row(
               children: [
-                Icon(Icons.cloud_upload_outlined, color: Colors.blue),
+                Icon(Icons.cloud_upload_outlined, color: context.appColors.info),
                 SizedBox(width: 8),
                 Text('上传到服务器'),
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'download_from_server',
             child: Row(
               children: [
-                Icon(Icons.cloud_download_outlined, color: Colors.green),
+                Icon(Icons.cloud_download_outlined, color: context.appColors.success),
                 SizedBox(width: 8),
                 Text('从服务器下载'),
               ],
@@ -933,11 +934,11 @@ class _ChapterListScreenRiverpodState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.cloud_upload_outlined, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('上传到服务器'),
+            Icon(Icons.cloud_upload_outlined, color: context.appColors.info),
+            const SizedBox(width: 8),
+            const Text('上传到服务器'),
           ],
         ),
         content: Column(
@@ -949,7 +950,7 @@ class _ChapterListScreenRiverpodState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -964,7 +965,7 @@ class _ChapterListScreenRiverpodState
                       widget.novel.author,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -975,7 +976,7 @@ class _ChapterListScreenRiverpodState
               '将同步：章节内容、角色信息、角色关系、大纲数据',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -1013,11 +1014,11 @@ class _ChapterListScreenRiverpodState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.cloud_download_outlined, color: Colors.green),
-            SizedBox(width: 8),
-            Text('从服务器下载'),
+            Icon(Icons.cloud_download_outlined, color: context.appColors.success),
+            const SizedBox(width: 8),
+            const Text('从服务器下载'),
           ],
         ),
         content: Column(
@@ -1029,7 +1030,7 @@ class _ChapterListScreenRiverpodState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -1044,7 +1045,7 @@ class _ChapterListScreenRiverpodState
                       widget.novel.author,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -1054,20 +1055,20 @@ class _ChapterListScreenRiverpodState
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: context.appColors.warningContainer,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: context.appColors.warningContainer),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
+                  Icon(Icons.warning_amber, color: context.appColors.onWarningContainer, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '下载将覆盖本地的章节数据',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.orange.shade700,
+                        color: context.appColors.onWarningContainer,
                       ),
                     ),
                   ),
@@ -1084,8 +1085,8 @@ class _ChapterListScreenRiverpodState
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: context.appColors.success,
+              foregroundColor: context.appColors.onSemantic,
             ),
             child: const Text('下载'),
           ),

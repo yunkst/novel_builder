@@ -440,6 +440,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     if (confirmed != true) return;
 
     final syncService = ref.read(novelSyncServiceProvider);
+    if (!mounted) return;
     await BatchSyncDialog.showUpload(
       context,
       () => syncService.uploadAllNovels(novels),
@@ -459,6 +460,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     if (confirmed != true) return;
 
     final syncService = ref.read(novelSyncServiceProvider);
+    if (!mounted) return;
     await BatchSyncDialog.showDownload(
       context,
       () => syncService.downloadAllNovels(),

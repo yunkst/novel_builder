@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 章节生成进度对话框
 /// 显示AI生成章节的实时进度，支持取消、重试、插入操作
@@ -45,10 +46,10 @@ class ChapterGenerationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.auto_awesome, color: Colors.blue),
-          SizedBox(width: 8),
+          Icon(Icons.auto_awesome, color: context.appColors.info),
+          const SizedBox(width: 8),
           Text('生成新章节'),
         ],
       ),
@@ -62,7 +63,7 @@ class ChapterGenerationDialog extends StatelessWidget {
               constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
                 color: Colors.black87,
-                border: Border.all(color: Colors.grey[600]!),
+                border: Border.all(color: Theme.of(context).colorScheme.outline),
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.all(12),
@@ -72,10 +73,10 @@ class ChapterGenerationDialog extends StatelessWidget {
                   builder: (context, value, child) {
                     return Text(
                       value.isEmpty ? '正在生成中...' : value,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         height: 1.6,
-                        color: Colors.white,
+                        color: context.appColors.onSemantic,
                       ),
                     );
                   },
@@ -85,12 +86,12 @@ class ChapterGenerationDialog extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '生成完成后，你可以选择插入或重新生成',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -124,8 +125,8 @@ class ChapterGenerationDialog extends StatelessWidget {
                   icon: const Icon(Icons.check),
                   label: const Text('插入'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    backgroundColor: context.appColors.success,
+                    foregroundColor: context.appColors.onSemantic,
                   ),
                 );
               },

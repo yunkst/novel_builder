@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../../services/logger_service.dart';
 
 /// 数据库迁移逻辑单例
@@ -604,7 +604,7 @@ class DatabaseMigrations {
   /// 记录日志（优先使用 LoggerService，否则打印）
   static void _log(String message) {
     if (kIsWeb) {
-      print(message);
+      debugPrint(message);
       return;
     }
     try {
@@ -614,7 +614,7 @@ class DatabaseMigrations {
         tags: ['database', 'migration'],
       );
     } catch (_) {
-      print(message);
+      debugPrint(message);
     }
   }
 }

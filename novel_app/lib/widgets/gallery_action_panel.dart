@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../models/role_gallery.dart';
 import 'generate_more_dialog.dart';
 
@@ -122,14 +123,14 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
                     icon: Icons.delete_outline,
                     label: '删除',
                     onPressed: _handleDelete,
-                    color: Colors.red,
+                    color: context.appColors.error,
                   ),
                   // 多来几张按钮
                   _ActionButton(
                     icon: Icons.add_photo_alternate_outlined,
                     label: _isProcessing ? '生成中...' : '多来几张',
                     onPressed: _handleGenerateMore,
-                    color: Colors.blue,
+                    color: context.appColors.info,
                     isLoading: _isProcessing,
                   ),
                   // 设为头像按钮
@@ -137,7 +138,7 @@ class _GalleryActionPanelState extends State<GalleryActionPanel> {
                     icon: Icons.face,
                     label: '设为头像',
                     onPressed: _handleSetAsAvatar,
-                    color: Colors.blue,
+                    color: context.appColors.info,
                   ),
                 ],
               ),

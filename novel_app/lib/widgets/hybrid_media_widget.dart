@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:typed_data';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:video_player/video_player.dart';
+import '../core/theme/app_colors.dart';
 import '../services/api_service_wrapper.dart';
 import '../utils/video_cache_manager.dart';
 import '../utils/video_generation_state_manager.dart';
@@ -250,10 +251,10 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
       height: widget.height,
       width: widget.width,
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.05),
+        color: context.appColors.errorContainer,
         borderRadius: widget.borderRadius,
         border: Border.all(
-          color: Colors.red.withValues(alpha: 0.2),
+          color: context.appColors.errorContainer,
         ),
       ),
       child: const ErrorStateWidget(

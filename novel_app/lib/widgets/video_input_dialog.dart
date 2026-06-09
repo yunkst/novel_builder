@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../services/logger_service.dart';
 import '../widgets/model_selector.dart';
 import '../utils/toast_utils.dart';
@@ -87,10 +88,10 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: context.appColors.infoContainer,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.blue.withValues(alpha: 0.3),
+                  color: context.appColors.infoContainer,
                 ),
               ),
               child: Column(
@@ -98,24 +99,24 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.lightbulb, size: 16, color: Colors.blue),
+                      Icon(Icons.lightbulb, size: 16, color: context.appColors.onInfoContainer),
                       const SizedBox(width: 4),
-                      const Text(
+                      Text(
                         '视频生成提示',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.blue,
+                          color: context.appColors.onInfoContainer,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '视频生成通常需要1-3分钟，生成的视频时长约5秒，将自动循环播放。',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue,
+                      color: context.appColors.onInfoContainer,
                     ),
                   ),
                 ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/outline.dart';
 import '../../controllers/chapter_list/outline_integration_handler.dart';
 import '../../utils/toast_utils.dart';
@@ -106,10 +107,10 @@ class _ChapterOutlineDialogState extends State<ChapterOutlineDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.edit_note, color: Colors.blue),
-          SizedBox(width: 8),
+          Icon(Icons.edit_note, color: context.appColors.info),
+          const SizedBox(width: 8),
           Text('章节细纲'),
         ],
       ),
@@ -118,9 +119,9 @@ class _ChapterOutlineDialogState extends State<ChapterOutlineDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '请确认或编辑章节细纲',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             TextField(

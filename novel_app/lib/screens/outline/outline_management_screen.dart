@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/outline.dart';
 import '../../models/novel.dart';
 import '../../core/providers/database_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../utils/toast_utils.dart';
 import '../../widgets/common/common_widgets.dart';
 import 'create_outline_screen.dart';
@@ -204,10 +205,10 @@ class _OutlineManagementScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline,
               size: 64,
-              color: Color(0xFFB00020),
+              color: context.appColors.errorAccent,
             ),
             const SizedBox(height: 16),
             Text(

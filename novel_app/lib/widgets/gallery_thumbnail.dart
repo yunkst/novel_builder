@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
 import '../services/role_gallery_cache_service.dart';
@@ -189,14 +190,14 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.red.withValues(alpha: 0.3),
+          color: context.appColors.error.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Icon(
         Icons.broken_image_outlined,
         size: size * 0.4,
-        color: Colors.red.withValues(alpha: 0.4),
+        color: context.appColors.error.withValues(alpha: 0.4),
       ),
     );
   }
@@ -212,7 +213,7 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
-          color: Colors.blue,
+          color: context.appColors.info,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: Theme.of(context).colorScheme.surface,

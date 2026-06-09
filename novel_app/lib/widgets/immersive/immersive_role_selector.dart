@@ -6,6 +6,7 @@ import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/database_providers.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 沉浸体验角色选择器
 ///
@@ -56,14 +57,16 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
   late CharacterImageCacheService _imageCacheService;
   CharacterAvatarService? _avatarService;
 
-  // 缓存阴影样式
-  final List<BoxShadow> _avatarShadow = [
-    const BoxShadow(
-      color: Color(0x4D000000), // Colors.black.withValues(alpha: 0.3)
-      blurRadius: 8,
-      offset: Offset(0, 4),
-    ),
-  ];
+  // 阴影样式（build 内根据主题计算）
+  List<BoxShadow> _buildAvatarShadow() {
+    return [
+      BoxShadow(
+        color: context.appColors.avatarShadow,
+        blurRadius: 8,
+        offset: const Offset(0, 4),
+      ),
+    ];
+  }
 
   bool get _isSelectAll =>
       _selectedRoleIds.length == widget.allCharacters.length;
@@ -381,7 +384,7 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primary,
                     shape: BoxShape.circle,
-                    boxShadow: _avatarShadow,
+                    boxShadow: _buildAvatarShadow(),
                   ),
                   child: Icon(
                     Icons.check,

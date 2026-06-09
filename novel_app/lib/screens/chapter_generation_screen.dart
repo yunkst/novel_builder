@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/common/common_widgets.dart';
+import '../core/theme/app_colors.dart';
 
 /// 章节生成全屏页面 (Riverpod版本)
 ///
@@ -196,17 +197,17 @@ class _ChapterGenerationScreenState
                 valueListenable: widget.generatedContentNotifier,
                 builder: (context, content, child) {
                   if (content.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
                           Text(
                             '正在生成中...',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -288,9 +289,9 @@ class _ChapterGenerationScreenState
                                             .onSurface,
                                       ),
                                     ),
-                                    const Divider(
+                                    Divider(
                                       height: 32,
-                                      color: Color(0xFF616161),
+                                      color: context.appColors.neutral,
                                     ),
 
                                     // 章节内容

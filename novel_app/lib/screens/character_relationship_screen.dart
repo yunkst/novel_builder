@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/relationship_edit_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
@@ -293,7 +294,7 @@ class _CharacterRelationshipScreenState
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _getGenderColor(targetCharacter?.gender),
+          backgroundColor: _getGenderColor(context, targetCharacter?.gender),
           child: Text(
             targetCharacter?.name.isNotEmpty ?? false
                 ? targetCharacter!.name[0].toUpperCase()
@@ -343,13 +344,13 @@ class _CharacterRelationshipScreenState
             if (isOutgoing)
               Icon(
                 Icons.arrow_forward,
-                color: Colors.blue[400],
+                color: context.appColors.info,
                 size: 20,
               )
             else
               Icon(
                 Icons.arrow_back,
-                color: Colors.green[400],
+                color: context.appColors.success,
                 size: 20,
               ),
             const SizedBox(width: 8),
@@ -360,7 +361,7 @@ class _CharacterRelationshipScreenState
               },
             ),
             IconButton(
-              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+              icon: Icon(Icons.delete, size: 20, color: context.appColors.error),
               onPressed: () {
                 _deleteRelationship(relationship);
               },
@@ -371,14 +372,14 @@ class _CharacterRelationshipScreenState
     );
   }
 
-  Color _getGenderColor(String? gender) {
+  Color _getGenderColor(BuildContext context, String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue;
+        return context.appColors.graphGenderMale;
       case '女':
-        return Colors.pink;
+        return context.appColors.graphGenderFemale;
       default:
-        return Colors.purple;
+        return context.appColors.graphGenderUnknown;
     }
   }
 

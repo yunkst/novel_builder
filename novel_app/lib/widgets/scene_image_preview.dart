@@ -338,10 +338,10 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
                 centered: false,
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 '预计需要1-3分钟',
                 style: TextStyle(
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),
@@ -468,10 +468,10 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
                       .withValues(alpha: 0.6),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   '插图生成中...',
                   style: TextStyle(
-                    color: Colors.grey,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),

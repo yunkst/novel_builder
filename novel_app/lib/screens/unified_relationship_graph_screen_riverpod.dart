@@ -7,6 +7,7 @@ import '../models/character_relationship.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
 import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 
 /// 统一的角色关系图可视化页面 - Riverpod版本
@@ -415,20 +416,20 @@ class _UnifiedRelationshipGraphScreenRiverpodState
                 end: Alignment.bottomRight,
                 colors: isCenter
                     ? [
-                        Colors.orange.shade400,
-                        Colors.orange.shade600,
+                        context.appColors.graphCenterStart,
+                        context.appColors.graphCenterEnd,
                       ]
                     : [
-                        _getGenderColor(character.gender)
+                        _getGenderColor(context, character.gender)
                             .withValues(alpha: 0.9),
-                        _getGenderColor(character.gender),
+                        _getGenderColor(context, character.gender),
                       ],
               ),
               boxShadow: [
                 BoxShadow(
                   color: isCenter
-                      ? Colors.orange.withValues(alpha: 0.5)
-                      : _getGenderColor(character.gender)
+                      ? context.appColors.graphCenterGlow
+                      : _getGenderColor(context, character.gender)
                           .withValues(alpha: 0.4),
                   blurRadius: isCenter ? 16 : 12,
                   spreadRadius: isCenter ? 3 : 2,
@@ -479,7 +480,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: isCenter
-                  ? Colors.orange.shade100
+                  ? context.appColors.graphCenterBorder
                   : Theme.of(context)
                       .colorScheme
                       .surface
@@ -487,7 +488,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isCenter
-                    ? Colors.orange.shade300
+                    ? context.appColors.graphCenterEnd
                     : Theme.of(context).colorScheme.outlineVariant,
                 width: 1,
               ),
@@ -508,7 +509,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
                 fontSize: isCenter ? 14 : 12,
                 fontWeight: isCenter ? FontWeight.bold : FontWeight.w600,
                 color: isCenter
-                    ? Colors.orange.shade900
+                    ? context.appColors.graphCenterOnDark
                     : Theme.of(context)
                         .colorScheme
                         .onSurface
@@ -541,7 +542,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
     }
 
     // 根据关系类型返回不同颜色和粗细
-    final color = _getRelationshipColor(relationship.relationshipType);
+    final color = _getRelationshipColor(context, relationship.relationshipType);
     final thickness = _getRelationshipThickness(relationship.relationshipType);
 
     return Container(
@@ -574,7 +575,7 @@ class _UnifiedRelationshipGraphScreenRiverpodState
           children: [
             Icon(
               Icons.person,
-              color: _getGenderColor(character.gender),
+              color: _getGenderColor(context, character.gender),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -667,40 +668,40 @@ class _UnifiedRelationshipGraphScreenRiverpodState
   }
 
   /// 获取性别颜色
-  Color _getGenderColor(String? gender) {
+  Color _getGenderColor(BuildContext context, String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue;
+        return context.appColors.graphGenderMale;
       case '女':
-        return Colors.pink;
+        return context.appColors.graphGenderFemale;
       default:
-        return Colors.purple;
+        return context.appColors.graphGenderUnknown;
     }
   }
 
   /// 获取关系类型颜色
-  Color _getRelationshipColor(String relationshipType) {
+  Color _getRelationshipColor(BuildContext context, String relationshipType) {
     switch (relationshipType) {
       case '亲密关系':
-        return Colors.red.shade600;
+        return context.appColors.graphRelationIntimate;
       case '家庭':
-        return Colors.teal.shade600;
+        return context.appColors.graphRelationFamily;
       case '恋人':
-        return Colors.pink.shade500;
+        return context.appColors.graphRelationLover;
       case '朋友':
-        return Colors.blue.shade600;
+        return context.appColors.graphRelationFriend;
       case '敌对':
-        return Colors.red.shade800;
+        return context.appColors.graphRelationHostile;
       case '竞争对手':
-        return Colors.orange.shade600;
+        return context.appColors.graphRelationRival;
       case '同事':
-        return Colors.amber.shade700;
+        return context.appColors.graphRelationColleague;
       case '师徒':
-        return Colors.indigo.shade600;
+        return context.appColors.graphRelationMaster;
       case '盟友':
-        return Colors.green.shade600;
+        return context.appColors.graphRelationAlly;
       default:
-        return Colors.grey.shade600;
+        return context.appColors.graphRelationDefault;
     }
   }
 

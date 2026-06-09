@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
 import '../../core/providers/novel_sync_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../services/novel_sync_service.dart';
 
 /// 小说同步对话框
@@ -216,9 +217,9 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
           color: Theme.of(context).primaryColor,
         );
       case SyncStatus.success:
-        return const Icon(Icons.check_circle, color: Colors.green);
+        return Icon(Icons.check_circle, color: context.appColors.success);
       case SyncStatus.error:
-        return const Icon(Icons.error, color: Colors.red);
+        return Icon(Icons.error, color: context.appColors.error);
     }
   }
 
@@ -243,7 +244,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -282,7 +283,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
                     widget.novel.author,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],
@@ -298,8 +299,8 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
     return Container(
       width: 40,
       height: 56,
-      color: Colors.grey.shade300,
-      child: const Icon(Icons.book, size: 20, color: Colors.grey),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Icon(Icons.book, size: 20, color: Theme.of(context).colorScheme.outline),
     );
   }
 
@@ -315,7 +316,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
               ? '正在上传小说数据到服务器...'
               : '正在从服务器下载小说数据...',
           style: TextStyle(
-            color: Colors.grey.shade700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontSize: 13,
           ),
         ),
@@ -328,9 +329,9 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: context.appColors.successContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200),
+        border: Border.all(color: context.appColors.successContainer),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +339,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
           Row(
             children: [
               Icon(Icons.check_circle_outline,
-                  size: 20, color: Colors.green.shade700),
+                  size: 20, color: context.appColors.onSuccessContainer),
               const SizedBox(width: 8),
               Text(
                 widget.operation == SyncOperation.upload
@@ -346,7 +347,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
                     : '小说数据已成功下载到本地',
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.green.shade700,
+                  color: context.appColors.onSuccessContainer,
                 ),
               ),
             ],
@@ -373,9 +374,9 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: context.appColors.errorContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: context.appColors.errorContainer),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,14 +384,14 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.error_outline, size: 20, color: Colors.red.shade700),
+              Icon(Icons.error_outline, size: 20, color: context.appColors.onErrorContainer),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _state.errorMessage ?? '未知错误',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.red.shade700,
+                    color: context.appColors.onErrorContainer,
                   ),
                 ),
               ),
@@ -410,7 +411,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
           child: Text(
             '$label:',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),

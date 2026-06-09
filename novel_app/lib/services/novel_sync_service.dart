@@ -390,12 +390,10 @@ class NovelSyncService {
       var novel = await _novelRepository.getNovelByTitle(title);
 
       // 2. 如果本地不存在，创建新小说
-      if (novel == null) {
-        novel = await _novelRepository.createNovel(
-          title: title,
-          author: '',
-        );
-      }
+      novel ??= await _novelRepository.createNovel(
+        title: title,
+        author: '',
+      );
 
       // 3. 下载并导入数据
       return await downloadNovel(novel, deleteExisting: true);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tag_group.dart';
 import '../models/prompt_tag_category.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 
 /// 标签选择面板（分组模式）
 ///
@@ -62,7 +63,7 @@ class _PromptTagSelectorSheetState
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade400,
+                color: context.appColors.neutral,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -84,7 +85,7 @@ class _PromptTagSelectorSheetState
                         '已选 ${_selectedKeys.length}',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.blue.shade700,
+                          color: context.appColors.onInfoContainer,
                         ),
                       ),
                     ),
@@ -295,7 +296,7 @@ class _GroupedTagListState extends ConsumerState<_GroupedTagList> {
           widget.categoryId == null
               ? '暂无标签，请先在管理页面创建'
               : (widget.keyword.isEmpty ? '此分类下暂无标签' : '未找到匹配项'),
-          style: TextStyle(color: Colors.grey.shade600),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
     }
@@ -317,7 +318,9 @@ class _GroupedTagListState extends ConsumerState<_GroupedTagList> {
                   selected
                       ? Icons.check_box
                       : Icons.check_box_outline_blank,
-                  color: selected ? Colors.blue : Colors.grey,
+                  color: selected
+                      ? context.appColors.info
+                      : Theme.of(context).colorScheme.outline,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -333,14 +336,14 @@ class _GroupedTagListState extends ConsumerState<_GroupedTagList> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
+                      color: context.appColors.infoContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '×${group.count}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.blue.shade700,
+                        color: context.appColors.onInfoContainer,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

@@ -5,6 +5,7 @@ import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import 'package:novel_app/widgets/hermes/hermes_settings_dialog.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天对话框
 class HermesChatDialog extends ConsumerStatefulWidget {
@@ -82,15 +83,16 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   }
 
   Widget _buildHeader(HermesChatNotifier notifier) {
+    final appColors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+        gradient: LinearGradient(
+          colors: [appColors.hermesBrandStart, appColors.hermesBrandEnd],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+            color: appColors.hermesBrandStart.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -98,13 +100,13 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+          Icon(Icons.auto_awesome, color: appColors.hermesOnBrand, size: 22),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Hermes AI 助手',
               style: TextStyle(
-                color: Colors.white,
+                color: appColors.hermesOnBrand,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
@@ -113,14 +115,15 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           IconButton(
             icon: Icon(
               _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              color: Colors.white70,
+              color: appColors.hermesOnBrandMuted,
               size: 20,
             ),
             onPressed: () => setState(() => _isFullscreen = !_isFullscreen),
             tooltip: _isFullscreen ? '退出全屏' : '全屏',
           ),
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white70, size: 20),
+            icon: Icon(Icons.settings,
+                color: appColors.hermesOnBrandMuted, size: 20),
             onPressed: () {
               showDialog(
                 context: context,
@@ -130,14 +133,16 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
             tooltip: '设置',
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white70, size: 20),
+            icon: Icon(Icons.delete_outline,
+                color: appColors.hermesOnBrandMuted, size: 20),
             onPressed: () {
               notifier.clearConversation();
             },
             tooltip: '清空对话',
           ),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+            icon: Icon(Icons.close,
+                color: appColors.hermesOnBrandMuted, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -203,17 +208,18 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   }
 
   Widget _buildErrorBar(String error) {
+    final appColors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.red.withValues(alpha: 0.1),
+      color: appColors.error.withValues(alpha: 0.1),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, size: 16, color: Colors.red),
+          Icon(Icons.error_outline, size: 16, color: appColors.error),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               error,
-              style: const TextStyle(color: Colors.red, fontSize: 12),
+              style: TextStyle(color: appColors.error, fontSize: 12),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -254,6 +260,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
 
   Widget _buildInputBar(HermesChatState chatState, HermesChatNotifier notifier) {
     final theme = Theme.of(context);
+    final appColors = context.appColors;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -299,7 +306,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                   icon: const Icon(Icons.stop, size: 18),
                   label: const Text('停止'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: appColors.error,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
                 )
@@ -309,7 +316,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                   icon: const Icon(Icons.send, size: 18),
                   label: const Text('发送'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: appColors.hermesAccent,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
                 ),

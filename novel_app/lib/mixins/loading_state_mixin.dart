@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 加载状态管理 Mixin
 ///
@@ -167,16 +168,16 @@ mixin LoadingStateMixin<T extends StatefulWidget> on State<T> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline,
                   size: 48,
-                  color: Colors.red,
+                  color: context.appColors.error,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(color: context.appColors.error),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
@@ -215,19 +216,19 @@ mixin LoadingStateMixin<T extends StatefulWidget> on State<T> {
           child: errorBanner ??
               Container(
                 padding: const EdgeInsets.all(12),
-                color: Colors.red.withValues(alpha: 0.9),
+                color: context.appColors.error.withValues(alpha: 0.9),
                 child: Row(
                   children: [
-                    const Icon(Icons.error, color: Colors.white),
+                    Icon(Icons.error, color: context.appColors.onSemantic),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: context.appColors.onSemantic),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
+                      icon: Icon(Icons.close, color: context.appColors.onSemantic),
                       onPressed: clearError,
                     ),
                   ],

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
 import '../widgets/prompt_history_bottom_sheet.dart';
@@ -220,9 +221,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: const PromptHistoryBottomSheet(),
       ),
@@ -256,9 +257,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: PromptTagSelectorSheet(
           initialSelectedGroups: _selectedTagGroups,
@@ -311,6 +312,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       _savePromptHistory(rawContent);
       final merged = await _mergeTagPrompt(rawContent);
 
+      if (!mounted) return;
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
         'content': merged,
@@ -329,6 +331,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       _savePromptHistory(_userInputController.text);
       final merged = await _mergeTagPrompt(_userInputController.text);
 
+      if (!mounted) return;
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
         'content': merged,
@@ -518,7 +521,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       appBar: AppBar(
         title: Row(
           children: [
-            const Icon(Icons.add_circle, color: Colors.blue),
+            Icon(Icons.add_circle, color: context.appColors.info),
             const SizedBox(width: 8),
             Text(isEmpty ? '创建新章节' : '插入新章节'),
           ],
@@ -618,7 +621,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isActive
-                ? Colors.blue
+                ? context.appColors.info
                 : Theme.of(context)
                     .colorScheme
                     .onSurface
@@ -641,7 +644,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           style: TextStyle(
             fontSize: 13,
             color: isActive
-                ? Colors.blue
+                ? context.appColors.info
                 : Theme.of(context)
                     .colorScheme
                     .onSurface
@@ -698,7 +701,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700),
+                  Icon(Icons.info_outline, color: context.appColors.onInfoContainer),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -818,7 +821,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
                     'AI将根据选中的角色特征来生成章节内容',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue.shade600,
+                      color: context.appColors.onInfoContainer,
                     ),
                   ),
                 ],
@@ -840,7 +843,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         children: [
           // 大纲预览
           Card(
-            color: Colors.blue.shade50,
+            color: context.appColors.infoContainer,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -849,14 +852,14 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
                   Row(
                     children: [
                       Icon(Icons.menu_book,
-                          size: 20, color: Colors.blue.shade700),
+                          size: 20, color: context.appColors.onInfoContainer),
                       const SizedBox(width: 8),
                       Text(
                         '大纲: ${_outline!.title}',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+                          color: context.appColors.onInfoContainer,
                         ),
                       ),
                     ],
@@ -1104,12 +1107,12 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         rightChild: ElevatedButton.icon(
           onPressed: isStreaming ? null : _handleConfirm,
           icon: isStreaming
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 )
               : const Icon(Icons.auto_awesome),

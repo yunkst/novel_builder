@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 
 /// 小说书名编辑对话框
@@ -75,10 +76,10 @@ class _NovelEditDialogState extends State<NovelEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.edit, color: Colors.blue),
-          SizedBox(width: 8),
+          Icon(Icons.edit, color: context.appColors.info),
+          const SizedBox(width: 8),
           Text('编辑书名'),
         ],
       ),

@@ -7,6 +7,7 @@ import '../../services/logger_service.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../core/providers/reader_screen_providers.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 全文重写对话框
 ///
@@ -65,10 +66,10 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.auto_stories, color: Colors.green),
-            SizedBox(width: 8),
+            Icon(Icons.auto_stories, color: context.appColors.success),
+            const SizedBox(width: 8),
             Text('全文重写'),
           ],
         ),
@@ -80,7 +81,7 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
               '将对整章内容进行重写',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 16),
@@ -99,7 +100,7 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
               '提示：AI将根据你的要求重新创作整章内容',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -114,8 +115,8 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
               Navigator.pop(context, userInputController.text);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: context.appColors.success,
+              foregroundColor: context.appColors.onSemantic,
             ),
             child: const Text('开始重写'),
           ),
@@ -193,10 +194,10 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.auto_stories, color: Colors.green),
-              SizedBox(width: 8),
+              Icon(Icons.auto_stories, color: context.appColors.success),
+              const SizedBox(width: 8),
               Text('全文重写结果'),
             ],
           ),
@@ -240,12 +241,12 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         '你可以选择替换全文、重新生成或关闭',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -293,8 +294,8 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
                       icon: const Icon(Icons.check),
                       label: const Text('替换全文'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                        backgroundColor: context.appColors.success,
+                        foregroundColor: context.appColors.onSemantic,
                       ),
                     );
                   },

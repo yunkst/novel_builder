@@ -5,6 +5,7 @@ import '../models/novel.dart';
 import '../models/character.dart';
 import '../models/character_update.dart';
 import '../models/outline.dart';
+import '../core/theme/app_colors.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/character_input_dialog.dart';
@@ -449,7 +450,7 @@ class _CharacterManagementScreenState
       message: '确定要删除选中的 ${_selectedCharacterIds.length} 个角色吗？\n此操作无法撤销。',
       confirmText: '删除',
       icon: Icons.delete,
-      confirmColor: Colors.red,
+      confirmColor: context.appColors.error,
     );
     return result ?? false;
   }
@@ -589,8 +590,8 @@ class _CharacterManagementScreenState
                   onPressed: _deleteSelectedCharacters,
                   icon: const Icon(Icons.delete),
                   label: Text('删除 (${_selectedCharacterIds.length})'),
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.appColors.error,
+                  foregroundColor: context.appColors.onSemantic,
                 )
               : FloatingActionButton(
                   heroTag: 'character_management_fab',
@@ -917,7 +918,7 @@ class _CharacterManagementScreenState
           style: TextStyle(
             fontSize: 48, // 固定字体大小，因为容器会自适应
             fontWeight: FontWeight.bold,
-            color: _getGenderColor(character.gender),
+            color: _getGenderColor(context, character.gender),
           ),
         ),
       ),
@@ -932,8 +933,8 @@ class _CharacterManagementScreenState
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            _getGenderColor(character.gender),
-            _getGenderColor(character.gender).withValues(alpha: 0.7),
+            _getGenderColor(context, character.gender),
+            _getGenderColor(context, character.gender).withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -946,14 +947,14 @@ class _CharacterManagementScreenState
     );
   }
 
-  Color _getGenderColor(String? gender) {
+  Color _getGenderColor(BuildContext context, String? gender) {
     switch (gender?.toLowerCase()) {
       case '男':
-        return Colors.blue;
+        return context.appColors.graphGenderMale;
       case '女':
-        return Colors.pink;
+        return context.appColors.graphGenderFemale;
       default:
-        return Colors.purple;
+        return context.appColors.graphGenderUnknown;
     }
   }
 }

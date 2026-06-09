@@ -73,6 +73,12 @@ class NovelReaderApp extends ConsumerWidget {
 
     return themeAsync.when(
       data: (themeState) {
+        // 同步主题色到 Toast 工具，使其能感知当前主题
+        ToastUtils.setThemeColors(
+          themeState.flutterThemeMode == ThemeMode.light
+              ? AppColors.light
+              : AppColors.dark,
+        );
         return MaterialApp(
           title: 'Novel App',
           theme: themeState.getLightTheme(),
@@ -97,7 +103,7 @@ class NovelReaderApp extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error, size: 64, color: Colors.red),
+                        Icon(Icons.error, size: 64, color: context.appColors.error),
                         const SizedBox(height: 16),
                         const Text(
                             'An error occurred. Check console for details.'),
@@ -127,6 +133,7 @@ class NovelReaderApp extends ConsumerWidget {
               brightness: Brightness.dark,
             ),
             useMaterial3: true,
+            extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
           ),
           home: const Center(
             child: CircularProgressIndicator(),
@@ -144,12 +151,13 @@ class NovelReaderApp extends ConsumerWidget {
               brightness: Brightness.dark,
             ),
             useMaterial3: true,
+            extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
           ),
           home: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error, size: 64, color: Colors.red),
+                Icon(Icons.error, size: 64, color: context.appColors.error),
                 const SizedBox(height: 16),
                 Text('主题加载失败: $error'),
                 const SizedBox(height: 8),

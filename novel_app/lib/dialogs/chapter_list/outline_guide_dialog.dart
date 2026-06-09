@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/outline.dart';
 
 /// 大纲引导对话框
@@ -20,10 +21,10 @@ class OutlineGuideDialog {
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.menu_book, color: Colors.orange),
-            SizedBox(width: 8),
+            Icon(Icons.menu_book, color: context.appColors.warning),
+            const SizedBox(width: 8),
             Text('暂无大纲'),
           ],
         ),
@@ -54,10 +55,10 @@ class OutlineGuideDialog {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.menu_book, color: Colors.blue),
-            SizedBox(width: 8),
+            Icon(Icons.menu_book, color: context.appColors.info),
+            const SizedBox(width: 8),
             Text('按照大纲插入'),
           ],
         ),
@@ -74,9 +75,9 @@ class OutlineGuideDialog {
               constraints: const BoxConstraints(maxHeight: 200),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
               ),
               child: SingleChildScrollView(
                 child: Text(
@@ -88,9 +89,9 @@ class OutlineGuideDialog {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'AI将根据大纲和前文生成章节细纲，您可以确认或修改细纲后再生成章节内容。',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),

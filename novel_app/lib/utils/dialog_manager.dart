@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/theme/app_colors.dart';
 
 /// 对话框管理工具类
 ///
@@ -71,7 +72,7 @@ class DialogManager {
             onPressed: () => Navigator.of(context).pop(true),
             style: isDanger
                 ? ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: context.appColors.error,
                   )
                 : null,
             child: Text(confirmText),
@@ -376,7 +377,7 @@ class DialogManager {
                 : Text(itemLabel!(item)),
             leading: Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
+              color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).colorScheme.outline,
             ),
             onTap: () => Navigator.of(context).pop(item),
           );

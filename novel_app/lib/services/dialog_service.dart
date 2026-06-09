@@ -43,6 +43,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ai_companion_response.dart';
 import '../widgets/reader/ai_companion_confirm_dialog.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../models/novel.dart';
 import '../utils/toast_utils.dart';
 
@@ -86,7 +87,7 @@ class DialogService {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: isDanger
-                ? ElevatedButton.styleFrom(backgroundColor: Colors.red)
+                ? ElevatedButton.styleFrom(backgroundColor: context.appColors.error)
                 : null,
             child: Text(confirmText),
           ),

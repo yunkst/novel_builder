@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 统一的错误显示组件
 ///
@@ -286,10 +287,10 @@ class ErrorDetailDialog extends StatelessWidget {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.error, color: Colors.red),
-          SizedBox(width: 8),
+          Icon(Icons.error, color: context.appColors.error),
+          const SizedBox(width: 8),
           Text('错误详情'),
         ],
       ),

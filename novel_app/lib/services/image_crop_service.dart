@@ -36,6 +36,8 @@ class ImageCropService {
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: '框选头像范围',
+            // image_cropper 走原生 Android UI，Flutter Theme 不可达，
+            // 因此 toolbarColor 保持硬编码（与 Material Blue 500 一致）。
             toolbarColor: const Color(0xFF2196F3),
             toolbarWidgetColor: Colors.white,
             backgroundColor: Colors.black87,

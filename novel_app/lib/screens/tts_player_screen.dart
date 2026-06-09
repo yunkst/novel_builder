@@ -8,6 +8,7 @@ import '../services/tts_player_service.dart';
 import '../widgets/tts_control_panel.dart';
 import '../widgets/tts_content_display.dart';
 import '../widgets/tts_chapter_selector.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/tts_timer_settings_sheet.dart';
 import '../widgets/tts_timer_complete_dialog.dart';
 import '../utils/toast_utils.dart';
@@ -129,7 +130,7 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
       children: [
         Text(
           widget.novel.title,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+          style: TextStyle(fontSize: 14, color: context.appColors.ttsHint),
         ),
         Row(
           children: [
@@ -143,7 +144,7 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
             if (totalChapters > 0)
               Text(
                 ' ${currentIndex + 1}/$totalChapters',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+                style: TextStyle(fontSize: 14, color: context.appColors.ttsHint),
               ),
           ],
         ),
@@ -162,7 +163,7 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
         children: [
           Icon(
             timerEnabled ? Icons.timer : Icons.timer_outlined,
-            color: timerEnabled ? Colors.orange : null,
+            color: timerEnabled ? context.appColors.warning : null,
           ),
           if (timerEnabled)
             Positioned(
@@ -170,8 +171,8 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
               bottom: -6,
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.orange,
+                decoration: BoxDecoration(
+                  color: context.appColors.warning,
                   shape: BoxShape.circle,
                 ),
                 constraints: const BoxConstraints(
@@ -226,11 +227,11 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              Icon(Icons.error_outline, size: 64, color: context.appColors.error),
               const SizedBox(height: 16),
               Text(
                 _playerService.errorMessage ?? '发生错误',
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: context.appColors.error),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -247,8 +248,8 @@ class _TtsPlayerScreenState extends ConsumerState<TtsPlayerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.check_circle_outline,
-                  size: 64, color: Colors.green),
+              Icon(Icons.check_circle_outline,
+                  size: 64, color: context.appColors.success),
               const SizedBox(height: 16),
               const Text('朗读完成', style: TextStyle(fontSize: 18)),
               const SizedBox(height: 16),

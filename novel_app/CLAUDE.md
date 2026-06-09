@@ -115,7 +115,6 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `scene_illustration_service.dart` - 场景插图服务
   - `backup_service.dart` - 备份服务
   - `preferences_service.dart` - 偏好设置服务
-  - `theme_service.dart` - 主题服务
   - `database_service.dart` - 数据库服务（@Deprecated，使用Repository Providers）
   - `dify_service.dart` - Dify AI服务
   - `dify_sse_parser.dart` - SSE流式解析器

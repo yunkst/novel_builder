@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/preload_progress_update.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
 
@@ -78,7 +79,7 @@ class _PreloadQueueDebugScreenState
       message: '确定要清空预加载队列吗？正在处理的任务将完成当前项后停止。',
       confirmText: '清空',
       icon: Icons.delete_outline,
-      confirmColor: Colors.red,
+      confirmColor: context.appColors.error,
     );
 
     if (confirmed != true || !mounted) return;
@@ -163,37 +164,37 @@ class _PreloadQueueDebugScreenState
         label: '队列长度',
         value: '$queueLength',
         icon: Icons.queue,
-        color: queueLength > 0 ? Colors.orange : Colors.grey,
+        color: queueLength > 0 ? context.appColors.warning : Theme.of(context).colorScheme.outline,
       ),
       _StatItem(
         label: '处理状态',
         value: isProcessing ? '处理中' : '空闲',
         icon: isProcessing ? Icons.sync : Icons.check_circle,
-        color: isProcessing ? Colors.green : Colors.grey,
+        color: isProcessing ? context.appColors.success : Theme.of(context).colorScheme.outline,
       ),
       _StatItem(
         label: '已处理',
         value: '$totalProcessed',
         icon: Icons.done_all,
-        color: Colors.blue,
+        color: context.appColors.info,
       ),
       _StatItem(
         label: '已失败',
         value: '$totalFailed',
         icon: Icons.error_outline,
-        color: totalFailed > 0 ? Colors.red : Colors.grey,
+        color: totalFailed > 0 ? context.appColors.error : Theme.of(context).colorScheme.outline,
       ),
       _StatItem(
         label: '已入队URL',
         value: '$enqueuedUrls',
         icon: Icons.link,
-        color: Colors.teal,
+        color: Theme.of(context).colorScheme.tertiary,
       ),
       _StatItem(
         label: '进度更新',
         value: '${_recentUpdates.length}',
         icon: Icons.update,
-        color: Colors.purple,
+        color: context.appColors.neutral,
       ),
     ];
 
@@ -426,19 +427,19 @@ class _PreloadQueueDebugScreenState
           child: FilledButton.icon(
             onPressed: _isClearing ? null : _clearQueue,
             icon: _isClearing
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.primary,
             ),
                   )
                 : const Icon(Icons.delete_sweep, size: 18),
             label: Text(_isClearing ? '清空中...' : '清空队列'),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: context.appColors.error,
+              foregroundColor: context.appColors.onSemantic,
             ),
           ),
         ),
@@ -525,7 +526,7 @@ class _PreloadQueueDebugScreenState
           Icon(
             update.isPreloading ? Icons.sync : Icons.check_circle_outline,
             size: 12,
-            color: update.isPreloading ? Colors.green : Colors.grey,
+            color: update.isPreloading ? context.appColors.success : Theme.of(context).colorScheme.outline,
           ),
           const SizedBox(width: 4),
           Expanded(

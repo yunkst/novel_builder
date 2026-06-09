@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:novel_app/services/novel_sync_service.dart';
+import '../core/theme/app_colors.dart';
 
 enum BatchSyncType { upload, download }
 
@@ -49,9 +50,9 @@ class BatchSyncDialog extends StatefulWidget {
 
 class _BatchSyncDialogState extends State<BatchSyncDialog> {
   bool _isSyncing = true;
-  int _current = 0;
-  int _total = 0;
-  String _currentTitle = '';
+  final int _current = 0;
+  final int _total = 0;
+  final String _currentTitle = '';
   BatchSyncResult? _result;
   String? _error;
 
@@ -127,7 +128,7 @@ class _BatchSyncDialogState extends State<BatchSyncDialog> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          Icon(Icons.error_outline, color: context.appColors.error, size: 48),
           const SizedBox(height: 16),
           Text(
             '同步失败',
@@ -149,7 +150,7 @@ class _BatchSyncDialogState extends State<BatchSyncDialog> {
       children: [
         Icon(
           result.failureCount == 0 ? Icons.check_circle : Icons.warning,
-          color: result.failureCount == 0 ? Colors.green : Colors.orange,
+          color: result.failureCount == 0 ? context.appColors.success : context.appColors.warning,
           size: 48,
         ),
         const SizedBox(height: 16),

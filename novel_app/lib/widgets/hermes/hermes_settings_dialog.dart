@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/services/network_service_providers.dart';
 import 'package:novel_app/services/hermes_chat_service.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Hermes 配置对话框
 class HermesSettingsDialog extends ConsumerStatefulWidget {
@@ -87,8 +88,8 @@ class _HermesSettingsDialogState extends ConsumerState<HermesSettingsDialog> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: _testResult!.contains('成功')
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
+                        ? context.appColors.successContainer
+                        : context.appColors.errorContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -96,7 +97,7 @@ class _HermesSettingsDialogState extends ConsumerState<HermesSettingsDialog> {
                       Icon(
                         _testResult!.contains('成功') ? Icons.check_circle : Icons.error,
                         size: 16,
-                        color: _testResult!.contains('成功') ? Colors.green : Colors.red,
+                        color: _testResult!.contains('成功') ? context.appColors.success : context.appColors.error,
                       ),
                       const SizedBox(width: 8),
                       Expanded(

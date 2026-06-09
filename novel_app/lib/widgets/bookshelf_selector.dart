@@ -256,12 +256,12 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
                   .withValues(alpha: 0.6),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
                 '暂无书架',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/chapter.dart';
 
 /// 删除章节确认对话框
@@ -19,10 +20,10 @@ class DeleteChapterDialog {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange),
-            SizedBox(width: 8),
+            Icon(Icons.warning, color: context.appColors.warning),
+            const SizedBox(width: 8),
             Text('删除章节'),
           ],
         ),
@@ -38,11 +39,11 @@ class DeleteChapterDialog {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '此操作无法撤销，章节内容将被永久删除。',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.red,
+                color: context.appColors.error,
               ),
             ),
             if (totalChapters > 1) ...[
@@ -51,7 +52,7 @@ class DeleteChapterDialog {
                 '删除后章节列表将重新排序。',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -65,8 +66,8 @@ class DeleteChapterDialog {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: context.appColors.error,
+              foregroundColor: context.appColors.onSemantic,
             ),
             child: const Text('删除'),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../core/theme/app_colors.dart';
 import '../services/logger_service.dart';
 import 'common/common_widgets.dart';
 
@@ -191,7 +192,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -270,10 +271,10 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       height: widget.height,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.05),
+          color: context.appColors.errorContainer,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Colors.red.withValues(alpha: 0.2),
+            color: context.appColors.errorContainer,
           ),
         ),
         child: ErrorStateWidget(

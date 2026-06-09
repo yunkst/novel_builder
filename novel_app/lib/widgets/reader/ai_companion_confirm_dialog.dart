@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/ai_companion_response.dart';
+import '../../core/theme/app_colors.dart';
 
 /// AI伴读确认对话框
 ///
@@ -42,7 +43,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.auto_stories, color: Colors.orange, size: 28),
+          Icon(Icons.auto_stories, color: context.appColors.warning, size: 28),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
@@ -119,8 +120,8 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
         ElevatedButton(
           onPressed: widget.onConfirm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
+            backgroundColor: context.appColors.warning,
+            foregroundColor: context.appColors.onSemantic,
           ),
           child: const Text('全部保存'),
         ),
@@ -148,7 +149,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Icon(icon, size: 20, color: Colors.orange),
+                  Icon(icon, size: 20, color: context.appColors.warning),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -182,9 +183,9 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
   /// 构建文本内容（自动换行）
   Widget _buildTextContent(String text) {
     if (text.isEmpty) {
-      return const Text(
+      return Text(
         '无内容',
-        style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
       );
     }
 
@@ -197,9 +198,9 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
   /// 构建角色列表
   Widget _buildRolesList() {
     if (widget.response.roles.isEmpty) {
-      return const Text(
+      return Text(
         '无角色更新',
-        style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
       );
     }
 
@@ -213,7 +214,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             title: Row(
               children: [
-                const Icon(Icons.person, size: 20, color: Colors.blue),
+                Icon(Icons.person, size: 20, color: context.appColors.info),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -229,7 +230,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -243,7 +244,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.orange[100],
+                      color: context.appColors.warningContainer,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -304,10 +305,10 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
           width: 80,
           child: Text(
             '$label:',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -349,24 +350,24 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: context.appColors.warningContainer,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.orange, width: 1),
+                    border: Border.all(color: context.appColors.warning, width: 1),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         relation.type,
-                        style: const TextStyle(
-                          color: Colors.orange,
+                        style: TextStyle(
+                          color: context.appColors.warning,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward,
-                          size: 16, color: Colors.orange),
+                      Icon(Icons.arrow_forward,
+                          size: 16, color: context.appColors.warning),
                     ],
                   ),
                 ),

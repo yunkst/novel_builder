@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/prompt_history.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 
 /// 历史提示词选择面板
 ///
@@ -41,7 +42,7 @@ class _PromptHistoryBottomSheetState
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade400,
+                color: context.appColors.neutral,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -145,7 +146,7 @@ class _PromptHistoryListState extends ConsumerState<_PromptHistoryList> {
           return Center(
             child: Text(
               widget.keyword.isEmpty ? '暂无历史提示词' : '未找到匹配项',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           );
         }
@@ -232,7 +233,7 @@ class _PromptHistoryTile extends StatelessWidget {
                     _relativeTime(item.updatedAt),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],

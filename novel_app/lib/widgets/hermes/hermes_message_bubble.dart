@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/hermes_sse_parser.dart';
 import 'package:novel_app/widgets/hermes/hermes_tool_progress.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天消息气泡
 class HermesMessageBubble extends StatelessWidget {
@@ -48,7 +49,7 @@ class HermesMessageBubble extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: context.appColors.avatarShadow.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -86,7 +87,7 @@ class HermesMessageBubble extends StatelessWidget {
   Color _getBubbleColor(BuildContext context) {
     final isUser = message.role == HermesRole.user;
     if (isUser) {
-      return const Color(0xFF6366F1);
+      return context.appColors.hermesAccent;
     }
     return Theme.of(context).colorScheme.surfaceContainerHighest;
   }
@@ -95,8 +96,8 @@ class HermesMessageBubble extends StatelessWidget {
     final text = message.content;
     return Text(
       text,
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: context.appColors.hermesOnBrand,
         fontSize: 15,
         height: 1.4,
       ),

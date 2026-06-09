@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/novel.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/reader/background_summary_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
@@ -170,7 +171,7 @@ class _BackgroundSettingScreenState
       message: '您有未保存的修改，确定要放弃吗？',
       confirmText: '放弃修改',
       cancelText: '继续编辑',
-      confirmColor: Colors.red,
+      confirmColor: context.appColors.error,
     );
 
     return result ?? false;
@@ -273,7 +274,7 @@ class _BackgroundSettingScreenState
                 _isModified ? '内容已修改，2秒后自动保存或点击右上角保存' : '点击右上角保存按钮保存修改',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: _isModified
-                          ? Colors.orange
+                          ? context.appColors.warning
                           : Theme.of(context)
                               .colorScheme
                               .onSurface
