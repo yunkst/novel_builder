@@ -367,6 +367,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
     return List.generate(maps.length, (i) {
       return Chapter(
+        id: maps[i]['id'] as int?,
         title: maps[i]['title'],
         url: maps[i]['chapterUrl'],
         content: maps[i]['content'] ?? '',
@@ -429,7 +430,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     final chapterUrl =
         'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
 
-    await db.insert(
+    final ncId = await db.insert(
       'novel_chapters',
       {
         'novelUrl': novelUrl,
@@ -455,7 +456,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    return chapterIndex;
+    return ncId;
   }
 
   /// 更新用户创建的章节内容
@@ -690,5 +691,91 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       );
       rethrow;
     }
+  }
+
+  // ========== ID-based 查询方法（Agent 工具用） ==========
+
+  /// 根据 ID 查询章节（JOIN 两表获取完整信息）
+  @override
+  Future<Chapter?> getChapterById(int id) async {
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT
+        nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
+        nc.chapterIndex, nc.isUserInserted, nc.readAt,
+        cc.content, cc.isAccompanied
+      FROM novel_chapters nc
+      LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
+      WHERE nc.id = ?
+    ''', [id]);
+    if (maps.isEmpty) return null;
+    return Chapter(
+      id: maps.first['id'] as int?,
+      title: maps.first['title'] as String,
+      url: maps.first['chapterUrl'] as String,
+      content: maps.first['content'] as String?,
+      isCached: maps.first['content'] != null,
+      chapterIndex: maps.first['chapterIndex'] as int?,
+      isUserInserted: (maps.first['isUserInserted'] as int?) == 1,
+      readAt: maps.first['readAt'] as int?,
+      isAccompanied: (maps.first['isAccompanied'] ?? 0) == 1,
+    );
+  }
+
+  /// 根据 ID 获取章节 URL（内部 ID→URL 解析用）
+  @override
+  Future<String?> getChapterUrlById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'novel_chapters',
+      columns: ['chapterUrl'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return maps.first['chapterUrl'] as String;
+  }
+
+  /// 根据 ID 检查章节是否存在
+  @override
+  Future<bool> chapterExistsById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'novel_chapters',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return maps.isNotEmpty;
+  }
+
+  /// 根据 ID 更新章节内容（解析 URL 后委托 updateChapterContent）
+  @override
+  Future<int> updateChapterContentById(int id, String content) async {
+    final chapterUrl = await getChapterUrlById(id);
+    if (chapterUrl == null) return 0;
+    return updateChapterContent(chapterUrl, content);
+  }
+
+  /// 根据 ID 获取缓存的章节内容（解析 URL 后委托 getCachedChapter）
+  @override
+  Future<String?> getCachedChapterById(int id) async {
+    final chapterUrl = await getChapterUrlById(id);
+    if (chapterUrl == null) return null;
+    return getCachedChapter(chapterUrl);
+  }
+
+  /// 根据 URL 获取章节 ID（搜索结果用）
+  @override
+  Future<int?> getChapterIdByUrl(String url) async {
+    final db = await database;
+    final maps = await db.query(
+      'novel_chapters',
+      columns: ['id'],
+      where: 'chapterUrl = ?',
+      whereArgs: [url],
+    );
+    if (maps.isEmpty) return null;
+    return maps.first['id'] as int;
   }
 }

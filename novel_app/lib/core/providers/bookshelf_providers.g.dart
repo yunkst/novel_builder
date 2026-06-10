@@ -6,7 +6,7 @@ part of 'bookshelf_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$bookshelfNovelsHash() => r'7146bd588697beffd5018216273f368319ab8bab';
+String _$bookshelfNovelsHash() => r'd4006a1ed2ae5573901a27423c067cddb1a3dedb';
 
 /// 书架小说列表
 ///
@@ -52,7 +52,7 @@ final bookshelfCacheStatsProvider =
 typedef BookshelfCacheStatsRef
     = AutoDisposeFutureProviderRef<Map<String, CacheStats>>;
 String _$currentBookshelfIdHash() =>
-    r'69e605f13545e51eef895abca5dcce883765886f';
+    r'bb284e432c14f971582d32838b8eb1e617bac264';
 
 /// 当前选中的书架ID
 ///

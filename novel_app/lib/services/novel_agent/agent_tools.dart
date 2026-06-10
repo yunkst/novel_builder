@@ -1,6 +1,8 @@
 /// Agent 工具定义（OpenAI Function Calling schema）
 ///
-/// Phase 2: 14 个工具的完整定义，按功能域分组
+/// 全面 ID 化：所有工具使用数字 ID 而非 URL 作为标识参数
+/// - chapterId: 来自 list_chapters 返回的 id 字段
+/// - novelId: 来自 list_novels 返回的 id 字段
 library;
 
 import 'package:novel_app/services/logger_service.dart';
@@ -72,16 +74,17 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'read_chapter_content',
-      'description': '读取指定章节的完整正文内容。修改章节前应先调用此工具了解当前内容。返回章节全文。',
+      'description':
+          '读取指定章节的完整正文内容。修改章节前应先调用此工具了解当前内容。chapterId 来自 list_chapters 返回的 id 字段。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'chapterUrl': {
-            'type': 'string',
-            'description': '章节的唯一标识URL',
+          'chapterId': {
+            'type': 'integer',
+            'description': '章节ID（从 list_chapters 获取）。如不确定ID，请先调用 list_chapters。',
           },
         },
-        'required': ['chapterUrl'],
+        'required': ['chapterId'],
       },
     },
   };
@@ -90,16 +93,17 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'list_chapters',
-      'description': '列出当前小说的所有章节目录，包括标题和URL。用于了解小说结构或定位特定章节。',
+      'description':
+          '列出指定小说的所有章节目录。每个章节包含 id、标题、索引和缓存状态。id 是其他章节操作工具的必填参数。novelId 来自 list_novels 返回的 id 字段。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。如不确定ID，请先调用 list_novels。',
           },
         },
-        'required': ['novelUrl'],
+        'required': ['novelId'],
       },
     },
   };
@@ -108,20 +112,21 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'search_in_chapters',
-      'description': '在小说的所有已缓存章节中搜索包含指定关键词的内容。返回匹配的章节列表和上下文片段。',
+      'description':
+          '在指定小说的所有已缓存章节中搜索包含指定关键词的内容。返回匹配的章节列表和上下文片段。novelId 来自 list_novels 返回的 id 字段。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。如不确定ID，请先调用 list_novels。',
           },
           'keyword': {
             'type': 'string',
             'description': '搜索关键词',
           },
         },
-        'required': ['novelUrl', 'keyword'],
+        'required': ['novelId', 'keyword'],
       },
     },
   };
@@ -132,20 +137,21 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_chapter_content',
-      'description': '完全替换指定章节的正文内容。⚠️ 此操作会覆盖原有内容，请先调用 read_chapter_content 确认当前内容。',
+      'description':
+          '完全替换指定章节的正文内容。⚠️ 此操作会覆盖原有内容，请先调用 read_chapter_content 确认当前内容。chapterId 来自 list_chapters。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'chapterUrl': {
-            'type': 'string',
-            'description': '章节的唯一标识URL',
+          'chapterId': {
+            'type': 'integer',
+            'description': '章节ID（从 list_chapters 获取）。',
           },
           'content': {
             'type': 'string',
             'description': '新的完整章节内容（将替换原有全文）',
           },
         },
-        'required': ['chapterUrl', 'content'],
+        'required': ['chapterId', 'content'],
       },
     },
   };
@@ -154,13 +160,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'rewrite_chapter_paragraph',
-      'description': '使用 AI 改写章节中的指定段落。保留其他段落不变。段落以空行分隔，索引从 0 开始。',
+      'description':
+          '使用 AI 改写章节中的指定段落。保留其他段落不变。段落以空行分隔，索引从 0 开始。chapterId 来自 list_chapters。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'chapterUrl': {
-            'type': 'string',
-            'description': '章节的唯一标识URL',
+          'chapterId': {
+            'type': 'integer',
+            'description': '章节ID（从 list_chapters 获取）。',
           },
           'paragraphIndex': {
             'type': 'integer',
@@ -171,7 +178,7 @@ class AgentTools {
             'description': '改写要求，如"改写得更有悬念"、"增加环境描写"等',
           },
         },
-        'required': ['chapterUrl', 'paragraphIndex', 'instruction'],
+        'required': ['chapterId', 'paragraphIndex', 'instruction'],
       },
     },
   };
@@ -180,13 +187,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'insert_paragraph',
-      'description': '在章节的指定位置后插入一段新文本。段落以空行分隔。',
+      'description':
+          '在章节的指定位置后插入一段新文本。段落以空行分隔。chapterId 来自 list_chapters。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'chapterUrl': {
-            'type': 'string',
-            'description': '章节的唯一标识URL',
+          'chapterId': {
+            'type': 'integer',
+            'description': '章节ID（从 list_chapters 获取）。',
           },
           'afterParagraphIndex': {
             'type': 'integer',
@@ -197,7 +205,7 @@ class AgentTools {
             'description': '要插入的新段落文本',
           },
         },
-        'required': ['chapterUrl', 'afterParagraphIndex', 'newParagraph'],
+        'required': ['chapterId', 'afterParagraphIndex', 'newParagraph'],
       },
     },
   };
@@ -206,20 +214,21 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'delete_paragraph',
-      'description': '删除章节中的指定段落。段落以空行分隔，索引从 0 开始。',
+      'description':
+          '删除章节中的指定段落。段落以空行分隔，索引从 0 开始。chapterId 来自 list_chapters。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'chapterUrl': {
-            'type': 'string',
-            'description': '章节的唯一标识URL',
+          'chapterId': {
+            'type': 'integer',
+            'description': '章节ID（从 list_chapters 获取）。',
           },
           'paragraphIndex': {
             'type': 'integer',
             'description': '要删除的段落索引',
           },
         },
-        'required': ['chapterUrl', 'paragraphIndex'],
+        'required': ['chapterId', 'paragraphIndex'],
       },
     },
   };
@@ -228,13 +237,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'create_custom_chapter',
-      'description': '在小说中创建一个全新的自定义章节。',
+      'description':
+          '在小说中创建一个全新的自定义章节。返回新章节的 id，可用于后续章节操作。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
           'title': {
             'type': 'string',
@@ -249,7 +259,7 @@ class AgentTools {
             'description': '插入位置（章节序号，不填则添加到末尾）',
           },
         },
-        'required': ['novelUrl', 'title', 'content'],
+        'required': ['novelId', 'title', 'content'],
       },
     },
   };
@@ -260,16 +270,17 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'list_characters',
-      'description': '获取当前小说的所有角色信息列表，包括名称、描述等。',
+      'description':
+          '获取指定小说的所有角色信息列表，包括名称、描述等。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
         },
-        'required': ['novelUrl'],
+        'required': ['novelId'],
       },
     },
   };
@@ -278,13 +289,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_character',
-      'description': '更新已有角色的信息。只更新传入的字段，未传入的字段保持不变。',
+      'description':
+          '更新已有角色的信息。只更新传入的字段，未传入的字段保持不变。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
           'name': {
             'type': 'string',
@@ -299,7 +311,7 @@ class AgentTools {
             'description': '新的头像URL',
           },
         },
-        'required': ['novelUrl', 'name'],
+        'required': ['novelId', 'name'],
       },
     },
   };
@@ -308,13 +320,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'create_character',
-      'description': '创建一个新角色。',
+      'description':
+          '创建一个新角色。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
           'name': {
             'type': 'string',
@@ -325,7 +338,7 @@ class AgentTools {
             'description': '角色描述（外貌、性格、背景等）',
           },
         },
-        'required': ['novelUrl', 'name'],
+        'required': ['novelId', 'name'],
       },
     },
   };
@@ -336,20 +349,21 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_background_setting',
-      'description': '更新小说的世界观和背景设定。会替换原有设定，请包含完整内容。',
+      'description':
+          '更新小说的世界观和背景设定。会替换原有设定，请包含完整内容。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
           'setting': {
             'type': 'string',
             'description': '新的背景设定全文',
           },
         },
-        'required': ['novelUrl', 'setting'],
+        'required': ['novelId', 'setting'],
       },
     },
   };
@@ -358,13 +372,14 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_outline',
-      'description': '创建或更新小说的大纲。',
+      'description':
+          '创建或更新小说的大纲。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
           'title': {
             'type': 'string',
@@ -375,7 +390,7 @@ class AgentTools {
             'description': '大纲内容（Markdown格式）',
           },
         },
-        'required': ['novelUrl', 'title', 'content'],
+        'required': ['novelId', 'title', 'content'],
       },
     },
   };
@@ -384,16 +399,17 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'get_outline',
-      'description': '获取小说的大纲内容。如果存在多个大纲，返回最新的一个。',
+      'description':
+          '获取小说的大纲内容。如果存在多个大纲，返回最新的一个。novelId 来自 list_novels。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'novelUrl': {
-            'type': 'string',
-            'description': '小说的唯一标识URL',
+          'novelId': {
+            'type': 'integer',
+            'description': '小说ID（从 list_novels 获取）。',
           },
         },
-        'required': ['novelUrl'],
+        'required': ['novelId'],
       },
     },
   };
@@ -404,7 +420,7 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'list_novels',
-      'description': '列出书架中的所有小说，包括标题、作者、简介和URL。用于了解用户当前在读哪些小说。',
+      'description': '列出书架中的所有小说，包括id、标题、作者和简介。id 是其他小说操作工具的必填参数。',
       'parameters': {
         'type': 'object',
         'properties': <String, dynamic>{},

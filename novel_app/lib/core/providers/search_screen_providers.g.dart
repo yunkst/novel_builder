@@ -7,7 +7,7 @@ part of 'search_screen_providers.dart';
 // **************************************************************************
 
 String _$searchScreenNotifierHash() =>
-    r'6c1280a2a29e9dec87465de1121f82a4c1181160';
+    r'97bb7d1fde7840814a123b45794e166df14883b0';
 
 /// 搜索状态 Provider
 ///
@@ -28,7 +28,7 @@ final searchScreenNotifierProvider =
 
 typedef _$SearchScreenNotifier = AutoDisposeNotifier<SearchState>;
 String _$sourceSitesNotifierHash() =>
-    r'19ffe0f692ffaae0fd9216ba86dd94e2ec919ab9';
+    r'dd1a6a65d657bc54382f6004ad93fc2bbf57718c';
 
 /// 源站状态 Provider
 ///

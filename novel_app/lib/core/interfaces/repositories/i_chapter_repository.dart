@@ -192,4 +192,43 @@ abstract class IChapterRepository {
     String keyword, {
     String? novelUrl,
   });
+
+  // ========== ID-based 查询方法（Agent 工具用） ==========
+
+  /// 根据 ID 查询章节（JOIN 两表获取完整信息）
+  ///
+  /// [id] novel_chapters.id
+  /// 返回 Chapter 对象，不存在则返回 null
+  Future<Chapter?> getChapterById(int id);
+
+  /// 根据 ID 获取章节 URL（内部 ID→URL 解析用）
+  ///
+  /// [id] novel_chapters.id
+  /// 返回 chapterUrl，不存在则返回 null
+  Future<String?> getChapterUrlById(int id);
+
+  /// 根据 ID 检查章节是否存在
+  ///
+  /// [id] novel_chapters.id
+  /// 返回是否存在的布尔值
+  Future<bool> chapterExistsById(int id);
+
+  /// 根据 ID 更新章节内容（解析 URL 后委托 updateChapterContent）
+  ///
+  /// [id] novel_chapters.id
+  /// [content] 新的章节内容
+  /// 返回受影响的行数，ID 不存在则返回 0
+  Future<int> updateChapterContentById(int id, String content);
+
+  /// 根据 ID 获取缓存的章节内容（解析 URL 后委托 getCachedChapter）
+  ///
+  /// [id] novel_chapters.id
+  /// 返回章节内容，ID 不存在或未缓存则返回 null
+  Future<String?> getCachedChapterById(int id);
+
+  /// 根据 URL 获取章节 ID（搜索结果用）
+  ///
+  /// [url] chapterUrl
+  /// 返回 novel_chapters.id，不存在则返回 null
+  Future<int?> getChapterIdByUrl(String url);
 }

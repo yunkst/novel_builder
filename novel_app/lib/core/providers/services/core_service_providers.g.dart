@@ -137,7 +137,7 @@ final backupServiceProvider = AutoDisposeProvider<BackupService>.internal(
 // ignore: unused_element
 typedef BackupServiceRef = AutoDisposeProviderRef<BackupService>;
 String _$logReporterServiceHash() =>
-    r'8a3d1f9e2b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e';
+    r'4fb0243ec15e652fa427935b524afe4494e6369c';
 
 /// LogReporterService Provider
 ///
@@ -151,6 +151,12 @@ String _$logReporterServiceHash() =>
 ///
 /// **依赖**:
 /// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final reporter = ref.read(logReporterServiceProvider);
+/// await reporter.flush(); // 立即上报
+/// ```
 ///
 /// Copied from [logReporterService].
 @ProviderFor(logReporterService)

@@ -92,4 +92,31 @@ abstract class INovelRepository {
     String? coverUrl,
     String? backgroundSetting,
   });
+
+  // ========== ID-based 查询方法（Agent 工具用） ==========
+
+  /// 根据 ID 查询小说
+  ///
+  /// [id] bookshelf.id
+  /// 返回 Novel 对象，不存在则返回 null
+  Future<Novel?> getNovelById(int id);
+
+  /// 根据 ID 获取小说 URL（内部 ID→URL 解析用）
+  ///
+  /// [id] bookshelf.id
+  /// 返回小说 URL，不存在则返回 null
+  Future<String?> getNovelUrlById(int id);
+
+  /// 根据 ID 检查小说是否存在
+  ///
+  /// [id] bookshelf.id
+  /// 返回是否存在的布尔值
+  Future<bool> novelExistsById(int id);
+
+  /// 根据 ID 更新小说背景设定（解析 URL 后委托 updateBackgroundSetting）
+  ///
+  /// [id] bookshelf.id
+  /// [setting] 背景设定内容
+  /// 返回受影响的行数，ID 不存在则返回 0
+  Future<int> updateBackgroundSettingById(int id, String? setting);
 }

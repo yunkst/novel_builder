@@ -93,6 +93,7 @@ class NovelRepository extends BaseRepository implements INovelRepository {
 
     return List.generate(maps.length, (i) {
       return Novel(
+        id: maps[i]['id'] as int?,
         title: maps[i]['title'],
         author: maps[i]['author'],
         url: maps[i]['url'],
@@ -284,6 +285,7 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     }
 
     return Novel(
+      id: maps[0]['id'] as int?,
       title: maps[0]['title'],
       author: maps[0]['author'],
       url: maps[0]['url'],
@@ -314,5 +316,67 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     );
     await addToBookshelf(novel);
     return novel;
+  }
+
+  // ========== ID-based 查询方法（Agent 工具用） ==========
+
+  /// 根据 ID 查询小说
+  @override
+  Future<Novel?> getNovelById(int id) async {
+    if (isWebPlatform) return null;
+    final db = await database;
+    final maps = await db.query(
+      'bookshelf',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Novel(
+      id: maps.first['id'] as int?,
+      title: maps.first['title'] as String,
+      author: maps.first['author'] as String,
+      url: maps.first['url'] as String,
+      isInBookshelf: true,
+      coverUrl: maps.first['coverUrl'] as String?,
+      description: maps.first['description'] as String?,
+      backgroundSetting: maps.first['backgroundSetting'] as String?,
+      lastReadChapterIndex: maps.first['lastReadChapter'] as int?,
+    );
+  }
+
+  /// 根据 ID 获取小说 URL（内部 ID→URL 解析用）
+  @override
+  Future<String?> getNovelUrlById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'bookshelf',
+      columns: ['url'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return maps.first['url'] as String;
+  }
+
+  /// 根据 ID 检查小说是否存在
+  @override
+  Future<bool> novelExistsById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'bookshelf',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return maps.isNotEmpty;
+  }
+
+  /// 根据 ID 更新小说背景设定（解析 URL 后委托 updateBackgroundSetting）
+  @override
+  Future<int> updateBackgroundSettingById(int id, String? setting) async {
+    final novelUrl = await getNovelUrlById(id);
+    if (novelUrl == null) return 0;
+    return updateBackgroundSetting(novelUrl, setting);
   }
 }

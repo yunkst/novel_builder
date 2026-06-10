@@ -151,16 +151,22 @@ class SseParseResult {
 }
 
 /// 流式响应累积结果（Phase 1: 支持 tool_calls 收集）
+///
+/// 注意：默认构造函数创建的是**可变**空列表，便于在流式消费中
+/// 逐 chunk add/addAll。如果需要不可变实例请使用 `StreamingResult.withData()`。
 class StreamingResult {
   final List<String> contentChunks;
   final List<String> reasoningChunks;
   final List<Map<String, dynamic>> toolCallDeltas;
 
-  const StreamingResult({
-    this.contentChunks = const [],
-    this.reasoningChunks = const [],
-    this.toolCallDeltas = const [],
-  });
+  /// 创建可变空列表实例（用于流式累积）
+  StreamingResult({
+    List<String>? contentChunks,
+    List<String>? reasoningChunks,
+    List<Map<String, dynamic>>? toolCallDeltas,
+  })  : contentChunks = contentChunks ?? [],
+        reasoningChunks = reasoningChunks ?? [],
+        toolCallDeltas = toolCallDeltas ?? [];
 
   String get fullContent => contentChunks.join();
 
@@ -326,6 +332,36 @@ abstract class LlmHttpClient {
   Future<String> postJson(String url, Map<String, String> headers, String body);
   Stream<String> postJsonStream(
       String url, Map<String, String> headers, String body);
+}
+
+/// 流式 chat completion 的单帧事件
+///
+/// - [contentChunk] 文本增量（可能为空，例如当帧只更新 tool_calls）
+/// - [toolCallDeltas] tool_calls 增量列表（可能为空）
+/// - [finishReason] 当 LLM 完成一帧响应时由 choices[].finish_reason 给出；
+///   - null 表示中间帧（未完成）
+///   - 'stop' 表示文本流式结束
+///   - 'tool_calls' 表示 LLM 决定调用工具
+///   - 'length' 表示达到 max_tokens 上限
+///   - 'content_filter' / 其他
+class LlmStreamChunk {
+  final String? contentChunk;
+  final List<Map<String, dynamic>> toolCallDeltas;
+  final String? finishReason;
+
+  const LlmStreamChunk({
+    this.contentChunk,
+    this.toolCallDeltas = const [],
+    this.finishReason,
+  });
+
+  bool get isContent => contentChunk != null && contentChunk!.isNotEmpty;
+  bool get isToolCallDelta => toolCallDeltas.isNotEmpty;
+  bool get isFinished => finishReason != null;
+
+  @override
+  String toString() =>
+      'LlmStreamChunk(content=$contentChunk, deltas=${toolCallDeltas.length}, finish=$finishReason)';
 }
 
 class LlmProvider {
@@ -525,6 +561,109 @@ class LlmProvider {
         return '';
       }
     }).where((chunk) => chunk.isNotEmpty);
+  }
+
+  /// 流式调用（支持 tools + tool_calls delta 聚合）
+  ///
+  /// 与 [chatStream] 不同，此方法：
+  /// - 传入 [tools] 和 [toolChoice] 参数
+  /// - 逐帧发出 [LlmStreamChunk]，包含文本增量、tool_calls delta 和 finish_reason
+  /// - 调用方可逐 chunk 实时更新 UI，流结束后通过
+  ///   [StreamingResult.buildToolCalls()] 聚合完整 ToolCall 列表
+  ///
+  /// 用法：
+  /// ```dart
+  /// final result = StreamingResult();
+  /// await for (final chunk in provider.chatStreamWithTools(
+  ///   messages: messages, tools: tools, toolChoice: 'auto',
+  /// )) {
+  ///   if (chunk.isContent) emit(TextDeltaEvent(chunk.contentChunk!));
+  ///   if (chunk.isToolCallDelta) result.toolCallDeltas.addAll(chunk.toolCallDeltas);
+  /// }
+  /// final toolCalls = result.buildToolCalls();
+  /// ```
+  Stream<LlmStreamChunk> chatStreamWithTools({
+    required List<ChatMessage> messages,
+    String? model,
+    int? maxTokens,
+    double? temperature,
+    List<Map<String, dynamic>>? tools,
+    String? toolChoice,
+  }) async* {
+    LoggerService.instance.d(
+      'LLM chatStreamWithTools 流式+工具调用入口: '
+      'model=${model ?? config.defaultModel}, '
+      'messages=${messages.length}, tools=${tools?.length ?? 0}, '
+      'toolChoice=$toolChoice',
+      category: LogCategory.ai,
+      tags: ['dsl', 'llm', 'stream-tools'],
+    );
+    final client = _requireHttpClient();
+    final body = buildRequestBody(
+      messages: messages,
+      model: model,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      tools: tools,
+      toolChoice: toolChoice,
+      stream: true,
+    );
+
+    yield* client
+        .postJsonStream(chatCompletionsUrl, defaultHeaders, jsonEncode(body))
+        .transform(const _LineSplitter())
+        .where((line) => line.startsWith('data:'))
+        .map((line) => line.substring(5).trim())
+        .where((payload) => payload.isNotEmpty && payload != '[DONE]')
+        .map((payload) {
+      try {
+        final json = jsonDecode(payload) as Map<String, dynamic>;
+        final choices = json['choices'] as List?;
+        if (choices == null || choices.isEmpty) {
+          return const LlmStreamChunk();
+        }
+        final first = choices.first as Map<String, dynamic>;
+        final delta = first['delta'] as Map<String, dynamic>?;
+        if (delta == null) {
+          // 可能只有 finish_reason，没有 delta
+          final finishReason = first['finish_reason'] as String?;
+          if (finishReason != null) {
+            return LlmStreamChunk(finishReason: finishReason);
+          }
+          return const LlmStreamChunk();
+        }
+
+        // 文本内容增量
+        final content = (delta['content'] as String?) ?? '';
+
+        // tool_calls 增量
+        final tcDeltas = <Map<String, dynamic>>[];
+        final tcRaw = delta['tool_calls'] as List?;
+        if (tcRaw != null) {
+          for (final tc in tcRaw) {
+            if (tc is Map<String, dynamic>) {
+              tcDeltas.add(tc);
+            }
+          }
+        }
+
+        // finish_reason（可能在任意帧上出现）
+        final finishReason = first['finish_reason'] as String?;
+
+        return LlmStreamChunk(
+          contentChunk: content.isNotEmpty ? content : null,
+          toolCallDeltas: tcDeltas,
+          finishReason: finishReason,
+        );
+      } catch (e) {
+        LoggerService.instance.w(
+          'chatStreamWithTools SSE 行解析失败: $e',
+          category: LogCategory.ai,
+          tags: ['dsl', 'llm', 'stream-tools'],
+        );
+        return const LlmStreamChunk();
+      }
+    }).where((chunk) => chunk.isContent || chunk.isToolCallDelta || chunk.isFinished);
   }
 
   LlmHttpClient _requireHttpClient() {

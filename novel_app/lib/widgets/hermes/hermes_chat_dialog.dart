@@ -4,6 +4,7 @@ import 'package:novel_app/core/providers/hermes_providers.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
+import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/widgets/hermes/hermes_confirmation_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import '../../core/theme/app_colors.dart';
@@ -92,6 +93,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   }
 
   Widget _buildHeader(HermesChatNotifier notifier) {
+    final chatState = ref.watch(hermesChatProvider);
     final appColors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -112,14 +114,61 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           Icon(Icons.auto_awesome, color: appColors.hermesOnBrand, size: 22),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'Hermes AI 助手',
-              style: TextStyle(
-                color: appColors.hermesOnBrand,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Hermes AI 助手',
+                  style: TextStyle(
+                    color: appColors.hermesOnBrand,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  chatState.scenarioDisplayName,
+                  style: TextStyle(
+                    color: appColors.hermesOnBrandMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
+          ),
+          // 场景切换按钮
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.swap_horiz,
+              color: appColors.hermesOnBrandMuted,
+              size: 20,
+            ),
+            tooltip: '切换场景',
+            onSelected: (scenarioId) {
+              final info = AgentScenarioFactory.availableScenarios
+                  .where((s) => s.id == scenarioId)
+                  .firstOrNull;
+              if (info != null) {
+                notifier.switchScenario(info.id, info.displayName);
+              }
+            },
+            itemBuilder: (context) => AgentScenarioFactory.availableScenarios
+                .map((s) => PopupMenuItem(
+                      value: s.id,
+                      child: Row(
+                        children: [
+                          Text(s.icon, style: const TextStyle(fontSize: 16)),
+                          const SizedBox(width: 8),
+                          Text(s.displayName),
+                          if (s.id == chatState.scenarioId) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 16,
+                                color: Theme.of(context).colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    ))
+                .toList(),
           ),
           IconButton(
             icon: Icon(

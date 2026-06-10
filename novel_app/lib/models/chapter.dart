@@ -1,4 +1,6 @@
 class Chapter {
+  /// 章节数据库主键（来自 novel_chapters.id），可空表示尚未持久化
+  final int? id;
   final String title;
   final String url;
   final String? content;
@@ -9,6 +11,7 @@ class Chapter {
   final bool isAccompanied;
 
   Chapter({
+    this.id,
     required this.title,
     required this.url,
     this.content,
@@ -24,6 +27,7 @@ class Chapter {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'title': title,
       'url': url,
       'content': content,
@@ -37,6 +41,7 @@ class Chapter {
 
   factory Chapter.fromMap(Map<String, dynamic> map) {
     return Chapter(
+      id: map['id'] as int?,
       title: map['title'] as String,
       url: map['url'] as String,
       content: map['content'] as String?,
@@ -49,6 +54,7 @@ class Chapter {
   }
 
   Chapter copyWith({
+    int? id,
     String? title,
     String? url,
     String? content,
@@ -59,6 +65,7 @@ class Chapter {
     bool? isAccompanied,
   }) {
     return Chapter(
+      id: id ?? this.id,
       title: title ?? this.title,
       url: url ?? this.url,
       content: content ?? this.content,

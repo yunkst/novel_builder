@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../core/providers/agent_scenario_provider.dart';
 import '../core/providers/webview_providers.dart';
+import '../services/novel_agent/agent_scenario.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 
@@ -21,6 +23,22 @@ class WebViewBrowserScreen extends ConsumerStatefulWidget {
 }
 
 class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 切换到 WebView 提取场景
+    ref.read(currentAgentScenarioProvider.notifier).state =
+        ScenarioIds.webviewExtract;
+  }
+
+  @override
+  void dispose() {
+    // 离开浏览器时恢复写作场景
+    ref.read(currentAgentScenarioProvider.notifier).state =
+        ScenarioIds.writing;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(webviewIsLoadingProvider);

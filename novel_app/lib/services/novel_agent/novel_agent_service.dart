@@ -1,6 +1,7 @@
 /// 本地小说写作 Agent 门面服务
 ///
 /// Phase 2: 封装 AgentLoop，提供面向 UI 的接口
+/// 重构: 支持多场景切换，通过 scenarioId 和 AgentScenarioContext 分派
 library;
 
 import 'dart:async';
@@ -9,14 +10,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novel_app/services/logger_service.dart';
 
-import '../../core/providers/reading_context_providers.dart';
 import '../dsl_engine/dsl_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
 import '../dsl_engine/real_llm_executor.dart';
 import 'agent_event.dart';
 import 'agent_loop.dart';
-import 'agent_system_prompt.dart';
-import 'tool_executor.dart';
+import 'agent_scenario.dart';
+import 'agent_scenario_factory.dart';
 
 class NovelAgentService {
   final Ref ref;
@@ -41,10 +41,14 @@ class NovelAgentService {
   ///
   /// [userInput] 用户输入
   /// [history] 之前的对话历史（用于上下文）
+  /// [scenarioId] 场景标识（'writing' | 'webview_extract' | ...）
+  /// [scenarioContext] 场景上下文参数
   /// [requestConfirmation] 确认回调
   Future<void> sendMessage({
     required String userInput,
     required List<ChatMessage> history,
+    required String scenarioId,
+    required AgentScenarioContext scenarioContext,
     required Future<bool> Function(
       String toolName,
       Map<String, dynamic> args,
@@ -69,8 +73,8 @@ class NovelAgentService {
     _isRunning = true;
 
     try {
-      LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条)',
-          category: LogCategory.ai, tags: ['agent', 'service', 'request']);
+      LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
+          category: LogCategory.ai, tags: ['agent', 'service', 'request', scenarioId]);
 
       // 构造 LLM Provider
       final config = LlmConfig(
@@ -83,17 +87,14 @@ class NovelAgentService {
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());
 
-      // 构造工具执行器
-      final tools = ToolExecutor(ref);
+      // 构造场景
+      final scenario = AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
 
       // 构造循环
-      final loop = AgentLoop(llm: llm, tools: tools);
+      final loop = AgentLoop(llm: llm, scenario: scenario);
 
-      // 构造 system prompt
-      final readingContext = ref.read(readingContextProvider);
-      final systemPrompt = AgentSystemPrompt.build(
-        readingContext: readingContext,
-      );
+      // 构造 system prompt（由场景生成）
+      final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
 
       // 构造初始消息
       final initialMessages = [
@@ -109,8 +110,8 @@ class NovelAgentService {
         requestConfirmation: requestConfirmation,
       );
 
-      LoggerService.instance.i('Agent 请求处理完成',
-          category: LogCategory.ai, tags: ['agent', 'service', 'complete']);
+      LoggerService.instance.i('Agent 请求处理完成 (scenario=$scenarioId)',
+          category: LogCategory.ai, tags: ['agent', 'service', 'complete', scenarioId]);
     } catch (e, stack) {
       LoggerService.instance.e('Agent 请求处理失败: $e',
           stackTrace: stack.toString(),

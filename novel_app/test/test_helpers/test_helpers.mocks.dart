@@ -2478,6 +2478,26 @@ class MockDifyService extends _i1.Mock implements _i35.DifyService {
       ) as _i22.Future<_i24.AICompanionResponse?>);
 
   @override
+  _i22.Future<List<_i20.ExtractedPromptTag>> extractPromptTags({
+    required String? userInput,
+    required String? chapterContent,
+    required String? tagCategories,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #extractPromptTags,
+          [],
+          {
+            #userInput: userInput,
+            #chapterContent: chapterContent,
+            #tagCategories: tagCategories,
+          },
+        ),
+        returnValue: _i22.Future<List<_i20.ExtractedPromptTag>>.value(
+            <_i20.ExtractedPromptTag>[]),
+      ) as _i22.Future<List<_i20.ExtractedPromptTag>>);
+
+  @override
   _i22.Future<void> generateCloseUpStreaming({
     required String? selectedParagraph,
     required String? userInput,

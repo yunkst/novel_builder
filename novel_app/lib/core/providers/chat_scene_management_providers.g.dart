@@ -7,7 +7,7 @@ part of 'chat_scene_management_providers.dart';
 // **************************************************************************
 
 String _$chatSceneManagementHash() =>
-    r'b723186abd07d4d9a2fd3825c42d112f21c81a71';
+    r'6ae00fc6c53cde4d2362015e9dd8b86435411729';
 
 /// ChatSceneManagementState Provider
 ///

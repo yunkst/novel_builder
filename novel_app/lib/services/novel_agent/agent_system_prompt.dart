@@ -37,15 +37,19 @@ class AgentSystemPrompt {
     }
 
     buffer.writeln('## 工作原则');
-    buffer.writeln('1. 修改章节前，先调用 read_chapter_content 了解当前内容');
-    buffer.writeln('2. 修改角色前，先调用 list_characters 确认角色是否存在');
-    buffer.writeln('3. 涉及写作风格/内容的修改，直接使用你的语言能力完成，不需要额外调用 AI');
-    buffer.writeln('4. 操作完成后，向用户汇报你做了什么');
-    buffer.writeln('5. 如果用户要求不明确，先问清楚再操作');
-    buffer.writeln('6. 修改操作会触发用户确认，请告知用户即将进行的修改');
+    buffer.writeln('1. 操作章节前，先调用 list_chapters 获取章节 ID 列表');
+    buffer.writeln('2. 使用 list_novels / list_chapters 返回的 id 字段作为其他工具的参数');
+    buffer.writeln('3. 修改章节前，先调用 read_chapter_content 了解当前内容');
+    buffer.writeln('4. 修改角色前，先调用 list_characters 确认角色是否存在');
+    buffer.writeln('5. 涉及写作风格/内容的修改，直接使用你的语言能力完成，不需要额外调用 AI');
+    buffer.writeln('6. 如果工具返回 xxx_not_found 错误，按 suggested_tool 提示重新获取 ID');
+    buffer.writeln('7. 操作完成后，向用户汇报你做了什么');
+    buffer.writeln('8. 如果用户要求不明确，先问清楚再操作');
+    buffer.writeln('9. 修改操作会触发用户确认，请告知用户即将进行的修改');
     buffer.writeln();
 
     buffer.writeln('## 注意事项');
+    buffer.writeln('- 所有工具使用数字 ID（novelId / chapterId），不是 URL');
     buffer.writeln('- 章节内容以空行分隔段落');
     buffer.writeln('- 角色名区分大小写');
     buffer.writeln('- 修改小说元数据时请谨慎，确保内容完整');

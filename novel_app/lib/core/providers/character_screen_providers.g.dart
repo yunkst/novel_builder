@@ -229,7 +229,7 @@ class _HasOutlineProviderElement extends AutoDisposeFutureProviderElement<bool?>
 }
 
 String _$characterManagementStateHash() =>
-    r'052dac6a3218174100639b50a9770d9ea5897cfb';
+    r'f819c64a2d06166d7cb85a7dab45e5d23e053794';
 
 abstract class _$CharacterManagementState
     extends BuildlessAutoDisposeAsyncNotifier<List<Character>> {
@@ -403,7 +403,7 @@ class _CharacterManagementStateProviderElement
 }
 
 String _$characterEditControllerHash() =>
-    r'771266ac9c709021effe0c36f6b8d589d7c878a3';
+    r'd3e0c526443f458747698d225451e71a219a5574';
 
 abstract class _$CharacterEditController
     extends BuildlessAutoDisposeAsyncNotifier<Character?> {

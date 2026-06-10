@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 24;
+  static const int currentVersion = 25;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -186,6 +186,9 @@ class DatabaseMigrations {
           UNIQUE(novelUrl, name)
         )
       ''');
+        // Bug fix: IF NOT EXISTS 不会给 v1 已存在的 characters 表加 updatedAt
+        // 必须用 ALTER TABLE 显式补列（已有表走 _addColumnIfNotExists 分支）
+        await _addColumnIfNotExists(db, 'characters', 'updatedAt', 'INTEGER');
         break;
 
       // ========== 版本 5：提示词字段 ==========
@@ -515,6 +518,26 @@ class DatabaseMigrations {
         await db.execute('ALTER TABLE prompt_tags_new RENAME TO prompt_tags');
         await _createIndexIfNotExists(
             db, 'idx_prompt_tags_category_id', 'prompt_tags', 'category_id');
+        break;
+
+      // ========== 版本 25：站点提取脚本表 ==========
+      case 25:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS site_scripts (
+          id TEXT PRIMARY KEY,
+          domain TEXT NOT NULL,
+          url_pattern TEXT NOT NULL DEFAULT '',
+          chapter_list_js TEXT NOT NULL,
+          chapter_content_js TEXT NOT NULL,
+          sample_url TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL,
+          last_used_at INTEGER NOT NULL,
+          use_count INTEGER NOT NULL DEFAULT 0,
+          verified INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_site_scripts_domain', 'site_scripts', 'domain');
         break;
     }
   }

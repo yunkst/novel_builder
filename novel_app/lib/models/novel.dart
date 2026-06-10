@@ -1,4 +1,6 @@
 class Novel {
+  /// 小说数据库主键（来自 bookshelf.id），可空表示尚未持久化
+  final int? id;
   final String title;
   final String author;
   final String url;
@@ -10,6 +12,7 @@ class Novel {
   final double? readingProgress;
 
   Novel({
+    this.id,
     required this.title,
     required this.author,
     required this.url,
@@ -23,6 +26,7 @@ class Novel {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'title': title,
       'author': author,
       'url': url,
@@ -35,6 +39,7 @@ class Novel {
 
   factory Novel.fromMap(Map<String, dynamic> map) {
     return Novel(
+      id: map['id'] as int?,
       title: map['title'] as String,
       author: map['author'] as String,
       url: map['url'] as String,
@@ -46,6 +51,7 @@ class Novel {
   }
 
   Novel copyWith({
+    int? id,
     String? title,
     String? author,
     String? url,
@@ -57,6 +63,7 @@ class Novel {
     double? readingProgress,
   }) {
     return Novel(
+      id: id ?? this.id,
       title: title ?? this.title,
       author: author ?? this.author,
       url: url ?? this.url,
