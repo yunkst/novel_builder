@@ -94,7 +94,7 @@ class ConditionProcessor {
   }) {
     LoggerService.instance.d(
       '条件求值开始: conditions=${conditions.length}, operator=$operator',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'condition'],
     );
 
@@ -118,7 +118,7 @@ class ConditionProcessor {
               (operator == 'or' && result)) {
             LoggerService.instance.d(
               '条件短路求值触发: operator=$operator, result=$result',
-              category: LogCategory.general,
+              category: LogCategory.ai,
               tags: ['dsl', 'condition'],
             );
             return ConditionCheckResult(
@@ -132,7 +132,7 @@ class ConditionProcessor {
         LoggerService.instance.e(
           '变量未找到: ${condition.variableSelector}',
           stackTrace: StackTrace.current.toString(),
-          category: LogCategory.general,
+          category: LogCategory.ai,
           tags: ['dsl', 'condition'],
         );
         throw ValueError(
@@ -176,7 +176,7 @@ class ConditionProcessor {
           (operator == 'or' && groupResults.last)) {
         LoggerService.instance.d(
           '条件短路求值触发: operator=$operator, lastResult=${groupResults.last}',
-          category: LogCategory.general,
+          category: LogCategory.ai,
           tags: ['dsl', 'condition'],
         );
         return ConditionCheckResult(
@@ -191,7 +191,7 @@ class ConditionProcessor {
         operator == 'and' ? groupResults.every((r) => r) : groupResults.any((r) => r);
     LoggerService.instance.i(
       '条件求值完成: finalResult=$finalResult, results=$groupResults',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'condition'],
     );
     return ConditionCheckResult(

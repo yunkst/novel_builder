@@ -10,6 +10,8 @@ class AgentTools {
 
   /// 全部工具定义
   static const List<Map<String, dynamic>> allTools = [
+    // ===== 小说 =====
+    _listNovels,
     // ===== 章节读取 =====
     _readChapterContent,
     _listChapters,
@@ -392,6 +394,21 @@ class AgentTools {
           },
         },
         'required': ['novelUrl'],
+      },
+    },
+  };
+
+  // ===== 小说 =====
+
+  static const _listNovels = {
+    'type': 'function',
+    'function': {
+      'name': 'list_novels',
+      'description': '列出书架中的所有小说，包括标题、作者、简介和URL。用于了解用户当前在读哪些小说。',
+      'parameters': {
+        'type': 'object',
+        'properties': <String, dynamic>{},
+        'required': <String>[],
       },
     },
   };

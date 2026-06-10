@@ -45,6 +45,7 @@ class RealLlmExecutor {
       final messages = _buildMessages(node, pool);
       final config = LlmNodeConfig.fromNode(node, _defaultModel);
 
+      final sw = Stopwatch()..start();
       final response = await _provider.chat(
         messages: messages,
         model: config.model,
@@ -54,10 +55,12 @@ class RealLlmExecutor {
             ? {'type': 'json_object'}
             : null,
       );
+      sw.stop();
 
       LoggerService.instance.i(
         'RealLlmExecutor.executeBlocking 完成: nodeId=${node.id}, '
-        'contentLength=${response.content.length}',
+        'contentLength=${response.content.length}, '
+        'elapsed=${sw.elapsedMilliseconds}ms',
         category: LogCategory.ai,
         tags: ['dsl', 'llm'],
       );
@@ -93,6 +96,8 @@ class RealLlmExecutor {
       final config = LlmNodeConfig.fromNode(node, _defaultModel);
 
       final chunks = <String>[];
+      final sw = Stopwatch()..start();
+      int? firstChunkMs;
       await for (final chunk in _provider.chatStream(
         messages: messages,
         model: config.model,
@@ -102,14 +107,19 @@ class RealLlmExecutor {
             ? {'type': 'json_object'}
             : null,
       )) {
+        if (chunks.isEmpty) {
+          firstChunkMs = sw.elapsedMilliseconds;
+        }
         chunks.add(chunk);
         onChunk?.call(chunk);
       }
 
+      sw.stop();
       final fullText = chunks.join();
       LoggerService.instance.i(
         'RealLlmExecutor.executeStreaming 完成: nodeId=${node.id}, '
-        'contentLength=${fullText.length}',
+        'contentLength=${fullText.length}, chunkCount=${chunks.length}, '
+        'firstChunk=${firstChunkMs}ms, total=${sw.elapsedMilliseconds}ms',
         category: LogCategory.ai,
         tags: ['dsl', 'llm'],
       );

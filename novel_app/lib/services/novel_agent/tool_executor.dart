@@ -25,6 +25,9 @@ class ToolExecutor {
         category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'exec']);
     try {
       switch (toolName) {
+        // ===== 小说 =====
+        case 'list_novels':
+          return await _listNovels(args);
         // ===== 章节读取 =====
         case 'read_chapter_content':
           return await _readChapterContent(args);
@@ -80,6 +83,25 @@ class ToolExecutor {
   /// 是否破坏性操作（需要用户确认）
   bool isDestructive(String toolName) =>
       AgentTools.destructiveTools.contains(toolName);
+
+  // ===== 小说 =====
+
+  Future<String> _listNovels(Map<String, dynamic> args) async {
+    final repo = ref.read(novelRepositoryProvider);
+    final novels = await repo.getNovels();
+    final list = novels.map((n) => {
+          'title': n.title,
+          'author': n.author,
+          'url': n.url,
+          if (n.description != null && n.description!.isNotEmpty)
+            'description': n.description!.length > 200
+                ? '${n.description!.substring(0, 200)}...'
+                : n.description,
+        }).toList();
+    LoggerService.instance.i('列出小说: ${list.length} 本',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'list_novels']);
+    return jsonEncode({'novels': list, 'count': list.length});
+  }
 
   // ===== 章节读取 =====
 

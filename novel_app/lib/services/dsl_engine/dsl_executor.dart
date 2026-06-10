@@ -52,7 +52,7 @@ class DslExecutor {
   }) async {
     LoggerService.instance.d(
       'DslExecutor.runStreaming 入口: inputs=${inputs.keys.toList()}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'run-streaming'],
     );
     try {
@@ -84,7 +84,7 @@ class DslExecutor {
       LoggerService.instance.e(
         'DslExecutor.runStreaming 执行失败: $e',
         stackTrace: stackTrace.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'run-streaming'],
       );
       onError?.call(e.toString());
@@ -100,7 +100,7 @@ class DslExecutor {
   }) async {
     LoggerService.instance.d(
       'DslExecutor.runBlocking 入口: inputs=${inputs.keys.toList()}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'run-blocking'],
     );
     try {
@@ -132,7 +132,7 @@ class DslExecutor {
       if (endNode.id.isEmpty) {
         LoggerService.instance.w(
           'structured_info.yml 未找到 end 节点，尝试从事件中提取 outputs',
-          category: LogCategory.general,
+          category: LogCategory.ai,
           tags: ['dsl', 'run-blocking'],
         );
         // 如果 end 节点不存在，从最后一个 event 收集
@@ -164,7 +164,7 @@ class DslExecutor {
       }
       LoggerService.instance.i(
         'DslExecutor.runBlocking 完成: resultKeys=${result.keys.toList()}',
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'run-blocking'],
       );
       return result;
@@ -172,7 +172,7 @@ class DslExecutor {
       LoggerService.instance.e(
         'DslExecutor.runBlocking 执行失败: $e',
         stackTrace: stackTrace.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'run-blocking'],
       );
       rethrow;
@@ -213,7 +213,7 @@ class DslExecutor {
 
     LoggerService.instance.d(
       'inputs 注入完成: startNode=${startNode.id}, inputs=${inputs.keys.toList()}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'inject-inputs'],
     );
 

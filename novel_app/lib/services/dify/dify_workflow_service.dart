@@ -20,8 +20,24 @@ class DifyWorkflowService {
   /// 检查是否应使用 DSL Engine 模式
   Future<bool> _shouldUseDslEngine() async {
     final enabled = await DslEngineConfig.isEnabled();
-    if (!enabled) return false;
-    return await DslEngineConfig.isConfigured();
+    if (!enabled) {
+      LoggerService.instance.d(
+        '路由决策: DSL Engine 未启用 → 走 Dify 远程 API',
+        category: LogCategory.ai,
+        tags: ['dify', 'route', 'dsl-disabled'],
+      );
+      return false;
+    }
+    final configured = await DslEngineConfig.isConfigured();
+    if (!configured) {
+      LoggerService.instance.w(
+        '路由决策: DSL Engine 已启用但配置不完整 → 降级到 Dify 远程 API',
+        category: LogCategory.ai,
+        tags: ['dify', 'route', 'dsl-misconfigured'],
+      );
+      return false;
+    }
+    return true;
   }
 
   /// 如果 DSL Engine 已启用且配置完整，返回 [DslExecutor]；否则返回 null
@@ -30,7 +46,11 @@ class DifyWorkflowService {
     final apiUrl = await DslEngineConfig.getApiUrl();
     final apiKey = await DslEngineConfig.getApiKey();
     final model = await DslEngineConfig.getModel();
-
+    LoggerService.instance.i(
+      '路由决策: 走 DSL Engine 本地执行 (apiUrl=$apiUrl, model=${model.isEmpty ? "默认" : model})',
+      category: LogCategory.ai,
+      tags: ['dify', 'route', 'dsl-active'],
+    );
     return DslExecutor(
       llmConfig: LlmConfig(baseUrl: apiUrl, apiKey: apiKey),
       defaultModel: model.isNotEmpty ? model : null,

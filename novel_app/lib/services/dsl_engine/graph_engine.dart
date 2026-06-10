@@ -197,7 +197,7 @@ class SkipPropagator {
     _sm.markNodeSkipped(nodeId);
     LoggerService.instance.d(
       '节点被 skip: $nodeId',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'skip-propagate'],
     );
     final outgoing = _graph.edges
@@ -242,7 +242,7 @@ class EdgeProcessor {
     LoggerService.instance.d(
       '分支选择完成: node=$nodeId, selectedHandle=$selectedHandle, '
       'selected=${selected.length}, unselected=${unselected.length}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'branch'],
     );
     _sp.skipBranchPaths(unselected);
@@ -276,9 +276,11 @@ class GraphEngine {
 
   /// 执行工作流，产生事件流（异步，支持 LLM 等网络节点）
   Stream<GraphEngineEvent> run() async* {
+    final totalSw = Stopwatch()..start();
     LoggerService.instance.i(
-      'GraphEngine.run 开始执行工作流',
-      category: LogCategory.general,
+      'GraphEngine.run 开始执行工作流: totalNodes=${graph.nodes.length}, '
+      'totalEdges=${graph.edges.length}',
+      category: LogCategory.ai,
       tags: ['dsl', 'graph-run'],
     );
     yield GraphRunStartedEvent();
@@ -291,6 +293,9 @@ class GraphEngine {
     final executing = <String>{};
     final failedNodes = <String>[];
     final outputs = <String, dynamic>{};
+    final executionOrder = <String>[];
+    final nodeTimings = <String, int>{};
+    int skippedCount = 0;
 
     // 入队根节点
     final rootNode = graph.rootNode;
@@ -298,7 +303,7 @@ class GraphEngine {
       LoggerService.instance.e(
         '未找到根节点 (start)',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'graph-run'],
       );
       yield GraphRunFailedEvent(error: 'No root node found');
@@ -310,6 +315,7 @@ class GraphEngine {
     while (readyQueue.isNotEmpty) {
       final nodeId = readyQueue.removeAt(0);
       executing.add(nodeId);
+      executionOrder.add(nodeId);
 
       // 找到节点
       final node = graph.nodes.firstWhere(
@@ -319,7 +325,18 @@ class GraphEngine {
       );
 
       // 执行节点（异步）
+      final nodeSw = Stopwatch()..start();
       final result = await _nodeExecutor(node, variablePool);
+      nodeSw.stop();
+      nodeTimings[nodeId] = nodeSw.elapsedMilliseconds;
+
+      LoggerService.instance.d(
+        '节点执行: id=$nodeId, type=${node.type.name}, '
+        'elapsed=${nodeSw.elapsedMilliseconds}ms, '
+        'status=${result.status.name}',
+        category: LogCategory.ai,
+        tags: ['dsl', 'node-exec'],
+      );
 
       executing.remove(nodeId);
 
@@ -327,7 +344,7 @@ class GraphEngine {
         failedNodes.add(nodeId);
         LoggerService.instance.e(
           '节点执行失败: nodeId=$nodeId, error=${result.error}',
-          category: LogCategory.general,
+          category: LogCategory.ai,
           tags: ['dsl', 'graph-run'],
         );
         yield NodeRunFailedEvent(
@@ -363,6 +380,8 @@ class GraphEngine {
             sm.getNodeState(downId) != NodeState.skipped) {
           sm.markNodeTaken(downId);
           readyQueue.add(downId);
+        } else if (sm.getNodeState(downId) == NodeState.skipped) {
+          skippedCount++;
         }
       }
 
@@ -372,11 +391,17 @@ class GraphEngine {
       }
     }
 
+    totalSw.stop();
+
     // 终止事件
     if (failedNodes.isNotEmpty) {
       LoggerService.instance.i(
-        'GraphEngine.run 完成(部分失败): failedCount=${failedNodes.length}',
-        category: LogCategory.general,
+        'GraphEngine.run 完成(部分失败): '
+        'executed=${executionOrder.length}, failed=${failedNodes.length}, '
+        'skipped=$skippedCount, total=${graph.nodes.length}, '
+        'elapsed=${totalSw.elapsedMilliseconds}ms, '
+        'order=${executionOrder.join('→')}',
+        category: LogCategory.ai,
         tags: ['dsl', 'graph-run'],
       );
       yield GraphRunPartialSucceededEvent(
@@ -385,8 +410,13 @@ class GraphEngine {
       );
     } else {
       LoggerService.instance.i(
-        'GraphEngine.run 完成(全部成功): outputKeys=${outputs.keys.toList()}',
-        category: LogCategory.general,
+        'GraphEngine.run 完成(全部成功): '
+        'executed=${executionOrder.length}, skipped=$skippedCount, '
+        'total=${graph.nodes.length}, '
+        'elapsed=${totalSw.elapsedMilliseconds}ms, '
+        'order=${executionOrder.join('→')}, '
+        'outputKeys=${outputs.keys.toList()}',
+        category: LogCategory.ai,
         tags: ['dsl', 'graph-run'],
       );
       yield GraphRunSucceededEvent(outputs: outputs);

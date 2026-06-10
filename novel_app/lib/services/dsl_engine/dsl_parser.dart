@@ -86,7 +86,7 @@ class DslParser {
   WorkflowGraph parseGraphConfig(String yaml) {
     LoggerService.instance.d(
       '开始解析 DSL 图配置',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'parse'],
     );
 
@@ -94,7 +94,7 @@ class DslParser {
       LoggerService.instance.e(
         'DSL YAML 内容为空',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('Empty YAML content');
@@ -107,7 +107,7 @@ class DslParser {
       LoggerService.instance.e(
         'YAML 解析失败: $e',
         stackTrace: stackTrace.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('YAML decode failed: $e');
@@ -117,7 +117,7 @@ class DslParser {
       LoggerService.instance.e(
         'YAML 根节点不是 Map',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('YAML root must be a map');
@@ -128,7 +128,7 @@ class DslParser {
       LoggerService.instance.e(
         '缺少 workflow 节点',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('Missing workflow section');
@@ -139,7 +139,7 @@ class DslParser {
       LoggerService.instance.e(
         '缺少 workflow.graph 节点',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('Missing workflow.graph section');
@@ -151,7 +151,7 @@ class DslParser {
       LoggerService.instance.e(
         'workflow.graph.nodes 不是列表',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('workflow.graph.nodes must be a list');
@@ -160,7 +160,7 @@ class DslParser {
       LoggerService.instance.e(
         'workflow.graph.edges 不是列表',
         stackTrace: StackTrace.current.toString(),
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'parse'],
       );
       throw DslParseError('workflow.graph.edges must be a list');
@@ -182,7 +182,7 @@ class DslParser {
 
     LoggerService.instance.i(
       'DSL 图配置解析完成: nodes=${nodes.length}, edges=${edges.length}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'parse'],
     );
 
@@ -260,7 +260,7 @@ class DslParser {
       default:
         LoggerService.instance.w(
           '未知节点类型: "$typeStr"',
-          category: LogCategory.general,
+          category: LogCategory.ai,
           tags: ['dsl', 'parse'],
         );
         return NodeType.unknown;

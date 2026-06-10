@@ -45,7 +45,7 @@ class DslEngineConfig {
     await PreferencesService.instance.setBool(_keyEnabled, value);
     LoggerService.instance.d(
       'DSL Engine 配置写入: enabled=$value',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'config'],
     );
   }
@@ -54,7 +54,7 @@ class DslEngineConfig {
     await PreferencesService.instance.setString(_keyApiUrl, value);
     LoggerService.instance.d(
       'DSL Engine 配置写入: apiUrl 长度=${value.length}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'config'],
     );
   }
@@ -63,7 +63,7 @@ class DslEngineConfig {
     await PreferencesService.instance.setString(_keyApiKey, value);
     LoggerService.instance.d(
       'DSL Engine 配置写入: apiKey 长度=${value.length}',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'config'],
     );
   }
@@ -72,7 +72,7 @@ class DslEngineConfig {
     await PreferencesService.instance.setString(_keyModel, value);
     LoggerService.instance.d(
       'DSL Engine 配置写入: model=$value',
-      category: LogCategory.general,
+      category: LogCategory.ai,
       tags: ['dsl', 'config'],
     );
   }
@@ -85,7 +85,7 @@ class DslEngineConfig {
     if (!configured) {
       LoggerService.instance.w(
         'DSL Engine 配置不完整: url=${url.isNotEmpty}, key=${key.isNotEmpty}',
-        category: LogCategory.general,
+        category: LogCategory.ai,
         tags: ['dsl', 'config'],
       );
     }

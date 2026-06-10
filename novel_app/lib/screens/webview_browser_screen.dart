@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/providers/webview_providers.dart';
 import '../widgets/webview_address_bar.dart';
+import '../widgets/bookmark_panel.dart';
 
 /// 浏览器主屏幕
 ///
 /// 布局：
-/// - AppBar: 地址栏 + 右侧前进/后退/刷新按钮
+/// - AppBar: 地址栏 + 右侧前进/后退/刷新/收藏夹按钮
 /// - 顶部加载进度条（仅在加载中显示）
-/// - 主体：WebView 内容
+/// - 主体：InAppWebView 内容
 /// - 系统返回手势：有历史时 WebView 后退，无历史时退出浏览器页面
 class WebViewBrowserScreen extends ConsumerStatefulWidget {
   const WebViewBrowserScreen({super.key});
@@ -21,17 +22,7 @@ class WebViewBrowserScreen extends ConsumerStatefulWidget {
 
 class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
   @override
-  void initState() {
-    super.initState();
-    // 异步初始化 WebView Controller（避免 build 阶段竞争）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(webviewControllerProvider.notifier).init();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = ref.watch(webviewControllerProvider);
     final isLoading = ref.watch(webviewIsLoadingProvider);
     final progress = ref.watch(webviewLoadingProgressProvider);
     final notifier = ref.read(webviewControllerProvider.notifier);
@@ -72,6 +63,12 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
               tooltip: '刷新',
               onPressed: () => notifier.reload(),
             ),
+            // 收藏夹按钮
+            IconButton(
+              icon: const Icon(Icons.bookmark_border),
+              tooltip: '收藏夹',
+              onPressed: () => _showBookmarkPanel(context, notifier),
+            ),
             const SizedBox(width: 4),
           ],
         ),
@@ -85,12 +82,49 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
               ),
             // WebView 主体
             Expanded(
-              child: controller == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : WebViewWidget(controller: controller),
+              child: InAppWebView(
+                initialUrlRequest:
+                    URLRequest(url: WebUri('https://so.com')),
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                ),
+                onWebViewCreated: (controller) {
+                  notifier.setController(controller);
+                },
+                onLoadStart: (controller, url) {
+                  notifier.handleLoadStart(url);
+                },
+                onLoadStop: (controller, url) {
+                  notifier.handleLoadStop(url);
+                },
+                onProgressChanged: (controller, progress) {
+                  notifier.handleProgress(progress);
+                },
+                onReceivedError: (controller, request, error) {
+                  notifier.handleError(error);
+                },
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 弹出收藏夹面板
+  void _showBookmarkPanel(
+    BuildContext context,
+    WebViewControllerNotifier notifier,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => BookmarkPanel(
+        onNavigate: (url) => notifier.loadUrl(url),
       ),
     );
   }

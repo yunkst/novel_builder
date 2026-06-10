@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ...database import get_db
 from ...deps.auth import verify_token
 from ...models.client_log import ClientLog
-from ...schemas.log import LogUploadRequest, LogUploadResponse
+from ...schemas import LogUploadRequest, LogUploadResponse
 
 logger = logging.getLogger(__name__)
 

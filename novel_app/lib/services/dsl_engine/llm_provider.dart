@@ -422,7 +422,9 @@ class LlmProvider {
   }) async {
     LoggerService.instance.d(
       'LLM chat 阻塞调用入口: model=${model ?? config.defaultModel}, '
-      'messages=${messages.length}',
+      'messages=${messages.length}, baseUrl=${config.baseUrl}, '
+      'maxTokens=${maxTokens ?? config.maxTokens}, '
+      'temperature=${temperature ?? config.temperature}',
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
     );
@@ -438,11 +440,14 @@ class LlmProvider {
       stream: false,
     );
     try {
+      final sw = Stopwatch()..start();
       final raw = await client.postJson(
           chatCompletionsUrl, defaultHeaders, jsonEncode(body));
       final response = parseBlockingResponse(raw);
+      sw.stop();
       LoggerService.instance.i(
-        'LLM chat 阻塞调用完成: contentLength=${response.content.length}',
+        'LLM chat 阻塞调用完成: contentLength=${response.content.length}, '
+        'elapsed=${sw.elapsedMilliseconds}ms',
         category: LogCategory.ai,
         tags: ['dsl', 'llm'],
       );
@@ -486,7 +491,9 @@ class LlmProvider {
   }) {
     LoggerService.instance.d(
       'LLM chatStream 流式调用入口: model=${model ?? config.defaultModel}, '
-      'messages=${messages.length}',
+      'messages=${messages.length}, baseUrl=${config.baseUrl}, '
+      'maxTokens=${maxTokens ?? config.maxTokens}, '
+      'temperature=${temperature ?? config.temperature}',
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
     );
