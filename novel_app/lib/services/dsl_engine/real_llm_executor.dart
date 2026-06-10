@@ -42,8 +42,12 @@ class RealLlmExecutor {
       tags: ['dsl', 'llm'],
     );
     try {
-      final messages = _buildMessages(node, pool);
       final config = LlmNodeConfig.fromNode(node, _defaultModel);
+      final messages = _buildMessages(
+        node,
+        pool,
+        structuredOutputEnabled: config.structuredOutputEnabled,
+      );
 
       final sw = Stopwatch()..start();
       final response = await _provider.chat(
@@ -92,8 +96,12 @@ class RealLlmExecutor {
       tags: ['dsl', 'llm'],
     );
     try {
-      final messages = _buildMessages(node, pool);
       final config = LlmNodeConfig.fromNode(node, _defaultModel);
+      final messages = _buildMessages(
+        node,
+        pool,
+        structuredOutputEnabled: config.structuredOutputEnabled,
+      );
 
       final chunks = <String>[];
       final sw = Stopwatch()..start();
@@ -140,7 +148,15 @@ class RealLlmExecutor {
   }
 
   /// 构建 OpenAI 格式的消息列表
-  List<ChatMessage> _buildMessages(DslNode node, VariablePool pool) {
+  ///
+  /// 当 [structuredOutputEnabled] 为 true 时，参考 Dify 的
+  /// structured_output.py 在 system prompt 前注入 JSON schema 约束提示，
+  /// 确保模型输出 JSON 格式。
+  List<ChatMessage> _buildMessages(
+    DslNode node,
+    VariablePool pool, {
+    bool structuredOutputEnabled = false,
+  }) {
     final promptTemplate = node.data['prompt_template'] as List?;
     if (promptTemplate == null || promptTemplate.isEmpty) {
       return [ChatMessage(role: 'user', content: '')];
@@ -179,10 +195,61 @@ class RealLlmExecutor {
 
       messages.add(ChatMessage(role: role, content: content));
     }
+
+    // structured_output: 注入 JSON schema 约束提示（Dify 风格）
+    if (structuredOutputEnabled) {
+      final schema = _extractStructuredOutputSchema(node);
+      if (schema != null) {
+        final schemaJson = jsonEncode(schema);
+        final structuredPrompt =
+            'You\'re a helpful AI assistant. You could answer questions and output in JSON format.\n'
+            'constraints:\n'
+            '    - You must output in JSON format.\n'
+            '    - Do not output boolean value, use string type instead.\n'
+            '    - Do not output integer or float value, use number type instead.\n'
+            'Here is the JSON schema:\n$schemaJson\n';
+
+        // 在 system prompt 前注入（或创建新的 system prompt）
+        final systemIdx = messages.indexWhere((m) => m.role == 'system');
+        if (systemIdx >= 0) {
+          final existing = messages[systemIdx];
+          messages[systemIdx] = ChatMessage(
+            role: 'system',
+            content: '$structuredPrompt\n${existing.content ?? ''}',
+          );
+        } else {
+          messages.insert(0, ChatMessage(role: 'system', content: structuredPrompt));
+        }
+
+        LoggerService.instance.d(
+          'structured_output: 注入 JSON schema 约束提示, schemaKeys=${(schema as Map).keys.toList()}',
+          category: LogCategory.ai,
+          tags: ['dsl', 'llm', 'structured-output'],
+        );
+      }
+    }
+
     return messages;
   }
 
+  /// 从节点 data 中提取 structured_output schema
+  Map<String, dynamic>? _extractStructuredOutputSchema(DslNode node) {
+    final structuredOutput = node.data['structured_output'];
+    if (structuredOutput is Map<String, dynamic>) {
+      final schema = structuredOutput['schema'];
+      if (schema is Map<String, dynamic>) {
+        return schema;
+      }
+    }
+    return null;
+  }
+
   /// 构建执行结果
+  ///
+  /// 当 [structuredOutputEnabled] 为 true 时，尝试解析 JSON。
+  /// 参考 Dify 的 `_parse_structured_output`，增加鲁棒性：
+  /// - 去除 markdown 代码围栏 ```json ... ```
+  /// - 去除 deepseek-r1 的 `<think>...</think>` 前缀
   NodeRunResult _buildResult(
     String nodeId,
     String responseText,
@@ -192,9 +259,32 @@ class RealLlmExecutor {
 
     if (structuredOutputEnabled && responseText.isNotEmpty) {
       try {
-        final json = jsonDecode(responseText);
+        var text = responseText.trim();
+
+        // 去除 markdown 代码围栏
+        if (text.startsWith('```')) {
+          final fenceMatch = RegExp(r'^```(?:json)?\s*\n?').firstMatch(text);
+          if (fenceMatch != null) {
+            text = text.substring(fenceMatch.end);
+          }
+          if (text.endsWith('```')) {
+            text = text.substring(0, text.length - 3);
+          }
+          text = text.trim();
+        }
+
+        final json = jsonDecode(text);
         if (json is Map<String, dynamic>) {
           outputs['structured_output'] = json;
+        } else if (json is List && json.isNotEmpty) {
+          // deepseek-r1 有时返回 [thinking, {...}] 格式
+          final firstMap = json.firstWhere(
+            (e) => e is Map<String, dynamic>,
+            orElse: () => <String, dynamic>{},
+          );
+          if (firstMap is Map<String, dynamic> && firstMap.isNotEmpty) {
+            outputs['structured_output'] = firstMap;
+          }
         }
       } catch (_) {
         LoggerService.instance.w(

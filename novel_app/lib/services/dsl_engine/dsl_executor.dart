@@ -344,19 +344,36 @@ class DslExecutor {
 
     if (variables != null) {
       for (final v in variables) {
-        if (v is! Map) continue;
-        final selector = v['value_selector'];
-        if (selector is! List) continue;
-        final path = selector.map((e) => e.toString()).toList();
-        final segment = pool.get(path);
-        if (segment != null) {
-          final val = segment.toObject();
-          if (val != null && val.toString().isNotEmpty) {
-            return NodeRunResult(
-              nodeId: node.id,
-              status: NodeExecutionStatus.succeeded,
-              outputs: {'output': val},
-            );
+        if (v is Map) {
+          // 格式: [{value_selector: [nodeId, varName]}, ...]
+          final selector = v['value_selector'];
+          if (selector is! List) continue;
+          final path = selector.map((e) => e.toString()).toList();
+          final segment = pool.get(path);
+          if (segment != null) {
+            final val = segment.toObject();
+            if (val != null && val.toString().isNotEmpty) {
+              return NodeRunResult(
+                nodeId: node.id,
+                status: NodeExecutionStatus.succeeded,
+                outputs: {'output': val},
+              );
+            }
+          }
+        } else if (v is List) {
+          // 格式: [[nodeId, varName], ...] (Dify 导出的 YAML 原始格式)
+          final path = v.map((e) => e.toString()).toList();
+          if (path.length < 2) continue;
+          final segment = pool.get(path);
+          if (segment != null) {
+            final val = segment.toObject();
+            if (val != null && val.toString().isNotEmpty) {
+              return NodeRunResult(
+                nodeId: node.id,
+                status: NodeExecutionStatus.succeeded,
+                outputs: {'output': val},
+              );
+            }
           }
         }
       }

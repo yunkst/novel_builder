@@ -293,10 +293,17 @@ Future<NodeRunResult> nodeExecutor(
       final variables = node.data['variables'] as List?;
       if (variables != null) {
         for (final v in variables) {
-          if (v is! Map) continue;
-          final selector = v['value_selector'] as List?;
-          if (selector == null) continue;
-          final path = selector.map((e) => e.toString()).toList();
+          List<String> path;
+          if (v is Map) {
+            final selector = v['value_selector'];
+            if (selector is! List) continue;
+            path = selector.map((e) => e.toString()).toList();
+          } else if (v is List) {
+            path = v.map((e) => e.toString()).toList();
+            if (path.length < 2) continue;
+          } else {
+            continue;
+          }
           final segment = pool.get(path);
           if (segment != null) {
             final val = segment.toObject();
