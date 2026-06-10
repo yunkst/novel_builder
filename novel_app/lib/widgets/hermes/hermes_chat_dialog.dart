@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/hermes_providers.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
+import 'package:novel_app/services/novel_agent/agent_event.dart';
+import 'package:novel_app/widgets/hermes/hermes_confirmation_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
-import 'package:novel_app/widgets/hermes/hermes_settings_dialog.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天对话框
@@ -54,6 +55,14 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       if (nextCount > prevCount || (next.isLoading && next.streamingContent != null)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToBottom();
+        });
+      }
+
+      // Phase 4: 监听待处理的确认，弹出确认弹窗
+      if (next.pendingConfirmation != null &&
+          (prev?.pendingConfirmation?.toolCallId != next.pendingConfirmation!.toolCallId)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showConfirmationDialog(next.pendingConfirmation!, notifier);
         });
       }
     });
@@ -122,17 +131,6 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
             tooltip: _isFullscreen ? '退出全屏' : '全屏',
           ),
           IconButton(
-            icon: Icon(Icons.settings,
-                color: appColors.hermesOnBrandMuted, size: 20),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => const HermesSettingsDialog(),
-              );
-            },
-            tooltip: '设置',
-          ),
-          IconButton(
             icon: Icon(Icons.delete_outline,
                 color: appColors.hermesOnBrandMuted, size: 20),
             onPressed: () {
@@ -165,7 +163,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           return HermesMessageBubble(
             message: HermesMessage.assistant(''),
             streamingContent: chatState.streamingContent,
-            activeToolProgress: chatState.activeToolProgress,
+            agentToolCalls: chatState.agentToolCalls,
             showTimestamp: false,
           );
         }
@@ -173,6 +171,28 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         final message = chatState.messages[index];
         return HermesMessageBubble(message: message);
       },
+    );
+  }
+
+  /// Phase 4: 弹出确认弹窗
+  void _showConfirmationDialog(
+    PendingConfirmation confirmation,
+    HermesChatNotifier notifier,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => HermesConfirmationDialog(
+        toolName: confirmation.toolName,
+        args: confirmation.args,
+        toolCallId: confirmation.toolCallId,
+        description: describeToolAction(
+          confirmation.toolName,
+          confirmation.args,
+        ),
+        requestedAt: confirmation.requestedAt,
+        onRespond: notifier.respondToConfirmation,
+      ),
     );
   }
 

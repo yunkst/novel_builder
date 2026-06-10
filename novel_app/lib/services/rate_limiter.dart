@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'logger_service.dart';
 
 /// 速率限制器
 ///
@@ -31,7 +31,11 @@ class RateLimiter {
     if (elapsed < interval) {
       // 需要等待剩余时间
       final waitTime = interval - elapsed;
-      debugPrint('⏳ 速率限制: 等待 ${waitTime.inSeconds} 秒');
+      LoggerService.instance.i(
+        '速率限制: 等待 ${waitTime.inSeconds} 秒',
+        category: LogCategory.network,
+        tags: ['rate-limit'],
+      );
       await Future.delayed(waitTime);
     }
 
@@ -44,7 +48,11 @@ class RateLimiter {
   /// 重置后，下一次acquire()将立即返回
   void reset() {
     _lastRequestTime = null;
-    debugPrint('🔄 速率限制器已重置');
+    LoggerService.instance.i(
+      '速率限制器已重置',
+      category: LogCategory.network,
+      tags: ['rate-limit'],
+    );
   }
 
   /// 获取距离下次可请求的时间

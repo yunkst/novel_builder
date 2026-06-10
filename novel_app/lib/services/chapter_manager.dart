@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import '../models/chapter_content_result.dart';
+import 'logger_service.dart';
 
 /// 章节请求管理器单例
 ///
@@ -28,7 +28,11 @@ class ChapterManager {
   /// 设置测试模式(必须在首次访问instance之前调用)
   static void setTestMode(bool enabled) {
     if (_instance != null) {
-      debugPrint('⚠️  ChapterManager: 实例已创建,无法更改测试模式');
+      LoggerService.instance.w(
+        'ChapterManager: 实例已创建,无法更改测试模式',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return;
     }
     _isTestMode = enabled;
@@ -71,20 +75,32 @@ class ChapterManager {
 
     // 强制刷新总是创建新请求，不去重
     if (forceRefresh) {
-      debugPrint('🔄 强制刷新章节: $chapterUrl');
+      LoggerService.instance.i(
+        '强制刷新章节: $chapterUrl',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return await fetchFunction();
     }
 
     // 检查是否已有相同请求在进行中
     if (_pendingRequests.containsKey(chapterUrl)) {
       _deduplicatedRequests++;
-      debugPrint('🔗 请求去重: 复用现有请求 - $chapterUrl');
+      LoggerService.instance.d(
+        '请求去重: 复用现有请求 - $chapterUrl',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       final result = await _pendingRequests[chapterUrl]!;
       return result.content;
     }
 
     // 创建新请求
-    debugPrint('🆕 发起章节请求: $chapterUrl');
+    LoggerService.instance.d(
+      '发起章节请求: $chapterUrl',
+      category: LogCategory.database,
+      tags: ['chapter'],
+    );
     final requestFuture = _createRequest(chapterUrl, fetchFunction);
     _pendingRequests[chapterUrl] = requestFuture.then((r) => ChapterContentResult(content: r, fromCache: false));
     _requestTimestamps[chapterUrl] = DateTime.now();
@@ -92,8 +108,13 @@ class ChapterManager {
     try {
       final result = await _pendingRequests[chapterUrl]!;
       return result.content;
-    } catch (e) {
-      debugPrint('❌ 章节请求失败: $chapterUrl, 错误: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '章节请求失败: $chapterUrl, 错误: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       rethrow;
     } finally {
       _cleanupRequest(chapterUrl);
@@ -134,7 +155,11 @@ class ChapterManager {
     }
 
     if (expiredUrls.isNotEmpty) {
-      debugPrint('🧹 清理过期状态: ${expiredUrls.length} 个请求');
+      LoggerService.instance.d(
+        '清理过期状态: ${expiredUrls.length} 个请求',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
     }
   }
 
@@ -144,7 +169,11 @@ class ChapterManager {
     _requestTimestamps.clear();
     _totalRequests = 0;
     _deduplicatedRequests = 0;
-    debugPrint('🔄 ChapterManager 状态已重置');
+    LoggerService.instance.i(
+      'ChapterManager 状态已重置',
+      category: LogCategory.database,
+      tags: ['chapter'],
+    );
   }
 
   /// 创建网络请求
@@ -152,8 +181,13 @@ class ChapterManager {
       String chapterUrl, Future<String> Function() fetchFunction) async {
     try {
       return await fetchFunction();
-    } catch (e) {
-      debugPrint('❌ 网络请求失败: $chapterUrl, 错误: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '网络请求失败: $chapterUrl, 错误: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       rethrow;
     }
   }
@@ -179,18 +213,30 @@ class ChapterManager {
     _totalRequests++;
 
     if (forceRefresh) {
-      debugPrint('🔄 强制刷新章节: $chapterUrl');
+      LoggerService.instance.i(
+        '强制刷新章节: $chapterUrl',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return await fetchFunction();
     }
 
     // 检查是否已有相同请求在进行中
     if (_pendingRequests.containsKey(chapterUrl)) {
       _deduplicatedRequests++;
-      debugPrint('🔗 请求去重: 复用现有请求 - $chapterUrl');
+      LoggerService.instance.d(
+        '请求去重: 复用现有请求 - $chapterUrl',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return await _pendingRequests[chapterUrl]!;
     }
 
-    debugPrint('🆕 发起章节请求: $chapterUrl');
+    LoggerService.instance.d(
+      '发起章节请求: $chapterUrl',
+      category: LogCategory.database,
+      tags: ['chapter'],
+    );
 
     // 创建新请求并缓存 Future
     final requestFuture = _createRequestWithSource(chapterUrl, fetchFunction);
@@ -200,8 +246,13 @@ class ChapterManager {
     try {
       final result = await requestFuture;
       return result;
-    } catch (e) {
-      debugPrint('❌ 章节请求失败: $chapterUrl, 错误: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '章节请求失败: $chapterUrl, 错误: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       rethrow;
     } finally {
       _cleanupRequest(chapterUrl);
@@ -213,8 +264,13 @@ class ChapterManager {
       String chapterUrl, Future<ChapterContentResult> Function() fetchFunction) async {
     try {
       return await fetchFunction();
-    } catch (e) {
-      debugPrint('❌ 网络请求失败: $chapterUrl, 错误: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '网络请求失败: $chapterUrl, 错误: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       rethrow;
     }
   }
@@ -223,7 +279,11 @@ class ChapterManager {
   void _initializeCleanupTimer() {
     // 在测试模式中不启动定时器,避免"Pending timers"错误
     if (_isTestMode) {
-      debugPrint('⚠️  ChapterManager: 测试模式中跳过定时器初始化');
+      LoggerService.instance.w(
+        'ChapterManager: 测试模式中跳过定时器初始化',
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return;
     }
 
@@ -237,6 +297,10 @@ class ChapterManager {
     _cleanupTimer?.cancel();
     _cleanupTimer = null;
     reset();
-    debugPrint('🗑️ ChapterManager 已销毁');
+    LoggerService.instance.i(
+      'ChapterManager 已销毁',
+      category: LogCategory.database,
+      tags: ['chapter'],
+    );
   }
 }

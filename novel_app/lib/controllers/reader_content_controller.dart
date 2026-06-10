@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import '../services/logger_service.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
@@ -55,12 +55,20 @@ class ReaderContentController {
   Future<void> initialize() async {
     try {
       await _apiService.init();
-      debugPrint('✅ ReaderContentController: API初始化成功');
+      LoggerService.instance.i(
+        'ReaderContentController: API初始化成功',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
     } catch (e) {
       _ref
           .read(chapterContentStateNotifierProvider.notifier)
           .setError('初始化API失败: $e');
-      debugPrint('❌ ReaderContentController: API初始化失败 - $e');
+      LoggerService.instance.e(
+        'ReaderContentController: API初始化失败 - $e',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
       rethrow;
     }
   }
@@ -89,14 +97,22 @@ class ReaderContentController {
     }
 
     try {
-      debugPrint('📖 ReaderContentController: 开始加载章节 - ${chapter.title}');
+      LoggerService.instance.d(
+        'ReaderContentController: 开始加载章节 - ${chapter.title}',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
 
       String content;
 
       // 强制刷新时先删除缓存
       if (forceRefresh) {
         await _chapterRepository.deleteChapterCache(chapter.url);
-        debugPrint('🗑️ ReaderContentController: 已删除缓存 - ${chapter.url}');
+        LoggerService.instance.d(
+          'ReaderContentController: 已删除缓存 - ${chapter.url}',
+          category: LogCategory.ui,
+          tags: ['reader'],
+        );
       }
 
       // 尝试从缓存获取
@@ -104,11 +120,18 @@ class ReaderContentController {
           await _chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.trim().isNotEmpty) {
         content = cachedContent;
-        debugPrint(
-            '💾 ReaderContentController: 从缓存加载 - ${cachedContent.length}字符');
+        LoggerService.instance.d(
+          'ReaderContentController: 从缓存加载 - ${cachedContent.length}字符',
+          category: LogCategory.ui,
+          tags: ['reader'],
+        );
       } else {
         // 缓存未命中，从API获取
-        debugPrint('🌐 ReaderContentController: 缓存未命中，从API获取');
+        LoggerService.instance.d(
+          'ReaderContentController: 缓存未命中，从API获取',
+          category: LogCategory.ui,
+          tags: ['reader'],
+        );
         content = await _apiService.getChapterContent(
           chapter.url,
           forceRefresh: forceRefresh,
@@ -130,7 +153,11 @@ class ReaderContentController {
           chapter,
           content,
         );
-        debugPrint('✅ ReaderContentController: 已缓存章节 - ${content.length}字符');
+        LoggerService.instance.i(
+          'ReaderContentController: 已缓存章节 - ${content.length}字符',
+          category: LogCategory.ui,
+          tags: ['reader'],
+        );
       }
 
       // 再次验证内容是否为空（防御性编程）
@@ -148,11 +175,19 @@ class ReaderContentController {
       // 注意：预加载功能由 reader_screen 直接调用 PreloadService 处理
       // 此 Controller 不负责预加载逻辑
 
-      debugPrint('✅ ReaderContentController: 章节加载完成 - ${chapter.title}');
+      LoggerService.instance.i(
+        'ReaderContentController: 章节加载完成 - ${chapter.title}',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
     } catch (e) {
       notifier.setLoading(false);
       notifier.setError('加载章节失败: $e');
-      debugPrint('❌ ReaderContentController: 加载失败 - $e');
+      LoggerService.instance.e(
+        'ReaderContentController: 加载失败 - $e',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
       rethrow;
     }
   }
@@ -165,9 +200,17 @@ class ReaderContentController {
     try {
       final chapterIndex = chapter.chapterIndex ?? 0;
       await _novelRepository.updateLastReadChapter(novelUrl, chapterIndex);
-      debugPrint('📖 ReaderContentController: 已更新阅读进度 - 章节$chapterIndex');
+      LoggerService.instance.d(
+        'ReaderContentController: 已更新阅读进度 - 章节$chapterIndex',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
     } catch (e) {
-      debugPrint('❌ ReaderContentController: 更新阅读进度失败 - $e');
+      LoggerService.instance.e(
+        'ReaderContentController: 更新阅读进度失败 - $e',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
     }
   }
 
@@ -176,7 +219,11 @@ class ReaderContentController {
     _ref
         .read(chapterContentStateNotifierProvider.notifier)
         .updateContent(newContent);
-    debugPrint('📝 ReaderContentController: 内容已更新 - ${newContent.length}字符');
+    LoggerService.instance.d(
+      'ReaderContentController: 内容已更新 - ${newContent.length}字符',
+      category: LogCategory.ui,
+      tags: ['reader'],
+    );
   }
 
   // ========== Getters ==========

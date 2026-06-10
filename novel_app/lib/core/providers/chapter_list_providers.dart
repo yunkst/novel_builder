@@ -15,7 +15,7 @@ import '../../constants/chapter_constants.dart';
 import 'service_providers.dart';
 import 'repository_providers.dart';
 import 'database_providers.dart';
-import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 
 part 'chapter_list_providers.g.dart';
@@ -92,6 +92,11 @@ class ChapterList extends _$ChapterList {
 
   /// 初始化数据
   Future<void> _initializeData() async {
+    LoggerService.instance.d(
+      '开始初始化章节数据: novel=${novel.title}',
+      category: LogCategory.ui,
+      tags: ['provider', 'chapter-list', 'init'],
+    );
     try {
       // 并行执行所有独立的初始化操作
       await Future.wait([
@@ -101,8 +106,18 @@ class ChapterList extends _$ChapterList {
         _loadAiSettings(),
       ]);
 
-      debugPrint('✅ 所有异步数据初始化完成');
-    } catch (e) {
+      LoggerService.instance.i(
+        '所有异步数据初始化完成',
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '初始化数据失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['provider', 'chapter-list', 'init'],
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: '初始化失败: $e',
@@ -184,8 +199,13 @@ class ChapterList extends _$ChapterList {
         // 从后端获取
         await _refreshChaptersFromBackend(forceRefresh: forceRefresh);
       }
-    } catch (e) {
-      debugPrint('❌ 加载章节列表失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载章节列表失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: '加载章节列表失败: $e',
@@ -210,8 +230,13 @@ class ChapterList extends _$ChapterList {
           isLoading: false,
         );
         _updateTotalPages();
-      } catch (e) {
-        debugPrint('❌ 加载自定义小说章节失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '加载自定义小说章节失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.ui,
+          tags: ['chapter-list'],
+        );
         state = state.copyWith(
           isLoading: false,
           errorMessage: '加载章节失败: $e',
@@ -275,8 +300,13 @@ class ChapterList extends _$ChapterList {
           errorMessage: '未能获取章节列表',
         );
       }
-    } catch (e) {
-      debugPrint('❌ 从后端刷新章节列表失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '从后端刷新章节列表失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
       // 如果已经有缓存数据，不显示错误，只显示提示
       if (state.chapters.isNotEmpty) {
         // ToastUtils.show('更新章节列表失败: $e');
@@ -305,17 +335,39 @@ class ChapterList extends _$ChapterList {
         cachedStatus: {...state.cachedStatus, ...results},
       );
 
-      debugPrint('✅ 已加载当前页 ${results.length} 个章节的缓存状态');
+      LoggerService.instance.i(
+        '已加载当前页 ${results.length} 个章节的缓存状态',
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
     } catch (e) {
-      debugPrint('⚠️ 加载当前页缓存状态失败: $e');
+      LoggerService.instance.w(
+        '加载当前页缓存状态失败: $e',
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
     }
   }
 
   /// 检查书架状态
   Future<void> _checkBookshelfStatus() async {
     final novelRepository = ref.read(novelRepositoryProvider);
-    final isInBookshelf = await novelRepository.isInBookshelf(novel.url);
-    state = state.copyWith(isInBookshelf: isInBookshelf);
+    try {
+      final isInBookshelf = await novelRepository.isInBookshelf(novel.url);
+      state = state.copyWith(isInBookshelf: isInBookshelf);
+      LoggerService.instance.d(
+        '书架状态检查完成: isInBookshelf=$isInBookshelf',
+        category: LogCategory.database,
+        tags: ['provider', 'chapter-list', 'bookshelf-status'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '检查书架状态失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chapter-list', 'bookshelf-status'],
+      );
+    }
   }
 
   /// 加载最后阅读章节
@@ -324,8 +376,13 @@ class ChapterList extends _$ChapterList {
     try {
       final lastReadIndex = await chapterLoader.loadLastReadChapter(novel.url);
       state = state.copyWith(lastReadChapterIndex: lastReadIndex);
-    } catch (e) {
-      debugPrint('获取上次阅读章节失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取上次阅读章节失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
     }
   }
 
@@ -337,7 +394,11 @@ class ChapterList extends _$ChapterList {
           await novelRepository.getAiAccompanimentSettings(novel.url);
       state = state.copyWith(aiSettings: settings);
     } catch (e) {
-      debugPrint('加载AI伴读设置失败: $e');
+      LoggerService.instance.w(
+        '加载AI伴读设置失败: $e',
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
     }
   }
 
@@ -388,8 +449,13 @@ class ChapterList extends _$ChapterList {
     final databaseService = ref.read(databaseServiceProvider);
     try {
       await databaseService.clearNovelCache(novel.url);
-    } catch (e) {
-      debugPrint('❌ 清除缓存失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '清除缓存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
       rethrow;
     }
   }
@@ -451,8 +517,13 @@ class ChapterList extends _$ChapterList {
 
       // 重新加载章节列表以确保数据一致性
       await _loadChapters();
-    } catch (e) {
-      debugPrint('❌ 保存章节顺序失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '保存章节顺序失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list'],
+      );
       rethrow;
     }
   }

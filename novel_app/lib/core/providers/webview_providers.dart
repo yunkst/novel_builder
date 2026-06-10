@@ -82,6 +82,11 @@ class WebViewControllerNotifier extends StateNotifier<WebViewController?> {
     await state?.goBack();
   }
 
+  /// 是否可以后退（有浏览历史）
+  Future<bool> canGoBack() async {
+    return await state?.canGoBack() ?? false;
+  }
+
   /// 前进
   Future<void> goForward() async {
     await state?.goForward();

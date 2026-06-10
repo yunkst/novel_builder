@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/search_result.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
+import 'logger_service.dart';
 
 /// 缓存内容搜索服务
 class CacheSearchService {
+  static const LogCategory _category = LogCategory.cache;
+  static const List<String> _tags = ['search'];
   final IChapterRepository _chapterRepository;
   final dynamic _databaseService;
 
@@ -33,7 +35,7 @@ class CacheSearchService {
         );
       }
 
-      debugPrint('搜索缓存内容: 关键字="$keyword", 小说URL=$novelUrl');
+      LoggerService.instance.d('搜索缓存内容: 关键字="$keyword", 小说URL=$novelUrl', category: _category, tags: _tags);
 
       // 执行搜索 - 使用 ChapterRepository
       List<ChapterSearchResult> allResults = [];
@@ -44,7 +46,7 @@ class CacheSearchService {
           novelUrl: novelUrl,
         );
       } catch (e) {
-        debugPrint('⚠️ searchInCachedContent方法调用失败: $e');
+        LoggerService.instance.w('searchInCachedContent方法调用失败', category: _category, tags: _tags);
         // 方法不存在时返回空结果
         allResults = [];
       }
@@ -65,7 +67,7 @@ class CacheSearchService {
         hasMore: endIndex < totalCount,
       );
     } catch (e) {
-      debugPrint('搜索缓存内容失败: $e');
+      LoggerService.instance.e('搜索缓存内容失败', category: _category, tags: _tags);
       return CacheSearchResult(
         results: [],
         totalCount: 0,
@@ -85,11 +87,11 @@ class CacheSearchService {
       try {
         return await _databaseService.getCachedNovels();
       } catch (e) {
-        debugPrint('⚠️ getCachedNovels方法未实现或调用失败: $e');
+        LoggerService.instance.w('getCachedNovels方法未实现或调用失败', category: _category, tags: _tags);
         return [];
       }
     } catch (e) {
-      debugPrint('获取已缓存小说列表失败: $e');
+      LoggerService.instance.e('获取已缓存小说列表失败', category: _category, tags: _tags);
       return [];
     }
   }
@@ -100,7 +102,7 @@ class CacheSearchService {
       final cachedNovels = await getCachedNovels();
       return cachedNovels.isNotEmpty;
     } catch (e) {
-      debugPrint('检查缓存内容失败: $e');
+      LoggerService.instance.e('检查缓存内容失败', category: _category, tags: _tags);
       return false;
     }
   }
@@ -122,7 +124,7 @@ class CacheSearchService {
           .take(5)
           .toList();
     } catch (e) {
-      debugPrint('获取搜索建议失败: $e');
+      LoggerService.instance.e('获取搜索建议失败', category: _category, tags: _tags);
       return [];
     }
   }

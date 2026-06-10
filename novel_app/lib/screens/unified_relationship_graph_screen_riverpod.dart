@@ -9,6 +9,7 @@ import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../utils/toast_utils.dart';
+import '../services/logger_service.dart';
 
 /// 统一的角色关系图可视化页面 - Riverpod版本
 ///
@@ -101,10 +102,18 @@ class _UnifiedRelationshipGraphScreenRiverpodState
       });
 
       final mode = widget.focusCharacter != null ? '单角色' : '全局';
-      debugPrint(
-          '✅ 关系图加载完成($mode): ${_characterMap.length} 个节点, ${_relationships.length} 条边');
-    } catch (e) {
-      debugPrint('❌ 加载关系图数据失败: $e');
+      LoggerService.instance.i(
+        '关系图加载完成($mode): ${_characterMap.length} 个节点, ${_relationships.length} 条边',
+        category: LogCategory.character,
+        tags: ['relationship'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载关系图数据失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['relationship'],
+      );
       setState(() {
         _isLoading = false;
       });
@@ -224,7 +233,11 @@ class _UnifiedRelationshipGraphScreenRiverpodState
             _avatarProviders[character.id!] = FileImage(imageFile);
           }
         } catch (e) {
-          debugPrint('⚠️ 加载头像失败: ${character.name}, $e');
+          LoggerService.instance.w(
+            '加载头像失败: ${character.name}, $e',
+            category: LogCategory.character,
+            tags: ['relationship'],
+          );
         }
       }
     }
@@ -353,11 +366,19 @@ class _UnifiedRelationshipGraphScreenRiverpodState
       controller: _controller,
       onDraggingStart: (characterId) {
         final character = _characterMap[characterId];
-        debugPrint('开始拖拽: ${character?.name}');
+        LoggerService.instance.d(
+          '开始拖拽: ${character?.name}',
+          category: LogCategory.character,
+          tags: ['relationship'],
+        );
       },
       onDraggingEnd: (characterId) {
         final character = _characterMap[characterId];
-        debugPrint('结束拖拽: ${character?.name}');
+        LoggerService.instance.d(
+          '结束拖拽: ${character?.name}',
+          category: LogCategory.character,
+          tags: ['relationship'],
+        );
       },
       onDraggingUpdate: (characterId) {
         // 拖拽中,可以添加实时更新逻辑

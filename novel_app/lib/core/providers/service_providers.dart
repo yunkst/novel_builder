@@ -28,6 +28,7 @@ library;
 export 'services/core_service_providers.dart'
     show
         loggerServiceProvider,
+        logReporterServiceProvider,
         preferencesServiceProvider,
         backupServiceProvider;
 

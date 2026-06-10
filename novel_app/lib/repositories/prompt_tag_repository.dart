@@ -1,6 +1,7 @@
 import 'dart:math';
 import '../models/prompt_tag.dart';
 import '../models/tag_group.dart';
+import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_prompt_tag_repository.dart';
 
@@ -13,6 +14,11 @@ class PromptTagRepository extends BaseRepository
   @override
   Future<List<PromptTag>> getByCategory(int categoryId) async {
     final db = await database;
+    LoggerService.instance.d(
+      'getByCategory: 查询分类下的标签 (categoryId: $categoryId)',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'getByCategory'],
+    );
     final maps = await db.query(
       _table,
       where: 'category_id = ?',
@@ -26,6 +32,11 @@ class PromptTagRepository extends BaseRepository
   Future<List<PromptTag>> search(String keyword, {int? categoryId}) async {
     final db = await database;
     final kw = keyword.trim();
+    LoggerService.instance.d(
+      'search: 搜索标签 (keyword: $kw, categoryId: $categoryId)',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'search'],
+    );
     final where = <String>[];
     final args = <Object?>[];
     if (categoryId != null) {
@@ -50,41 +61,92 @@ class PromptTagRepository extends BaseRepository
   Future<int> save(PromptTag tag) async {
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (tag.id == null) {
-      return await db.insert(_table, {
-        'category_id': tag.categoryId,
-        'name': tag.name,
-        'prompt_text': tag.promptText,
-        'sort_order': tag.sortOrder,
-        'created_at': now,
-        'updated_at': now,
-      });
+    try {
+      if (tag.id == null) {
+        final newId = await db.insert(_table, {
+          'category_id': tag.categoryId,
+          'name': tag.name,
+          'prompt_text': tag.promptText,
+          'sort_order': tag.sortOrder,
+          'created_at': now,
+          'updated_at': now,
+        });
+        LoggerService.instance.i(
+          'save: 新增标签 (ID: $newId, name: ${tag.name})',
+          category: LogCategory.database,
+          tags: ['prompt-tag', 'insert'],
+        );
+        return newId;
+      }
+      await db.update(
+        _table,
+        {
+          'category_id': tag.categoryId,
+          'name': tag.name,
+          'prompt_text': tag.promptText,
+          'sort_order': tag.sortOrder,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [tag.id],
+      );
+      LoggerService.instance.i(
+        'save: 更新标签 (ID: ${tag.id}, name: ${tag.name})',
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'update'],
+      );
+      return tag.id!;
+    } catch (e, stack) {
+      LoggerService.instance.e(
+        'save: 保存标签失败 (ID: ${tag.id}, name: ${tag.name}): $e',
+        stackTrace: stack.toString(),
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'save', 'error'],
+      );
+      rethrow;
     }
-    await db.update(
-      _table,
-      {
-        'category_id': tag.categoryId,
-        'name': tag.name,
-        'prompt_text': tag.promptText,
-        'sort_order': tag.sortOrder,
-        'updated_at': now,
-      },
-      where: 'id = ?',
-      whereArgs: [tag.id],
-    );
-    return tag.id!;
   }
 
   @override
   Future<void> delete(int id) async {
     final db = await database;
-    await db.delete(_table, where: 'id = ?', whereArgs: [id]);
+    try {
+      await db.delete(_table, where: 'id = ?', whereArgs: [id]);
+      LoggerService.instance.i(
+        'delete: 删除标签 (ID: $id)',
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'delete'],
+      );
+    } catch (e, stack) {
+      LoggerService.instance.e(
+        'delete: 删除标签失败 (ID: $id): $e',
+        stackTrace: stack.toString(),
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'delete', 'error'],
+      );
+      rethrow;
+    }
   }
 
   @override
   Future<void> deleteByCategory(int categoryId) async {
     final db = await database;
-    await db.delete(_table, where: 'category_id = ?', whereArgs: [categoryId]);
+    try {
+      await db.delete(_table, where: 'category_id = ?', whereArgs: [categoryId]);
+      LoggerService.instance.i(
+        'deleteByCategory: 删除分类下所有标签 (categoryId: $categoryId)',
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'delete', 'by-category'],
+      );
+    } catch (e, stack) {
+      LoggerService.instance.e(
+        'deleteByCategory: 删除分类标签失败 (categoryId: $categoryId): $e',
+        stackTrace: stack.toString(),
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'delete', 'by-category', 'error'],
+      );
+      rethrow;
+    }
   }
 
   @override
@@ -101,12 +163,22 @@ class PromptTagRepository extends BaseRepository
       );
     }
     await batch.commit(noResult: true);
+    LoggerService.instance.i(
+      'reorder: 重排标签顺序 (count: ${orderedIds.length})',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'update', 'reorder'],
+    );
   }
 
   @override
   Future<List<PromptTag>> getByIds(List<int> ids) async {
     if (ids.isEmpty) return [];
     final db = await database;
+    LoggerService.instance.d(
+      'getByIds: 按ID列表查询标签 (count: ${ids.length})',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'getByIds'],
+    );
     final placeholders = List.filled(ids.length, '?').join(',');
     final maps = await db.query(
       _table,
@@ -120,6 +192,11 @@ class PromptTagRepository extends BaseRepository
   @override
   Future<List<TagGroup>> getGroupedByCategory(int categoryId) async {
     final db = await database;
+    LoggerService.instance.d(
+      'getGroupedByCategory: 按分组查询标签 (categoryId: $categoryId)',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'grouped'],
+    );
     final maps = await db.rawQuery(
       '''
       SELECT MIN(id) AS representative_id,
@@ -146,6 +223,11 @@ class PromptTagRepository extends BaseRepository
   @override
   Future<String?> getRandomPromptText(int categoryId, String name) async {
     final db = await database;
+    LoggerService.instance.d(
+      'getRandomPromptText: 随机获取提示词文本 (categoryId: $categoryId, name: $name)',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'random'],
+    );
     final maps = await db.query(
       _table,
       columns: ['prompt_text'],

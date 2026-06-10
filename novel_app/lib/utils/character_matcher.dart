@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import '../models/character.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
+import '../services/logger_service.dart';
 
 /// 角色名称匹配工具类
 /// 用于分析章节内容中的角色出现情况并准备角色更新数据
@@ -121,7 +121,11 @@ class CharacterMatcher {
     try {
       return await _repo.getCharacters(novelUrl);
     } catch (e) {
-      debugPrint('获取现有角色失败: $e');
+      LoggerService.instance.e(
+        '获取现有角色失败: $e',
+        category: LogCategory.character,
+        tags: ['matcher'],
+      );
       return [];
     }
   }

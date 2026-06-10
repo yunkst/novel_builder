@@ -727,8 +727,12 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
         });
       }
     } catch (e) {
-      LoggerService.instance.e('搜索章节失败: ${e.toString()}');
-      debugPrint('❌ 搜索章节失败: $e');
+      LoggerService.instance.e(
+        '搜索章节失败',
+        stackTrace: e.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'search', 'failed'],
+      );
       setState(() {
         _searchError = '搜索失败: $e';
       });

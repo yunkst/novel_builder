@@ -167,9 +167,11 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
         _status = ImmersiveStatus.success;
       });
 
-      debugPrint('✅ 剧本生成成功');
-      debugPrint('剧本长度: ${play.length} 字符');
-      debugPrint('角色策略数量: ${roleStrategyList.length}');
+      LoggerService.instance.i(
+        '剧本生成成功: 剧本长度=${play.length}字符, 角色策略数量=${roleStrategyList.length}',
+        category: LogCategory.ai,
+        tags: ['immersive', 'script', 'generate', 'success'],
+      );
     } catch (e, stackTrace) {
       // 停止动画和提示轮播
       _tipTimer?.cancel();
@@ -190,7 +192,6 @@ class _ImmersiveInitScreenState extends State<ImmersiveInitScreen>
         _errorMessage = e.toString();
       });
 
-      debugPrint('❌ 剧本生成失败: $e');
       if (mounted) {
         _showErrorDialog(e.toString());
       }

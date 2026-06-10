@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/dsl_engine/dsl_engine_config.dart';
 import '../utils/toast_utils.dart';
 
 class DifySettingsScreen extends ConsumerWidget {
@@ -27,6 +28,13 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
   final _structTokenController = TextEditingController();
   final _aiWriterPromptController = TextEditingController();
   final _maxHistoryLengthController = TextEditingController();
+
+  // DSL Engine 配置
+  final _dslApiUrlController = TextEditingController();
+  final _dslApiKeyController = TextEditingController();
+  final _dslModelController = TextEditingController();
+  bool _dslEnabled = false;
+
   bool _isLoading = true;
 
   @override
@@ -42,6 +50,9 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
     _structTokenController.dispose();
     _aiWriterPromptController.dispose();
     _maxHistoryLengthController.dispose();
+    _dslApiUrlController.dispose();
+    _dslApiKeyController.dispose();
+    _dslModelController.dispose();
     super.dispose();
   }
 
@@ -87,9 +98,18 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
       _structTokenController.text = structToken ?? '';
     }
 
+    await _loadDslSettings();
+
     setState(() {
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadDslSettings() async {
+    _dslEnabled = await DslEngineConfig.isEnabled();
+    _dslApiUrlController.text = await DslEngineConfig.getApiUrl();
+    _dslApiKeyController.text = await DslEngineConfig.getApiKey();
+    _dslModelController.text = await DslEngineConfig.getModel();
   }
 
   Future<void> _saveSettings() async {
@@ -105,8 +125,14 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
       await prefs.setInt('max_history_length',
           int.tryParse(_maxHistoryLengthController.text) ?? 3000);
 
+      // 保存 DSL Engine 配置
+      await DslEngineConfig.setEnabled(_dslEnabled);
+      await DslEngineConfig.setApiUrl(_dslApiUrlController.text.trim());
+      await DslEngineConfig.setApiKey(_dslApiKeyController.text.trim());
+      await DslEngineConfig.setModel(_dslModelController.text.trim());
+
       if (mounted) {
-        ToastUtils.showSuccess('Dify 设置已保存');
+        ToastUtils.showSuccess('设置已保存');
         Navigator.pop(context);
       }
     }
@@ -194,6 +220,8 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   const SizedBox(height: 32),
+                  _buildDslEngineSection(),
+                  const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: _saveSettings,
                     style: ElevatedButton.styleFrom(
@@ -204,6 +232,65 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
                 ],
               ),
             ),
+    );
+  }
+
+  /// DSL Engine 配置区块
+  Widget _buildDslEngineSection() {
+    return Column(
+      children: [
+        const Divider(),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'DSL Engine（直连 LLM）',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Switch(
+              value: _dslEnabled,
+              onChanged: (v) => setState(() => _dslEnabled = v),
+            ),
+          ],
+        ),
+        if (_dslEnabled) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _dslApiUrlController,
+            decoration: const InputDecoration(
+              labelText: 'LLM API URL',
+              hintText: '例如: https://api.deepseek.com/v1',
+              border: OutlineInputBorder(),
+              helperText: 'OpenAI 兼容的 API 地址',
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _dslApiKeyController,
+            decoration: const InputDecoration(
+              labelText: 'LLM API Key',
+              hintText: 'sk-xxx',
+              border: OutlineInputBorder(),
+            ),
+            obscureText: true,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _dslModelController,
+            decoration: const InputDecoration(
+              labelText: '默认模型（可选）',
+              hintText: '留空使用 DSL 内置模型',
+              border: OutlineInputBorder(),
+              helperText: '如 deepseek-chat, deepseek-v4-pro',
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

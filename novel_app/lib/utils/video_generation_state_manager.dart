@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/logger_service.dart';
 
 /// 视频生成状态管理器
 /// 用于全局管理图片的视频生成状态
@@ -37,7 +38,11 @@ class VideoGenerationStateManager {
       try {
         listener();
       } catch (e) {
-        debugPrint('视频生成状态监听器错误: $e');
+        LoggerService.instance.e(
+        '视频生成状态监听器错误: $e',
+        category: LogCategory.ui,
+        tags: ['video'],
+      );
       }
     }
   }

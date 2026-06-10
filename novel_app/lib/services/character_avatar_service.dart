@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'character_image_cache_service.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
+import 'logger_service.dart';
 
 /// 角色头像管理服务
 /// 负责头像的设置、获取、缓存等操作
@@ -33,8 +33,11 @@ class CharacterAvatarService {
     String? originalImageUrl,
   }) async {
     try {
-      debugPrint(
-          '🎨 开始设置角色头像: characterId=$characterId, originalFilename=$originalFilename');
+      LoggerService.instance.i(
+        '开始设置角色头像: characterId=$characterId, originalFilename=$originalFilename',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
 
       // 生成唯一的头像文件名
       final avatarFilename =
@@ -56,14 +59,27 @@ class CharacterAvatarService {
           originalImageUrl: originalImageUrl,
         );
 
-        debugPrint('✅ 角色头像设置成功: $cachedPath');
+        LoggerService.instance.i(
+          '角色头像设置成功: $cachedPath',
+          category: LogCategory.character,
+          tags: ['avatar'],
+        );
         return cachedPath;
       } else {
-        debugPrint('❌ 角色头像缓存失败');
+        LoggerService.instance.e(
+          '角色头像缓存失败',
+          category: LogCategory.character,
+          tags: ['avatar'],
+        );
         return null;
       }
-    } catch (e) {
-      debugPrint('❌ 设置角色头像失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '设置角色头像失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return null;
     }
   }
@@ -94,8 +110,13 @@ class CharacterAvatarService {
       final cachedUrl =
           await _characterRepo.getCharacterCachedImage(characterId);
       return cachedUrl;
-    } catch (e) {
-      debugPrint('❌ 获取角色头像路径失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取角色头像路径失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return null;
     }
   }
@@ -119,8 +140,13 @@ class CharacterAvatarService {
       }
 
       return null;
-    } catch (e) {
-      debugPrint('❌ 获取角色头像信息失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取角色头像信息失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return null;
     }
   }
@@ -130,7 +156,11 @@ class CharacterAvatarService {
   /// 返回是否删除成功
   Future<bool> deleteCharacterAvatar(int characterId) async {
     try {
-      debugPrint('🗑️ 开始删除角色头像: characterId=$characterId');
+      LoggerService.instance.i(
+        '开始删除角色头像: characterId=$characterId',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
 
       // 获取当前头像路径
       final avatarPath = await getCharacterAvatarPath(characterId);
@@ -140,17 +170,30 @@ class CharacterAvatarService {
         final avatarFile = File(avatarPath);
         if (await avatarFile.exists()) {
           await avatarFile.delete();
-          debugPrint('✅ 删除头像文件: $avatarPath');
+          LoggerService.instance.i(
+            '删除头像文件: $avatarPath',
+            category: LogCategory.character,
+            tags: ['avatar'],
+          );
         }
       }
 
       // 清空数据库中的头像信息
       await _characterRepo.updateCharacterCachedImage(characterId, null);
 
-      debugPrint('✅ 角色头像删除成功');
+      LoggerService.instance.i(
+        '角色头像删除成功',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return true;
-    } catch (e) {
-      debugPrint('❌ 删除角色头像失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除角色头像失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return false;
     }
   }
@@ -177,11 +220,19 @@ class CharacterAvatarService {
     String originalFilename,
   ) async {
     try {
-      debugPrint('🔄 开始同步图集图片到头像: $galleryImagePath');
+      LoggerService.instance.i(
+        '开始同步图集图片到头像: $galleryImagePath',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
 
       final galleryFile = File(galleryImagePath);
       if (!await galleryFile.exists()) {
-        debugPrint('❌ 图集图片文件不存在: $galleryImagePath');
+        LoggerService.instance.e(
+          '图集图片文件不存在: $galleryImagePath',
+          category: LogCategory.character,
+          tags: ['avatar'],
+        );
         return null;
       }
 
@@ -194,8 +245,13 @@ class CharacterAvatarService {
         imageBytes,
         originalFilename,
       );
-    } catch (e) {
-      debugPrint('❌ 同步图集图片到头像失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '同步图集图片到头像失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
       return null;
     }
   }
@@ -210,27 +266,49 @@ class CharacterAvatarService {
       if (avatarPath != null) {
         final avatarFile = File(avatarPath);
         if (!await avatarFile.exists()) {
-          debugPrint('🧹 清理无效的头像缓存记录: $avatarPath');
+          LoggerService.instance.i(
+            '清理无效的头像缓存记录: $avatarPath',
+            category: LogCategory.character,
+            tags: ['avatar'],
+          );
           await _characterRepo.updateCharacterCachedImage(characterId, null);
         }
       }
-    } catch (e) {
-      debugPrint('❌ 清理无效头像缓存失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '清理无效头像缓存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
     }
   }
 
   /// 批量清理所有角色的无效头像缓存
   Future<void> cleanupAllInvalidAvatarCaches() async {
     try {
-      debugPrint('🧹 开始批量清理无效头像缓存');
+      LoggerService.instance.i(
+        '开始批量清理无效头像缓存',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
 
       // 这里可以获取所有角色ID，然后逐个清理
       // 需要扩展 DatabaseService 来支持获取所有角色
       // 暂时跳过实现，可以在需要时添加
 
-      debugPrint('✅ 批量清理无效头像缓存完成');
-    } catch (e) {
-      debugPrint('❌ 批量清理无效头像缓存失败: $e');
+      LoggerService.instance.i(
+        '批量清理无效头像缓存完成',
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '批量清理无效头像缓存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['avatar'],
+      );
     }
   }
 }

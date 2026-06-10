@@ -22,6 +22,7 @@ library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
+import '../../services/logger_service.dart';
 import '../../services/novel_sync_service.dart';
 import 'services/sync_service_providers.dart';
 
@@ -141,7 +142,28 @@ class SyncServiceHelper {
     dynamic novel, {
     bool forceOverwrite = false,
   }) async {
-    return _syncService.uploadNovel(novel, forceOverwrite: forceOverwrite);
+    LoggerService.instance.d(
+      '开始上传小说: forceOverwrite=$forceOverwrite',
+      category: LogCategory.network,
+      tags: ['provider', 'novel-sync', 'upload'],
+    );
+    try {
+      final result = await _syncService.uploadNovel(novel, forceOverwrite: forceOverwrite);
+      LoggerService.instance.i(
+        '小说上传成功',
+        category: LogCategory.ui,
+        tags: ['provider', 'novel-sync', 'upload'],
+      );
+      return result;
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '上传小说失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'novel-sync', 'upload'],
+      );
+      rethrow;
+    }
   }
 
   /// 从服务器下载小说
@@ -154,7 +176,28 @@ class SyncServiceHelper {
     dynamic novel, {
     bool deleteExisting = true,
   }) async {
-    return _syncService.downloadNovel(novel, deleteExisting: deleteExisting);
+    LoggerService.instance.d(
+      '开始下载小说: deleteExisting=$deleteExisting',
+      category: LogCategory.network,
+      tags: ['provider', 'novel-sync', 'download'],
+    );
+    try {
+      final result = await _syncService.downloadNovel(novel, deleteExisting: deleteExisting);
+      LoggerService.instance.i(
+        '小说下载成功',
+        category: LogCategory.ui,
+        tags: ['provider', 'novel-sync', 'download'],
+      );
+      return result;
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '下载小说失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'novel-sync', 'download'],
+      );
+      rethrow;
+    }
   }
 
   /// 获取已同步的小说列表
@@ -162,7 +205,28 @@ class SyncServiceHelper {
     int page = 1,
     int pageSize = 20,
   }) async {
-    return _syncService.listSyncedNovels(page: page, pageSize: pageSize);
+    LoggerService.instance.d(
+      '获取已同步小说列表: page=$page, pageSize=$pageSize',
+      category: LogCategory.network,
+      tags: ['provider', 'novel-sync', 'list'],
+    );
+    try {
+      final result = await _syncService.listSyncedNovels(page: page, pageSize: pageSize);
+      LoggerService.instance.i(
+        '已同步小说列表获取成功: count=${result.length}',
+        category: LogCategory.ui,
+        tags: ['provider', 'novel-sync', 'list'],
+      );
+      return result;
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '获取已同步小说列表失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'novel-sync', 'list'],
+      );
+      rethrow;
+    }
   }
 }
 

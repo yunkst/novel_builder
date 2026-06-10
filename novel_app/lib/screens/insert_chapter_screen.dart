@@ -16,6 +16,7 @@ import '../services/prompt_tag_service.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 import '../services/preferences_service.dart';
+import '../services/logger_service.dart';
 
 /// 插入章节全屏页面
 ///
@@ -174,14 +175,19 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           _currentMode = _InsertMode.manual;
         }
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       // 加载大纲失败，默认使用手动模式
       setState(() {
         _outline = null;
         _isLoadingOutline = false;
         _currentMode = _InsertMode.manual;
       });
-      debugPrint('加载大纲失败: $e');
+      LoggerService.instance.e(
+        '加载大纲失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
     }
 
     // 同时加载背景设定
@@ -199,8 +205,13 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           _cachedBackgroundSetting = backgroundSetting;
         });
       }
-    } catch (e) {
-      debugPrint('加载背景设定失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载背景设定失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       // 加载失败时使用widget中的值作为后备
       if (mounted) {
         setState(() {
@@ -244,8 +255,13 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       try {
         final repo = ref.read(promptHistoryRepositoryProvider);
         await repo.addOrUpdate(trimmed);
-      } catch (e) {
-        debugPrint('保存提示词历史失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '保存提示词历史失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.database,
+          tags: ['chapter'],
+        );
       }
     });
   }
@@ -476,8 +492,13 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
       );
 
       feedbackController.dispose();
-    } catch (e) {
-      debugPrint('❌ 显示修改意见对话框失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '显示修改意见对话框失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter'],
+      );
       return;
     }
 

@@ -12,7 +12,6 @@ export 'package:novel_api/src/model/date.dart';
 
 export 'package:novel_api/src/api/backup_api.dart';
 export 'package:novel_api/src/api/default_api.dart';
-export 'package:novel_api/src/api/hermes_api.dart';
 export 'package:novel_api/src/api/novel_sync_api.dart';
 
 export 'package:novel_api/src/model/app_version_response.dart';

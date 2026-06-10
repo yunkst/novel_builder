@@ -5,7 +5,6 @@
 library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:flutter/material.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/ai_companion_response.dart';
@@ -13,6 +12,7 @@ import '../../models/ai_accompaniment_settings.dart';
 import '../../models/character.dart';
 import '../../models/character_relationship.dart';
 import '../../services/dify_service.dart';
+import '../../services/logger_service.dart';
 import '../../services/novel_context_service.dart';
 import '../../utils/character_matcher.dart';
 import '../../core/interfaces/repositories/i_chapter_repository.dart';
@@ -212,13 +212,21 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   /// 检查并自动触发AI伴读
   Future<void> checkAndAutoTriggerAICompanion() async {
     if (_currentNovel == null || _currentChapter == null || _content == null) {
-      debugPrint('上下文未设置，跳过AI伴读');
+      LoggerService.instance.d(
+        '上下文未设置，跳过AI伴读',
+        category: LogCategory.ai,
+        tags: ['companion', 'skip', 'no-context'],
+      );
       return;
     }
 
     // 防抖检查
     if (state.hasAutoTriggered || state.isAutoCompanionRunning) {
-      debugPrint('AI伴读已触发或正在运行，跳过');
+      LoggerService.instance.d(
+        'AI伴读已触发或正在运行，跳过',
+        category: LogCategory.ai,
+        tags: ['companion', 'skip', 'debounce'],
+      );
       return;
     }
 
@@ -229,7 +237,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     );
 
     if (hasAccompanied) {
-      debugPrint('章节已伴读，跳过自动触发');
+      LoggerService.instance.d(
+        '章节已伴读，跳过自动触发',
+        category: LogCategory.ai,
+        tags: ['companion', 'skip', 'already-done'],
+      );
       return;
     }
 
@@ -239,13 +251,21 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
     );
 
     if (!settings.autoEnabled) {
-      debugPrint('自动伴读未启用');
+      LoggerService.instance.d(
+        '自动伴读未启用',
+        category: LogCategory.ai,
+        tags: ['companion', 'skip', 'disabled'],
+      );
       return;
     }
 
     // 检查章节内容
     if (_content!.isEmpty) {
-      debugPrint('章节内容为空，跳过AI伴读');
+      LoggerService.instance.w(
+        '章节内容为空，跳过AI伴读',
+        category: LogCategory.ai,
+        tags: ['companion', 'skip', 'empty-content'],
+      );
       return;
     }
 
@@ -255,12 +275,20 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       isAutoCompanionRunning: true,
     );
 
-    debugPrint('=== 自动触发AI伴读 ===');
+    LoggerService.instance.i(
+      '自动触发AI伴读',
+      category: LogCategory.ai,
+      tags: ['companion', 'auto', 'start'],
+    );
 
     try {
       await _handleAICompanionSilent(settings);
     } catch (e) {
-      debugPrint('❌ 自动AI伴读失败: $e');
+      LoggerService.instance.e(
+        '自动AI伴读失败: $e',
+        category: LogCategory.ai,
+        tags: ['companion', 'auto', 'error'],
+      );
       // 记录错误日志
       rethrow;
     } finally {
@@ -297,10 +325,13 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
         chapterCharacters,
       );
 
-      debugPrint('=== AI伴读分析开始 ===');
-      debugPrint('小说总角色数: ${allCharacters.length}');
-      debugPrint('本章出现角色数: ${chapterCharacters.length}');
-      debugPrint('相关关系数: ${chapterRelationships.length}');
+      LoggerService.instance.i(
+        'AI伴读分析开始: 总角色=${allCharacters.length}, '
+        '本章角色=${chapterCharacters.length}, '
+        '关系数=${chapterRelationships.length}',
+        category: LogCategory.ai,
+        tags: ['companion', 'analyze', 'start'],
+      );
 
       // 使用 NovelContextBuilder 获取背景设定
       final backgroundSetting = await _contextBuilder.getBackgroundSetting(
@@ -319,18 +350,25 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
         throw Exception('AI伴读返回数据为空');
       }
 
-      debugPrint('=== AI伴读分析完成 ===');
-      debugPrint('角色更新: ${response.roles.length}');
-      debugPrint('关系更新: ${response.relations.length}');
-      debugPrint('背景设定新增: ${response.background.length} 字符');
-      debugPrint('本章总结: ${response.summery.length} 字符');
+      LoggerService.instance.i(
+        'AI伴读分析完成: 角色更新=${response.roles.length}, '
+        '关系更新=${response.relations.length}, '
+        '背景设定新增=${response.background.length}字符, '
+        '本章总结=${response.summery.length}字符',
+        category: LogCategory.ai,
+        tags: ['companion', 'analyze', 'done'],
+      );
 
       // 通过状态管理触发对话框显示
       showAICompanionDialog(response);
 
       return response;
     } catch (e) {
-      debugPrint('❌ AI伴读失败: $e');
+      LoggerService.instance.e(
+        'AI伴读失败: $e',
+        category: LogCategory.ai,
+        tags: ['companion', 'error'],
+      );
       rethrow;
     }
   }
@@ -359,10 +397,13 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
         chapterCharacters,
       );
 
-      debugPrint('=== AI伴读分析开始（静默模式）===');
-      debugPrint('小说总角色数: ${allCharacters.length}');
-      debugPrint('本章出现角色数: ${chapterCharacters.length}');
-      debugPrint('相关关系数: ${chapterRelationships.length}');
+      LoggerService.instance.i(
+        'AI伴读分析开始（静默模式）: 总角色=${allCharacters.length}, '
+        '本章角色=${chapterCharacters.length}, '
+        '关系数=${chapterRelationships.length}',
+        category: LogCategory.ai,
+        tags: ['companion', 'silent', 'start'],
+      );
 
       // 使用 NovelContextBuilder 获取背景设定
       final backgroundSetting = await _contextBuilder.getBackgroundSetting(
@@ -381,11 +422,14 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
         throw Exception('AI伴读返回数据为空');
       }
 
-      debugPrint('=== AI伴读分析完成 ===');
-      debugPrint('角色更新: ${response.roles.length}');
-      debugPrint('关系更新: ${response.relations.length}');
-      debugPrint('背景设定新增: ${response.background.length} 字符');
-      debugPrint('本章总结: ${response.summery.length} 字符');
+      LoggerService.instance.i(
+        'AI伴读分析完成（静默模式）: 角色更新=${response.roles.length}, '
+        '关系更新=${response.relations.length}, '
+        '背景设定新增=${response.background.length}字符, '
+        '本章总结=${response.summery.length}字符',
+        category: LogCategory.ai,
+        tags: ['companion', 'silent', 'done'],
+      );
 
       // 直接执行数据更新（不显示确认对话框）
       await _performAICompanionUpdates(response, isSilent: true);
@@ -396,7 +440,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
         _currentChapter!.url,
       );
     } catch (e) {
-      debugPrint('❌ 静默AI伴读失败: $e');
+      LoggerService.instance.e(
+        '静默AI伴读失败: $e',
+        category: LogCategory.ai,
+        tags: ['companion', 'silent', 'error'],
+      );
       // 静默失败，不打扰用户
       rethrow; // 抛出异常供上层记录日志
     }
@@ -431,7 +479,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
           _currentNovel!.url,
           updatedBackground,
         );
-        debugPrint('✅ 背景设定追加成功');
+        LoggerService.instance.i(
+          '背景设定追加成功',
+          category: LogCategory.ai,
+          tags: ['companion', 'update', 'background'],
+        );
       }
 
       // 2. 批量更新或插入角色
@@ -441,7 +493,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
           _currentNovel!.url,
           response.roles,
         );
-        debugPrint('✅ 角色更新成功: $updatedRoles');
+        LoggerService.instance.i(
+          '角色更新成功: $updatedRoles',
+          category: LogCategory.ai,
+          tags: ['companion', 'update', 'characters'],
+        );
       }
 
       // 3. 批量更新或插入关系
@@ -452,12 +508,24 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
           response.relations,
           _characterRepo.getCharacters,
         );
-        debugPrint('✅ 关系更新成功: $updatedRelations');
+        LoggerService.instance.i(
+          '关系更新成功: $updatedRelations',
+          category: LogCategory.ai,
+          tags: ['companion', 'update', 'relations'],
+        );
       }
 
-      debugPrint('✅ AI伴读数据更新完成');
+      LoggerService.instance.i(
+        'AI伴读数据更新完成',
+        category: LogCategory.ai,
+        tags: ['companion', 'update', 'done'],
+      );
     } catch (e) {
-      debugPrint('❌ AI伴读数据更新失败: $e');
+      LoggerService.instance.e(
+        'AI伴读数据更新失败: $e',
+        category: LogCategory.ai,
+        tags: ['companion', 'update', 'error'],
+      );
       rethrow;
     }
   }
@@ -528,7 +596,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
       allCharacters,
     );
 
-    debugPrint('✅ 章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}');
+    LoggerService.instance.i(
+      '章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}',
+      category: LogCategory.ai,
+      tags: ['companion', 'filter', 'characters'],
+    );
     return foundCharacters;
   }
 
@@ -552,8 +624,11 @@ class ReaderScreenNotifier extends _$ReaderScreenNotifier {
           characterIds.contains(rel.targetCharacterId);
     }).toList();
 
-    debugPrint(
-        '✅ 关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}');
+    LoggerService.instance.d(
+      '关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}',
+      category: LogCategory.ai,
+      tags: ['companion', 'filter', 'relations'],
+    );
     return filteredRelationships;
   }
 

@@ -14,6 +14,7 @@ import '../utils/toast_utils.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../controllers/pagination_controller.dart';
 import 'package:novel_api/novel_api.dart';
+import '../services/logger_service.dart';
 
 /// 场景插图调试屏幕 - Riverpod 版本
 class IllustrationDebugScreen extends ConsumerStatefulWidget {
@@ -318,8 +319,13 @@ class _IllustrationDebugScreenState
       await _pagination.refresh();
 
       ToastUtils.showSuccess('调试任务已创建');
-    } catch (e) {
-      debugPrint('创建调试生图请求失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '创建调试生图请求失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['illustration', 'create'],
+      );
       ToastUtils.showError('创建生图请求失败: $e');
     }
   }
@@ -357,7 +363,11 @@ class _IllustrationDebugScreenState
               );
       prompts = illustration?.content;
     } catch (e) {
-      debugPrint('获取插图信息失败: $e');
+      LoggerService.instance.w(
+        '获取插图信息失败: $e',
+        category: LogCategory.ui,
+        tags: ['illustration'],
+      );
       prompts = null;
     }
 
@@ -383,24 +393,38 @@ class _IllustrationDebugScreenState
 
   /// 再来几张 - 重新生成更多图片
   Future<void> _regenerateMoreImages(String taskId) async {
-    debugPrint('=== IllustrationDebugScreen._regenerateMoreImages 开始 ===');
-    debugPrint('taskId: $taskId');
+    LoggerService.instance.d(
+      '_regenerateMoreImages 开始, taskId: $taskId',
+      category: LogCategory.ui,
+      tags: ['illustration', 'regenerate'],
+    );
 
     try {
       // 显示数量选择对话框
       if (!mounted) {
-        debugPrint('❌ widget已销毁，取消操作');
+        LoggerService.instance.w(
+          'widget已销毁，取消操作',
+          category: LogCategory.ui,
+          tags: ['illustration', 'regenerate'],
+        );
         return;
       }
 
-      debugPrint('🔄 显示 GenerateMoreDialog...');
+      LoggerService.instance.d(
+        '显示 GenerateMoreDialog...',
+        category: LogCategory.ui,
+        tags: ['illustration', 'regenerate'],
+      );
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => GenerateMoreDialog(
           apiType: 't2i', // 文生图模型
           onConfirm: (count, modelName) {
-            debugPrint(
-                'GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            LoggerService.instance.d(
+              'GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName',
+              category: LogCategory.ui,
+              tags: ['illustration', 'regenerate'],
+            );
             Navigator.of(context).pop({
               'count': count,
               'modelName': modelName,
@@ -410,53 +434,89 @@ class _IllustrationDebugScreenState
       );
 
       if (result == null || !mounted) {
-        debugPrint('用户取消或widget已销毁');
+        LoggerService.instance.d(
+          '用户取消或widget已销毁',
+          category: LogCategory.ui,
+          tags: ['illustration', 'regenerate'],
+        );
         return;
       }
 
       final count = result['count'] as int;
       final modelName = result['modelName'] as String?;
-      debugPrint('✅ 用户选择: count=$count, model=$modelName');
+      LoggerService.instance.i(
+        '用户选择: count=$count, model=$modelName',
+        category: LogCategory.ui,
+        tags: ['illustration', 'regenerate'],
+      );
 
       // 显示加载提示
       if (mounted) {
-        debugPrint('📢 显示加载提示');
+        LoggerService.instance.d(
+          '显示加载提示',
+          category: LogCategory.ui,
+          tags: ['illustration', 'regenerate'],
+        );
         ToastUtils.showSuccess('正在生成 $count 张图片...');
       }
 
       // 调用 API 生成图片
-      debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
+      LoggerService.instance.d(
+        '准备调用 API: regenerateSceneIllustrationImages',
+        category: LogCategory.network,
+        tags: ['api', 'illustration'],
+      );
       final apiService = ref.read(apiServiceWrapperProvider);
-      debugPrint('✅ ApiServiceWrapper 实例已获取');
+      LoggerService.instance.d(
+        'ApiServiceWrapper 实例已获取',
+        category: LogCategory.network,
+        tags: ['api', 'illustration'],
+      );
 
-      debugPrint('🔄 开始API调用...');
+      LoggerService.instance.i(
+        '开始API调用...',
+        category: LogCategory.network,
+        tags: ['api', 'illustration'],
+      );
       final response = await apiService.regenerateSceneIllustrationImages(
         taskId: taskId,
         count: count,
         modelName: modelName,
       );
 
-      debugPrint('✅ API调用成功');
-      debugPrint('响应: $response');
+      LoggerService.instance.i(
+        'API调用成功, 响应: $response',
+        category: LogCategory.network,
+        tags: ['api', 'illustration'],
+      );
 
       // 显示成功提示（不刷新列表）
       if (mounted) {
-        debugPrint('📢 显示成功提示');
+        LoggerService.instance.d(
+          '显示成功提示',
+          category: LogCategory.ui,
+          tags: ['illustration', 'regenerate'],
+        );
         _showErrorSnackBar('图片生成任务已创建，预计需要1-3分钟', isSuccess: true);
       }
     } catch (e, stackTrace) {
-      debugPrint('❌❌❌ _regenerateMoreImages 异常 ❌❌❌');
-      debugPrint('异常类型: ${e.runtimeType}');
-      debugPrint('异常信息: $e');
-      debugPrint('堆栈跟踪:\n$stackTrace');
+      LoggerService.instance.e(
+        '_regenerateMoreImages 异常 (${e.runtimeType}): $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['api', 'illustration'],
+      );
 
       if (mounted) {
-        debugPrint('📢 显示错误提示');
         _showErrorSnackBar('生成图片失败: $e');
       }
     }
 
-    debugPrint('=== _regenerateMoreImages 结束 ===');
+    LoggerService.instance.d(
+      '_regenerateMoreImages 结束',
+      category: LogCategory.ui,
+      tags: ['illustration', 'regenerate'],
+    );
   }
 
   /// 为特定图片生成视频
@@ -548,7 +608,11 @@ class _IllustrationDebugScreenState
             ToastUtils.showSuccess('插图已删除');
           }
         } else {
-          debugPrint('删除插图失败: 服务返回false');
+          LoggerService.instance.e(
+            '删除插图失败: 服务返回false',
+            category: LogCategory.ui,
+            tags: ['illustration', 'delete'],
+          );
           if (mounted) {
             ToastUtils.showError('删除插图失败');
           }

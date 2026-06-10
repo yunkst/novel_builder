@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/logger_service.dart';
 import 'format_utils.dart';
 
 /// 图片缓存管理器
@@ -61,8 +62,11 @@ class ImageCacheManager {
       final removed = _cache.remove(oldestKey);
       _cacheTime.remove(oldestKey);
       final size = removed?.length ?? 0;
-      debugPrint(
-          '🗑️ 清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}');
+      LoggerService.instance.d(
+        '清理最旧图片缓存: $oldestKey, 大小: ${FormatUtils.formatFileSize(size)}',
+        category: LogCategory.cache,
+        tags: ['image', 'evict'],
+      );
     }
   }
 
@@ -72,13 +76,21 @@ class ImageCacheManager {
     if (_isCacheValid(imageUrl)) {
       // 更新访问时间（LRU）
       _cacheTime[imageUrl] = DateTime.now();
-      debugPrint('✅ 命中图片缓存: $imageUrl');
+      LoggerService.instance.d(
+        '命中图片缓存: $imageUrl',
+        category: LogCategory.cache,
+        tags: ['image', 'hit'],
+      );
       return _cache[imageUrl]!;
     }
 
     // 检查是否正在加载中（防止重复请求）
     if (_loadingRequests.containsKey(imageUrl)) {
-      debugPrint('⏳ 等待其他实例加载图片: $imageUrl');
+      LoggerService.instance.d(
+        '等待其他实例加载图片: $imageUrl',
+        category: LogCategory.cache,
+        tags: ['image', 'loading'],
+      );
       return await _loadingRequests[imageUrl]!;
     }
 
@@ -98,7 +110,11 @@ class ImageCacheManager {
   /// 从后端加载图片
   Future<Uint8List> _loadImageFromBackend(String imageUrl) async {
     try {
-      debugPrint('📥 从后端加载图片: $imageUrl');
+      LoggerService.instance.i(
+        '从后端加载图片: $imageUrl',
+        category: LogCategory.cache,
+        tags: ['image', 'load'],
+      );
 
       final data = await _apiService.getImageProxy(imageUrl);
 
@@ -108,7 +124,11 @@ class ImageCacheManager {
       }
 
       if (data.length > _maxImageSize) {
-        debugPrint('⚠️ 图片过大，跳过缓存: ${FormatUtils.formatFileSize(data.length)}');
+        LoggerService.instance.w(
+          '图片过大，跳过缓存: ${FormatUtils.formatFileSize(data.length)}',
+          category: LogCategory.cache,
+          tags: ['image', 'oversize'],
+        );
         return data;
       }
 
@@ -121,13 +141,20 @@ class ImageCacheManager {
       _cache[imageUrl] = data;
       _cacheTime[imageUrl] = DateTime.now();
 
-      debugPrint(
-          '✅ 图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
-          '缓存数量: ${_cache.length}/$_maxCacheSize');
+      LoggerService.instance.i(
+        '图片已缓存: $imageUrl, 大小: ${FormatUtils.formatFileSize(data.length)}, '
+            '缓存数量: ${_cache.length}/$_maxCacheSize',
+        category: LogCategory.cache,
+        tags: ['image', 'cached'],
+      );
 
       return data;
     } catch (e) {
-      debugPrint('❌ 加载图片失败: $imageUrl, 错误: $e');
+      LoggerService.instance.e(
+        '加载图片失败: $imageUrl, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['image', 'load', 'error'],
+      );
       rethrow;
     }
   }
@@ -136,20 +163,36 @@ class ImageCacheManager {
   Future<void> prefetchImage(String imageUrl) async {
     try {
       await getImage(imageUrl);
-      debugPrint('🔄 预加载完成: $imageUrl');
+      LoggerService.instance.d(
+        '预加载完成: $imageUrl',
+        category: LogCategory.cache,
+        tags: ['image', 'prefetch'],
+      );
     } catch (e) {
-      debugPrint('⚠️ 预加载失败: $imageUrl, 错误: $e');
+      LoggerService.instance.w(
+        '预加载失败: $imageUrl, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['image', 'prefetch', 'error'],
+      );
     }
   }
 
   /// 批量预加载图片
   Future<void> prefetchImages(List<String> imageUrls) async {
-    debugPrint('🔄 开始批量预加载 ${imageUrls.length} 张图片');
+    LoggerService.instance.i(
+      '开始批量预加载 ${imageUrls.length} 张图片',
+      category: LogCategory.cache,
+      tags: ['image', 'prefetch', 'batch'],
+    );
     await Future.wait(
       imageUrls.map((url) => prefetchImage(url)),
       eagerError: false, // 即使某个失败也继续加载其他
     );
-    debugPrint('✅ 批量预加载完成');
+    LoggerService.instance.i(
+      '批量预加载完成',
+      category: LogCategory.cache,
+      tags: ['image', 'prefetch', 'batch', 'done'],
+    );
   }
 
   /// 清除指定图片的缓存
@@ -157,7 +200,11 @@ class ImageCacheManager {
     final removed = _cache.remove(imageUrl);
     _cacheTime.remove(imageUrl);
     if (removed != null) {
-      debugPrint('🗑️ 清除图片缓存: $imageUrl');
+      LoggerService.instance.d(
+        '清除图片缓存: $imageUrl',
+        category: LogCategory.cache,
+        tags: ['image', 'remove'],
+      );
       return true;
     }
     return false;
@@ -171,8 +218,11 @@ class ImageCacheManager {
     _cache.clear();
     _cacheTime.clear();
     _loadingRequests.clear();
-    debugPrint(
-        '🗑️ 清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}');
+    LoggerService.instance.i(
+      '清除所有图片缓存: $count 张, 总大小: ${FormatUtils.formatFileSize(totalSize)}',
+      category: LogCategory.cache,
+      tags: ['image', 'clear'],
+    );
   }
 
   /// 获取缓存统计信息
@@ -194,11 +244,13 @@ class ImageCacheManager {
   /// 打印缓存统计信息（用于调试）
   static void printCacheInfo() {
     final info = getCacheInfo();
-    debugPrint('📊 图片缓存统计:');
-    debugPrint('   - 缓存数量: ${info['cachedCount']}/${info['maxCacheSize']} '
-        '(${info['usagePercent']}%)');
-    debugPrint('   - 总大小: ${info['totalSize']}');
-    debugPrint('   - 正在加载: ${info['loadingCount']}');
+    LoggerService.instance.i(
+      '图片缓存统计: 缓存数量=${info['cachedCount']}/${info['maxCacheSize']} '
+          '(${info['usagePercent']}%), 总大小=${info['totalSize']}, '
+          '正在加载=${info['loadingCount']}',
+      category: LogCategory.cache,
+      tags: ['image', 'stats'],
+    );
   }
 
   /// 获取缓存命中率估算（仅供调试）

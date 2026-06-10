@@ -3,15 +3,39 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/stream_state_manager.dart';
 import '../../services/logger_service.dart';
+import '../dsl_engine/dsl_engine_config.dart';
+import '../dsl_engine/dsl_executor.dart';
+import '../dsl_engine/llm_provider.dart';
 import 'dify_config_service.dart';
 
 /// Dify工作流服务
 ///
 /// 负责与Dify API的工作流交互，包括流式和阻塞式两种响应模式。
+/// 支持通过 [DslEngineConfig] 切换到 DSL Engine 直连 LLM 模式。
 class DifyWorkflowService {
   final DifyConfigService _config;
 
   DifyWorkflowService({required DifyConfigService config}) : _config = config;
+
+  /// 检查是否应使用 DSL Engine 模式
+  Future<bool> _shouldUseDslEngine() async {
+    final enabled = await DslEngineConfig.isEnabled();
+    if (!enabled) return false;
+    return await DslEngineConfig.isConfigured();
+  }
+
+  /// 如果 DSL Engine 已启用且配置完整，返回 [DslExecutor]；否则返回 null
+  Future<DslExecutor?> _maybeBuildDslExecutor() async {
+    if (!await _shouldUseDslEngine()) return null;
+    final apiUrl = await DslEngineConfig.getApiUrl();
+    final apiKey = await DslEngineConfig.getApiKey();
+    final model = await DslEngineConfig.getModel();
+
+    return DslExecutor(
+      llmConfig: LlmConfig(baseUrl: apiUrl, apiKey: apiKey),
+      defaultModel: model.isNotEmpty ? model : null,
+    );
+  }
 
   /// 通用的流式工作流执行方法
   ///
@@ -27,6 +51,17 @@ class DifyWorkflowService {
     Function()? onDone,
     bool enableDebugLog = false,
   }) async {
+    // DSL Engine 模式路由
+    final dslExecutor = await _maybeBuildDslExecutor();
+    if (dslExecutor != null) {
+      return dslExecutor.runStreaming(
+        inputs: inputs,
+        onData: onData,
+        onError: onError,
+        onDone: onDone,
+      );
+    }
+
     // 如果启用调试日志，使用 StreamStateManager
     if (enableDebugLog) {
       await _executeStreamingWithManager(
@@ -50,6 +85,12 @@ class DifyWorkflowService {
   Future<Map<String, dynamic>?> executeBlocking({
     required Map<String, dynamic> inputs,
   }) async {
+    // DSL Engine 模式路由
+    final dslExecutor = await _maybeBuildDslExecutor();
+    if (dslExecutor != null) {
+      return dslExecutor.runBlocking(inputs: inputs);
+    }
+
     final difyUrl = await _config.getDifyUrl();
     final difyToken = await _config.getStructToken();
 

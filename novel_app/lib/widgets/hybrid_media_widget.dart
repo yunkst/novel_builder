@@ -5,6 +5,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import 'package:video_player/video_player.dart';
 import '../core/theme/app_colors.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/logger_service.dart';
 import '../utils/video_cache_manager.dart';
 import '../utils/video_generation_state_manager.dart';
 import '../utils/image_cache_manager.dart';
@@ -117,21 +118,33 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
   @override
   void initState() {
     super.initState();
-    debugPrint('✅ 创建 HybridMediaWidget: ${widget.imgName}');
+    LoggerService.instance.i(
+      '创建 HybridMediaWidget: ${widget.imgName}',
+      category: LogCategory.cache,
+      tags: const ['media'],
+    );
     _checkVideoStatus();
     _loadImageWithCache();
   }
 
   @override
   void dispose() {
-    debugPrint('❌ 销毁 HybridMediaWidget: ${widget.imgName}');
+    LoggerService.instance.i(
+      '销毁 HybridMediaWidget: ${widget.imgName}',
+      category: LogCategory.cache,
+      tags: const ['media'],
+    );
     // 使用引用计数机制释放视频控制器
     if (_videoUrl != null) {
       // 暂停当前组件的视频播放
       VideoCacheManager.pauseVideo(_videoUrl!);
       // 减少引用计数，如果计数为0则自动释放控制器
       VideoCacheManager.releaseController(_videoUrl!);
-      debugPrint('❌ 释放视频控制器引用: ${widget.imgName}, url: $_videoUrl');
+      LoggerService.instance.i(
+        '释放视频控制器引用: ${widget.imgName}, url: $_videoUrl',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
     }
     // 清理本地引用
     _videoController = null;
@@ -142,17 +155,29 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
   /// 使用缓存加载图片
   Future<void> _loadImageWithCache() async {
     try {
-      debugPrint('📥 使用缓存加载图片: ${widget.imgName}');
+      LoggerService.instance.d(
+        '使用缓存加载图片: ${widget.imgName}',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
       final data = await widget.imageCacheManager.getImage(widget.imageUrl);
       if (mounted) {
         setState(() {
           _imageData = data;
           _imageLoadingError = false;
         });
-        debugPrint('✅ 图片加载成功: ${widget.imgName}, 大小: ${data.length} bytes');
+        LoggerService.instance.i(
+          '图片加载成功: ${widget.imgName}, 大小: ${data.length} bytes',
+          category: LogCategory.cache,
+          tags: const ['media'],
+        );
       }
     } catch (e) {
-      debugPrint('❌ 图片加载失败: ${widget.imgName}, 错误: $e');
+      LoggerService.instance.e(
+        '图片加载失败: ${widget.imgName}, 错误: $e',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
       if (mounted) {
         setState(() {
           _imageLoadingError = true;
@@ -165,12 +190,19 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
   Future<void> _checkVideoStatus() async {
     if (!mounted) return;
 
-    debugPrint('🔍 检查视频状态: ${widget.imgName}');
+    LoggerService.instance.d(
+      '检查视频状态: ${widget.imgName}',
+      category: LogCategory.cache,
+      tags: const ['media'],
+    );
     try {
       final apiService = widget.apiService;
       final videoStatus = await apiService.checkVideoStatus(widget.imgName);
-      debugPrint(
-          '📊 视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}');
+      LoggerService.instance.i(
+        '视频状态检查结果: ${widget.imgName}, hasVideo=${videoStatus.hasVideo}',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
 
       if (videoStatus.hasVideo == true) {
         // 有视频，获取视频URL并准备播放
@@ -186,7 +218,11 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
         _setState(MediaType.image);
       }
     } catch (e) {
-      debugPrint('检查视频状态失败: ${widget.imgName}, 错误: $e');
+      LoggerService.instance.e(
+        '检查视频状态失败: ${widget.imgName}, 错误: $e',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
       _setState(MediaType.error);
     }
   }
@@ -213,7 +249,11 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
         _setState(MediaType.image);
       }
     } catch (e) {
-      debugPrint('初始化视频失败: $_videoUrl, 错误: $e');
+      LoggerService.instance.e(
+        '初始化视频失败: $_videoUrl, 错误: $e',
+        category: LogCategory.cache,
+        tags: const ['media'],
+      );
       _setState(MediaType.error);
     }
   }
@@ -398,11 +438,19 @@ class _HybridMediaWidgetContentState extends State<_HybridMediaWidgetContent> {
             if (isVisible) {
               // 可见时播放
               VideoCacheManager.playVideo(_videoUrl!);
-              debugPrint('视频开始播放: ${widget.imgName}');
+              LoggerService.instance.d(
+                '视频开始播放: ${widget.imgName}',
+                category: LogCategory.cache,
+                tags: const ['media'],
+              );
             } else {
               // 不可见时暂停
               VideoCacheManager.pauseVideo(_videoUrl!);
-              debugPrint('视频暂停播放: ${widget.imgName}');
+              LoggerService.instance.d(
+                '视频暂停播放: ${widget.imgName}',
+                category: LogCategory.cache,
+                tags: const ['media'],
+              );
             }
           }
 

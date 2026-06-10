@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path/path.dart' as path;
 import '../utils/format_utils.dart';
+import 'logger_service.dart';
 
 /// 图片裁剪服务
 class ImageCropService {
-  static const String _serviceTag = '[ImageCropService]';
+  static const LogCategory _category = LogCategory.ui;
+  static const List<String> _tags = ['image-crop'];
 
   /// 裁剪图片为头像
   ///
@@ -15,11 +17,11 @@ class ImageCropService {
   /// 返回裁剪后的文件，如果用户取消或裁剪失败则返回 null
   static Future<File?> cropImageForAvatar(File imageFile) async {
     try {
-      debugPrint('$_serviceTag 开始裁剪图片: ${imageFile.path}');
+      LoggerService.instance.d('开始裁剪图片: ${imageFile.path}', category: _category, tags: _tags);
 
       // 检查文件是否存在
       if (!await imageFile.exists()) {
-        debugPrint('$_serviceTag ❌ 图片文件不存在: ${imageFile.path}');
+        LoggerService.instance.e('图片文件不存在: ${imageFile.path}', category: _category, tags: _tags);
         return null;
       }
 
@@ -58,20 +60,17 @@ class ImageCropService {
       );
 
       if (croppedFile != null) {
-        debugPrint('$_serviceTag ✅ 图片裁剪成功: ${croppedFile.path}');
-
-        // 检查裁剪后文件大小
         final croppedFileObj = File(croppedFile.path);
         final croppedFileSize = await croppedFileObj.length();
-        debugPrint('$_serviceTag 📊 裁剪后文件大小: $croppedFileSize bytes');
+        LoggerService.instance.i('图片裁剪成功: ${croppedFile.path}, 文件大小: $croppedFileSize bytes', category: _category, tags: _tags);
 
         return croppedFileObj;
       } else {
-        debugPrint('$_serviceTag ℹ️ 用户取消裁剪操作');
+        LoggerService.instance.i('用户取消裁剪操作', category: _category, tags: _tags);
         return null;
       }
     } catch (e) {
-      debugPrint('$_serviceTag ❌ 图片裁裁失败: $e');
+      LoggerService.instance.e('图片裁剪失败: $e', category: _category, tags: _tags);
       return null;
     }
   }
@@ -102,10 +101,10 @@ class ImageCropService {
       // 复制文件
       await croppedFile.copy(targetPath);
 
-      debugPrint('$_serviceTag ✅ 裁剪图片保存成功: $targetPath');
+      LoggerService.instance.i('裁剪图片保存成功: $targetPath', category: _category, tags: _tags);
       return targetPath;
     } catch (e) {
-      debugPrint('$_serviceTag ❌ 保存裁剪图片失败: $e');
+      LoggerService.instance.e('保存裁剪图片失败: $e', category: _category, tags: _tags);
       return null;
     }
   }
@@ -127,7 +126,7 @@ class ImageCropService {
 
       return true;
     } catch (e) {
-      debugPrint('$_serviceTag ❌ 检查图片裁剪需求失败: $e');
+      LoggerService.instance.e('检查图片裁剪需求失败: $e', category: _category, tags: _tags);
       return false;
     }
   }
@@ -151,7 +150,7 @@ class ImageCropService {
         'fileSizeFormatted': FormatUtils.formatFileSize(fileSize),
       };
     } catch (e) {
-      debugPrint('$_serviceTag ❌ 获取图片信息失败: $e');
+      LoggerService.instance.e('获取图片信息失败: $e', category: _category, tags: _tags);
       return null;
     }
   }

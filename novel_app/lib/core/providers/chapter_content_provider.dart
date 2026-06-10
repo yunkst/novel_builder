@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
+import '../../services/logger_service.dart';
 import 'service_providers.dart';
 import 'repository_providers.dart';
 
@@ -57,6 +58,12 @@ class ChapterContent extends _$ChapterContent {
     // 设置加载状态
     state = state.copyWith(isLoading: true, errorMessage: '');
 
+    LoggerService.instance.d(
+      '开始加载章节内容: chapter=${chapter.title}, forceRefresh=$forceRefresh',
+      category: LogCategory.database,
+      tags: ['provider', 'chapter-content', 'load'],
+    );
+
     try {
       final apiService = ref.read(apiServiceWrapperProvider);
       final chapterRepository = ref.read(chapterRepositoryProvider);
@@ -73,6 +80,11 @@ class ChapterContent extends _$ChapterContent {
           await chapterRepository.getCachedChapter(chapter.url);
       if (cachedContent != null && cachedContent.isNotEmpty) {
         content = cachedContent;
+        LoggerService.instance.d(
+          '章节内容从缓存加载成功',
+          category: LogCategory.database,
+          tags: ['provider', 'chapter-content', 'cache'],
+        );
       } else {
         // 缓存未命中，从API获取
         content = await apiService.getChapterContent(
@@ -87,6 +99,11 @@ class ChapterContent extends _$ChapterContent {
             chapter,
             content,
           );
+          LoggerService.instance.d(
+            '章节内容从API获取并缓存成功',
+            category: LogCategory.database,
+            tags: ['provider', 'chapter-content', 'api'],
+          );
         } else {
           throw Exception('获取到的章节内容为空或过短');
         }
@@ -95,12 +112,24 @@ class ChapterContent extends _$ChapterContent {
       // 更新状态
       state = state.copyWith(content: content, isLoading: false);
 
+      LoggerService.instance.i(
+        '章节内容加载成功: ${chapter.title}',
+        category: LogCategory.ui,
+        tags: ['provider', 'chapter-content', 'success'],
+      );
+
       // 标记章节为已读
       await chapterRepository.markChapterAsRead(
         novel.url,
         chapter.url,
       );
-    } catch (e) {
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '加载章节内容失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chapter-content', 'load'],
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: '加载章节失败: $e',

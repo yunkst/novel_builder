@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../models/novel.dart';
 import '../../core/providers/database_providers.dart';
 import '../../core/providers/service_providers.dart';
+import '../../services/logger_service.dart';
 import '../../services/preferences_service.dart';
 
 part 'bookshelf_providers.g.dart';
@@ -33,9 +34,23 @@ class CurrentBookshelfId extends _$CurrentBookshelfId {
 
   /// 从SharedPreferences加载保存的书架ID
   Future<void> _loadSavedBookshelfId(PreferencesService prefsService) async {
-    final savedId = await prefsService.getInt(_key, defaultValue: 1);
-    // 更新状态为保存的值
-    state = savedId;
+    try {
+      final savedId = await prefsService.getInt(_key, defaultValue: 1);
+      LoggerService.instance.d(
+        '书架ID加载完成: $savedId',
+        category: LogCategory.ui,
+        tags: ['provider', 'bookshelf', 'load'],
+      );
+      // 更新状态为保存的值
+      state = savedId;
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '加载书架ID失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ui,
+        tags: ['provider', 'bookshelf', 'load'],
+      );
+    }
   }
 
   /// 设置当前书架ID并持久化
@@ -80,9 +95,23 @@ Future<List<Novel>> bookshelfNovels(Ref ref) async {
   final bookshelfRepository = ref.watch(bookshelfRepositoryProvider);
 
   // 从数据库加载小说列表
-  final novels = await bookshelfRepository.getNovelsByBookshelf(bookshelfId);
-
-  return novels;
+  try {
+    final novels = await bookshelfRepository.getNovelsByBookshelf(bookshelfId);
+    LoggerService.instance.d(
+      '书架小说列表加载成功: bookshelfId=$bookshelfId, count=${novels.length}',
+      category: LogCategory.database,
+      tags: ['provider', 'bookshelf', 'load'],
+    );
+    return novels;
+  } catch (e, st) {
+    LoggerService.instance.e(
+      '加载书架小说列表失败: $e',
+      stackTrace: st.toString(),
+      category: LogCategory.database,
+      tags: ['provider', 'bookshelf', 'load'],
+    );
+    rethrow;
+  }
 }
 
 /// 书架小说列表缓存统计

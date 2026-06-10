@@ -7,6 +7,7 @@ import '../../models/tag_group.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/rewrite_service.dart';
 import '../../services/prompt_tag_service.dart';
+import '../../services/logger_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
 import '../../utils/paragraph_replace_helper.dart';
@@ -223,7 +224,11 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
         errorMessagePrefix: '改写失败',
       );
     } catch (e) {
-      debugPrint('❌ 准备改写内容时发生异常: $e');
+      LoggerService.instance.e(
+        '准备改写内容时发生异常: $e',
+        category: LogCategory.ui,
+        tags: const ['rewrite'],
+      );
       if (mounted) {
         ToastUtils.showError('操作失败: $e');
       }
@@ -259,8 +264,11 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
 
     // 显示操作信息（可选）
     if (rewrittenParagraphs.isNotEmpty) {
-      debugPrint(
-          '📝 准备替换: 删除 ${widget.selectedParagraphIndices.length} 段，插入 ${rewrittenParagraphs.length} 段');
+      LoggerService.instance.d(
+        '准备替换: 删除 ${widget.selectedParagraphIndices.length} 段，插入 ${rewrittenParagraphs.length} 段',
+        category: LogCategory.ui,
+        tags: const ['rewrite'],
+      );
     }
 
     final updatedParagraphs = List<String>.from(paragraphs);
@@ -302,7 +310,11 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
     List<String> contentToInsert,
   ) {
     if (indicesToDelete.isEmpty) {
-      debugPrint('⚠️ 没有要删除的段落');
+      LoggerService.instance.w(
+        '没有要删除的段落',
+        category: LogCategory.ui,
+        tags: const ['rewrite'],
+      );
       return;
     }
 
@@ -323,7 +335,11 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
     );
 
     if (!validation.isValid) {
-      debugPrint('⚠️ ${validation.message}');
+      LoggerService.instance.w(
+        validation.message,
+        category: LogCategory.ui,
+        tags: const ['rewrite'],
+      );
     }
 
     // 完成替换

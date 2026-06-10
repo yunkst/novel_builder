@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import '../models/outline.dart';
 import '../core/interfaces/repositories/i_outline_repository.dart';
+import 'logger_service.dart';
 
 /// 大纲管理服务
 /// 负责大纲的业务逻辑和AI生成接口
@@ -14,6 +14,9 @@ import '../core/interfaces/repositories/i_outline_repository.dart';
 /// final outlineService = OutlineService(outlineRepo: outlineRepo);
 /// ```
 class OutlineService {
+  static const LogCategory _category = LogCategory.database;
+  static const List<String> _tags = ['outline'];
+
   final IOutlineRepository _outlineRepo;
 
   /// 创建 OutlineService 实例
@@ -40,7 +43,7 @@ class OutlineService {
       updatedAt: DateTime.now(),
     );
     await _outlineRepo.saveOutline(outline);
-    debugPrint('✅ 大纲已保存: $title');
+    LoggerService.instance.i('大纲已保存: $title', category: _category, tags: _tags);
   }
 
   /// 获取小说的大纲
@@ -51,7 +54,7 @@ class OutlineService {
   /// 删除大纲
   Future<void> deleteOutline(String novelUrl) async {
     await _outlineRepo.deleteOutline(novelUrl);
-    debugPrint('🗑️ 大纲已删除: $novelUrl');
+    LoggerService.instance.i('大纲已删除: $novelUrl', category: _category, tags: _tags);
   }
 
   /// 更新大纲内容
@@ -61,7 +64,7 @@ class OutlineService {
     required String content,
   }) async {
     await _outlineRepo.updateOutlineContent(novelUrl, title, content);
-    debugPrint('✏️ 大纲已更新: $title');
+    LoggerService.instance.i('大纲已更新: $title', category: _category, tags: _tags);
   }
 
   // ========== AI生成接口（已迁移到CreateOutlineScreen使用Dify流式API）==========
@@ -85,9 +88,9 @@ class OutlineService {
     required String mainOutline,
     required List<String> previousChapters,
   }) async {
-    debugPrint('🤖 开始生成章节细纲...');
-    debugPrint('📚 参考大纲长度: ${mainOutline.length} 字符');
-    debugPrint('📖 前文章节数: ${previousChapters.length}');
+    LoggerService.instance.d(
+        '开始生成章节细纲，参考大纲长度: ${mainOutline.length} 字符, 前文章节数: ${previousChapters.length}',
+        category: _category, tags: _tags);
 
     // 获取当前大纲信息
     final outline = await getOutline(novelUrl);
@@ -129,8 +132,8 @@ class OutlineService {
       ],
     );
 
-    debugPrint('✅ 章节细纲生成完成（模拟）');
-    debugPrint('📝 细纲标题: ${mockDraft.title}');
+    LoggerService.instance.i(
+        '章节细纲生成完成（模拟），标题: ${mockDraft.title}', category: _category, tags: _tags);
     return mockDraft;
   }
 
@@ -155,8 +158,8 @@ class OutlineService {
     required String feedback,
     required ChapterOutlineDraft currentDraft,
   }) async {
-    debugPrint('🔄 开始重新生成章节细纲...');
-    debugPrint('💬 修改意见: $feedback');
+    LoggerService.instance.d(
+        '开始重新生成章节细纲，修改意见: $feedback', category: _category, tags: _tags);
 
     // 模拟AI生成延迟
     await Future.delayed(const Duration(seconds: 2));
@@ -191,7 +194,7 @@ class OutlineService {
       ],
     );
 
-    debugPrint('✅ 章节细纲重新生成完成（模拟）');
+    LoggerService.instance.i('章节细纲重新生成完成（模拟）', category: _category, tags: _tags);
     return mockDraft;
   }
 

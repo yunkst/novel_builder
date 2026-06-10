@@ -52,38 +52,36 @@ class _GenerateMoreDialogState extends State<GenerateMoreDialog> {
   }
 
   void _handleConfirm() {
-    debugPrint('=== GenerateMoreDialog: 用户点击确认生成 ===');
-    debugPrint('输入的文本: ${_controller.text}');
-
     final text = _controller.text.trim();
     final count = int.tryParse(text);
 
-    debugPrint('解析的数量: $count');
-    debugPrint('选择的模型: $_selectedModel');
-
     if (count == null || count <= 0) {
-      debugPrint('❌ 数量验证失败');
       LoggerService.instance.w(
         '图片数量验证失败: count=$count',
-        category: LogCategory.ui,
-        tags: ['validation', 'image-count', 'invalid'],
+        category: LogCategory.ai,
+        tags: ['generate', 'validation', 'invalid'],
       );
       ToastUtils.showWarning('请输入有效的图片数量');
       return;
     }
 
-    debugPrint('✅ 数量验证通过，调用 onConfirm 回调');
+    LoggerService.instance.i(
+      '确认生成更多图片: count=$count, model=$_selectedModel',
+      category: LogCategory.ai,
+      tags: ['generate', 'confirm'],
+    );
 
     try {
       if (!mounted) {
-        debugPrint('❌ widget已销毁，取消操作');
+        LoggerService.instance.w(
+          'widget已销毁，取消生成操作',
+          category: LogCategory.ai,
+          tags: ['generate', 'cancelled'],
+        );
         return;
       }
 
-      // 调用回调，传递用户选择的模型（可能为null，后端会使用原图模型）
-      debugPrint('🔄 调用 onConfirm 回调: count=$count, model=$_selectedModel');
       widget.onConfirm(count, _selectedModel);
-      debugPrint('✅ onConfirm 回调调用完成');
     } catch (e, stackTrace) {
       ErrorHelper.logError(
         'onConfirm回调执行失败',

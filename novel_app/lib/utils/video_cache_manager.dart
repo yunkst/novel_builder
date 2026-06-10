@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
+import '../services/logger_service.dart';
 
 /// 视频缓存管理器
 /// 用于管理视频播放器的创建、缓存和生命周期
@@ -18,7 +18,11 @@ class VideoCacheManager {
           (_disposedFlags[controller.dataSource] ?? false) == false;
     } catch (e) {
       // 如果访问控制器属性时抛出异常，说明控制器已被释放
-      debugPrint('控制器状态检查失败，可能已被释放: $e');
+      LoggerService.instance.w(
+        '控制器状态检查失败，可能已被释放: $e',
+        category: LogCategory.cache,
+        tags: ['video', 'controller', 'invalid'],
+      );
       return false;
     }
   }
@@ -27,7 +31,11 @@ class VideoCacheManager {
   static Future<VideoPlayerController?> getController(String videoUrl) async {
     // 检查是否正在创建中（竞态条件防护）
     if (_creatingFlags[videoUrl] == true) {
-      debugPrint('等待其他实例创建控制器: $videoUrl');
+      LoggerService.instance.d(
+        '等待其他实例创建控制器: $videoUrl',
+        category: LogCategory.cache,
+        tags: ['video', 'controller', 'waiting'],
+      );
       // 等待创建完成
       while (_creatingFlags[videoUrl] == true) {
         await Future.delayed(const Duration(milliseconds: 50));
@@ -37,7 +45,11 @@ class VideoCacheManager {
       if (controller != null && _isControllerValid(controller)) {
         // 增加引用计数
         _refCounts[videoUrl] = (_refCounts[videoUrl] ?? 0) + 1;
-        debugPrint('获取到已创建的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}');
+        LoggerService.instance.d(
+          '获取到已创建的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}',
+          category: LogCategory.cache,
+          tags: ['video', 'controller', 'reuse'],
+        );
         return controller;
       }
       return null;
@@ -54,12 +66,20 @@ class VideoCacheManager {
         if (controller != null && _isControllerValid(controller)) {
           // 增加引用计数
           _refCounts[videoUrl] = (_refCounts[videoUrl] ?? 0) + 1;
-          debugPrint('获取缓存的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}');
+          LoggerService.instance.d(
+            '获取缓存的控制器: $videoUrl, 引用计数: ${_refCounts[videoUrl]}',
+            category: LogCategory.cache,
+            tags: ['video', 'controller', 'hit'],
+          );
           return controller;
         } else {
           // 控制器已失效，清理缓存
           _removeController(videoUrl);
-          debugPrint('清理失效的视频控制器缓存: $videoUrl');
+          LoggerService.instance.w(
+            '清理失效的视频控制器缓存: $videoUrl',
+            category: LogCategory.cache,
+            tags: ['video', 'controller', 'stale'],
+          );
         }
       }
 
@@ -69,7 +89,11 @@ class VideoCacheManager {
       }
 
       // 创建新的控制器
-      debugPrint('开始创建新的视频控制器: $videoUrl');
+      LoggerService.instance.i(
+        '创建新的视频控制器: $videoUrl',
+        category: LogCategory.cache,
+        tags: ['video', 'controller', 'create'],
+      );
       final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
 
       // 初始化并设置为循环播放
@@ -81,10 +105,18 @@ class VideoCacheManager {
       _disposedFlags[videoUrl] = false;
       _refCounts[videoUrl] = 1; // 初始引用计数为1
 
-      debugPrint('视频控制器已创建和缓存: $videoUrl, 引用计数: 1');
+      LoggerService.instance.i(
+        '视频控制器已创建和缓存: $videoUrl, 引用计数: 1',
+        category: LogCategory.cache,
+        tags: ['video', 'controller', 'created'],
+      );
       return controller;
     } catch (e) {
-      debugPrint('创建视频控制器失败: $videoUrl, 错误: $e');
+      LoggerService.instance.e(
+        '创建视频控制器失败: $videoUrl, 错误: $e',
+        category: LogCategory.cache,
+        tags: ['video', 'controller', 'error'],
+      );
       return null;
     } finally {
       // 释放创建锁
@@ -145,9 +177,17 @@ class VideoCacheManager {
     if (controller != null) {
       try {
         controller.dispose();
-        debugPrint('视频控制器已释放: $videoUrl');
+        LoggerService.instance.d(
+          '视频控制器已释放: $videoUrl',
+          category: LogCategory.cache,
+          tags: ['video', 'controller', 'dispose'],
+        );
       } catch (e) {
-        debugPrint('释放视频控制器时出错: $videoUrl, 错误: $e');
+        LoggerService.instance.e(
+          '释放视频控制器时出错: $videoUrl, 错误: $e',
+          category: LogCategory.cache,
+          tags: ['video', 'controller', 'dispose', 'error'],
+        );
       }
     }
     _disposedFlags[videoUrl] = true;
@@ -161,14 +201,26 @@ class VideoCacheManager {
   static void releaseController(String videoUrl) {
     if (_refCounts.containsKey(videoUrl)) {
       _refCounts[videoUrl] = _refCounts[videoUrl]! - 1;
-      debugPrint('减少引用计数: $videoUrl, 剩余引用: ${_refCounts[videoUrl]}');
+      LoggerService.instance.d(
+        '减少引用计数: $videoUrl, 剩余引用: ${_refCounts[videoUrl]}',
+        category: LogCategory.cache,
+        tags: ['video', 'refcount'],
+      );
 
       if (_refCounts[videoUrl]! <= 0) {
-        debugPrint('引用计数为0，释放控制器: $videoUrl');
+        LoggerService.instance.i(
+          '引用计数为0，释放控制器: $videoUrl',
+          category: LogCategory.cache,
+          tags: ['video', 'refcount', 'release'],
+        );
         disposeController(videoUrl);
       }
     } else {
-      debugPrint('警告: 尝试释放不存在的控制器引用: $videoUrl');
+      LoggerService.instance.w(
+        '尝试释放不存在的控制器引用: $videoUrl',
+        category: LogCategory.cache,
+        tags: ['video', 'refcount', 'missing'],
+      );
     }
   }
 
@@ -187,7 +239,11 @@ class VideoCacheManager {
 
     final firstKey = _controllers.keys.first;
     disposeController(firstKey);
-    debugPrint('已释放最旧的视频控制器以腾出空间');
+    LoggerService.instance.d(
+      '已释放最旧的视频控制器以腾出空间',
+      category: LogCategory.cache,
+      tags: ['video', 'controller', 'evict'],
+    );
   }
 
   /// 释放所有控制器
@@ -196,7 +252,11 @@ class VideoCacheManager {
       try {
         controller.dispose();
       } catch (e) {
-        debugPrint('释放控制器时出错: $e');
+        LoggerService.instance.e(
+          '释放控制器时出错: $e',
+          category: LogCategory.cache,
+          tags: ['video', 'controller', 'dispose', 'error'],
+        );
       }
     }
     _controllers.clear();
@@ -204,7 +264,11 @@ class VideoCacheManager {
     _creatingFlags.clear();
     _refCounts.clear();
     _activeVideoUrl = null;
-    debugPrint('所有视频控制器已释放');
+    LoggerService.instance.i(
+      '所有视频控制器已释放',
+      category: LogCategory.cache,
+      tags: ['video', 'controller', 'disposeAll'],
+    );
   }
 
   /// 获取缓存状态信息

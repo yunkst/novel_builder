@@ -136,5 +136,37 @@ final backupServiceProvider = AutoDisposeProvider<BackupService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BackupServiceRef = AutoDisposeProviderRef<BackupService>;
+String _$logReporterServiceHash() =>
+    r'8a3d1f9e2b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e';
+
+/// LogReporterService Provider
+///
+/// 提供全局日志上报服务实例，用于将本地日志批量上报到后端。
+///
+/// **功能**:
+/// - 批量上报：累积 20 条或 30 秒后自动触发
+/// - 级别过滤：可配置最低上报级别（默认 WARNING）
+/// - 退避策略：连续失败 3 次后进入退避模式（间隔翻倍，最大 5 分钟）
+/// - 配置持久化：开关与级别存在 SharedPreferences
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// Copied from [logReporterService].
+@ProviderFor(logReporterService)
+final logReporterServiceProvider =
+    AutoDisposeProvider<LogReporterService>.internal(
+  logReporterService,
+  name: r'logReporterServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$logReporterServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef LogReporterServiceRef = AutoDisposeProviderRef<LogReporterService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

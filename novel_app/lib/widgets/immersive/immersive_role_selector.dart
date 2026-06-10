@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/character.dart';
 import '../../services/character_avatar_service.dart';
 import '../../services/character_image_cache_service.dart';
+import '../../services/logger_service.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/database_providers.dart';
 import '../../core/theme/app_colors.dart';
@@ -87,7 +88,11 @@ class _ImmersiveRoleSelectorState extends State<ImmersiveRoleSelector> {
     try {
       await _imageCacheService.init();
     } catch (e) {
-      debugPrint('❌ 初始化图片缓存服务失败: $e');
+      LoggerService.instance.e(
+        '初始化图片缓存服务失败: $e',
+        category: LogCategory.ui,
+        tags: const ['immersive'],
+      );
     }
   }
 

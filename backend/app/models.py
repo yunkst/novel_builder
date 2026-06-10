@@ -9,6 +9,7 @@ This module contains database model definitions for the application.
 from .models.cache import CacheTask, ChapterCache
 from .models.scene_illustration import SceneIllustrationTask, SceneImageGallery
 from .models.text2img import RoleCardTask, RoleImageGallery
+from .models.client_log import ClientLog
 
 # 导出所有模型，方便其他模块导入
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "RoleImageGallery",
     "SceneIllustrationTask",
     "SceneImageGallery",
+    "ClientLog",
 ]

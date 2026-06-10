@@ -97,9 +97,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     if (enableDebugLog) {
       _startTime = DateTime.now();
       _charCount = 0;
-      debugPrint('🚀 [DifyStreamingMixin] 开始流式交互');
-      debugPrint('命令: ${inputs['cmd']}');
-      debugPrint('输入参数: ${inputs.keys.join(', ')}');
+      LoggerService.instance.d(
+        '开始流式交互, 命令: ${inputs['cmd']}, 输入参数: ${inputs.keys.join(', ')}',
+        category: LogCategory.ai,
+        tags: ['dify', 'streaming'],
+      );
     }
 
     if (startMessage != null && mounted) {
@@ -137,8 +139,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           // 调试统计
           if (enableDebugLog) {
             _charCount += processedChunk.length;
-            debugPrint(
-                '📝 [DifyStreamingMixin] 收到数据块: ${processedChunk.length}字符 (累计: $_charCount字符)');
+            LoggerService.instance.d(
+              '收到数据块: ${processedChunk.length}字符 (累计: $_charCount字符)',
+              category: LogCategory.ai,
+              tags: ['dify', 'streaming'],
+            );
           }
 
           // 回调UI层（传递处理后的内容）
@@ -156,10 +161,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           // 调试统计
           if (enableDebugLog && _startTime != null) {
             final duration = DateTime.now().difference(_startTime!);
-            debugPrint('✅ [DifyStreamingMixin] 流式交互完成');
-            debugPrint('总字符数: $_charCount');
-            debugPrint(
-                '耗时: ${duration.inMilliseconds}ms (${duration.inSeconds}s)');
+            LoggerService.instance.i(
+              '流式交互完成, 总字符数: $_charCount, 耗时: ${duration.inMilliseconds}ms (${duration.inSeconds}s)',
+              category: LogCategory.ai,
+              tags: ['dify', 'streaming'],
+            );
           }
 
           if (completeMessage != null && showErrorSnackBar && mounted) {
@@ -187,9 +193,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
           // 调试统计
           if (enableDebugLog && _startTime != null) {
             final duration = DateTime.now().difference(_startTime!);
-            debugPrint('❌ [DifyStreamingMixin] 流式交互失败');
-            debugPrint('已接收字符数: $_charCount');
-            debugPrint('失败前耗时: ${duration.inMilliseconds}ms');
+            LoggerService.instance.e(
+              '流式交互失败, 已接收字符数: $_charCount, 失败前耗时: ${duration.inMilliseconds}ms',
+              category: LogCategory.ai,
+              tags: ['dify', 'streaming'],
+            );
           }
 
           final errorMsg = '${errorMessagePrefix ?? "操作失败"}: $error';
@@ -218,7 +226,11 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
 
       // 调试统计
       if (enableDebugLog && _startTime != null) {
-        debugPrint('❌ [DifyStreamingMixin] 流式交互异常: $e');
+        LoggerService.instance.e(
+          '流式交互异常: $e',
+          category: LogCategory.ai,
+          tags: ['dify', 'streaming'],
+        );
       }
 
       final errorMsg = '${errorMessagePrefix ?? "操作异常"}: $e';

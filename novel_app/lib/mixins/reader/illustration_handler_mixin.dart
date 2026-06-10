@@ -187,24 +187,38 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
 
   /// 再来几张 - 重新生成更多图片
   Future<void> regenerateMoreImages(String taskId) async {
-    debugPrint('=== [IllustrationHandlerMixin] regenerateMoreImages 开始 ===');
-    debugPrint('taskId: $taskId');
+    LoggerService.instance.d(
+      'regenerateMoreImages 开始, taskId: $taskId',
+      category: LogCategory.ai,
+      tags: ['illustration'],
+    );
 
     try {
       // 显示数量选择对话框
       if (!mounted) {
-        debugPrint('❌ widget已销毁，取消操作');
+        LoggerService.instance.e(
+          'regenerateMoreImages: widget已销毁，取消操作',
+          category: LogCategory.ai,
+          tags: ['illustration'],
+        );
         return;
       }
 
-      debugPrint('🔄 显示 GenerateMoreDialog...');
+      LoggerService.instance.d(
+        '显示 GenerateMoreDialog',
+        category: LogCategory.ai,
+        tags: ['illustration'],
+      );
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => GenerateMoreDialog(
           apiType: 't2i', // 文生图模型
           onConfirm: (count, modelName) {
-            debugPrint(
-                'GenerateMoreDialog onConfirm 回调被触发: count=$count, model=$modelName');
+            LoggerService.instance.d(
+              'GenerateMoreDialog onConfirm: count=$count, model=$modelName',
+              category: LogCategory.ai,
+              tags: ['illustration'],
+            );
             Navigator.of(context).pop({
               'count': count,
               'modelName': modelName,
@@ -214,41 +228,64 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       );
 
       if (result == null || !mounted) {
-        debugPrint('用户取消或widget已销毁');
+        LoggerService.instance.i(
+          '用户取消或widget已销毁',
+          category: LogCategory.ai,
+          tags: ['illustration'],
+        );
         return;
       }
 
       final count = result['count'] as int;
       final modelName = result['modelName'] as String?;
-      debugPrint('✅ 用户选择: count=$count, model=$modelName');
+      LoggerService.instance.i(
+        '用户选择生成图片: count=$count, model=$modelName',
+        category: LogCategory.ai,
+        tags: ['illustration'],
+      );
 
       // 显示加载提示
       if (mounted) {
-        debugPrint('📢 显示加载提示');
+        LoggerService.instance.d(
+          '显示加载提示',
+          category: LogCategory.ai,
+          tags: ['illustration'],
+        );
         ToastUtils.showInfo('正在生成 $count 张图片...');
       }
 
       // 调用 API 生成图片
-      debugPrint('🔄 准备调用 API: regenerateSceneIllustrationImages');
-      debugPrint('ApiServiceWrapper 初始化状态检查...');
-      // ✅ 使用子类提供的 apiService 访问器，而不是创建新实例
       final apiService = this.apiService;
-      debugPrint('✅ ApiServiceWrapper 实例已获取');
-      debugPrint('初始化状态: ${apiService.getInitStatus()}');
+      LoggerService.instance.d(
+        '准备调用 API: regenerateSceneIllustrationImages, ApiServiceWrapper初始化状态: ${apiService.getInitStatus()}',
+        category: LogCategory.ai,
+        tags: ['illustration'],
+      );
 
-      debugPrint('🔄 开始API调用...');
+      LoggerService.instance.d(
+        '开始API调用: regenerateSceneIllustrationImages',
+        category: LogCategory.cache,
+        tags: ['illustration'],
+      );
       final response = await apiService.regenerateSceneIllustrationImages(
         taskId: taskId,
         count: count,
         modelName: modelName,
       );
 
-      debugPrint('✅ API调用成功');
-      debugPrint('响应: $response');
+      LoggerService.instance.i(
+        'API调用成功, 响应: $response',
+        category: LogCategory.ai,
+        tags: ['illustration'],
+      );
 
       // 显示成功提示（不刷新列表，按需求）
       if (mounted) {
-        debugPrint('📢 显示成功提示');
+        LoggerService.instance.d(
+          '显示成功提示',
+          category: LogCategory.ai,
+          tags: ['illustration'],
+        );
         ToastUtils.showSuccess('图片生成任务已创建，预计需要1-3分钟');
       }
     } catch (e, stackTrace) {
@@ -262,7 +299,11 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
       );
     }
 
-    debugPrint('=== regenerateMoreImages 结束 ===');
+    LoggerService.instance.d(
+      'regenerateMoreImages 结束',
+      category: LogCategory.ai,
+      tags: ['illustration'],
+    );
   }
 
   /// 为特定图片生成视频
@@ -378,7 +419,11 @@ mixin IllustrationHandlerMixin<T extends StatefulWidget> on State<T> {
             ToastUtils.showSuccess('插图已删除');
           }
         } else {
-          debugPrint('删除插图失败: 服务返回false');
+          LoggerService.instance.e(
+            '删除插图失败: 服务返回false',
+            category: LogCategory.ai,
+            tags: ['illustration', 'delete', 'failed'],
+          );
           if (mounted) {
             ToastUtils.showError('删除插图失败');
           }

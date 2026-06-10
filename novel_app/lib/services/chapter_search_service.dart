@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import '../models/search_result.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
+import 'logger_service.dart';
 
 /// 章节搜索服务类
 class ChapterSearchService {
@@ -98,7 +98,12 @@ class ChapterSearchService {
       // 用于后续的搜索建议功能
     } catch (e) {
       // 搜索历史保存失败不应该影响搜索功能
-      debugPrint('保存搜索历史失败: $e');
+      LoggerService.instance.e(
+        '保存搜索历史失败: $e',
+        stackTrace: e is Error ? e.stackTrace.toString() : null,
+        category: LogCategory.database,
+        tags: ['search'],
+      );
     }
   }
 

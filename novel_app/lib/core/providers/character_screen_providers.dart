@@ -9,6 +9,7 @@ import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/character.dart';
 import '../../services/character_image_cache_service.dart';
+import '../../services/logger_service.dart';
 import 'database_providers.dart';
 
 part 'character_screen_providers.g.dart';
@@ -34,6 +35,11 @@ CharacterImageCacheService characterImageCacheService(Ref ref) {
 class CharacterManagementState extends _$CharacterManagementState {
   @override
   Future<List<Character>> build(Novel novel) async {
+    LoggerService.instance.d(
+      '开始加载角色列表: novel=${novel.title}',
+      category: LogCategory.database,
+      tags: ['provider', 'character', 'load'],
+    );
     final repository = ref.watch(characterRepositoryProvider);
     final characters = await repository.getCharacters(novel.url);
 
@@ -44,17 +50,32 @@ class CharacterManagementState extends _$CharacterManagementState {
         try {
           await relationRepo.getRelationshipCount(character.id!);
           // 关系数量缓存可以在外部处理
-        } catch (e) {
-          // 忽略错误
+        } catch (e, st) {
+          LoggerService.instance.w(
+            '加载角色关系数量失败: character=${character.name}, $e',
+            stackTrace: st.toString(),
+            category: LogCategory.database,
+            tags: ['provider', 'character', 'relation-count'],
+          );
         }
       }
     }
 
+    LoggerService.instance.i(
+      '角色列表加载成功: count=${characters.length}',
+      category: LogCategory.ui,
+      tags: ['provider', 'character', 'load'],
+    );
     return characters;
   }
 
   /// 重新加载角色列表
   Future<void> refresh() async {
+    LoggerService.instance.d(
+      '刷新角色列表',
+      category: LogCategory.ui,
+      tags: ['provider', 'character', 'refresh'],
+    );
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(characterRepositoryProvider);
@@ -64,31 +85,88 @@ class CharacterManagementState extends _$CharacterManagementState {
 
   /// 删除角色
   Future<void> deleteCharacter(int characterId) async {
-    final repository = ref.read(characterRepositoryProvider);
-    await repository.deleteCharacter(characterId);
-
-    // 刷新列表
-    await refresh();
+    LoggerService.instance.d(
+      '删除角色: id=$characterId',
+      category: LogCategory.database,
+      tags: ['provider', 'character', 'delete'],
+    );
+    try {
+      final repository = ref.read(characterRepositoryProvider);
+      await repository.deleteCharacter(characterId);
+      LoggerService.instance.i(
+        '角色删除成功: id=$characterId',
+        category: LogCategory.ui,
+        tags: ['provider', 'character', 'delete'],
+      );
+      // 刷新列表
+      await refresh();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '删除角色失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'character', 'delete'],
+      );
+      rethrow;
+    }
   }
 
   /// 批量删除角色
   Future<void> deleteCharacters(List<int> characterIds) async {
-    final repository = ref.read(characterRepositoryProvider);
-    for (final id in characterIds) {
-      await repository.deleteCharacter(id);
+    LoggerService.instance.d(
+      '批量删除角色: ids=$characterIds',
+      category: LogCategory.database,
+      tags: ['provider', 'character', 'delete-batch'],
+    );
+    try {
+      final repository = ref.read(characterRepositoryProvider);
+      for (final id in characterIds) {
+        await repository.deleteCharacter(id);
+      }
+      LoggerService.instance.i(
+        '批量删除角色成功: count=${characterIds.length}',
+        category: LogCategory.ui,
+        tags: ['provider', 'character', 'delete-batch'],
+      );
+      // 刷新列表
+      await refresh();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '批量删除角色失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'character', 'delete-batch'],
+      );
+      rethrow;
     }
-
-    // 刷新列表
-    await refresh();
   }
 
   /// 创建角色
   Future<void> createCharacter(Character character) async {
-    final repository = ref.read(characterRepositoryProvider);
-    await repository.createCharacter(character);
-
-    // 刷新列表
-    await refresh();
+    LoggerService.instance.d(
+      '创建角色: name=${character.name}',
+      category: LogCategory.database,
+      tags: ['provider', 'character', 'create'],
+    );
+    try {
+      final repository = ref.read(characterRepositoryProvider);
+      await repository.createCharacter(character);
+      LoggerService.instance.i(
+        '角色创建成功: ${character.name}',
+        category: LogCategory.ui,
+        tags: ['provider', 'character', 'create'],
+      );
+      // 刷新列表
+      await refresh();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '创建角色失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'character', 'create'],
+      );
+      rethrow;
+    }
   }
 }
 
@@ -146,6 +224,11 @@ class CharacterEditController extends _$CharacterEditController {
     List<String>? aliases,
   }) async {
     try {
+      LoggerService.instance.d(
+        '保存角色: name=$name, isNew=${state.value == null}',
+        category: LogCategory.database,
+        tags: ['provider', 'character', 'save'],
+      );
       final repository = ref.read(characterRepositoryProvider);
 
       final characterData = Character(
@@ -177,8 +260,19 @@ class CharacterEditController extends _$CharacterEditController {
         state = AsyncValue.data(characterData);
       }
 
+      LoggerService.instance.i(
+        '角色保存成功: $name',
+        category: LogCategory.ui,
+        tags: ['provider', 'character', 'save'],
+      );
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '保存角色失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'character', 'save'],
+      );
       state = AsyncValue.error(e, StackTrace.current);
       return false;
     }

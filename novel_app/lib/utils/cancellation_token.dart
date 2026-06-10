@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+
+import 'package:flutter/foundation.dart' show VoidCallback;
 import '../services/logger_service.dart';
 
 /// 取消令牌
@@ -39,13 +40,21 @@ class CancellationToken {
   /// [reason] 可选的取消原因说明
   void cancel({String? reason}) {
     if (_isCancelled) {
-      debugPrint('⚠️ 操作已经取消，无需重复取消');
+      LoggerService.instance.w(
+        '操作已经取消，无需重复取消',
+        category: LogCategory.general,
+        tags: ['cancellation'],
+      );
       return;
     }
 
     _isCancelled = true;
     _cancelReason = reason;
-    debugPrint('🚫 操作已取消${reason != null ? ": $reason" : ""}');
+    LoggerService.instance.i(
+      '操作已取消${reason != null ? ": $reason" : ""}',
+      category: LogCategory.general,
+      tags: ['cancellation'],
+    );
 
     // 通知所有监听器
     for (final callback in _callbacks) {
@@ -75,7 +84,11 @@ class CancellationToken {
   /// 返回一个取消注册的函数
   VoidCallback register(VoidCallback callback) {
     if (_isCancelled) {
-      debugPrint('⚠️ 令牌已取消，注册监听器会立即执行');
+      LoggerService.instance.w(
+        '令牌已取消，注册监听器会立即执行',
+        category: LogCategory.general,
+        tags: ['cancellation'],
+      );
       // 立即执行回调
       try {
         callback();

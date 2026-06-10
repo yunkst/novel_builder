@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/character.dart';
+import '../../services/logger_service.dart';
 import '../../utils/toast_utils.dart';
 import 'immersive_role_selector.dart';
 
@@ -102,10 +103,12 @@ class _ImmersiveSetupDialogState extends State<ImmersiveSetupDialog> {
     });
 
     if (selected.isNotEmpty) {
-      debugPrint('✅ 自动选择了 ${selected.length} 个在本章出现的角色');
-      for (final role in selected) {
-        debugPrint('   - ${role.name}');
-      }
+      final roleNames = selected.map((r) => r.name).join(', ');
+      LoggerService.instance.i(
+        '自动选择了 ${selected.length} 个在本章出现的角色: $roleNames',
+        category: LogCategory.ui,
+        tags: const ['immersive'],
+      );
     }
   }
 

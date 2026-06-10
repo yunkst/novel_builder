@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../utils/format_utils.dart';
+import 'logger_service.dart';
 
 /// 角色图片缓存管理器
 ///
@@ -42,9 +42,18 @@ class CharacterImageCacheService {
       }
 
       _initialized = true;
-      debugPrint('角色图片缓存目录初始化完成: ${_cacheDir.path}');
-    } catch (e) {
-      debugPrint('初始化角色图片缓存目录失败: $e');
+      LoggerService.instance.i(
+        '角色图片缓存目录初始化完成: ${_cacheDir.path}',
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '初始化角色图片缓存目录失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       rethrow;
     }
   }
@@ -80,11 +89,20 @@ class CharacterImageCacheService {
       final file = File(filePath);
 
       await file.writeAsBytes(imageData);
-      debugPrint('角色图片已缓存: $filePath');
+      LoggerService.instance.i(
+        '角色图片已缓存: $filePath',
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
 
       return filePath;
-    } catch (e) {
-      debugPrint('缓存角色图片失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '缓存角色图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return null;
     }
   }
@@ -123,10 +141,19 @@ class CharacterImageCacheService {
 
       // 下载图片（这里简化实现，实际项目中可能需要使用http包）
       // 这里只返回URL，实际下载需要在UI层处理
-      debugPrint('准备缓存角色图片: $imageUrl -> $filePath');
+      LoggerService.instance.d(
+        '准备缓存角色图片: $imageUrl -> $filePath',
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return imageUrl;
-    } catch (e) {
-      debugPrint('缓存角色图片URL失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '缓存角色图片URL失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return null;
     }
   }
@@ -155,8 +182,13 @@ class CharacterImageCacheService {
       }
 
       return null;
-    } catch (e) {
-      debugPrint('获取角色图片缓存路径失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取角色图片缓存路径失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return null;
     }
   }
@@ -185,10 +217,19 @@ class CharacterImageCacheService {
         }
       }
 
-      debugPrint('删除了 $deletedCount 个角色图片缓存 (ID: $characterId)');
+      LoggerService.instance.i(
+        '删除了 $deletedCount 个角色图片缓存 (ID: $characterId)',
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return true;
-    } catch (e) {
-      debugPrint('删除角色图片缓存失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除角色图片缓存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return false;
     }
   }
@@ -201,12 +242,21 @@ class CharacterImageCacheService {
       if (await _cacheDir.exists()) {
         await _cacheDir.delete(recursive: true);
         await _cacheDir.create(recursive: true);
-        debugPrint('已清理所有角色图片缓存');
+        LoggerService.instance.i(
+          '已清理所有角色图片缓存',
+          category: LogCategory.cache,
+          tags: ['image'],
+        );
       }
 
       return true;
-    } catch (e) {
-      debugPrint('清理所有角色图片缓存失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '清理所有角色图片缓存失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return false;
     }
   }
@@ -230,8 +280,13 @@ class CharacterImageCacheService {
       }
 
       return totalSize;
-    } catch (e) {
-      debugPrint('获取缓存大小失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取缓存大小失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return 0;
     }
   }
@@ -255,8 +310,13 @@ class CharacterImageCacheService {
       }
 
       return count;
-    } catch (e) {
-      debugPrint('获取缓存文件数量失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取缓存文件数量失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return 0;
     }
   }
@@ -270,8 +330,13 @@ class CharacterImageCacheService {
       final file = File(filePath);
 
       return await file.exists();
-    } catch (e) {
-      debugPrint('检查图片缓存状态失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '检查图片缓存状态失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
       return false;
     }
   }
@@ -289,8 +354,13 @@ class CharacterImageCacheService {
           return lastSegment.substring(dotIndex);
         }
       }
-    } catch (e) {
-      debugPrint('从URL提取扩展名失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '从URL提取扩展名失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['image'],
+      );
     }
 
     return '.jpg'; // 默认扩展名

@@ -19,6 +19,7 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/logger_service.dart';
+import '../../../services/log_reporter_service.dart';
 import '../../../services/preferences_service.dart';
 import '../../../services/backup_service.dart';
 
@@ -111,4 +112,27 @@ PreferencesService preferencesService(Ref ref) {
 @riverpod
 BackupService backupService(Ref ref) {
   return BackupService();
+}
+
+/// LogReporterService Provider
+///
+/// 提供全局日志上报服务实例，用于将本地日志批量上报到后端。
+///
+/// **功能**:
+/// - 批量上报：累积 20 条或 30 秒后自动触发
+/// - 级别过滤：可配置最低上报级别（默认 WARNING）
+/// - 退避策略：连续失败 3 次后进入退避模式（间隔翻倍，最大 5 分钟）
+/// - 配置持久化：开关与级别存在 SharedPreferences
+///
+/// **依赖**:
+/// - 无（单例服务）
+///
+/// **使用示例**:
+/// ```dart
+/// final reporter = ref.read(logReporterServiceProvider);
+/// await reporter.flush(); // 立即上报
+/// ```
+@riverpod
+LogReporterService logReporterService(Ref ref) {
+  return LogReporterService.instance;
 }

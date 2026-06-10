@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
 import '../../models/character_relationship.dart';
+import '../../services/logger_service.dart';
 import 'database_providers.dart';
 
 /// 角色关系Screen的Riverpod Providers
@@ -69,11 +70,27 @@ final relationshipListStateProvider = StateNotifierProvider.autoDispose<
 /// 返回成功(true)或失败(false)
 final addRelationshipProvider = FutureProvider.autoDispose
     .family<bool, CharacterRelationship>((ref, relationship) async {
+  LoggerService.instance.d(
+    '开始添加角色关系: ${relationship.sourceCharacterId} -> ${relationship.targetCharacterId}',
+    category: LogCategory.database,
+    tags: ['provider', 'character-relationship', 'add'],
+  );
   try {
     final repository = ref.watch(characterRelationRepositoryProvider);
     await repository.createRelationship(relationship);
+    LoggerService.instance.i(
+      '角色关系添加成功',
+      category: LogCategory.ui,
+      tags: ['provider', 'character-relationship', 'add'],
+    );
     return true;
-  } catch (e) {
+  } catch (e, st) {
+    LoggerService.instance.e(
+      '添加角色关系失败: $e',
+      stackTrace: st.toString(),
+      category: LogCategory.database,
+      tags: ['provider', 'character-relationship', 'add'],
+    );
     return false;
   }
 });
@@ -83,11 +100,27 @@ final addRelationshipProvider = FutureProvider.autoDispose
 /// 返回成功(true)或失败(false)
 final updateRelationshipProvider = FutureProvider.autoDispose
     .family<bool, CharacterRelationship>((ref, relationship) async {
+  LoggerService.instance.d(
+    '开始更新角色关系: id=${relationship.id}',
+    category: LogCategory.database,
+    tags: ['provider', 'character-relationship', 'update'],
+  );
   try {
     final repository = ref.watch(characterRelationRepositoryProvider);
     await repository.updateRelationship(relationship);
+    LoggerService.instance.i(
+      '角色关系更新成功',
+      category: LogCategory.ui,
+      tags: ['provider', 'character-relationship', 'update'],
+    );
     return true;
-  } catch (e) {
+  } catch (e, st) {
+    LoggerService.instance.e(
+      '更新角色关系失败: $e',
+      stackTrace: st.toString(),
+      category: LogCategory.database,
+      tags: ['provider', 'character-relationship', 'update'],
+    );
     return false;
   }
 });
@@ -97,11 +130,27 @@ final updateRelationshipProvider = FutureProvider.autoDispose
 /// 返回成功(true)或失败(false)
 final deleteRelationshipProvider =
     FutureProvider.autoDispose.family<bool, int>((ref, relationshipId) async {
+  LoggerService.instance.d(
+    '开始删除角色关系: id=$relationshipId',
+    category: LogCategory.database,
+    tags: ['provider', 'character-relationship', 'delete'],
+  );
   try {
     final repository = ref.watch(characterRelationRepositoryProvider);
     await repository.deleteRelationship(relationshipId);
+    LoggerService.instance.i(
+      '角色关系删除成功',
+      category: LogCategory.ui,
+      tags: ['provider', 'character-relationship', 'delete'],
+    );
     return true;
-  } catch (e) {
+  } catch (e, st) {
+    LoggerService.instance.e(
+      '删除角色关系失败: $e',
+      stackTrace: st.toString(),
+      category: LogCategory.database,
+      tags: ['provider', 'character-relationship', 'delete'],
+    );
     return false;
   }
 });

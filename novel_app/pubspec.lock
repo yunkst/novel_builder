@@ -442,6 +442,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.15.6"
+  html_unescape:
+    dependency: transitive
+    description:
+      name: html_unescape
+      sha256: "15362d7a18f19d7b742ef8dcb811f5fd2a2df98db9f80ea393c075189e0b61e3"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.0.0"
   http:
     dependency: "direct main"
     description:
@@ -503,6 +511,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.5"
+  jinja:
+    dependency: "direct main"
+    description:
+      name: jinja
+      sha256: "065f662e534335f5262d73dd377e6e57d799261ac9abd9de15f7efe59aff2f8c"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.6.6"
   js:
     dependency: transitive
     description:
@@ -1107,6 +1123,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.6"
+  textwrap:
+    dependency: transitive
+    description:
+      name: textwrap
+      sha256: "780b164d83dfed30b475b1310d288145c5e0109193c3c507cf015d38e4adc844"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.0.0"
   timing:
     dependency: transitive
     description:
@@ -1284,7 +1308,7 @@ packages:
     source: hosted
     version: "1.1.0"
   yaml:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: yaml
       sha256: b9da305ac7c39faa3f030eccd175340f968459dae4af175130b3fc47e40d76ce

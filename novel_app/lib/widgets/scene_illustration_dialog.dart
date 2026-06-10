@@ -126,7 +126,11 @@ class _SceneIllustrationDialogState
       final chapterContent =
           await chapterRepository.getCachedChapter(widget.chapterId);
       if (chapterContent == null || chapterContent.isEmpty) {
-        debugPrint('章节内容为空，跳过角色预选');
+        LoggerService.instance.d(
+          '章节内容为空，跳过角色预选',
+          category: LogCategory.ai,
+          tags: ['illustration', 'preselect', 'skipped'],
+        );
         return;
       }
 
@@ -146,8 +150,11 @@ class _SceneIllustrationDialogState
             _selectedCharacterIds = appearingIds;
           });
         }
-        debugPrint(
-            '预选了 ${appearingIds.length} 个角色: ${appearingIds.join(', ')}');
+        LoggerService.instance.d(
+          '预选了 ${appearingIds.length} 个角色: ${appearingIds.join(', ')}',
+          category: LogCategory.ai,
+          tags: ['illustration', 'preselect', 'characters'],
+        );
       }
     } catch (e, stackTrace) {
       LoggerService.instance.w(
@@ -164,11 +171,19 @@ class _SceneIllustrationDialogState
   Future<void> _startSceneDescriptionGeneration() async {
     // 防止重复调用
     if (isStreaming) {
-      debugPrint('AI生成正在进行中，忽略重复调用');
+      LoggerService.instance.w(
+        'AI生成正在进行中，忽略重复调用',
+        category: LogCategory.ai,
+        tags: ['illustration', 'duplicate-call'],
+      );
       return;
     }
 
-    debugPrint('🚀 === 开始场景描写生成 ===');
+    LoggerService.instance.i(
+      '开始场景描写生成',
+      category: LogCategory.ai,
+      tags: ['illustration', 'scene-description', 'start'],
+    );
 
     // 清空现有内容
     _contentController.clear();
@@ -178,7 +193,11 @@ class _SceneIllustrationDialogState
     final prefs = await SharedPreferences.getInstance();
     final difyUrl = prefs.getString('dify_url');
     if (difyUrl == null || difyUrl.isEmpty) {
-      debugPrint('Dify未配置，跳过场景描写生成');
+      LoggerService.instance.w(
+        'Dify未配置，跳过场景描写生成',
+        category: LogCategory.ai,
+        tags: ['illustration', 'dify-not-configured'],
+      );
       setState(() {
         _sceneGenerationError = 'Dify服务未配置，请在设置中配置Dify URL';
       });
@@ -190,7 +209,11 @@ class _SceneIllustrationDialogState
     final chapterContent =
         await databaseService.getCachedChapter(widget.chapterId);
     if (chapterContent == null || chapterContent.isEmpty) {
-      debugPrint('章节内容为空，跳过场景描写生成');
+      LoggerService.instance.w(
+        '章节内容为空，跳过场景描写生成',
+        category: LogCategory.ai,
+        tags: ['illustration', 'empty-chapter'],
+      );
       setState(() {
         _sceneGenerationError = '章节内容为空，无法生成场景描写';
       });
@@ -219,14 +242,17 @@ class _SceneIllustrationDialogState
     await callDifyStreaming(
       inputs: inputs,
       onChunk: (chunk) {
-        debugPrint('🔥 收到场景描写文本块: "$chunk"');
         // 流式追加内容
         _contentController.text += chunk;
         // 自动滚动到文本末尾
         _scrollToBottom();
       },
       onComplete: (fullContent) {
-        debugPrint('✅ 场景描写生成完成: "$fullContent"');
+        LoggerService.instance.i(
+          '场景描写生成完成: 长度=${fullContent.length}字符',
+          category: LogCategory.ai,
+          tags: ['illustration', 'scene-description', 'complete'],
+        );
         // 完成回调（fullContent 由 mixin 提供）
       },
       startMessage: 'AI正在生成场景描写...',
@@ -262,7 +288,11 @@ class _SceneIllustrationDialogState
       // 创建角色信息列表（使用新的RoleInfo格式）
       final rolesList = Character.toRoleInfoList(selectedCharacters);
 
-      debugPrint('开始创建插图，段落索引: ${widget.paragraphIndex}');
+      LoggerService.instance.i(
+        '开始创建插图: novelUrl=${widget.novelUrl}, paragraphIndex=${widget.paragraphIndex}',
+        category: LogCategory.ai,
+        tags: ['illustration', 'create', 'start'],
+      );
 
       // 使用SceneIllustrationService创建插图（自动插入标记）
       final illustrationId =

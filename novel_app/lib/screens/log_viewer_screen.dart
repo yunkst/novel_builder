@@ -9,8 +9,8 @@ import '../widgets/common/common_widgets.dart';
 
 /// 日志查看页面
 ///
-/// 提供应用日志的查看、过滤、导出和清空功能。
-/// 日志按时间倒序显示（最新日志在最上方），支持按级别过滤。
+/// 提供应用日志的查看、过滤、搜索、导出和清空功能。
+/// 日志按时间倒序显示（最新日志在最上方），支持按级别、分类过滤和关键词搜索。
 class LogViewerScreen extends ConsumerStatefulWidget {
   const LogViewerScreen({super.key});
 
@@ -21,6 +21,12 @@ class LogViewerScreen extends ConsumerStatefulWidget {
 class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   /// 当前选择的日志级别过滤器
   LogLevel? _selectedLevel;
+
+  /// 当前选择的日志分类过滤器
+  LogCategory? _selectedCategory;
+
+  /// 搜索关键词
+  String _searchQuery = '';
 
   /// 当前显示的日志列表
   late List<LogEntry> _displayedLogs;
@@ -54,11 +60,49 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   /// 从LoggerService加载日志
   void _loadLogs() {
     final loggerService = ref.read(loggerServiceProvider);
-    final logs = _selectedLevel == null
-        ? loggerService.getLogs()
-        : loggerService.getLogsByLevel(_selectedLevel);
+    List<LogEntry> logs;
+
+    if (_searchQuery.isNotEmpty) {
+      // 搜索模式
+      logs = loggerService.searchLogs(
+        _searchQuery,
+        category: _selectedCategory,
+      );
+      if (_selectedLevel != null) {
+        logs = logs.where((log) => log.level == _selectedLevel).toList();
+      }
+    } else if (_selectedLevel != null && _selectedCategory != null) {
+      // 同时按级别和分类过滤
+      logs = loggerService
+          .getLogsByCategory(_selectedCategory!)
+          .where((log) => log.level == _selectedLevel)
+          .toList();
+    } else if (_selectedLevel != null) {
+      logs = loggerService.getLogsByLevel(_selectedLevel);
+    } else if (_selectedCategory != null) {
+      logs = loggerService.getLogsByCategory(_selectedCategory!);
+    } else {
+      logs = loggerService.getLogs();
+    }
+
     setState(() {
       _displayedLogs = logs;
+    });
+  }
+
+  /// 判断是否有活跃的过滤器
+  bool get _hasActiveFilter =>
+      _selectedLevel != null ||
+      _selectedCategory != null ||
+      _searchQuery.isNotEmpty;
+
+  /// 清除所有过滤器
+  void _clearFilters() {
+    setState(() {
+      _selectedLevel = null;
+      _selectedCategory = null;
+      _searchQuery = '';
+      _loadLogs();
     });
   }
 
@@ -72,8 +116,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
     }
 
     final text = _displayedLogs.map((log) {
-      final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-      return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
+      final stackTrace =
+          log.stackTrace != null ? '\n${log.stackTrace}' : '';
+      return '[${LoggerService.formatTimestamp(log.timestamp)}] [${log.level.label}] [${log.category.label}] ${log.message}$stackTrace';
     }).join('\n\n---\n\n');
 
     await Clipboard.setData(ClipboardData(text: text));
@@ -85,28 +130,16 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
 
   /// 导出日志到文件
   ///
-  /// 将当前过滤后的所有日志导出为文本文件。
+  /// 调用 LoggerService.exportToFile 将所有日志导出为文本文件。
   Future<void> _exportLogs() async {
-    if (_displayedLogs.isEmpty) {
-      ToastUtils.show('暂无日志可导出');
-      return;
-    }
-
     setState(() {
       _isExporting = true;
     });
 
     try {
-      // 使用临时方案：生成文本内容后让用户复制
-      final text = _displayedLogs.map((log) {
-        final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
-        return '[${_formatTimestamp(log.timestamp)}] [${log.level.label}] ${log.message}$stackTrace';
-      }).join('\n\n---\n\n');
-
-      await Clipboard.setData(ClipboardData(text: text));
-
+      final file = await ref.read(loggerServiceProvider).exportToFile();
       if (mounted) {
-        ToastUtils.showSuccess('已复制日志内容，请粘贴到文本文件保存');
+        ToastUtils.showSuccess('日志已导出到: ${file.path}');
       }
     } catch (e) {
       if (mounted) {
@@ -144,20 +177,6 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
       _loadLogs();
       ToastUtils.showSuccess('日志已清空');
     }
-  }
-
-  /// 格式化时间戳
-  ///
-  /// 将DateTime格式化为易读的字符串格式。
-  /// 格式: YYYY-MM-DD HH:mm:ss
-  String _formatTimestamp(DateTime dt) {
-    final year = dt.year;
-    final month = dt.month.toString().padLeft(2, '0');
-    final day = dt.day.toString().padLeft(2, '0');
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final second = dt.second.toString().padLeft(2, '0');
-    return '$year-$month-$day $hour:$minute:$second';
   }
 
   /// 获取日志级别的颜色
@@ -205,10 +224,53 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
         title: const Text('应用日志'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 搜索按钮
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: _showSearchDialog,
+            tooltip: '搜索日志',
+          ),
+          // 分类过滤按钮
+          PopupMenuButton<LogCategory?>(
+            icon: const Icon(Icons.category_outlined),
+            tooltip: '按分类过滤',
+            onSelected: (category) {
+              setState(() {
+                _selectedCategory = category;
+                _loadLogs();
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: null,
+                child: Text('全部分类'),
+              ),
+              const PopupMenuDivider(),
+              ...LogCategory.values.map(
+                (category) => PopupMenuItem(
+                  value: category,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _getCategoryColor(category),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(category.label),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
           // 级别过滤按钮
           PopupMenuButton<LogLevel?>(
             icon: const Icon(Icons.filter_list),
-            tooltip: '过滤日志',
+            tooltip: '按级别过滤',
             onSelected: (level) {
               setState(() {
                 _selectedLevel = level;
@@ -218,7 +280,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: null,
-                child: Text('全部'),
+                child: Text('全部级别'),
               ),
               const PopupMenuDivider(),
               ...LogLevel.values.map(
@@ -245,13 +307,25 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                   )
                 : const Icon(Icons.file_download),
             onPressed: _isExporting ? null : _exportLogs,
-            tooltip: '导出日志',
+            tooltip: '导出日志文件',
           ),
           // 复制按钮
           IconButton(
             icon: const Icon(Icons.copy),
             onPressed: _copyAllLogs,
             tooltip: '复制全部日志',
+          ),
+          // 上报按钮
+          IconButton(
+            icon: const Icon(Icons.cloud_upload_outlined),
+            onPressed: () async {
+              final reporter = ref.read(logReporterServiceProvider);
+              await reporter.flush();
+              if (mounted) {
+                ToastUtils.showSuccess('日志已上报');
+              }
+            },
+            tooltip: '上报日志',
           ),
           // 清空按钮
           IconButton(
@@ -262,8 +336,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
         ],
       ),
       body: _displayedLogs.isEmpty
-          ? // 空状态提示
-          Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -277,9 +350,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _selectedLevel == null
-                        ? '暂无日志'
-                        : '暂无${_selectedLevel!.label}级别日志',
+                    _hasActiveFilter ? '没有匹配的日志' : '暂无日志',
                     style: TextStyle(
                       fontSize: 16,
                       color: Theme.of(context)
@@ -291,42 +362,88 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                 ],
               ),
             )
-          : // 日志列表（倒序显示，最新日志在最上方）
-          Column(
+          : Column(
               children: [
                 // 过滤状态提示
-                if (_selectedLevel != null)
+                if (_hasActiveFilter)
                   Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    color: Theme.of(context).colorScheme.secondaryContainer,
-                    child: Row(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    color:
+                        Theme.of(context).colorScheme.secondaryContainer,
+                    child: Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          _selectedLevel!.icon,
-                          size: 16,
-                          color: _getLevelColor(_selectedLevel!),
+                        if (_selectedLevel != null)
+                          Chip(
+                            label: Text(
+                              '级别: ${_selectedLevel!.label}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: Icon(_selectedLevel!.icon,
+                                size: 14,
+                                color: _getLevelColor(_selectedLevel!)),
+                            onDeleted: () {
+                              setState(() {
+                                _selectedLevel = null;
+                                _loadLogs();
+                              });
+                            },
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        if (_selectedCategory != null)
+                          Chip(
+                            label: Text(
+                              '分类: ${_selectedCategory!.label}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _getCategoryColor(
+                                    _selectedCategory!),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            onDeleted: () {
+                              setState(() {
+                                _selectedCategory = null;
+                                _loadLogs();
+                              });
+                            },
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        if (_searchQuery.isNotEmpty)
+                          Chip(
+                            label: Text(
+                              '搜索: $_searchQuery',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: const Icon(Icons.search, size: 14),
+                            onDeleted: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _loadLogs();
+                              });
+                            },
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        TextButton(
+                          onPressed: _clearFilters,
+                          child: const Text('清除全部'),
                         ),
-                        const SizedBox(width: 8),
+                        const Spacer(),
                         Text(
-                          '仅显示 ${_selectedLevel!.label} 级别日志 (${_displayedLogs.length} 条)',
+                          '${_displayedLogs.length} 条',
                           style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSecondaryContainer,
                           ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedLevel = null;
-                              _loadLogs();
-                            });
-                          },
-                          child: const Text('清除过滤'),
                         ),
                       ],
                     ),
@@ -337,8 +454,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                     itemCount: _displayedLogs.length,
                     reverse: true,
                     itemBuilder: (context, index) {
-                      final log =
-                          _displayedLogs[_displayedLogs.length - 1 - index];
+                      final log = _displayedLogs[
+                          _displayedLogs.length - 1 - index];
                       return Card(
                         margin: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -350,7 +467,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                             color: _getLevelColor(log.level),
                           ),
                           title: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               // 消息内容
                               Text(
@@ -367,39 +485,48 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                   Chip(
                                     label: Text(
                                       log.category.label,
-                                      style: const TextStyle(fontSize: 10),
+                                      style:
+                                          const TextStyle(fontSize: 10),
                                     ),
                                     backgroundColor:
                                         _getCategoryColor(log.category)
                                             .withValues(alpha: 0.2),
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
+                                        MaterialTapTargetSize
+                                            .shrinkWrap,
+                                    visualDensity:
+                                        VisualDensity.compact,
                                   ),
                                   ...log.tags.map((tag) => Chip(
                                         label: Text(
                                           tag,
-                                          style: const TextStyle(fontSize: 10),
+                                          style: const TextStyle(
+                                              fontSize: 10),
                                         ),
-                                        backgroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.1),
+                                        backgroundColor:
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.1),
                                         padding: EdgeInsets.zero,
                                         materialTapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        visualDensity: VisualDensity.compact,
+                                            MaterialTapTargetSize
+                                                .shrinkWrap,
+                                        visualDensity:
+                                            VisualDensity.compact,
                                       )),
                                 ],
                               ),
                             ],
                           ),
                           subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _formatTimestamp(log.timestamp),
+                                LoggerService.formatTimestamp(
+                                    log.timestamp),
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Theme.of(context)
@@ -415,7 +542,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                     _showStackTraceDialog(log);
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.only(top: 4),
+                                    padding:
+                                        const EdgeInsets.only(top: 4),
                                     child: Text(
                                       '查看堆栈信息',
                                       style: TextStyle(
@@ -423,7 +551,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                         color: Theme.of(context)
                                             .colorScheme
                                             .primary,
-                                        decoration: TextDecoration.underline,
+                                        decoration:
+                                            TextDecoration.underline,
                                       ),
                                     ),
                                   ),
@@ -438,6 +567,54 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
               ],
             ),
     );
+  }
+
+  /// 显示搜索对话框
+  void _showSearchDialog() {
+    final controller = TextEditingController(text: _searchQuery);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('搜索日志'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入关键词搜索日志内容和标签...',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.search),
+          ),
+          onSubmitted: (_) => _applySearch(controller.text),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (_searchQuery.isNotEmpty) {
+                setState(() {
+                  _searchQuery = '';
+                  _loadLogs();
+                });
+              }
+            },
+            child: const Text('清除'),
+          ),
+          FilledButton(
+            onPressed: () => _applySearch(controller.text),
+            child: const Text('搜索'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 应用搜索
+  void _applySearch(String query) {
+    Navigator.pop(context);
+    setState(() {
+      _searchQuery = query.trim();
+      _loadLogs();
+    });
   }
 
   /// 显示堆栈信息对话框
@@ -471,7 +648,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
           ),
           TextButton(
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: log.stackTrace ?? ''));
+              Clipboard.setData(
+                  ClipboardData(text: log.stackTrace ?? ''));
               Navigator.pop(context);
               ToastUtils.showSuccess('已复制堆栈信息');
             },

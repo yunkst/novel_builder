@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/chat_scene.dart';
+import '../../services/logger_service.dart';
 import '../interfaces/repositories/i_chat_scene_repository.dart';
 import 'database_providers.dart';
 
@@ -57,6 +58,11 @@ class ChatSceneManagement extends _$ChatSceneManagement {
 
   /// 加载所有场景
   Future<void> loadScenes() async {
+    LoggerService.instance.d(
+      '开始加载聊天场景',
+      category: LogCategory.database,
+      tags: ['provider', 'chat-scene', 'load'],
+    );
     state = state.copyWith(isLoading: true);
 
     try {
@@ -67,7 +73,18 @@ class ChatSceneManagement extends _$ChatSceneManagement {
         filteredScenes: scenes,
         isLoading: false,
       );
-    } catch (e) {
+      LoggerService.instance.i(
+        '聊天场景加载成功: count=${scenes.length}',
+        category: LogCategory.ui,
+        tags: ['provider', 'chat-scene', 'load'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '加载聊天场景失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chat-scene', 'load'],
+      );
       state = state.copyWith(isLoading: false);
       rethrow;
     }
@@ -75,20 +92,80 @@ class ChatSceneManagement extends _$ChatSceneManagement {
 
   /// 添加新场景
   Future<void> addScene(ChatScene scene) async {
-    await _repository.insertChatScene(scene);
-    await loadScenes();
+    LoggerService.instance.d(
+      '添加聊天场景: title=${scene.title}',
+      category: LogCategory.database,
+      tags: ['provider', 'chat-scene', 'add'],
+    );
+    try {
+      await _repository.insertChatScene(scene);
+      LoggerService.instance.i(
+        '聊天场景添加成功: ${scene.title}',
+        category: LogCategory.ui,
+        tags: ['provider', 'chat-scene', 'add'],
+      );
+      await loadScenes();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '添加聊天场景失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chat-scene', 'add'],
+      );
+      rethrow;
+    }
   }
 
   /// 更新场景
   Future<void> updateScene(ChatScene scene) async {
-    await _repository.updateChatScene(scene);
-    await loadScenes();
+    LoggerService.instance.d(
+      '更新聊天场景: id=${scene.id}, title=${scene.title}',
+      category: LogCategory.database,
+      tags: ['provider', 'chat-scene', 'update'],
+    );
+    try {
+      await _repository.updateChatScene(scene);
+      LoggerService.instance.i(
+        '聊天场景更新成功: ${scene.title}',
+        category: LogCategory.ui,
+        tags: ['provider', 'chat-scene', 'update'],
+      );
+      await loadScenes();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '更新聊天场景失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chat-scene', 'update'],
+      );
+      rethrow;
+    }
   }
 
   /// 删除场景
   Future<void> deleteScene(int id) async {
-    await _repository.deleteChatScene(id);
-    await loadScenes();
+    LoggerService.instance.d(
+      '删除聊天场景: id=$id',
+      category: LogCategory.database,
+      tags: ['provider', 'chat-scene', 'delete'],
+    );
+    try {
+      await _repository.deleteChatScene(id);
+      LoggerService.instance.i(
+        '聊天场景删除成功: id=$id',
+        category: LogCategory.ui,
+        tags: ['provider', 'chat-scene', 'delete'],
+      );
+      await loadScenes();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '删除聊天场景失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['provider', 'chat-scene', 'delete'],
+      );
+      rethrow;
+    }
   }
 
   /// 搜索场景

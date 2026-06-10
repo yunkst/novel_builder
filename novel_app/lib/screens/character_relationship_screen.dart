@@ -9,6 +9,7 @@ import '../utils/toast_utils.dart';
 import '../core/providers/character_relationship_providers.dart';
 import '../core/providers/database_providers.dart';
 import 'unified_relationship_graph_screen_riverpod.dart';
+import '../services/logger_service.dart';
 
 /// 角色关系列表页面
 ///
@@ -65,8 +66,13 @@ class _CharacterRelationshipScreenState
         }
       }
       return cache;
-    } catch (e) {
-      debugPrint('❌ 加载角色信息失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载角色信息失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['relationship'],
+      );
       return {};
     }
   }
@@ -439,8 +445,13 @@ class _CharacterRelationshipScreenState
       if (mounted) {
         ToastUtils.showSuccess('关系删除成功');
       }
-    } catch (e) {
-      debugPrint('❌ 删除关系失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除关系失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['relationship'],
+      );
       if (mounted) {
         ToastUtils.showError('删除失败: $e');
       }

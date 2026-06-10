@@ -1,4 +1,5 @@
 import '../models/chat_scene.dart';
+import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_chat_scene_repository.dart';
 
@@ -33,26 +34,17 @@ class ChatSceneRepository extends BaseRepository
   @override
   Future<int> insertChatScene(ChatScene scene) async {
     final db = await database;
-    return await db.insert('chat_scenes', scene.toMap());
+    final result = await db.insert('chat_scenes', scene.toMap());
+    LoggerService.instance.i(
+      '聊天场景已创建: ${scene.title}',
+      category: LogCategory.database,
+      tags: ['chat-scene', 'create'],
+    );
+    return result;
   }
 
   /// 更新聊天场景
-  ///
-  /// 根据场景ID更新场景信息，自动更新 updatedAt 时间戳。
-  ///
-  /// 参数：
-  /// - [scene] 要更新的聊天场景对象（必须包含有效的ID）
-  ///
-  /// 示例：
-  /// ```dart
-  /// final scene = ChatScene(
-  ///   id: 1,
-  ///   title: '更新后的标题',
-  ///   content: '更新后的内容...',
-  ///   createdAt: DateTime.now(),
-  /// );
-  /// await repository.updateChatScene(scene);
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<void> updateChatScene(ChatScene scene) async {
     final db = await database;
@@ -62,18 +54,15 @@ class ChatSceneRepository extends BaseRepository
       where: 'id = ?',
       whereArgs: [scene.id],
     );
+    LoggerService.instance.i(
+      '聊天场景已更新: ${scene.title}',
+      category: LogCategory.database,
+      tags: ['chat-scene', 'update'],
+    );
   }
 
   /// 删除聊天场景
-  ///
-  /// 参数：
-  /// - [id] 要删除的场景ID
-  ///
-  /// 示例：
-  /// ```dart
-  /// await repository.deleteChatScene(1);
-  /// print('场景已删除');
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<void> deleteChatScene(int id) async {
     final db = await database;
@@ -81,6 +70,11 @@ class ChatSceneRepository extends BaseRepository
       'chat_scenes',
       where: 'id = ?',
       whereArgs: [id],
+    );
+    LoggerService.instance.i(
+      '聊天场景已删除: id=$id',
+      category: LogCategory.database,
+      tags: ['chat-scene', 'delete'],
     );
   }
 

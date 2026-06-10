@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
+import 'logger_service.dart';
 
 /// TTS语音模型
 class TtsVoice {
@@ -81,13 +81,20 @@ class TtsService {
 
   /// 处理原生层回调
   Future<dynamic> _handleMethodCall(MethodCall call) async {
-    debugPrint(
-        '[TtsService] 🔔 收到原生回调: ${call.method} (args: ${call.arguments})');
+    LoggerService.instance.d(
+      '收到原生回调: ${call.method} (args: ${call.arguments})',
+      category: LogCategory.tts,
+      tags: ['callback'],
+    );
     switch (call.method) {
       case 'onSpeakStart':
         final utteranceId = call.arguments as String?;
         if (utteranceId != null) {
-          debugPrint('[TtsService] ▶️ 朗读开始: $utteranceId');
+          LoggerService.instance.i(
+            '朗读开始: $utteranceId',
+            category: LogCategory.tts,
+            tags: ['speak', 'start'],
+          );
           _speakStartController.add(utteranceId);
         }
         _isSpeakingController.add(true);
@@ -95,19 +102,31 @@ class TtsService {
       case 'onSpeakComplete':
         final utteranceId = call.arguments as String?;
         if (utteranceId != null) {
-          debugPrint('[TtsService] ⏹️ 朗读完成: $utteranceId');
+          LoggerService.instance.i(
+            '朗读完成: $utteranceId',
+            category: LogCategory.tts,
+            tags: ['speak', 'complete'],
+          );
           _speakCompleteController.add(utteranceId);
         }
         _isSpeakingController.add(false);
         break;
       case 'onError':
         final error = call.arguments as String?;
-        debugPrint('[TtsService] ❌ TTS错误: $error');
+        LoggerService.instance.e(
+          'TTS错误: $error',
+          category: LogCategory.tts,
+          tags: ['speak', 'error'],
+        );
         _errorController.add(error ?? 'Unknown error');
         _isSpeakingController.add(false);
         break;
       default:
-        debugPrint('[TtsService] ⚠️ 未知回调方法: ${call.method}');
+        LoggerService.instance.w(
+          '未知回调方法: ${call.method}',
+          category: LogCategory.tts,
+          tags: ['callback', 'unknown'],
+        );
     }
   }
 
@@ -116,19 +135,35 @@ class TtsService {
   /// 返回 true 表示初始化成功，false 表示失败
   Future<bool> initialize() async {
     try {
-      debugPrint('[TtsService] 正在初始化TTS引擎...');
+      LoggerService.instance.i(
+        '正在初始化TTS引擎...',
+        category: LogCategory.tts,
+        tags: ['init', 'start'],
+      );
       final result = await _channel.invokeMethod<bool>('initialize');
       _initialized = result ?? false;
 
       if (_initialized) {
-        debugPrint('[TtsService] ✅ TTS引擎初始化成功');
+        LoggerService.instance.i(
+          'TTS引擎初始化成功',
+          category: LogCategory.tts,
+          tags: ['init', 'success'],
+        );
       } else {
-        debugPrint('[TtsService] ❌ TTS引擎初始化失败');
+        LoggerService.instance.w(
+          'TTS引擎初始化失败',
+          category: LogCategory.tts,
+          tags: ['init', 'failed'],
+        );
       }
 
       return _initialized;
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 初始化异常: ${e.message}');
+      LoggerService.instance.e(
+        '初始化异常: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['init', 'exception'],
+      );
       _initialized = false;
       return false;
     }
@@ -148,13 +183,20 @@ class TtsService {
     }
 
     try {
-      debugPrint(
-          '[TtsService] 开始朗读: ${text.substring(0, text.length > 50 ? 50 : text.length)}...');
+      LoggerService.instance.i(
+        '开始朗读: ${text.substring(0, text.length > 50 ? 50 : text.length)}...',
+        category: LogCategory.tts,
+        tags: ['speak'],
+      );
       final utteranceId =
           await _channel.invokeMethod<String>('speak', {'text': text});
       return utteranceId ?? DateTime.now().millisecondsSinceEpoch.toString();
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 朗读失败: ${e.message}');
+      LoggerService.instance.e(
+        '朗读失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['speak', 'error'],
+      );
       throw TtsException('朗读失败', e);
     }
   }
@@ -164,10 +206,18 @@ class TtsService {
     if (!_initialized) return;
 
     try {
-      debugPrint('[TtsService] 暂停朗读');
+      LoggerService.instance.i(
+        '暂停朗读',
+        category: LogCategory.tts,
+        tags: ['pause'],
+      );
       await _channel.invokeMethod('pause');
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 暂停失败: ${e.message}');
+      LoggerService.instance.e(
+        '暂停失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['pause', 'error'],
+      );
       throw TtsException('暂停失败', e);
     }
   }
@@ -177,10 +227,18 @@ class TtsService {
     if (!_initialized) return;
 
     try {
-      debugPrint('[TtsService] 继续朗读');
+      LoggerService.instance.i(
+        '继续朗读',
+        category: LogCategory.tts,
+        tags: ['resume'],
+      );
       await _channel.invokeMethod('resume');
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 继续失败: ${e.message}');
+      LoggerService.instance.e(
+        '继续失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['resume', 'error'],
+      );
       throw TtsException('继续失败', e);
     }
   }
@@ -190,10 +248,18 @@ class TtsService {
     if (!_initialized) return;
 
     try {
-      debugPrint('[TtsService] 停止朗读');
+      LoggerService.instance.i(
+        '停止朗读',
+        category: LogCategory.tts,
+        tags: ['stop'],
+      );
       await _channel.invokeMethod('stop');
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 停止失败: ${e.message}');
+      LoggerService.instance.e(
+        '停止失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['stop', 'error'],
+      );
       throw TtsException('停止失败', e);
     }
   }
@@ -209,10 +275,18 @@ class TtsService {
     }
 
     try {
-      debugPrint('[TtsService] 设置语速: $rate');
+      LoggerService.instance.i(
+        '设置语速: $rate',
+        category: LogCategory.tts,
+        tags: ['config', 'rate'],
+      );
       await _channel.invokeMethod('setSpeechRate', {'rate': rate});
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 设置语速失败: ${e.message}');
+      LoggerService.instance.e(
+        '设置语速失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['config', 'rate', 'error'],
+      );
       throw TtsException('设置语速失败', e);
     }
   }
@@ -228,10 +302,18 @@ class TtsService {
     }
 
     try {
-      debugPrint('[TtsService] 设置音调: $pitch');
+      LoggerService.instance.i(
+        '设置音调: $pitch',
+        category: LogCategory.tts,
+        tags: ['config', 'pitch'],
+      );
       await _channel.invokeMethod('setPitch', {'pitch': pitch});
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 设置音调失败: ${e.message}');
+      LoggerService.instance.e(
+        '设置音调失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['config', 'pitch', 'error'],
+      );
       throw TtsException('设置音调失败', e);
     }
   }
@@ -247,10 +329,18 @@ class TtsService {
     }
 
     try {
-      debugPrint('[TtsService] 设置音量: $volume');
+      LoggerService.instance.i(
+        '设置音量: $volume',
+        category: LogCategory.tts,
+        tags: ['config', 'volume'],
+      );
       await _channel.invokeMethod('setVolume', {'volume': volume});
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 设置音量失败: ${e.message}');
+      LoggerService.instance.e(
+        '设置音量失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['config', 'volume', 'error'],
+      );
       throw TtsException('设置音量失败', e);
     }
   }
@@ -262,7 +352,11 @@ class TtsService {
     }
 
     try {
-      debugPrint('[TtsService] 获取可用语音列表');
+      LoggerService.instance.i(
+        '获取可用语音列表',
+        category: LogCategory.tts,
+        tags: ['voices', 'list'],
+      );
       final result =
           await _channel.invokeListMethod<Map<Object?, Object?>>('getVoices');
       if (result == null) return [];
@@ -271,7 +365,11 @@ class TtsService {
           .map((map) => TtsVoice.fromMap(map.cast<String, dynamic>()))
           .toList();
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 获取语音列表失败: ${e.message}');
+      LoggerService.instance.e(
+        '获取语音列表失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['voices', 'list', 'error'],
+      );
       throw TtsException('获取语音列表失败', e);
     }
   }
@@ -283,17 +381,29 @@ class TtsService {
     if (!_initialized) return;
 
     try {
-      debugPrint('[TtsService] 设置语音: $voiceId');
+      LoggerService.instance.i(
+        '设置语音: $voiceId',
+        category: LogCategory.tts,
+        tags: ['config', 'voice'],
+      );
       await _channel.invokeMethod('setVoice', {'voiceId': voiceId});
     } on PlatformException catch (e) {
-      debugPrint('[TtsService] ❌ 设置语音失败: ${e.message}');
+      LoggerService.instance.e(
+        '设置语音失败: ${e.message}',
+        category: LogCategory.tts,
+        tags: ['config', 'voice', 'error'],
+      );
       throw TtsException('设置语音失败', e);
     }
   }
 
   /// 释放资源
   Future<void> dispose() async {
-    debugPrint('[TtsService] 释放资源');
+    LoggerService.instance.i(
+      '释放资源',
+      category: LogCategory.tts,
+      tags: ['dispose'],
+    );
     await _isSpeakingController.close();
     await _speakCompleteController.close();
     await _speakStartController.close();

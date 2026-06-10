@@ -4,6 +4,7 @@ import '../models/novel.dart';
 import '../constants/chapter_constants.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_character_repository.dart';
+import 'logger_service.dart';
 import 'preferences_service.dart';
 
 /// 章节生成相关的业务逻辑服务
@@ -42,6 +43,12 @@ class ChapterService {
     required int afterIndex,
     Novel? novel,
   }) async {
+    LoggerService.instance.d(
+      '获取历史章节内容: afterIndex=$afterIndex, chapters=${chapters.length}',
+      category: LogCategory.ai,
+      tags: ['chapter', 'context'],
+    );
+
     String historyChaptersContent = '';
 
     // 安全检查：确保chapters不为空且索引有效
@@ -53,6 +60,7 @@ class ChapterService {
           .clamp(0, chapters.length - 1);
 
       // 遍历并拼接历史章节内容
+      int cacheMissCount = 0;
       for (int i = startIndex; i <= afterIndex; i++) {
         final content = await _chapterRepository.getCachedChapter(
           chapters[i].url,
@@ -60,7 +68,16 @@ class ChapterService {
         if (content != null && content.isNotEmpty) {
           historyChaptersContent +=
               '第${i + 1}章 ${chapters[i].title}\n$content\n\n';
+        } else {
+          cacheMissCount++;
         }
+      }
+      if (cacheMissCount > 0) {
+        LoggerService.instance.w(
+          '历史章节缓存未命中: $cacheMissCount/${afterIndex - startIndex + 1} 章',
+          category: LogCategory.cache,
+          tags: ['chapter', 'cache-miss'],
+        );
       }
     } else if (chapters.isEmpty && novel != null) {
       // 如果是空列表（创建第一章），提供默认的上下文信息
@@ -96,6 +113,7 @@ class ChapterService {
     final startIndex = (afterIndex - ChapterConstants.contextChapterCount)
         .clamp(0, afterIndex);
 
+    int uncachedCount = 0;
     for (int i = startIndex; i <= afterIndex && i < chapters.length; i++) {
       final chapter = chapters[i];
       // 优先从缓存获取
@@ -103,8 +121,17 @@ class ChapterService {
       if (content != null && content.isNotEmpty) {
         previousChapters.add('第${i + 1}章 ${chapter.title}\n$content');
       } else {
+        uncachedCount++;
         previousChapters.add('第${i + 1}章 ${chapter.title}\n（内容未缓存）');
       }
+    }
+
+    if (uncachedCount > 0) {
+      LoggerService.instance.w(
+        '前文章节内容未缓存: $uncachedCount 章',
+        category: LogCategory.cache,
+        tags: ['chapter', 'context', 'uncached'],
+      );
     }
 
     return previousChapters;
@@ -153,6 +180,12 @@ class ChapterService {
     required String userInput,
     required List<int> characterIds,
   }) async {
+    LoggerService.instance.d(
+      '构建章节生成 inputs: novel=${novel.title}, afterIndex=$afterIndex, characters=${characterIds.length}',
+      category: LogCategory.ai,
+      tags: ['chapter', 'generate', 'inputs'],
+    );
+
     // 获取历史章节内容
     final historyChaptersContent = await getHistoryChaptersContent(
       chapters: chapters,
@@ -166,6 +199,14 @@ class ChapterService {
     // 获取 AI 作家设定
     final aiWriterSetting = await PreferencesService.instance
         .getString('ai_writer_prompt', defaultValue: '');
+
+    if (aiWriterSetting.isEmpty) {
+      LoggerService.instance.d(
+        'AI 作家设定未配置，使用默认风格',
+        category: LogCategory.ai,
+        tags: ['config', 'ai-writer', 'empty'],
+      );
+    }
 
     // 构建Dify请求参数
     return {

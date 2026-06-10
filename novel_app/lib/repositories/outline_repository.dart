@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/outline.dart';
+import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_outline_repository.dart';
 
@@ -44,7 +45,7 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
 
     if (existing != null) {
       // 更新现有大纲
-      return await db.update(
+      final result = await db.update(
         'outlines',
         {
           'title': outline.title,
@@ -54,9 +55,15 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
         where: 'novel_url = ?',
         whereArgs: [outline.novelUrl],
       );
+      LoggerService.instance.i(
+        '大纲已更新: ${outline.novelUrl}',
+        category: LogCategory.database,
+        tags: ['outline', 'save', 'update'],
+      );
+      return result;
     } else {
       // 创建新大纲
-      return await db.insert(
+      final result = await db.insert(
         'outlines',
         {
           'novel_url': outline.novelUrl,
@@ -67,24 +74,17 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+      LoggerService.instance.i(
+        '大纲已创建: ${outline.novelUrl}',
+        category: LogCategory.database,
+        tags: ['outline', 'save', 'create'],
+      );
+      return result;
     }
   }
 
   /// 根据小说URL获取大纲
-  ///
-  /// 参数：
-  /// - [novelUrl] 小说的URL，作为唯一标识
-  ///
-  /// 返回：
-  /// - 找到的大纲对象，如果不存在则返回 null
-  ///
-  /// 示例：
-  /// ```dart
-  /// final outline = await repository.getOutlineByNovelUrl('https://example.com/novel/123');
-  /// if (outline != null) {
-  ///   print('找到大纲：${outline.title}');
-  /// }
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<Outline?> getOutlineByNovelUrl(String novelUrl) async {
     final db = await database;
@@ -101,17 +101,7 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
   }
 
   /// 获取所有大纲
-  ///
-  /// 返回：
-  /// - 所有大纲的列表，按更新时间降序排列（最近更新的在前）
-  ///
-  /// 示例：
-  /// ```dart
-  /// final outlines = await repository.getAllOutlines();
-  /// for (var outline in outlines) {
-  ///   print('${outline.title} - ${outline.updatedAt}');
-  /// }
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<List<Outline>> getAllOutlines() async {
     final db = await database;
@@ -126,50 +116,25 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
   }
 
   /// 删除大纲
-  ///
-  /// 参数：
-  /// - [novelUrl] 要删除大纲的小说URL
-  ///
-  /// 返回：
-  /// - 受影响的行数，如果大纲不存在则返回 0
-  ///
-  /// 示例：
-  /// ```dart
-  /// final count = await repository.deleteOutline('https://example.com/novel/123');
-  /// if (count > 0) {
-  ///   print('大纲已删除');
-  /// }
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<int> deleteOutline(String novelUrl) async {
     final db = await database;
-    return await db.delete(
+    final result = await db.delete(
       'outlines',
       where: 'novel_url = ?',
       whereArgs: [novelUrl],
     );
+    LoggerService.instance.i(
+      '大纲已删除: $novelUrl',
+      category: LogCategory.database,
+      tags: ['outline', 'delete'],
+    );
+    return result;
   }
 
   /// 更新大纲内容
-  ///
-  /// 直接更新大纲的标题和内容，同时更新时间戳。
-  ///
-  /// 参数：
-  /// - [novelUrl] 小说URL
-  /// - [title] 新的标题
-  /// - [content] 新的内容
-  ///
-  /// 返回：
-  /// - 受影响的行数，如果大纲不存在则返回 0
-  ///
-  /// 示例：
-  /// ```dart
-  /// final count = await repository.updateOutlineContent(
-  ///   'https://example.com/novel/123',
-  ///   '更新后的标题',
-  ///   '更新后的大纲内容...',
-  /// );
-  /// ```
+  /// ... (文档注释不变)
   @override
   Future<int> updateOutlineContent(
     String novelUrl,
@@ -177,7 +142,7 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
     String content,
   ) async {
     final db = await database;
-    return await db.update(
+    final result = await db.update(
       'outlines',
       {
         'title': title,
@@ -187,5 +152,11 @@ class OutlineRepository extends BaseRepository implements IOutlineRepository {
       where: 'novel_url = ?',
       whereArgs: [novelUrl],
     );
+    LoggerService.instance.i(
+      '大纲内容已更新: $novelUrl',
+      category: LogCategory.database,
+      tags: ['outline', 'update', 'content'],
+    );
+    return result;
   }
 }

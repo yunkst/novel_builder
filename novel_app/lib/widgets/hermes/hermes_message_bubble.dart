@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:novel_app/models/hermes_message.dart';
-import 'package:novel_app/services/hermes_sse_parser.dart';
-import 'package:novel_app/widgets/hermes/hermes_tool_progress.dart';
+import 'package:novel_app/services/novel_agent/agent_event.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天消息气泡
 class HermesMessageBubble extends StatelessWidget {
   final HermesMessage message;
   final String? streamingContent;
-  final List<ToolProgress> activeToolProgress;
+  final List<AgentToolCall> agentToolCalls;
   final bool showTimestamp;
 
   const HermesMessageBubble({
     super.key,
     required this.message,
     this.streamingContent,
-    this.activeToolProgress = const [],
+    this.agentToolCalls = const [],
     this.showTimestamp = true,
   });
 
@@ -62,9 +61,10 @@ class HermesMessageBubble extends StatelessWidget {
                   _buildContent(context)
                 else
                   _buildAssistantContent(context),
-                if (activeToolProgress.isNotEmpty) ...[
+                // Phase 4: Agent 工具调用卡片
+                if (agentToolCalls.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  HermesToolProgress(progressList: activeToolProgress),
+                  _buildAgentToolCalls(context),
                 ],
               ],
             ),
@@ -201,5 +201,49 @@ class HermesMessageBubble extends StatelessWidget {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  /// Phase 4: 渲染 Agent 工具调用卡片
+  Widget _buildAgentToolCalls(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: agentToolCalls.map((call) {
+        final statusIcon = switch (call.status) {
+          AgentToolStatus.running => Icons.sync,
+          AgentToolStatus.completed => Icons.check_circle,
+          AgentToolStatus.error => Icons.error,
+          AgentToolStatus.rejected => Icons.cancel,
+        };
+        final statusColor = switch (call.status) {
+          AgentToolStatus.running => theme.colorScheme.primary,
+          AgentToolStatus.completed => theme.colorScheme.tertiary,
+          AgentToolStatus.error => theme.colorScheme.error,
+          AgentToolStatus.rejected => theme.colorScheme.outline,
+        };
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              Icon(statusIcon, size: 14, color: statusColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  call.status == AgentToolStatus.running
+                      ? '${call.name}...'
+                      : call.name,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: statusColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
   }
 }

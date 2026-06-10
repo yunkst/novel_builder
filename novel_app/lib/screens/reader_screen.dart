@@ -265,8 +265,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                 defaultModel.width,
                 defaultModel.height,
               );
-          debugPrint(
-              '✅ 默认模型尺寸已加载: ${defaultModel.width} × ${defaultModel.height}');
+          LoggerService.instance.i(
+            '默认模型尺寸已加载: ${defaultModel.width} × ${defaultModel.height}',
+            category: LogCategory.ai,
+            tags: ['model', 'illustration'],
+          );
         }
       }
     } catch (e, stackTrace) {
@@ -276,7 +279,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ai,
         tags: ['model', 'illustration'],
       );
-      debugPrint('⚠️ 加载默认模型尺寸失败: $e');
       // 使用默认值 704×1280
       ref.read(modelSizeStateNotifierProvider.notifier).resetToDefault();
     }
@@ -339,9 +341,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
       final chapterUrls = widget.chapters.map((c) => c.url).toList();
 
-      debugPrint('=== 触发预加载 (PreloadService) ===');
-      debugPrint('当前章节: ${_currentChapter.title}');
-      debugPrint('总章节数: ${widget.chapters.length}');
+      LoggerService.instance.d(
+        '触发预加载: 当前章节=${_currentChapter.title}, '
+        '总章节数=${widget.chapters.length}, '
+        '当前索引=$currentIndex',
+        category: LogCategory.cache,
+        tags: ['preload', 'chapter', 'start'],
+      );
 
       // 使用PreloadService进行预加载（通过Provider获取）
       final preloadService = ref.read(preloadServiceProvider);
@@ -358,7 +364,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.cache,
         tags: ['preload', 'chapter'],
       );
-      debugPrint('❌ 预加载启动失败: $e');
     }
   }
 
@@ -559,7 +564,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           startAutoScroll();
-          debugPrint('📖 _navigateToChapter: 翻页后恢复自动滚动');
+          LoggerService.instance.d(
+            '翻页后恢复自动滚动',
+            category: LogCategory.ui,
+            tags: ['navigation', 'auto-scroll', 'resume'],
+          );
         }
       });
     }
@@ -690,7 +699,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         novel: widget.novel,
         chapterContent: _contentController.content,
         onProgress: (message) {
-          debugPrint(message); // 保留日志输出便于调试
+          LoggerService.instance.d(
+            message,
+            category: LogCategory.character,
+            tags: ['character-card', 'progress'],
+          );
         },
       );
 
@@ -732,7 +745,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Future<void> _checkAndAutoTriggerAICompanion() async {
     // 防抖检查
     if (_hasAutoTriggered || _isAutoCompanionRunning) {
-      debugPrint('AI伴读已触发或正在运行，跳过');
       return;
     }
 
@@ -743,7 +755,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
 
     if (hasAccompanied) {
-      debugPrint('章节已伴读，跳过自动触发');
       return;
     }
 
@@ -753,21 +764,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
 
     if (!settings.autoEnabled) {
-      debugPrint('自动伴读未启用');
       return;
     }
 
     // 检查章节内容
     if (_contentController.content.isEmpty) {
-      debugPrint('章节内容为空，跳过AI伴读');
       return;
     }
 
     // 开始自动伴读
     _hasAutoTriggered = true;
     _isAutoCompanionRunning = true;
-
-    debugPrint('=== 自动触发AI伴读 ===');
 
     try {
       await _handleAICompanionSilent(settings);
@@ -778,7 +785,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ai,
         tags: ['auto-companion', 'chapter'],
       );
-      debugPrint('❌ 自动AI伴读失败: $e');
     } finally {
       _isAutoCompanionRunning = false;
     }
@@ -823,7 +829,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ai,
         tags: ['companion', 'chapter-analysis'],
       );
-      debugPrint('❌ AI伴读失败: $e');
       if (mounted) {
         _dialogService.dismissToast();
       }
@@ -875,11 +880,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         chapterCharacters,
       );
 
-      debugPrint('=== AI伴读分析开始（静默模式）===');
-      debugPrint('小说总角色数: ${allCharacters.length}');
-      debugPrint('本章出现角色数: ${chapterCharacters.length}');
-      debugPrint('相关关系数: ${chapterRelationships.length}');
-
       // 使用 NovelContextBuilder 获取背景设定
       final backgroundSetting = await _contextBuilder.getBackgroundSetting(
         widget.novel.url,
@@ -896,12 +896,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       if (response == null) {
         throw Exception('AI伴读返回数据为空');
       }
-
-      debugPrint('=== AI伴读分析完成 ===');
-      debugPrint('角色更新: ${response.roles.length}');
-      debugPrint('关系更新: ${response.relations.length}');
-      debugPrint('背景设定新增: ${response.background.length} 字符');
-      debugPrint('本章总结: ${response.summery.length} 字符');
 
       // 直接执行数据更新（不显示确认对话框）
       await _performAICompanionUpdates(response, isSilent: true);
@@ -931,7 +925,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ai,
         tags: ['silent-companion', 'auto'],
       );
-      debugPrint('❌ 静默AI伴读失败: $e');
       // 静默失败，不打扰用户
       rethrow; // 抛出异常供上层记录日志
     }
@@ -958,7 +951,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                 : '$currentBackground\n\n${response.background}';
         await _novelRepo.updateBackgroundSetting(
             widget.novel.url, updatedBackground);
-        debugPrint('✅ 背景设定追加成功');
+        LoggerService.instance.i(
+          '背景设定追加成功',
+          category: LogCategory.database,
+          tags: ['companion', 'update', 'background'],
+        );
       }
 
       // 2. 批量更新或插入角色
@@ -968,7 +965,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           widget.novel.url,
           response.roles,
         );
-        debugPrint('✅ 角色更新成功: $updatedRoles');
+        LoggerService.instance.i(
+          '角色更新成功: $updatedRoles',
+          category: LogCategory.database,
+          tags: ['companion', 'update', 'characters'],
+        );
       }
 
       // 3. 批量更新或插入关系
@@ -979,7 +980,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           response.relations,
           _characterRepo.getCharacters,
         );
-        debugPrint('✅ 关系更新成功: $updatedRelations');
+        LoggerService.instance.i(
+          '关系更新成功: $updatedRelations',
+          category: LogCategory.database,
+          tags: ['companion', 'update', 'relations'],
+        );
       }
 
       // 关闭进度提示
@@ -1013,7 +1018,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.database,
         tags: ['companion', 'update'],
       );
-      debugPrint('❌ AI伴读数据更新失败: $e');
       if (mounted && !isSilent) {
         _dialogService.dismissToast();
         _dialogService.showError('数据更新失败: $e', context: context);
@@ -1036,7 +1040,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       allCharacters,
     );
 
-    debugPrint('✅ 章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}');
+    LoggerService.instance.i(
+      '章节角色筛选完成: ${foundCharacters.length}/${allCharacters.length}',
+      category: LogCategory.character,
+      tags: ['filter', 'chapter'],
+    );
     return foundCharacters;
   }
 
@@ -1064,8 +1072,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           characterIds.contains(rel.targetCharacterId);
     }).toList();
 
-    debugPrint(
-        '✅ 关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}');
+    LoggerService.instance.i(
+      '关系筛选完成: ${filteredRelationships.length}/${allRelationships.length}',
+      category: LogCategory.character,
+      tags: ['filter', 'relationship'],
+    );
     return filteredRelationships;
   }
 
@@ -1190,9 +1201,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               _currentChapter.url,
               newContent,
             );
-            debugPrint('✅ 替换内容已保存到数据库 - ${newContent.length}字符');
+            LoggerService.instance.i(
+              '替换内容已保存到数据库: ${newContent.length}字符',
+              category: LogCategory.database,
+              tags: ['save', 'paragraph-rewrite'],
+            );
           } catch (e) {
-            debugPrint('❌ 保存替换内容失败: $e');
+            LoggerService.instance.e(
+              '保存替换内容失败: $e',
+              category: LogCategory.database,
+              tags: ['save', 'paragraph-rewrite'],
+            );
             // 即使保存失败，UI 已更新，用户可以看到新内容
             // 但重新打开后会丢失更改
             if (mounted) {
@@ -1263,7 +1282,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               category: LogCategory.database,
               tags: ['save', 'chapter-content', 'full-rewrite'],
             );
-            debugPrint('保存章节内容失败: $e');
           }
         },
       ),
@@ -1289,7 +1307,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.database,
         tags: ['save', 'chapter-content', 'edit'],
       );
-      debugPrint('保存编辑内容失败: $e');
     }
   }
 
@@ -1544,7 +1561,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ui,
         tags: ['immersive', 'setup'],
       );
-      debugPrint('❌ 打开沉浸体验失败: $e');
     }
   }
 

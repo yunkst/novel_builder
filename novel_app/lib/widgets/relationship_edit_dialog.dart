@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../core/interfaces/repositories/i_character_relation_repository.dart';
+import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
 
 /// 关系编辑对话框
@@ -160,7 +161,11 @@ class _RelationshipEditDialogState extends State<RelationshipEditDialog> {
         Navigator.of(context).pop(relationship);
       }
     } catch (e) {
-      debugPrint('❌ 保存关系失败: $e');
+      LoggerService.instance.e(
+        '保存关系失败: $e',
+        category: LogCategory.character,
+        tags: const ['relationship'],
+      );
       if (mounted) {
         setState(() {
           _isSaving = false;

@@ -119,15 +119,6 @@ class LogEntry {
   /// 日志标签
   final List<String> tags;
 
-  /// 结构化额外数据（可选）
-  ///
-  /// 用于存储额外的结构化信息，如：
-  /// - 操作耗时
-  /// - 关联ID (correlation_id)
-  /// - 性能指标
-  /// - 业务上下文
-  final Map<String, dynamic>? extra;
-
   const LogEntry({
     required this.timestamp,
     required this.level,
@@ -135,7 +126,6 @@ class LogEntry {
     this.stackTrace,
     this.category = LogCategory.general,
     this.tags = const [],
-    this.extra,
   });
 
   /// 转换为Map用于序列化
@@ -147,7 +137,6 @@ class LogEntry {
       'stackTrace': stackTrace,
       'category': category.index,
       'tags': tags,
-      'extra': extra,
     };
   }
 
@@ -166,10 +155,6 @@ class LogEntry {
       tags: map.containsKey('tags')
           ? (map['tags'] as List<dynamic>).cast<String>()
           : const [],
-      // 向后兼容：如果没有extra字段，默认为null
-      extra: map.containsKey('extra')
-          ? map['extra'] as Map<String, dynamic>?
-          : null,
     );
   }
 
@@ -339,14 +324,14 @@ class LoggerService {
   /// - 应用即将退出时
   Future<void> flush() async {
     if (_pendingPersist) {
-      await _persist();
+      await _persistChain();
     }
   }
 
   /// 记录日志（内部方法）
   ///
   /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
-  /// 添加后会触发持久化和状态通知。
+  /// 添加后会触发持久化、状态通知和上报服务回调。
   void _log(String message, LogLevel level,
       [String? stackTrace,
       LogCategory category = LogCategory.general,
@@ -372,6 +357,51 @@ class LoggerService {
 
     // 触发持久化（使用锁机制防止并发）
     _schedulePersist();
+
+    // 通知上报服务（静默调用，由 LogReporterService 自行做级别过滤）
+    _notifyReporter(entry);
+  }
+
+  /// 通知日志上报服务
+  ///
+  /// 通过动态 import 避免循环依赖：
+  /// logger_service → log_reporter_service（单向）
+  void _notifyReporter(LogEntry entry) {
+    try {
+      // 延迟加载避免循环引用
+      // ignore: invalid_use_of_visible_for_testing_member
+      _reporterCallback?.call(entry);
+    } catch (_) {
+      // 静默忽略上报服务异常
+    }
+  }
+
+  /// 静态回调钩子：上报服务注册到 LoggerService
+  ///
+  /// 调用 LogReporterService.instance.onLogAdded。
+  /// 设为静态字段以避免 logger_service.dart 顶部 import log_reporter_service.dart 形成循环依赖。
+  static void Function(LogEntry entry)? _reporterCallback;
+
+  /// 注册上报回调（仅供 LogReporterService 内部调用）
+  static void registerReporter(void Function(LogEntry entry) callback) {
+    _reporterCallback = callback;
+  }
+
+  /// 注销上报回调（仅供 LogReporterService 内部 dispose 调用）
+  static void unregisterReporter() {
+    _reporterCallback = null;
+  }
+
+  /// 获取指定级别及以上的日志（供上报服务初始化时补齐已累积的日志）
+  List<LogEntry> getLogsAboveLevel(LogLevel level) {
+    return _logs.where((log) => log.level.index >= level.index).toList();
+  }
+
+  /// 删除指定时间之前的日志
+  Future<void> removeLogsBefore(DateTime cutoff) async {
+    _logs.removeWhere((log) => log.timestamp.isBefore(cutoff));
+    await _persistLogs();
+    logChangeNotifier.value++;
   }
 
   /// 调度持久化任务
@@ -382,34 +412,23 @@ class LoggerService {
     final now = DateTime.now();
     if (_lastPersistTime == null ||
         now.difference(_lastPersistTime!).inMilliseconds >= _flushIntervalMs) {
-      _persist();
+      _persistChain();
     }
   }
 
-  /// 持久化日志（带锁机制）
-  Future<void> _persist() async {
-    // 如果正在持久化，等待完成后再处理
-    if (_isPersisting) {
-      return;
-    }
-
-    if (!_pendingPersist) {
-      return;
-    }
+  /// 持久化链（带互斥锁，确保不会并发执行）
+  Future<void> _persistChain() async {
+    if (_isPersisting) return;
 
     _isPersisting = true;
-    _pendingPersist = false;
-    _lastPersistTime = DateTime.now(); // 新增：更新时间戳
-
     try {
-      await _persistLogs();
+      while (_pendingPersist) {
+        _pendingPersist = false;
+        _lastPersistTime = DateTime.now();
+        await _persistLogs();
+      }
     } finally {
       _isPersisting = false;
-
-      // 如果在持久化过程中有新的日志，再次触发
-      if (_pendingPersist) {
-        await _persist();
-      }
     }
   }
 
@@ -544,7 +563,7 @@ class LoggerService {
     final file = File('${directory.path}/$_exportFileName');
 
     final content = _logs.map((log) {
-      final timestamp = _formatTimestamp(log.timestamp);
+      final timestamp = formatTimestamp(log.timestamp);
       final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
       return '[$timestamp] [${log.level.label}] ${log.message}$stackTrace';
     }).join('\n\n---\n\n');
@@ -588,7 +607,10 @@ class LoggerService {
   }
 
   /// 格式化时间戳
-  String _formatTimestamp(DateTime dt) {
+  ///
+  /// 将DateTime格式化为易读的字符串格式。
+  /// 格式: YYYY-MM-DD HH:mm:ss
+  static String formatTimestamp(DateTime dt) {
     final year = dt.year;
     final month = dt.month.toString().padLeft(2, '0');
     final day = dt.day.toString().padLeft(2, '0');

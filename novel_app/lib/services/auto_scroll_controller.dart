@@ -1,5 +1,6 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'logger_service.dart';
 
 /// 高性能自动滚动控制器
 ///
@@ -22,6 +23,8 @@ import 'package:flutter/widgets.dart';
 /// controller.dispose();
 /// ```
 class HighPerformanceAutoScrollController {
+  static const LogCategory _category = LogCategory.ui;
+  static const List<String> _tags = ['auto-scroll'];
   /// 关联的滚动控制器
   final ScrollController scrollController;
 
@@ -61,7 +64,7 @@ class HighPerformanceAutoScrollController {
   }) {
     // 如果已经在滚动，先停止
     if (isScrolling) {
-      debugPrint('⚠️ [startAutoScroll] 已在滚动中，先停止当前滚动');
+      LoggerService.instance.w('[startAutoScroll] 已在滚动中，先停止当前滚动', category: _category, tags: _tags);
       stopAutoScroll();
     }
 
@@ -69,14 +72,14 @@ class HighPerformanceAutoScrollController {
     _onScrollComplete = onScrollComplete;
     _lastFrameTime = DateTime.now();
 
-    debugPrint('✅ [startAutoScroll] 设置完成，速度=$pixelsPerSecond px/s');
+    LoggerService.instance.i('[startAutoScroll] 设置完成，速度=$pixelsPerSecond px/s', category: _category, tags: _tags);
     _requestFrame();
   }
 
   /// 暂停自动滚动（不重置内部状态）
   void pauseAutoScroll() {
     _isPaused = true;
-    debugPrint('⏸️ [pauseAutoScroll] 自动滚动已暂停');
+    LoggerService.instance.i('[pauseAutoScroll] 自动滚动已暂停', category: _category, tags: _tags);
   }
 
   /// 恢复自动滚动
@@ -84,12 +87,12 @@ class HighPerformanceAutoScrollController {
     _isPaused = false;
     _lastFrameTime = DateTime.now(); // 重置时间戳避免跳跃
     _requestFrame();
-    debugPrint('▶️ [resumeAutoScroll] 自动滚动已恢复');
+    LoggerService.instance.i('[resumeAutoScroll] 自动滚动已恢复', category: _category, tags: _tags);
   }
 
   /// 停止自动滚动
   void stopAutoScroll() {
-    debugPrint('🛑 [HighPerformanceAutoScrollController.stopAutoScroll] 被调用');
+    LoggerService.instance.d('[HighPerformanceAutoScrollController.stopAutoScroll] 被调用', category: _category, tags: _tags);
 
     _pixelsPerSecond = 0;
     _hasScheduledFrame = false;
@@ -97,7 +100,7 @@ class HighPerformanceAutoScrollController {
     _onScrollComplete = null;
     _isPaused = false; // 重置暂停状态
 
-    debugPrint('✅ [stopAutoScroll] 已重置所有状态');
+    LoggerService.instance.i('[stopAutoScroll] 已重置所有状态', category: _category, tags: _tags);
     // 注意：Flutter 的 SchedulerBinding 不提供 cancelFrameCallback 方法
     // 我们通过 _pixelsPerSecond 和 _hasScheduledFrame 标志来控制回调是否继续执行
   }
@@ -141,7 +144,7 @@ class HighPerformanceAutoScrollController {
 
     // 检查滚动控制器状态
     if (!scrollController.hasClients) {
-      debugPrint('🛑 [_onFrame] scrollController.hasClients == false，无法滚动');
+      LoggerService.instance.w('[_onFrame] scrollController.hasClients == false，无法滚动', category: _category, tags: _tags);
       stopAutoScroll();
       return;
     }
@@ -158,7 +161,7 @@ class HighPerformanceAutoScrollController {
 
     // 判断是否到底部
     if (newPosition >= maxPosition) {
-      debugPrint('🏁 [_onFrame] 已滚动到底部，停止滚动');
+      LoggerService.instance.i('[_onFrame] 已滚动到底部，停止滚动', category: _category, tags: _tags);
       scrollController.jumpTo(newPosition);
       stopAutoScroll();
       _onScrollComplete?.call();

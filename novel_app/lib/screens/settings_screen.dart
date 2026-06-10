@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
+import 'log_report_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'preload_queue_debug_screen.dart';
 import 'prompt_tag_management_screen.dart';
@@ -223,6 +224,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const PromptTagManagementScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+
+          // 日志上报设置
+          ListTile(
+            leading: const Icon(Icons.cloud_upload_outlined),
+            title: const Text('日志上报'),
+            subtitle: const Text('配置远程日志上报行为'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LogReportSettingsScreen(),
                 ),
               );
             },

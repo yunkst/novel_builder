@@ -6,6 +6,7 @@ import '../../core/providers/database_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../utils/toast_utils.dart';
 import '../../widgets/common/common_widgets.dart';
+import '../../services/logger_service.dart';
 import 'create_outline_screen.dart';
 
 /// 大纲管理页面
@@ -75,8 +76,13 @@ class _OutlineManagementScreenState
         ),
       );
       backgroundSetting = novel.backgroundSetting;
-    } catch (e) {
-      debugPrint('获取小说背景设定失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取小说背景设定失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['outline'],
+      );
     }
 
     if (!mounted) return;
@@ -116,8 +122,13 @@ class _OutlineManagementScreenState
         ),
       );
       backgroundSetting = novel.backgroundSetting;
-    } catch (e) {
-      debugPrint('获取小说背景设定失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取小说背景设定失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['outline'],
+      );
     }
 
     if (!mounted) return;

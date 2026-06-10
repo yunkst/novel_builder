@@ -124,9 +124,11 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
     // 累积 AI 回复内容（用于后续添加到历史记录）
     _currentAiResponse += chunk;
 
-    // 调试：打印接收到的chunk
-    debugPrint('🔥 收到chunk: "$chunk"');
-    debugPrint('当前状态: _inDialogue=$_inDialogue');
+    LoggerService.instance.d(
+      '收到chunk: "$chunk", 当前状态: _inDialogue=$_inDialogue',
+      category: LogCategory.ai,
+      tags: ['chat', 'chunk'],
+    );
 
     final result = ChatStreamParser.parseChunk(
       chunk,
@@ -136,7 +138,11 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
     );
 
     // 调试：打印更新后的消息列表
-    ChatStreamParser.debugPrintMessages(result.messages, '解析后消息');
+    LoggerService.instance.d(
+      '解析后消息: ${result.messages.length}条',
+      category: LogCategory.ai,
+      tags: ['chat', 'messages', 'parsed'],
+    );
 
     setState(() {
       // 更新消息列表和解析状态

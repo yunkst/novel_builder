@@ -814,7 +814,11 @@ class _ChapterListScreenRiverpodState
 
       // 统一使用insertUserChapter方法
       final insertIndex = state.chapters.isEmpty ? 0 : afterIndex + 1;
-      debugPrint('AI生成章节：使用insertUserChapter插入到位置$insertIndex');
+      LoggerService.instance.i(
+        'AI生成章节：使用insertUserChapter插入到位置$insertIndex',
+        category: LogCategory.ui,
+        tags: ['chapter-list', 'chapter', 'insert'],
+      );
 
       await chapterActionHandler.insertChapter(
         novelUrl: widget.novel.url,

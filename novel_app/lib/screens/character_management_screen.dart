@@ -202,9 +202,13 @@ class _CharacterManagementScreenState
           }
         },
       );
-    } catch (e) {
-      LoggerService.instance.e('创建角色失败: ${e.toString()}');
-      debugPrint('❌ 创建角色失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '创建角色失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'create', 'failed'],
+      );
       if (!mounted) return;
 
       // 关闭加载对话框
@@ -312,9 +316,13 @@ class _CharacterManagementScreenState
           }
         },
       );
-    } catch (e) {
-      LoggerService.instance.e('提取角色失败: ${e.toString()}');
-      debugPrint('❌ 提取角色失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '提取角色失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'extract', 'failed'],
+      );
       if (!mounted) return;
 
       // 关闭加载对话框
@@ -344,10 +352,15 @@ class _CharacterManagementScreenState
         try {
           await repository.createCharacter(character);
           successCount++;
-        } catch (e) {
+        } catch (e, stackTrace) {
           failCount++;
           failedCharacters.add('${character.name}: $e');
-          debugPrint('保存角色失败 - ${character.name}: $e');
+          LoggerService.instance.w(
+            '保存角色失败 - ${character.name}: $e',
+            stackTrace: stackTrace.toString(),
+            category: LogCategory.character,
+            tags: ['character', 'save', 'item-failed', character.name],
+          );
         }
       }
 
@@ -367,9 +380,13 @@ class _CharacterManagementScreenState
               () => _showFailDetails(failedCharacters));
         }
       }
-    } catch (e) {
-      LoggerService.instance.e('保存角色时发生错误: ${e.toString()}');
-      debugPrint('❌ 保存角色时发生错误: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '保存角色时发生错误: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'save', 'failed'],
+      );
       if (mounted) {
         ToastUtils.showError('保存角色时发生错误: $e');
       }
@@ -479,8 +496,13 @@ class _CharacterManagementScreenState
       // 退出多选模式并重新加载
       _exitMultiSelectMode();
       ref.invalidate(characterManagementStateProvider(widget.novel));
-    } catch (e) {
-      debugPrint('❌ 批量删除角色失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '批量删除角色失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'batch-delete', 'failed'],
+      );
       if (mounted) {
         ToastUtils.showError('批量删除失败: $e');
       }
@@ -868,7 +890,12 @@ class _CharacterManagementScreenState
                 height: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint('❌ 头像加载失败: $error');
+                  LoggerService.instance.e(
+                    '头像加载失败: $error',
+                    stackTrace: stackTrace.toString(),
+                    category: LogCategory.character,
+                    tags: ['character', 'avatar', 'load-failed'],
+                  );
                   return _buildFallbackAvatar(character);
                 },
               ),

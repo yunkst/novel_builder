@@ -8,6 +8,7 @@ import '../utils/toast_utils.dart';
 import '../widgets/api_image_widget.dart';
 import '../widgets/gallery_action_panel.dart';
 import '../services/image_crop_service.dart';
+import '../services/logger_service.dart';
 
 /// 图集浏览页面 - Riverpod 版本
 class GalleryViewScreen extends ConsumerStatefulWidget {
@@ -62,8 +63,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       await avatarSyncService.init();
       _loadGallery();
       _fadeController.forward();
-    } catch (e) {
-      debugPrint('❌ 缓存服务初始化失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '缓存服务初始化失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
       // 即使缓存服务初始化失败，也要加载图集
       _loadGallery();
       _fadeController.forward();
@@ -92,13 +98,22 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       // 预加载前几张图片
       _preloadImages();
 
-      debugPrint('✓ 图集加载成功: ${_sortedImages.length} 张图片');
-    } catch (e) {
+      LoggerService.instance.i(
+        '图集加载成功: ${_sortedImages.length} 张图片',
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
+    } catch (e, stackTrace) {
       setState(() {
         _isLoading = false;
         _hasGalleryLoadError = true;
       });
-      debugPrint('❌ 图集加载失败: $e');
+      LoggerService.instance.e(
+        '图集加载失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
 
       if (mounted) {
         _showErrorSnackBar('加载图集失败: $e', onRetry: _loadGallery);
@@ -183,8 +198,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
           ToastUtils.showSuccess('图片删除成功');
         }
       }
-    } catch (e) {
-      debugPrint('❌ 删除图片失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
       if (mounted) {
         ToastUtils.showError('删除失败: $e');
       }
@@ -200,8 +220,11 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
           _sortedImages.isNotEmpty ? _sortedImages[_currentIndex] : null;
       final referenceImageUrl = currentImage?.filename;
 
-      debugPrint(
-          '🔄 生成更多图片，当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName');
+      LoggerService.instance.d(
+        '生成更多图片, 当前图片索引: $_currentIndex, 参考图片: $referenceImageUrl, 模型: $modelName',
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
 
       await apiService.generateMoreImages(
         roleId: widget.roleId,
@@ -225,8 +248,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
 
       // 显示生成中提示
       _showGeneratingDialog();
-    } catch (e) {
-      debugPrint('❌ 生成图片失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '生成图片失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
       if (mounted) {
         ToastUtils.showError('生成失败: $e', context: context);
       }
@@ -238,12 +266,20 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       final cacheService = ref.read(roleGalleryCacheServiceProvider);
       final avatarService = ref.read(characterAvatarServiceProvider);
 
-      debugPrint('🎨 开始设置图片为头像: ${image.filename}');
+      LoggerService.instance.d(
+        '开始设置图片为头像: ${image.filename}',
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
 
       // 获取图片字节数据
       final imageBytes = await cacheService.getImageBytes(image.filename);
       if (imageBytes == null) {
-        debugPrint('❌ 无法获取图片数据: ${image.filename}');
+        LoggerService.instance.e(
+          '无法获取图片数据: ${image.filename}',
+          category: LogCategory.ui,
+          tags: ['gallery'],
+        );
         if (mounted) {
           ToastUtils.showError('无法获取图片数据');
         }
@@ -254,8 +290,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       int characterId;
       try {
         characterId = int.parse(widget.roleId);
-      } catch (e) {
-        debugPrint('❌ 角色ID解析失败: ${widget.roleId}, 错误: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '角色ID解析失败: ${widget.roleId}, 错误: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.ui,
+          tags: ['gallery'],
+        );
         if (mounted) {
           ToastUtils.showError('角色ID无效');
         }
@@ -275,7 +316,11 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
 
         // 写入图片数据
         await tempFile.writeAsBytes(imageBytes);
-        debugPrint('📁 临时图片保存: ${tempFile.path}');
+        LoggerService.instance.d(
+          '临时图片保存: ${tempFile.path}',
+          category: LogCategory.ui,
+          tags: ['gallery'],
+        );
 
         // 验证文件是否成功创建
         if (!await tempFile.exists()) {
@@ -284,8 +329,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
 
         // 执行图片裁剪
         croppedFile = await ImageCropService.cropImageForAvatar(tempFile);
-      } catch (e) {
-        debugPrint('❌ 图片准备阶段失败: $e');
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '图片准备阶段失败: $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.ui,
+          tags: ['gallery'],
+        );
         if (mounted) {
           ToastUtils.showError('图片准备失败: $e');
         }
@@ -298,7 +348,11 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
       await _cleanupTempFiles(tempDir, tempFile, null);
 
       if (croppedFile == null) {
-        debugPrint('ℹ️ 用户取消了图片裁剪');
+        LoggerService.instance.i(
+          '用户取消了图片裁剪',
+          category: LogCategory.ui,
+          tags: ['gallery'],
+        );
         if (mounted) {
           ToastUtils.showInfo('已取消头像设置');
         }
@@ -317,13 +371,21 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
         );
 
         if (avatarPath != null) {
-          debugPrint('✅ 图片裁剪并设置头像成功: ${image.filename} -> $avatarPath');
+          LoggerService.instance.i(
+            '图片裁剪并设置头像成功: ${image.filename} -> $avatarPath',
+            category: LogCategory.ui,
+            tags: ['gallery'],
+          );
 
           if (mounted) {
             ToastUtils.showSuccess('头像设置成功');
           }
         } else {
-          debugPrint('❌ 裁剪后的图片设置头像失败');
+          LoggerService.instance.e(
+            '裁剪后的图片设置头像失败',
+            category: LogCategory.ui,
+            tags: ['gallery'],
+          );
           if (mounted) {
             ToastUtils.showError('头像设置失败');
           }
@@ -335,11 +397,20 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
             await croppedFile.delete();
           }
         } catch (e) {
-          debugPrint('⚠️ 清理裁剪文件失败: $e');
+          LoggerService.instance.w(
+            '清理裁剪文件失败: $e',
+            category: LogCategory.ui,
+            tags: ['gallery'],
+          );
         }
       }
-    } catch (e) {
-      debugPrint('❌ 设置头像失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '设置头像失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
       if (mounted) {
         _showErrorSnackBar('设置头像失败: $e');
       }
@@ -360,7 +431,11 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
         await tempDir.delete(recursive: true);
       }
     } catch (e) {
-      debugPrint('⚠️ 清理临时文件失败: $e');
+      LoggerService.instance.w(
+        '清理临时文件失败: $e',
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
     }
   }
 
@@ -808,8 +883,13 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
 
       // 重新加载图集
       await _loadGallery();
-    } catch (e) {
-      debugPrint('❌ 重新加载图集失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '重新加载图集失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['gallery'],
+      );
       if (mounted) {
         ToastUtils.showError('重新加载失败，请稍后再试: $e');
       }

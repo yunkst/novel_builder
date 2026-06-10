@@ -15,6 +15,7 @@ import '../core/providers/character_screen_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../core/providers/database_providers.dart';
+import '../services/logger_service.dart';
 
 /// 人物编辑界面
 ///
@@ -231,8 +232,13 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       if (mounted) {
         ToastUtils.showInfo('数据已刷新');
       }
-    } catch (e) {
-      debugPrint('❌ 刷新角色数据失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '刷新角色数据失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character'],
+      );
     }
   }
 
@@ -386,7 +392,11 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
         ToastUtils.showSuccess('图片生成中，请耐心等待');
       }
 
-      debugPrint('角色卡生成响应: $response');
+      LoggerService.instance.d(
+        '角色卡生成响应: $response',
+        category: LogCategory.character,
+        tags: ['character'],
+      );
     } catch (e) {
       if (mounted) {
         ToastUtils.showError('生成失败: $e');
@@ -999,7 +1009,12 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                       height: 80,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        debugPrint('❌ 头像加载失败: $error');
+                        LoggerService.instance.e(
+                          '头像加载失败: $error',
+                          stackTrace: stackTrace.toString(),
+                          category: LogCategory.character,
+                          tags: ['character'],
+                        );
                         return _buildFallbackAvatar(80);
                       },
                     ),
@@ -1406,14 +1421,27 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
 
       final rawImages = galleryData['images'];
       if (rawImages is List && rawImages.isNotEmpty) {
-        debugPrint('角色图集检查: 找到 ${rawImages.length} 张图片');
+        LoggerService.instance.d(
+          '角色图集检查: 找到 ${rawImages.length} 张图片',
+          category: LogCategory.character,
+          tags: ['character'],
+        );
         return false;
       } else {
-        debugPrint('角色图集检查: 图集数据为空');
+        LoggerService.instance.d(
+          '角色图集检查: 图集数据为空',
+          category: LogCategory.character,
+          tags: ['character'],
+        );
         return true;
       }
-    } catch (e) {
-      debugPrint('❌ 检查图集状态异常: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '检查图集状态异常: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character'],
+      );
       // 如果发生异常，假设图集为空，避免用户进入空页面
       return true;
     }

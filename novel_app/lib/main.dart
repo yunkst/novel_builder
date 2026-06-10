@@ -12,6 +12,7 @@ import 'core/theme/app_colors.dart';
 import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
+import 'services/log_reporter_service.dart';
 import 'widgets/hermes/hermes_floating_button.dart';
 
 void main() async {
@@ -20,6 +21,28 @@ void main() async {
 
   // 初始化日志服务
   await LoggerService.instance.init();
+  LoggerService.instance.i(
+    'LoggerService 初始化完成',
+    category: LogCategory.general,
+    tags: ['startup', 'logger'],
+  );
+
+  // 初始化日志上报服务（在 LoggerService 之后）
+  try {
+    await LogReporterService.instance.init();
+    LoggerService.instance.i(
+      'LogReporterService 初始化完成',
+      category: LogCategory.general,
+      tags: ['startup', 'log-reporter'],
+    );
+  } catch (e, stackTrace) {
+    LoggerService.instance.e(
+      'LogReporterService 初始化失败: $e',
+      stackTrace: stackTrace.toString(),
+      category: LogCategory.general,
+      tags: ['startup', 'log-reporter', 'error'],
+    );
+  }
 
   // 启用详细的错误日志 - 全局错误处理器
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -143,6 +166,12 @@ class NovelReaderApp extends ConsumerWidget {
         );
       },
       error: (error, stack) {
+        LoggerService.instance.e(
+          '主题加载失败: $error',
+          stackTrace: stack.toString(),
+          category: LogCategory.ui,
+          tags: ['theme', 'load', 'error'],
+        );
         // 错误时显示错误信息
         return MaterialApp(
           title: 'Novel App',
@@ -254,6 +283,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       case AppLifecycleState.paused:
         // 应用进入后台时，暂停所有视频播放
         VideoCacheManager.pauseAllExcept(null);
+        // 立即上报缓冲日志，避免丢失
+        LogReporterService.instance.flush();
         break;
       case AppLifecycleState.resumed:
         // 应用恢复前台时，不自动恢复播放，让可见性检测器处理

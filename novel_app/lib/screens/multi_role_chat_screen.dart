@@ -263,8 +263,11 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
 
     final displayChunk =
         chunk.length > 50 ? '${chunk.substring(0, 50)}...' : chunk;
-    debugPrint('📦 收到chunk: "$displayChunk"');
-    debugPrint('🏷️ 标签状态: ${_tagParserState.toString()}');
+    LoggerService.instance.d(
+      '收到chunk: "$displayChunk", 标签状态: ${_tagParserState.toString()}',
+      category: LogCategory.ai,
+      tags: ['chat', 'multi-role', 'chunk'],
+    );
 
     // 解析显示（传递标签状态）
     final result = ChatStreamParser.parseChunkForMultiRole(

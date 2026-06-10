@@ -7,6 +7,7 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/novel.dart';
 import '../../services/api_service_wrapper.dart';
+import '../../services/logger_service.dart';
 
 part 'search_screen_providers.g.dart';
 
@@ -87,6 +88,11 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
 
   /// 开始初始化 API
   Future<void> initialize(ApiServiceWrapper api) async {
+    LoggerService.instance.d(
+      '开始初始化搜索 API',
+      category: LogCategory.network,
+      tags: ['provider', 'search', 'init'],
+    );
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
@@ -96,7 +102,18 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
         isInitialized: true,
         errorMessage: null,
       );
-    } catch (e) {
+      LoggerService.instance.i(
+        '搜索 API 初始化成功',
+        category: LogCategory.ui,
+        tags: ['provider', 'search', 'init'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '搜索 API 初始化失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'search', 'init'],
+      );
       state = state.copyWith(
         isLoading: false,
         isInitialized: false,
@@ -131,6 +148,12 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
       return;
     }
 
+    LoggerService.instance.d(
+      '开始搜索小说: keyword=$keyword, sites=$sites',
+      category: LogCategory.network,
+      tags: ['provider', 'search', 'search'],
+    );
+
     state = state.copyWith(
       isLoading: true,
       errorMessage: null,
@@ -144,7 +167,18 @@ class SearchScreenNotifier extends _$SearchScreenNotifier {
         results: results,
         errorMessage: results.isEmpty ? '未找到相关小说，请尝试其他关键词或调整源站筛选' : null,
       );
-    } catch (e) {
+      LoggerService.instance.i(
+        '搜索完成: keyword=$keyword, results=${results.length}',
+        category: LogCategory.ui,
+        tags: ['provider', 'search', 'search'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '搜索小说失败: keyword=$keyword, $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'search', 'search'],
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -170,13 +204,29 @@ class SourceSitesNotifier extends _$SourceSitesNotifier {
 
   /// 加载源站列表
   Future<void> loadSourceSites(ApiServiceWrapper api) async {
+    LoggerService.instance.d(
+      '开始加载源站列表',
+      category: LogCategory.network,
+      tags: ['provider', 'search', 'load-sites'],
+    );
     try {
       final sites = await api.getSourceSites();
       state = state.copyWith(
         sites: sites,
         selectedSiteIds: sites.map((site) => site['id'] as String).toSet(),
       );
-    } catch (e) {
+      LoggerService.instance.i(
+        '源站列表加载成功: count=${sites.length}',
+        category: LogCategory.ui,
+        tags: ['provider', 'search', 'load-sites'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '加载源站列表失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['provider', 'search', 'load-sites'],
+      );
       // 加载失败，保持空列表，但记录错误以便调试
       // 如果sites已经不为空，说明之前加载过，那么保持之前的数据
       if (state.sites.isEmpty) {

@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../services/logger_service.dart';
 import '../../services/preferences_service.dart';
 import '../theme/app_colors.dart';
 
@@ -105,6 +106,11 @@ class ThemeNotifier extends _$ThemeNotifier {
     final prefs = PreferencesService.instance;
 
     try {
+      LoggerService.instance.d(
+        '开始加载主题设置',
+        category: LogCategory.ui,
+        tags: ['provider', 'theme', 'load'],
+      );
       final themeModeString = await prefs.getString(_themeModeKey);
 
       AppThemeMode themeMode;
@@ -118,8 +124,19 @@ class ThemeNotifier extends _$ThemeNotifier {
         themeMode = AppThemeMode.dark;
       }
 
+      LoggerService.instance.i(
+        '主题设置加载成功: $themeMode',
+        category: LogCategory.ui,
+        tags: ['provider', 'theme', 'load'],
+      );
       return ThemeState(themeMode: themeMode);
-    } catch (e) {
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '加载主题设置失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ui,
+        tags: ['provider', 'theme', 'load'],
+      );
       // 发生错误时使用默认主题
       return const ThemeState(themeMode: AppThemeMode.dark);
     }
@@ -131,6 +148,12 @@ class ThemeNotifier extends _$ThemeNotifier {
     final current = await future;
     if (current.themeMode == mode) return;
 
+    LoggerService.instance.d(
+      '设置主题模式: $mode',
+      category: LogCategory.ui,
+      tags: ['provider', 'theme', 'set'],
+    );
+
     try {
       final prefs = PreferencesService.instance;
 
@@ -139,7 +162,18 @@ class ThemeNotifier extends _$ThemeNotifier {
 
       // 更新状态
       state = AsyncData(current.copyWith(themeMode: mode));
-    } catch (e) {
+      LoggerService.instance.i(
+        '主题模式切换成功: $mode',
+        category: LogCategory.ui,
+        tags: ['provider', 'theme', 'set'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        '保存主题模式失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ui,
+        tags: ['provider', 'theme', 'set'],
+      );
       // 保存失败时抛出错误
       throw Exception('保存主题模式失败: $e');
     }

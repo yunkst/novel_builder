@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/logger_service.dart';
 import '../utils/media_markup_parser.dart';
 import 'scene_image_preview.dart';
 
@@ -125,7 +126,11 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           ? (taskId) => widget.onImageDelete!(taskId)
           : null,
       onImageDeleted: () {
-        debugPrint('单张图片删除成功: ${markup.id}');
+        LoggerService.instance.i(
+          '单张图片删除成功: ${markup.id}',
+          category: LogCategory.ui,
+          tags: const ['paragraph'],
+        );
       },
       modelWidth: widget.modelWidth,
       modelHeight: widget.modelHeight,

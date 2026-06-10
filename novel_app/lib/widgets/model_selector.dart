@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:novel_api/novel_api.dart';
 import '../core/providers/services/network_service_providers.dart';
+import '../services/logger_service.dart';
 
 /// 统一的模型选择组件
 /// 支持从后端API动态获取模型列表并提供下拉选择功能
@@ -89,7 +90,11 @@ class _ModelSelectorState extends ConsumerState<ModelSelector> {
           return allModels;
       }
     } catch (e) {
-      debugPrint('加载模型列表失败: $e');
+      LoggerService.instance.e(
+        '加载模型列表失败: $e',
+        category: LogCategory.ui,
+        tags: const ['model'],
+      );
       // 返回空列表，避免崩溃
       return [];
     }

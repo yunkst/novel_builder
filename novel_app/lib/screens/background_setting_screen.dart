@@ -205,8 +205,13 @@ class _BackgroundSettingScreenState
           _isModified = false;
         });
       }
-    } catch (e) {
-      debugPrint('加载背景设定失败: $e');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载背景设定失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['background', 'load', 'failed'],
+      );
       if (mounted) {
         // 如果加载失败，使用widget.novel中的值作为后备
         setState(() {

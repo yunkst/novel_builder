@@ -1,0 +1,1806 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: 结构化信息
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/deepseek:0.0.15@725407927b04e236212083d20e92830d60fa944e42cd357ef6902c160414f6f1
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: 1759138104711-source-1765253093804-target
+      source: '1759138104711'
+      sourceHandle: source
+      target: '1765253093804'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-true-1765253186012-target
+      source: '1765253093804'
+      sourceHandle: 'true'
+      target: '1765253186012'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-true-1765256215751-target
+      source: '1765253093804'
+      sourceHandle: 'true'
+      target: '1765256215751'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-false-1765266099735-target
+      source: '1765253093804'
+      sourceHandle: 'false'
+      target: '1765266099735'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-false-1765350627730-target
+      selected: false
+      source: '1765253093804'
+      sourceHandle: 'false'
+      target: '1765350627730'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: template-transform
+        targetType: variable-aggregator
+      id: 1765253186012-source-1765350654908-target
+      source: '1765253186012'
+      sourceHandle: source
+      target: '1765350654908'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: variable-aggregator
+        targetType: llm
+      id: 1765350654908-source-1765258804094-target
+      source: '1765350654908'
+      sourceHandle: source
+      target: '1765258804094'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: template-transform
+        targetType: variable-aggregator
+      id: 1765266099735-source-1765350654908-target
+      source: '1765266099735'
+      sourceHandle: source
+      target: '1765350654908'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: variable-aggregator
+        targetType: llm
+      id: 1765350663475-source-1765258804094-target
+      source: '1765350663475'
+      sourceHandle: source
+      target: '1765258804094'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: template-transform
+        targetType: variable-aggregator
+      id: 1765350627730-source-1765350663475-target
+      source: '1765350627730'
+      sourceHandle: source
+      target: '1765350663475'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: variable-aggregator
+        targetType: end
+      id: 1765362177201-source-1759138140959-target
+      source: '1765362177201'
+      sourceHandle: source
+      target: '1759138140959'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1765258804094-source-1765362177201-target
+      source: '1765258804094'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: template-transform
+        targetType: variable-aggregator
+      id: 1765256215751-source-1765350663475-target
+      source: '1765256215751'
+      sourceHandle: source
+      target: '1765350663475'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-dea14d44-4aaa-43b4-b132-05b15a3ab7ca-1765445210538-target
+      source: '1765253093804'
+      sourceHandle: dea14d44-4aaa-43b4-b132-05b15a3ab7ca
+      target: '1765445210538'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1765445210538-source-1765362177201-target
+      source: '1765445210538'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-4c4b1b82-c7ca-4926-8d11-bbf6843475ce-1765448088725-target
+      source: '1765253093804'
+      sourceHandle: 4c4b1b82-c7ca-4926-8d11-bbf6843475ce
+      target: '1765448088725'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1765448088725-source-1765362177201-target
+      source: '1765448088725'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-e2df5d17-53cb-47a7-8e97-40eba21b1132-1765719994072-target
+      source: '1765253093804'
+      sourceHandle: e2df5d17-53cb-47a7-8e97-40eba21b1132
+      target: '1765719994072'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1765719994072-source-1765362177201-target
+      source: '1765719994072'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-48b453c7-93e6-47c7-a3ac-1d796d93c2f6-1765862282048-target
+      source: '1765253093804'
+      sourceHandle: 48b453c7-93e6-47c7-a3ac-1d796d93c2f6
+      target: '1765862282048'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1765862282048-source-1765362177201-target
+      source: '1765862282048'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-e3f4fd99-7a3c-441a-abde-f997046c1a71-1767591248220-target
+      source: '1765253093804'
+      sourceHandle: e3f4fd99-7a3c-441a-abde-f997046c1a71
+      target: '1767591248220'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: template-transform
+        targetType: variable-aggregator
+      id: 1767591248220-source-1765350654908-target
+      source: '1767591248220'
+      sourceHandle: source
+      target: '1765350654908'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: 1765253093804-e3f4fd99-7a3c-441a-abde-f997046c1a71-1765256215751-target
+      source: '1765253093804'
+      sourceHandle: e3f4fd99-7a3c-441a-abde-f997046c1a71
+      target: '1765256215751'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-3b3153f6-e5c8-4660-bc42-004b0d14eca4-1767678678901-target
+      source: '1765253093804'
+      sourceHandle: 3b3153f6-e5c8-4660-bc42-004b0d14eca4
+      target: '1767678678901'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1767678678901-source-1765362177201-target
+      source: '1767678678901'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-d5f7f264-4309-4f60-b7f5-9e9cf8c9c3eb-1768896895365-target
+      source: '1765253093804'
+      sourceHandle: d5f7f264-4309-4f60-b7f5-9e9cf8c9c3eb
+      target: '1768896895365'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1768896895365-source-1765362177201-target
+      source: '1768896895365'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-a210f2cf-e506-43c4-a9be-fb8d6cc5de27-1769320891074-target
+      source: '1765253093804'
+      sourceHandle: a210f2cf-e506-43c4-a9be-fb8d6cc5de27
+      target: '1769320891074'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1769320891074-source-1765362177201-target
+      source: '1769320891074'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1765253093804-c2faa150-7fb6-4d43-89d6-80c07384d10f-1780652201290-target
+      source: '1765253093804'
+      sourceHandle: c2faa150-7fb6-4d43-89d6-80c07384d10f
+      target: '1780652201290'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+      id: 1780652201290-source-1765362177201-target
+      source: '1780652201290'
+      sourceHandle: source
+      target: '1765362177201'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 用户输入
+          max_length: 4800
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: user_input
+        - default: ''
+          hint: ''
+          label: 小说内容
+          max_length: 1000000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: chapters_content
+        - default: ''
+          hint: ''
+          label: 角色
+          max_length: 48000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: roles
+        - default: ''
+          hint: ''
+          label: 命令
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: cmd
+        - default: ''
+          hint: ''
+          label: ai_writer_setting
+          max_length: 480000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: ai_writer_setting
+        - default: ''
+          hint: ''
+          label: 背景设定
+          max_length: 480000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: background_setting
+        - default: ''
+          hint: ''
+          label: 图片提示词
+          max_length: 100000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: prompts
+        - default: ''
+          hint: ''
+          label: 大纲
+          max_length: 4800001
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: outline
+        - default: ''
+          hint: ''
+          label: 用户选择角色
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: user_choice_role
+        - default: ''
+          hint: ''
+          label: 剧本
+          max_length: 480000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: play
+        - default: ''
+          hint: ''
+          label: role_strategy
+          max_length: 48000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: role_strategy
+        - default: ''
+          hint: ''
+          label: 提示词技巧
+          max_length: 480000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: prompt_skill
+        - default: ''
+          hint: ''
+          label: 人物关系
+          max_length: 480000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: relations
+        - default: ''
+          hint: ''
+          label: 标签类型
+          max_length: 8000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: tag_categories
+        - default: ''
+          hint: ''
+          label: 当前章节内容
+          max_length: 100000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: current_chapter_content
+      height: 471
+      id: '1759138104711'
+      position:
+        x: -90.83435502577001
+        y: -63.65456546464242
+      positionAbsolute:
+        x: -90.83435502577001
+        y: -63.65456546464242
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1765362177201'
+          - output
+          value_type: object
+          variable: content
+        selected: false
+        title: 结束
+        type: end
+      height: 86
+      id: '1759138140959'
+      position:
+        x: 2510.6921826614416
+        y: 430.1891223270777
+      positionAbsolute:
+        x: 2510.6921826614416
+        y: 430.1891223270777
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: is
+            id: 4e960018-9d5c-4cd5-9f11-d447bc6b0ab2
+            value: 生成
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: 'true'
+          logical_operator: and
+        - case_id: dea14d44-4aaa-43b4-b132-05b15a3ab7ca
+          conditions:
+          - comparison_operator: contains
+            id: d609ae24-453b-472e-8726-df68d6308a96
+            value: 角色卡提示词描写
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: dea14d44-4aaa-43b4-b132-05b15a3ab7ca
+          logical_operator: and
+        - case_id: 4c4b1b82-c7ca-4926-8d11-bbf6843475ce
+          conditions:
+          - comparison_operator: contains
+            id: 2539dc41-4a74-42ef-8a5b-86a0341dacd1
+            value: 拍照
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: 4c4b1b82-c7ca-4926-8d11-bbf6843475ce
+          logical_operator: and
+        - case_id: e2df5d17-53cb-47a7-8e97-40eba21b1132
+          conditions:
+          - comparison_operator: contains
+            id: 2f9e46aa-791f-4e3c-8fff-ebc698d9a0c8
+            value: 场面绘制
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: e2df5d17-53cb-47a7-8e97-40eba21b1132
+          logical_operator: and
+        - case_id: 48b453c7-93e6-47c7-a3ac-1d796d93c2f6
+          conditions:
+          - comparison_operator: contains
+            id: 024e67f1-7e46-4108-90e9-17a4ebfc1138
+            value: 图生视频
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: 48b453c7-93e6-47c7-a3ac-1d796d93c2f6
+          logical_operator: and
+        - case_id: e3f4fd99-7a3c-441a-abde-f997046c1a71
+          conditions:
+          - comparison_operator: is
+            id: 5f7affc8-df47-4a70-8334-de3156becb9b
+            value: 大纲生成角色
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: e3f4fd99-7a3c-441a-abde-f997046c1a71
+          logical_operator: and
+        - case_id: 3b3153f6-e5c8-4660-bc42-004b0d14eca4
+          conditions:
+          - comparison_operator: contains
+            id: 1bd6bcaf-0440-4624-ada9-f8b3daca83e8
+            value: 生成剧本
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: 3b3153f6-e5c8-4660-bc42-004b0d14eca4
+          logical_operator: and
+        - case_id: d5f7f264-4309-4f60-b7f5-9e9cf8c9c3eb
+          conditions:
+          - comparison_operator: contains
+            id: bdf83956-90e1-40ea-9371-50da4e11c527
+            value: 提取角色
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: d5f7f264-4309-4f60-b7f5-9e9cf8c9c3eb
+          logical_operator: and
+        - case_id: a210f2cf-e506-43c4-a9be-fb8d6cc5de27
+          conditions:
+          - comparison_operator: contains
+            id: 228b41eb-e588-499d-bdfc-f65f7aa26aa7
+            value: AI伴读
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: a210f2cf-e506-43c4-a9be-fb8d6cc5de27
+          logical_operator: and
+        - case_id: c2faa150-7fb6-4d43-89d6-80c07384d10f
+          conditions:
+          - comparison_operator: contains
+            id: 03e973d4-eeaf-48ca-8d6f-dc14bf005c78
+            value: 提取标签
+            varType: string
+            variable_selector:
+            - '1759138104711'
+            - cmd
+          id: c2faa150-7fb6-4d43-89d6-80c07384d10f
+          logical_operator: and
+        selected: false
+        title: 条件分支
+        type: if-else
+      height: 578
+      id: '1765253093804'
+      position:
+        x: 337.26154126431095
+        y: -7.094054231610556
+      positionAbsolute:
+        x: 337.26154126431095
+        y: -7.094054231610556
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        selected: false
+        template: "你是热门网络小说家\r\n现在你的任务是根据用户要求设计角色\r\n\r\n{% if background_setting\
+          \ %}\r\n以下是小说的基本设定\r\n<小说故事背景>\r\n{{ background_setting }}\r\n</小说故事背景>\r\
+          \n{% endif %}\r\n"
+        title: 生成角色
+        type: template-transform
+        variables:
+        - value_selector:
+          - '1759138104711'
+          - ai_writer_setting
+          value_type: string
+          variable: ai_writer_setting
+        - value_selector:
+          - '1759138104711'
+          - background_setting
+          value_type: string
+          variable: background_setting
+      height: 50
+      id: '1765253186012'
+      position:
+        x: 792.5714285714287
+        y: -93.0000000000001
+      positionAbsolute:
+        x: 792.5714285714287
+        y: -93.0000000000001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        selected: false
+        template: "按照以下要求进行角色设计\r\n\r\n{{ user_input }}"
+        title: 要求
+        type: template-transform
+        variables:
+        - value_selector:
+          - '1759138104711'
+          - user_input
+          value_type: string
+          variable: user_input
+      height: 50
+      id: '1765256215751'
+      position:
+        x: 780.4466599108582
+        y: -22.38332010820767
+      positionAbsolute:
+        x: 780.4466599108582
+        y: -22.38332010820767
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 116cd6da-398c-4b09-8c22-f96a6f09a327
+          role: system
+          text: '{{#1765350654908.output#}}'
+        - id: 077a270c-1bf7-4404-a4be-ef1889427a6e
+          role: user
+          text: '{{#1765350663475.output#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              roles:
+                items:
+                  additionalProperties: false
+                  properties:
+                    age:
+                      description: 年龄
+                      type: number
+                    appearanceFeatures:
+                      description: 外貌特点
+                      type: string
+                    backgroundStory:
+                      description: 经历简述
+                      type: string
+                    bodyType:
+                      description: 身材
+                      type: string
+                    clothingStyle:
+                      description: 穿衣风格
+                      type: string
+                    gender:
+                      description: 性别
+                      type: string
+                    name:
+                      description: 姓名
+                      type: string
+                    occupation:
+                      description: 职业
+                      type: string
+                    personality:
+                      description: 性格
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 角色卡
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1765258804094'
+      position:
+        x: 1907.7142857142858
+        y: -64.42857142857147
+      positionAbsolute:
+        x: 1907.7142857142858
+        y: -64.42857142857147
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        selected: false
+        template: "根据以下文章内容，提取文章中出现的角色信息，如果角色已经在角色列表中，那么就需要判断是否需要更新，如果需要更新，那么就输出修改后的信息，除非出现设定冲突，否则保留原始设定。\r\
+          \n如果没有要修改的内容，那么就不需要输出这个角色信息。\r\n\r\n<小说内容>\r\n{{ chapters_content }}\r\n\
+          </小说内容>\r\n\r\n<已有角色>\r\n{{ roles }}\r\n</已有角色>\r\n"
+        title: 从文章中提取
+        type: template-transform
+        variables:
+        - value_selector:
+          - '1759138104711'
+          - chapters_content
+          value_type: string
+          variable: chapters_content
+        - value_selector:
+          - '1759138104711'
+          - roles
+          value_type: string
+          variable: roles
+      height: 50
+      id: '1765266099735'
+      position:
+        x: 792.5714285714287
+        y: 146.14285714285705
+      positionAbsolute:
+        x: 792.5714285714287
+        y: 146.14285714285705
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        selected: false
+        template: 生成章节中提到的角色信息列表吧
+        title: 默认要求
+        type: template-transform
+        variables: []
+      height: 50
+      id: '1765350627730'
+      position:
+        x: 792.5714285714287
+        y: 238.5714285714285
+      positionAbsolute:
+        x: 792.5714285714287
+        y: 238.5714285714285
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        output_type: string
+        selected: false
+        title: 系统提示词
+        type: variable-aggregator
+        variables:
+        - - '1765266099735'
+          - output
+        - - '1765253186012'
+          - output
+        - - '1767591248220'
+          - output
+      height: 159
+      id: '1765350654908'
+      position:
+        x: 1346.0940542316107
+        y: -93.0000000000001
+      positionAbsolute:
+        x: 1346.0940542316107
+        y: -93.0000000000001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        output_type: string
+        selected: false
+        title: 用户输入
+        type: variable-aggregator
+        variables:
+        - - '1765350627730'
+          - output
+        - - '1765256215751'
+          - output
+      height: 133
+      id: '1765350663475'
+      position:
+        x: 1364.8571428571431
+        y: 146.14285714285705
+      positionAbsolute:
+        x: 1364.8571428571431
+        y: 146.14285714285705
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        output_type: object
+        selected: false
+        title: 结构输出聚合
+        type: variable-aggregator
+        variables:
+        - - '1765258804094'
+          - structured_output
+        - - '1765445210538'
+          - structured_output
+        - - '1765448088725'
+          - structured_output
+        - - '1765719994072'
+          - structured_output
+        - - '1765862282048'
+          - structured_output
+        - - '1767678678901'
+          - structured_output
+        - - '1768896895365'
+          - structured_output
+        - - '1769320891074'
+          - structured_output
+        - - '1780652201290'
+          - structured_output
+      height: 315
+      id: '1765362177201'
+      position:
+        x: 1801.0948580388185
+        y: 367.85962742941615
+      positionAbsolute:
+        x: 1801.0948580388185
+        y: 367.85962742941615
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - roles
+            value_type: string
+            variable: roles
+        prompt_template:
+        - edition_type: jinja2
+          id: 31b8e0df-a7be-4323-b902-10475901a277
+          jinja2_text: "根据以下人物外貌设定，帮我把相应的文生图提示词写以下，需要是英文的提示词\r\n\r\n\r\n{{ roles }}\r\
+            \n"
+          role: system
+          text: '根据以下人物外貌设定，帮我把相应的文生图提示词写以下，需要是英文的提示词
+
+
+
+            {{ roles }}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              body_prompts:
+                description: 身材提示词
+                type: string
+              face_prompts:
+                description: 面部提示词
+                type: string
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 提示词转换
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1765445210538'
+      position:
+        x: 786.6312167831964
+        y: 325.5648490434418
+      positionAbsolute:
+        x: 786.6312167831964
+        y: 325.5648490434418
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - roles
+            variable: roles
+          - value_selector:
+            - '1759138104711'
+            - prompt_skill
+            variable: prompt_skill
+        prompt_template:
+        - edition_type: jinja2
+          id: a977675f-d726-40ff-9fca-b9e628e0c7d6
+          jinja2_text: "{% if prompt_skill %}\r\n{{ prompt_skill }}\r\n{% else %}\r\
+            \n请根据以下信息，生成一段高品质、可用于图像生成的英文提示词，以下提示词中包含人脸和身材设定的生图提示词，需要保留，其他内容需要你根据其他信息发挥，比如身份职业，服装风格。\r\
+            \n{% endif %}\r\n\r\n现在选哟生成以下人物的肖像提示词，体现人物的特点：\r\n{{ roles }}"
+          role: system
+          text: '请根据以下信息，生成一段高品质、可用于图像生成的英文提示词，以下提示词中包含人脸和身材设定的生图提示词，需要保留，其他内容需要你根据其他信息发挥，比如身份职业，服装风格。
+
+
+            {{#1759138104711.roles#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              prompts:
+                description: 提示词列表
+                items:
+                  type: string
+                type: array
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 拍肖像
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1765448088725'
+      position:
+        x: 786.6312167831964
+        y: 430.1891223270777
+      positionAbsolute:
+        x: 786.6312167831964
+        y: 430.1891223270777
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - roles
+            variable: roles
+          - value_selector:
+            - '1759138104711'
+            - chapters_content
+            variable: chapters_content
+          - value_selector:
+            - '1759138104711'
+            - prompt_skill
+            value_type: string
+            variable: prompt_skill
+        prompt_template:
+        - edition_type: jinja2
+          id: df4a4e05-988a-4372-881f-6a608cd996b2
+          jinja2_text: "{% if prompt_skill %}\r\n{{ prompt_skill }}\r\n{% else %}\r\
+            \n你是Stable Diffusion文生图提示词编写大师，现在需要你\r\n根据以下场景描写以及出场人物设定，人物角色设定包含面部和身材提示词，在绘制场面的时候需要保留人物的外貌设定，生成英文的文生图提示词\r\
+            \n关于画风和质感相关的提示词需要省略\r\n{% endif %}\r\n<场景>\r\n{{ chapters_content }}\r\
+            \n</场景>\r\n{% if roles %}\r\n<角色>\r\n{{ roles }}\r\n</角色>\r\n{% endif\
+            \ %}\r\n\r\n请根据提供的场景和角色信息，生成详细的英文文生图提示词。"
+          role: system
+          text: '你是Stable Diffusion文生图提示词编写大师，现在需要你
+
+            根据以下场景描写以及出场人物设定，人物角色设定包含面部和身材提示词，在绘制场面的时候需要保留人物的外貌设定，生成英文的文生图提示词
+
+            关于画风和质感相关的提示词需要省略
+
+
+            <场景>
+
+            {{#1759138104711.chapters_content#}}
+
+            </场景>
+
+
+            <角色>
+
+            {{#1759138104711.roles#}}
+
+            </角色>
+
+
+            请根据提供的场景和角色信息，生成详细的英文文生图提示词。'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              prompts:
+                description: 提示词内容
+                type: string
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 场面绘制
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1765719994072'
+      position:
+        x: 786.6312167831964
+        y: 552.9343247905231
+      positionAbsolute:
+        x: 786.6312167831964
+        y: 552.9343247905231
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: b743418a-e775-4da4-91d6-e7b044cb2af0
+          role: system
+          text: '按照用户的要求，生成 图生视频 提示词。
+
+            提示词将会用于 comfyui 的图生视频工作流中。在这个工作流中，会自动识别图片内容，所以你只需要提供 视频 核心的动态相关内容，不需要再把图片描述一遍。
+
+            <图片内容>
+
+            {{#1759138104711.prompts#}}
+
+            </图片内容>'
+        - id: 73c58fee-da57-42ef-977d-785ef852564a
+          role: user
+          text: '让画面按照以下要求变成视频：
+
+            {{#1759138104711.user_input#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              prompts:
+                description: 图生视频提示词
+                type: string
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 图生视频
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1765862282048'
+      position:
+        x: 780.4466599108582
+        y: 668.333761997611
+      positionAbsolute:
+        x: 780.4466599108582
+        y: 668.333761997611
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        selected: false
+        template: "根据以下大纲内容，提取其中涉及到的角色，并适当的补充没有提到的合理的细节信息\r\n\r\n<大纲>\r\n{{ outline\
+          \ }}\r\n</大纲>"
+        title: 大纲生成角色
+        type: template-transform
+        variables:
+        - value_selector:
+          - '1759138104711'
+          - outline
+          value_type: string
+          variable: outline
+      height: 50
+      id: '1767591248220'
+      position:
+        x: 780.4466599108582
+        y: 49.94456361632021
+      positionAbsolute:
+        x: 780.4466599108582
+        y: 49.94456361632021
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - chapters_content
+            value_type: string
+            variable: chapters_content
+          - value_selector:
+            - '1759138104711'
+            - play
+            value_type: string
+            variable: play
+          - value_selector:
+            - '1759138104711'
+            - user_choice_role
+            value_type: string
+            variable: user_choice_role
+          - value_selector:
+            - '1759138104711'
+            - roles
+            value_type: string
+            variable: roles
+          - value_selector:
+            - '1759138104711'
+            - role_strategy
+            variable: role_strategy
+          - value_selector:
+            - '1759138104711'
+            - user_input
+            value_type: string
+            variable: user_input
+        prompt_template:
+        - edition_type: jinja2
+          id: 6895cc76-d938-49bc-9ffc-b440188f4e73
+          jinja2_text: "你是一位顶尖的沉浸式戏剧编剧和动态叙事设计师。你擅长将静态的小说文字转化为具有高度参与感的互动剧本，能够精准捕捉人物的情感内核和语言风格。\r\
+            \n{% if play %}\r\nTASK: 请在保留原有剧本框架的基础上，根据用户需求进行深度优化\r\n\r\n<原始剧本>\r\n\
+            {{ play }}\r\n</原始剧本>\r\n\r\n<原始策略>\r\n{{ role_strategy }}\r\n</原始策略>\r\
+            \n\r\n{% else %}\r\nTask: 请基于我提供的“小说章节”和“初始角色信息”，构建一个多维度的互动剧本，并为后期 AI\
+            \ 接管角色提供深度逻辑支撑。\r\nOutput Requirements:\r\n1. 世界观与情境重塑（Atmosphere & Setting）\r\
+            \n情境基调： 基于小说内容，提炼出当前的氛围（如：哀伤、热烈、压抑、江湖气等）。\r\n叙事视角： 描述玩家（用户）进入这一章故事时的切入点，TA\
+            \ 的出现如何扰动原本的剧情。\r\n2. 深度角色图谱（Character Blueprints）\r\n针对每一个提供的角色，生成以下非模板化的内容：\r\
+            \n性格底色： 用 一些关键词定义其性格（如：外冷内热、极度自卑、权力至上）。\r\n情感羁绊： 该角色与其他角色（包括玩家）之间的复杂关系（是救赎、背叛、仰慕还是利用？）。\r\
+            \n核心夙愿： 在本章节的特定情境下，该角色最想达成的事情是什么？\r\n语言习惯（接管关键）： 描述其措辞习惯（是否有口头禅？语气是谦卑、高傲还是充满讽刺？喜欢用短句还是长难句？）。\r\
+            \n反应机制： 当玩家表现出某种态度（如：示好、挑衅、求助）时，该角色的典型反应逻辑。\r\n即兴演播指南： 角色在互动中如何通过神态描述、动作细节（而不只是对白）来增强沉浸感。\r\
+            \n\r\n<小说素材>\r\n{{ chapters_content }}\r\n</小说素材>\r\n\r\n<参与角色>\r\n{{\
+            \ roles }}\r\n</参与角色>\r\n\r\n{% endif %}"
+          role: system
+          text: '
+
+            Role: 你是一位顶尖的沉浸式戏剧编剧和动态叙事设计师。你擅长将静态的小说文字转化为具有高度参与感的互动剧本，能够精准捕捉人物的情感内核和语言风格。
+
+            Task: 请基于我提供的“小说章节”和“初始角色信息”，构建一个多维度的互动剧本，并为后期 AI 接管角色提供深度逻辑支撑。
+
+            Output Requirements:
+
+            1. 世界观与情境重塑（Atmosphere & Setting）
+
+            情境基调： 基于小说内容，提炼出当前的氛围（如：哀伤、热烈、压抑、江湖气等）。
+
+            叙事视角： 描述玩家（用户）进入这一章故事时的切入点，TA 的出现如何扰动原本的剧情。
+
+            2. 深度角色图谱（Character Blueprints）
+
+            针对每一个提供的角色，生成以下非模板化的内容：
+
+            性格底色： 用 一些关键词定义其性格（如：外冷内热、极度自卑、权力至上）。
+
+            情感羁绊： 该角色与其他角色（包括玩家）之间的复杂关系（是救赎、背叛、仰慕还是利用？）。
+
+            核心夙愿： 在本章节的特定情境下，该角色最想达成的事情是什么？
+
+            语言习惯（接管关键）： 描述其措辞习惯（是否有口头禅？语气是谦卑、高傲还是充满讽刺？喜欢用短句还是长难句？）。
+
+            反应机制： 当玩家表现出某种态度（如：示好、挑衅、求助）时，该角色的典型反应逻辑。
+
+            即兴演播指南： 角色在互动中如何通过神态描述、动作细节（而不只是对白）来增强沉浸感。
+
+
+            <小说素材>
+
+            {{#1759138104711.chapters_content#}}
+
+            </小说素材>
+
+
+            <参与角色>
+
+            {{#1759138104711.roles#}}
+
+            </参与角色>
+
+
+            '
+        - edition_type: jinja2
+          id: 2f44598d-54ba-41d4-8719-a6a005b5fd96
+          jinja2_text: "{% if play %}\r\n我需要你按照以下要求进行调整，保留剧本的主体和角色策略\r\n\r\n{{user_input}}\r\
+            \n{% else %}\r\n我将扮演 ：{{user_choice_role}}\r\n\r\n你创作的剧本需要满足 ：{{user_input}}\r\
+            \n\r\n\r\n{% endif %}\r\n\r\n输出内容不要包含任何markdown符号，严格遵循json格式"
+          role: user
+          text: "我将扮演 {{#1759138104711.user_choice_role#}} \n\n我需要你生成的剧本满足：{{#1759138104711.user_input#}}"
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              play:
+                description: 剧本
+                type: string
+              role_strategy:
+                description: 角色策略
+                items:
+                  additionalProperties: false
+                  properties:
+                    clothes:
+                      description: 这个角色，在当前场景服装，和设定卡中的服装可能不一致
+                      type: string
+                    name:
+                      description: 角色名
+                      type: string
+                    strategy:
+                      description: 策略内容
+                      type: string
+                  required:
+                  - name
+                  - strategy
+                  - clothes
+                  type: object
+                type: array
+            required:
+            - play
+            - role_strategy
+            type: object
+        structured_output_enabled: true
+        title: 生成剧本
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1767678678901'
+      position:
+        x: 786.6312167831964
+        y: 791.7545717268396
+      positionAbsolute:
+        x: 786.6312167831964
+        y: 791.7545717268396
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 48a89d3f-eb86-4899-9189-9cca842eebd6
+          role: system
+          text: '把以下章节内容中的角色相关信息提取出来。在提取人物角色的时候，经历上不用太细致，但是人物的外貌，性格特点需要详细的提取。
+
+
+            以下角色名是同一个人：
+
+            {{#1759138104711.roles#}}
+
+
+            <章节内容>
+
+            {{#1759138104711.chapters_content#}}
+
+            </章节内容>'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              roles:
+                items:
+                  additionalProperties: false
+                  properties:
+                    age:
+                      description: 年龄
+                      type: number
+                    appearanceFeatures:
+                      description: 外貌特点
+                      type: string
+                    backgroundStory:
+                      description: 经历简述
+                      type: string
+                    bodyType:
+                      description: 身材
+                      type: string
+                    clothingStyle:
+                      description: 穿衣风格
+                      type: string
+                    gender:
+                      description: 性别
+                      type: string
+                    name:
+                      description: 姓名
+                      type: string
+                    occupation:
+                      description: 职业
+                      type: string
+                    personality:
+                      description: 性格
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 提取某个角色
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1768896895365'
+      position:
+        x: 786.6312167831964
+        y: 928.9477992928838
+      positionAbsolute:
+        x: 786.6312167831964
+        y: 928.9477992928838
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            response_format: json_object
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - background_setting
+            variable: background_setting
+          - value_selector:
+            - '1759138104711'
+            - roles
+            variable: roles
+          - value_selector:
+            - '1759138104711'
+            - chapters_content
+            variable: chapters_content
+          - value_selector:
+            - '1759138104711'
+            - relations
+            variable: relations
+        prompt_template:
+        - edition_type: jinja2
+          id: 2395a693-60bf-4f70-acc3-dd9bc5a7c9b1
+          jinja2_text: "需要你从最新章节内容中，提取出对于背景设定中需要更新的内容，以及人物设定如果发生了变更，那么就顺便进行人物设定的更新。\r\
+            \n背景设定只需要输出新增的设定，如果没有新增设定，那么就不需要输出。背景设定是世界观设定中比较重要的元素，不要牵涉到具体的剧情因素。\r\n\
+            如果人物信息没有发生变更，那么也不需要输出相应的人物卡。如果发生了变更，那么就需要结合旧的人物信息生成一个全新的人物信息，这个人物信息将会覆盖旧的，尽量不要丢失旧的信息。对于人物的经历，非决定性影响人物命运性格的不要写。如果人物经历字数太多，帮我简写掉\r\
+            \n人物关系在发生变更情况下进行更新，如果没变更则不需要输出关系，如果旧的关系并没有消失比如 本来是未婚妻关系，现在仇人，那么关系类型上就写\
+            \ 【未婚妻/仇人】，除非关系消失，比如解除婚约之类的情况。\r\n\r\n\r\n\r\n<背景设定>\r\n{{ background_setting\
+            \ }}\r\n</背景设定>\r\n\r\n<roles>\r\n{{ roles }}\r\n</roles>\r\n\r\n<人物关系>\r\
+            \n{{ relations }}\r\n</人物关系>\r\n\r\n<最新章节>\r\n{{ chapters_content }}\r\
+            \n</最新章节>\r\n\r\n"
+          role: system
+          text: '<>
+
+
+            '
+        - id: 71d3cd33-c1c0-48de-b49e-df70da2d40e5
+          role: user
+          text: 开始整理吧
+        reasoning_format: separated
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              background:
+                description: 新增的背景设定，不需要重复旧的背景设定，就把当前章节新增的背景设定输出即可
+                type: string
+              relations:
+                description: 人物之间的关系
+                items:
+                  additionalProperties: false
+                  properties:
+                    source:
+                      description: 关系的起点人物名，比如 A 是 B 的徒弟，那么 这个字段就填 A
+                      type: string
+                    target:
+                      description: 关系的起点人物名，比如 A 是 B 的徒弟，那么 这个字段就填 B
+                      type: string
+                    type:
+                      description: 关系类型，比如 A 是 B 的徒弟，那么 这个字段就填 徒弟
+                      type: string
+                  required: []
+                  type: object
+                type: array
+              roles:
+                description: 需要更新的信息的人物卡，需要结合旧人物卡的信息进行更新，不要覆盖旧人物卡信息
+                items:
+                  additionalProperties: false
+                  properties:
+                    age:
+                      description: 年龄
+                      type: number
+                    appearanceFeatures:
+                      description: 外貌特点
+                      type: string
+                    backgroundStory:
+                      description: 经历简述
+                      type: string
+                    bodyType:
+                      description: 身材
+                      type: string
+                    clothingStyle:
+                      description: 穿衣风格
+                      type: string
+                    gender:
+                      description: 性别
+                      type: string
+                    name:
+                      description: 姓名
+                      type: string
+                    occupation:
+                      description: 职业
+                      type: string
+                    personality:
+                      description: 性格
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              summery:
+                description: 本章内容总结
+                type: string
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: AI伴读
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1769320891074'
+      position:
+        x: 775.3500461278361
+        y: 1050.8511855098614
+      positionAbsolute:
+        x: 775.3500461278361
+        y: 1050.8511855098614
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-pro
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1759138104711'
+            - user_input
+            variable: user_input
+          - value_selector:
+            - '1759138104711'
+            - chapters_content
+            variable: chapters_content
+          - value_selector:
+            - '1759138104711'
+            - tag_categories
+            variable: tag_categories
+          - value_selector:
+            - '1759138104711'
+            - current_chapter_content
+            variable: current_chapter_content
+        prompt_template:
+        - edition_type: jinja2
+          id: 92eaaed3-9a4c-4108-ba72-2d29f165f3e6
+          jinja2_text: "按照用户要求，提取文章中的写作技巧。\r\n对于每个写作技巧，给出一个对应的标签（简洁的关键词）\r\n为每个标签写出相应的写作技巧提示词，提示词要紧扣标签，具体且可操作，不要出现与标签无关的内容，也不要出现常见宽泛的要求，需要有明确的细节指导，要言之有物。\r\
+            \n\r\n标签类型可以使用现有类型，如果现有类型不满足，可以自定义类型\r\n\r\n现有类型：\r\n{{ tag_categories\
+            \ }}\r\n\r\n\r\n"
+          role: system
+          text: '需要你从最新章节内容中，提取出对于背景设定中需要更新的内容，以及人物设定如果发生了变更，那么就顺便进行人物设定的更新。
+
+            背景设定只需要输出新增的设定，如果没有新增设定，那么就不需要输出。背景设定是世界观设定中比较重要的元素，不要牵涉到具体的剧情因素。
+
+            如果人物信息没有发生变更，那么也不需要输出相应的人物卡。如果发生了变更，那么就需要结合旧的人物信息生成一个全新的人物信息，这个人物信息将会覆盖旧的，尽量不要丢失旧的信息。对于人物的经历，非决定性影响人物命运性格的不要写。如果人物经历字数太多，帮我简写掉
+
+            人物关系在发生变更情况下进行更新，如果没变更则不需要输出关系，如果旧的关系并没有消失比如 本来是未婚妻关系，现在仇人，那么关系类型上就写 【未婚妻/仇人】，除非关系消失，比如解除婚约之类的情况。
+
+
+
+
+
+            <背景设定>
+
+            {{ background_setting }}
+
+            </背景设定>
+
+
+
+            <roles>
+
+            {{ roles }}
+
+            </roles>
+
+
+
+            <人物关系>
+
+            {{ relations }}
+
+            </人物关系>
+
+
+
+            <最新章节>
+
+            {{ chapters_content }}
+
+            </最新章节>
+
+
+            '
+        - edition_type: jinja2
+          id: 72fc1aa8-59ab-4979-b022-08e846317278
+          jinja2_text: "<要求>\r\n{{ user_input }}\r\n</要求>\r\n\r\n<文章内容>\r\n{{ current_chapter_content\
+            \ }}\r\n</文章内容>"
+          role: user
+          text: ''
+        selected: true
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              tags:
+                description: 标签列表
+                items:
+                  additionalProperties: false
+                  properties:
+                    tag:
+                      description: 标签名
+                      type: string
+                    提示词:
+                      description: 具体的提示词内容
+                      type: string
+                    类型:
+                      description: 标签所属类型
+                      type: string
+                  required:
+                  - 提示词
+                  type: object
+                type: array
+            required: []
+            type: object
+        structured_output_enabled: true
+        title: 标签提取
+        type: llm
+        vision:
+          enabled: false
+      height: 86
+      id: '1780652201290'
+      position:
+        x: 780.4466599108582
+        y: 1174.961577331362
+      positionAbsolute:
+        x: 780.4466599108582
+        y: 1174.961577331362
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 3.63540397659699
+      y: -97.03328745429735
+      zoom: 0.6299605403706594
+  rag_pipeline_variables: []
