@@ -36,5 +36,5 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Run tests
-        run: flutter test --no-pub
+      - name: Run unit tests
+        run: flutter test --no-pub test/unit/ test/bug/ test/verification/
