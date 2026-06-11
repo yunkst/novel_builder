@@ -1,1 +1,0 @@
-dart run tool/generate_api.dart
