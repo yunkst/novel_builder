@@ -64,11 +64,17 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 0,
-          title: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: WebViewAddressBar(),
+          title: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: WebViewAddressBar(
+              onFocusChanged: (focused) {
+                setState(() => _addressBarFocused = focused);
+              },
+            ),
           ),
-          actions: [
+          actions: _addressBarFocused
+              ? null
+              : [
             IconButton(
               icon: const Icon(Icons.arrow_back_ios_new),
               tooltip: '后退',

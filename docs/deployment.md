@@ -47,7 +47,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 ```bash
 # 克隆项目
-git clone https://github.com/yedazhi/novel_builder.git
+git clone https://github.com/yunkst/novel_builder.git
 cd novel_builder
 
 # 检出稳定版本
@@ -73,11 +73,12 @@ DATABASE_URL=postgresql://novel_user:your_password@postgres:5432/novel_db
 NOVEL_API_TOKEN=your_secure_api_token_here
 
 # 启用的爬虫站点
-NOVEL_ENABLED_SITES=alice_sw,shukuge,xspsw,wdscw
+NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543
 
 # AI 功能配置（可选）
-DIFY_API_URL=https://api.dify.ai/v1
-DIFY_API_TOKEN=your_dify_api_token
+HERMES_API_URL=http://your-llm-server:11434
+HERMES_API_KEY=your_api_key
+COMFYUI_API_URL=http://your-comfyui-server:8188
 ```
 
 #### 4. 配置反向代理（Nginx）
@@ -159,7 +160,7 @@ docker-compose exec backend python -m app.scripts.create_admin
 
 ```bash
 # 克隆项目
-git clone https://github.com/yedazhi/novel_builder.git
+git clone https://github.com/yunkst/novel_builder.git
 cd novel_builder
 
 # 启动开发环境
@@ -333,9 +334,9 @@ REDIS_URL=redis://redis:6379/0
 CACHE_TTL=3600
 
 # AI 功能配置（可选）
-DIFY_API_URL=https://api.dify.ai/v1
-DIFY_API_TOKEN=your_dify_token
-DIFY_WORKFLOW_ID=your_workflow_id
+HERMES_API_URL=http://your-llm-server:11434
+HERMES_API_KEY=your_api_key
+COMFYUI_API_URL=http://your-comfyui-server:8188
 
 # 代理配置（可选）
 HTTP_PROXY=http://proxy.example.com:8080
@@ -534,6 +535,6 @@ docker system prune -a
 
 如果在部署过程中遇到问题，请通过以下方式获取帮助：
 
-- GitHub Issues：https://github.com/yedazhi/novel_builder/issues
+- GitHub Issues：https://github.com/yunkst/novel_builder/issues
 - 邮件支持：yedazhi@c2h4.cn
 - 文档：https://novel-builder.readthedocs.io

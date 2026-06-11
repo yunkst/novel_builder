@@ -6,36 +6,30 @@
 
 ### 用户文档
 - [📖 用户指南](user-guide.md) - 如何安装和使用 Novel Builder
-- [❓ 常见问题](user-guide.md#常见问题) - 常见问题解答
-- [🔧 故障排除](user-guide.md#故障排除) - 问题诊断和解决
+- [📱 APP 功能介绍](APP功能介绍.md) - 应用功能特性详解
 
 ### 开发者文档
-- [🏗️ 系统架构](architecture.md) - 项目架构设计说明
-- [📡 API 文档](接口文档.md) - 后端 API 接口文档
+- [🛠️ 开发者指南](developer-guide.md) - 架构设计、环境搭建、扩展开发
+- [📝 后端模块文档](../backend/CLAUDE.md) - Python 后端架构
+- [📱 前端模块文档](../novel_app/CLAUDE.md) - Flutter 应用架构
+- [🪵 日志系统使用指南](logging-guidelines.md) - LoggerService 使用方法
+
+### 运维文档
 - [🐳 部署指南](deployment.md) - 生产环境部署说明
-- [🔄 后端实现计划](backend_implementation_plan.md) - 后端开发计划
 
-### 技术文档
-- [🎨 场景插图增强](scene_illustration_enhancement_summary.md) - AI 插图功能说明
-- [🔗 ComfyUI 工作流](comfyui_workflow.json) - AI 工作流配置
-- [🐛 调试页面](debug_page.html) - 开发调试工具
-
-### 历史文档
-- [📋 函数测试报告](_mergeContextsByOrder_函数测试报告.md) - 测试报告
-- [📝 架构设计](架构.md) - 中文架构文档
-- [📖 章节示例](ch1.txt) - 章节内容示例
-- [✅ 待办事项](todo.md) - 开发待办清单
+### 架构图表
+- [🖼️ Flutter 架构图](diagrams/flutter_architecture_diagram.png) - 架构可视化
 
 ## 🚀 快速开始
 
 ### 新用户
 1. 阅读 [用户指南](user-guide.md) 了解基本功能
-2. 按照 [安装指南](user-guide.md#安装指南) 部署应用
+2. 按照 [安装指南](user-guide.md#安装) 下载安装 APP
 3. 查看 [常见问题](user-guide.md#常见问题) 解决使用问题
 
 ### 开发者
-1. 阅读 [系统架构](architecture.md) 了解项目结构
-2. 查看 [API 文档](接口文档.md) 了解接口规范
+1. 阅读 [开发者指南](developer-guide.md) 了解项目结构
+2. 查看 API 文档（http://localhost:3800/docs）了解接口规范
 3. 参考 [部署指南](deployment.md) 进行开发环境搭建
 
 ### 运维人员
@@ -47,27 +41,27 @@
 
 ```
 docs/
-├── README.md                           # 文档索引（本文件）
-├── user-guide.md                       # 用户指南
-├── deployment.md                       # 部署指南
-├── architecture.md                     # 系统架构
-├── 接口文档.md                          # API 文档
-├── backend_implementation_plan.md     # 后端实现计划
-├── scene_illustration_enhancement_summary.md  # AI 插图功能
-├── comfyui_workflow.json               # ComfyUI 工作流
-├── debug_page.html                     # 调试页面
-├── _mergeContextsByOrder_函数测试报告.md # 测试报告
-├── 架构.md                              # 中文架构文档
-├── ch1.txt                             # 章节示例
-└── todo.md                             # 待办事项
+├── README.md                  # 文档索引（本文件）
+├── user-guide.md              # 用户使用指南
+├── APP功能介绍.md              # APP 功能介绍
+├── developer-guide.md         # 开发者指南
+├── deployment.md              # 部署指南
+├── logging-guidelines.md      # 日志系统使用指南
+├── diagrams/                  # 架构图
+│   ├── flutter_architecture_diagram.png
+│   ├── flutter_architecture_diagram.pdf
+│   └── flutter_architecture_diagram_4k.png
+└── plans/                     # 历史设计计划
+    ├── 2025-01-25-logger-service-enhancement.md
+    └── 2026-01-26-enhanced-relationship-graph-design.md
 ```
 
 ## 📖 文档规范
 
 ### 文档格式
 - 使用 Markdown 格式
-- 遵循 Google 文档风格指南
 - 包含目录、代码示例、图片说明
+- 保持中英文混排一致性
 
 ### 更新频率
 - **用户指南**：随版本更新
@@ -87,10 +81,11 @@ docs/
 
 ## 🔗 相关链接
 
-- **项目主页**：https://github.com/yedazhi/novel_builder
-- **问题反馈**：https://github.com/yedazhi/novel_builder/issues
-- **讨论区**：https://github.com/yedazhi/novel_builder/discussions
+- **项目主页**：https://github.com/yunkst/novel_builder
+- **问题反馈**：https://github.com/yunkst/novel_builder/issues
+- **讨论区**：https://github.com/yunkst/novel_builder/discussions
 - **API 文档**：http://localhost:3800/docs
+- **最新发布**：https://github.com/yunkst/novel_builder/releases
 
 ## 📞 获取帮助
 
@@ -102,5 +97,5 @@ docs/
 
 ---
 
-**最后更新**：2025-12-16
-**文档版本**：v1.0.0
+**最后更新**：2026-06-11
+**文档版本**：v1.7.6
