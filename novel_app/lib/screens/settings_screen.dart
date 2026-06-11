@@ -174,9 +174,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.cloud_queue),
-            title: const Text('Dify 配置'),
-            subtitle: const Text('配置 Dify API 连接信息'),
+            leading: const Icon(Icons.smart_toy),
+            title: const Text('AI 配置'),
+            subtitle: const Text('配置 DSL Engine 和 AI 设定'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               Navigator.push(

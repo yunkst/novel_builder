@@ -4,7 +4,7 @@
 ///
 /// 运行方式:
 ///   cd novel_app
-///   flutter test test/unit/services/dsl_engine/real_api_integration_test.dart
+///   flutter test test/integration/real_api_integration_test.dart
 ///
 /// 前置条件:
 ///   - 网络连接正常
@@ -14,9 +14,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/condition_processor.dart';
 import 'package:novel_app/services/dsl_engine/dsl_parser.dart';
@@ -35,46 +33,17 @@ const apiKey = 'sk-WXwOAGUEUQ2QDTiJE8yElBHUSphtsohFUOShE2lOQJCSDnD7';
 const defaultModel = 'DeepSeek-V4-Pro';
 
 // ============================================================================
-// Mock Asset Bundle（与 asset_load_test.dart 中相同的机制）
+// YAML 资源路径
 // ============================================================================
 
-class _MockAssetBundle {
-  static const Map<String, String> _assetToFile = {
-    'assets/dsl/creater.yml': 'test/fixtures/creater.yml',
-    'assets/dsl/structured_info.yml': 'test/fixtures/structured_info.yml',
-  };
-
-  static void register() {
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMessageHandler('flutter/assets', (ByteData? message) async {
-      final key = message != null
-          ? utf8.decode(message.buffer.asUint8List())
-          : '';
-      final filePath = _assetToFile[key];
-      if (filePath == null) {
-        return null;
-      }
-      final file = File(filePath);
-      if (!file.existsSync()) {
-        throw StateError('Mock asset 文件不存在: $filePath');
-      }
-      final content = file.readAsStringSync();
-      return ByteData.view(
-        Uint8List.fromList(utf8.encode(content)).buffer,
-      );
-    });
-  }
-}
+const createrYamlPath = 'test/fixtures/creater.yml';
+const structuredInfoYamlPath = 'test/fixtures/structured_info.yml';
 
 // ============================================================================
 // 测试
 // ============================================================================
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-  _MockAssetBundle.register();
-
   late DslParser parser;
   late TemplateRenderer renderer;
 
@@ -84,7 +53,8 @@ void main() {
   });
 
   group('真实 API - LLM Provider', () {
-    test('阻塞调用 - 中文生成', () async {
+    test('阻塞调用 - 中文生成',
+        timeout: const Timeout(Duration(minutes: 2)), () async {
       final provider = LlmProvider(
         LlmConfig(
           baseUrl: apiBaseUrl,
@@ -106,7 +76,8 @@ void main() {
       print('✅ 阻塞调用响应: ${response.content}');
     });
 
-    test('流式调用 - 中文生成', () async {
+    test('流式调用 - 中文生成',
+        timeout: const Timeout(Duration(minutes: 2)), () async {
       final provider = LlmProvider(
         LlmConfig(
           baseUrl: apiBaseUrl,
@@ -132,7 +103,8 @@ void main() {
       print('✅ 流式调用: ${chunks.length} chunks, 内容: $fullText');
     });
 
-    test('结构化输出 - JSON 模式', () async {
+    test('结构化输出 - JSON 模式',
+        timeout: const Timeout(Duration(minutes: 2)), () async {
       final provider = LlmProvider(
         LlmConfig(
           baseUrl: apiBaseUrl,
@@ -165,8 +137,9 @@ void main() {
   });
 
   group('真实 API - RealLlmExecutor', () {
-    test('executeBlocking - 从 DSL 节点提取配置并调用 LLM', () async {
-      final yaml = await rootBundle.loadString('assets/dsl/creater.yml');
+    test('executeBlocking - 从 DSL 节点提取配置并调用 LLM',
+        timeout: const Timeout(Duration(minutes: 2)), () async {
+      final yaml = File(createrYamlPath).readAsStringSync();
       final graph = parser.parseGraphConfig(yaml);
 
       final llmNode = graph.nodes.firstWhere(
@@ -210,8 +183,9 @@ void main() {
       print('✅ RealLlmExecutor 阻塞: $text');
     });
 
-    test('executeStreaming - 流式输出', () async {
-      final yaml = await rootBundle.loadString('assets/dsl/creater.yml');
+    test('executeStreaming - 流式输出',
+        timeout: const Timeout(Duration(minutes: 2)), () async {
+      final yaml = File(createrYamlPath).readAsStringSync();
       final graph = parser.parseGraphConfig(yaml);
 
       final llmNode = graph.nodes.firstWhere(
@@ -262,8 +236,9 @@ void main() {
   });
 
   group('真实 API - DSL 工作流 E2E', () {
-    test('creater.yml - cmd=特写 完整工作流', () async {
-      final yaml = await rootBundle.loadString('assets/dsl/creater.yml');
+    test('creater.yml - cmd=特写 完整工作流',
+        timeout: const Timeout(Duration(minutes: 3)), () async {
+      final yaml = File(createrYamlPath).readAsStringSync();
       final graph = parser.parseGraphConfig(yaml);
 
       final pool = VariablePool();
@@ -332,8 +307,9 @@ void main() {
       print('   LLM 输出: ${llmOutput.substring(0, math.min(200, llmOutput.length))}...');
     });
 
-    test('creater.yml - cmd=总结 完整工作流', () async {
-      final yaml = await rootBundle.loadString('assets/dsl/creater.yml');
+    test('creater.yml - cmd=总结 完整工作流',
+        timeout: const Timeout(Duration(minutes: 3)), () async {
+      final yaml = File(createrYamlPath).readAsStringSync();
       final graph = parser.parseGraphConfig(yaml);
 
       final pool = VariablePool();
@@ -403,9 +379,9 @@ void main() {
   });
 
   group('真实 API - structured_info.yml E2E', () {
-    test('structured_info.yml - cmd=生成 完整工作流', () async {
-      final yaml =
-          await rootBundle.loadString('assets/dsl/structured_info.yml');
+    test('structured_info.yml - cmd=生成 完整工作流',
+        timeout: const Timeout(Duration(minutes: 3)), () async {
+      final yaml = File(structuredInfoYamlPath).readAsStringSync();
       final graph = parser.parseGraphConfig(yaml);
 
       final pool = VariablePool();

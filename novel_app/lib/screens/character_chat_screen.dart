@@ -7,7 +7,7 @@ import '../services/character_avatar_service.dart';
 import '../services/logger_service.dart';
 import '../utils/chat_stream_parser.dart';
 import '../utils/toast_utils.dart';
-import '../screens/providers/dify_provider.dart';
+import '../core/providers/services/ai_service_providers.dart';
 import '../core/providers/services/cache_service_providers.dart';
 import 'dart:io';
 

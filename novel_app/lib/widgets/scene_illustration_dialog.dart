@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/character.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/model_selector.dart';
 import '../services/scene_illustration_service.dart';
 import '../services/logger_service.dart';
+import '../services/dsl_engine/dsl_engine_config.dart';
 import '../utils/error_helper.dart';
 import '../utils/character_matcher.dart';
 import '../mixins/dify_streaming_mixin.dart';
@@ -189,17 +189,16 @@ class _SceneIllustrationDialogState
     _contentController.clear();
     _sceneGenerationError = null;
 
-    // 检查Dify配置
-    final prefs = await SharedPreferences.getInstance();
-    final difyUrl = prefs.getString('dify_url');
-    if (difyUrl == null || difyUrl.isEmpty) {
+    // 检查 DSL Engine 配置
+    final dslConfigured = await DslEngineConfig.isConfigured();
+    if (!dslConfigured) {
       LoggerService.instance.w(
-        'Dify未配置，跳过场景描写生成',
+        'DSL Engine 未配置，跳过场景描写生成',
         category: LogCategory.ai,
-        tags: ['illustration', 'dify-not-configured'],
+        tags: ['illustration', 'dsl-not-configured'],
       );
       setState(() {
-        _sceneGenerationError = 'Dify服务未配置，请在设置中配置Dify URL';
+        _sceneGenerationError = 'DSL Engine 未配置，请在 AI 设置中配置 API URL 和 API Key';
       });
       return;
     }

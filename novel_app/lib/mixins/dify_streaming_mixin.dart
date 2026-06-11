@@ -118,36 +118,23 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
         onData: (chunk) {
           if (!mounted || _isCancelled) return;
 
-          // 处理特殊标记（确保最后一部分内容不丢失）
-          const completeContentMarker = '<<COMPLETE_CONTENT>>';
-          String processedChunk;
-
-          if (chunk.startsWith(completeContentMarker)) {
-            // 一次性设置完整内容
-            processedChunk = chunk.substring(completeContentMarker.length);
-            setState(() {
-              _fullContent = processedChunk;
-            });
-          } else {
-            // 正常累积内容
-            processedChunk = chunk;
-            setState(() {
-              _fullContent += chunk;
-            });
-          }
+          // 正常累积内容（DSL Engine 不发送特殊标记）
+          setState(() {
+            _fullContent += chunk;
+          });
 
           // 调试统计
           if (enableDebugLog) {
-            _charCount += processedChunk.length;
+            _charCount += chunk.length;
             LoggerService.instance.d(
-              '收到数据块: ${processedChunk.length}字符 (累计: $_charCount字符)',
+              '收到数据块: ${chunk.length}字符 (累计: $_charCount字符)',
               category: LogCategory.ai,
               tags: ['dify', 'streaming'],
             );
           }
 
-          // 回调UI层（传递处理后的内容）
-          onChunk(processedChunk);
+          // 回调UI层
+          onChunk(chunk);
         },
         onDone: () {
           if (!mounted || _isCancelled) return;

@@ -6,9 +6,7 @@ class AppConfig {
   static const String defaultBackendHost = 'http://localhost:3800';
   static const String defaultBackendToken = 'your-api-token-here';
 
-  // Dify AI配置（可选）
-  static const String defaultDifyUrl = '';
-  static const String defaultDifyToken = '';
+  // AI 配置已迁移到 DslEngineConfig（SharedPreferences 管理）
 
   // 应用信息
   static const String appName = 'Novel App';
