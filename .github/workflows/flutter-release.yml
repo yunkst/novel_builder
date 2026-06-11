@@ -26,6 +26,17 @@ jobs:
           VERSION_CODE=$(grep -E "^version:" novel_app/pubspec.yaml | sed -E 's/.*\+//')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "## Novel Builder v${VERSION}" > release_body.md
+          echo "" >> release_body.md
+          echo "**版本代码**: ${VERSION_CODE}" >> release_body.md
+          echo "" >> release_body.md
+          echo "### 安装说明" >> release_body.md
+          echo "1. 下载下方的 \`app-release.apk\`" >> release_body.md
+          echo "2. 在 Android 设备上安装" >> release_body.md
+          echo "3. 首次启动配置后端 API 地址" >> release_body.md
+          echo "" >> release_body.md
+          echo "### 完整更新日志" >> release_body.md
+          echo "请查看 [CHANGELOG.md](https://github.com/yunkst/novel_builder/blob/master/CHANGELOG.md)" >> release_body.md
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -51,15 +62,4 @@ jobs:
           generate_release_notes: true
           files: |
             novel_app/build/app/outputs/flutter-apk/app-release.apk
-          body: |
-            ## Novel Builder v${{ steps.version.outputs.version }}
-
-            **版本代码**: ${{ steps.version.outputs.version_code }}
-
-            ### 安装说明
-            1. 下载下方的 `app-release.apk`
-            2. 在 Android 设备上安装
-            3. 首次启动配置后端 API 地址
-
-            ### 完整更新日志
-            请查看 [CHANGELOG.md](../../blob/master/CHANGELOG.md)
+          body_path: novel_app/release_body.md

@@ -439,6 +439,7 @@ class _ChapterListScreenRiverpodState
   ) {
     return ReorderableListView.builder(
       itemCount: state.chapters.length,
+      // ignore: deprecated_member_use
       onReorder: (oldIndex, newIndex) =>
           notifier.reorderChapters(oldIndex, newIndex),
       itemBuilder: (context, index) {

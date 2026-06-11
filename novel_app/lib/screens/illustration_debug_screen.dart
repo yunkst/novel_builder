@@ -165,6 +165,7 @@ class _IllustrationDebugScreenState
         return _buildIllustrationCard(illustration, index);
       },
       // 性能优化：添加cacheExtent和addAutomaticKeepAlives
+      // ignore: deprecated_member_use
       cacheExtent: 500,
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: false,

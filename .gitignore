@@ -80,6 +80,7 @@ pubspec.lock
 
 # Flutter web
 *.dart.js
+*.mocks.dart
 *.dart.js.map
 *.info.json
 *.part.js
