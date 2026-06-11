@@ -5,6 +5,8 @@ import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
+import 'package:novel_app/services/novel_agent/agent_scenario.dart';
+import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/widgets/hermes/hermes_confirmation_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import '../../core/theme/app_colors.dart';
@@ -81,6 +83,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildHeader(notifier),
+              if (chatState.scenarioId == ScenarioIds.webviewExtract)
+                _buildWebViewInfoBar(),
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null) _buildErrorBar(chatState.error!),
               _buildContextTag(),
@@ -119,18 +123,11 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Hermes AI 助手',
+                  chatState.scenarioDisplayName,
                   style: TextStyle(
                     color: appColors.hermesOnBrand,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  chatState.scenarioDisplayName,
-                  style: TextStyle(
-                    color: appColors.hermesOnBrandMuted,
-                    fontSize: 11,
                   ),
                 ),
               ],
@@ -244,8 +241,109 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     );
   }
 
+  /// 网页提取场景专用信息栏
+  ///
+  /// 显示当前 WebView 页面 URL 和本会话工具调用统计
+  Widget _buildWebViewInfoBar() {
+    final theme = Theme.of(context);
+    final appColors = context.appColors;
+    final currentUrl = ref.watch(webviewCurrentUrlProvider);
+    final chatState = ref.watch(hermesChatProvider);
+
+    // 从历史消息的 ToolCallSegment 统计
+    int pageInfoCount = 0;
+    int executeJsOk = 0;
+    int executeJsFail = 0;
+    int saveScriptOk = 0;
+    bool hasCacheHit = false;
+
+    void scan(List<HermesSegment> segs) {
+      for (final s in segs) {
+        if (s is! ToolCallSegment) {
+          continue;
+        }
+        final c = s.call;
+        switch (c.name) {
+          case 'get_page_info':
+            pageInfoCount++;
+          case 'execute_js':
+            if (c.status == AgentToolStatus.completed) {
+              executeJsOk++;
+            } else if (c.status == AgentToolStatus.error) {
+              executeJsFail++;
+            }
+          case 'save_script':
+            if (c.status == AgentToolStatus.completed) {
+              saveScriptOk++;
+            }
+          case 'get_cached_script':
+            if (c.status == AgentToolStatus.completed) {
+              hasCacheHit = true;
+            }
+        }
+      }
+    }
+
+    for (final m in chatState.messages) {
+      scan(m.segments);
+    }
+    scan(chatState.streamingSegments);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: appColors.hermesAccent.withValues(alpha: 0.06),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link, size: 14, color: appColors.hermesAccent),
+              const SizedBox(width: 4),
+              Text('当前页面', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: appColors.hermesAccent)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(currentUrl, style: const TextStyle(fontFamily: 'monospace', fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(spacing: 6, runSpacing: 4, children: [
+            _chip(context, Icons.pageview, 'page_info', '$pageInfoCount'),
+            _chip(context, Icons.check_circle_outline, 'execute_js', executeJsOk > 0 ? '$executeJsOk ok' : '0', theme.colorScheme.tertiary),
+            if (executeJsFail > 0) _chip(context, Icons.error_outline, 'execute_js', '$executeJsFail fail', theme.colorScheme.error),
+            if (saveScriptOk > 0) _chip(context, Icons.save_outlined, 'saved', '', theme.colorScheme.tertiary),
+            if (hasCacheHit) _chip(context, Icons.flash_on, 'cache hit', '', theme.colorScheme.tertiary),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(BuildContext context, IconData icon, String label, String value, [Color? color]) {
+    final c = color ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+    final text = value.isEmpty ? label : '$label $value';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: c.withValues(alpha: 0.3))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 12, color: c),
+        const SizedBox(width: 3),
+        Text(text, style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: c)),
+      ]),
+    );
+  }
+
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
+    final chatState = ref.watch(hermesChatProvider);
 
     return Center(
       child: Column(
@@ -258,7 +356,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Hermes AI 助手',
+            chatState.scenarioDisplayName,
             style: theme.textTheme.titleMedium?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),

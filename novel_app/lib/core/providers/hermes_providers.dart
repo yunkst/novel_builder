@@ -219,11 +219,31 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     });
 
     // 构造历史消息（不含刚加入的 user message）
+    // 关键：把 ToolCallSegment 转成 OpenAI 标准的 assistant(tool_calls) + tool 消息，
+    // 否则跨回合时工具调用结果丢失，LLM 无法引用上一轮查询数据。
     final history = <ChatMessage>[];
     for (final m in state.messages) {
-      history.add(ChatMessage(role: m.role.name, content: m.content));
+      if (m.role == HermesRole.assistant) {
+        final toolCalls = m.toolCalls
+            .map((c) => ToolCall(id: c.id, name: c.name, arguments: c.arguments))
+            .toList();
+        final withResults = m.toolCalls.where((c) => c.result != null).toList();
+        if (toolCalls.isNotEmpty) {
+          history.add(ChatMessage(
+            role: 'assistant',
+            content: m.content.isEmpty ? null : m.content,
+            toolCalls: toolCalls,
+          ));
+          for (final c in withResults) {
+            history.add(ChatMessage(role: 'tool', content: c.result, toolCallId: c.id));
+          }
+        } else {
+          history.add(ChatMessage(role: m.role.name, content: m.content));
+        }
+      } else {
+        history.add(ChatMessage(role: m.role.name, content: m.content));
+      }
     }
-    // 移除最后一条（刚加入的 user message，避免重复）
     if (history.isNotEmpty && history.last.role == 'user') {
       history.removeLast();
     }

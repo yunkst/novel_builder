@@ -34,21 +34,20 @@ class WebViewExtractScenario implements AgentScenario {
   String buildSystemPrompt(AgentScenarioContext context) {
     final url = context.currentUrl ?? _currentUrl;
     return '''
-你是网页数据提取专家。用户正在浏览一个小说网站，你需要生成 JavaScript 脚本来提取小说的目录和内容。
-
 ## 当前页面
 URL: $url
 
+## 工作目标
+从当前小说网站页面生成 JavaScript 提取脚本，获取小说目录和章节内容。
+
 ## 工作流程
-1. 先调用 get_page_info 获取页面 DOM 结构（返回包含 pageType 推断）
-2. 分析 DOM 结构，理解页面布局（目录页还是章节页）
-3. 调用 get_cached_script 查询该域名是否已有缓存脚本
-4. 如果有缓存脚本，检查是否可用；如果没有，则新生成
-5. 生成两段 JS 脚本：
+1. 调用 get_page_info 获取页面 DOM 结构和页面类型推断
+2. 调用 get_cached_script 查询该域名是否已有缓存脚本，有则检查可用性，无则新生成
+3. 生成两段 JS 脚本：
    - 目录提取脚本：提取小说标题 + 章节列表（含URL），支持自动翻页
    - 内容提取脚本：提取章节标题 + 正文，支持自动翻页拼接
-6. 调用 execute_js 测试脚本
-7. 测试成功后调用 save_script 保存
+4. 调用 execute_js 测试脚本
+5. 测试成功后调用 save_script 保存
 
 ## JS 脚本规范
 - 整个脚本是一个 async IIFE: `(async function() { ... return JSON.stringify(result); })()`

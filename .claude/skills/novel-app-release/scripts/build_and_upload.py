@@ -366,7 +366,7 @@ def upload_to_backend(
 
 def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
     """
-    提交代码变更到 git
+    提交代码变更到 git 并创建 tag
 
     Args:
         project_root: 项目根目录
@@ -378,6 +378,8 @@ def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
     """
     print("-" * 50)
     print("正在提交代码变更...")
+
+    tag_name = f"v{version}"
 
     try:
         # 添加所有变更文件
@@ -411,15 +413,36 @@ def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
         if result.returncode == 0:
             print("代码提交成功!")
             print(f"提交信息:\n{stdout}")
-            return True
+        elif "nothing to commit" in stdout.lower():
+            print("没有需要提交的代码变更")
         else:
-            # 可能没有需要提交的变更
-            if "nothing to commit" in stdout.lower():
-                print("没有需要提交的代码变更")
-                return True
             print("代码提交失败:")
             print(stdout)
             return False
+
+        # 创建 git tag
+        print(f"\n创建版本标签: {tag_name}")
+        tag_result = subprocess.run(
+            ["git", "tag", "-a", tag_name, "-m", f"Release {version}\n\n{changelog}"],
+            cwd=project_root,
+            capture_output=True,
+            shell=True if os.name == "nt" else False,
+        )
+
+        if tag_result.returncode == 0:
+            print(f"标签 {tag_name} 创建成功!")
+        else:
+            # tag 可能已存在
+            try:
+                tag_stderr = tag_result.stderr.decode("utf-8")
+            except UnicodeDecodeError:
+                tag_stderr = tag_result.stderr.decode("gbk", errors="ignore")
+            if "already exists" in tag_stderr.lower():
+                print(f"标签 {tag_name} 已存在，跳过")
+            else:
+                print(f"创建标签失败: {tag_stderr}")
+                # tag 创建失败不阻塞整体流程
+        return True
 
     except subprocess.CalledProcessError as e:
         print(f"Git 命令执行失败: {e}")
@@ -491,6 +514,7 @@ def main():
     if commit_success:
         print("\n提示: 代码已提交到本地仓库，如需推送到远程请执行:")
         print(f"  git push")
+        print(f"  git push origin {tag_name}")
 
 
 if __name__ == "__main__":
