@@ -18,7 +18,7 @@ Novel Builder 项目致力于维护一个安全的开源项目。我们认真对
 如果您发现了安全漏洞，请不要在公开的 Issue 中报告，而是按照以下方式私下报告：
 
 ### 📧 邮件报告
-**收件人**：yedazhi@c2h4.cn
+**收件人**：kfeb4@outlook.com
 **主题**：[Security] Novel Builder 安全漏洞报告
 
 ### 报告内容
@@ -139,7 +139,7 @@ Novel Builder 项目致力于维护一个安全的开源项目。我们认真对
 ## 联系我们
 
 ### 安全相关联系
-- **安全邮箱**：yedazhi@c2h4.cn
+- **安全邮箱**：kfeb4@outlook.com
 - **项目主页**：https://github.com/yedazhi/novel_builder
 - **问题报告**：https://github.com/yedazhi/novel_builder/security/policy
 

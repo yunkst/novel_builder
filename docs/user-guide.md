@@ -213,4 +213,4 @@
 如果你遇到问题：
 - 🐛 [提交 Bug 报告](https://github.com/yunkst/novel_builder/issues)
 - 💬 [参与讨论](https://github.com/yunkst/novel_builder/discussions)
-- 📧 联系维护者：yedazhi@c2h4.cn
+- 📧 联系维护者：kfeb4@outlook.com

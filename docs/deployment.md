@@ -536,5 +536,5 @@ docker system prune -a
 如果在部署过程中遇到问题，请通过以下方式获取帮助：
 
 - GitHub Issues：https://github.com/yunkst/novel_builder/issues
-- 邮件支持：yedazhi@c2h4.cn
+- 邮件支持：kfeb4@outlook.com
 - 文档：https://novel-builder.readthedocs.io

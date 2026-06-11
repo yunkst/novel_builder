@@ -91,7 +91,7 @@ docs/
 
 如果您在使用文档过程中遇到问题：
 
-1. 📧 邮件支持：yedazhi@c2h4.cn
+1. 📧 邮件支持：kfeb4@outlook.com
 2. 💬 GitHub Issues：报告文档问题或建议
 3. 📖 GitHub Discussions：参与社区讨论
 
