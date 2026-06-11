@@ -30,9 +30,9 @@ import 'package:novel_app/services/dsl_engine/template_renderer.dart';
 // 配置
 // ============================================================================
 
-const apiBaseUrl = 'https://new-api.c2h4.cn/v1';
-const apiKey = 'sk-WXwOAGUEUQ2QDTiJE8yElBHUSphtsohFUOShE2lOQJCSDnD7';
-const defaultModel = 'DeepSeek-V4-Pro';
+const apiBaseUrl = String.fromEnvironment('TEST_API_BASE_URL');
+const apiKey = String.fromEnvironment('TEST_API_KEY');
+const defaultModel = String.fromEnvironment('TEST_DEFAULT_MODEL', defaultValue: 'deepseek-chat');
 
 // ============================================================================
 // 修复版 HTTP 客户端

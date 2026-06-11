@@ -1,7 +1,7 @@
 /// DSL 引擎本地集成测试 v3
 ///
 /// 使用真实 LLM API 测试 DSL 引擎的完整工作流执行。
-/// API: https://new-api.c2h4.cn/v1
+/// API: 通过环境变量 TEST_API_BASE_URL 配置
 ///
 /// 运行方式:
 ///   cd novel_app
@@ -16,8 +16,8 @@ import 'dart:math' as math;
 // 配置
 // ============================================================================
 
-const apiBaseUrl = 'https://new-api.c2h4.cn/v1';
-const apiKey = 'sk-WXwOAGUEUQ2QDTiJE8yElBHUSphtsohFUOShE2lOQJCSDnD7';
+const apiBaseUrl = String.fromEnvironment('TEST_API_BASE_URL');
+const apiKey = String.fromEnvironment('TEST_API_KEY');
 
 // 从 /models 端点探测到的正确模型名
 // DeepSeek-V4-Pro (首字母大写) - 对应 DSL 中的 deepseek-v4-pro

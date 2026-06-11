@@ -1,6 +1,6 @@
 /// DSL 引擎真实 API 集成测试
 ///
-/// 使用真实 LLM API (https://new-api.c2h4.cn/v1) 测试 DSL 引擎的完整工作流。
+/// 使用真实 LLM API 测试 DSL 引擎的完整工作流。
 ///
 /// 运行方式:
 ///   cd novel_app
@@ -28,9 +28,9 @@ import 'package:novel_app/services/dsl_engine/template_renderer.dart';
 // 配置
 // ============================================================================
 
-const apiBaseUrl = 'https://new-api.c2h4.cn/v1';
-const apiKey = 'sk-WXwOAGUEUQ2QDTiJE8yElBHUSphtsohFUOShE2lOQJCSDnD7';
-const defaultModel = 'DeepSeek-V4-Pro';
+const apiBaseUrl = String.fromEnvironment('TEST_API_BASE_URL');
+const apiKey = String.fromEnvironment('TEST_API_KEY');
+const defaultModel = String.fromEnvironment('TEST_DEFAULT_MODEL', defaultValue: 'deepseek-chat');
 
 // ============================================================================
 // YAML 资源路径

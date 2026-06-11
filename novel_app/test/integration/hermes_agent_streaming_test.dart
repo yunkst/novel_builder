@@ -23,9 +23,9 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 // 配置（与 dsl_all_cmds_test.dart 一致）
 // ============================================================================
 
-const apiBaseUrl = 'https://new-api.c2h4.cn/v1';
-const apiKey = 'sk-WXwOAGUEUQ2QDTiJE8yElBHUSphtsohFUOShE2lOQJCSDnD7';
-const defaultModel = 'DeepSeek-V4-Pro';
+const apiBaseUrl = String.fromEnvironment('TEST_API_BASE_URL');
+const apiKey = String.fromEnvironment('TEST_API_KEY');
+const defaultModel = String.fromEnvironment('TEST_DEFAULT_MODEL', defaultValue: 'deepseek-chat');
 
 // ============================================================================
 // HTTP 客户端（与 dsl_all_cmds_test.dart 一致，使用 http 包的真实流式）
