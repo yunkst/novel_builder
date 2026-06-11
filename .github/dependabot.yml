@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+    commit:
+      message: "chore(ci): update GitHub Actions versions"
+    labels:
+      - "dependencies"
+      - "ci"
+
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    commit:
+      message: "chore(backend): update Python dependencies"
+    labels:
+      - "dependencies"
+      - "backend"
+
+  - package-ecosystem: "pub"
+    directory: "/novel_app"
+    schedule:
+      interval: "weekly"
+    commit:
+      message: "chore(flutter): update Flutter dependencies"
+    labels:
+      - "dependencies"
+      - "flutter"

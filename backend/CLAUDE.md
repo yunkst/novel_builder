@@ -5,6 +5,7 @@
 ## 变更记录 (Changelog)
 
 - **2025-11-13**: 模块文档初始化，详细描述API架构和爬虫系统
+- **2026-06-11**: 更新为 Scrapling 爬虫引擎，扩展至 9 个站点，添加 Hermes/ComfyUI 客户端
 
 ## 模块职责
 
@@ -74,14 +75,16 @@ Python后端是Novel Builder平台的核心服务，提供FastAPI驱动的小说
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    "requests>=2.31.0",
-    "beautifulsoup4>=4.12.0",
-    "lxml>=4.9.0",
+    "scrapling[all]>=0.4.0",      # 现代网页爬虫引擎
+    "urllib3>=2.0.0",
     "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
     "alembic>=1.12.0",
-    "playwright>=1.55.0",
+    "opencc>=1.1.2",                 # 简繁转换
+    "aiofiles>=23.0.0",
+    "packaging>=23.0.0",             # 版本管理
 ]
 ```
 
@@ -142,21 +145,39 @@ class SourceSite(BaseModel):
 - **注册机制**: 动态加载和站点配置
 
 ### 支持的小说站点
-1. **AliceSW** (轻小说文库)
-   - 爬虫类: `AliceSWCrawlerRefactored`
-   - 特点: 专业的轻小说网站
 
-2. **书库** (Shukuge)
-   - 爬虫类: `ShukugeCrawlerRefactored`
-   - 特点: 综合性小说书库
+#### 活跃站点（7个）
+1. **AliceSW** (轻小说文库) - `AliceSWCrawlerRefactored`
+2. **书库** (Shukuge) - `ShukugeCrawlerRefactored`
+3. **顶点小说** (Ddxsmf) - `DdxsmfCrawler`（搜索禁用，使用外部搜索引擎）
+4. **我的书城** (Wdscw) - `WdscwCrawlerRefactored`
+5. **我的书城备用** (Wodeshucheng) - `WodeshuchengCrawler`
+6. **微风小说** (Wfxs) - `WfxsCrawler`
+7. **笔趣阁543** (Biquge543) - `Biquge543Crawler`（搜索限流）
 
-3. **小说网** (Xspsw)
-   - 爬虫类: `XspswCrawlerRefactored`
-   - 特点: 移动端优化
+#### 禁用站点（2个）
+8. **小说网** (Xspsw) - `XspswCrawlerRefactored`（HTTP 520，服务不可用）
+9. **蜘蛛小说** (Smxku) - `SmxkuCrawler`（403 反爬）
 
-4. **我的书城** (Wdscw)
-   - 爬虫类: `WdscwCrawlerRefactored`
-   - 特点: 精品小说免费阅读
+### 网络层架构
+- **ScraplingFetcher** (`scrapling_fetcher.py`): 核心请求引擎，支持 SIMPLE / STEALTH 策略
+- **PageResponse** (`page_response.py`): 统一响应封装，支持 Scrapling Selector + BeautifulSoup
+- **BaseCrawler** (`base_crawler.py`): 爬虫基类，提供 get_page / post_form / clean_text 等方法
+- **缓存装饰器** (`cache_decorator.py`): 声明式缓存逻辑
+
+### AI 服务客户端
+- **DifyClient** (`dify_client.py`): Dify 工作流 API 客户端
+- **HermesClient** (`hermes_client.py`): OpenAI 兼容的 LLM 直连客户端
+- **ComfyUI 相关**: `comfyui_client.py`, `comfyui_client_v2.py`, `comfyui_client_title_based.py`, `comfyui_video_client.py`
+- **角色卡服务**: `role_card_service.py`, `role_card_async_service.py`
+- **场景插图**: `scene_illustration_service.py`
+- **图生视频**: `image_to_video_service.py`
+
+### APP版本管理
+- **服务**: `app_version_service.py`
+- **上传**: `POST /api/app-version/upload`
+- **下载**: `GET /api/app-version/download/{version}`
+- **最新版本**: `GET /api/app-version/latest`
 
 
 ### 爬虫接口规范

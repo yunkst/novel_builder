@@ -10,7 +10,10 @@ import '../core/providers/webview_providers.dart';
 /// - 回车/搜索按钮触发加载
 /// - 用户正在输入时不同步远端 URL（避免输入抖动）
 class WebViewAddressBar extends ConsumerStatefulWidget {
-  const WebViewAddressBar({super.key});
+  /// 地址栏聚焦状态变化回调
+  final ValueChanged<bool>? onFocusChanged;
+
+  const WebViewAddressBar({super.key, this.onFocusChanged});
 
   @override
   ConsumerState<WebViewAddressBar> createState() => _WebViewAddressBarState();
@@ -26,6 +29,11 @@ class _WebViewAddressBarState extends ConsumerState<WebViewAddressBar> {
     final initial = ref.read(webviewCurrentUrlProvider);
     _textController = TextEditingController(text: initial);
     _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    widget.onFocusChanged?.call(_focusNode.hasFocus);
   }
 
   @override
@@ -70,6 +78,7 @@ class _WebViewAddressBarState extends ConsumerState<WebViewAddressBar> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
     _textController.dispose();
     _focusNode.dispose();
     super.dispose();

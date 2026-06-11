@@ -1,0 +1,40 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'novel_app/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'novel_app/**'
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: novel_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test

@@ -3,6 +3,7 @@
 ## 变更记录 (Changelog)
 
 - **2025-11-13**: AI上下文初始化，重新设计架构文档，添加模块化结构
+- **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DS Engine + Scrapling + Riverpod
 
 ## 项目愿景
 
@@ -27,17 +28,19 @@ graph TD
     F --> K["书架管理"];
     F --> L["搜索功能"];
     F --> M["阅读界面"];
-    F --> N["AI集成"];
+    F --> N["AI集成（DSL Engine + Hermes）"];
 
     H --> O["搜索API"];
     H --> P["章节API"];
     H --> Q["缓存API"];
+    H --> R["版本管理API"];
 
-    I --> R["AliceSW爬虫"];
-    I --> S["书库爬虫"];
-    I --> T["小说网爬虫"];
-    I --> U["我的书城爬虫"];
-    I --> V["爱尚小说爬虫"];
+    I --> S["AliceSW"];
+    I --> T["书库"];
+    I --> U["顶点小说"];
+    I --> V["我的书城"];
+    I --> W["微风小说"];
+    I --> X["笔趣阁543"];
 
     click B "./novel_app/CLAUDE.md" "查看 Flutter 移动应用模块"
     click C "./backend/CLAUDE.md" "查看 Python 后端模块"
@@ -49,43 +52,50 @@ graph TD
 - **Flutter 3.0+**: 跨平台移动应用框架
 - **Dart SDK**: 编程语言
 - **SQLite**: 本地数据存储
-- **Provider**: 状态管理
+- **Riverpod**: 状态管理
 - **Material Design 3**: UI设计系统
 
 ### 后端技术
 - **FastAPI**: Python Web框架
 - **PostgreSQL**: 主数据库
 - **SQLAlchemy**: ORM框架
-- **BeautifulSoup4 + lxml**: 网页爬虫
+- **Scrapling**: 现代网页爬虫引擎
 - **Playwright**: 高级网页自动化
 
 ### 基础设施
 - **Docker & Docker Compose**: 容器化部署
 - **Alembic**: 数据库迁移
 - **OpenAPI**: API文档生成
+- **GitHub Actions**: CI/CD 自动化
 
 ## 模块索引
 
 | 模块路径 | 类型 | 主要功能 | 状态 |
 |---------|------|----------|------|
 | [novel_app](./novel_app/CLAUDE.md) | Flutter移动应用 | 小说阅读器，搜索，缓存，AI功能 | ✅ 活跃 |
-| [backend](./backend/CLAUDE.md) | FastAPI后端 | 多站点爬虫，API服务，缓存管理 | ✅ 活跃 |
+| [backend](./backend/CLAUDE.md) | FastAPI后端 | 多站点爬虫（9个），API服务，缓存管理 | ✅ 活跃 |
 
 ## 核心功能
 
 ### 📱 移动应用功能
 - **书架管理**: 本地小说收藏与阅读进度跟踪
-- **智能搜索**: 跨多个小说站点的统一搜索
+- **智能搜索**: 跨9个小说站点的统一搜索
 - **离线阅读**: 章节内容本地缓存
-- **AI增强**: 基于Dify工作流的内容生成
-- **用户插入章节**: 支持用户自定义章节内容
+- **AI增强**: DS Engine 本地工作流 + Hermes Agent 智能对话
+- **场景插图**: AI生成的场景插图功能（ComfyUI 后端）
+- **角色卡管理**: 智能识别和提取章节角色信息
+- **人物关系图**: 可视化角色关系网络
+- **TTS朗读**: 文字转语音阅读功能
+- **提纲管理**: 小说结构和章节规划
 
 ### 🌐 后端服务功能
-- **多站点爬虫**: 支持5+个小说站点的内容抓取
-- **智能缓存**: PostgreSQL数据库缓存优化
+- **多站点爬虫**: 支持9个小说站点（7个活跃 + 2个禁用）
+- **智能缓存**: PostgreSQL数据库缓存 + 装饰器模式
 - **实时API**: RESTful API with OpenAPI文档
 - **任务管理**: 后台缓存任务与进度跟踪
 - **WebSocket**: 实时进度推送
+- **版本管理**: APP版本上传与分发
+- **数据同步**: 小说数据导入/导出
 
 ### 🔧 基础设施功能
 - **容器化部署**: Docker Compose一键部署
@@ -105,7 +115,7 @@ graph TD
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone git@github.com:yunkst/novel_builder.git
 cd novel_builder
 
 # 使用Docker Compose启动所有服务
@@ -118,6 +128,7 @@ docker-compose ps
 ### 端口映射
 - **移动应用**: 3154 (开发调试)
 - **后端API**: 3800 → 8000 (FastAPI)
+- **调试端口**: 6678 → 5678 (debugpy)
 - **数据库**: 5432 (PostgreSQL)
 
 ### 开发环境配置
@@ -125,7 +136,8 @@ docker-compose ps
 创建 `.env` 文件：
 ```env
 NOVEL_API_TOKEN=your_api_token_here
-NOVEL_ENABLED_SITES=alice_sw,shukuge,xspsw,wdscw
+NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543
+DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
 ```
 
 ## 测试策略
@@ -136,7 +148,7 @@ NOVEL_ENABLED_SITES=alice_sw,shukuge,xspsw,wdscw
 - **维护可控**: 测试代码维护成本不高于业务代码
 
 ### 测试覆盖率
-- **Flutter应用**: 核心业务逻辑单元测试
+- **Flutter应用**: 核心业务逻辑单元测试 + Riverpod Provider 测试
 - **后端服务**: API端点集成测试
 - **爬虫功能**: 模拟站点测试
 
@@ -151,7 +163,6 @@ mypy app/             # 类型检查
 
 # 代码格式化
 ruff format .         # 自动格式化
-black .               # 备选格式化
 isort .               # 导入排序
 ```
 
@@ -165,6 +176,9 @@ flutter format lib/
 
 # 测试
 flutter test
+
+# 代码生成（Riverpod）
+dart run build_runner build --delete-conflicting-outputs
 ```
 
 ## AI使用指引
@@ -174,10 +188,10 @@ flutter test
 - 通过Mermaid图理解系统架构
 - 遵循各模块的具体开发规范
 
-### Task Master集成
-- 项目已集成Task Master AI工作流
-- 支持任务管理和开发流程追踪
-- 使用MCP服务器进行AI增强
+### 技能系统
+- 使用 `.claude/skills/` 中的技能进行开发辅助
+- 提交时使用 chinese-commit-conventions 技能
+- 代码审查使用 chinese-code-review 技能
 
 ## 部署指南
 
@@ -204,11 +218,15 @@ docker-compose logs -f
 - **chapter_cache**: 章节内容缓存
 - **novel_chapters**: 章节列表元数据
 - **cache_tasks**: 缓存任务管理
+- **characters / character_relationships**: 角色及关系
+- **scene_illustrations**: 场景插图
+- **outlines**: 提纲数据
+- **chat_scenes**: 对话场景
 
 ### 数据库版本
-- **当前版本**: v2
-- **迁移工具**: Alembic
-- **支持功能**: 用户插入章节保护
+- **前端SQLite**: v21 (novel_reader.db)
+- **后端PostgreSQL**: Alembic 管理
+- **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 
 ## API文档
 
@@ -223,13 +241,18 @@ docker-compose logs -f
 - `GET /chapter-content`: 获取章节内容
 - `POST /api/cache/create`: 创建缓存任务
 - `GET /api/cache/status/{task_id}`: 查询缓存状态
+- `GET /api/source-sites`: 获取支持的站点列表
+- `POST /api/app-version/upload`: 上传APP版本
+- `GET /api/app-version/download/{version}`: 下载APP版本
 
 ## 故障排除
 
 ### 常见问题
-1. **Flutter应用无法连接后端**: 检查API地址配置
+1. **Flutter应用无法连接后端**: 检查API地址配置和Token
 2. **爬虫失败**: 检查代理设置和站点可用性
 3. **数据库连接失败**: 检查PostgreSQL服务状态
+4. **DSL Engine执行失败**: 确认AI设置中已配置API URL和Key
+5. **ComfyUI图片生成失败**: 确认ComfyUI服务运行正常
 
 ### 日志查看
 ```bash
@@ -251,6 +274,7 @@ docker-compose logs -f postgres
 
 ### 代码提交规范
 - 使用清晰的提交消息
+- 遵循 Conventional Commits 规范
 - 一个提交只做一件事
 - 包含必要的测试
 - 遵循代码规范

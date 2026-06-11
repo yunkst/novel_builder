@@ -4,6 +4,10 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-06-11**: 更新文档，移除 Dify 引用，DSL Engine + Hermes Agent 成为 AI 主力
+- **2026-06-09**: 移除 Dify 云端依赖（v1.7.4），仅保留本地 DSL Engine
+- **2026-06-05**: DSL Engine 客户端 Dify 工作流复刻（v1.7.0）
+- **2026-05-10**: Riverpod 状态管理迁移完成（v1.5.0）
 - **2026-02-04**: 完整更新项目架构文档，反映 Riverpod 状态管理、Repository 模式和数据库 v21
 - **2025-11-13**: 模块文档初始化，详细描述应用架构和核心功能
 
@@ -830,37 +834,50 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 ## AI集成功能
 
-### Dify工作流集成
+### DSL Engine（本地 Dify 工作流复刻）
 
-**Service**: `lib/services/dify_service.dart`
-
-**配置**:
-- URL: Dify工作流API地址
-- Token: API认证Token
-- 提示词模板
-
-**模式**:
-- **流式响应**: SSE协议，实时生成
-- **阻塞响应**: 等待完整结果
+**核心组件** (`lib/services/dsl_engine/`):
+- `dsl_parser.dart` - YAML DSL 解析器
+- `graph_engine.dart` - 工作流图执行引擎
+- `variable_pool.dart` - 变量上下文管理
+- `llm_provider.dart` - OpenAI 兼容的 LLM 调用
+- `dsl_executor.dart` - 统一执行入口（streaming + blocking）
+- `dsl_engine_config.dart` - SharedPreferences 配置管理
 
 **用途**:
-- "特写"内容生成（场景描述、细节补充）
-- 角色对话
-- 大纲生成辅助
+- 结构化信息提取（角色、关系、背景）
+- 创意写作（段落重写、全文重写）
+- 章节/背景摘要生成
+- 场景插图提示词生成
 
-### SSE处理
+**配置** (设置 → AI 配置):
+- LLM API URL（OpenAI 兼容地址）
+- LLM API Key
+- 默认模型（可选）
 
-**Parser**: `lib/services/dify_sse_parser.dart`
-- 解析SSE流式数据
-- 事件处理（message, end, error）
+### Hermes Agent（LLM 直连对话）
 
-**状态管理**: `lib/services/stream_state_manager.dart`
-- 流式状态追踪
-- 连接状态管理
+**核心组件**:
+- `lib/core/providers/hermes_providers.dart` - Riverpod Provider
+- `lib/widgets/hermes/` - 对话 UI 组件
+- `lib/services/hermes_client.dart` - API 客户端
 
-**Mixin**: `lib/mixins/dify_streaming_mixin.dart`
+**用途**:
+- 角色对话（单角色 / 多角色）
+- 沉浸式聊天
+- 流式输出支持
+
+### DifyService（Facade 层，已重构）
+
+**Service**: `lib/services/dify_service.dart`
+- 保留类名和接口不变（12+ 调用点零改动）
+- 内部委托给 DSL Engine 执行
+- 构造函数无参（不再依赖 DifyConfigService）
+
+**Streaming Mixin**: `lib/mixins/dify_streaming_mixin.dart`
 - 流式响应处理复用
 - 错误处理和重连
+- 已移除 `<<COMPLETE_CONTENT>>` 标记处理
 
 ### AI相关Widget
 

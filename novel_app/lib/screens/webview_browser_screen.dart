@@ -24,6 +24,8 @@ class WebViewBrowserScreen extends ConsumerStatefulWidget {
 }
 
 class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
+  bool _addressBarFocused = false;
+
   @override
   void initState() {
     super.initState();

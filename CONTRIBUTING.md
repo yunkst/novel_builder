@@ -24,20 +24,20 @@
 
 1. **Fork 并克隆项目**
 ```bash
-git clone https://github.com/your-username/novel_builder.git
+git clone https://github.com/yunkst/novel_builder.git
 cd novel_builder
 ```
 
 2. **设置上游仓库**
 ```bash
-git remote add upstream https://github.com/yedazhi/novel_builder.git
+git remote add upstream https://github.com/yunkst/novel_builder.git
 ```
 
 3. **安装依赖**
 ```bash
 # 后端依赖
 cd backend
-pip install -r requirements.txt
+pip install -e .
 
 # 前端依赖
 cd ../novel_app
@@ -90,12 +90,17 @@ flutter analyze
 # 代码格式化
 flutter format lib/
 
+# 代码生成（Riverpod）
+dart run build_runner build --delete-conflicting-outputs
+
 # 测试
 flutter test
 ```
 
 **代码风格要求：**
 - 遵循 Dart 官方代码规范
+- 使用 Riverpod 进行状态管理（ConsumerWidget / ConsumerStatefulWidget）
+- 遵循 Repository 模式进行数据访问
 - 使用 dartdoc 格式注释
 - 最大行长度：80 字符
 - 有意义的变量和函数命名
@@ -181,7 +186,7 @@ git push origin feature/your-feature-name
 ## 🐛 问题报告
 
 ### 报告 Bug
-使用 [Issue 模板](https://github.com/yedazhi/novel_builder/issues/new?assignees=&labels=bug&template=bug_report.md) 报告 bug：
+使用 Issue 模板报告 bug：
 
 **必需信息：**
 - 问题描述和重现步骤
@@ -196,7 +201,7 @@ git push origin feature/your-feature-name
 ## 💡 功能请求
 
 ### 提出新功能
-使用 [功能请求模板](https://github.com/yedazhi/novel_builder/issues/new?assignees=&labels=enhancement&template=feature_request.md)：
+使用功能请求模板：
 
 **内容要求：**
 - 功能描述和使用场景
@@ -213,9 +218,9 @@ git push origin feature/your-feature-name
 
 ### 文档类型
 - **API 文档**：接口说明和示例
-- **用户指南**：功能使用教程
-- **开发文档**：架构和实现说明
-- **部署文档**：安装和配置指南
+- **用户指南**：功能使用教程（docs/user-guide.md）
+- **开发文档**：架构和实现说明（docs/developer-guide.md）
+- **部署文档**：安装和配置指南（docs/deployment.md）
 
 ### 文档规范
 - 使用 Markdown 格式
@@ -240,8 +245,8 @@ git push origin feature/your-feature-name
 如果您在贡献过程中遇到问题：
 
 - 📧 邮件：yedazhi@c2h4.cn
-- 💬 GitHub Discussions：https://github.com/yedazhi/novel_builder/discussions
-- 🐛 Issues：https://github.com/yedazhi/novel_builder/issues
+- 💬 GitHub Discussions：https://github.com/yunkst/novel_builder/discussions
+- 🐛 Issues：https://github.com/yunkst/novel_builder/issues
 
 ## 📜 行为准则
 
