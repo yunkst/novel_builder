@@ -295,6 +295,36 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
     });
   }
 
+  /// 构建操作按钮 chip（标签选择 / 历史提示词）
+  Widget _buildActionChip({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 处理确认按钮点击
   Future<void> _handleConfirm() async {
     // 大纲模式：生成细纲后进入下一步
@@ -770,28 +800,29 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 操作按钮行
+                  Row(
+                    children: [
+                      _buildActionChip(
+                        icon: Icons.label_outline,
+                        label: '选择标签',
+                        onTap: _openTagSelector,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionChip(
+                        icon: Icons.history,
+                        label: '历史提示词',
+                        onTap: () => _showPromptHistory(_userInputController),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _userInputController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: '章节内容要求',
                       hintText: '描述你想要的故事情节、人物对话、场景描述等...',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.label_outline),
-                            tooltip: '选择标签',
-                            onPressed: _openTagSelector,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.history),
-                            tooltip: '历史提示词',
-                            onPressed: () =>
-                                _showPromptHistory(_userInputController),
-                          ),
-                        ],
-                      ),
+                      border: OutlineInputBorder(),
                     ),
                     maxLines: 8,
                   ),
@@ -907,27 +938,28 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           const SizedBox(height: 16),
 
           // 用户输入
+          Row(
+            children: [
+              _buildActionChip(
+                icon: Icons.label_outline,
+                label: '选择标签',
+                onTap: _openTagSelector,
+              ),
+              const SizedBox(width: 8),
+              _buildActionChip(
+                icon: Icons.history,
+                label: '历史提示词',
+                onTap: () => _showPromptHistory(_userInputController),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _userInputController,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: '章节要求（可选）',
               hintText: '描述您希望这一章包含的内容、情节、冲突等，留空则完全根据大纲生成...',
-              border: const OutlineInputBorder(),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.label_outline),
-                    tooltip: '选择标签',
-                    onPressed: _openTagSelector,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.history),
-                    tooltip: '历史提示词',
-                    onPressed: () => _showPromptHistory(_userInputController),
-                  ),
-                ],
-              ),
+              border: OutlineInputBorder(),
             ),
             maxLines: 5,
             autofocus: true,

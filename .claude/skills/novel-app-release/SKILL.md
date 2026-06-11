@@ -62,7 +62,7 @@ python .claude/skills/novel-app-release/scripts/build_and_upload.py
 2. **生成更新日志** - 分析 `novel_app/lib` 目录的 git diff
 3. **构建 APK** - 执行 `flutter build apk --release`
 4. **上传到后端** - 调用后端 API 上传 APK
-5. **提交代码** - 自动创建 git commit
+5. **提交代码并打 tag** - 自动创建 git commit + `v{version}` annotated tag
 
 ### 仅上传已有 APK
 
@@ -225,10 +225,11 @@ novel_app/build/app/outputs/flutter-apk/app-release.apk
 
 ### 推送到远程仓库
 
-脚本会自动创建本地 commit，需要手动推送：
+脚本会自动创建本地 commit 和 tag，需要手动推送tag：
 
 ```bash
 git push
+git push origin v1.3.8
 ```
 
 ### 验证发布

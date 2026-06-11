@@ -285,7 +285,7 @@ Future<void> testWithFlutterDslEngine() async {
   print('   2. 开启 "DSL Engine" 开关');
   print('   3. 配置:');
   print('      - LLM API URL: $apiBaseUrl');
-  print('      - LLM API Key: ${apiKey.substring(0, 10)}...');
+  print('      - LLM API Key: ${apiKey.isNotEmpty ? apiKey.substring(0, 10) : "<未配置>"}...');
   print('      - 默认模型: $defaultModel (可选，留空则使用 DSL 中的模型)');
   print('   4. 进入任意小说章节，触发 AI 功能（特写/总结/聊天等）');
   print('   5. 观察是否正常生成内容');

@@ -7,7 +7,7 @@ Novel App 自动打包并上传脚本
 2. 分析 git diff 生成更新日志
 3. 构建 Flutter APK (release)
 4. 上传 APK 到后端服务器
-5. 自动提交代码到 git
+5. 自动提交代码到 git（含 annotated tag v{version}）
 """
 
 import os
