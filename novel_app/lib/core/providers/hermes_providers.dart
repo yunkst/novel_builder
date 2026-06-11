@@ -17,12 +17,11 @@ import 'webview_providers.dart';
 class HermesChatState {
   final List<HermesMessage> messages;
   final bool isLoading;
-  final String? streamingContent;
+  /// 实时流式 segments（当前回合进行中时非空）
+  final List<HermesSegment> streamingSegments;
   final String? error;
 
   // ===== Agent 扩展字段 (Phase 3) =====
-  /// 是否有待处理的工具调用（用于在消息气泡下方展示进度）
-  final List<AgentToolCall> agentToolCalls;
   /// 当前是否等待用户确认
   final PendingConfirmation? pendingConfirmation;
   /// 当前场景 ID
@@ -33,9 +32,8 @@ class HermesChatState {
   const HermesChatState({
     this.messages = const [],
     this.isLoading = false,
-    this.streamingContent,
+    this.streamingSegments = const [],
     this.error,
-    this.agentToolCalls = const [],
     this.pendingConfirmation,
     this.scenarioId = ScenarioIds.writing,
     this.scenarioDisplayName = '小说写作助手',
@@ -44,9 +42,8 @@ class HermesChatState {
   HermesChatState copyWith({
     List<HermesMessage>? messages,
     bool? isLoading,
-    String? streamingContent,
+    List<HermesSegment>? streamingSegments,
     String? error,
-    List<AgentToolCall>? agentToolCalls,
     PendingConfirmation? pendingConfirmation,
     bool clearPendingConfirmation = false,
     String? scenarioId,
@@ -55,9 +52,8 @@ class HermesChatState {
     return HermesChatState(
       messages: messages ?? this.messages,
       isLoading: isLoading ?? this.isLoading,
-      streamingContent: streamingContent,
+      streamingSegments: streamingSegments ?? this.streamingSegments,
       error: error,
-      agentToolCalls: agentToolCalls ?? this.agentToolCalls,
       pendingConfirmation: clearPendingConfirmation
           ? null
           : pendingConfirmation ?? this.pendingConfirmation,
@@ -70,7 +66,11 @@ class HermesChatState {
 /// Hermes Chat Notifier
 class HermesChatNotifier extends StateNotifier<HermesChatState> {
   final Ref _ref;
-  String _pendingContent = '';
+
+  /// 当前回合的 segments（私有，按事件流构建）
+  /// 每个 TextDelta 追加到最后一个 TextSegment 或创建新的，
+  /// 每个 ToolCallStart/ToolCallEnd 插入/更新 ToolCallSegment
+  final List<HermesSegment> _pendingSegments = [];
 
   // ===== Agent 相关 (Phase 3) =====
   StreamSubscription<AgentEvent>? _agentSub;
@@ -112,17 +112,15 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     final userMessage = HermesMessage.user(content.trim());
     final updatedMessages = [...state.messages, userMessage];
 
-    // 清除之前的状态
+    // 清除当前回合的临时状态
+    _pendingSegments.clear();
     state = state.copyWith(
       messages: updatedMessages,
       isLoading: true,
-      streamingContent: null,
+      streamingSegments: const [],
       error: null,
-      agentToolCalls: const [],
       clearPendingConfirmation: true,
     );
-
-    _pendingContent = '';
 
     try {
       await _sendViaLocalAgent(content);
@@ -164,12 +162,22 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     // 取消之前的订阅
     await _agentSub?.cancel();
 
-    // 订阅事件流
+    // 订阅事件流：按事件时序构建 segments 列表
     _agentSub = agentService.events.listen((event) {
       switch (event) {
         case TextDeltaEvent e:
-          _pendingContent += e.text;
-          state = state.copyWith(streamingContent: _pendingContent);
+          // 追加到最后一个 TextSegment，或创建新的
+          if (_pendingSegments.isNotEmpty &&
+              _pendingSegments.last is TextSegment) {
+            final idx = _pendingSegments.length - 1;
+            final last = _pendingSegments[idx] as TextSegment;
+            _pendingSegments[idx] = TextSegment(last.content + e.text);
+          } else {
+            _pendingSegments.add(TextSegment(e.text));
+          }
+          state = state.copyWith(
+            streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
+          );
 
         case ToolCallStartEvent e:
           final call = AgentToolCall(
@@ -178,19 +186,25 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
             arguments: e.args,
             status: AgentToolStatus.running,
           );
+          _pendingSegments.add(ToolCallSegment(call));
           state = state.copyWith(
-            agentToolCalls: [...state.agentToolCalls, call],
+            streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
           );
 
         case ToolCallEndEvent e:
+          // 找到对应 ToolCallSegment 并更新状态
+          final idx = _pendingSegments.indexWhere(
+            (s) => s is ToolCallSegment && s.call.id == e.toolCallId,
+          );
+          if (idx >= 0) {
+            final old = (_pendingSegments[idx] as ToolCallSegment).call;
+            _pendingSegments[idx] = ToolCallSegment(old.copyWith(
+              status: e.success ? AgentToolStatus.completed : AgentToolStatus.error,
+              result: e.result,
+            ));
+          }
           state = state.copyWith(
-            agentToolCalls: state.agentToolCalls.map((c) {
-              if (c.id != e.toolCallId) return c;
-              return c.copyWith(
-                status: e.success ? AgentToolStatus.completed : AgentToolStatus.error,
-                result: e.result,
-              );
-            }).toList(),
+            streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
           );
 
         case ConfirmationRequestedEvent e:
@@ -250,7 +264,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     _isSwitchingFromUI = false;
 
     // 清空对话历史并设置新场景
-    _pendingContent = '';
+    _pendingSegments.clear();
     state = HermesChatState(
       scenarioId: scenarioId,
       scenarioDisplayName: displayName,
@@ -300,8 +314,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
         tags: ['provider', 'hermes', 'done'],
       );
     }
-    final assistantMessage = _pendingContent.isNotEmpty
-        ? HermesMessage.assistant(_pendingContent)
+    final segmentsSnapshot = List<HermesSegment>.unmodifiable(_pendingSegments);
+    final assistantMessage = segmentsSnapshot.isNotEmpty
+        ? HermesMessage.assistantFromSegments(segmentsSnapshot)
         : null;
     final newMessages = assistantMessage != null
         ? [...state.messages, assistantMessage]
@@ -310,12 +325,18 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     state = state.copyWith(
       messages: newMessages,
       isLoading: false,
-      streamingContent: null,
+      streamingSegments: const [],
       error: error,
       clearPendingConfirmation: true,
     );
-    _pendingContent = '';
+    _pendingSegments.clear();
   }
+
+  /// 合并所有文本片段的临时内容（用于日志）
+  String get _pendingContent => _pendingSegments
+      .whereType<TextSegment>()
+      .map((s) => s.content)
+      .join('');
 
   /// 停止当前生成
   void cancelRequest() {
@@ -329,31 +350,30 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     }
     _pendingConfirmations.clear();
 
-    // 保留已生成内容
-    if (_pendingContent.isNotEmpty) {
-      final assistantMessage = HermesMessage.assistant(_pendingContent);
-      final finalMessages = [...state.messages, assistantMessage];
+    // 保留已生成的交替 segments
+    if (_pendingSegments.isNotEmpty) {
+      final segmentsSnapshot = List<HermesSegment>.unmodifiable(_pendingSegments);
+      final partial = HermesMessage.assistantFromSegments(segmentsSnapshot);
+      final finalMessages = [...state.messages, partial];
       state = state.copyWith(
         messages: finalMessages,
         isLoading: false,
-        streamingContent: null,
-        agentToolCalls: const [],
+        streamingSegments: const [],
         clearPendingConfirmation: true,
       );
     } else {
       state = state.copyWith(
         isLoading: false,
-        streamingContent: null,
-        agentToolCalls: const [],
+        streamingSegments: const [],
         clearPendingConfirmation: true,
       );
     }
-    _pendingContent = '';
+    _pendingSegments.clear();
   }
 
   /// 清空会话
   void clearConversation() {
-    _pendingContent = '';
+    _pendingSegments.clear();
     state = HermesChatState(
       scenarioId: state.scenarioId,
       scenarioDisplayName: state.scenarioDisplayName,

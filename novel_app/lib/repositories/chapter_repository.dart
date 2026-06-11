@@ -757,14 +757,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     return updateChapterContent(chapterUrl, content);
   }
 
-  /// 根据 ID 获取缓存的章节内容（解析 URL 后委托 getCachedChapter）
-  @override
-  Future<String?> getCachedChapterById(int id) async {
-    final chapterUrl = await getChapterUrlById(id);
-    if (chapterUrl == null) return null;
-    return getCachedChapter(chapterUrl);
-  }
-
   /// 根据 URL 获取章节 ID（搜索结果用）
   @override
   Future<int?> getChapterIdByUrl(String url) async {

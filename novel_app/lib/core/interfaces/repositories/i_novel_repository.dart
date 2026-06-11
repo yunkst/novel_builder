@@ -107,12 +107,6 @@ abstract class INovelRepository {
   /// 返回小说 URL，不存在则返回 null
   Future<String?> getNovelUrlById(int id);
 
-  /// 根据 ID 检查小说是否存在
-  ///
-  /// [id] bookshelf.id
-  /// 返回是否存在的布尔值
-  Future<bool> novelExistsById(int id);
-
   /// 根据 ID 更新小说背景设定（解析 URL 后委托 updateBackgroundSetting）
   ///
   /// [id] bookshelf.id

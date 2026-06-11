@@ -173,10 +173,36 @@ class AgentLoop {
             result = {'raw': rawResult};
           }
 
-          // 截断过长结果
+          // 截断过长结果：错误响应优先保留 error/message/suggestion 字段
           var resultStr = jsonEncode(result);
           if (resultStr.length > _config.toolResultMaxChars) {
-            resultStr = '${resultStr.substring(0, _config.toolResultMaxChars)}... [truncated]';
+            if (result.containsKey('error')) {
+              // 错误结果：优先保留错误信息，截断其余数据
+              final errorInfo = <String, dynamic>{
+                'error': result['error'],
+              };
+              if (result['message'] != null) {
+                errorInfo['message'] = result['message'];
+              }
+              if (result['suggestion'] != null) {
+                errorInfo['suggestion'] = result['suggestion'];
+              }
+              final errorStr = jsonEncode(errorInfo);
+              final remaining =
+                  _config.toolResultMaxChars - errorStr.length - 30;
+              if (remaining > 200) {
+                final truncated = <String, dynamic>{
+                  ...errorInfo,
+                  'partial_data': resultStr.substring(0, remaining),
+                };
+                resultStr = jsonEncode(truncated);
+              } else {
+                resultStr = errorStr;
+              }
+            } else {
+              resultStr =
+                  '${resultStr.substring(0, _config.toolResultMaxChars)}... [truncated]';
+            }
           }
 
           messages.add(ChatMessage(

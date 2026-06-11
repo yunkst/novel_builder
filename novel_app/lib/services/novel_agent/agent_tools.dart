@@ -20,9 +20,6 @@ class AgentTools {
     _searchInChapters,
     // ===== 章节写入 =====
     _updateChapterContent,
-    _rewriteChapterParagraph,
-    _insertParagraph,
-    _deleteParagraph,
     _createCustomChapter,
     // ===== 角色 =====
     _listCharacters,
@@ -37,9 +34,6 @@ class AgentTools {
   /// 破坏性工具列表（需要用户确认）
   static const Set<String> destructiveTools = {
     'update_chapter_content',
-    'rewrite_chapter_paragraph',
-    'delete_paragraph',
-    'insert_paragraph',
     'create_custom_chapter',
     'update_character',
     'create_character',
@@ -152,83 +146,6 @@ class AgentTools {
           },
         },
         'required': ['chapterId', 'content'],
-      },
-    },
-  };
-
-  static const _rewriteChapterParagraph = {
-    'type': 'function',
-    'function': {
-      'name': 'rewrite_chapter_paragraph',
-      'description':
-          '使用 AI 改写章节中的指定段落。保留其他段落不变。段落以空行分隔，索引从 0 开始。chapterId 来自 list_chapters。',
-      'parameters': {
-        'type': 'object',
-        'properties': {
-          'chapterId': {
-            'type': 'integer',
-            'description': '章节ID（从 list_chapters 获取）。',
-          },
-          'paragraphIndex': {
-            'type': 'integer',
-            'description': '要改写的段落索引（从0开始，以空行分隔）',
-          },
-          'instruction': {
-            'type': 'string',
-            'description': '改写要求，如"改写得更有悬念"、"增加环境描写"等',
-          },
-        },
-        'required': ['chapterId', 'paragraphIndex', 'instruction'],
-      },
-    },
-  };
-
-  static const _insertParagraph = {
-    'type': 'function',
-    'function': {
-      'name': 'insert_paragraph',
-      'description':
-          '在章节的指定位置后插入一段新文本。段落以空行分隔。chapterId 来自 list_chapters。',
-      'parameters': {
-        'type': 'object',
-        'properties': {
-          'chapterId': {
-            'type': 'integer',
-            'description': '章节ID（从 list_chapters 获取）。',
-          },
-          'afterParagraphIndex': {
-            'type': 'integer',
-            'description': '在哪个段落之后插入（-1表示插入到最前面）',
-          },
-          'newParagraph': {
-            'type': 'string',
-            'description': '要插入的新段落文本',
-          },
-        },
-        'required': ['chapterId', 'afterParagraphIndex', 'newParagraph'],
-      },
-    },
-  };
-
-  static const _deleteParagraph = {
-    'type': 'function',
-    'function': {
-      'name': 'delete_paragraph',
-      'description':
-          '删除章节中的指定段落。段落以空行分隔，索引从 0 开始。chapterId 来自 list_chapters。',
-      'parameters': {
-        'type': 'object',
-        'properties': {
-          'chapterId': {
-            'type': 'integer',
-            'description': '章节ID（从 list_chapters 获取）。',
-          },
-          'paragraphIndex': {
-            'type': 'integer',
-            'description': '要删除的段落索引',
-          },
-        },
-        'required': ['chapterId', 'paragraphIndex'],
       },
     },
   };

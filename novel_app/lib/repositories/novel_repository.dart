@@ -359,19 +359,6 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     return maps.first['url'] as String;
   }
 
-  /// 根据 ID 检查小说是否存在
-  @override
-  Future<bool> novelExistsById(int id) async {
-    final db = await database;
-    final maps = await db.query(
-      'bookshelf',
-      columns: ['id'],
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return maps.isNotEmpty;
-  }
-
   /// 根据 ID 更新小说背景设定（解析 URL 后委托 updateBackgroundSetting）
   @override
   Future<int> updateBackgroundSettingById(int id, String? setting) async {

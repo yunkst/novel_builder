@@ -4,6 +4,7 @@
 /// 提取小说目录和章节内容。
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,7 +40,7 @@ class WebViewExtractScenario implements AgentScenario {
 URL: $url
 
 ## 工作流程
-1. 先调用 get_page_info 获取页面 DOM 结构
+1. 先调用 get_page_info 获取页面 DOM 结构（返回包含 pageType 推断）
 2. 分析 DOM 结构，理解页面布局（目录页还是章节页）
 3. 调用 get_cached_script 查询该域名是否已有缓存脚本
 4. 如果有缓存脚本，检查是否可用；如果没有，则新生成
@@ -51,6 +52,12 @@ URL: $url
 
 ## JS 脚本规范
 - 整个脚本是一个 async IIFE: `(async function() { ... return JSON.stringify(result); })()`
+- **必须**在脚本开头声明页面URL参数: `const PAGE_URL = '{{URL}}';`
+  - 目录脚本中 `PAGE_URL` 是章节列表页 URL
+  - 内容脚本中 `PAGE_URL` 是章节内容页 URL
+  - **禁止硬编码任何 URL**，所有 URL 相关操作必须通过 `PAGE_URL` 变量
+  - **禁止使用** `window.location.href` / `document.URL` / `location.href`，统一用 `PAGE_URL`
+  - 翻页时如果链接是相对路径，用 `new URL(href, PAGE_URL).href` 拼接完整URL
 - 目录脚本返回: `{ "title": "小说名", "chapters": [{ "title": "第1章 xxx", "url": "..." }] }`
 - 内容脚本返回: `{ "title": "章节名", "content": "正文..." }`
 - 翻页逻辑：检测下一页按钮 → 点击 → `await new Promise(r => setTimeout(r, 1000))` → 继续提取
@@ -63,6 +70,30 @@ URL: $url
 - 章节URL必须是完整URL（含协议和域名），如果是相对路径请拼接完整
 - 内容提取时跳过广告段落（含"本章未完"、"一秒记住"、"笔趣阁"等关键词的行）
 - 如果页面不是小说目录页，直接告知用户
+
+## 错误处理策略
+收到工具返回的 error 响应时，**务必先阅读 suggestion 字段**获取修复建议，再决定下一步。
+
+**JS 错误码**（来自 execute_js）：
+- `JS_SYNTAX_ERROR`：语法错误 → 检查括号/引号配对，IIFE 格式是否完整
+- `JS_REFERENCE_ERROR`：引用了未定义变量 → 不要使用 jQuery/\$/underscore/Vue/React 等第三方库，只用原生 DOM API；检查变量名拼写
+- `JS_TYPE_ERROR`：访问了 null/undefined 属性 → 在 querySelector 后加 if(el) 判断
+- `JS_TIMEOUT`：脚本超时（>60秒）→ 检查死循环，用 await new Promise(r => setTimeout(r, 100)) 分批
+- `JS_RUNTIME_ERROR`：其他运行时错误 → 简化提取逻辑重试
+- `missing_param`：缺少参数 → 查看 missing 字段了解具体缺哪些
+
+**保存脚本错误**（来自 save_script）：
+- 注意字段名是**下划线格式**：domain / chapter_list_js / chapter_content_js
+- 如果缺参，查看 received_keys 和 missing 字段，不要反复重试同一个错误调用
+
+**脚本校验错误**（来自 execute_js / save_script）：
+- `SCRIPT_VALIDATION_FAILED`：脚本不符合参数化规范，查看 validation_error 和 script_type 定位问题
+  - 缺少 {{URL}} 占位符 → 在脚本开头加 `const PAGE_URL = '{{URL}}';`
+  - 硬编码 URL 过多 → 改用 PAGE_URL 变量拼接完整 URL
+  - 使用了 window.location.href/document.URL → 改用 PAGE_URL
+  - 脚本已校验通过的标志：{{URL}} 占位符 + PAGE_URL 变量 + 无 location.href
+
+**同一错误连续出现 3 次**时，**换一种完全不同的思路**重写脚本（如换选择器、简化提取逻辑、放弃某些字段），不要在同一个错误上死磕。
 ''';
   }
 
@@ -116,44 +147,247 @@ URL: $url
 
   // ===== 工具实现 =====
 
-  /// 获取当前页面信息（URL + 精简 DOM）
+  /// 获取当前页面信息（URL + 精简 DOM + 页面类型推断）
   Future<String> _getPageInfo() async {
     try {
       final url = await _webviewController.getUrl();
       final domResult = await _webviewController.evaluateJavascript(
         source: _domSimplifyJs,
       );
+
+      // 推断页面类型
+      final pageTypeResult = await _webviewController.evaluateJavascript(
+        source: _inferPageTypeJs,
+      );
+      String pageType = 'unknown';
+      String? pageTitle;
+      if (pageTypeResult != null && pageTypeResult is String) {
+        try {
+          final parsed = jsonDecode(pageTypeResult);
+          pageType = parsed['pageType'] ?? 'unknown';
+          pageTitle = parsed['title'] ?? '';
+        } catch (_) {
+          // 推断失败不影响主流程
+        }
+      }
+
       LoggerService.instance.i(
-        '获取页面信息: ${url?.toString() ?? ""} (domLen=${(domResult ?? '').length})',
+        '获取页面信息: ${url?.toString() ?? ""} (domLen=${(domResult ?? '').length}, pageType=$pageType)',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'get_page_info'],
       );
       return jsonEncode({
         'url': url?.toString() ?? '',
+        'pageType': pageType,
+        'title': pageTitle ?? '',
         'dom': domResult ?? '',
       });
     } catch (e) {
-      return jsonEncode({'error': 'fetch_failed', 'message': e.toString()});
+      return jsonEncode({
+        'error': 'PAGE_NOT_READY',
+        'message': '页面尚未加载完成或 WebView 未初始化',
+        'raw': e.toString(),
+        'suggestion': '请等待几秒后重试 get_page_info',
+      });
     }
   }
 
   /// 在 WebView 中执行 JS 脚本
+  ///
+  /// 执行前会：
+  /// 1. 校验脚本包含 `{{URL}}` 占位符（防呆）
+  /// 2. 将 `{{URL}}` 替换为 `test_url`（如提供）或当前页面 URL
+  /// 3. 在 WebView 中执行替换后的脚本
   Future<String> _executeJs(Map<String, dynamic> args) async {
     final script = args['script'] as String?;
     if (script == null || script.isEmpty) {
-      return jsonEncode({'error': 'missing_param', 'message': '缺少 script 参数'});
+      return jsonEncode({
+        'error': 'missing_param',
+        'message': '缺少 script 参数',
+        'missing': ['script'],
+        'suggestion':
+            '请传入要执行的 JavaScript 代码。格式要求: (async function(){ const PAGE_URL = \'{{URL}}\'; ... return JSON.stringify(result); })()',
+      });
     }
+
+    // 防呆校验：脚本必须符合参数化规范
+    final validationError = _validateScript(script);
+    if (validationError != null) {
+      LoggerService.instance.w(
+        '脚本校验失败: $validationError',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'execute_js', 'validation'],
+      );
+      return jsonEncode({
+        'error': 'SCRIPT_VALIDATION_FAILED',
+        'message': '脚本校验失败',
+        'validation_error': validationError,
+        'suggestion': validationError,
+      });
+    }
+
+    // 参数注入：将 {{URL}} 替换为 test_url 或当前页面 URL
+    final testUrl = (args['test_url'] as String?) ?? _currentUrl;
+    final resolvedScript = script.replaceAll('{{URL}}', testUrl);
+
+    LoggerService.instance.d(
+      '执行 JS: 替换 {{URL}} → $testUrl (scriptLen=${resolvedScript.length})',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'execute_js', 'inject'],
+    );
+
     try {
-      final result = await _webviewController.evaluateJavascript(source: script);
+      final result = await _webviewController
+          .evaluateJavascript(source: resolvedScript)
+          .timeout(const Duration(seconds: 60));
       LoggerService.instance.i(
         '执行 JS 成功: resultLen=${(result ?? '').length}',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'execute_js'],
       );
       return result ?? jsonEncode({'result': null});
+    } on TimeoutException {
+      LoggerService.instance.w(
+        '执行 JS 超时 (>60s)',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'execute_js', 'timeout'],
+      );
+      return jsonEncode({
+        'error': 'JS_TIMEOUT',
+        'message': '脚本执行超过 60 秒未返回',
+        'script_length': script.length,
+        'suggestion':
+            '检查脚本中是否有死循环、长时间 setTimeout，或在循环中加 await new Promise(r => setTimeout(r, 100)) 让出主线程',
+      });
     } catch (e) {
-      return jsonEncode({'error': 'js_execution_failed', 'message': e.toString()});
+      // 解析 WebView 抛出的 JS 异常，给出针对性建议
+      final errorInfo = _parseJsError(e.toString(), script);
+      LoggerService.instance.w(
+        '执行 JS 失败: ${errorInfo.code} - ${errorInfo.message}',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'execute_js', errorInfo.code],
+      );
+      return jsonEncode({
+        'error': errorInfo.code,
+        'message': errorInfo.message,
+        'raw': e.toString(),
+        'suggestion': errorInfo.suggestion,
+      });
     }
+  }
+
+  /// 解析 WebView 抛出的 JS 异常，按错误类型给出针对性修复建议
+  ({String code, String message, String suggestion}) _parseJsError(
+    String raw,
+    String script,
+  ) {
+    final lowerRaw = raw.toLowerCase();
+
+    // 语法错误
+    if (lowerRaw.contains('syntaxerror')) {
+      return (
+        code: 'JS_SYNTAX_ERROR',
+        message: '脚本有语法错误',
+        suggestion:
+            '检查括号/引号是否配对，async IIFE 格式是否正确: (async function(){...})()',
+      );
+    }
+
+    // 引用错误（未定义变量 / 第三方库）
+    if (lowerRaw.contains('referenceerror')) {
+      // 提取出错的变量名
+      final match = RegExp(r"(\w+)\s+is\s+not\s+defined").firstMatch(raw);
+      final varName = match?.group(1);
+      final isLibHint = varName != null &&
+          (varName == r'$' ||
+              varName == 'jQuery' ||
+              varName == '_' ||
+              varName == 'Vue' ||
+              varName == 'React');
+      return (
+        code: 'JS_REFERENCE_ERROR',
+        message: varName != null
+            ? '引用了未定义的变量: $varName'
+            : '引用了未定义的变量',
+        suggestion: isLibHint
+            ? '目标网站没有加载 $varName 等第三方库，请改用原生 DOM API (document.querySelector, innerText, etc.)'
+            : '检查变量名拼写是否正确，注意 IIFE 内是独立作用域，外部 const/let 无法直接访问',
+      );
+    }
+
+    // 类型错误
+    if (lowerRaw.contains('typeerror')) {
+      // 提取"Cannot read properties of XXX (reading 'yyy')"
+      final nullMatch =
+          RegExp(r"Cannot read propert(?:y|ies) of (null|undefined)").firstMatch(raw);
+      final isNullAccess = nullMatch != null;
+      return (
+        code: 'JS_TYPE_ERROR',
+        message: isNullAccess
+            ? '访问了 null/undefined 对象的属性'
+            : '类型错误',
+        suggestion: isNullAccess
+            ? 'querySelector 可能返回 null。访问前加判断: const el = document.querySelector("..."); if (el) { ... }'
+            : '检查对象/数组的访问方式是否正确，必要时加 typeof 或 instanceof 判断',
+      );
+    }
+
+    // 超时（被外层 catch 捕获前）
+    if (lowerRaw.contains('timeout')) {
+      return (
+        code: 'JS_TIMEOUT',
+        message: '脚本执行超时',
+        suggestion:
+            '在长循环中加 await new Promise(r => setTimeout(r, 100)) 让出主线程，避免阻塞 WebView',
+      );
+    }
+
+    return (
+      code: 'JS_RUNTIME_ERROR',
+      message: '脚本执行失败: $raw',
+      suggestion:
+          '根据错误信息修正后重试。如果连续失败 3 次，建议换一种思路（如换选择器、简化提取逻辑）',
+    );
+  }
+
+  /// 校验脚本是否符合参数化规范
+  ///
+  /// 规则：
+  /// 1. 必须包含 `{{URL}}` 占位符
+  /// 2. 禁止硬编码过多完整 URL（允许 ≤2 个，如广告域名过滤）
+  /// 3. 禁止使用 window.location.href / document.URL
+  ///
+  /// 返回 null 表示校验通过，否则返回错误描述。
+  String? _validateScript(String script) {
+    // 1. 必须包含 {{URL}} 占位符
+    if (!script.contains('{{URL}}')) {
+      return '脚本缺少 {{URL}} 占位符。'
+          "请在脚本开头声明: const PAGE_URL = '{{URL}}'; "
+          '并在脚本中使用 PAGE_URL 代替硬编码 URL';
+    }
+
+    // 2. 禁止硬编码过多完整 URL
+    final hardcodedUrlPattern = RegExp(r'https?://[^\s<>]+');
+    final hardcodedUrls = hardcodedUrlPattern
+        .allMatches(script)
+        .where((m) => !m.group(0)!.contains('{{'))
+        .map((m) => m.group(0)!)
+        .toList();
+    if (hardcodedUrls.length > 2) {
+      return '脚本中包含 ${hardcodedUrls.length} 个硬编码 URL（最多允许 2 个），'
+          '请使用 PAGE_URL 变量代替。'
+          '检测到的 URL: ${hardcodedUrls.take(3).join(", ")}';
+    }
+
+    // 3. 禁止使用 window.location.href / document.URL / location.href
+    if (script.contains('window.location.href') ||
+        script.contains('document.URL') ||
+        script.contains('location.href')) {
+      return '脚本中禁止使用 window.location.href/document.URL/location.href，'
+          '请统一使用 PAGE_URL 变量（从 {{URL}} 占位符获取）';
+    }
+
+    return null; // 校验通过
   }
 
   /// 查询该域名是否已有缓存脚本
@@ -166,7 +400,12 @@ URL: $url
     final effectiveDomain = domain ?? uri?.host ?? '';
 
     if (effectiveDomain.isEmpty) {
-      return jsonEncode({'error': 'missing_domain', 'message': '无法确定域名'});
+      return jsonEncode({
+        'error': 'missing_domain',
+        'message': '无法确定域名',
+        'current_url': url,
+        'suggestion': '当前页面 URL 无法解析出域名。请传入 domain 参数（如 "www.example.com"）',
+      });
     }
 
     // 查询数据库（通过 DatabaseConnection）
@@ -183,17 +422,18 @@ URL: $url
       return jsonEncode({
         'found': false,
         'domain': effectiveDomain,
-        'message': '该域名无缓存脚本',
+        'message': '该域名无缓存脚本，需要新生成提取脚本',
       });
     }
 
+    // 统一使用下划线命名，与 save_script 参数名一致
     final scripts = results.map((row) => {
           'id': row['id'],
           'domain': row['domain'],
-          'urlPattern': row['url_pattern'],
-          'chapterListJs': row['chapter_list_js'],
-          'chapterContentJs': row['chapter_content_js'],
-          'useCount': row['use_count'],
+          'url_pattern': row['url_pattern'],
+          'chapter_list_js': row['chapter_list_js'],
+          'chapter_content_js': row['chapter_content_js'],
+          'use_count': row['use_count'],
           'verified': row['verified'],
         }).toList();
 
@@ -211,19 +451,70 @@ URL: $url
   }
 
   /// 保存提取脚本到数据库
+  ///
+  /// 保存前会校验两个脚本均包含 `{{URL}}` 占位符（防呆）。
+  /// `{{URL}}` 占位符原样存入数据库，不做替换。
   Future<String> _saveScript(Map<String, dynamic> args) async {
     final domain = args['domain'] as String?;
     final chapterListJs = args['chapter_list_js'] as String?;
     final chapterContentJs = args['chapter_content_js'] as String?;
     final urlPattern = args['url_pattern'] as String? ?? '';
 
-    if (domain == null || chapterListJs == null || chapterContentJs == null) {
+    // 逐个检查，精确报告缺失字段
+    final missing = <String>[];
+    if (domain == null || domain.isEmpty) missing.add('domain');
+    if (chapterListJs == null || chapterListJs.isEmpty) {
+      missing.add('chapter_list_js');
+    }
+    if (chapterContentJs == null || chapterContentJs.isEmpty) {
+      missing.add('chapter_content_js');
+    }
+    if (missing.isNotEmpty) {
       return jsonEncode({
         'error': 'missing_param',
-        'message': '缺少 domain/chapter_list_js/chapter_content_js 参数',
+        'message': '缺少必需的参数: ${missing.join(", ")}',
+        'missing': missing,
+        'received_keys': args.keys.toList(),
+        'suggestion':
+            '请补充缺失参数。注意字段名是下划线格式: domain / chapter_list_js / chapter_content_js',
       });
     }
 
+    // 防呆校验：目录脚本
+    final listValidation = _validateScript(chapterListJs!);
+    if (listValidation != null) {
+      LoggerService.instance.w(
+        '保存时目录脚本校验失败: $listValidation',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'validation'],
+      );
+      return jsonEncode({
+        'error': 'SCRIPT_VALIDATION_FAILED',
+        'message': '目录脚本校验失败',
+        'script_type': 'chapter_list_js',
+        'validation_error': listValidation,
+        'suggestion': listValidation,
+      });
+    }
+
+    // 防呆校验：内容脚本
+    final contentValidation = _validateScript(chapterContentJs!);
+    if (contentValidation != null) {
+      LoggerService.instance.w(
+        '保存时内容脚本校验失败: $contentValidation',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'validation'],
+      );
+      return jsonEncode({
+        'error': 'SCRIPT_VALIDATION_FAILED',
+        'message': '内容脚本校验失败',
+        'script_type': 'chapter_content_js',
+        'validation_error': contentValidation,
+        'suggestion': contentValidation,
+      });
+    }
+
+    // {{URL}} 占位符原样存入数据库，不做替换
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = now.toString();
 
@@ -318,17 +609,63 @@ URL: $url
 })()
 ''';
 
+  /// 页面类型推断脚本
+  ///
+  /// 通过 DOM 特征简单判断是目录页还是章节内容页：
+  /// - 大量相同结构链接 + 长列表 → chapter_list
+  /// - 少量链接 + 大量长段落 → chapter_content
+  /// - 其他 → unknown
+  ///
+  /// 返回 JSON: `{"pageType": "chapter_list|chapter_content|unknown", "title": "页面title"}`
+  static const _inferPageTypeJs = r'''
+(function() {
+  try {
+    var title = document.title || '';
+    // 统计链接数量
+    var links = document.querySelectorAll('a[href]');
+    var linkCount = links.length;
+    // 统计长段落（>200字符）
+    var paragraphs = document.querySelectorAll('p, div');
+    var longParaCount = 0;
+    var paraSample = [];
+    for (var i = 0; i < paragraphs.length && paraSample.length < 5; i++) {
+      var text = (paragraphs[i].innerText || '').trim();
+      if (text.length > 200) {
+        longParaCount++;
+        if (paraSample.length < 3) paraSample.push(text.length);
+      }
+    }
+    // 列表标签
+    var listItems = document.querySelectorAll('li').length;
+    // 简单启发式：
+    // 链接密度高 + 段落少 → 目录页
+    // 链接少 + 大量长段落 → 章节内容页
+    var pageType = 'unknown';
+    if (linkCount >= 20 && longParaCount <= 3) {
+      pageType = 'chapter_list';
+    } else if (longParaCount >= 3 && linkCount < 20) {
+      pageType = 'chapter_content';
+    } else if (listItems >= 10 && linkCount >= 10) {
+      pageType = 'chapter_list';
+    }
+    return JSON.stringify({pageType: pageType, title: title});
+  } catch (e) {
+    return JSON.stringify({pageType: 'unknown', title: '', error: e.toString()});
+  }
+})()
+''';
+
   // ===== 工具定义（OpenAI Function Calling schema）=====
 
   static const _getPageInfoTool = {
     'type': 'function',
     'function': {
       'name': 'get_page_info',
-      'description': '获取当前浏览器页面的 URL 和精简后的 DOM 结构。用于分析页面布局、找到小说目录或内容区域。',
+      'description':
+          '获取当前浏览器页面的 URL、页面标题、页面类型推断（chapter_list=目录页 / chapter_content=章节内容页 / unknown=未知）和精简后的 DOM 结构。注意：pageType 仅为参考，请结合 DOM 确认。若返回 PAGE_NOT_READY，请稍后重试。',
       'parameters': {
         'type': 'object',
         'properties': <String, dynamic>{},
-        'required': <String>[],
       },
     },
   };
@@ -337,13 +674,27 @@ URL: $url
     'type': 'function',
     'function': {
       'name': 'execute_js',
-      'description': '在当前 WebView 页面中执行 JavaScript 脚本并返回结果。用于测试生成的提取脚本。',
+      'description':
+          '在当前 WebView 页面中执行 JavaScript 脚本并返回结果。用于测试生成的提取脚本。'
+          '脚本必须包含 {{URL}} 占位符（代码层会自动替换为真实 URL）。'
+          '脚本超时 60 秒会被自动终止（返回 JS_TIMEOUT）。'
+          '常见错误码: JS_SYNTAX_ERROR / JS_REFERENCE_ERROR / JS_TYPE_ERROR / SCRIPT_VALIDATION_FAILED。'
+          '请根据返回的 suggestion 字段修正。',
       'parameters': {
         'type': 'object',
         'properties': {
           'script': {
             'type': 'string',
-            'description': '要执行的 JavaScript 代码。应是一个 async IIFE，返回 JSON.stringify(结果)。',
+            'description':
+                '要执行的 JavaScript 代码。必须包含 {{URL}} 占位符。'
+                "格式: (async function(){ const PAGE_URL = '{{URL}}'; ... return JSON.stringify(result); })()",
+          },
+          'test_url': {
+            'type': 'string',
+            'description':
+                '可选。测试用的 URL，会替换脚本中的 {{URL}}。'
+                '测试内容脚本时，建议从目录脚本返回的 chapters 数组中取一个 URL 传入。'
+                '不填则使用当前浏览器页面 URL。',
           },
         },
         'required': ['script'],
@@ -355,16 +706,17 @@ URL: $url
     'type': 'function',
     'function': {
       'name': 'get_cached_script',
-      'description': '查询指定域名是否已有缓存的提取脚本。如果有则返回脚本内容，可直接复用。',
+      'description':
+          '查询指定域名是否已有缓存的提取脚本。如果有则返回脚本内容，可直接复用或修改后测试。返回字段使用下划线命名（chapter_list_js / chapter_content_js），与 save_script 参数名一致。',
       'parameters': {
         'type': 'object',
         'properties': {
           'domain': {
             'type': 'string',
-            'description': '要查询的域名（如 www.example.com）。不填则使用当前页面域名。',
+            'description':
+                '要查询的域名（如 www.example.com）。不填则使用当前页面域名。',
           },
         },
-        'required': <String>[],
       },
     },
   };
@@ -407,7 +759,6 @@ URL: $url
       'parameters': {
         'type': 'object',
         'properties': <String, dynamic>{},
-        'required': <String>[],
       },
     },
   };

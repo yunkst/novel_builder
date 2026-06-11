@@ -1,11 +1,11 @@
 /// AgentTools 工具定义单元测试
 ///
-/// 验证 14 个工具的 OpenAI Function Calling schema：
+/// 验证 12 个工具的 OpenAI Function Calling schema：
 /// - 工具总数正确
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
 /// - findTool 查找功能
-/// - isDestructive 判定（9 个破坏性 + 5 个非破坏性）
+/// - isDestructive 判定（6 个破坏性 + 6 个非破坏性）
 library;
 
 import 'dart:convert';
@@ -15,8 +15,8 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 15 个工具', () {
-      expect(AgentTools.allTools.length, 15);
+    test('应该有 12 个工具', () {
+      expect(AgentTools.allTools.length, 12);
     });
 
     test('每个工具都有 type=function', () {
@@ -122,21 +122,6 @@ void main() {
           required: ['chapterId', 'content']);
     });
 
-    test('rewrite_chapter_paragraph — 需要 chapterId + paragraphIndex + instruction', () {
-      verifyToolSchema('rewrite_chapter_paragraph',
-          required: ['chapterId', 'paragraphIndex', 'instruction']);
-    });
-
-    test('insert_paragraph — 需要 chapterId + afterParagraphIndex + newParagraph', () {
-      verifyToolSchema('insert_paragraph',
-          required: ['chapterId', 'afterParagraphIndex', 'newParagraph']);
-    });
-
-    test('delete_paragraph — 需要 chapterId + paragraphIndex', () {
-      verifyToolSchema('delete_paragraph',
-          required: ['chapterId', 'paragraphIndex']);
-    });
-
     test('create_custom_chapter — 需要 novelId + title + content, index 可选', () {
       verifyToolSchema('create_custom_chapter',
           required: ['novelId', 'title', 'content'], optional: ['index']);
@@ -177,9 +162,6 @@ void main() {
       final tools = [
         'read_chapter_content',
         'update_chapter_content',
-        'rewrite_chapter_paragraph',
-        'insert_paragraph',
-        'delete_paragraph',
       ];
       for (final name in tools) {
         final tool = AgentTools.findTool(name);
@@ -246,7 +228,7 @@ void main() {
       expect(tool, isNull);
     });
 
-    test('所有 15 个工具都能被 findTool 找到', () {
+    test('所有 12 个工具都能被 findTool 找到', () {
       final names =
           AgentTools.allTools.map((t) => t['function']['name'] as String).toList();
       for (final name in names) {
@@ -257,12 +239,9 @@ void main() {
   });
 
   group('AgentTools.isDestructive', () {
-    test('破坏性工具 (9个)', () {
+    test('破坏性工具 (6个)', () {
       final destructive = [
         'update_chapter_content',
-        'rewrite_chapter_paragraph',
-        'delete_paragraph',
-        'insert_paragraph',
         'create_custom_chapter',
         'update_character',
         'create_character',
@@ -275,7 +254,7 @@ void main() {
       }
     });
 
-    test('非破坏性工具 (5个)', () {
+    test('非破坏性工具 (6个)', () {
       final nonDestructive = [
         'list_novels',
         'read_chapter_content',
@@ -295,7 +274,7 @@ void main() {
     });
 
     test('destructiveTools 集合大小正确', () {
-      expect(AgentTools.destructiveTools.length, 9);
+      expect(AgentTools.destructiveTools.length, 6);
     });
   });
 

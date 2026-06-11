@@ -173,12 +173,6 @@ String describeToolAction(String toolName, Map<String, dynamic> args) {
     case 'update_chapter_content':
       final content = args['content'] as String? ?? '';
       return '将完全替换指定章节的正文（约 ${content.length} 字）';
-    case 'rewrite_chapter_paragraph':
-      return '将改写章节第 ${args['paragraphIndex']} 段';
-    case 'insert_paragraph':
-      return '将在第 ${args['afterParagraphIndex']} 段后插入新内容';
-    case 'delete_paragraph':
-      return '将删除章节第 ${args['paragraphIndex']} 段';
     case 'create_custom_chapter':
       return '将创建新章节 "${args['title']}"';
     case 'update_character':

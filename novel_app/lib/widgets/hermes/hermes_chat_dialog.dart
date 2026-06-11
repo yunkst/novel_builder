@@ -53,7 +53,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     ref.listen(hermesChatProvider, (prev, next) {
       final prevCount = prev?.messages.length ?? 0;
       final nextCount = next.messages.length;
-      if (nextCount > prevCount || (next.isLoading && next.streamingContent != null)) {
+      if (nextCount > prevCount || (next.isLoading && next.streamingSegments.isNotEmpty)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToBottom();
         });
@@ -207,12 +207,11 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       padding: const EdgeInsets.symmetric(vertical: 12),
       itemCount: chatState.messages.length + (chatState.isLoading ? 1 : 0),
       itemBuilder: (context, index) {
-        // 流式响应时，在最后一条 assistant 消息显示 streaming content
+        // 流式响应时，在最后一条 assistant 消息显示 streaming segments
         if (index == chatState.messages.length && chatState.isLoading) {
           return HermesMessageBubble(
-            message: HermesMessage.assistant(''),
-            streamingContent: chatState.streamingContent,
-            agentToolCalls: chatState.agentToolCalls,
+            message: HermesMessage(role: HermesRole.assistant),
+            streamingSegments: chatState.streamingSegments,
             showTimestamp: false,
           );
         }

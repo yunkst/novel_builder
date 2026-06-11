@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/site_script.dart';
 import '../../services/logger_service.dart';
 import '../../services/bookmark_service.dart';
+import 'database_providers.dart';
 
 /// 当前显示的 URL（地址栏订阅）
 final webviewCurrentUrlProvider = StateProvider<String>(
@@ -217,4 +219,103 @@ class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
   bool isBookmarked(String url) {
     return state.value?.any((b) => b.url == url) ?? false;
   }
+}
+
+// ============================================================
+// 站点脚本相关 Providers
+// ============================================================
+
+/// 脚本列表 Provider
+final siteScriptListProvider = StateNotifierProvider<SiteScriptListNotifier,
+    AsyncValue<List<SiteScript>>>(
+  (ref) => SiteScriptListNotifier(ref),
+);
+
+/// 脚本列表状态管理
+class SiteScriptListNotifier
+    extends StateNotifier<AsyncValue<List<SiteScript>>> {
+  final Ref _ref;
+
+  SiteScriptListNotifier(this._ref) : super(const AsyncValue.loading()) {
+    _loadScripts();
+  }
+
+  /// 初始化加载脚本列表
+  Future<void> _loadScripts() async {
+    try {
+      final repository = _ref.read(siteScriptRepositoryProvider);
+      final scripts = await repository.getAll();
+      state = AsyncValue.data(scripts);
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载脚本列表失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['site_script', 'load', 'error'],
+      );
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  /// 删除脚本
+  Future<void> deleteScript(String id) async {
+    try {
+      final repository = _ref.read(siteScriptRepositoryProvider);
+      await repository.delete(id);
+      await _loadScripts();
+      LoggerService.instance.i(
+        '删除脚本: id=$id',
+        category: LogCategory.database,
+        tags: ['site_script', 'delete'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除脚本失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['site_script', 'delete', 'error'],
+      );
+    }
+  }
+
+  /// 删除域名的所有脚本
+  Future<void> deleteScriptByDomain(String domain) async {
+    try {
+      final repository = _ref.read(siteScriptRepositoryProvider);
+      await repository.deleteByDomain(domain);
+      await _loadScripts();
+      LoggerService.instance.i(
+        '删除域名脚本: domain=$domain',
+        category: LogCategory.database,
+        tags: ['site_script', 'delete', 'domain'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除域名脚本失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['site_script', 'delete', 'domain', 'error'],
+      );
+    }
+  }
+
+  /// 标记脚本已验证
+  Future<void> verifyScript(String id) async {
+    try {
+      final repository = _ref.read(siteScriptRepositoryProvider);
+      await repository.setVerified(id, true);
+      await repository.markUsed(id);
+      await _loadScripts();
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '验证脚本失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['site_script', 'verify', 'error'],
+      );
+    }
+  }
+
+  /// 刷新脚本列表
+  void refresh() => _loadScripts();
 }

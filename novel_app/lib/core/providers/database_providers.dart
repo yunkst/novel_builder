@@ -14,6 +14,7 @@ import '../../repositories/novel_export_repository.dart';
 import '../../repositories/prompt_history_repository.dart';
 import '../../repositories/prompt_tag_category_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
+import '../../repositories/site_script_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/i_database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
@@ -170,3 +171,11 @@ NovelExportRepository novelExportRepository(Ref ref) {
     outlineRepository: outlineRepository,
   );
 }
+
+/// SiteScriptRepository Provider
+///
+/// 站点提取脚本的持久化操作
+final siteScriptRepositoryProvider = Provider<SiteScriptRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return SiteScriptRepository(dbConnection: dbConnection);
+});

@@ -1,10 +1,9 @@
 /// ToolExecutor 工具执行器单元测试 — 真实 SQLite
 ///
 /// 使用内存 SQLite 数据库 + 真实 Repository 实现，
-/// 验证 15 个工具端到端的执行逻辑（ID-based）：
+/// 验证 12 个工具端到端的执行逻辑（ID-based）：
 /// - 正常路径：数据写入 → 工具读取 → 返回正确 JSON
 /// - 边界条件：空数据、未缓存章节、角色不存在、大纲不存在
-/// - 段落操作：增删改的索引边界、段落解析与拼接
 /// - 错误处理：未知工具、ID 不存在（含 suggested_tool）
 ///
 /// 运行:
@@ -413,233 +412,6 @@ void main() {
   });
 
   // ========================================================================
-  // rewrite_chapter_paragraph
-  // ========================================================================
-  group('rewrite_chapter_paragraph', () {
-    test('改写指定段落', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0\n\n段落1\n\n段落2');
-
-      final result = await executor.execute(
-        'rewrite_chapter_paragraph',
-        {
-          'chapterId': chId,
-          'paragraphIndex': 1,
-          'instruction': '改写后的段落1',
-        },
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-
-      expect(json['success'], true);
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '段落0\n\n改写后的段落1\n\n段落2');
-    });
-
-    test('改写第 0 段', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '首段\n\n尾段');
-
-      await executor.execute(
-        'rewrite_chapter_paragraph',
-        {'chapterId': chId, 'paragraphIndex': 0, 'instruction': '新首段'},
-      );
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '新首段\n\n尾段');
-    });
-
-    test('章节不存在 → chapter_not_found + suggested_tool', () async {
-      final result = await executor.execute(
-        'rewrite_chapter_paragraph',
-        {'chapterId': 99999, 'paragraphIndex': 0, 'instruction': 'x'},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'chapter_not_found');
-      expect(json['suggested_tool'], 'list_chapters');
-    });
-
-    test('段落索引越界 → invalid_index', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0\n\n段落1');
-
-      final result = await executor.execute(
-        'rewrite_chapter_paragraph',
-        {'chapterId': chId, 'paragraphIndex': 99, 'instruction': 'x'},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'invalid_index');
-    });
-
-    test('负数索引 → invalid_index', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0');
-
-      final result = await executor.execute(
-        'rewrite_chapter_paragraph',
-        {'chapterId': chId, 'paragraphIndex': -1, 'instruction': 'x'},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'invalid_index');
-    });
-  });
-
-  // ========================================================================
-  // insert_paragraph
-  // ========================================================================
-  group('insert_paragraph', () {
-    test('在段落 0 之后插入新段落', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0\n\n段落1');
-
-      await executor.execute(
-        'insert_paragraph',
-        {
-          'chapterId': chId,
-          'afterParagraphIndex': 0,
-          'newParagraph': '新段落',
-        },
-      );
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '段落0\n\n新段落\n\n段落1');
-    });
-
-    test('afterParagraphIndex=-1 插入到最前面', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '原有段落');
-
-      await executor.execute(
-        'insert_paragraph',
-        {
-          'chapterId': chId,
-          'afterParagraphIndex': -1,
-          'newParagraph': '插入在最前',
-        },
-      );
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '插入在最前\n\n原有段落');
-    });
-
-    test('在末尾段落之后插入', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0\n\n段落1');
-
-      await executor.execute(
-        'insert_paragraph',
-        {
-          'chapterId': chId,
-          'afterParagraphIndex': 1,
-          'newParagraph': '新尾段',
-        },
-      );
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '段落0\n\n段落1\n\n新尾段');
-    });
-
-    test('章节不存在 → chapter_not_found + suggested_tool', () async {
-      final result = await executor.execute(
-        'insert_paragraph',
-        {
-          'chapterId': 99999,
-          'afterParagraphIndex': 0,
-          'newParagraph': 'x',
-        },
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'chapter_not_found');
-      expect(json['suggested_tool'], 'list_chapters');
-    });
-
-    test('afterParagraphIndex 越界 → invalid_index', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0');
-
-      final result = await executor.execute(
-        'insert_paragraph',
-        {
-          'chapterId': chId,
-          'afterParagraphIndex': 99,
-          'newParagraph': 'x',
-        },
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'invalid_index');
-    });
-  });
-
-  // ========================================================================
-  // delete_paragraph
-  // ========================================================================
-  group('delete_paragraph', () {
-    test('删除指定段落', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0\n\n段落1\n\n段落2');
-
-      final result = await executor.execute(
-        'delete_paragraph',
-        {'chapterId': chId, 'paragraphIndex': 1},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-
-      expect(json['success'], true);
-      expect(json['deletedPreview'], '段落1');
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '段落0\n\n段落2');
-    });
-
-    test('删除唯一段落 → 内容为空', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '唯一段落');
-
-      await executor.execute(
-        'delete_paragraph',
-        {'chapterId': chId, 'paragraphIndex': 0},
-      );
-
-      final chapter = await chapterRepo.getChapterById(chId);
-      expect(chapter!.content, '');
-    });
-
-    test('章节不存在 → chapter_not_found + suggested_tool', () async {
-      final result = await executor.execute(
-        'delete_paragraph',
-        {'chapterId': 99999, 'paragraphIndex': 0},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'chapter_not_found');
-      expect(json['suggested_tool'], 'list_chapters');
-    });
-
-    test('段落索引越界 → invalid_index', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0');
-
-      final result = await executor.execute(
-        'delete_paragraph',
-        {'chapterId': chId, 'paragraphIndex': 99},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'invalid_index');
-    });
-
-    test('负数索引 → invalid_index', () async {
-      await insertNovel();
-      final chId = await insertChapter(content: '段落0');
-
-      final result = await executor.execute(
-        'delete_paragraph',
-        {'chapterId': chId, 'paragraphIndex': -1},
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'invalid_index');
-    });
-  });
-
-  // ========================================================================
   // create_custom_chapter
   // ========================================================================
   group('create_custom_chapter', () {
@@ -979,12 +751,9 @@ void main() {
   // isDestructive
   // ========================================================================
   group('isDestructive', () {
-    test('破坏性工具 (9个)', () {
+    test('破坏性工具 (6个)', () {
       for (final name in [
         'update_chapter_content',
-        'rewrite_chapter_paragraph',
-        'delete_paragraph',
-        'insert_paragraph',
         'create_custom_chapter',
         'update_character',
         'create_character',

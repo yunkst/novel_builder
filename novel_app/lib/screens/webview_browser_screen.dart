@@ -6,6 +6,7 @@ import '../core/providers/webview_providers.dart';
 import '../services/novel_agent/agent_scenario.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
+import '../widgets/site_script_panel.dart';
 
 /// 浏览器主屏幕
 ///
@@ -87,6 +88,12 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
               tooltip: '收藏夹',
               onPressed: () => _showBookmarkPanel(context, notifier),
             ),
+            // 脚本管理按钮
+            IconButton(
+              icon: const Icon(Icons.code),
+              tooltip: '脚本管理',
+              onPressed: () => _showScriptPanel(context),
+            ),
             const SizedBox(width: 4),
           ],
         ),
@@ -144,6 +151,19 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
       builder: (_) => BookmarkPanel(
         onNavigate: (url) => notifier.loadUrl(url),
       ),
+    );
+  }
+
+  /// 弹出脚本管理面板
+  void _showScriptPanel(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => const SiteScriptPanel(),
     );
   }
 }
