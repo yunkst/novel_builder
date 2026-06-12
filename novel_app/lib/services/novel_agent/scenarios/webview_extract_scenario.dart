@@ -49,6 +49,12 @@ URL: $url
 4. 调用 execute_js 测试脚本
 5. 测试成功后调用 save_script 保存
 
+## 跨页面提取
+- 当前页面是**目录页**时，先提取章节 URL 列表
+- 如果某章节的 URL 与当前页不同（如 `/book/xxx/yyy.html`），调用 **navigate_to** 工具跳转到该 URL
+- 跳转成功后再次调用 get_page_info 探测新页面 DOM，编写内容提取脚本
+- 如果当前页本身就是章节内容页（pageType=chapter_content），直接提取正文
+
 ## JS 脚本规范
 - 整个脚本是一个 async IIFE: `(async function() { ... return JSON.stringify(result); })()`
 - **必须**在脚本开头声明页面URL参数: `const PAGE_URL = '{{URL}}';`
@@ -100,6 +106,7 @@ URL: $url
   List<Map<String, dynamic>> get tools => [
         _getPageInfoTool,
         _executeJsTool,
+        _navigateToTool,
         _getCachedScriptTool,
         _saveScriptTool,
         _listCachedScriptsTool,
@@ -118,6 +125,8 @@ URL: $url
           return await _getPageInfo();
         case 'execute_js':
           return await _executeJs(args);
+        case 'navigate_to':
+          return await _navigateTo(args);
         case 'get_cached_script':
           return await _getCachedScript(args);
         case 'save_script':
@@ -504,6 +513,121 @@ URL: $url
     return body;
   }
 
+  /// 让 WebView 跳转到指定 URL
+  ///
+  /// 场景：当前页是目录页，AI 需要提取某个章节的内容。
+  /// 章节 URL 在目录页中已提取到，AI 调用本工具跳转到该 URL 后，
+  /// 再调用 get_page_info / execute_js 提取正文。
+  ///
+  /// 等待 onLoadStop 完成才返回，确保后续工具调用看到的是新页面。
+  /// 同时禁止跳转至当前页面（避免无意义重载）。
+  Future<String> _navigateTo(Map<String, dynamic> args) async {
+    final url = args['url'] as String?;
+    if (url == null || url.isEmpty) {
+      return jsonEncode({
+        'error': 'missing_param',
+        'message': '缺少 url 参数',
+        'missing': ['url'],
+        'suggestion': '传入要跳转的完整 URL，例如 https://example.com/chapter/1.html',
+      });
+    }
+
+    // 校验 URL 格式
+    Uri? uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      return jsonEncode({
+        'error': 'INVALID_URL',
+        'message': 'URL 格式不合法: $url',
+        'suggestion': '请传入完整的 URL（包含 http/https）',
+      });
+    }
+    if (!uri.isAbsolute || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return jsonEncode({
+        'error': 'INVALID_URL',
+        'message': 'URL 必须是 http(s) 绝对地址: $url',
+        'suggestion': '请使用完整 URL（包含 http/https），不支持 javascript: 等伪协议',
+      });
+    }
+
+    // 阻止跳转到当前页面（避免无意义重载浪费一次 HTTP 请求）
+    try {
+      final currentUrl = await _webviewController.getUrl();
+      if (currentUrl != null && currentUrl.toString() == url) {
+        return jsonEncode({
+          'ok': true,
+          'message': '已在目标页面',
+          'url': url,
+          'note': '当前页面已为目标 URL，未执行跳转',
+        });
+      }
+    } catch (_) {
+      // getUrl 失败不阻止跳转
+    }
+
+    try {
+      LoggerService.instance.i(
+        'navigate_to: 跳转 $url',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'navigate_to'],
+      );
+
+      // 调用 loadUrl 触发跳转
+      await _webviewController.loadUrl(
+        urlRequest: URLRequest(url: WebUri(url)),
+      );
+
+      // 等待 onLoadStop 触发（最多 30 秒）
+      // 通过轮询 getUrl 简单实现：每 500ms 检查一次 URL 是否为目标 URL
+      // 更精确的做法是注册一次性 onLoadStop 监听，但 WebView2 的 controller
+      // 不暴露监听器订阅接口，所以用轮询方式
+      final start = DateTime.now();
+      String? loadedUrl;
+      while (DateTime.now().difference(start) < const Duration(seconds: 30)) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        try {
+          final current = await _webviewController.getUrl();
+          if (current != null && current.toString() == url) {
+            loadedUrl = current.toString();
+            break;
+          }
+        } catch (_) {
+          // 忽略轮询错误
+        }
+      }
+
+      if (loadedUrl == null) {
+        return jsonEncode({
+          'error': 'NAVIGATE_TIMEOUT',
+          'message': '跳转后等待页面加载超时（30秒）',
+          'target_url': url,
+          'suggestion': '检查网络连接，或目标网站是否可访问',
+        });
+      }
+
+      // 给 DOM 一些稳定时间
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      return jsonEncode({
+        'ok': true,
+        'url': loadedUrl,
+        'message': '跳转成功',
+      });
+    } catch (e) {
+      LoggerService.instance.w(
+        'navigate_to 失败: $url, error=$e',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'navigate_to', 'error'],
+      );
+      return jsonEncode({
+        'error': 'NAVIGATE_FAILED',
+        'message': '跳转失败: ${e.toString()}',
+        'url': url,
+      });
+    }
+  }
+
   /// 查询该域名是否已有缓存脚本
   Future<String> _getCachedScript(Map<String, dynamic> args) async {
     final domain = args['domain'] as String?;
@@ -873,6 +997,27 @@ URL: $url
       'parameters': {
         'type': 'object',
         'properties': <String, dynamic>{},
+      },
+    },
+  };
+
+  static const _navigateToTool = {
+    'type': 'function',
+    'function': {
+      'name': 'navigate_to',
+      'description':
+          '让 WebView 跳转到指定 URL，等待页面加载完成后返回。'
+          '用于从目录页跳转到章节内容页提取正文。'
+          '跳转成功后可调用 get_page_info 查看新页面的 DOM 结构。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'url': {
+            'type': 'string',
+            'description': '目标 URL（必须是完整的 http/https 地址）',
+          },
+        },
+        'required': ['url'],
       },
     },
   };
