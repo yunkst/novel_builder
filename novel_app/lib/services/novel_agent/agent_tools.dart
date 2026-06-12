@@ -31,15 +31,8 @@ class AgentTools {
     _getOutline,
   ];
 
-  /// 破坏性工具列表（需要用户确认）
-  static const Set<String> destructiveTools = {
-    'update_chapter_content',
-    'create_custom_chapter',
-    'update_character',
-    'create_character',
-    'update_background_setting',
-    'update_outline',
-  };
+  /// 破坏性工具列表（已禁用确认 — 所有工具自动执行）
+  static const Set<String> destructiveTools = {};
 
   /// 查找工具定义（带日志）
   ///

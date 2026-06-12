@@ -29,7 +29,7 @@ class WebViewExtractScenario implements AgentScenario {
   String get displayName => '网页小说提取';
 
   @override
-  Set<String> get destructiveTools => {'save_script'};
+  Set<String> get destructiveTools => {}; // 已禁用确认 — 所有工具自动执行
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) {
