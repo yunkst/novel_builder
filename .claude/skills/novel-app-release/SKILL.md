@@ -225,11 +225,10 @@ novel_app/build/app/outputs/flutter-apk/app-release.apk
 
 ### 推送到远程仓库
 
-脚本会自动创建本地 commit 和 tag，需要手动推送tag：
+脚本会自动创建本地 commit 并自动推送 tag 到远程。只需手动推送 commit：
 
 ```bash
 git push
-git push origin v1.3.8
 ```
 
 ### 验证发布

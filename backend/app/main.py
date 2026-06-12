@@ -8,7 +8,6 @@ for novel searching, chapter management, and caching functionality.
 
 import logging
 import secrets
-from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -36,9 +35,6 @@ from .exceptions import (
 )
 from .logging_config import setup_logging
 from .schemas import (
-    AppVersionResponse,
-    AppVersionUploadRequest,
-    BackupUploadResponse,
     Chapter,
     ChapterContent,
     EnhancedSceneIllustrationRequest,
@@ -71,7 +67,6 @@ from .services.dify_client import create_dify_client
 from .services.image_to_video_service import create_image_to_video_service
 from .services.role_card_async_service import role_card_async_service
 from .services.role_card_service import role_card_service
-from .services.app_version_service import AppVersionServiceError, get_app_version_service
 from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
 from .api.routes.backup import router as backup_router
@@ -811,149 +806,10 @@ async def get_video_file(
 # ================= 缓存管理 API =================
 
 
-# ================= APP版本管理 API =================
-
-
-@app.post(
-    "/api/app-version/upload",
-    dependencies=[Depends(verify_token)],
-)
-async def upload_app_version(
-    file: UploadFile = File(..., description="APK文件"),
-    version: str = Form(..., description="版本号 (如 1.0.1)"),
-    version_code: int = Form(..., ge=1, description="版本递增码"),
-    changelog: str = Form(None, description="更新日志"),
-    force_update: bool = Form(False, description="是否强制更新"),
-    db: Session = Depends(get_db),
-):
-    """
-    上传APP新版本
-
-    - **file**: APK文件
-    - **version**: 版本号（如 1.0.1）
-    - **version_code**: 版本递增码
-    - **changelog**: 更新日志（可选）
-    - **force_update**: 是否强制更新（默认false）
-
-    返回上传结果和下载URL
-    """
-    try:
-        # 验证文件类型
-        if not file.filename or not file.filename.endswith(".apk"):
-            raise HTTPException(status_code=400, detail="仅支持APK文件")
-
-        # 验证文件大小
-        file_content = await file.read()
-        file_size_mb = len(file_content) / (1024 * 1024)
-        if file_size_mb > settings.apk_max_size:
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件大小超过限制 ({settings.apk_max_size}MB)",
-            )
-
-        # 保存文件和创建版本记录
-        service = get_app_version_service()
-        app_version = await service.save_apk_file(
-            file_content=file_content,
-            filename=file.filename,
-            version_str=version,
-            version_code=version_code,
-            changelog=changelog,
-            force_update=force_update,
-            db=db,
-        )
-
-        return {
-            "message": "上传成功",
-            "version": app_version.version,
-            "version_code": app_version.version_code,
-            "download_url": app_version.download_url,
-            "file_size": app_version.file_size,
-        }
-
-    except AppVersionServiceError as e:
-        logger.warning(f"APP版本上传失败: {e.message}")
-        raise HTTPException(status_code=400, detail=e.to_dict())
-    except Exception as e:
-        raise handle_service_exception(e, logger, "APP版本上传")
-
-
-@app.get(
-    "/api/app-version/latest",
-    response_model=AppVersionResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def get_latest_app_version(db: Session = Depends(get_db)):
-    """
-    查询最新APP版本
-
-    返回最新版本信息，包括版本号、下载URL、更新日志等
-    """
-    try:
-        service = get_app_version_service()
-        latest = service.get_latest_version(db)
-
-        if not latest:
-            raise HTTPException(status_code=404, detail="暂无可用版本")
-
-        return service.to_response_model(latest)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "查询最新版本")
-
-
-@app.get(
-    "/api/app-version/download/{version}",
-    response_class=FileResponse,
-    responses={
-        200: {
-            "content": {
-                "application/vnd.android.package-archive": {
-                    "schema": {"type": "string", "format": "binary"}
-                }
-            },
-            "description": "成功返回APK文件",
-        },
-        404: {"description": "版本不存在"},
-    },
-)
-async def download_app_version(
-    version: str,
-    db: Session = Depends(get_db),
-):
-    """
-    下载指定版本的APK文件
-
-    - **version**: 版本号（如 1.0.1）
-
-    返回APK文件
-    """
-    try:
-        service = get_app_version_service()
-        app_version = service.get_version_by_string(version, db)
-
-        if not app_version:
-            raise HTTPException(status_code=404, detail="版本不存在")
-
-        file_path = app_version.file_path
-        if not Path(file_path).exists():
-            raise HTTPException(status_code=404, detail="APK文件不存在")
-
-        return FileResponse(
-            path=file_path,
-            media_type="application/vnd.android.package-archive",
-            filename=f"novel_app_v{version}.apk",
-            headers={
-                "Cache-Control": f"public, max-age={CACHE_ONE_DAY}",
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "下载APK")
+# ================= APP版本管理 API 已废弃 =================
+# 版本更新已迁移到 GitHub Releases：
+# https://github.com/yunkst/novel_builder/releases
+# 应用内通过 GitHub Releases API 检测更新（lib/services/github_release_service.dart）
 
 
 # 便于 Docker 容器启动时的提示

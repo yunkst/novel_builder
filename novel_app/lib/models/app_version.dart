@@ -3,23 +3,21 @@ import 'package:json_annotation/json_annotation.dart';
 part 'app_version.g.dart';
 
 /// APP版本信息模型
+///
+/// 用于在 App 内展示版本更新信息
 @JsonSerializable()
 class AppVersion {
   final String version;
-  final int versionCode;
   final String downloadUrl;
   final int fileSize;
   final String? changelog;
-  final bool forceUpdate;
   final String createdAt;
 
   AppVersion({
     required this.version,
-    required this.versionCode,
     required this.downloadUrl,
     required this.fileSize,
     this.changelog,
-    required this.forceUpdate,
     required this.createdAt,
   });
 
@@ -52,9 +50,9 @@ class AppVersion {
 
   @override
   String toString() {
-    return 'AppVersion(version: $version, versionCode: $versionCode, '
+    return 'AppVersion(version: $version, '
         'downloadUrl: $downloadUrl, fileSize: $fileSize, '
-        'changelog: $changelog, forceUpdate: $forceUpdate, '
+        'changelog: $changelog, '
         'createdAt: $createdAt)';
   }
 }

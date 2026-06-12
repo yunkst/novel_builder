@@ -46,10 +46,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
-    # APK上传配置
-    apk_upload_dir: str = "uploads/apk"
-    apk_max_size: int = 100  # MB
-
     # 小说同步配置
     novel_sync_dir: str = "novel_sync"
 

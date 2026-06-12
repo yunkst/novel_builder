@@ -64,8 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     try {
-      final apiWrapper = ref.read(apiServiceWrapperProvider);
-      final updateService = AppUpdateService(apiWrapper: apiWrapper);
+      final updateService = AppUpdateService();
 
       final latestVersion =
           await updateService.checkForUpdate(forceCheck: true);
@@ -176,7 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.smart_toy),
             title: const Text('AI 配置'),
-            subtitle: const Text('配置 DSL Engine 和 AI 设定'),
+            subtitle: const Text('配置 DSL Engine、Hermes Agent 和 AI 设定'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               Navigator.push(

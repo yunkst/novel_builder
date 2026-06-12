@@ -420,7 +420,7 @@ def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
             print(stdout)
             return False
 
-        # 创建 git tag
+        # 创建 git tag 并推送
         print(f"\n创建版本标签: {tag_name}")
         tag_result = subprocess.run(
             ["git", "tag", "-a", tag_name, "-m", f"Release {version}\n\n{changelog}"],
@@ -431,6 +431,22 @@ def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
 
         if tag_result.returncode == 0:
             print(f"标签 {tag_name} 创建成功!")
+            # 推送 tag 到远程
+            print("推送标签到远程仓库...")
+            push_result = subprocess.run(
+                ["git", "push", "origin", tag_name],
+                cwd=project_root,
+                capture_output=True,
+                shell=True if os.name == "nt" else False,
+            )
+            try:
+                push_stdout = push_result.stdout.decode("utf-8")
+            except UnicodeDecodeError:
+                push_stdout = push_result.stdout.decode("gbk", errors="ignore")
+            if push_result.returncode == 0:
+                print(f"标签 {tag_name} 推送成功!")
+            else:
+                print(f"标签推送失败: {push_stdout}")
         else:
             # tag 可能已存在
             try:
@@ -438,7 +454,17 @@ def commit_changes(project_root: Path, version: str, changelog: str) -> bool:
             except UnicodeDecodeError:
                 tag_stderr = tag_result.stderr.decode("gbk", errors="ignore")
             if "already exists" in tag_stderr.lower():
-                print(f"标签 {tag_name} 已存在，跳过")
+                print(f"标签 {tag_name} 已存在，推送已有标签...")
+                push_result = subprocess.run(
+                    ["git", "push", "origin", tag_name],
+                    cwd=project_root,
+                    capture_output=True,
+                    shell=True if os.name == "nt" else False,
+                )
+                if push_result.returncode == 0:
+                    print(f"标签 {tag_name} 推送成功!")
+                else:
+                    print("标签推送失败（可能已存在于远程）")
             else:
                 print(f"创建标签失败: {tag_stderr}")
                 # tag 创建失败不阻塞整体流程
@@ -512,9 +538,8 @@ def main():
     print(f"Download URL: {api_url}/api/app-version/download/{version}")
 
     if commit_success:
-        print("\n提示: 代码已提交到本地仓库，如需推送到远程请执行:")
+        print("\n提示: 代码和标签已提交到本地仓库，如需推送 commit 请执行:")
         print(f"  git push")
-        print(f"  git push origin {tag_name}")
 
 
 if __name__ == "__main__":

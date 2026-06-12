@@ -10,7 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novel_app/services/logger_service.dart';
 
-import '../dsl_engine/dsl_engine_config.dart';
+import 'agent_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
 import '../dsl_engine/real_llm_executor.dart';
 import 'agent_event.dart';
@@ -34,7 +34,7 @@ class NovelAgentService {
 
   /// 检查 LLM 是否已配置
   Future<bool> isConfigured() async {
-    return await DslEngineConfig.isConfigured();
+    return await AgentEngineConfig.isConfigured();
   }
 
   /// 发送消息给 Agent
@@ -64,7 +64,7 @@ class NovelAgentService {
 
     if (!await isConfigured()) {
       _controller.add(const AgentErrorEvent(
-          '请先在设置 → Dify/AI 设置中配置 DSL Engine（OpenAI 兼容 API）'));
+          '请先在设置 → AI 配置中配置 LLM 后端（Agent 或 DSL Engine）'));
       LoggerService.instance.w('Agent 拒绝请求（未配置 DSLEngine）',
           category: LogCategory.ai, tags: ['agent', 'service', 'not_configured']);
       return;
@@ -76,13 +76,11 @@ class NovelAgentService {
       LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
           category: LogCategory.ai, tags: ['agent', 'service', 'request', scenarioId]);
 
-      // 构造 LLM Provider
+      // 构造 LLM Provider（使用 Agent 专属配置，为空则回退到 DSL Engine）
       final config = LlmConfig(
-        baseUrl: await DslEngineConfig.getApiUrl(),
-        apiKey: await DslEngineConfig.getApiKey(),
-        defaultModel: await DslEngineConfig.getModel() == ''
-            ? 'deepseek-chat'
-            : await DslEngineConfig.getModel(),
+        baseUrl: await AgentEngineConfig.getEffectiveApiUrl(),
+        apiKey: await AgentEngineConfig.getEffectiveApiKey(),
+        defaultModel: await AgentEngineConfig.getEffectiveModel(),
         timeout: const Duration(seconds: 120),
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());

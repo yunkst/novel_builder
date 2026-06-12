@@ -1,32 +1,30 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
-import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:novel_api/novel_api.dart';
 
 import '../models/app_version.dart';
+import 'github_release_service.dart';
 import 'logger_service.dart';
-import 'api_service_wrapper.dart';
 import 'preferences_service.dart';
 
 /// APP更新服务
 ///
-/// 提供版本检查、下载和安装功能
+/// 通过 GitHub Releases 获取版本信息和下载 APK
 class AppUpdateService {
-  static const String _lastCheckKey = 'app_update_last_check';
   static const String _ignoreVersionKey = 'app_update_ignore_version';
   static const _platformChannel =
       MethodChannel('com.example.novel_app/app_install');
 
-  final ApiServiceWrapper _apiWrapper;
+  final GithubReleaseService _githubService;
   final Future<PackageInfo> Function()? _packageInfoGetter;
 
   AppUpdateService({
-    required ApiServiceWrapper apiWrapper,
+    GithubReleaseService? githubService,
     Future<PackageInfo> Function()? packageInfoGetter,
-  })  : _apiWrapper = apiWrapper,
+  })  : _githubService = githubService ?? GithubReleaseService(),
         _packageInfoGetter = packageInfoGetter;
 
   /// 获取当前APP版本信息
@@ -39,62 +37,63 @@ class AppUpdateService {
 
   /// 检查是否有新版本
   ///
-  /// 返回null表示没有新版本，否则返回新版本信息
+  /// 返回 null 表示没有新版本（或 API 错误/无可用 release）
   Future<AppVersion?> checkForUpdate({bool forceCheck = false}) async {
     try {
-      // 检查是否需要跳过此次检查（距离上次检查不足1小时且非强制检查）
-      if (!forceCheck) {
-        final lastCheck =
-            await PreferencesService.instance.getInt(_lastCheckKey);
-        final now = DateTime.now().millisecondsSinceEpoch;
-
-        if ((now - lastCheck) < 3600000) {
-          // 1小时内已检查过，跳过
-          return null;
-        }
+      // 频率控制
+      if (!await _githubService.shouldCheck(forceCheck: forceCheck)) {
+        LoggerService.instance.d(
+          '1 小时内已检查过，跳过',
+          category: LogCategory.general,
+          tags: ['update'],
+        );
+        return null;
       }
+
+      // 记录检查时间
+      await _githubService.recordCheckTime();
 
       // 获取当前版本
       final currentInfo = await getCurrentVersion();
 
-      // 使用生成的API客户端获取最新版本
-      final token = await _apiWrapper.getToken();
-
-      if (token == null || token.isEmpty) {
+      // 从 GitHub 获取最新 release
+      final release = await _githubService.fetchLatestRelease();
+      if (release == null) {
         return null;
       }
 
-      final response = await _apiWrapper.defaultApi
-          .getLatestAppVersionApiAppVersionLatestGet(
-        X_API_TOKEN: token,
+      final asset = release.apkAsset;
+      if (asset == null) {
+        return null;
+      }
+
+      // 构造 AppVersion（downloadUrl 使用 GitHub 直链）
+      final appVersion = AppVersion(
+        version: release.versionNumber,
+        downloadUrl: asset.browserDownloadUrl,
+        fileSize: asset.size,
+        changelog: release.body,
+        createdAt: release.publishedAt,
       );
 
-      if (response.data != null) {
-        // 记录检查时间
-        await PreferencesService.instance
-            .setInt(_lastCheckKey, DateTime.now().millisecondsSinceEpoch);
+      // 比较版本号
+      final hasNew =
+          hasNewVersion(currentInfo.version, appVersion.version);
 
-        final latestVersion = _convertToAppVersion(response.data!);
+      LoggerService.instance.d(
+        '版本比较: ${currentInfo.version} vs ${appVersion.version}, hasNew: $hasNew, forceCheck: $forceCheck',
+        category: LogCategory.general,
+        tags: ['update', 'debug'],
+      );
 
-        // 比较版本号
-        // 强制检查时，即使版本相同也返回版本信息（允许用户重新下载安装）
-        final hasNew =
-            hasNewVersion(currentInfo.version, latestVersion.version);
-        LoggerService.instance.d(
-          '版本比较: ${currentInfo.version} vs ${latestVersion.version}, hasNew: $hasNew, forceCheck: $forceCheck',
-          category: LogCategory.general,
-          tags: ['update', 'debug'],
-        );
-
-        if (forceCheck || hasNew) {
-          return latestVersion;
-        }
+      if (forceCheck || hasNew) {
+        return appVersion;
       }
 
       return null;
     } catch (e) {
       LoggerService.instance.e(
-        '检查更新失败',
+        '检查更新失败: $e',
         category: LogCategory.general,
         tags: ['update', 'check', 'error'],
       );
@@ -102,22 +101,9 @@ class AppUpdateService {
     }
   }
 
-  /// 将API返回的 AppVersionResponse 转换为本地 AppVersion 模型
-  AppVersion _convertToAppVersion(AppVersionResponse response) {
-    return AppVersion(
-      version: response.version,
-      versionCode: response.versionCode,
-      downloadUrl: response.downloadUrl,
-      fileSize: response.fileSize,
-      changelog: response.changelog,
-      forceUpdate: response.forceUpdate ?? false,
-      createdAt: response.createdAt,
-    );
-  }
-
   /// 比较版本号
   ///
-  /// 返回true表示有新版本
+  /// 返回 true 表示有新版本
   bool hasNewVersion(String current, String latest) {
     try {
       final currentParts = current.split('.').map(int.parse).toList();
@@ -145,7 +131,7 @@ class AppUpdateService {
       return false;
     } catch (e) {
       LoggerService.instance.e(
-        '版本号比较失败',
+        '版本号比较失败: $e',
         category: LogCategory.general,
         tags: ['update', 'version', 'compare'],
       );
@@ -156,267 +142,31 @@ class AppUpdateService {
   /// 请求安装权限
   Future<bool> requestInstallPermission() async {
     if (!Platform.isAndroid) {
-      return true; // iOS不需要安装权限
+      return true;
     }
-
     final status = await Permission.requestInstallPackages.request();
     return status.isGranted;
   }
 
   /// 下载更新
   ///
-  /// [onProgress] 进度回调，参数为0.0-1.0
-  /// [onStatus] 状态回调
+  /// [onProgress] 进度回调 0.0-1.0
+  /// [onStatus] 状态文本回调
   Future<bool> downloadUpdate({
     required AppVersion version,
     void Function(double progress)? onProgress,
     void Function(String status)? onStatus,
   }) async {
-    try {
-      LoggerService.instance.i(
-        '开始下载流程',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'start'],
-      );
-      onStatus?.call('准备下载...');
-
-      // 请求存储权限
-      LoggerService.instance.d(
-        '检查存储权限',
-        category: LogCategory.general,
-        tags: ['update', 'permission'],
-      );
-      final storageStatus = await Permission.storage.request();
-      LoggerService.instance.d(
-        'storage权限: $storageStatus',
-        category: LogCategory.general,
-        tags: ['update', 'permission', 'storage'],
-      );
-      if (!storageStatus.isGranted) {
-        final manageStatus = await Permission.manageExternalStorage.request();
-        LoggerService.instance.d(
-          'manageExternalStorage权限: $manageStatus',
-          category: LogCategory.general,
-          tags: ['update', 'permission', 'manage'],
-        );
-        if (!manageStatus.isGranted) {
-          LoggerService.instance.w(
-            '存储权限被拒绝',
-            category: LogCategory.general,
-            tags: ['update', 'permission', 'denied'],
-          );
-          onStatus?.call('需要存储权限');
-          return false;
-        }
-      }
-
-      // 获取下载目录
-      LoggerService.instance.d(
-        '获取下载目录',
-        category: LogCategory.general,
-        tags: ['update', 'path'],
-      );
-      final directory = await getApplicationDocumentsDirectory();
-      LoggerService.instance.d(
-        '下载目录: ${directory.path}',
-        category: LogCategory.general,
-        tags: ['update', 'path'],
-      );
-
-      // 确保 updates 目录存在
-      final updatesDir = Directory('${directory.path}/updates');
-      if (!await updatesDir.exists()) {
-        await updatesDir.create(recursive: true);
-        LoggerService.instance.d(
-          '创建 updates 目录',
-          category: LogCategory.general,
-          tags: ['update', 'directory'],
-        );
-      }
-
-      final fileName = 'novel_app_v${version.version}.apk';
-      final filePath = '${updatesDir.path}/$fileName';
-      LoggerService.instance.d(
-        '文件路径: $filePath',
-        category: LogCategory.general,
-        tags: ['update', 'path'],
-      );
-
-      // 构建完整的下载URL
-      LoggerService.instance.d(
-        '获取API配置',
-        category: LogCategory.general,
-        tags: ['update', 'api'],
-      );
-      final baseUrl = await _apiWrapper.getHost();
-      LoggerService.instance.d(
-        'baseUrl: $baseUrl',
-        category: LogCategory.general,
-        tags: ['update', 'api'],
-      );
-      LoggerService.instance.d(
-        'version.downloadUrl: ${version.downloadUrl}',
-        category: LogCategory.general,
-        tags: ['update', 'api'],
-      );
-
-      if (baseUrl == null || baseUrl.isEmpty) {
-        LoggerService.instance.e(
-          'baseUrl 配置不完整',
-          category: LogCategory.general,
-          tags: ['update', 'api', 'error'],
-        );
-        onStatus?.call('API配置不完整');
-        return false;
-      }
-
-      final downloadUrl = '$baseUrl${version.downloadUrl}';
-      LoggerService.instance.d(
-        '完整下载URL: $downloadUrl',
-        category: LogCategory.general,
-        tags: ['update', 'url'],
-      );
-
-      onStatus?.call('开始下载...');
-
-      // 使用 ApiServiceWrapper 的 Dio 实例下载文件
-      LoggerService.instance.i(
-        '开始执行下载',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'execute'],
-      );
-
-      // 添加 API Token 到请求头
-      final token = await _apiWrapper.getToken();
-      if (token == null || token.isEmpty) {
-        LoggerService.instance.e(
-          'API Token未配置',
-          category: LogCategory.general,
-          tags: ['update', 'api', 'error'],
-        );
-        onStatus?.call('API配置不完整');
-        return false;
-      }
-
-      final response = await _apiWrapper.dio.download(
-        downloadUrl,
-        filePath,
-        options: Options(
-          headers: {
-            'X-API-TOKEN': token,
-          },
-          receiveTimeout: const Duration(minutes: 10), // 增加超时时间
-        ),
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            final progress = received / total;
-            LoggerService.instance.d(
-              '下载进度: ${(progress * 100).toStringAsFixed(0)}%',
-              category: LogCategory.general,
-              tags: ['update', 'download', 'progress'],
-            );
-            onProgress?.call(progress);
-          } else {
-            LoggerService.instance.d(
-              '下载进度: 已接收 $received 字节',
-              category: LogCategory.general,
-              tags: ['update', 'download', 'progress'],
-            );
-          }
-        },
-      );
-
-      // 验证下载是否成功
-      if (response.statusCode == 200) {
-        LoggerService.instance.i(
-          '下载完成，状态码: ${response.statusCode}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'success'],
-        );
-      } else {
-        LoggerService.instance.e(
-          '下载响应状态码异常: ${response.statusCode}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'error'],
-        );
-        onStatus?.call('下载失败: 响应状态 ${response.statusCode}');
-        return false;
-      }
-
-      LoggerService.instance.i(
-        '下载完成',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'success'],
-      );
-      onStatus?.call('下载完成');
-      onProgress?.call(1.0);
-
-      return true;
-    } on DioException catch (e) {
-      LoggerService.instance.e(
-        '下载失败',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'error'],
-      );
-      LoggerService.instance.e(
-        'DioException类型: ${e.type}',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'error_type'],
-      );
-
-      if (e.response != null) {
-        LoggerService.instance.e(
-          '响应状态: ${e.response?.statusCode}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'status'],
-        );
-        LoggerService.instance.e(
-          '响应数据: ${e.response?.data}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'response'],
-        );
-        onStatus?.call('下载失败: 服务器错误 ${e.response?.statusCode}');
-      } else if (e.error != null) {
-        LoggerService.instance.e(
-          '错误信息: ${e.error}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'error_message'],
-        );
-        onStatus?.call('下载失败: ${e.error}');
-      } else {
-        LoggerService.instance.e(
-          '无响应信息: ${e.message}',
-          category: LogCategory.general,
-          tags: ['update', 'download', 'no_response'],
-        );
-        onStatus?.call('下载失败: ${e.message}');
-      }
-
-      return false;
-    } catch (e) {
-      LoggerService.instance.e(
-        '下载异常',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'exception'],
-      );
-      LoggerService.instance.e(
-        '异常详情: $e',
-        category: LogCategory.general,
-        tags: ['update', 'download', 'exception_detail'],
-      );
-
-      final errorMessage = e.toString();
-      if (errorMessage.contains('null')) {
-        onStatus?.call('下载失败: 服务器无响应，请检查网络连接');
-      } else {
-        onStatus?.call('下载出错: $e');
-      }
-
-      return false;
-    }
+    final fileName = 'novel_app_v${version.version}.apk';
+    return await _githubService.downloadApk(
+      downloadUrl: version.downloadUrl,
+      fileName: fileName,
+      onProgress: onProgress,
+      onStatus: onStatus,
+    );
   }
 
-  /// 安装APK
+  /// 安装 APK
   Future<bool> installUpdate(String version) async {
     try {
       LoggerService.instance.i(
@@ -424,7 +174,6 @@ class AppUpdateService {
         category: LogCategory.general,
         tags: ['update', 'install', 'start'],
       );
-      // 检查安装权限
       final hasPermission = await requestInstallPermission();
       if (!hasPermission) {
         LoggerService.instance.w(
@@ -436,17 +185,9 @@ class AppUpdateService {
       }
 
       final fileName = 'novel_app_v$version.apk';
-
-      // 获取应用文档目录
       final directory = await getApplicationDocumentsDirectory();
       final filePath = '${directory.path}/updates/$fileName';
-      LoggerService.instance.d(
-        'APK文件路径: $filePath',
-        category: LogCategory.general,
-        tags: ['update', 'install', 'path'],
-      );
 
-      // 检查文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
         LoggerService.instance.e(
@@ -457,7 +198,6 @@ class AppUpdateService {
         return false;
       }
 
-      // 使用 MethodChannel 调用原生安装方法
       LoggerService.instance.i(
         '调用原生安装方法',
         category: LogCategory.general,
@@ -470,19 +210,14 @@ class AppUpdateService {
       return result == true;
     } on PlatformException catch (e) {
       LoggerService.instance.e(
-        '安装失败',
+        '安装失败: ${e.code}',
         category: LogCategory.general,
         tags: ['update', 'install', 'error'],
-      );
-      LoggerService.instance.e(
-        '错误码: ${e.code}',
-        category: LogCategory.general,
-        tags: ['update', 'install', 'code'],
       );
       return false;
     } catch (e) {
       LoggerService.instance.e(
-        '安装APK失败',
+        '安装APK失败: $e',
         category: LogCategory.general,
         tags: ['update', 'install', 'exception'],
       );

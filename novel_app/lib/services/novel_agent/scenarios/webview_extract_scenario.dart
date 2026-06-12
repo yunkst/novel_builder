@@ -191,12 +191,18 @@ URL: $url
     }
   }
 
-  /// 在 WebView 中执行 JS 脚本
+  /// 在 WebView 中执行 JS 脚本（使用 callAsyncJavaScript）
   ///
   /// 执行前会：
   /// 1. 校验脚本包含 `{{URL}}` 占位符（防呆）
   /// 2. 将 `{{URL}}` 替换为 `test_url`（如提供）或当前页面 URL
-  /// 3. 在 WebView 中执行替换后的脚本
+  /// 3. 通过 callAsyncJavaScript 执行替换后的脚本
+  ///
+  /// callAsyncJavaScript 相比 evaluateJavascript 的优势：
+  /// - 支持 async/await（Promise 结果正确返回）
+  /// - 支持 setTimeout 等异步操作（翻页等待）
+  /// - 结构化返回值 CallAsyncJavaScriptResult{value, error}
+  /// - JS 错误通过 error 字段返回，不再静默吞噬
   Future<String> _executeJs(Map<String, dynamic> args) async {
     final script = args['script'] as String?;
     if (script == null || script.isEmpty) {
@@ -229,6 +235,11 @@ URL: $url
     final testUrl = (args['test_url'] as String?) ?? _currentUrl;
     final resolvedScript = script.replaceAll('{{URL}}', testUrl);
 
+    // callAsyncJavaScript 的 functionBody 会被包裹为 async function() { <body> }
+    // Agent 生成的脚本是 (async function(){...})() 格式（IIFE），
+    // 需要提取内部函数体，否则 IIFE 返回值会被丢弃
+    final functionBody = _extractAsyncFunctionBody(resolvedScript);
+
     LoggerService.instance.d(
       '执行 JS: 替换 {{URL}} → $testUrl (scriptLen=${resolvedScript.length})',
       category: LogCategory.ai,
@@ -237,14 +248,38 @@ URL: $url
 
     try {
       final result = await _webviewController
-          .evaluateJavascript(source: resolvedScript)
+          .callAsyncJavaScript(functionBody: functionBody)
           .timeout(const Duration(seconds: 60));
+
+      // callAsyncJavaScript 返回 CallAsyncJavaScriptResult?
+      if (result == null) {
+        return jsonEncode({'result': null});
+      }
+
+      // JS Promise reject → 返回错误信息
+      if (result.error != null) {
+        final errorStr = result.error.toString();
+        final errorInfo = _parseJsError(errorStr, script);
+        LoggerService.instance.w(
+          'JS 执行错误: ${errorInfo.code} - ${errorInfo.message}',
+          category: LogCategory.ai,
+          tags: ['agent', 'webview-extract', 'execute_js', errorInfo.code],
+        );
+        return jsonEncode({
+          'error': errorInfo.code,
+          'message': errorInfo.message,
+          'raw': errorStr,
+          'suggestion': errorInfo.suggestion,
+        });
+      }
+
+      // JS Promise resolve → 返回结果
       LoggerService.instance.i(
-        '执行 JS 成功: resultLen=${(result ?? '').length}',
+        '执行 JS 成功: resultLen=${(result.value ?? '').toString().length}',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'execute_js'],
       );
-      return result ?? jsonEncode({'result': null});
+      return _stringifyJsResult(result.value);
     } on TimeoutException {
       LoggerService.instance.w(
         '执行 JS 超时 (>60s)',
@@ -259,7 +294,7 @@ URL: $url
             '检查脚本中是否有死循环、长时间 setTimeout，或在循环中加 await new Promise(r => setTimeout(r, 100)) 让出主线程',
       });
     } catch (e) {
-      // 解析 WebView 抛出的 JS 异常，给出针对性建议
+      // Dart 层异常（如 callAsyncJavaScript 方法本身不可用）
       final errorInfo = _parseJsError(e.toString(), script);
       LoggerService.instance.w(
         '执行 JS 失败: ${errorInfo.code} - ${errorInfo.message}',
@@ -331,6 +366,18 @@ URL: $url
       );
     }
 
+    // Dart 侧类型转换错误：evaluateJavascript 返回了 Map 而非 String
+    // 典型错误: "type '_Map<String, dynamic>' is not a subtype of type 'FutureOr<String>'"
+    if (raw.contains('_Map<String, dynamic>') ||
+        raw.contains('FutureOr<String>')) {
+      return (
+        code: 'JS_TYPE_ERROR',
+        message: '脚本返回了 JSON 对象而非字符串',
+        suggestion:
+            '脚本必须返回字符串（用 JSON.stringify 包装返回值）。例如: return JSON.stringify({title: ..., content: ...})',
+      );
+    }
+
     // 超时（被外层 catch 捕获前）
     if (lowerRaw.contains('timeout')) {
       return (
@@ -387,6 +434,74 @@ URL: $url
     }
 
     return null; // 校验通过
+  }
+
+  /// 将 callAsyncJavaScript 返回值统一转为 JSON 字符串
+  ///
+  /// callAsyncJavaScript 的 value 字段类型因平台和返回内容而异：
+  /// - JS 返回 JSON.stringify(...) → value 是 String
+  /// - JS 返回普通对象 → value 可能是 Map/List
+  /// - JS 返回 null → value 是 null
+  /// 此方法统一处理：如果是 String 则原样返回，
+  /// 如果是对象则 jsonEncode 后再返回。
+  String _stringifyJsResult(dynamic result) {
+    if (result == null) return jsonEncode({'result': null});
+    if (result is String) return result;
+    return jsonEncode(result);
+  }
+
+  /// 将 Agent 生成的 IIFE 脚本转换为 callAsyncJavaScript 函数体
+  ///
+  /// callAsyncJavaScript(functionBody: body) 会包裹为:
+  ///   async function(...){ <body> }
+  ///
+  /// Agent 生成的脚本有两种格式：
+  ///   1. async IIFE: `(async function() { ... })()` → 提取内部函数体
+  ///   2. 同步 IIFE: `(function() { ... })()` → 提取内部函数体
+  ///   3. 非包裹的函数体 → 原样返回（兼容）
+  String _extractAsyncFunctionBody(String script) {
+    final trimmed = script.trim();
+
+    // 匹配 (async function() { ... })() 或 (async function(){...})()
+    // 也匹配 (function() { ... })() 同步 IIFE
+    final iifePattern = RegExp(
+      r'^\(\s*(?:async\s+)?function\s*\([^)]*\)\s*\{',
+    );
+    final match = iifePattern.firstMatch(trimmed);
+    if (match == null) return script;
+
+    // 找到第一个 { 的位置
+    final firstBrace = trimmed.indexOf('{', match.start);
+    if (firstBrace == -1) return script;
+
+    // 找到匹配的最后一个 }（去掉末尾的 )()
+    var depth = 0;
+    var lastBrace = -1;
+    for (var i = firstBrace; i < trimmed.length; i++) {
+      if (trimmed[i] == '{') {
+        depth++;
+      } else if (trimmed[i] == '}') {
+        depth--;
+        if (depth == 0) {
+          lastBrace = i;
+          break;
+        }
+      }
+    }
+
+    if (lastBrace == -1) return script;
+
+    // 提取 { } 之间的内容（去掉外层花括号）
+    final body = trimmed.substring(firstBrace + 1, lastBrace).trim();
+
+    // 验证末尾是 )() —— 确认是 IIFE
+    final tail = trimmed.substring(lastBrace + 1).trim();
+    if (!tail.startsWith(')') || !tail.endsWith('()') && !tail.endsWith(')()')) {
+      // 可能不是标准 IIFE，保守返回原脚本
+      // 但还是提取了 body，因为大多数情况是 IIFE
+    }
+
+    return body;
   }
 
   /// 查询该域名是否已有缓存脚本

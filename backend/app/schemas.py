@@ -464,7 +464,7 @@ class ModelsResponse(BaseModel):
 
 
 class AppVersionUploadRequest(BaseModel):
-    """APP版本上传请求模式."""
+    """APP版本上传请求模式（已废弃，版本更新迁移到 GitHub Releases）."""
 
     version: str = Field(..., min_length=1, max_length=20, description="版本号 (如 1.0.1)")
     version_code: int = Field(..., ge=1, description="版本递增码")
@@ -473,7 +473,7 @@ class AppVersionUploadRequest(BaseModel):
 
 
 class AppVersionResponse(BaseModel):
-    """APP版本信息响应模式."""
+    """APP版本信息响应模式（已废弃，版本更新迁移到 GitHub Releases）."""
 
     version: str = Field(..., description="版本号")
     version_code: int = Field(..., description="版本递增码")

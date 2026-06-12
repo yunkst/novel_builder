@@ -328,11 +328,21 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
         tags: ['provider', 'hermes', 'agent-error'],
       );
     } else {
-      LoggerService.instance.i(
-        'Hermes Agent 响应完成: contentLength=${_pendingContent.length}',
-        category: LogCategory.ai,
-        tags: ['provider', 'hermes', 'done'],
-      );
+      // contentLength=0 表示 LLM 返回了空响应，需要告警
+      final contentLength = _pendingContent.length;
+      if (contentLength == 0) {
+        LoggerService.instance.w(
+          'Hermes Agent 响应完成: contentLength=0 [异常: 响应内容为空]',
+          category: LogCategory.ai,
+          tags: ['provider', 'hermes', 'done', 'abnormal-empty'],
+        );
+      } else {
+        LoggerService.instance.i(
+          'Hermes Agent 响应完成: contentLength=$contentLength',
+          category: LogCategory.ai,
+          tags: ['provider', 'hermes', 'done'],
+        );
+      }
     }
     final segmentsSnapshot = List<HermesSegment>.unmodifiable(_pendingSegments);
     final assistantMessage = segmentsSnapshot.isNotEmpty

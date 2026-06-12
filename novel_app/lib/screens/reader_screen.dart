@@ -250,6 +250,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Future<void> _loadDefaultModelSize() async {
     try {
       final models = await _apiService.getModels();
+      if (!mounted) return; // widget 可能在异步等待期间被销毁
       final t2iModels = models.text2img?.toList() ?? [];
 
       if (t2iModels.isNotEmpty) {
@@ -273,6 +274,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         }
       }
     } catch (e, stackTrace) {
+      if (!mounted) return; // widget 可能在异步等待期间被销毁
       ErrorHelper.logError(
         '加载默认模型尺寸失败',
         stackTrace: stackTrace,
@@ -287,11 +289,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // ========== 以下方法已迁移到 ReaderContentController ==========
 
   @override
+  void deactivate() {
+    // 清除 Hermes 阅读上下文（必须在 deactivate 中执行，此时 ref 仍有效）
+    ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     disposeAutoScroll(); // 清理自动滚动资源（AutoScrollMixin）
     _scrollController.dispose();
-    // 清除 Hermes 阅读上下文
-    ref.read(readingContextProvider.notifier).state = const ReadingContext();
     super.dispose();
   }
 

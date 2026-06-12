@@ -35,10 +35,15 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
   }
 
   @override
-  void dispose() {
-    // 离开浏览器时恢复写作场景
+  void deactivate() {
+    // 离开浏览器时恢复写作场景（必须在 deactivate 中执行，此时 ref 仍有效）
     ref.read(currentAgentScenarioProvider.notifier).state =
         ScenarioIds.writing;
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
     super.dispose();
   }
 
@@ -54,9 +59,28 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         // WebView 有浏览历史 → 后退；没有历史 → 退出浏览器页面
-        final canBack = await notifier.canGoBack();
+        // 添加超时保护：canGoBack() 是 platform channel 异步调用，
+        // 在 Android 某些 WebView 版本上，无历史时可能永久挂起导致 APP 卡死
+        bool canBack;
+        try {
+          canBack = await notifier.canGoBack().timeout(
+            const Duration(milliseconds: 500),
+          );
+        } catch (_) {
+          // 超时或异常时，默认认为不能后退，直接退出浏览器页面
+          canBack = false;
+        }
         if (canBack) {
-          await notifier.goBack();
+          try {
+            await notifier.goBack().timeout(
+              const Duration(seconds: 3),
+            );
+          } catch (_) {
+            // goBack() 超时，直接退出浏览器页面
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+          }
         } else if (context.mounted) {
           Navigator.of(context).pop();
         }

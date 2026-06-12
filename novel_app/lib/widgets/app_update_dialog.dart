@@ -40,16 +40,12 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       title: Row(
         children: [
           Icon(
-            widget.version.forceUpdate
-                ? Icons.system_update_alt
-                : Icons.new_releases,
+            Icons.new_releases,
             color: theme.colorScheme.primary,
           ),
           const SizedBox(width: 8),
           Text(
-            widget.version.forceUpdate
-                ? '强制更新'
-                : (widget.isNewVersion ? '发现新版本' : '重新下载'),
+            widget.isNewVersion ? '发现新版本' : '重新下载',
             style: const TextStyle(fontSize: 18),
           ),
         ],
@@ -150,9 +146,6 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   }
 
   List<Widget> _buildActions(BuildContext context) {
-    // 强制更新时不显示"稍后提醒"按钮
-    final showSkipButton = !widget.version.forceUpdate && !_isDownloading;
-
     if (_isInstalling) {
       return [
         const Center(
@@ -183,16 +176,15 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
     }
 
     return [
-      if (showSkipButton)
-        TextButton(
-          onPressed: () async {
-            await widget.updateService.ignoreVersion(widget.version.version);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Text('稍后提醒'),
-        ),
+      TextButton(
+        onPressed: () async {
+          await widget.updateService.ignoreVersion(widget.version.version);
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        child: const Text('稍后提醒'),
+      ),
       ElevatedButton(
         onPressed: _startDownload,
         child: Text(widget.isNewVersion ? '立即更新' : '重新下载'),
@@ -232,10 +224,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       });
 
       if (success) {
-        // 下载成功后自动提示安装
         _installApk();
       } else {
-        // 下载失败，记录日志
         LoggerService.instance.e(
           'APK下载失败: ${widget.version.version}',
           category: LogCategory.network,
@@ -259,11 +249,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       });
 
       if (success) {
-        // 安装启动后关闭对话框
         Navigator.of(context).pop();
         widget.onUpdateComplete?.call();
       } else {
-        // 安装失败，显示提示
         LoggerService.instance.e(
           'APK安装失败: ${widget.version.version}',
           category: LogCategory.general,
@@ -285,15 +273,11 @@ Future<void> showAppUpdateDialog(
 }) {
   return showDialog(
     context: context,
-    barrierDismissible: !version.forceUpdate,
-    builder: (context) => PopScope(
-      canPop: !version.forceUpdate,
-      child: AppUpdateDialog(
-        version: version,
-        updateService: updateService,
-        onUpdateComplete: onUpdateComplete,
-        isNewVersion: isNewVersion,
-      ),
+    builder: (context) => AppUpdateDialog(
+      version: version,
+      updateService: updateService,
+      onUpdateComplete: onUpdateComplete,
+      isNewVersion: isNewVersion,
     ),
   );
 }

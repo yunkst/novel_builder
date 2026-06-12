@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/dsl_engine/dsl_engine_config.dart';
+import '../services/novel_agent/agent_engine_config.dart';
 import '../utils/toast_utils.dart';
 
 class DifySettingsScreen extends ConsumerWidget {
@@ -31,6 +32,11 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
   final _dslApiKeyController = TextEditingController();
   final _dslModelController = TextEditingController();
 
+  // Agent Engine 配置（Hermes ReAct 对话专用）
+  final _agentApiUrlController = TextEditingController();
+  final _agentApiKeyController = TextEditingController();
+  final _agentModelController = TextEditingController();
+
   bool _isLoading = true;
 
   @override
@@ -46,6 +52,9 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
     _dslApiUrlController.dispose();
     _dslApiKeyController.dispose();
     _dslModelController.dispose();
+    _agentApiUrlController.dispose();
+    _agentApiKeyController.dispose();
+    _agentModelController.dispose();
     super.dispose();
   }
 
@@ -66,6 +75,11 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
     _dslApiKeyController.text = await DslEngineConfig.getApiKey();
     _dslModelController.text = await DslEngineConfig.getModel();
 
+    // 加载 Agent Engine 配置
+    _agentApiUrlController.text = await AgentEngineConfig.getApiUrl();
+    _agentApiKeyController.text = await AgentEngineConfig.getApiKey();
+    _agentModelController.text = await AgentEngineConfig.getModel();
+
     setState(() {
       _isLoading = false;
     });
@@ -84,6 +98,11 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
       await DslEngineConfig.setApiUrl(_dslApiUrlController.text.trim());
       await DslEngineConfig.setApiKey(_dslApiKeyController.text.trim());
       await DslEngineConfig.setModel(_dslModelController.text.trim());
+
+      // 保存 Agent Engine 配置
+      await AgentEngineConfig.setApiUrl(_agentApiUrlController.text.trim());
+      await AgentEngineConfig.setApiKey(_agentApiKeyController.text.trim());
+      await AgentEngineConfig.setModel(_agentModelController.text.trim());
 
       if (mounted) {
         ToastUtils.showSuccess('设置已保存');
@@ -157,6 +176,56 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
                       hintText: '留空使用 DSL 内置模型',
                       border: OutlineInputBorder(),
                       helperText: '如 deepseek-chat, deepseek-v4-pro',
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // ── Hermes Agent（ReAct 对话）配置 ──
+                  const Text(
+                    'Hermes Agent（ReAct 对话）',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '为 Agent 对话单独配置 LLM 后端，留空则使用上方 DSL Engine 的配置',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _agentApiUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Agent API URL',
+                      hintText: '留空使用 DSL Engine 配置',
+                      border: OutlineInputBorder(),
+                      helperText: '如 https://api.openai.com/v1',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _agentApiKeyController,
+                    decoration: const InputDecoration(
+                      labelText: 'Agent API Key',
+                      hintText: '留空使用 DSL Engine 配置',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _agentModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Agent 默认模型（可选）',
+                      hintText: '留空使用 DSL Engine 配置',
+                      border: OutlineInputBorder(),
+                      helperText: '如 gpt-4o, deepseek-chat',
                     ),
                   ),
                   const SizedBox(height: 32),

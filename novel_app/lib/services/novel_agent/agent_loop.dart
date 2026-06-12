@@ -102,15 +102,30 @@ class AgentLoop {
         final toolCalls = streamingResult.buildToolCalls();
         final fullContent = streamingResult.fullContent;
 
-        LoggerService.instance.i(
-          'LLM 流式响应 (round $round): '
-          'contentChunks=$contentChunkCount, '
-          'contentLength=${fullContent.length}, '
-          'toolCalls=${toolCalls.length}, '
-          'finishReason=$streamFinishReason',
-          category: LogCategory.ai,
-          tags: ['agent', 'llm', 'response', _scenario.id],
-        );
+        // contentLength=0 但 finishReason 不是 tool_calls 时，说明 LLM 异常返回空内容，需要告警
+        // contentLength=0 + finishReason=tool_calls 是正常的 ReAct 行为（LLM 决定调用工具）
+        final isAbnormalEmpty = fullContent.isEmpty &&
+            toolCalls.isEmpty &&
+            streamFinishReason != 'tool_calls';
+        final logMessage =
+            'LLM 流式响应 (round $round): '
+            'contentChunks=$contentChunkCount, '
+            'contentLength=${fullContent.length}, '
+            'toolCalls=${toolCalls.length}, '
+            'finishReason=$streamFinishReason';
+        if (isAbnormalEmpty) {
+          LoggerService.instance.w(
+            '$logMessage [异常: 响应内容为空]',
+            category: LogCategory.ai,
+            tags: ['agent', 'llm', 'response', 'abnormal-empty', _scenario.id],
+          );
+        } else {
+          LoggerService.instance.i(
+            logMessage,
+            category: LogCategory.ai,
+            tags: ['agent', 'llm', 'response', _scenario.id],
+          );
+        }
 
         // 3. 无工具调用 → 结束
         if (toolCalls.isEmpty) {
