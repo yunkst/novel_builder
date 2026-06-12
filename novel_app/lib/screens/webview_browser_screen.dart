@@ -7,6 +7,7 @@ import '../services/novel_agent/agent_scenario.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
+import '../widgets/webview_add_novel_button.dart';
 
 /// 浏览器主屏幕
 ///
@@ -129,38 +130,49 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
             const SizedBox(width: 4),
           ],
         ),
-        body: Column(
+        body: Stack(
           children: [
-            // 加载进度条
-            if (isLoading)
-              LinearProgressIndicator(
-                value: progress > 0 ? progress : null,
-                minHeight: 2,
-              ),
-            // WebView 主体
-            Expanded(
-              child: InAppWebView(
-                initialUrlRequest:
-                    URLRequest(url: WebUri('https://so.com')),
-                initialSettings: InAppWebViewSettings(
-                  javaScriptEnabled: true,
+            Column(
+              children: [
+                // 加载进度条
+                if (isLoading)
+                  LinearProgressIndicator(
+                    value: progress > 0 ? progress : null,
+                    minHeight: 2,
+                  ),
+                // WebView 主体
+                Expanded(
+                  child: InAppWebView(
+                    initialUrlRequest:
+                        URLRequest(url: WebUri('https://so.com')),
+                    initialSettings: InAppWebViewSettings(
+                      javaScriptEnabled: true,
+                    ),
+                    onWebViewCreated: (controller) {
+                      notifier.setController(controller);
+                    },
+                    onLoadStart: (controller, url) {
+                      notifier.handleLoadStart(url);
+                    },
+                    onLoadStop: (controller, url) {
+                      notifier.handleLoadStop(url);
+                    },
+                    onProgressChanged: (controller, progress) {
+                      notifier.handleProgress(progress);
+                    },
+                    onReceivedError: (controller, request, error) {
+                      notifier.handleError(error);
+                    },
+                  ),
                 ),
-                onWebViewCreated: (controller) {
-                  notifier.setController(controller);
-                },
-                onLoadStart: (controller, url) {
-                  notifier.handleLoadStart(url);
-                },
-                onLoadStop: (controller, url) {
-                  notifier.handleLoadStop(url);
-                },
-                onProgressChanged: (controller, progress) {
-                  notifier.handleProgress(progress);
-                },
-                onReceivedError: (controller, request, error) {
-                  notifier.handleError(error);
-                },
-              ),
+              ],
+            ),
+            // 右下角「添加小说」悬浮按钮
+            // 仅在当前域名有提取脚本时显示
+            const Positioned(
+              right: 16,
+              bottom: 16,
+              child: WebViewAddNovelFab(),
             ),
           ],
         ),

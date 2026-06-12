@@ -13,6 +13,7 @@ import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 import '../agent_scenario.dart';
+import 'webview_js_executor.dart';
 
 class WebViewExtractScenario implements AgentScenario {
   final Ref _ref;
@@ -225,7 +226,7 @@ URL: $url
     }
 
     // 防呆校验：脚本必须符合参数化规范
-    final validationError = _validateScript(script);
+    final validationError = WebViewJsExecutor.validateScript(script);
     if (validationError != null) {
       LoggerService.instance.w(
         '脚本校验失败: $validationError',
@@ -247,7 +248,7 @@ URL: $url
     // callAsyncJavaScript 的 functionBody 会被包裹为 async function() { <body> }
     // Agent 生成的脚本是 (async function(){...})() 格式（IIFE），
     // 需要提取内部函数体，否则 IIFE 返回值会被丢弃
-    final functionBody = _extractAsyncFunctionBody(resolvedScript);
+    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
 
     LoggerService.instance.d(
       '执行 JS: 替换 {{URL}} → $testUrl (scriptLen=${resolvedScript.length})',
@@ -288,7 +289,7 @@ URL: $url
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'execute_js'],
       );
-      return _stringifyJsResult(result.value);
+      return WebViewJsExecutor.stringifyJsResult(result.value);
     } on TimeoutException {
       LoggerService.instance.w(
         '执行 JS 超时 (>60s)',
@@ -403,114 +404,6 @@ URL: $url
       suggestion:
           '根据错误信息修正后重试。如果连续失败 3 次，建议换一种思路（如换选择器、简化提取逻辑）',
     );
-  }
-
-  /// 校验脚本是否符合参数化规范
-  ///
-  /// 规则：
-  /// 1. 必须包含 `{{URL}}` 占位符
-  /// 2. 禁止硬编码过多完整 URL（允许 ≤2 个，如广告域名过滤）
-  /// 3. 禁止使用 window.location.href / document.URL
-  ///
-  /// 返回 null 表示校验通过，否则返回错误描述。
-  String? _validateScript(String script) {
-    // 1. 必须包含 {{URL}} 占位符
-    if (!script.contains('{{URL}}')) {
-      return '脚本缺少 {{URL}} 占位符。'
-          "请在脚本开头声明: const PAGE_URL = '{{URL}}'; "
-          '并在脚本中使用 PAGE_URL 代替硬编码 URL';
-    }
-
-    // 2. 禁止硬编码过多完整 URL
-    final hardcodedUrlPattern = RegExp(r'https?://[^\s<>]+');
-    final hardcodedUrls = hardcodedUrlPattern
-        .allMatches(script)
-        .where((m) => !m.group(0)!.contains('{{'))
-        .map((m) => m.group(0)!)
-        .toList();
-    if (hardcodedUrls.length > 2) {
-      return '脚本中包含 ${hardcodedUrls.length} 个硬编码 URL（最多允许 2 个），'
-          '请使用 PAGE_URL 变量代替。'
-          '检测到的 URL: ${hardcodedUrls.take(3).join(", ")}';
-    }
-
-    // 3. 禁止使用 window.location.href / document.URL / location.href
-    if (script.contains('window.location.href') ||
-        script.contains('document.URL') ||
-        script.contains('location.href')) {
-      return '脚本中禁止使用 window.location.href/document.URL/location.href，'
-          '请统一使用 PAGE_URL 变量（从 {{URL}} 占位符获取）';
-    }
-
-    return null; // 校验通过
-  }
-
-  /// 将 callAsyncJavaScript 返回值统一转为 JSON 字符串
-  ///
-  /// callAsyncJavaScript 的 value 字段类型因平台和返回内容而异：
-  /// - JS 返回 JSON.stringify(...) → value 是 String
-  /// - JS 返回普通对象 → value 可能是 Map/List
-  /// - JS 返回 null → value 是 null
-  /// 此方法统一处理：如果是 String 则原样返回，
-  /// 如果是对象则 jsonEncode 后再返回。
-  String _stringifyJsResult(dynamic result) {
-    if (result == null) return jsonEncode({'result': null});
-    if (result is String) return result;
-    return jsonEncode(result);
-  }
-
-  /// 将 Agent 生成的 IIFE 脚本转换为 callAsyncJavaScript 函数体
-  ///
-  /// callAsyncJavaScript(functionBody: body) 会包裹为:
-  ///   async function(...){ <body> }
-  ///
-  /// Agent 生成的脚本有两种格式：
-  ///   1. async IIFE: `(async function() { ... })()` → 提取内部函数体
-  ///   2. 同步 IIFE: `(function() { ... })()` → 提取内部函数体
-  ///   3. 非包裹的函数体 → 原样返回（兼容）
-  String _extractAsyncFunctionBody(String script) {
-    final trimmed = script.trim();
-
-    // 匹配 (async function() { ... })() 或 (async function(){...})()
-    // 也匹配 (function() { ... })() 同步 IIFE
-    final iifePattern = RegExp(
-      r'^\(\s*(?:async\s+)?function\s*\([^)]*\)\s*\{',
-    );
-    final match = iifePattern.firstMatch(trimmed);
-    if (match == null) return script;
-
-    // 找到第一个 { 的位置
-    final firstBrace = trimmed.indexOf('{', match.start);
-    if (firstBrace == -1) return script;
-
-    // 找到匹配的最后一个 }（去掉末尾的 )()
-    var depth = 0;
-    var lastBrace = -1;
-    for (var i = firstBrace; i < trimmed.length; i++) {
-      if (trimmed[i] == '{') {
-        depth++;
-      } else if (trimmed[i] == '}') {
-        depth--;
-        if (depth == 0) {
-          lastBrace = i;
-          break;
-        }
-      }
-    }
-
-    if (lastBrace == -1) return script;
-
-    // 提取 { } 之间的内容（去掉外层花括号）
-    final body = trimmed.substring(firstBrace + 1, lastBrace).trim();
-
-    // 验证末尾是 )() —— 确认是 IIFE
-    final tail = trimmed.substring(lastBrace + 1).trim();
-    if (!tail.startsWith(')') || !tail.endsWith('()') && !tail.endsWith(')()')) {
-      // 可能不是标准 IIFE，保守返回原脚本
-      // 但还是提取了 body，因为大多数情况是 IIFE
-    }
-
-    return body;
   }
 
   /// 让 WebView 跳转到指定 URL
@@ -719,7 +612,7 @@ URL: $url
     }
 
     // 防呆校验：目录脚本
-    final listValidation = _validateScript(chapterListJs!);
+    final listValidation = WebViewJsExecutor.validateScript(chapterListJs!);
     if (listValidation != null) {
       LoggerService.instance.w(
         '保存时目录脚本校验失败: $listValidation',
@@ -736,7 +629,7 @@ URL: $url
     }
 
     // 防呆校验：内容脚本
-    final contentValidation = _validateScript(chapterContentJs!);
+    final contentValidation = WebViewJsExecutor.validateScript(chapterContentJs!);
     if (contentValidation != null) {
       LoggerService.instance.w(
         '保存时内容脚本校验失败: $contentValidation',
