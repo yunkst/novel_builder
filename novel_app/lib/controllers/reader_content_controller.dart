@@ -2,6 +2,7 @@ import '../services/logger_service.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
+import '../services/headless_webview_content_service.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_novel_repository.dart';
 import '../core/providers/reader_state_providers.dart';
@@ -34,6 +35,7 @@ class ReaderContentController {
   final IChapterRepository _chapterRepository;
   final INovelRepository _novelRepository;
   final WidgetRef _ref;
+  final HeadlessWebViewContentService? _headlessService;
 
   // ========== 构造函数 ==========
 
@@ -42,10 +44,12 @@ class ReaderContentController {
     required ApiServiceWrapper apiService,
     required IChapterRepository chapterRepository,
     required INovelRepository novelRepository,
+    HeadlessWebViewContentService? headlessService,
   })  : _ref = ref,
         _apiService = apiService,
         _chapterRepository = chapterRepository,
-        _novelRepository = novelRepository;
+        _novelRepository = novelRepository,
+        _headlessService = headlessService;
 
   // ========== 公开方法 ==========
 
@@ -105,60 +109,63 @@ class ReaderContentController {
 
       String content;
 
-      // 强制刷新时先删除缓存
-      if (forceRefresh) {
-        await _chapterRepository.deleteChapterCache(chapter.url);
-        LoggerService.instance.d(
-          'ReaderContentController: 已删除缓存 - ${chapter.url}',
-          category: LogCategory.ui,
-          tags: ['reader'],
-        );
+      // 先尝试从缓存获取（非强制刷新时）
+      if (!forceRefresh) {
+        final cachedContent =
+            await _chapterRepository.getCachedChapter(chapter.url);
+        if (cachedContent != null && cachedContent.trim().isNotEmpty) {
+          content = cachedContent;
+          LoggerService.instance.d(
+            'ReaderContentController: 从缓存加载 - ${cachedContent.length}字符',
+            category: LogCategory.ui,
+            tags: ['reader'],
+          );
+
+          // 更新状态
+          notifier.setContent(content);
+          notifier.setLoading(false);
+
+          // 更新阅读进度
+          await updateReadingProgress(novel.url, chapter);
+
+          LoggerService.instance.i(
+            'ReaderContentController: 章节加载完成 - ${chapter.title}',
+            category: LogCategory.ui,
+            tags: ['reader'],
+          );
+          return;
+        }
       }
 
-      // 尝试从缓存获取
-      final cachedContent =
-          await _chapterRepository.getCachedChapter(chapter.url);
-      if (cachedContent != null && cachedContent.trim().isNotEmpty) {
-        content = cachedContent;
-        LoggerService.instance.d(
-          'ReaderContentController: 从缓存加载 - ${cachedContent.length}字符',
-          category: LogCategory.ui,
-          tags: ['reader'],
-        );
-      } else {
-        // 缓存未命中，从API获取
-        LoggerService.instance.d(
-          'ReaderContentController: 缓存未命中，从API获取',
-          category: LogCategory.ui,
-          tags: ['reader'],
-        );
-        content = await _apiService.getChapterContent(
-          chapter.url,
-          forceRefresh: forceRefresh,
-        );
+      // 缓存未命中或强制刷新，先尝试 Headless WebView，再回退 API
+      LoggerService.instance.d(
+        'ReaderContentController: ${forceRefresh ? "强制刷新" : "缓存未命中"}，尝试获取',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
+      content = await _fetchChapterContent(chapter.url, forceRefresh);
 
-        // 改进：使用 trim() 验证内容有效性
-        final trimmedContent = content.trim();
-        if (trimmedContent.isEmpty) {
-          throw Exception('获取到的章节内容为空');
-        }
-
-        if (trimmedContent.length < 50) {
-          throw Exception('获取到的章节内容过短（${trimmedContent.length}字符）');
-        }
-
-        // 验证通过，缓存章节
-        await _chapterRepository.cacheChapter(
-          novel.url,
-          chapter,
-          content,
-        );
-        LoggerService.instance.i(
-          'ReaderContentController: 已缓存章节 - ${content.length}字符',
-          category: LogCategory.ui,
-          tags: ['reader'],
-        );
+      // 改进：使用 trim() 验证内容有效性
+      final trimmedContent = content.trim();
+      if (trimmedContent.isEmpty) {
+        throw Exception('获取到的章节内容为空');
       }
+
+      if (trimmedContent.length < 50) {
+        throw Exception('获取到的章节内容过短（${trimmedContent.length}字符）');
+      }
+
+      // 验证通过，缓存章节（forceRefresh时覆盖旧缓存）
+      await _chapterRepository.cacheChapter(
+        novel.url,
+        chapter,
+        content,
+      );
+      LoggerService.instance.i(
+        'ReaderContentController: 已缓存章节 - ${content.length}字符',
+        category: LogCategory.ui,
+        tags: ['reader'],
+      );
 
       // 再次验证内容是否为空（防御性编程）
       if (content.trim().isEmpty) {
@@ -246,4 +253,25 @@ class ReaderContentController {
   /// 当前小说（从Provider获取）
   Novel? get currentNovel =>
       _ref.read(chapterContentStateNotifierProvider).currentNovel;
+
+  // ========== 私有方法 ==========
+
+  /// 获取章节内容（优先 Headless WebView → 回退后端 API）
+  Future<String> _fetchChapterContent(String chapterUrl, bool forceRefresh) async {
+    // 尝试 Headless WebView（如有该域名的提取脚本）
+    if (_headlessService != null) {
+      final webViewResult = await _headlessService!.fetchContent(chapterUrl);
+      if (webViewResult != null && webViewResult.content.trim().isNotEmpty) {
+        LoggerService.instance.d(
+          'ReaderContentController: Headless WebView 获取成功',
+          category: LogCategory.ui,
+          tags: ['reader', 'headless-webview'],
+        );
+        return webViewResult.content;
+      }
+    }
+
+    // 回退到后端 API
+    return _apiService.getChapterContent(chapterUrl, forceRefresh: forceRefresh);
+  }
 }

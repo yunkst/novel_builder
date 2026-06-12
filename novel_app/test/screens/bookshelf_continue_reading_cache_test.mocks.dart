@@ -247,6 +247,40 @@ class MockINovelRepository extends _i1.Mock implements _i5.INovelRepository {
           ),
         )),
       ) as _i6.Future<_i3.Novel>);
+
+  @override
+  _i6.Future<_i3.Novel?> getNovelById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelById,
+          [id],
+        ),
+        returnValue: _i6.Future<_i3.Novel?>.value(),
+      ) as _i6.Future<_i3.Novel?>);
+
+  @override
+  _i6.Future<String?> getNovelUrlById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelUrlById,
+          [id],
+        ),
+        returnValue: _i6.Future<String?>.value(),
+      ) as _i6.Future<String?>);
+
+  @override
+  _i6.Future<int> updateBackgroundSettingById(
+    int? id,
+    String? setting,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateBackgroundSettingById,
+          [
+            id,
+            setting,
+          ],
+        ),
+        returnValue: _i6.Future<int>.value(0),
+      ) as _i6.Future<int>);
 }
 
 /// A class which mocks [IDatabaseConnection].

@@ -954,6 +954,58 @@ class MockIChapterRepository extends _i1.Mock
         returnValue: _i8.Future<List<_i14.ChapterSearchResult>>.value(
             <_i14.ChapterSearchResult>[]),
       ) as _i8.Future<List<_i14.ChapterSearchResult>>);
+
+  @override
+  _i8.Future<_i9.Chapter?> getChapterById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getChapterById,
+          [id],
+        ),
+        returnValue: _i8.Future<_i9.Chapter?>.value(),
+      ) as _i8.Future<_i9.Chapter?>);
+
+  @override
+  _i8.Future<String?> getChapterUrlById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getChapterUrlById,
+          [id],
+        ),
+        returnValue: _i8.Future<String?>.value(),
+      ) as _i8.Future<String?>);
+
+  @override
+  _i8.Future<bool> chapterExistsById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #chapterExistsById,
+          [id],
+        ),
+        returnValue: _i8.Future<bool>.value(false),
+      ) as _i8.Future<bool>);
+
+  @override
+  _i8.Future<int> updateChapterContentById(
+    int? id,
+    String? content,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateChapterContentById,
+          [
+            id,
+            content,
+          ],
+        ),
+        returnValue: _i8.Future<int>.value(0),
+      ) as _i8.Future<int>);
+
+  @override
+  _i8.Future<int?> getChapterIdByUrl(String? url) => (super.noSuchMethod(
+        Invocation.method(
+          #getChapterIdByUrl,
+          [url],
+        ),
+        returnValue: _i8.Future<int?>.value(),
+      ) as _i8.Future<int?>);
 }
 
 /// A class which mocks [INovelRepository].
@@ -1145,4 +1197,38 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
           ),
         )),
       ) as _i8.Future<_i4.Novel>);
+
+  @override
+  _i8.Future<_i4.Novel?> getNovelById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelById,
+          [id],
+        ),
+        returnValue: _i8.Future<_i4.Novel?>.value(),
+      ) as _i8.Future<_i4.Novel?>);
+
+  @override
+  _i8.Future<String?> getNovelUrlById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelUrlById,
+          [id],
+        ),
+        returnValue: _i8.Future<String?>.value(),
+      ) as _i8.Future<String?>);
+
+  @override
+  _i8.Future<int> updateBackgroundSettingById(
+    int? id,
+    String? setting,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateBackgroundSettingById,
+          [
+            id,
+            setting,
+          ],
+        ),
+        returnValue: _i8.Future<int>.value(0),
+      ) as _i8.Future<int>);
 }

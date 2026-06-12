@@ -1,11 +1,13 @@
 import 'dart:async';
 import '../models/chapter.dart';
+import '../models/chapter_content_result.dart';
 import '../utils/deque.dart';
 import 'rate_limiter.dart';
 import 'preload_task.dart';
 import 'preload_progress_update.dart';
 import '../repositories/chapter_repository.dart';
 import 'api_service_wrapper.dart';
+import 'headless_webview_content_service.dart';
 import 'logger_service.dart';
 
 /// 全局预加载服务
@@ -47,6 +49,7 @@ class PreloadService {
   // 服务依赖（通过构造函数注入）
   final ApiServiceWrapper _apiService;
   final ChapterRepository _chapterRepository;
+  final HeadlessWebViewContentService? _headlessService;
 
   /// 构造函数
   ///
@@ -54,8 +57,10 @@ class PreloadService {
   PreloadService({
     required ApiServiceWrapper apiService,
     required ChapterRepository chapterRepository,
+    HeadlessWebViewContentService? headlessService,
   })  : _apiService = apiService,
-        _chapterRepository = chapterRepository {
+        _chapterRepository = chapterRepository,
+        _headlessService = headlessService {
     _logInitialization();
   }
 
@@ -215,8 +220,8 @@ class PreloadService {
           // 标记正在预加载
           _chapterRepository.markAsPreloading(task.chapterUrl);
 
-          // 获取内容（带来源标识）
-          final result = await _apiService.getChapterContentWithSource(task.chapterUrl);
+          // 获取内容（优先 Headless WebView → 回退 API）
+          final result = await _fetchChapterContent(task.chapterUrl);
 
           // 保存到数据库
           final chapter = Chapter(
@@ -357,5 +362,24 @@ class PreloadService {
     _progressController.close();
     _rateLimiter.reset();
     clearQueue();
+  }
+
+  /// 获取章节内容（优先 Headless WebView → 回退后端 API）
+  Future<ChapterContentResult> _fetchChapterContent(String chapterUrl) async {
+    // 尝试 Headless WebView（如有该域名的提取脚本）
+    if (_headlessService != null) {
+      final webViewResult = await _headlessService!.fetchContent(chapterUrl);
+      if (webViewResult != null) {
+        LoggerService.instance.d(
+          '预加载: Headless WebView 获取成功',
+          category: LogCategory.cache,
+          tags: ['preload', 'headless-webview'],
+        );
+        return webViewResult;
+      }
+    }
+
+    // 回退到后端 API
+    return _apiService.getChapterContentWithSource(chapterUrl);
   }
 }

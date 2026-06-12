@@ -124,7 +124,7 @@ final apiServiceWrapperInitProvider = FutureProvider<void>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ApiServiceWrapperInitRef = FutureProviderRef<void>;
-String _$preloadServiceHash() => r'de5034b7741f37734cfb299923b88010b685931b';
+String _$preloadServiceHash() => r'691a0c3eb97bf993afff0c0b0a57d1f96b6807b1';
 
 /// PreloadService Provider
 ///
@@ -261,5 +261,50 @@ final sceneIllustrationCacheServiceProvider =
 // ignore: unused_element
 typedef SceneIllustrationCacheServiceRef
     = ProviderRef<SceneIllustrationCacheService>;
+String _$headlessWebViewContentServiceHash() =>
+    r'26a8a40b4f21f416141880f61921ed366e05dabd';
+
+/// HeadlessWebViewContentService Provider
+///
+/// 提供无头 WebView 内容获取服务实例。
+/// 当域名有 AI Agent 生成的 `chapter_content_js` 脚本时，
+/// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取内容。
+///
+/// **功能**:
+/// - 绕过 API 直接获取章节内容
+/// - 自动回退：无脚本或失败时返回 null
+/// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
+///
+/// **依赖**:
+/// - [siteScriptRepositoryProvider] - 站点脚本查询
+///
+/// **使用示例**:
+/// ```dart
+/// final headlessService = ref.watch(headlessWebViewContentServiceProvider);
+/// final result = await headlessService.fetchContent(chapterUrl);
+/// if (result != null) {
+///   // 使用 result.content
+/// } else {
+///   // 回退到 API
+/// }
+/// ```
+///
+/// Copied from [headlessWebViewContentService].
+@ProviderFor(headlessWebViewContentService)
+final headlessWebViewContentServiceProvider =
+    Provider<HeadlessWebViewContentService>.internal(
+  headlessWebViewContentService,
+  name: r'headlessWebViewContentServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$headlessWebViewContentServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HeadlessWebViewContentServiceRef
+    = ProviderRef<HeadlessWebViewContentService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

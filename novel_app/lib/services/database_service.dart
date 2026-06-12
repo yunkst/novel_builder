@@ -1133,6 +1133,9 @@ class DatabaseService {
 
     // 清理章节列表元数据
     await db.delete('novel_chapters');
+
+    // 同步清理 ChapterRepository 的内存缓存，防止"幻读"
+    _chapterRepository.clearMemoryState();
   }
 
   // ========== 角色操作 (委托给 CharacterRepository) ==========

@@ -21,10 +21,12 @@ import 'package:dio/io.dart';
 import 'dart:io';
 import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
+import '../../../services/headless_webview_content_service.dart';
 import '../../../services/scene_illustration_service.dart';
 import '../../../services/scene_illustration_cache_service.dart';
 import '../../../repositories/chapter_repository.dart';
 import '../repository_providers.dart';
+import '../database_providers.dart';
 import '../../../services/logger_service.dart';
 
 part 'network_service_providers.g.dart';
@@ -224,6 +226,7 @@ Future<void> _initializeApiService(ApiServiceWrapper apiService) async {
 PreloadService preloadService(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
   final chapterRepository = ref.watch(chapterRepositoryProvider);
+  final headlessService = ref.watch(headlessWebViewContentServiceProvider);
 
   // 类型转换：IChapterRepository -> ChapterRepository
   // 因为 PreloadService 需要具体的 ChapterRepository 实现
@@ -233,6 +236,7 @@ PreloadService preloadService(Ref ref) {
   return PreloadService(
     apiService: apiService,
     chapterRepository: repository,
+    headlessService: headlessService,
   );
 }
 
@@ -293,4 +297,34 @@ SceneIllustrationService sceneIllustrationService(Ref ref) {
 SceneIllustrationCacheService sceneIllustrationCacheService(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
   return SceneIllustrationCacheService(apiService: apiService);
+}
+
+/// HeadlessWebViewContentService Provider
+///
+/// 提供无头 WebView 内容获取服务实例。
+/// 当域名有 AI Agent 生成的 `chapter_content_js` 脚本时，
+/// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取内容。
+///
+/// **功能**:
+/// - 绕过 API 直接获取章节内容
+/// - 自动回退：无脚本或失败时返回 null
+/// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
+///
+/// **依赖**:
+/// - [siteScriptRepositoryProvider] - 站点脚本查询
+///
+/// **使用示例**:
+/// ```dart
+/// final headlessService = ref.watch(headlessWebViewContentServiceProvider);
+/// final result = await headlessService.fetchContent(chapterUrl);
+/// if (result != null) {
+///   // 使用 result.content
+/// } else {
+///   // 回退到 API
+/// }
+/// ```
+@Riverpod(keepAlive: true)
+HeadlessWebViewContentService headlessWebViewContentService(Ref ref) {
+  final scriptRepo = ref.watch(siteScriptRepositoryProvider);
+  return HeadlessWebViewContentService(scriptRepo: scriptRepo);
 }

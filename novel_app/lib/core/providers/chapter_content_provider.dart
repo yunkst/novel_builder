@@ -70,43 +70,56 @@ class ChapterContent extends _$ChapterContent {
 
       String content;
 
-      // 强制刷新时先删除缓存
-      if (forceRefresh) {
-        await chapterRepository.deleteChapterCache(chapter.url);
+      // 先尝试从缓存获取（非强制刷新时）
+      if (!forceRefresh) {
+        final cachedContent =
+            await chapterRepository.getCachedChapter(chapter.url);
+        if (cachedContent != null && cachedContent.isNotEmpty) {
+          content = cachedContent;
+          LoggerService.instance.d(
+            '章节内容从缓存加载成功',
+            category: LogCategory.database,
+            tags: ['provider', 'chapter-content', 'cache'],
+          );
+
+          // 更新状态
+          state = state.copyWith(content: content, isLoading: false);
+
+          LoggerService.instance.i(
+            '章节内容加载成功: ${chapter.title}',
+            category: LogCategory.ui,
+            tags: ['provider', 'chapter-content', 'success'],
+          );
+
+          // 标记章节为已读
+          await chapterRepository.markChapterAsRead(
+            novel.url,
+            chapter.url,
+          );
+          return;
+        }
       }
 
-      // 尝试从缓存获取
-      final cachedContent =
-          await chapterRepository.getCachedChapter(chapter.url);
-      if (cachedContent != null && cachedContent.isNotEmpty) {
-        content = cachedContent;
+      // 缓存未命中或强制刷新，从API获取
+      content = await apiService.getChapterContent(
+        chapter.url,
+        forceRefresh: forceRefresh,
+      );
+
+      // 验证内容并缓存（forceRefresh时cacheChapter的ConflictAlgorithm.replace会覆盖旧缓存）
+      if (content.isNotEmpty && content.length > 50) {
+        await chapterRepository.cacheChapter(
+          novel.url,
+          chapter,
+          content,
+        );
         LoggerService.instance.d(
-          '章节内容从缓存加载成功',
+          '章节内容从API获取并缓存成功',
           category: LogCategory.database,
-          tags: ['provider', 'chapter-content', 'cache'],
+          tags: ['provider', 'chapter-content', 'api'],
         );
       } else {
-        // 缓存未命中，从API获取
-        content = await apiService.getChapterContent(
-          chapter.url,
-          forceRefresh: forceRefresh,
-        );
-
-        // 验证内容并缓存
-        if (content.isNotEmpty && content.length > 50) {
-          await chapterRepository.cacheChapter(
-            novel.url,
-            chapter,
-            content,
-          );
-          LoggerService.instance.d(
-            '章节内容从API获取并缓存成功',
-            category: LogCategory.database,
-            tags: ['provider', 'chapter-content', 'api'],
-          );
-        } else {
-          throw Exception('获取到的章节内容为空或过短');
-        }
+        throw Exception('获取到的章节内容为空或过短');
       }
 
       // 更新状态

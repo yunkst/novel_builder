@@ -73,6 +73,7 @@ import '../utils/error_helper.dart';
 // Riverpod Providers
 import '../core/providers/service_providers.dart';
 import '../core/providers/database_providers.dart';
+import '../core/providers/services/network_service_providers.dart';
 import '../core/providers/reader_screen_providers.dart';
 import '../core/providers/reader_screen_notifier.dart';
 import '../core/providers/reader_settings_state.dart';
@@ -180,6 +181,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       apiService: _apiService,
       chapterRepository: ref.read(chapterRepositoryProvider),
       novelRepository: ref.read(novelRepositoryProvider),
+      headlessService: ref.read(headlessWebViewContentServiceProvider),
     );
 
     // ========== 初始化 ReaderInteractionController ==========

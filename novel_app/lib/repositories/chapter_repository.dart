@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'package:sqflite/sqflite.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
@@ -13,7 +14,8 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   ChapterRepository({required super.dbConnection});
 
   // 内存状态管理
-  final Set<String> _cachedInMemory = <String>{};
+  // 使用 LinkedHashSet 实现 LRU 淘汰：新访问的条目移到末尾，淘汰时从头部移除
+  final LinkedHashSet<String> _cachedInMemory = LinkedHashSet<String>();
   final Set<String> _preloading = <String>{};
   static const int _maxMemoryCacheSize = 1000;
 
@@ -162,8 +164,12 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 删除章节缓存
+  ///
+  /// 同时清理内存缓存和预加载状态，防止"幻读"
   @override
   Future<int> deleteChapterCache(String chapterUrl) async {
+    _removeFromMemoryCache(chapterUrl);
+    _preloading.remove(chapterUrl);
     final db = await database;
     return await db.delete(
       'chapter_cache',
@@ -260,9 +266,23 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 删除小说的所有缓存章节
+  ///
+  /// 同时清理内存缓存中该小说的所有条目，防止"幻读"
   @override
   Future<int> deleteCachedChapters(String novelUrl) async {
+    // 先查询该小说的所有章节URL，用于清理内存缓存
     final db = await database;
+    final urls = await db.query(
+      'chapter_cache',
+      columns: ['chapterUrl'],
+      where: 'novelUrl = ?',
+      whereArgs: [novelUrl],
+    );
+    for (final row in urls) {
+      _removeFromMemoryCache(row['chapterUrl'] as String);
+      _preloading.remove(row['chapterUrl'] as String);
+    }
+
     return await db.delete(
       'chapter_cache',
       where: 'novelUrl = ?',
@@ -409,6 +429,8 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 创建用户自定义章节
+  ///
+  /// 使用事务保证两表写入的原子性，同时更新内存缓存
   @override
   Future<int> createCustomChapter(String novelUrl, String title, String content,
       [int? index]) async {
@@ -430,31 +452,38 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     final chapterUrl =
         'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
 
-    final ncId = await db.insert(
-      'novel_chapters',
-      {
-        'novelUrl': novelUrl,
-        'chapterUrl': chapterUrl,
-        'title': title,
-        'chapterIndex': chapterIndex,
-        'isUserInserted': 1,
-        'insertedAt': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    late final int ncId;
+    // 使用事务保证两表写入的原子性
+    await db.transaction((txn) async {
+      ncId = await txn.insert(
+        'novel_chapters',
+        {
+          'novelUrl': novelUrl,
+          'chapterUrl': chapterUrl,
+          'title': title,
+          'chapterIndex': chapterIndex,
+          'isUserInserted': 1,
+          'insertedAt': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
-    await db.insert(
-      'chapter_cache',
-      {
-        'novelUrl': novelUrl,
-        'chapterUrl': chapterUrl,
-        'title': title,
-        'content': content,
-        'chapterIndex': chapterIndex,
-        'cachedAt': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+      await txn.insert(
+        'chapter_cache',
+        {
+          'novelUrl': novelUrl,
+          'chapterUrl': chapterUrl,
+          'title': title,
+          'content': content,
+          'chapterIndex': chapterIndex,
+          'cachedAt': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+
+    // 写入成功后同步更新内存缓存
+    _addCachedInMemory(chapterUrl);
 
     return ncId;
   }
@@ -501,16 +530,32 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     );
   }
 
+  /// 将章节URL添加到内存缓存（LRU淘汰策略）
+  ///
+  /// 使用 LinkedHashSet 实现 LRU：
+  /// - 已存在的条目会被移除后重新添加（移到末尾，表示最近访问）
+  /// - 超过容量时从头部移除最久未访问的条目
   void _addCachedInMemory(String chapterUrl) {
+    // 如果已存在，先移除（LinkedHashSet 不会改变已存在元素的顺序）
+    _cachedInMemory.remove(chapterUrl);
+
+    // 超过容量时，淘汰最久未访问的条目（头部）
     if (_cachedInMemory.length >= _maxMemoryCacheSize) {
-      _cachedInMemory.clear();
-      LoggerService.instance.i(
-        '内存缓存已满，已清空 ($_maxMemoryCacheSize条)',
+      final oldest = _cachedInMemory.first;
+      _cachedInMemory.remove(oldest);
+      LoggerService.instance.d(
+        'LRU淘汰内存缓存条目: $oldest (当前${_cachedInMemory.length}条)',
         category: LogCategory.cache,
-        tags: ['memory', 'cleanup'],
+        tags: ['memory', 'lru-evict'],
       );
     }
+
     _cachedInMemory.add(chapterUrl);
+  }
+
+  /// 从内存缓存中移除章节URL
+  void _removeFromMemoryCache(String chapterUrl) {
+    _cachedInMemory.remove(chapterUrl);
   }
 
   /// 标记章节为已读

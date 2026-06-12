@@ -237,6 +237,40 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
           ),
         )),
       ) as _i5.Future<_i3.Novel>);
+
+  @override
+  _i5.Future<_i3.Novel?> getNovelById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelById,
+          [id],
+        ),
+        returnValue: _i5.Future<_i3.Novel?>.value(),
+      ) as _i5.Future<_i3.Novel?>);
+
+  @override
+  _i5.Future<String?> getNovelUrlById(int? id) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelUrlById,
+          [id],
+        ),
+        returnValue: _i5.Future<String?>.value(),
+      ) as _i5.Future<String?>);
+
+  @override
+  _i5.Future<int> updateBackgroundSettingById(
+    int? id,
+    String? setting,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateBackgroundSettingById,
+          [
+            id,
+            setting,
+          ],
+        ),
+        returnValue: _i5.Future<int>.value(0),
+      ) as _i5.Future<int>);
 }
 
 /// A class which mocks [ChapterLoader].
