@@ -326,7 +326,7 @@ class HeadlessWebViewContentService {
 
     if (count >= _maxConsecutiveFailures) {
       LoggerService.instance.w(
-        'HeadlessWebView: 脚本连续失败${count}次，自动标记 unverified id=$scriptId',
+        'HeadlessWebView: 脚本连续失败$count次，自动标记 unverified id=$scriptId',
         category: LogCategory.cache,
         tags: ['headless-webview', 'auto-disable'],
       );

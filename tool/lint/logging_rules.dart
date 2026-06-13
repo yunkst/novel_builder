@@ -9,7 +9,6 @@
 /// - 提供详细的统计信息
 
 import 'dart:io';
-import 'dart:collection';
 
 void main() async {
   print('🔍 开始检查日志使用规范...\n');
@@ -39,14 +38,12 @@ void main() async {
       final lines = contents.split('\n');
 
       final issues = <String>[];
-      int debugPrintCount = 0;
 
       // 统计每一行的 debugPrint 使用
       for (int i = 0; i < lines.length; i++) {
         final line = lines[i];
 
         if (line.contains('debugPrint(')) {
-          debugPrintCount++;
           totalDebugPrint++;
 
           // 检查是否有对应的 LoggerService 调用

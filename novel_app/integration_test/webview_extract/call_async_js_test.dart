@@ -40,10 +40,14 @@ void main() {
       );
       // ignore: avoid_print
       print('TEST1 - callAsyncJavaScript result: $result');
+      // ignore: avoid_print
       print('TEST1 - result.runtimeType=${result.runtimeType}');
       if (result != null) {
+        // ignore: avoid_print
         print('TEST1 - result.value.runtimeType=${result.value.runtimeType}');
+        // ignore: avoid_print
         print('TEST1 - result.value=${result.value}');
+        // ignore: avoid_print
         print('TEST1 - result.error=${result.error}');
       }
 
@@ -206,6 +210,7 @@ void main() {
       );
       // ignore: avoid_print
       print('TEST6 - 综合翻页流程: value=${result?.value}');
+      // ignore: avoid_print
       print('TEST6 - error=${result?.error}');
       if (result?.value != null) {
         final parsed = jsonDecode(result!.value as String) as Map<String, dynamic>;

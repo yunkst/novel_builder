@@ -70,7 +70,7 @@ class WebViewJsExecutor {
   /// 将 Agent 生成的 IIFE 脚本转换为 callAsyncJavaScript 函数体
   ///
   /// callAsyncJavaScript(functionBody: body) 会包裹为:
-  ///   async function(...){ <body> }
+  ///   async function(...){ `body` }
   ///
   /// Agent 生成的脚本有两种格式：
   ///   1. async IIFE: `(async function() { ... })()` → 提取内部函数体

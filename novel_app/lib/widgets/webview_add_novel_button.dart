@@ -163,6 +163,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
         _markScriptUsed(script.id);
         _toast('章节已更新');
         if (mounted) {
+          // ignore: use_build_context_synchronously
           _navigateToChapterList(context, Novel(
             title: extractedTitle,
             author: '',
@@ -175,6 +176,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       // 6. 显示预览弹窗
       if (!mounted) return;
       final previewResult = await showModalBottomSheet<Map<String, dynamic>>(
+        // ignore: use_build_context_synchronously
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -205,6 +207,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
 
       // 8. 导航到章节列表
       if (mounted) {
+        // ignore: use_build_context_synchronously
         _navigateToChapterList(context, Novel(
           title: finalTitle,
           author: '',

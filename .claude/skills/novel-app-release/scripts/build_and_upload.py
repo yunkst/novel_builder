@@ -149,12 +149,8 @@ def run_preflight(project_root: Path) -> bool:
     for line in output_lines[-8:]:
         print(f"  {line}")
 
-    # --no-fatal-infos 下，warning 也会导致非零退出码
-    # 但 GitHub Actions 不会因此失败（只有 error 才是真正的阻断项）
-    # 检查输出中是否有 "error -" 级别的诊断
-    has_errors = any("error -" in line for line in output_lines)
-    if has_errors:
-        print(f"\n  ❌ flutter analyze 存在 error 级别诊断")
+    if rc != 0:
+        print(f"\n  ❌ flutter analyze 失败 (exit code: {rc})")
         print(f"  请修复上述问题后重新运行发布脚本")
         return False
     print("  ✅ flutter analyze 通过")

@@ -61,17 +61,6 @@ void main() {
     return container.read(provider);
   }
 
-  /// 解析 execute_js 的返回值
-  /// Windows 平台 evaluateJavascript 会尝试 jsonDecode，
-  /// 返回值可能是已解析的 Map/List，也可能是原始 JSON String。
-  dynamic parseResult(String result) {
-    try {
-      return jsonDecode(result);
-    } catch (_) {
-      return result;
-    }
-  }
-
   // ===========================================================================
   // 所有测试在一个 testWidgets 中运行，共享 WebView 实例
   // ===========================================================================

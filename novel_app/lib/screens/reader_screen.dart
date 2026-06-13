@@ -385,7 +385,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void _handleLongPress(int index) {
     final interactionState = ref.read(interactionStateNotifierProvider);
     if (!_interactionController
-        .shouldHandleLongPress(interactionState.isCloseupMode)) return;
+        .shouldHandleLongPress(interactionState.isCloseupMode)) {
+      return;
+    }
 
     final paragraphs = _paragraphs;
 
