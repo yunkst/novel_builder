@@ -751,7 +751,7 @@ void main() {
   // isDestructive
   // ========================================================================
   group('isDestructive', () {
-    test('破坏性工具 (6个)', () {
+    test('当前已禁用工具确认 — 所有工具均非破坏性', () {
       for (final name in [
         'update_chapter_content',
         'create_custom_chapter',
@@ -759,13 +759,6 @@ void main() {
         'create_character',
         'update_background_setting',
         'update_outline',
-      ]) {
-        expect(executor.isDestructive(name), true, reason: '$name');
-      }
-    });
-
-    test('非破坏性工具 (6个)', () {
-      for (final name in [
         'list_novels',
         'read_chapter_content',
         'list_chapters',

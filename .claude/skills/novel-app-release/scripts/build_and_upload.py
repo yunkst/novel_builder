@@ -3,12 +3,25 @@
 Novel App 发布脚本
 
 此脚本自动化执行以下操作：
-1. 从 pubspec.yaml 读取版本信息
-2. 分析 git diff 生成更新日志
-3. 提交代码到 git（含 annotated tag v{version}）
-4. 推送 commit 和 tag 到远程仓库
 
-APK 构建由 GitHub Actions（flutter-release.yml）在 tag 推送后自动完成。
+阶段 1 — 预检（模拟 CI）:
+  1.1 flutter analyze --no-fatal-infos
+  1.2 flutter test --no-pub test/unit/ test/bug/ test/verification/
+  1.3 flutter build apk --release
+
+阶段 2 — 版本识别:
+  2.1 从 pubspec.yaml 读取版本信息
+  2.2 分析 git diff 生成更新日志
+
+阶段 3 — git 操作:
+  3.1 git add .
+  3.2 git commit -m "chore: 发布版本 {version}"
+  3.3 git tag -a v{version} -m "Release {version}"
+  3.4 git push
+  3.5 git push origin v{version}
+
+预检中任何一步失败都会中断发布，因为这意味着 GitHub Actions 也会失败。
+可通过 SKIP_PREFLIGHT=1 环境变量跳过预检（不推荐）。
 """
 
 import os
@@ -17,12 +30,25 @@ import subprocess
 import sys
 from pathlib import Path
 
+# 强制使用 UTF-8 输出（修复 Windows cmd 的 GBK 编码问题）
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 
 def get_project_root() -> Path:
     """获取项目根目录（包含此脚本的目录的上五级）"""
     # 脚本位置: .claude/skills/novel-app-release/scripts/build_and_upload.py
     # 需要向上5级到达项目根目录
     return Path(__file__).parent.parent.parent.parent.parent.resolve()
+
+
+def get_flutter_app_dir(project_root: Path) -> Path:
+    """获取 Flutter 应用目录"""
+    return project_root / "novel_app"
 
 
 def get_flutter_version(project_root: Path) -> tuple[str, int]:
@@ -50,17 +76,21 @@ def get_flutter_version(project_root: Path) -> tuple[str, int]:
     return version_name, version_code
 
 
-def run_git_command(args: list[str], cwd: Path) -> tuple[int, str, str]:
+def run_command(args: list[str], cwd: Path, description: str = "") -> tuple[int, str, str]:
     """
-    执行 git 命令并处理 Windows 编码问题
+    执行命令并处理 Windows 编码问题
 
     Args:
-        args: git 命令参数列表
+        args: 命令参数列表
         cwd: 工作目录
+        description: 步骤描述（用于日志输出）
 
     Returns:
         (return_code, stdout, stderr) 元组
     """
+    if description:
+        print(f"  {description}...")
+
     result = subprocess.run(
         args,
         cwd=cwd,
@@ -88,6 +118,116 @@ def run_git_command(args: list[str], cwd: Path) -> tuple[int, str, str]:
     return result.returncode, stdout, stderr
 
 
+def run_preflight(project_root: Path) -> bool:
+    """
+    阶段 1：预检 — 模拟 CI 流程
+
+    运行与 GitHub Actions 完全一致的检查：
+    1. flutter analyze --no-fatal-infos
+    2. flutter test --no-pub test/unit/ test/bug/ test/verification/
+    3. flutter build apk --release
+
+    Returns:
+        是否全部通过
+    """
+    flutter_dir = get_flutter_app_dir(project_root)
+
+    print("=" * 60)
+    print("阶段 1/3: 预检（模拟 CI 流程）")
+    print("=" * 60)
+
+    # 1.1 flutter analyze
+    print("\n  [1.1/3] flutter analyze --no-fatal-infos")
+    print("  " + "-" * 40)
+    rc, stdout, stderr = run_command(
+        ["flutter", "analyze", "--no-fatal-infos"],
+        flutter_dir,
+    )
+
+    # 打印最后几行（分析结果摘要）
+    output_lines = stdout.strip().split("\n") if stdout.strip() else []
+    for line in output_lines[-8:]:
+        print(f"  {line}")
+
+    # --no-fatal-infos 下，warning 也会导致非零退出码
+    # 但 GitHub Actions 不会因此失败（只有 error 才是真正的阻断项）
+    # 检查输出中是否有 "error -" 级别的诊断
+    has_errors = any("error -" in line for line in output_lines)
+    if has_errors:
+        print(f"\n  ❌ flutter analyze 存在 error 级别诊断")
+        print(f"  请修复上述问题后重新运行发布脚本")
+        return False
+    print("  ✅ flutter analyze 通过")
+
+    # 1.2 flutter test
+    print("\n  [1.2/3] flutter test --no-pub test/unit/ test/bug/ test/verification/")
+    print("  " + "-" * 40)
+    rc, stdout, stderr = run_command(
+        ["flutter", "test", "--no-pub", "test/unit/", "test/bug/", "test/verification/"],
+        flutter_dir,
+    )
+
+    # 打印最后几行（测试结果摘要）
+    output_lines = stdout.strip().split("\n") if stdout.strip() else []
+    for line in output_lines[-8:]:
+        print(f"  {line}")
+
+    if rc != 0:
+        print(f"\n  ❌ flutter test 失败 (exit code: {rc})")
+        print(f"  请修复失败的测试后重新运行发布脚本")
+
+        # 尝试找出具体失败的测试
+        failed_lines = [l for l in output_lines if "FAILED" in l or "Some tests failed" in l]
+        if failed_lines:
+            print(f"  失败摘要:")
+            for line in failed_lines[:5]:
+                print(f"    {line}")
+
+        if stderr:
+            # 只打印 stderr 中非 info 级别的错误
+            error_lines = [l for l in stderr.split("\n") if "Error" in l or "error" in l]
+            if error_lines:
+                print(f"  错误详情:")
+                for line in error_lines[:5]:
+                    print(f"    {line}")
+        return False
+    print("  ✅ flutter test 通过")
+
+    # 1.3 flutter build apk --release
+    print("\n  [1.3/3] flutter build apk --release")
+    print("  " + "-" * 40)
+    print("  ⏳ 正在构建 Release APK（可能需要几分钟）...")
+    rc, stdout, stderr = run_command(
+        ["flutter", "build", "apk", "--release"],
+        flutter_dir,
+    )
+
+    # 打印最后几行
+    output_lines = stdout.strip().split("\n") if stdout.strip() else []
+    for line in output_lines[-5:]:
+        print(f"  {line}")
+
+    if rc != 0:
+        print(f"\n  ❌ flutter build apk --release 失败 (exit code: {rc})")
+        print(f"  请修复构建错误后重新运行发布脚本")
+        if stderr:
+            # 打印 stderr 中关键的错误行
+            error_lines = [l for l in stderr.split("\n") if "Error" in l or "error" in l or "FAILURE" in l]
+            if error_lines:
+                print(f"  错误详情:")
+                for line in error_lines[:10]:
+                    print(f"    {line}")
+            else:
+                print(f"  stderr (前500字符): {stderr[:500]}")
+        return False
+    print("  ✅ flutter build apk --release 通过")
+
+    print("\n" + "=" * 60)
+    print("✅ 预检全部通过 — 本地验证与 CI 一致，可以安全发布")
+    print("=" * 60)
+    return True
+
+
 def analyze_git_changes(project_root: Path) -> str:
     """
     分析 git 变更生成更新日志
@@ -101,7 +241,7 @@ def analyze_git_changes(project_root: Path) -> str:
     print("正在分析代码变更...")
 
     # 获取 novel_app 目录的变更文件列表
-    returncode, stdout, _ = run_git_command(
+    returncode, stdout, _ = run_command(
         ["git", "diff", "--name-only", "novel_app/lib"],
         project_root,
     )
@@ -147,7 +287,7 @@ def analyze_git_changes(project_root: Path) -> str:
     change_descriptions = []
 
     for file_path in changed_files:
-        returncode, diff_content, _ = run_git_command(
+        returncode, diff_content, _ = run_command(
             ["git", "diff", file_path],
             project_root,
         )
@@ -188,7 +328,7 @@ def analyze_git_changes(project_root: Path) -> str:
 
 def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
     """
-    提交代码变更到 git，创建 tag，并推送到远程仓库
+    阶段 3：提交代码变更到 git，创建 tag，并推送到远程仓库
 
     Args:
         project_root: 项目根目录
@@ -264,7 +404,7 @@ def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
         # 自动检测 remote 名字（origin / o1 / upstream）
         remote_name = "origin"
         for candidate in ("origin", "o1", "upstream"):
-            rc, _, _ = run_git_command(
+            rc, _, _ = run_command(
                 ["git", "remote", "get-url", candidate], project_root
             )
             if rc == 0:
@@ -294,7 +434,7 @@ def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
         # 自动检测 remote 名字（o1 或 origin）
         remote_name = "origin"
         for candidate in ("origin", "o1", "upstream"):
-            rc, _, _ = run_git_command(
+            rc, _, _ = run_command(
                 ["git", "remote", "get-url", candidate], project_root
             )
             if rc == 0:
@@ -334,14 +474,35 @@ def main():
     # 获取项目根目录
     project_root = get_project_root()
     print(f"项目根目录: {project_root}")
-    print("=" * 50)
+    print("=" * 60)
 
-    # 1. 读取版本信息
+    # ============================================================
+    # 阶段 1: 预检（模拟 CI）
+    # ============================================================
+    skip_preflight = os.getenv("SKIP_PREFLIGHT", "").strip() in ("1", "true", "yes", "True", "YES")
+
+    if skip_preflight:
+        print("⚠️  SKIP_PREFLIGHT=1，跳过预检阶段")
+        print("⚠️  请注意：GitHub Actions 仍会运行同样的检查，如失败则发布不成功")
+        print("=" * 60)
+    else:
+        if not run_preflight(project_root):
+            print("\n" + "=" * 60)
+            print("❌ 预检失败，发布已中断")
+            print("   请修复上述问题后重新运行，或使用 SKIP_PREFLIGHT=1 跳过（不推荐）")
+            print("=" * 60)
+            sys.exit(1)
+
+    # ============================================================
+    # 阶段 2: 版本识别
+    # ============================================================
+    print("\n" + "=" * 60)
+    print("阶段 2/3: 版本识别与变更日志")
+    print("=" * 60)
+
     version, version_code = get_flutter_version(project_root)
     print(f"版本: {version} (version_code: {version_code})")
-    print("-" * 50)
 
-    # 2. 生成更新日志
     changelog_env = os.getenv("CHANGELOG", None)
     if changelog_env:
         changelog = changelog_env
@@ -349,20 +510,25 @@ def main():
     else:
         changelog = analyze_git_changes(project_root)
     print(f"更新日志: {changelog}")
-    print("-" * 50)
 
-    # 3. 提交 + 打 tag + 推送
+    # ============================================================
+    # 阶段 3: git 操作
+    # ============================================================
+    print("\n" + "=" * 60)
+    print("阶段 3/3: git commit + tag + push")
+    print("=" * 60)
+
     success = commit_and_push(project_root, version, changelog)
 
-    print("=" * 50)
+    print("=" * 60)
     if success:
-        print("发布成功!")
+        print("🎉 发布成功!")
         print(f"  版本: {version} (code: {version_code})")
         print(f"  标签: v{version} 已推送到 origin")
         print(f"  GitHub Actions 将自动构建 APK 并创建 Release")
         print(f"  Release 页面: https://github.com/yunkst/novel_builder/releases/tag/v{version}")
     else:
-        print("发布失败，请检查上方错误信息")
+        print("❌ 发布失败，请检查上方错误信息")
         sys.exit(1)
 
 
