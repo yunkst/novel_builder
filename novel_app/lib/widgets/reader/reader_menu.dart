@@ -35,24 +35,14 @@ class ReaderMenu {
         icon: Icons.refresh,
       ),
       _buildMenuItem(
-        value: 'scroll_speed',
-        label: '滚动速度',
-        icon: Icons.speed,
-      ),
-      _buildMenuItem(
-        value: 'font_size',
-        label: '字体大小',
-        icon: Icons.text_fields,
+        value: 'reader_settings',
+        label: '阅读设置',
+        icon: Icons.tune,
       ),
       _buildMenuItem(
         value: 'summarize',
         label: '总结',
         icon: Icons.summarize,
-      ),
-      _buildMenuItem(
-        value: 'tts_read',
-        label: '朗读',
-        icon: Icons.headphones,
       ),
       _buildMenuItem(
         value: 'full_rewrite',

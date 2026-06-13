@@ -12,16 +12,23 @@ class AgentScenarioContext {
   /// 小说/章节阅读上下文
   final ReadingContext? readingContext;
 
-  /// WebView 控制器（webview_extract 场景必需）
+  /// WebView 控制器（webview_extract 场景必需，Headless 模式可为 null）
   final InAppWebViewController? webviewController;
 
   /// 当前页面 URL（webview_extract 场景使用）
   final String? currentUrl;
 
+  /// 是否使用 Headless WebView 模式（webview_extract 场景专用）
+  ///
+  /// 设为 true 时，`AgentScenarioFactory` 从 `HeadlessWebViewPool` 获取后台
+  /// WebView controller，使 AI 提取进程不依赖可见 WebView 页面生命周期。
+  final bool useHeadlessWebView;
+
   const AgentScenarioContext({
     this.readingContext,
     this.webviewController,
     this.currentUrl,
+    this.useHeadlessWebView = false,
   });
 }
 

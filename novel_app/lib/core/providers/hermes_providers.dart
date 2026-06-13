@@ -142,10 +142,16 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     final webviewController = _ref.read(webviewControllerProvider);
     final currentUrl = _ref.read(webviewCurrentUrlProvider);
 
+    // webview_extract 场景使用 Headless WebView（不受页面生命周期影响）
+    final useHeadless =
+        state.scenarioId == ScenarioIds.webviewExtract;
+
     return AgentScenarioContext(
       readingContext: readingContext,
-      webviewController: webviewController,
+      // Headless 模式下不传可见 WebView controller（由工厂从池获取）
+      webviewController: useHeadless ? null : webviewController,
       currentUrl: currentUrl,
+      useHeadlessWebView: useHeadless,
     );
   }
 
@@ -420,7 +426,11 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   }
 }
 
-/// Hermes Chat Provider (keepAlive 保持全局状态)
+/// Hermes Chat Provider
+///
+/// StateNotifierProvider 在 Riverpod 2.x 中默认不 autoDispose，
+/// 因此用户离开页面后对话历史和 Agent 任务状态会一直保持。
+/// 用户切换到 APP 其他页面后返回，仍能看到之前的任务执行情况。
 final hermesChatProvider =
     StateNotifierProvider<HermesChatNotifier, HermesChatState>((ref) {
   return HermesChatNotifier(ref);

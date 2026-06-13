@@ -238,4 +238,51 @@ class PromptTagRepository extends BaseRepository
     final picked = maps[Random().nextInt(maps.length)];
     return picked['prompt_text'] as String?;
   }
+
+  @override
+  Future<void> moveToCategory(int tagId, int newCategoryId) async {
+    final db = await database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    try {
+      // 获取目标分类的下一个排序序号
+      final maxOrderResult = await db.rawQuery(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM $_table WHERE category_id = ?',
+        [newCategoryId],
+      );
+      final nextOrder = (maxOrderResult.first['next_order'] as int?) ?? 0;
+      await db.update(
+        _table,
+        {
+          'category_id': newCategoryId,
+          'sort_order': nextOrder,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [tagId],
+      );
+      LoggerService.instance.i(
+        'moveToCategory: 移动标签 (tagId: $tagId → categoryId: $newCategoryId, sortOrder: $nextOrder)',
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'update', 'move-category'],
+      );
+    } catch (e, stack) {
+      LoggerService.instance.e(
+        'moveToCategory: 移动标签失败 (tagId: $tagId → categoryId: $newCategoryId): $e',
+        stackTrace: stack.toString(),
+        category: LogCategory.database,
+        tags: ['prompt-tag', 'update', 'move-category', 'error'],
+      );
+      rethrow;
+    }
+  }
+
+  @override
+  Future<int> getNextSortOrder(int categoryId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM $_table WHERE category_id = ?',
+      [categoryId],
+    );
+    return (result.first['next_order'] as int?) ?? 0;
+  }
 }

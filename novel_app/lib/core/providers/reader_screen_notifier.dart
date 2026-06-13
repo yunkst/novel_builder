@@ -109,7 +109,6 @@ class ReaderScreenState {
 /// - AI伴读功能
 /// - 章节内容刷新
 /// - 角色卡更新
-/// - TTS朗读
 @riverpod
 class ReaderScreenNotifier extends _$ReaderScreenNotifier {
   // ========== 依赖服务 ==========

@@ -151,7 +151,6 @@ def main():
         "unit/services/scene_illustration_bugfix_test.dart",
         "unit/services/scene_illustration_service_test.dart",
         "unit/widgets/bookshelf_selector_test.dart",
-        "unit/widgets/tts_widgets_test.dart",
     ]
 
     fixed = 0

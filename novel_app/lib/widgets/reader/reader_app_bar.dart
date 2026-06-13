@@ -111,22 +111,12 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
             const PopupMenuItem(
-              value: 'scroll_speed',
+              value: 'reader_settings',
               child: Row(
                 children: [
-                  Icon(Icons.speed, size: 18),
+                  Icon(Icons.tune, size: 18),
                   SizedBox(width: 12),
-                  Text('滚动速度'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'font_size',
-              child: Row(
-                children: [
-                  Icon(Icons.text_fields, size: 18),
-                  SizedBox(width: 12),
-                  Text('字体大小'),
+                  Text('阅读设置'),
                 ],
               ),
             ),
@@ -137,16 +127,6 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                   Icon(Icons.summarize, size: 18),
                   SizedBox(width: 12),
                   Text('总结'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'tts_read',
-              child: Row(
-                children: [
-                  Icon(Icons.headphones, size: 18),
-                  SizedBox(width: 12),
-                  Text('朗读'),
                 ],
               ),
             ),

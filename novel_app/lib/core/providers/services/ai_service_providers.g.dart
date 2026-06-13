@@ -226,52 +226,5 @@ final invalidMarkupCleanerProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef InvalidMarkupCleanerRef = AutoDisposeProviderRef<InvalidMarkupCleaner>;
-String _$ttsPlayerServiceHash() => r'b06c4d1c1a7a7a5d770678dd6ee2332e0ba57052';
-
-/// TtsPlayerService Provider
-///
-/// 提供TTS播放器服务实例，管理TTS播放状态、章节切换和进度保存。
-///
-/// **功能**:
-/// - TTS播放控制（播放、暂停、停止）
-/// - 章节切换和段落导航
-/// - 播放进度保存和恢复
-/// - 定时播放功能
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-/// - [apiServiceWrapperProvider] - API服务
-///
-/// **使用示例**:
-/// ```dart
-/// final playerService = ref.watch(ttsPlayerServiceProvider);
-/// await playerService.initializeWithNovel(
-///   novel: novel,
-///   chapters: chapters,
-///   startChapter: startChapter,
-/// );
-/// await playerService.play();
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每个播放器实例独立
-/// - 需要正确调用 dispose() 释放资源
-/// - 播放器状态通过 ChangeNotifier 通知
-///
-/// Copied from [ttsPlayerService].
-@ProviderFor(ttsPlayerService)
-final ttsPlayerServiceProvider = AutoDisposeProvider<TtsPlayerService>.internal(
-  ttsPlayerService,
-  name: r'ttsPlayerServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$ttsPlayerServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef TtsPlayerServiceRef = AutoDisposeProviderRef<TtsPlayerService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

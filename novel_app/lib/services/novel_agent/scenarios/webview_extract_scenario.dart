@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
+import 'package:novel_app/core/providers/extraction_task_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 import '../agent_scenario.dart';
@@ -20,7 +21,23 @@ class WebViewExtractScenario implements AgentScenario {
   final InAppWebViewController _webviewController;
   final String _currentUrl;
 
-  WebViewExtractScenario(this._ref, this._webviewController, this._currentUrl);
+  /// 是否为 Headless 模式
+  ///
+  /// Headless 模式下使用 `HeadlessInAppWebView`（后台无 UI），
+  /// 不受可见 WebView 页面生命周期影响。
+  /// 普通模式下使用可见 `InAppWebView`（向后兼容）。
+  final bool _isHeadless;
+
+  /// 普通 WebView 模式构造函数（向后兼容）
+  WebViewExtractScenario(this._ref, this._webviewController, this._currentUrl)
+    : _isHeadless = false;
+
+  /// Headless 模式工厂构造函数
+  WebViewExtractScenario.headless(
+    this._ref,
+    this._webviewController,
+    this._currentUrl,
+  ) : _isHeadless = true;
 
   @override
   String get id => ScenarioIds.webviewExtract;
@@ -120,27 +137,39 @@ URL: $url
       category: LogCategory.ai,
       tags: ['agent', 'scenario', 'webview-extract', name],
     );
+
+    // 更新提取任务状态
+    _updateTaskPhase(name);
+
     try {
+      String result;
       switch (name) {
         case 'get_page_info':
-          return await _getPageInfo();
+          result = await _getPageInfo();
         case 'execute_js':
-          return await _executeJs(args);
+          result = await _executeJs(args);
         case 'navigate_to':
-          return await _navigateTo(args);
+          result = await _navigateTo(args);
         case 'get_cached_script':
-          return await _getCachedScript(args);
+          result = await _getCachedScript(args);
         case 'save_script':
-          return await _saveScript(args);
+          result = await _saveScript(args);
         case 'list_cached_scripts':
-          return await _listCachedScripts();
+          result = await _listCachedScripts();
         default:
-          return jsonEncode({
+          result = jsonEncode({
             'error': 'unknown_tool',
             'message': '未知工具: $name',
           });
       }
+
+      // 工具完成后更新状态
+      _ref.read(extractionTaskNotifierProvider).toolEnd();
+
+      return result;
     } catch (e, stackTrace) {
+      _ref.read(extractionTaskNotifierProvider).toolEnd();
+
       LoggerService.instance.e(
         'WebViewExtractScenario 工具执行失败: $name, error=$e',
         stackTrace: stackTrace.toString(),
@@ -154,12 +183,47 @@ URL: $url
     }
   }
 
+  /// 根据工具名更新提取任务阶段
+  void _updateTaskPhase(String toolName) {
+    final notifier = _ref.read(extractionTaskNotifierProvider);
+    notifier.toolStart(toolName);
+
+    // 首次执行时，从 _currentUrl 提取域名并启动任务
+    if (notifier.isIdle) {
+      final domain = Uri.tryParse(_currentUrl)?.host ?? '';
+      if (domain.isNotEmpty) {
+        notifier.start(domain);
+      }
+    }
+
+    switch (toolName) {
+      case 'get_page_info':
+      case 'navigate_to':
+        notifier.setPhase(ExtractionPhase.analyzing, toolName: toolName);
+      case 'execute_js':
+        notifier.setPhase(ExtractionPhase.executing, toolName: toolName);
+      case 'save_script':
+        notifier.setPhase(ExtractionPhase.saving, toolName: toolName);
+    }
+  }
+
   // ===== 工具实现 =====
 
   /// 获取当前页面信息（URL + 精简 DOM + 页面类型推断）
+  ///
+  /// Headless 模式下使用 [_currentUrl] 作为页面 URL（Headless WebView
+  /// 的 getUrl() 在某些平台上可能不准确或返回 about:blank）。
   Future<String> _getPageInfo() async {
     try {
-      final url = await _webviewController.getUrl();
+      // Headless 模式使用 _currentUrl；普通模式从 WebView 获取实际 URL
+      final String pageUrl;
+      if (_isHeadless) {
+        pageUrl = _currentUrl;
+      } else {
+        final url = await _webviewController.getUrl();
+        pageUrl = url?.toString() ?? _currentUrl;
+      }
+
       final domResult = await _webviewController.evaluateJavascript(
         source: _domSimplifyJs,
       );
@@ -181,12 +245,12 @@ URL: $url
       }
 
       LoggerService.instance.i(
-        '获取页面信息: ${url?.toString() ?? ""} (domLen=${(domResult ?? '').length}, pageType=$pageType)',
+        '获取页面信息: $pageUrl (domLen=${(domResult ?? '').length}, pageType=$pageType, headless=$_isHeadless)',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'get_page_info'],
       );
       return jsonEncode({
-        'url': url?.toString() ?? '',
+        'url': pageUrl,
         'pageType': pageType,
         'title': pageTitle ?? '',
         'dom': domResult ?? '',
@@ -445,9 +509,9 @@ URL: $url
     }
 
     // 阻止跳转到当前页面（避免无意义重载浪费一次 HTTP 请求）
-    try {
-      final currentUrl = await _webviewController.getUrl();
-      if (currentUrl != null && currentUrl.toString() == url) {
+    if (_isHeadless) {
+      // Headless 模式：用 _currentUrl 比较
+      if (_currentUrl == url) {
         return jsonEncode({
           'ok': true,
           'message': '已在目标页面',
@@ -455,13 +519,25 @@ URL: $url
           'note': '当前页面已为目标 URL，未执行跳转',
         });
       }
-    } catch (_) {
-      // getUrl 失败不阻止跳转
+    } else {
+      try {
+        final currentUrl = await _webviewController.getUrl();
+        if (currentUrl != null && currentUrl.toString() == url) {
+          return jsonEncode({
+            'ok': true,
+            'message': '已在目标页面',
+            'url': url,
+            'note': '当前页面已为目标 URL，未执行跳转',
+          });
+        }
+      } catch (_) {
+        // getUrl 失败不阻止跳转
+      }
     }
 
     try {
       LoggerService.instance.i(
-        'navigate_to: 跳转 $url',
+        'navigate_to: 跳转 $url (headless=$_isHeadless)',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'navigate_to'],
       );
@@ -471,10 +547,8 @@ URL: $url
         urlRequest: URLRequest(url: WebUri(url)),
       );
 
-      // 等待 onLoadStop 触发（最多 30 秒）
-      // 通过轮询 getUrl 简单实现：每 500ms 检查一次 URL 是否为目标 URL
-      // 更精确的做法是注册一次性 onLoadStop 监听，但 WebView2 的 controller
-      // 不暴露监听器订阅接口，所以用轮询方式
+      // 等待页面加载（最多 30 秒）
+      // 通过轮询 getUrl 检查 URL 是否为目标 URL
       final start = DateTime.now();
       String? loadedUrl;
       while (DateTime.now().difference(start) < const Duration(seconds: 30)) {
@@ -488,6 +562,14 @@ URL: $url
         } catch (_) {
           // 忽略轮询错误
         }
+      }
+
+      // Headless 模式：即使 getUrl 轮询超时，也信任 loadUrl 调用
+      // 因为 Headless WebView 的 getUrl() 在某些平台可能不更新
+      if (loadedUrl == null && _isHeadless) {
+        // 给 DOM 额外稳定时间
+        await Future.delayed(const Duration(seconds: 2));
+        loadedUrl = url; // 信任传入的 URL
       }
 
       if (loadedUrl == null) {

@@ -24,7 +24,6 @@ import '../../../services/character_card_service.dart';
 import '../../../services/outline_service.dart';
 import '../../../services/chapter_history_service.dart';
 import '../../../services/invalid_markup_cleaner.dart';
-import '../../../services/tts_player_service.dart';
 import '../database_providers.dart';
 import 'network_service_providers.dart';
 
@@ -192,44 +191,5 @@ InvalidMarkupCleaner invalidMarkupCleaner(Ref ref) {
   return InvalidMarkupCleaner(
     chapterRepo: chapterRepository,
     illustrationRepo: illustrationRepository,
-  );
-}
-
-/// TtsPlayerService Provider
-///
-/// 提供TTS播放器服务实例，管理TTS播放状态、章节切换和进度保存。
-///
-/// **功能**:
-/// - TTS播放控制（播放、暂停、停止）
-/// - 章节切换和段落导航
-/// - 播放进度保存和恢复
-/// - 定时播放功能
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-/// - [apiServiceWrapperProvider] - API服务
-///
-/// **使用示例**:
-/// ```dart
-/// final playerService = ref.watch(ttsPlayerServiceProvider);
-/// await playerService.initializeWithNovel(
-///   novel: novel,
-///   chapters: chapters,
-///   startChapter: startChapter,
-/// );
-/// await playerService.play();
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每个播放器实例独立
-/// - 需要正确调用 dispose() 释放资源
-/// - 播放器状态通过 ChangeNotifier 通知
-@riverpod
-TtsPlayerService ttsPlayerService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final apiService = ref.watch(apiServiceWrapperProvider);
-  return TtsPlayerService(
-    chapterRepository: chapterRepository,
-    apiService: apiService,
   );
 }

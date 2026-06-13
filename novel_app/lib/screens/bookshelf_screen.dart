@@ -306,7 +306,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   // 显示创建空小说对话框
   Future<void> _showCreateNovelDialog() async {
     final titleController = TextEditingController();
-    final authorController = TextEditingController();
     final descriptionController = TextEditingController();
 
     final result = await showDialog<Map<String, String>>(
@@ -337,15 +336,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: authorController,
-              decoration: const InputDecoration(
-                labelText: '作者',
-                hintText: '请输入作者名称',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
               controller: descriptionController,
               decoration: const InputDecoration(
                 labelText: '简介 (可选)',
@@ -365,16 +355,15 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
           ElevatedButton(
             onPressed: () async {
               final title = titleController.text.trim();
-              final author = authorController.text.trim();
 
-              if (title.isEmpty || author.isEmpty) {
-                ToastUtils.showError('请填写小说标题和作者', context: context);
+              if (title.isEmpty) {
+                ToastUtils.showError('请填写小说标题', context: context);
                 return;
               }
 
               final Map<String, String> resultData = {
                 'title': title,
-                'author': author,
+                'author': '原创',
                 'description': descriptionController.text.trim(),
               };
 

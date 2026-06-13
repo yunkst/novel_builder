@@ -10,19 +10,23 @@ part 'reader_settings_state.g.dart';
 class ReaderSettingsState {
   final double? fontSize;
   final double? scrollSpeed;
+  final double? textBrightness;
 
   const ReaderSettingsState({
     this.fontSize,
     this.scrollSpeed,
+    this.textBrightness,
   });
 
   ReaderSettingsState copyWith({
     double? fontSize,
     double? scrollSpeed,
+    double? textBrightness,
   }) {
     return ReaderSettingsState(
       fontSize: fontSize ?? this.fontSize,
       scrollSpeed: scrollSpeed ?? this.scrollSpeed,
+      textBrightness: textBrightness ?? this.textBrightness,
     );
   }
 }
@@ -38,10 +42,12 @@ class ReaderSettingsStateNotifier extends _$ReaderSettingsStateNotifier {
     final service = ReaderSettingsService.instance;
     final fontSize = await service.getFontSize();
     final scrollSpeed = await service.getScrollSpeed();
+    final textBrightness = await service.getTextBrightness();
 
     return ReaderSettingsState(
       fontSize: fontSize,
       scrollSpeed: scrollSpeed,
+      textBrightness: textBrightness,
     );
   }
 
@@ -65,15 +71,27 @@ class ReaderSettingsStateNotifier extends _$ReaderSettingsStateNotifier {
         ReaderSettingsState(scrollSpeed: newSpeed));
   }
 
+  /// 更新文字亮度
+  Future<void> setTextBrightness(double newBrightness) async {
+    final service = ReaderSettingsService.instance;
+    await service.setTextBrightness(newBrightness);
+
+    // 更新状态
+    state = AsyncData(state.value?.copyWith(textBrightness: newBrightness) ??
+        ReaderSettingsState(textBrightness: newBrightness));
+  }
+
   /// 重新加载设置
   Future<void> reload() async {
     final service = ReaderSettingsService.instance;
     final fontSize = await service.getFontSize();
     final scrollSpeed = await service.getScrollSpeed();
+    final textBrightness = await service.getTextBrightness();
 
     state = AsyncData(ReaderSettingsState(
       fontSize: fontSize,
       scrollSpeed: scrollSpeed,
+      textBrightness: textBrightness,
     ));
   }
 }

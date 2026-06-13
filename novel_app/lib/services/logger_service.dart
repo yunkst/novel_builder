@@ -55,9 +55,6 @@ enum LogCategory {
   /// 缓存操作
   cache('cache', '缓存'),
 
-  /// 语音合成
-  tts('tts', '语音'),
-
   /// 角色管理
   character('character', '角色'),
 

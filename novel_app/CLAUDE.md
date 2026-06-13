@@ -19,7 +19,6 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
 - 离线阅读体验
 - AI增强功能（角色聊天、特写生成）
 - 大纲管理（全书大纲、章节细纲）
-- TTS朗读功能
 - 用户偏好设置
 
 ## 入口与启动
@@ -112,8 +111,6 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `chapter_search_service.dart` - 章节搜索服务
   - `character_avatar_service.dart` - 角色头像服务
   - `character_card_service.dart` - 角色卡片服务
-  - `tts_service.dart` - TTS朗读服务
-  - `tts_player_service.dart` - TTS播放服务
   - `rewrite_service.dart` - 内容改写服务
   - `outline_service.dart` - 大纲业务服务
   - `scene_illustration_service.dart` - 场景插图服务
@@ -473,7 +470,6 @@ AI伴侣响应模型。
 - **Bookshelf** - 书架分类模型（id, name, icon, color）
 - **ChatMessage** - 聊天消息模型
 - **RoleGallery** - 角色画廊模型
-- **TTSTimerConfig** - TTS定时器配置
 - **AppVersion** - 应用版本信息
 
 ## 数据库设计
@@ -713,7 +709,6 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 - 章节阅读（段落式渲染）
 - AI特写生成
 - 场景插图请求
-- TTS朗读
 - 阅读进度自动保存
 - 编辑模式（段落改写、删除）
 
@@ -768,21 +763,7 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 - 阅读设置（字体、字号、行间距）
 - 主题设置
 
-### 8. TTS朗读
-
-**Screen**: `lib/screens/tts_player_screen.dart`
-
-**Service**:
-- `tts_service.dart` - TTS引擎
-- `tts_player_service.dart` - 播放控制
-
-**功能**:
-- 章节朗读
-- 语速调节
-- 定时关闭
-- 后台播放
-
-### 9. 插图管理
+### 8. 插图管理
 
 **Screen**: `lib/screens/illustration_debug_screen.dart`
 

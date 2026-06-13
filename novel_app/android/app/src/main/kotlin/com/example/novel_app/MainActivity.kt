@@ -14,8 +14,6 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val APP_INSTALL_CHANNEL = "com.example.novel_app/app_install"
-    private val TTS_CHANNEL = "com.example.novel_app/tts"
-    private var ttsPlugin: TtsPlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -37,14 +35,6 @@ class MainActivity : FlutterActivity() {
             } else {
                 result.notImplemented()
             }
-        }
-
-        // TTS Channel
-        ttsPlugin = TtsPlugin(this)
-        val ttsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TTS_CHANNEL)
-        ttsPlugin?.setMethodChannel(ttsChannel)
-        ttsChannel.setMethodCallHandler { call, result ->
-            ttsPlugin?.onMethodCall(call, result)
         }
     }
 
@@ -95,6 +85,5 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        ttsPlugin?.dispose()
     }
 }

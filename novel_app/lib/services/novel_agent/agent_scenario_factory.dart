@@ -1,10 +1,13 @@
 /// Agent 场景工厂
 ///
 /// 根据 scenarioId 和 AgentScenarioContext 构造对应的场景实例。
+/// 支持 Headless WebView 模式（webview_extract 场景可使用后台 WebView，
+/// 不依赖可见页面生命周期）。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'agent_scenario.dart';
+import '../headless_webview_pool.dart';
 import 'scenarios/writing_scenario.dart';
 import 'scenarios/webview_extract_scenario.dart';
 
@@ -13,12 +16,28 @@ class AgentScenarioFactory {
 
   AgentScenarioFactory(this._ref);
 
-  /// 构造场景实例
-  AgentScenario build(String scenarioId, AgentScenarioContext context) {
+  /// 构造场景实例（异步，因为 Headless WebView 初始化需要异步）
+  ///
+  /// 当 `context.useHeadlessWebView == true` 且场景为 `webviewExtract` 时，
+  /// 从 [HeadlessWebViewPool] 获取后台 WebView controller，使 AI 提取进程
+  /// 不依赖可见 WebView 页面生命周期。
+  Future<AgentScenario> build(
+      String scenarioId, AgentScenarioContext context) async {
     switch (scenarioId) {
       case ScenarioIds.writing:
         return WritingScenario(_ref);
       case ScenarioIds.webviewExtract:
+        if (context.useHeadlessWebView) {
+          // Headless 模式：从池获取 controller
+          final pool = _ref.read(headlessWebViewPoolProvider);
+          final controller = await pool.acquire();
+          return WebViewExtractScenario.headless(
+            _ref,
+            controller,
+            context.currentUrl ?? '',
+          );
+        }
+        // 兼容：普通 WebView 模式
         if (context.webviewController == null) {
           throw ArgumentError('WebViewExtract 场景需要 webviewController');
         }

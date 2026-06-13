@@ -7,6 +7,7 @@ class ParagraphWidget extends StatefulWidget {
   final String paragraph;
   final int index;
   final double fontSize;
+  final double textBrightness;
   final bool isCloseupMode;
   final bool isEditMode;
   final bool isSelected;
@@ -24,6 +25,7 @@ class ParagraphWidget extends StatefulWidget {
     required this.paragraph,
     required this.index,
     required this.fontSize,
+    this.textBrightness = 1.0,
     required this.isCloseupMode,
     required this.isEditMode,
     required this.isSelected,
@@ -208,6 +210,11 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   }
 
   Widget _buildReadableText() {
+    // 应用文字亮度调节（仅阅读模式）
+    final baseColor = Theme.of(context).textTheme.bodyLarge?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final effectiveColor = baseColor.withValues(alpha: widget.textBrightness);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -243,6 +250,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
                 fontSize: widget.fontSize,
                 height: 1.8,
                 letterSpacing: 0.5,
+                color: effectiveColor,
               ),
             ),
           ),

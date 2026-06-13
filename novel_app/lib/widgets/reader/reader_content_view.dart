@@ -18,11 +18,13 @@ class ReaderContentView extends StatefulWidget {
   final List<String> paragraphs;
   final List<int> selectedParagraphIndices;
   final double fontSize;
+  final double textBrightness;
   final bool isCloseupMode;
   final bool isEditMode;
   final bool isAutoScrolling;
   final ValueChanged<int> onParagraphTap;
   final ValueChanged<int> onParagraphLongPress;
+
   /// 内容变化回调
   /// - [index] 段落索引（-1 表示全文编辑，>=0 表示段落编辑）
   /// - [newContent] 新的内容
@@ -42,6 +44,7 @@ class ReaderContentView extends StatefulWidget {
     required this.paragraphs,
     required this.selectedParagraphIndices,
     required this.fontSize,
+    this.textBrightness = 1.0,
     required this.isCloseupMode,
     required this.isEditMode,
     required this.isAutoScrolling,
@@ -99,7 +102,7 @@ class _ReaderContentViewState extends State<ReaderContentView> {
     // 使用深度比较避免因列表实例不同导致的不必要更新
     if (!widget.isEditMode &&
         (oldWidget.paragraphs.length != widget.paragraphs.length ||
-         !_listEquals(oldWidget.paragraphs, widget.paragraphs))) {
+            !_listEquals(oldWidget.paragraphs, widget.paragraphs))) {
       _fullTextController.text = widget.paragraphs.join('\n\n');
     }
   }
@@ -144,7 +147,8 @@ class _ReaderContentViewState extends State<ReaderContentView> {
           ),
         ),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+        fillColor:
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         hintText: '开始编辑章节内容...',
         hintStyle: TextStyle(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
@@ -195,6 +199,7 @@ class _ReaderContentViewState extends State<ReaderContentView> {
               paragraph: paragraph,
               index: index,
               fontSize: widget.fontSize,
+              textBrightness: widget.textBrightness,
               isCloseupMode: widget.isCloseupMode,
               isEditMode: widget.isEditMode,
               isSelected: isSelected,
@@ -205,7 +210,8 @@ class _ReaderContentViewState extends State<ReaderContentView> {
               onImageTap: (taskId, imageUrl, imageIndex) =>
                   widget.onImageTap(taskId, imageUrl, imageIndex),
               onImageDelete: (taskId) => widget.onImageDelete(taskId),
-              generateVideoFromIllustration: widget.generateVideoFromIllustration,
+              generateVideoFromIllustration:
+                  widget.generateVideoFromIllustration,
               modelWidth: widget.modelWidth,
               modelHeight: widget.modelHeight,
             );

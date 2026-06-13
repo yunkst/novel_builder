@@ -192,6 +192,59 @@ class _PromptTagManagementScreenState
     await _loadTags();
   }
 
+  Future<void> _moveTagToCategory(PromptTag tag) async {
+    // 过滤出可用的目标分类（排除当前分类）
+    final availableCategories = _categories
+        .where((c) => c.id != tag.categoryId)
+        .toList();
+    if (availableCategories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有其他可用的分类，请先创建分类')),
+      );
+      return;
+    }
+    final selectedCategoryId = await showDialog<int?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('移动 "${tag.name}" 到'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableCategories.length,
+            itemBuilder: (context, index) {
+              final cat = availableCategories[index];
+              return ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(cat.name),
+                onTap: () => Navigator.pop(context, cat.id),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+    if (selectedCategoryId == null) return;
+    // 校验分类是否仍然存在
+    final targetExists = _categories.any((c) => c.id == selectedCategoryId);
+    if (!targetExists) return;
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+    await tagRepo.moveToCategory(tag.id!, selectedCategoryId);
+    if (!mounted) return;
+    // 刷新当前列表（若目标分类是当前选中分类，标签会出现在末尾；否则从当前列表消失）
+    await _loadTags();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已将标签"${tag.name}"移动到目标分类')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -276,10 +329,13 @@ class _PromptTagManagementScreenState
                                 onSelected: (v) {
                                   if (v == 'edit') _editTag(tag);
                                   if (v == 'delete') _deleteTag(tag);
+                                  if (v == 'move') _moveTagToCategory(tag);
                                 },
                                 itemBuilder: (_) => const [
                                   PopupMenuItem(
                                       value: 'edit', child: Text('编辑')),
+                                  PopupMenuItem(
+                                      value: 'move', child: Text('移动到分类')),
                                   PopupMenuItem(
                                       value: 'delete', child: Text('删除')),
                                 ],

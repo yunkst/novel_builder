@@ -16,7 +16,6 @@ String _$readerScreenNotifierHash() =>
 /// - AI伴读功能
 /// - 章节内容刷新
 /// - 角色卡更新
-/// - TTS朗读
 ///
 /// Copied from [ReaderScreenNotifier].
 @ProviderFor(ReaderScreenNotifier)

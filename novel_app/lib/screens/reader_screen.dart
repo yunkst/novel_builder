@@ -49,8 +49,7 @@ import '../mixins/reader/auto_scroll_mixin.dart';
 import '../mixins/reader/illustration_handler_mixin.dart';
 import '../widgets/character_preview_dialog.dart';
 import '../widgets/scene_illustration_dialog.dart';
-import '../widgets/font_size_adjuster_dialog.dart'; // 新增导入
-import '../widgets/scroll_speed_adjuster_dialog.dart'; // 新增导入
+import '../widgets/reader_settings_dialog.dart'; // 阅读设置合并对话框（字体大小/文字亮度/滚动速度）
 import '../widgets/reader_action_buttons.dart'; // 新增导入
 import '../widgets/reader/reader_app_bar.dart'; // ReaderAppBar组件
 import '../widgets/reader/reader_bottom_bar.dart'; // ReaderBottomBar组件
@@ -67,7 +66,6 @@ import '../widgets/reader/paragraph_rewrite_dialog.dart';
 import '../widgets/reader/chapter_summary_dialog.dart';
 import '../widgets/reader/full_rewrite_dialog.dart';
 import '../widgets/reader/ai_prompt_tag_extract_sheet.dart';
-import 'tts_player_screen.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 // Riverpod Providers
@@ -138,8 +136,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   // ========== 计算属性 ==========
   /// 段落列表（缓存分割结果，提升性能）
-  List<String> get _paragraphs =>
-      _contentController.content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+  List<String> get _paragraphs => _contentController.content
+      .split('\n')
+      .where((p) => p.trim().isNotEmpty)
+      .toList();
 
   /// 当前章节索引（避免重复查找）
   int get _currentChapterIndex =>
@@ -147,6 +147,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   late Chapter _currentChapter;
   double? _fontSize;
+
+  // 文字亮度 0.0=最暗, 1.0=最亮（默认）
+  double? _textBrightness;
 
   // ========== AI伴读自动触发防抖标志 ==========
   bool _hasAutoTriggered = false;
@@ -381,7 +384,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ User Interaction Handlers ============
   void _handleLongPress(int index) {
     final interactionState = ref.read(interactionStateNotifierProvider);
-    if (!_interactionController.shouldHandleLongPress(interactionState.isCloseupMode)) return;
+    if (!_interactionController
+        .shouldHandleLongPress(interactionState.isCloseupMode)) return;
 
     final paragraphs = _paragraphs;
 
@@ -601,22 +605,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     } else {
       ToastUtils.showInfo('已经是最后一章了', context: context);
     }
-  }
-
-  void _showFontSizeDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => FontSizeAdjusterDialog(
-        initialFontSize: _fontSize ?? 18.0,
-        onFontSizeChanged: (newSize) async {
-          // 使用 Riverpod Provider 更新字体大小
-          await ref
-              .read(readerSettingsStateNotifierProvider.notifier)
-              .setFontSize(newSize);
-        },
-      ),
-    );
   }
 
   // 刷新当前章节 - 删除本地缓存并重新获取最新内容
@@ -1094,17 +1082,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ Dialog Handlers ============
   void _handleMenuAction(String action) {
     switch (action) {
-      case 'scroll_speed':
-        _showScrollSpeedDialog();
+      case 'reader_settings':
+        _showReaderSettingsDialog();
         break;
       case 'font_size':
-        _showFontSizeDialog();
+      case 'scroll_speed':
+        // 兼容旧菜单项，统一跳转合并的阅读设置对话框
+        _showReaderSettingsDialog();
         break;
       case 'summarize':
         _showChapterSummaryDialog(); // 使用新的 Dialog Widget
-        break;
-      case 'tts_read':
-        _startTtsReading();
         break;
       case 'full_rewrite':
         _showFullRewriteDialog(); // 使用新的 Dialog Widget
@@ -1141,18 +1128,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  // 显示滚动速度调整对话框
-  void _showScrollSpeedDialog() {
+  // 显示阅读设置对话框（合并字体大小、文字亮度、滚动速度）
+  void _showReaderSettingsDialog() {
     showDialog(
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => ScrollSpeedAdjusterDialog(
+      builder: (context) => ReaderSettingsDialog(
+        initialFontSize: _fontSize ?? 18.0,
+        initialTextBrightness: _textBrightness ?? 1.0,
         initialScrollSpeed: _scrollSpeed ?? 1.0,
-        onScrollSpeedChanged: (newSpeed) async {
-          // 使用 Riverpod Provider 更新滚动速度
-          await ref
-              .read(readerSettingsStateNotifierProvider.notifier)
-              .setScrollSpeed(newSpeed);
+        onConfirm: ({
+          required double fontSize,
+          required double textBrightness,
+          required double scrollSpeed,
+        }) async {
+          final notifier =
+              ref.read(readerSettingsStateNotifierProvider.notifier);
+          // 字体大小
+          await notifier.setFontSize(fontSize);
+          // 文字亮度
+          await notifier.setTextBrightness(textBrightness);
+          // 滚动速度
+          await notifier.setScrollSpeed(scrollSpeed);
           // 速度改变后重新启动自动滚动以应用新速度（Mixin方法）
           startAutoScroll();
         },
@@ -1302,7 +1299,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ Content Editing ============
   Future<void> _saveEditedContent() async {
     try {
-      await _chapterRepo.updateChapterContent(_currentChapter.url, _contentController.content);
+      await _chapterRepo.updateChapterContent(
+          _currentChapter.url, _contentController.content);
 
       if (mounted) {
         ToastUtils.showSuccess('章节内容已保存', context: context);
@@ -1325,6 +1323,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final settingsState = ref.watch(readerSettingsStateNotifierProvider);
     _fontSize = settingsState.value?.fontSize ?? 18.0;
     _scrollSpeed = settingsState.value?.scrollSpeed ?? 1.0;
+    _textBrightness = settingsState.value?.textBrightness ?? 1.0;
 
     // 使用 ref.watch 监听编辑模式状态
     final isEditMode = ref.watch(readerEditModeProvider);
@@ -1356,42 +1355,44 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // _content getter 内部使用 ref.read()，不会触发 UI 重建
     // 这里已经通过 ref.watch(chapterContentStateNotifierProvider) 建立了响应式依赖
     final content = contentState.content;
-    final paragraphs = content.split('\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs =
+        content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
     return HermesFloatingShell(
       child: Scaffold(
         // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
         appBar: ReaderAppBar(
-        novel: widget.novel,
-        currentChapter: _currentChapter,
-        chapters: widget.chapters,
-        isEditMode: isEditMode,
-        isUpdatingRoleCards: ref
-            .watch(characterCardUpdateStateNotifierProvider)
-            .isUpdating, // 从Provider读取
-        onToggleEditMode: () =>
-            ref.read(readerEditModeProvider.notifier).toggle(),
-        onSaveAndExitEditMode: () async {
-          await _saveEditedContent();
-          ref.read(readerEditModeProvider.notifier).toggle();
-        },
-        onShowImmersiveSetup: _showImmersiveSetup,
-        onMenuAction: _handleMenuAction,
-      ),
-      body: _buildBody(context, isEditMode, paragraphs, interactionState),
-      floatingActionButton: _contentController.content.isEmpty
-          ? null
-          : ReaderActionButtons(
-              isCloseupMode: interactionState.isCloseupMode,
-              hasSelectedParagraphs: interactionState.selectedParagraphIndices.isNotEmpty,
-              isAutoScrolling: isAutoScrolling, // Mixin getter
-              isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
-              onRewritePressed: () {
-                _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
-              },
-              onToggleCloseupMode: _toggleCloseupMode,
-              onToggleAutoScroll: toggleAutoScroll, // Mixin method
-            ),
+          novel: widget.novel,
+          currentChapter: _currentChapter,
+          chapters: widget.chapters,
+          isEditMode: isEditMode,
+          isUpdatingRoleCards: ref
+              .watch(characterCardUpdateStateNotifierProvider)
+              .isUpdating, // 从Provider读取
+          onToggleEditMode: () =>
+              ref.read(readerEditModeProvider.notifier).toggle(),
+          onSaveAndExitEditMode: () async {
+            await _saveEditedContent();
+            ref.read(readerEditModeProvider.notifier).toggle();
+          },
+          onShowImmersiveSetup: _showImmersiveSetup,
+          onMenuAction: _handleMenuAction,
+        ),
+        body: _buildBody(context, isEditMode, paragraphs, interactionState),
+        floatingActionButton: _contentController.content.isEmpty
+            ? null
+            : ReaderActionButtons(
+                isCloseupMode: interactionState.isCloseupMode,
+                hasSelectedParagraphs:
+                    interactionState.selectedParagraphIndices.isNotEmpty,
+                isAutoScrolling: isAutoScrolling, // Mixin getter
+                isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
+                onRewritePressed: () {
+                  _showParagraphRewriteDialog(); // 使用新的 Dialog Widget
+                },
+                onToggleCloseupMode: _toggleCloseupMode,
+                onToggleAutoScroll: toggleAutoScroll, // Mixin method
+              ),
       ),
     );
   }
@@ -1415,7 +1416,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     // 新增：检查内容是否为空（修复空白页面问题）
-    if (!_isLoading && _contentController.content.trim().isEmpty && paragraphs.isEmpty) {
+    if (!_isLoading &&
+        _contentController.content.trim().isEmpty &&
+        paragraphs.isEmpty) {
       return ReaderErrorView(
         errorMessage: '章节内容为空，请尝试刷新或联系开发者',
         onRetry: () => _loadChapterContent(
@@ -1437,6 +1440,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           paragraphs: paragraphs,
           selectedParagraphIndices: interactionState.selectedParagraphIndices,
           fontSize: _fontSize ?? 18.0,
+          textBrightness: _textBrightness ?? 1.0,
           isCloseupMode: interactionState.isCloseupMode,
           isEditMode: isEditMode,
           isAutoScrolling: isAutoScrolling,
@@ -1570,53 +1574,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.ui,
         tags: ['immersive', 'setup'],
       );
-    }
-  }
-
-  /// 获取当前可见区域的第一段索引（基于滚动位置估算）
-
-// ============ TTS Reading ============
-  int _getFirstVisibleParagraphIndex() {
-    if (!_scrollController.hasClients) return 0;
-
-    final position = _scrollController.position;
-
-    // 内容未超过一屏，返回0
-    if (position.maxScrollExtent <= 0) {
-      return 0;
-    }
-
-    // 空列表保护
-    if (_paragraphs.isEmpty) return 0;
-
-    // 计算滚动进度比例
-    final scrollRatio = position.pixels / position.maxScrollExtent;
-    final estimatedIndex = (scrollRatio * _paragraphs.length).floor();
-
-    // 边界保护
-    return estimatedIndex.clamp(0, _paragraphs.length - 1);
-  }
-
-  /// 启动TTS朗读
-  Future<void> _startTtsReading() async {
-    final startParagraphIndex = _getFirstVisibleParagraphIndex();
-
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TtsPlayerScreen(
-          novel: widget.novel,
-          chapters: widget.chapters,
-          startChapter: _currentChapter,
-          startContent: _contentController.content,
-          startParagraphIndex: startParagraphIndex,
-        ),
-      ),
-    );
-
-    // 返回后重新加载章节内容，因为可能被修改
-    if (mounted) {
-      _loadChapterContent(resetScrollPosition: false);
     }
   }
 }

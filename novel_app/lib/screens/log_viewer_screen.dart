@@ -206,8 +206,6 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
         return Colors.green;
       case LogCategory.cache:
         return Colors.orange;
-      case LogCategory.tts:
-        return Colors.teal;
       case LogCategory.character:
         return Colors.pink;
       case LogCategory.backup:

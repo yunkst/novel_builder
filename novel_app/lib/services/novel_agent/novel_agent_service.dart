@@ -85,8 +85,9 @@ class NovelAgentService {
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());
 
-      // 构造场景
-      final scenario = AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
+      // 构造场景（异步，可能需要初始化 Headless WebView）
+      final scenario =
+          await AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
 
       // 构造循环
       final loop = AgentLoop(llm: llm, scenario: scenario);

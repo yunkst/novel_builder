@@ -31,13 +31,6 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Hermes 头部次要图标色
   final Color hermesOnBrandMuted;
 
-  // ─── TTS ──────────────────────────────────────────────────────
-  /// TTS 加载图标色（Material Blue 500）
-  final Color ttsAccent;
-
-  /// TTS 提示文字色（Material Grey 500）
-  final Color ttsHint;
-
   // ─── 语义色（Toast/状态）─────────────────────────────────────
   final Color success;
   final Color error;
@@ -165,8 +158,6 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.hermesAccent,
     required this.hermesOnBrand,
     required this.hermesOnBrandMuted,
-    required this.ttsAccent,
-    required this.ttsHint,
     required this.success,
     required this.error,
     required this.warning,
@@ -226,8 +217,6 @@ class AppColors extends ThemeExtension<AppColors> {
     hermesAccent: Color(0xFF6366F1),
     hermesOnBrand: Colors.white,
     hermesOnBrandMuted: Colors.white70,
-    ttsAccent: Color(0xFF2196F3),
-    ttsHint: Color(0xFF9E9E9E),
     success: Color(0xFF2E7D32),
     error: Color(0xFFC62828),
     warning: Color(0xFFEF6C00),
@@ -288,8 +277,6 @@ class AppColors extends ThemeExtension<AppColors> {
     hermesAccent: Color(0xFF6366F1),
     hermesOnBrand: Colors.white,
     hermesOnBrandMuted: Colors.white70,
-    ttsAccent: Color(0xFF2196F3),
-    ttsHint: Color(0xFF9E9E9E),
     success: Colors.green,
     error: Colors.red,
     warning: Colors.orange,
@@ -348,8 +335,6 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? hermesAccent,
     Color? hermesOnBrand,
     Color? hermesOnBrandMuted,
-    Color? ttsAccent,
-    Color? ttsHint,
     Color? success,
     Color? error,
     Color? warning,
@@ -404,8 +389,6 @@ class AppColors extends ThemeExtension<AppColors> {
       hermesAccent: hermesAccent ?? this.hermesAccent,
       hermesOnBrand: hermesOnBrand ?? this.hermesOnBrand,
       hermesOnBrandMuted: hermesOnBrandMuted ?? this.hermesOnBrandMuted,
-      ttsAccent: ttsAccent ?? this.ttsAccent,
-      ttsHint: ttsHint ?? this.ttsHint,
       success: success ?? this.success,
       error: error ?? this.error,
       warning: warning ?? this.warning,
@@ -468,8 +451,6 @@ class AppColors extends ThemeExtension<AppColors> {
       hermesOnBrand: Color.lerp(hermesOnBrand, other.hermesOnBrand, t)!,
       hermesOnBrandMuted:
           Color.lerp(hermesOnBrandMuted, other.hermesOnBrandMuted, t)!,
-      ttsAccent: Color.lerp(ttsAccent, other.ttsAccent, t)!,
-      ttsHint: Color.lerp(ttsHint, other.ttsHint, t)!,
       success: Color.lerp(success, other.success, t)!,
       error: Color.lerp(error, other.error, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
