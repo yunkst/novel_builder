@@ -190,8 +190,8 @@ void main() {
       }
     });
 
-    test('应有 9 个分类', () {
-      expect(LogCategory.values.length, equals(9));
+    test('应有 8 个分类', () {
+      expect(LogCategory.values.length, equals(8));
     });
   });
 

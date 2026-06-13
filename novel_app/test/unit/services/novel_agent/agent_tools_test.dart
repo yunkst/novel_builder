@@ -5,7 +5,7 @@
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
 /// - findTool 查找功能
-/// - isDestructive 判定（6 个破坏性 + 6 个非破坏性）
+/// - isDestructive 判定（当前所有工具均非破坏性 — 已禁用确认）
 library;
 
 import 'dart:convert';
@@ -239,23 +239,14 @@ void main() {
   });
 
   group('AgentTools.isDestructive', () {
-    test('破坏性工具 (6个)', () {
-      final destructive = [
+    test('当前已禁用工具确认 — 所有工具均非破坏性', () {
+      final allToolNames = [
         'update_chapter_content',
         'create_custom_chapter',
         'update_character',
         'create_character',
         'update_background_setting',
         'update_outline',
-      ];
-      for (final name in destructive) {
-        expect(AgentTools.isDestructive(name), true,
-            reason: '$name 应该是破坏性工具');
-      }
-    });
-
-    test('非破坏性工具 (6个)', () {
-      final nonDestructive = [
         'list_novels',
         'read_chapter_content',
         'list_chapters',
@@ -263,9 +254,9 @@ void main() {
         'list_characters',
         'get_outline',
       ];
-      for (final name in nonDestructive) {
+      for (final name in allToolNames) {
         expect(AgentTools.isDestructive(name), false,
-            reason: '$name 不应该是破坏性工具');
+            reason: '$name 当前不应该被标记为破坏性工具（已禁用确认）');
       }
     });
 
@@ -273,8 +264,8 @@ void main() {
       expect(AgentTools.isDestructive('non_existent'), false);
     });
 
-    test('destructiveTools 集合大小正确', () {
-      expect(AgentTools.destructiveTools.length, 6);
+    test('destructiveTools 集合当前为空（已禁用确认）', () {
+      expect(AgentTools.destructiveTools.length, 0);
     });
   });
 
