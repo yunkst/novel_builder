@@ -64,22 +64,24 @@ jobs:
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/novel-app-release-key.jks
-
-      - name: Create key.properties
-        env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        if: env.ANDROID_KEYSTORE_PASSWORD != ''
         run: |
+          set -e
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "❌ 缺少 secret ANDROID_KEYSTORE_BASE64，请在仓库 Settings → Secrets 配置"
+            exit 1
+          fi
+          # keystore 放在 android 根目录（rootProject），key.properties 中的 storeFile 用 rootProject.file 解析
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/novel-app-release-key.jks
           cat > android/key.properties <<EOF
           storePassword=$ANDROID_KEYSTORE_PASSWORD
           keyPassword=$ANDROID_KEYSTORE_PASSWORD
           keyAlias=$ANDROID_KEY_ALIAS
-          storeFile=app/novel-app-release-key.jks
+          storeFile=novel-app-release-key.jks
           EOF
+          echo "✅ keystore 解码完成，key.properties 已生成"
+          ls -la android/novel-app-release-key.jks
 
       - name: Build per-architecture release APKs
         run: flutter build apk --release --split-per-abi

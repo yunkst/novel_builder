@@ -47,7 +47,8 @@ android {
             // 仅当 key.properties 存在且字段完整时启用，否则降级为 debug 签名
             keyAlias = keystoreProperties["keyAlias"] as String?
             keyPassword = keystoreProperties["keyPassword"] as String?
-            storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+            // storeFile 用 rootProject.file 解析，相对于 android 根目录（避免 app/app/ 双重路径）
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let { rootProject.file(it) }
             storePassword = keystoreProperties["storePassword"] as String?
         }
     }
@@ -56,7 +57,7 @@ android {
         release {
             // 当 key.properties 不存在（如本地无签名配置）时，
             // release 签名为空，会自动回退到 debug 签名，保证 `flutter run --release` 仍可用。
-            val hasKeystore = file("../key.properties").exists()
+            val hasKeystore = rootProject.file("key.properties").exists()
             signingConfig = if (hasKeystore) {
                 signingConfigs.getByName("release")
             } else {
