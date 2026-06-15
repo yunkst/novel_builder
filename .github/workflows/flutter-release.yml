@@ -30,9 +30,19 @@ jobs:
           echo "" >> release_body.md
           echo "**版本代码**: ${VERSION_CODE}" >> release_body.md
           echo "" >> release_body.md
-          echo "### 安装说明" >> release_body.md
-          echo "1. 下载下方的 \`app-release.apk\`" >> release_body.md
-          echo "2. 在 Android 设备上安装" >> release_body.md
+          echo "### 下载说明" >> release_body.md
+          echo "" >> release_body.md
+          echo "本版本按 CPU 架构拆分为多个 APK，请根据设备选择：" >> release_body.md
+          echo "" >> release_body.md
+          echo "- **app-arm64-v8a-release.apk** — 绝大多数现代手机（推荐）" >> release_body.md
+          echo "- **app-armeabi-v7a-release.apk** — 老旧 32 位设备" >> release_body.md
+          echo "- **app-x86_64-release.apk** — 模拟器 / ChromeOS" >> release_body.md
+          echo "" >> release_body.md
+          echo "> 💡 提示：在已安装的 App 内「设置 → 检查更新」会**自动**下载与本机架构匹配的 APK。" >> release_body.md
+          echo "" >> release_body.md
+          echo "### 安装步骤" >> release_body.md
+          echo "1. 下载对应架构的 APK" >> release_body.md
+          echo "2. 在 Android 设备上安装（允许「未知来源」）" >> release_body.md
           echo "3. 首次启动配置后端 API 地址" >> release_body.md
           echo "" >> release_body.md
           echo "### 完整更新日志" >> release_body.md
@@ -51,8 +61,8 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build per-architecture release APKs
+        run: flutter build apk --release --split-per-abi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -61,5 +71,7 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            novel_app/build/app/outputs/flutter-apk/app-release.apk
+            novel_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            novel_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            novel_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
           body_path: novel_app/release_body.md

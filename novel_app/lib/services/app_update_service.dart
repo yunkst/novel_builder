@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/app_version.dart';
+import '../utils/device_arch.dart';
 import 'github_release_service.dart';
 import 'logger_service.dart';
 import 'preferences_service.dart';
@@ -62,8 +63,23 @@ class AppUpdateService {
         return null;
       }
 
-      final asset = release.apkAsset;
+      // 检测设备 CPU 架构，按架构选择最合适的 APK
+      final arch = await DeviceArchDetector.getCurrent();
+      final archSegment = arch.apkNameSegment;
+
+      LoggerService.instance.d(
+        '设备架构: ${arch.name} (segment=$archSegment)',
+        category: LogCategory.general,
+        tags: ['update', 'arch'],
+      );
+
+      final asset = release.apkAssetFor(archSegment);
       if (asset == null) {
+        LoggerService.instance.w(
+          'Release ${release.tagName} 无可用 APK asset (arch=$archSegment)',
+          category: LogCategory.general,
+          tags: ['update', 'arch', 'noapk'],
+        );
         return null;
       }
 

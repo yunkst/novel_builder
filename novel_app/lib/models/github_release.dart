@@ -35,7 +35,9 @@ class GithubRelease {
     );
   }
 
-  /// 获取第一个 APK asset（通常只有一个）
+  /// 通用 APK asset：取第一个 APK（兼容旧逻辑）
+  ///
+  /// 保留此方法以避免破坏外部调用者；新代码应使用 [apkAssetFor] 按设备架构选取。
   GithubAsset? get apkAsset {
     try {
       return assets.firstWhere(
@@ -49,6 +51,43 @@ class GithubRelease {
         return null;
       }
     }
+  }
+
+  /// 按设备架构选择最合适的 APK asset
+  ///
+  /// 兜底链：
+  ///   1. 精确匹配当前架构的 split APK（如 `app-arm64-v8a-release.apk`）
+  ///   2. 通用 fat APK（`app-release.apk`，包含所有架构）
+  ///   3. 任意一个 APK（避免升级流程完全走不通）
+  GithubAsset? apkAssetFor(String archSegment) {
+    // 1) 优先按架构精确匹配
+    if (archSegment.isNotEmpty) {
+      final matched = _firstApkNameContains(archSegment);
+      if (matched != null) return matched;
+    }
+
+    // 2) 兜底：通用 fat APK
+    final universal = _firstApkNameContains('-release.apk') ??
+        _firstApkNameContains('app-release');
+    if (universal != null) return universal;
+
+    // 3) 最后兜底：任意 .apk
+    return _anyApk();
+  }
+
+  GithubAsset? _firstApkNameContains(String segment) {
+    for (final a in assets) {
+      if (!a.name.endsWith('.apk')) continue;
+      if (a.name.contains(segment)) return a;
+    }
+    return null;
+  }
+
+  GithubAsset? _anyApk() {
+    for (final a in assets) {
+      if (a.name.endsWith('.apk')) return a;
+    }
+    return null;
   }
 
   /// 版本号（去除 'v' 前缀）
