@@ -1,4 +1,6 @@
+import 'dart:convert';
 import '../models/prompt_history.dart';
+import '../models/saved_tag_group.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_prompt_history_repository.dart';
@@ -10,7 +12,10 @@ class PromptHistoryRepository extends BaseRepository
   static const String _table = 'prompt_history';
 
   @override
-  Future<void> addOrUpdate(String promptText) async {
+  Future<void> addOrUpdate(
+    String promptText, {
+    List<SavedTagGroup> tagGroups = const [],
+  }) async {
     final trimmed = promptText.trim();
     if (trimmed.isEmpty) {
       LoggerService.instance.d(
@@ -22,37 +27,47 @@ class PromptHistoryRepository extends BaseRepository
     }
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
+    final tagGroupsJson = jsonEncode(tagGroups.map((t) => t.toJson()).toList());
 
     try {
       final existing = await db.query(
         _table,
-        columns: ['id'],
+        columns: ['id', 'tag_group_ids'],
         where: 'prompt_text = ?',
         whereArgs: [trimmed],
         limit: 1,
       );
 
       if (existing.isNotEmpty) {
-        final id = existing.first['id'];
+        final id = existing.first['id'] as int;
+        final existingTags = existing.first['tag_group_ids'] as String?;
+        // 合并标签：新传入的非空才覆盖旧的
+        final mergedTagsJson = tagGroups.isNotEmpty
+            ? tagGroupsJson
+            : (existingTags ?? tagGroupsJson);
         await db.update(
           _table,
-          {'updated_at': now},
+          {
+            'updated_at': now,
+            'tag_group_ids': mergedTagsJson,
+          },
           where: 'id = ?',
           whereArgs: [id],
         );
         LoggerService.instance.i(
-          'addOrUpdate: 更新已存在的提示词历史 (ID: $id)',
+          'addOrUpdate: 更新已存在的提示词历史 (ID: $id, tags: ${tagGroups.length})',
           category: LogCategory.database,
           tags: ['prompt-history', 'update'],
         );
       } else {
-        final newId = await db.insert(_table, {
+        await db.insert(_table, {
           'prompt_text': trimmed,
           'created_at': now,
           'updated_at': now,
+          'tag_group_ids': tagGroups.isEmpty ? null : tagGroupsJson,
         });
         LoggerService.instance.i(
-          'addOrUpdate: 新增提示词历史 (ID: $newId)',
+          'addOrUpdate: 新增提示词历史 (tags: ${tagGroups.length})',
           category: LogCategory.database,
           tags: ['prompt-history', 'insert'],
         );

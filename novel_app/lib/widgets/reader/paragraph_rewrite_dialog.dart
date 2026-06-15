@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/tag_group.dart';
+import '../../models/prompt_history_selection.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/rewrite_service.dart';
 import '../../services/prompt_tag_service.dart';
@@ -14,6 +15,7 @@ import '../../utils/paragraph_replace_helper.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../widgets/prompt_tag_selector_sheet.dart';
+import '../../widgets/prompt_history_bottom_sheet.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/reader_screen_providers.dart';
 
@@ -620,7 +622,7 @@ class _RewriteInputResult {
   _RewriteInputResult(this.text, this.selectedGroups);
 }
 
-/// 改写要求输入对话框（支持标签选择）
+/// 改写要求输入对话框（支持标签选择 + 历史提示词恢复）
 class _RewriteInputDialog extends StatefulWidget {
   final String initialInput;
   final List<TagGroup> selectedGroups;
@@ -653,6 +655,31 @@ class _RewriteInputDialogState extends State<_RewriteInputDialog> {
     super.dispose();
   }
 
+  /// 打开历史提示词面板，选中后恢复文本和标签
+  Future<void> _openHistory() async {
+    final selection = await showModalBottomSheet<PromptHistorySelection>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: const PromptHistoryBottomSheet(),
+      ),
+    );
+    if (selection == null || selection.promptText.isEmpty) return;
+
+    setState(() {
+      _controller.text = selection.promptText;
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: selection.promptText.length),
+      );
+      _groups = selection.tagGroups;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -667,15 +694,25 @@ class _RewriteInputDialogState extends State<_RewriteInputDialog> {
               decoration: InputDecoration(
                 hintText: '例如：增加细节描述、改变语气、加强情感表达等...',
                 border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.label_outline),
-                  tooltip: '选择标签',
-                  onPressed: () async {
-                    final groups = await widget.onOpenTagSelector();
-                    if (groups != null) {
-                      setState(() => _groups = groups);
-                    }
-                  },
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.history),
+                      tooltip: '历史提示词',
+                      onPressed: _openHistory,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.label_outline),
+                      tooltip: '选择标签',
+                      onPressed: () async {
+                        final groups = await widget.onOpenTagSelector();
+                        if (groups != null) {
+                          setState(() => _groups = groups);
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
               autofocus: true,
@@ -686,7 +723,8 @@ class _RewriteInputDialogState extends State<_RewriteInputDialog> {
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   '已选 ${_groups.length} 个标签',
-                  style: TextStyle(fontSize: 12, color: context.appColors.onInfoContainer),
+                  style: TextStyle(
+                      fontSize: 12, color: context.appColors.onInfoContainer),
                 ),
               ),
           ],

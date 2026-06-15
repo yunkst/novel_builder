@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 25;
+  static const int currentVersion = 26;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -462,7 +462,8 @@ class DatabaseMigrations {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           prompt_text TEXT NOT NULL UNIQUE,
           created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
+          updated_at INTEGER NOT NULL,
+          tag_group_ids TEXT
         )
       ''');
         await _createIndexIfNotExists(
@@ -538,6 +539,13 @@ class DatabaseMigrations {
       ''');
         await _createIndexIfNotExists(
             db, 'idx_site_scripts_domain', 'site_scripts', 'domain');
+        break;
+
+      // ========== 版本 26：prompt_history 关联标签快照 ==========
+      case 26:
+        await _addColumnIfNotExists(
+            db, 'prompt_history', 'tag_group_ids', 'TEXT');
+        _log('迁移 v25 → v26: 添加 prompt_history.tag_group_ids 列');
         break;
     }
   }

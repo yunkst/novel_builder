@@ -216,6 +216,14 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
         case ConfirmationRequestedEvent e:
           state = state.copyWith(pendingConfirmation: e.confirmation);
 
+        case CompactionEvent e:
+          // 上下文压缩事件：记录到日志即可（UI 暂不展示）
+          LoggerService.instance.i(
+            'Hermes 收到压缩事件: ${e.description}',
+            category: LogCategory.ai,
+            tags: ['provider', 'hermes', 'compaction'],
+          );
+
         case AgentDoneEvent _:
           _finalizeAgentResponse();
 

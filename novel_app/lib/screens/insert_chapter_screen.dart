@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
+import '../models/prompt_history_selection.dart';
+import '../models/saved_tag_group.dart';
 import '../core/theme/app_colors.dart';
 import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
@@ -225,9 +227,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   // 步骤管理
   // ========================================================================
 
-  /// 弹出历史提示词面板，选择后填入 [controller]
+  /// 弹出历史提示词面板，选择后填入 [controller] 并恢复标签
   Future<void> _showPromptHistory(TextEditingController controller) async {
-    final selected = await showModalBottomSheet<String>(
+    final selection = await showModalBottomSheet<PromptHistorySelection>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -239,22 +241,34 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         child: const PromptHistoryBottomSheet(),
       ),
     );
-    if (selected != null && selected.isNotEmpty) {
-      controller.text = selected;
-      controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: selected.length),
-      );
-    }
+    if (selection == null || selection.promptText.isEmpty) return;
+
+    // 恢复文本
+    controller.text = selection.promptText;
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: selection.promptText.length),
+    );
+
+    // 恢复标签状态（自动过滤失效标签）
+    final validGroups = await _validateTagGroups(selection.tagGroups);
+    if (!mounted) return;
+    setState(() => _selectedTagGroups = validGroups);
   }
 
-  /// 异步保存提示词到历史（去重 + 提升到最新）
+  /// 异步保存提示词到历史（去重 + 关联当前标签快照）
   void _savePromptHistory(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    final tagGroupsSnapshot = _selectedTagGroups
+        .map((g) => SavedTagGroup(
+              categoryId: g.categoryId,
+              name: g.name,
+            ))
+        .toList();
     Future.microtask(() async {
       try {
         final repo = ref.read(promptHistoryRepositoryProvider);
-        await repo.addOrUpdate(trimmed);
+        await repo.addOrUpdate(trimmed, tagGroups: tagGroupsSnapshot);
       } catch (e, stackTrace) {
         LoggerService.instance.e(
           '保存提示词历史失败: $e',
@@ -264,6 +278,24 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         );
       }
     });
+  }
+
+  /// 校验历史标签是否仍存在，过滤掉已删除的标签
+  Future<List<TagGroup>> _validateTagGroups(List<TagGroup> groups) async {
+    if (groups.isEmpty) return groups;
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+    final valid = <TagGroup>[];
+    for (final g in groups) {
+      final exists = await tagRepo.search(g.name, categoryId: g.categoryId);
+      if (exists.isNotEmpty) {
+        valid.add(g);
+      }
+    }
+    final invalid = groups.length - valid.length;
+    if (invalid > 0) {
+      ToastUtils.showWarning('已自动移除 $invalid 个失效的历史标签');
+    }
+    return valid;
   }
 
   /// 打开标签选择面板

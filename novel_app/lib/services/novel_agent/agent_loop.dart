@@ -11,15 +11,20 @@ import 'package:novel_app/services/logger_service.dart';
 import '../dsl_engine/llm_provider.dart';
 import 'agent_event.dart';
 import 'agent_scenario.dart';
+import 'context_compactor.dart';
 
 /// Agent 循环配置
 class AgentLoopConfig {
   final int maxRounds;
   final int toolResultMaxChars;
 
+  /// 上下文压缩配置（默认启用）
+  final CompactorConfig compaction;
+
   const AgentLoopConfig({
     this.maxRounds = 10,
     this.toolResultMaxChars = 2000,
+    this.compaction = const CompactorConfig(),
   });
 }
 
@@ -31,6 +36,7 @@ class AgentLoop {
   final LlmProvider _llm;
   final AgentScenario _scenario;
   final AgentLoopConfig _config;
+  final ContextCompactor _compactor;
 
   AgentLoop({
     required LlmProvider llm,
@@ -38,7 +44,9 @@ class AgentLoop {
     AgentLoopConfig? config,
   })  : _llm = llm,
         _scenario = scenario,
-        _config = config ?? const AgentLoopConfig();
+        _config = config ?? const AgentLoopConfig(),
+        _compactor = ContextCompactor(
+            config: (config ?? const AgentLoopConfig()).compaction);
 
   /// 运行 Agent 循环
   ///
@@ -68,6 +76,30 @@ class AgentLoop {
       try {
         LoggerService.instance.d('Agent 循环第 $round 轮 (${_scenario.id})',
             category: LogCategory.ai, tags: ['agent', 'loop', _scenario.id]);
+
+        // 0. 上下文压缩检查（每轮 LLM 调用前）
+        //    防止 messages 无限增长导致超出 LLM 上下文窗口
+        if (_compactor.needsCompaction(messages)) {
+          LoggerService.instance.w(
+            '触发上下文压缩: 消息总量 ${_compactor.needsCompaction(messages) ? messages.length : 0} '
+            '条，超过阈值 (${_config.compaction.maxContextChars} 字符)',
+            category: LogCategory.ai,
+            tags: ['agent', 'compaction', 'triggered', _scenario.id],
+          );
+          final result = _compactor.compact(
+            messages: messages,
+            systemPrompt: systemPrompt,
+          );
+          messages
+            ..clear()
+            ..addAll(result.messages);
+          emit(CompactionEvent(
+            removedChars: result.removedChars,
+            originalChars: result.originalChars,
+            keptMessageCount: result.keptMessageCount,
+            droppedMessageCount: result.droppedMessageCount,
+          ));
+        }
 
         // 1. 调用 LLM（流式 + 工具定义），逐 chunk 实时 emit
         final toolsCount = _scenario.tools.length;

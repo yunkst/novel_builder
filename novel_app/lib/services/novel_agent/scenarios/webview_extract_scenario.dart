@@ -28,11 +28,29 @@ class WebViewExtractScenario implements AgentScenario {
   /// 普通模式下使用可见 `InAppWebView`（向后兼容）。
   final bool _isHeadless;
 
+  /// Headless 模式下，是否已把 _currentUrl 同步到 Headless WebView
+  ///
+  /// Headless WebView 是全局单例池，复用同一实例。
+  /// 上次执行可能停留在任意页面（about:blank / 上次的章节 URL），
+  /// 必须在第一次执行 WebView 类工具前显式 loadUrl + 等待 onLoadStop。
+  bool _headlessPageSynced = false;
+
+  /// 需要 Headless WebView 已就绪的工具（其余 3 个是纯数据库工具）
+  static const _webviewRequiredTools = {
+    'get_page_info',
+    'execute_js',
+    'navigate_to',
+    'get_current_url',
+  };
+
   /// 普通 WebView 模式构造函数（向后兼容）
   WebViewExtractScenario(this._ref, this._webviewController, this._currentUrl)
     : _isHeadless = false;
 
   /// Headless 模式工厂构造函数
+  ///
+  /// 注意：Headless 模式下，_currentUrl 与 WebView 实际页面**不同步**。
+  /// 第一次执行工具时会通过 [_ensureHeadlessPageLoaded] 显式同步。
   WebViewExtractScenario.headless(
     this._ref,
     this._webviewController,
@@ -70,7 +88,7 @@ URL: $url
 ## 跨页面提取
 - 当前页面是**目录页**时，先提取章节 URL 列表
 - 如果某章节的 URL 与当前页不同（如 `/book/xxx/yyy.html`），调用 **navigate_to** 工具跳转到该 URL
-- 跳转成功后再次调用 get_page_info 探测新页面 DOM，编写内容提取脚本
+- 跳转后可调用 get_current_url 确认 WebView 实际 URL 已变更，再调用 get_page_info 探测新页面 DOM，编写内容提取脚本
 - 如果当前页本身就是章节内容页（pageType=chapter_content），直接提取正文
 
 ## JS 脚本规范
@@ -125,6 +143,7 @@ URL: $url
         _getPageInfoTool,
         _executeJsTool,
         _navigateToTool,
+        _getCurrentUrlTool,
         _getCachedScriptTool,
         _saveScriptTool,
         _listCachedScriptsTool,
@@ -138,6 +157,16 @@ URL: $url
       tags: ['agent', 'scenario', 'webview-extract', name],
     );
 
+    // Headless 模式：仅 WebView 类工具（get_page_info / execute_js / navigate_to）
+    // 需要确保 Headless WebView 加载了 _currentUrl。
+    // 数据库工具（get_cached_script / save_script / list_cached_scripts）不依赖 WebView。
+    if (_isHeadless && _webviewRequiredTools.contains(name)) {
+      final syncResult = await _ensureHeadlessPageLoaded();
+      if (syncResult != null) {
+        return syncResult;
+      }
+    }
+
     // 更新提取任务状态
     _updateTaskPhase(name);
 
@@ -150,6 +179,8 @@ URL: $url
           result = await _executeJs(args);
         case 'navigate_to':
           result = await _navigateTo(args);
+        case 'get_current_url':
+          result = await _getCurrentUrl();
         case 'get_cached_script':
           result = await _getCachedScript(args);
         case 'save_script':
@@ -263,6 +294,100 @@ URL: $url
         'suggestion': '请等待几秒后重试 get_page_info',
       });
     }
+  }
+
+  /// 确保 Headless WebView 已加载 _currentUrl
+  ///
+  /// Headless WebView 是全局单例池，复用同一实例。
+  /// 上次执行可能停留在任意页面，必须在第一次执行 WebView 工具前显式同步。
+  ///
+  /// 优化：先检查 WebView 当前 URL 是否就是 _currentUrl，避免无效 loadUrl。
+  ///
+  /// 返回 `null` 表示同步成功；返回 JSON 字符串表示同步失败（作为工具错误返回给 LLM）。
+  Future<String?> _ensureHeadlessPageLoaded() async {
+    if (_headlessPageSynced) return null;
+
+    try {
+      // 池复用：先检查 WebView 实际 URL，可能已经是 _currentUrl
+      final currentUrl = await _webviewController.getUrl();
+      if (currentUrl != null && currentUrl.toString() == _currentUrl) {
+        await Future.delayed(_domStabilizeDelay);
+        _headlessPageSynced = true;
+        return null;
+      }
+
+      LoggerService.instance.i(
+        'Headless 模式: 同步加载 _currentUrl → $_currentUrl',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'headless-sync'],
+      );
+
+      await _webviewController.loadUrl(
+        urlRequest: URLRequest(url: WebUri(_currentUrl)),
+      );
+
+      final loaded = await _waitForUrl(_currentUrl, timeout: _pageLoadTimeout);
+      if (loaded) {
+        _headlessPageSynced = true;
+        return null;
+      }
+
+      // 超时：Headless WebView 的 getUrl() 在某些平台可能不更新，
+      // 但 loadUrl 调用本身是成功的，信任它并继续
+      LoggerService.instance.w(
+        'Headless 模式: URL 同步超时，信任 loadUrl 调用并继续',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'headless-sync', 'timeout'],
+      );
+      await Future.delayed(_headlessTrustDelay);
+      _headlessPageSynced = true;
+      return null;
+    } catch (e) {
+      LoggerService.instance.e(
+        'Headless 模式: URL 同步失败 $e',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'headless-sync', 'error'],
+      );
+      return jsonEncode({
+        'error': 'PAGE_NOT_READY',
+        'message': 'Headless WebView 加载目标页面失败: $e',
+        'url': _currentUrl,
+        'suggestion': '请稍后重试 get_page_info',
+      });
+    }
+  }
+
+  // ===== WebView 加载等待（统一 _ensureHeadlessPageLoaded 和 _navigateTo 的轮询逻辑）=====
+
+  static const _pageLoadTimeout = Duration(seconds: 30);
+  static const _pollInterval = Duration(milliseconds: 500);
+  static const _domStabilizeDelay = Duration(milliseconds: 500);
+  static const _headlessTrustDelay = Duration(seconds: 2);
+
+  /// 等待 WebView 加载完成（URL 匹配 targetUrl）
+  ///
+  /// 返回 `true` 表示成功等到 URL 匹配；`false` 表示超时。
+  /// [trustOnTimeout] 为 true 时，超时不再抛错（Headless WebView 在某些平台
+  /// 的 getUrl() 不更新，但 loadUrl 本身成功）。
+  Future<bool> _waitForUrl(
+    String targetUrl, {
+    Duration timeout = _pageLoadTimeout,
+    bool trustOnTimeout = false,
+  }) async {
+    final start = DateTime.now();
+    while (DateTime.now().difference(start) < timeout) {
+      await Future.delayed(_pollInterval);
+      try {
+        final current = await _webviewController.getUrl();
+        if (current != null && current.toString() == targetUrl) {
+          await Future.delayed(_domStabilizeDelay);
+          return true;
+        }
+      } catch (_) {
+        // 轮询错误继续等待
+      }
+    }
+    return false;
   }
 
   /// 在 WebView 中执行 JS 脚本（使用 callAsyncJavaScript）
@@ -542,37 +667,15 @@ URL: $url
         tags: ['agent', 'webview-extract', 'navigate_to'],
       );
 
-      // 调用 loadUrl 触发跳转
       await _webviewController.loadUrl(
         urlRequest: URLRequest(url: WebUri(url)),
       );
 
-      // 等待页面加载（最多 30 秒）
-      // 通过轮询 getUrl 检查 URL 是否为目标 URL
-      final start = DateTime.now();
-      String? loadedUrl;
-      while (DateTime.now().difference(start) < const Duration(seconds: 30)) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        try {
-          final current = await _webviewController.getUrl();
-          if (current != null && current.toString() == url) {
-            loadedUrl = current.toString();
-            break;
-          }
-        } catch (_) {
-          // 忽略轮询错误
-        }
-      }
-
-      // Headless 模式：即使 getUrl 轮询超时，也信任 loadUrl 调用
-      // 因为 Headless WebView 的 getUrl() 在某些平台可能不更新
-      if (loadedUrl == null && _isHeadless) {
-        // 给 DOM 额外稳定时间
-        await Future.delayed(const Duration(seconds: 2));
-        loadedUrl = url; // 信任传入的 URL
-      }
-
-      if (loadedUrl == null) {
+      final loaded = await _waitForUrl(
+        url,
+        trustOnTimeout: _isHeadless,
+      );
+      if (!loaded && !_isHeadless) {
         return jsonEncode({
           'error': 'NAVIGATE_TIMEOUT',
           'message': '跳转后等待页面加载超时（30秒）',
@@ -581,12 +684,9 @@ URL: $url
         });
       }
 
-      // 给 DOM 一些稳定时间
-      await Future.delayed(const Duration(milliseconds: 500));
-
       return jsonEncode({
         'ok': true,
-        'url': loadedUrl,
+        'url': url,
         'message': '跳转成功',
       });
     } catch (e) {
@@ -601,6 +701,61 @@ URL: $url
         'url': url,
       });
     }
+  }
+
+  /// 查询 WebView 当前实际加载的 URL
+  ///
+  /// 区别于 [_currentUrl]（场景构造时传入的预期 URL），本工具返回
+  /// WebView 运行时的真实 URL（`getUrl()` 的返回值）。
+  ///
+  /// 典型用途：
+  /// - 在 navigate_to 之后确认 WebView 是否真的停留在目标页面
+  /// - 排查 Headless WebView 在某些平台 URL 不更新的问题
+  /// - 判断 JS 脚本中的 `{{URL}}` 占位符实际会被替换成什么
+  Future<String> _getCurrentUrl() async {
+    final expectedUrl = _currentUrl;
+    String? actualUrl;
+    try {
+      final uri = await _webviewController.getUrl();
+      actualUrl = uri?.toString();
+    } catch (e) {
+      LoggerService.instance.w(
+        'get_current_url: getUrl() 调用失败 $e',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'get_current_url', 'error'],
+      );
+      return jsonEncode({
+        'error': 'GET_URL_FAILED',
+        'message': '无法读取 WebView 当前 URL: $e',
+        'expected_url': expectedUrl,
+        'suggestion': '可能 WebView 尚未就绪，请稍后重试 get_current_url',
+      });
+    }
+
+    LoggerService.instance.i(
+      'get_current_url: actual=$actualUrl (expected=$expectedUrl, headless=$_isHeadless)',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'get_current_url'],
+    );
+
+    // getUrl() 返回空：某些平台 Headless WebView 未加载页面时会返回 null
+    if (actualUrl == null || actualUrl.isEmpty) {
+      return jsonEncode({
+        'url': null,
+        'expected_url': expectedUrl,
+        'matched': false,
+        'note': 'WebView 当前未加载任何页面（getUrl 返回空）',
+        'suggestion': _isHeadless
+            ? 'Headless WebView 可能尚未加载页面，可调用 get_page_info 触发加载'
+            : '页面可能尚未初始化，请稍后重试',
+      });
+    }
+
+    return jsonEncode({
+      'url': actualUrl,
+      'expected_url': expectedUrl,
+      'matched': actualUrl == expectedUrl,
+    });
   }
 
   /// 查询该域名是否已有缓存脚本
@@ -993,6 +1148,23 @@ URL: $url
           },
         },
         'required': ['url'],
+      },
+    },
+  };
+
+  static const _getCurrentUrlTool = {
+    'type': 'function',
+    'function': {
+      'name': 'get_current_url',
+      'description':
+          '查询 WebView 当前实际加载的 URL（不是场景构造时传入的预期 URL）。'
+          '返回字段：url=WebView 实际 URL，expected_url=场景预期 URL，matched=两者是否一致。'
+          '典型用途：1) navigate_to 之后确认跳转是否生效；2) 排查 Headless WebView URL 不更新的问题；'
+          '3) 判断 execute_js 脚本中 {{URL}} 占位符实际会被替换成什么。'
+          'Headless 模式下首次调用会自动同步预期 URL 到 Headless WebView。',
+      'parameters': {
+        'type': 'object',
+        'properties': <String, dynamic>{},
       },
     },
   };

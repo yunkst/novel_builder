@@ -112,3 +112,36 @@ class AgentErrorEvent extends AgentEvent {
   final String error;
   const AgentErrorEvent(this.error);
 }
+
+/// 上下文压缩事件
+///
+/// 在 Agent 循环自动压缩消息列表时触发，UI 可用于展示压缩提示。
+class CompactionEvent extends AgentEvent {
+  /// 释放的字符数
+  final int removedChars;
+
+  /// 原始字符数
+  final int originalChars;
+
+  /// 保留的消息条数
+  final int keptMessageCount;
+
+  /// 丢弃的消息条数
+  final int droppedMessageCount;
+
+  const CompactionEvent({
+    required this.removedChars,
+    required this.originalChars,
+    required this.keptMessageCount,
+    required this.droppedMessageCount,
+  });
+
+  /// 压缩率（0-1）
+  double get compressionRatio =>
+      originalChars > 0 ? removedChars / originalChars : 0;
+
+  /// 友好描述
+  String get description =>
+      '已压缩上下文：$removedChars 字符'
+      '（保留 $keptMessageCount 条，丢弃 $droppedMessageCount 条）';
+}

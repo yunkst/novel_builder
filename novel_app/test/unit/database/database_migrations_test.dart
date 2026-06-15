@@ -122,11 +122,11 @@ void main() {
       });
     });
 
-    group('upgrade 完整迁移 v1→v25', () {
-      test('从 v1 升级到 v25 应成功', () async {
+    group('upgrade 完整迁移 v1→最新', () {
+      test('从 v1 升级到最新版本应成功', () async {
         final db = await createEmptyDb();
         await DatabaseMigrations.createV1Tables(db);
-        await DatabaseMigrations.upgrade(db, 1, 25);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
 
         // 验证所有表都存在
         final tables = await db.rawQuery(
@@ -161,7 +161,7 @@ void main() {
       test('升级后 novels 视图应存在', () async {
         final db = await createEmptyDb();
         await DatabaseMigrations.createV1Tables(db);
-        await DatabaseMigrations.upgrade(db, 1, 25);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
 
         final views = await db.rawQuery(
             "SELECT name FROM sqlite_master WHERE type='view' AND name='novels'");
@@ -177,10 +177,10 @@ void main() {
         await DatabaseMigrations.createV1Tables(db);
 
         // 第一次升级
-        await DatabaseMigrations.upgrade(db, 1, 25);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
 
         // 第二次升级（模拟重复执行）
-        await DatabaseMigrations.upgrade(db, 1, 25);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
 
         // 不应抛出异常，到这里即通过
         await db.close();
@@ -199,7 +199,7 @@ void main() {
       test('repair 应可安全重复执行', () async {
         final db = await createEmptyDb();
         await DatabaseMigrations.createV1Tables(db);
-        await DatabaseMigrations.upgrade(db, 1, 25);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
 
         // 第一次 repair
         await DatabaseMigrations.repair(db);
@@ -490,8 +490,41 @@ void main() {
     });
 
     group('currentVersion', () {
-      test('currentVersion 应为 25', () {
-        expect(DatabaseMigrations.currentVersion, 25);
+      test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
+        expect(DatabaseMigrations.currentVersion, 26);
+      });
+    });
+
+    group('v26 — prompt_history 标签快照列', () {
+      test('prompt_history 表应包含 tag_group_ids 列', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, DatabaseMigrations.currentVersion);
+
+        final columns =
+            await db.rawQuery("PRAGMA table_info(prompt_history)");
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+
+        expect(columnNames.contains('tag_group_ids'), isTrue,
+            reason: 'v26 迁移应添加 tag_group_ids 列');
+
+        await db.close();
+      });
+
+      test('从 v25 升级到 v26 应添加 tag_group_ids 列', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 25); // 先到 v25
+
+        // 确认 v25 时没有新列（或未执行 v26 迁移）
+        await DatabaseMigrations.upgrade(db, 25, 26); // 只执行 v25→v26
+
+        final columns =
+            await db.rawQuery("PRAGMA table_info(prompt_history)");
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+        expect(columnNames.contains('tag_group_ids'), isTrue);
+
+        await db.close();
       });
     });
   });

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReAct Agent 网页提取 — 架构图</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 1100px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card-dot.orange { background: #fb923c; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+
+    .toolbar { display: flex; gap: 0.5rem; margin-left: auto; flex-shrink: 0; align-items: center; }
+    .toolbar-toggle { background: transparent; border: none; color: #475569; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0.25rem 0.5rem; border-radius: 0.375rem; transition: color 0.2s, background 0.2s; }
+    .toolbar-toggle:hover { color: #94a3b8; background: rgba(30, 41, 59, 0.5); }
+    .toolbar-actions { display: none; gap: 0.5rem; }
+    .toolbar.expanded .toolbar-actions { display: flex; }
+    .toolbar-actions button { background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; color: #94a3b8; padding: 0.375rem 0.75rem; border-radius: 0.375rem; font-family: inherit; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .toolbar-actions button:hover { background: rgba(51, 65, 85, 0.8); color: white; border-color: #475569; }
+    @media print { body { background: #020617; padding: 1rem; } .toolbar { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>ReAct Agent — 网页小说提取架构</h1>
+        <div class="toolbar">
+          <div class="toolbar-actions">
+            <button onclick="copyAsImage(this)">📋 Copy</button>
+            <button onclick="downloadPNG(this)">🖼️ PNG</button>
+            <button onclick="downloadPDF(this)">📄 PDF</button>
+          </div>
+          <button class="toolbar-toggle" onclick="this.parentElement.classList.toggle('expanded')" title="Export options" aria-label="Export options">⋯</button>
+        </div>
+      </div>
+      <p class="subtitle">Flutter 移动应用 — Novel Builder · 2026-06</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 1080">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- =================================================================
+             LAYER BOUNDARIES
+             ================================================================= -->
+
+        <!-- Layer 1: UI 层 -->
+        <rect x="20" y="20" width="480" height="220" rx="12" fill="rgba(8, 51, 68, 0.08)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="44" fill="#22d3ee" font-size="11" font-weight="600">Layer 1 · UI 层</text>
+
+        <!-- Layer 2: Provider 层 -->
+        <rect x="20" y="260" width="480" height="370" rx="12" fill="rgba(34, 211, 238, 0.04)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="284" fill="#22d3ee" font-size="11" font-weight="600">Layer 2 · Provider 状态管理层</text>
+
+        <!-- Layer 3: Service + ReAct 循环 -->
+        <rect x="520" y="20" width="740" height="370" rx="12" fill="rgba(6, 78, 59, 0.06)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="532" y="44" fill="#34d399" font-size="11" font-weight="600">Layer 3 · Service + ReAct 循环</text>
+
+        <!-- Layer 4: 场景层 (2个场景) -->
+        <rect x="520" y="410" width="740" height="340" rx="12" fill="rgba(161, 120, 250, 0.05)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="532" y="434" fill="#a78bfa" font-size="11" font-weight="600">Layer 4 · Agent Scenario 场景层</text>
+
+        <!-- Layer 5: 基础设施 -->
+        <rect x="20" y="650" width="1240" height="230" rx="12" fill="rgba(251, 191, 36, 0.05)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="674" fill="#fbbf24" font-size="11" font-weight="600">Layer 5 · 基础设施层</text>
+
+        <!-- =================================================================
+             ARROWS (drawn early so they render behind components)
+             ================================================================= -->
+
+        <!-- WebView 浏览器 → webviewCurrentUrlProvider -->
+        <line x1="110" y1="190" x2="110" y2="298" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#arrow-cyan)"/>
+
+        <!-- AgentScenarioProvider → hermesChatNotifier -->
+        <line x1="220" y1="380" x2="220" y2="448" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#arrow-cyan)"/>
+
+        <!-- hermesChatNotifier → NovelAgentService -->
+        <line x1="295" y1="470" x2="540" y2="180" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrow-emerald)"/>
+        <text x="380" y="310" fill="#64748b" font-size="8">_sendViaLocalAgent()</text>
+
+        <!-- NovelAgentService → AgentLoop -->
+        <line x1="660" y1="180" x2="760" y2="298" stroke="#34d399" stroke-width="1.2" marker-end="url(#arrow-emerald)"/>
+
+        <!-- AgentLoop → executeTool (Scenario) -->
+        <line x1="870" y1="450" x2="870" y2="510" stroke="#a78bfa" stroke-width="1.2" marker-end="url(#arrow-violet)"/>
+        <text x="885" y="485" fill="#64748b" font-size="8">scenario.executeTool()</text>
+
+        <!-- WebViewExtractScenario → HeadlessWebViewPool -->
+        <line x1="1060" y1="640" x2="1160" y2="688" stroke="#fbbf24" stroke-width="1.2" marker-end="url(#arrow-orange)"/>
+        <text x="1145" y="660" fill="#64748b" font-size="7">acquire</text>
+
+        <!-- WebViewExtractScenario → site_scripts -->
+        <line x1="770" y1="640" x2="690" y2="688" stroke="#fbbf24" stroke-width="1.2" marker-end="url(#arrow-orange)"/>
+
+        <!-- AgentLoop events → hermesChatNotifier (stream) -->
+        <path d="M 760 450 L 760 380 L 295 380 L 295 448" fill="none" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrow-orange)"/>
+        <text x="500" y="370" fill="#fb923c" font-size="7">AgentEvent 流</text>
+
+        <!-- WebView script 执行路径 (3个工具) -->
+        <path d="M 1060 720 L 1060 788" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrow-orange)"/>
+        <text x="1072" y="758" fill="#fbbf24" font-size="6">3工具用</text>
+
+        <!-- =================================================================
+             LAYER 1: UI 层
+             ================================================================= -->
+
+        <!-- WebViewBrowserScreen -->
+        <rect x="30" y="60" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="30" y="60" width="160" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="110" y="82" fill="white" font-size="11" font-weight="600" text-anchor="middle">WebViewBrowser</text>
+        <text x="110" y="104" fill="#94a3b8" font-size="8" text-anchor="middle">InAppWebView</text>
+
+        <!-- HermesChatDialog -->
+        <rect x="220" y="60" width="200" height="55" rx="6" fill="#0f172a"/>
+        <rect x="220" y="60" width="200" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="320" y="82" fill="white" font-size="11" font-weight="600" text-anchor="middle">HermesChatDialog</text>
+        <text x="320" y="104" fill="#94a3b8" font-size="8" text-anchor="middle">流式对话 + 工具卡片</text>
+
+        <!-- WebViewAddNovelFab -->
+        <rect x="260" y="140" width="190" height="55" rx="6" fill="#0f172a"/>
+        <rect x="260" y="140" width="190" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="355" y="162" fill="white" font-size="11" font-weight="600" text-anchor="middle">WebViewAddNovelFab</text>
+        <text x="355" y="184" fill="#94a3b8" font-size="8" text-anchor="middle">FAB 一键提取</text>
+
+        <!-- =================================================================
+             LAYER 2: Provider 层
+             ================================================================= -->
+
+        <!-- webviewCurrentUrlProvider -->
+        <rect x="30" y="305" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="30" y="305" width="160" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="110" y="327" fill="white" font-size="10" font-weight="600" text-anchor="middle">currentUrlProvider</text>
+        <text x="110" y="349" fill="#94a3b8" font-size="8" text-anchor="middle">StateProvider&lt;String&gt;</text>
+
+        <!-- webviewControllerProvider -->
+        <rect x="30" y="375" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="30" y="375" width="160" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="110" y="397" fill="white" font-size="10" font-weight="600" text-anchor="middle">controllerProvider</text>
+        <text x="110" y="419" fill="#94a3b8" font-size="8" text-anchor="middle">StateNotifier</text>
+
+        <!-- currentAgentScenarioProvider -->
+        <rect x="220" y="305" width="200" height="55" rx="6" fill="#0f172a"/>
+        <rect x="220" y="305" width="200" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="320" y="327" fill="white" font-size="10" font-weight="600" text-anchor="middle">agentScenarioProvider</text>
+        <text x="320" y="349" fill="#94a3b8" font-size="8" text-anchor="middle">StateProvider webview_extract</text>
+
+        <!-- hermesChatProvider -->
+        <rect x="220" y="450" width="200" height="70" rx="6" fill="#0f172a"/>
+        <rect x="220" y="450" width="200" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="320" y="475" fill="white" font-size="11" font-weight="600" text-anchor="middle">HermesChatNotifier</text>
+        <text x="320" y="491" fill="#94a3b8" font-size="8" text-anchor="middle">消息列表 · 流式segments</text>
+        <text x="320" y="505" fill="#94a3b8" font-size="7" text-anchor="middle">场景切换 · 确认回调</text>
+        <text x="320" y="516" fill="#22d3ee" font-size="7" text-anchor="middle">StateNotifierProvider</text>
+
+        <!-- extractionTaskProvider -->
+        <rect x="220" y="375" width="200" height="55" rx="6" fill="#0f172a"/>
+        <rect x="220" y="375" width="200" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="320" y="397" fill="white" font-size="10" font-weight="600" text-anchor="middle">extractionTaskProvider</text>
+        <text x="320" y="419" fill="#94a3b8" font-size="8" text-anchor="middle">idle → analyze → exec → save</text>
+
+        <!-- =================================================================
+             LAYER 3: Service + ReAct 循环
+             ================================================================= -->
+
+        <!-- NovelAgentService -->
+        <rect x="540" y="60" width="200" height="90" rx="8" fill="#0f172a"/>
+        <rect x="540" y="60" width="200" height="90" rx="8" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="640" y="85" fill="white" font-size="11" font-weight="600" text-anchor="middle">NovelAgentService</text>
+        <text x="640" y="102" fill="#94a3b8" font-size="8" text-anchor="middle">sendMessage( input, history</text>
+        <text x="640" y="115" fill="#94a3b8" font-size="8" text-anchor="middle">, scenarioId, context )</text>
+        <text x="640" y="134" fill="#34d399" font-size="7" text-anchor="middle">Provider 门面 · Stream&lt;AgentEvent&gt;</text>
+
+        <!-- LlmProvider -->
+        <rect x="790" y="60" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="790" y="60" width="160" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="870" y="82" fill="white" font-size="10" font-weight="600" text-anchor="middle">LlmProvider</text>
+        <text x="870" y="104" fill="#94a3b8" font-size="8" text-anchor="middle">chatStreamWithTools</text>
+
+        <!-- AgentScenarioFactory -->
+        <rect x="540" y="175" width="200" height="55" rx="6" fill="#0f172a"/>
+        <rect x="540" y="175" width="200" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="640" y="197" fill="white" font-size="10" font-weight="600" text-anchor="middle">AgentScenarioFactory</text>
+        <text x="640" y="219" fill="#94a3b8" font-size="8" text-anchor="middle">build( scenarioId, context )</text>
+
+        <!-- AgentLoop -->
+        <rect x="760" y="255" width="240" height="110" rx="8" fill="#0f172a"/>
+        <rect x="760" y="255" width="240" height="110" rx="8" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="880" y="280" fill="white" font-size="12" font-weight="700" text-anchor="middle">⚙ AgentLoop</text>
+        <text x="880" y="302" fill="#94a3b8" font-size="7" text-anchor="middle">for round in 0..maxRounds:</text>
+        <text x="880" y="316" fill="#94a3b8" font-size="7" text-anchor="middle">  1. llm.chatStreamWithTools(tools)</text>
+        <text x="880" y="330" fill="#94a3b8" font-size="7" text-anchor="middle">  2. 聚合 tool_calls delta</text>
+        <text x="880" y="344" fill="#94a3b8" font-size="7" text-anchor="middle">  3. 注入 assistant + tool 消息</text>
+        <text x="880" y="358" fill="#94a3b8" font-size="7" text-anchor="middle">  4. destructive? → 用户确认</text>
+        <text x="880" y="372" fill="#94a3b8" font-size="7" text-anchor="middle">  5. scenario.executeTool()</text>
+
+        <!-- AgentEngineConfig -->
+        <rect x="1060" y="60" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="1060" y="60" width="160" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="1140" y="82" fill="white" font-size="10" font-weight="600" text-anchor="middle">AgentEngineConfig</text>
+        <text x="1140" y="104" fill="#94a3b8" font-size="8" text-anchor="middle">LLM API URL/Key</text>
+
+        <!-- =================================================================
+             LAYER 4: Agent Scenario 场景层 (2 scenarios side-by-side)
+             ================================================================= -->
+
+        <!-- WritingScenario -->
+        <rect x="540" y="450" width="200" height="135" rx="6" fill="#0f172a"/>
+        <rect x="540" y="450" width="200" height="135" rx="6" fill="rgba(161, 120, 250, 0.25)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="640" y="475" fill="white" font-size="11" font-weight="600" text-anchor="middle">✍ WritingScenario</text>
+        <text x="640" y="497" fill="#94a3b8" font-size="8" text-anchor="middle">12 个工具 (ID 化)</text>
+        <line x1="560" y1="506" x2="720" y2="506" stroke="#475569" stroke-width="0.5"/>
+        <text x="640" y="520" fill="#a78bfa" font-size="7" text-anchor="middle">list_novels · list_chapters</text>
+        <text x="640" y="534" fill="#a78bfa" font-size="7" text-anchor="middle">read_chapter · search_chapters</text>
+        <text x="640" y="548" fill="#a78bfa" font-size="7" text-anchor="middle">update_chapter · create_chapter</text>
+        <text x="640" y="562" fill="#a78bfa" font-size="7" text-anchor="middle">characters · outline · setting</text>
+        <text x="640" y="578" fill="#64748b" font-size="7" text-anchor="middle">ToolExecutor → Repository</text>
+
+        <!-- WebViewExtractScenario -->
+        <rect x="770" y="450" width="300" height="290" rx="8" fill="#0f172a"/>
+        <rect x="770" y="450" width="300" height="290" rx="8" fill="rgba(161, 120, 250, 0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="920" y="475" fill="white" font-size="11" font-weight="600" text-anchor="middle">🔍 WebViewExtractScenario</text>
+        <text x="920" y="497" fill="#94a3b8" font-size="8" text-anchor="middle">6 个工具 · Headless 模式</text>
+        <line x1="785" y1="506" x2="1055" y2="506" stroke="#475569" stroke-width="0.5"/>
+
+        <!-- 3 WebView 工具 (需要页面同步) -->
+        <rect x="785" y="514" width="130" height="90" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="850" y="530" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">WebView 工具</text>
+        <text x="850" y="546" fill="white" font-size="9" text-anchor="middle">get_page_info</text>
+        <text x="850" y="560" fill="#94a3b8" font-size="7" text-anchor="middle">DOM精简 · 页面推断</text>
+        <text x="850" y="576" fill="white" font-size="9" text-anchor="middle">execute_js</text>
+        <text x="850" y="590" fill="#94a3b8" font-size="7" text-anchor="middle">callAsyncJavaScript</text>
+        <text x="850" y="600" fill="#64748b" font-size="6" text-anchor="middle">+ navigate_to</text>
+
+        <!-- 3 DB 工具 -->
+        <rect x="925" y="514" width="130" height="90" rx="4" fill="rgba(76, 29, 149, 0.15)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="990" y="530" fill="#a78bfa" font-size="8" font-weight="600" text-anchor="middle">数据库工具</text>
+        <text x="990" y="546" fill="white" font-size="9" text-anchor="middle">get_cached_script</text>
+        <text x="990" y="560" fill="#94a3b8" font-size="7" text-anchor="middle">SQLite 查询</text>
+        <text x="990" y="576" fill="white" font-size="9" text-anchor="middle">save_script</text>
+        <text x="990" y="590" fill="#94a3b8" font-size="7" text-anchor="middle">SQLite 写入</text>
+        <text x="990" y="600" fill="#64748b" font-size="6" text-anchor="middle">+ list_cached_scripts</text>
+
+        <!-- 守卫 + 同步逻辑 -->
+        <rect x="785" y="616" width="270" height="55" rx="4" fill="rgba(251, 146, 60, 0.1)" stroke="#fb923c" stroke-width="1"/>
+        <text x="920" y="632" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">executeTool 入口守卫</text>
+        <text x="920" y="648" fill="#94a3b8" font-size="7" text-anchor="middle">_isHeadless + _webviewRequiredTools.contains(name)</text>
+        <text x="920" y="662" fill="#94a3b8" font-size="7" text-anchor="middle">→ _ensureHeadlessPageLoaded() → _waitForUrl()</text>
+
+        <!-- Scenario 底部标注 -->
+        <text x="920" y="695" fill="#64748b" font-size="7" text-anchor="middle">destructiveTools: {} (已禁用确认)</text>
+
+        <!-- =================================================================
+             LAYER 5: 基础设施层
+             ================================================================= -->
+
+        <!-- HeadlessWebViewPool -->
+        <rect x="40" y="690" width="230" height="90" rx="6" fill="#0f172a"/>
+        <rect x="40" y="690" width="230" height="90" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="155" y="715" fill="white" font-size="11" font-weight="600" text-anchor="middle">HeadlessWebViewPool</text>
+        <text x="155" y="735" fill="#94a3b8" font-size="8" text-anchor="middle">APP 全局单例</text>
+        <text x="155" y="750" fill="#94a3b8" font-size="7" text-anchor="middle">acquire() → controller</text>
+        <text x="155" y="764" fill="#94a3b8" font-size="7" text-anchor="middle">JS=true · 图片=false</text>
+        <text x="155" y="776" fill="#fbbf24" font-size="7" text-anchor="middle">keepAlive Provider</text>
+
+        <!-- Headless WebView (实例) -->
+        <rect x="40" y="795" width="230" height="60" rx="6" fill="#0f172a"/>
+        <rect x="40" y="795" width="230" height="60" rx="6" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="155" y="818" fill="white" font-size="10" font-weight="600" text-anchor="middle">HeadlessInAppWebView</text>
+        <text x="155" y="838" fill="#94a3b8" font-size="7" text-anchor="middle">后台 · 无 UI · 全局复用</text>
+        <text x="155" y="850" fill="#64748b" font-size="6" text-anchor="middle">callAsyncJavaScript / evaluateJavascript</text>
+
+        <!-- HeadlessWebViewContentService -->
+        <rect x="310" y="690" width="230" height="90" rx="6" fill="#0f172a"/>
+        <rect x="310" y="690" width="230" height="90" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="425" y="715" fill="white" font-size="11" font-weight="600" text-anchor="middle">HeadlessWebView</text>
+        <text x="425" y="731" fill="white" font-size="11" font-weight="600" text-anchor="middle">ContentService</text>
+        <text x="425" y="751" fill="#94a3b8" font-size="8" text-anchor="middle">独立 WebView 实例</text>
+        <text x="425" y="765" fill="#94a3b8" font-size="7" text-anchor="middle">fetchContent(url)</text>
+        <text x="425" y="776" fill="#fbbf24" font-size="7" text-anchor="middle">连续失败3次→标记unverified</text>
+
+        <!-- WebViewJsExecutor -->
+        <rect x="310" y="795" width="230" height="60" rx="6" fill="#0f172a"/>
+        <rect x="310" y="795" width="230" height="60" rx="6" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="425" y="818" fill="white" font-size="10" font-weight="600" text-anchor="middle">WebViewJsExecutor</text>
+        <text x="425" y="838" fill="#94a3b8" font-size="7" text-anchor="middle">validateScript · extractIIFE</text>
+        <text x="425" y="850" fill="#94a3b8" font-size="7" text-anchor="middle">stringifyJsResult</text>
+
+        <!-- SQLite site_scripts -->
+        <rect x="580" y="690" width="200" height="90" rx="6" fill="#0f172a"/>
+        <rect x="580" y="690" width="200" height="90" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="680" y="715" fill="white" font-size="11" font-weight="600" text-anchor="middle">site_scripts 表</text>
+        <text x="680" y="735" fill="#94a3b8" font-size="8" text-anchor="middle">SQLite · local DB</text>
+        <text x="680" y="751" fill="#a78bfa" font-size="7" text-anchor="middle">domain · url_pattern</text>
+        <text x="680" y="765" fill="#a78bfa" font-size="7" text-anchor="middle">chapter_list_js  ▶ {{URL}}</text>
+        <text x="680" y="775" fill="#a78bfa" font-size="7" text-anchor="middle">chapter_content_js ▶ {{URL}}</text>
+
+        <!-- SiteScriptRepository -->
+        <rect x="580" y="795" width="200" height="60" rx="6" fill="#0f172a"/>
+        <rect x="580" y="795" width="200" height="60" rx="6" fill="rgba(76, 29, 149, 0.25)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="680" y="818" fill="white" font-size="10" font-weight="600" text-anchor="middle">SiteScriptRepository</text>
+        <text x="680" y="838" fill="#94a3b8" font-size="7" text-anchor="middle">getByDomain · markUsed</text>
+        <text x="680" y="850" fill="#94a3b8" font-size="7" text-anchor="middle">setVerified · delete</text>
+
+        <!-- ToolExecutor (Writing 场景工具执行器) -->
+        <rect x="825" y="690" width="200" height="90" rx="6" fill="#0f172a"/>
+        <rect x="825" y="690" width="200" height="90" rx="6" fill="rgba(76, 29, 149, 0.25)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="925" y="715" fill="white" font-size="10" font-weight="600" text-anchor="middle">ToolExecutor</text>
+        <text x="925" y="735" fill="#94a3b8" font-size="8" text-anchor="middle">novelId → novelUrl</text>
+        <text x="925" y="751" fill="#94a3b8" font-size="7" text-anchor="middle">Repository 调度</text>
+        <text x="925" y="765" fill="#94a3b8" font-size="7" text-anchor="middle">错误码 + suggested_tool</text>
+        <text x="925" y="776" fill="#64748b" font-size="7" text-anchor="middle">12 个 CRUD 工具</text>
+
+        <!-- Repositories -->
+        <rect x="1055" y="690" width="180" height="90" rx="6" fill="#0f172a"/>
+        <rect x="1055" y="690" width="180" height="90" rx="6" fill="rgba(76, 29, 149, 0.2)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="1145" y="715" fill="white" font-size="10" font-weight="600" text-anchor="middle">Repositories</text>
+        <text x="1145" y="735" fill="#94a3b8" font-size="7" text-anchor="middle">NovelRepository</text>
+        <text x="1145" y="749" fill="#94a3b8" font-size="7" text-anchor="middle">ChapterRepository</text>
+        <text x="1145" y="763" fill="#94a3b8" font-size="7" text-anchor="middle">CharacterRepository</text>
+        <text x="1145" y="775" fill="#94a3b8" font-size="7" text-anchor="middle">OutlineRepository</text>
+
+        <!-- Database -->
+        <rect x="1055" y="795" width="180" height="60" rx="6" fill="#0f172a"/>
+        <rect x="1055" y="795" width="180" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="1145" y="818" fill="white" font-size="10" font-weight="600" text-anchor="middle">SQLite Database</text>
+        <text x="1145" y="838" fill="#94a3b8" font-size="7" text-anchor="middle">novel_reader.db</text>
+        <text x="1145" y="850" fill="#a78bfa" font-size="7" text-anchor="middle">v21</text>
+
+        <!-- =================================================================
+             Event Bus (中间连接器，放在 Provider 和 Service 之间)
+             ================================================================= -->
+        <rect x="330" y="540" width="140" height="18" rx="4" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
+        <text x="400" y="553" fill="#fb923c" font-size="8" text-anchor="middle">AgentEvent Stream</text>
+
+        <!-- =================================================================
+             LEGEND
+             ================================================================= -->
+        <text x="30" y="908" fill="white" font-size="10" font-weight="600">图例</text>
+
+        <rect x="30" y="918" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="52" y="926" fill="#94a3b8" font-size="8">UI / Provider 层</text>
+
+        <rect x="180" y="918" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="202" y="926" fill="#94a3b8" font-size="8">Service / ReAct 循环</text>
+
+        <rect x="370" y="918" width="16" height="10" rx="2" fill="rgba(161, 120, 250, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="392" y="926" fill="#94a3b8" font-size="8">Agent Scenario 场景</text>
+
+        <rect x="550" y="918" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="572" y="926" fill="#94a3b8" font-size="8">Headless WebView / 基础设施</text>
+
+        <rect x="780" y="918" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="802" y="926" fill="#94a3b8" font-size="8">数据库 / Repository</text>
+
+        <line x1="550" y1="929" x2="566" y2="929" stroke="#fb923c" stroke-width="1" stroke-dasharray="5,3"/>
+        <text x="572" y="932" fill="#94a3b8" font-size="7">Event Stream</text>
+
+        <rect x="158" y="800" y="800" width="16" height="10" rx="2" fill="#0f172a"/>
+        <line x1="30" y1="940" x2="46" y2="940" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="52" y="943" fill="#94a3b8" font-size="7">WebView JS 执行路径</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>数据流：用户对话提取</h3>
+        </div>
+        <ul>
+          <li>• 用户输入 → hermesChatNotifier.sendMessage()</li>
+          <li>• 构造 AgentScenarioContext (useHeadless=true)</li>
+          <li>• Factory 从池获取 Headless controller</li>
+          <li>• AgentLoop 流式 LLM + 工具循环</li>
+          <li>• AgentEvent 通过 Stream 推回 UI</li>
+          <li>• extractionTaskProvider 全局可见</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot orange"></div>
+          <h3>6 个工具执行环境</h3>
+        </div>
+        <ul>
+          <li>• get_page_info — WebView evalJS</li>
+          <li>• execute_js — WebView callAsyncJS</li>
+          <li>• navigate_to — WebView loadUrl</li>
+          <li>• get_cached_script — SQLite 查询</li>
+          <li>• save_script — SQLite 写入</li>
+          <li>• list_cached_scripts — SQLite 查询</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>关键设计决策</h3>
+        </div>
+        <ul>
+          <li>• {{URL}} 占位符：原样存储，执行时替换</li>
+          <li>• Headless 全局单例池：复用 WebView</li>
+          <li>• 轮询等待：Headless 无 onLoadStop</li>
+          <li>• 错误码 + suggestion：LLM 自助修正</li>
+          <li>• 数据库工具不做页面同步 (优化项)</li>
+          <li>• destructiveTools 已禁用确认</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      Novel Builder · Flutter 移动应用 · ReAct Agent 网页提取子系统 · 2026-06
+    </p>
+  </div>
+
+  <script>
+    async function copyAsImage(btn) {
+      const orig = btn.textContent;
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        btn.textContent = '✓ Copied!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+    async function downloadPNG(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const link = document.createElement('a');
+        link.download = 'react-agent-architecture.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.textContent = '✓ Done!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+    async function downloadPDF(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], hotfixes: ['px_scaling'] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('react-agent-architecture.pdf');
+        btn.textContent = '✓ Done!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+  </script>
+</body>
+</html>

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/prompt_history.dart';
+import '../models/prompt_history_selection.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
 
 /// 历史提示词选择面板
 ///
 /// 显示用户历史提示词列表，支持搜索、选中、删除。
+/// 选中时返回 PromptHistorySelection（携带关联标签快照）。
 class PromptHistoryBottomSheet extends ConsumerStatefulWidget {
   const PromptHistoryBottomSheet({super.key});
 
@@ -96,7 +98,15 @@ class _PromptHistoryBottomSheetState
               child: _PromptHistoryList(
                 keyword: _keyword,
                 scrollController: scrollController,
-                onSelected: (item) => Navigator.pop(context, item.promptText),
+                onSelected: (item) => Navigator.pop(
+                  context,
+                  PromptHistorySelection(
+                    promptText: item.promptText,
+                    tagGroups: item.tagGroups
+                        .map((t) => t.toTagGroup())
+                        .toList(),
+                  ),
+                ),
               ),
             ),
           ],
@@ -228,6 +238,10 @@ class _PromptHistoryTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 14, height: 1.4),
                   ),
+                  if (item.tagGroups.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _buildTagPreview(context),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     _relativeTime(item.updatedAt),
@@ -249,6 +263,40 @@ class _PromptHistoryTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTagPreview(BuildContext context) {
+    final visible = item.tagGroups.take(3).toList();
+    final more = item.tagGroups.length - visible.length;
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        for (final g in visible)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: context.appColors.infoContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '【${g.name}】',
+              style: TextStyle(
+                fontSize: 11,
+                color: context.appColors.onInfoContainer,
+              ),
+            ),
+          ),
+        if (more > 0)
+          Text(
+            '+$more',
+            style: TextStyle(
+              fontSize: 11,
+              color: context.appColors.onInfoContainer,
+            ),
+          ),
+      ],
     );
   }
 }
