@@ -2255,6 +2255,59 @@ class MockApiServiceWrapper extends _i1.Mock implements _i31.ApiServiceWrapper {
           ),
         )),
       ) as _i22.Future<_i13.BackupUploadResponse>);
+
+  @override
+  _i22.Future<List<Map<String, dynamic>>> getBackupList() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getBackupList,
+          [],
+        ),
+        returnValue: _i22.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i22.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i22.Future<String> downloadBackup({
+    required String? backupId,
+    required String? savePath,
+    _i14.ProgressCallback? onProgress,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #downloadBackup,
+          [],
+          {
+            #backupId: backupId,
+            #savePath: savePath,
+            #onProgress: onProgress,
+          },
+        ),
+        returnValue: _i22.Future<String>.value(_i32.dummyValue<String>(
+          this,
+          Invocation.method(
+            #downloadBackup,
+            [],
+            {
+              #backupId: backupId,
+              #savePath: savePath,
+              #onProgress: onProgress,
+            },
+          ),
+        )),
+      ) as _i22.Future<String>);
+
+  @override
+  _i22.Future<void> deleteBackupOnServer({required String? backupId}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #deleteBackupOnServer,
+          [],
+          {#backupId: backupId},
+        ),
+        returnValue: _i22.Future<void>.value(),
+        returnValueForMissingStub: _i22.Future<void>.value(),
+      ) as _i22.Future<void>);
 }
 
 /// A class which mocks [DifyService].

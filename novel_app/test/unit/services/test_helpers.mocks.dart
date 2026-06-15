@@ -602,4 +602,56 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           ),
         )),
       ) as _i7.Future<_i2.BackupUploadResponse>);
+
+  @override
+  _i7.Future<List<Map<String, dynamic>>> getBackupList() => (super.noSuchMethod(
+        Invocation.method(
+          #getBackupList,
+          [],
+        ),
+        returnValue: _i7.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i7.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i7.Future<String> downloadBackup({
+    required String? backupId,
+    required String? savePath,
+    _i3.ProgressCallback? onProgress,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #downloadBackup,
+          [],
+          {
+            #backupId: backupId,
+            #savePath: savePath,
+            #onProgress: onProgress,
+          },
+        ),
+        returnValue: _i7.Future<String>.value(_i9.dummyValue<String>(
+          this,
+          Invocation.method(
+            #downloadBackup,
+            [],
+            {
+              #backupId: backupId,
+              #savePath: savePath,
+              #onProgress: onProgress,
+            },
+          ),
+        )),
+      ) as _i7.Future<String>);
+
+  @override
+  _i7.Future<void> deleteBackupOnServer({required String? backupId}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #deleteBackupOnServer,
+          [],
+          {#backupId: backupId},
+        ),
+        returnValue: _i7.Future<void>.value(),
+        returnValueForMissingStub: _i7.Future<void>.value(),
+      ) as _i7.Future<void>);
 }

@@ -1305,4 +1305,140 @@ class ApiServiceWrapper {
       throw _handleError(e);
     }
   }
+
+  /// 获取服务器备份列表
+  ///
+  /// 返回服务器上所有备份文件的信息（按时间倒序）
+  /// 直接使用 _dio 绕过 OpenAPI 生成代码
+  Future<List<Map<String, dynamic>>> getBackupList() async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      if (token == null || token.isEmpty) {
+        throw Exception('API Token未配置');
+      }
+
+      final response = await _dio.get(
+        '/api/backup/list',
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final backups = (data['backups'] as List<dynamic>?)
+                ?.cast<Map<String, dynamic>>() ??
+            [];
+
+        LoggerService.instance.i(
+          '获取备份列表成功: ${backups.length} 条',
+          category: LogCategory.network,
+          tags: ['backup', 'list', 'success'],
+        );
+        return backups;
+      } else {
+        throw Exception('获取备份列表失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '获取备份列表失败',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'backup', 'list', 'failed'],
+      );
+      throw _handleError(e);
+    }
+  }
+
+  /// 下载备份到本地文件
+  ///
+  /// [backupId] 备份唯一标识（如 "2025-07-15/novel_app_backup.db"）
+  /// [savePath] 本地保存路径
+  /// [onProgress] 下载进度回调（可选）
+  ///
+  /// 返回本地保存的文件路径
+  Future<String> downloadBackup({
+    required String backupId,
+    required String savePath,
+    ProgressCallback? onProgress,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      if (token == null || token.isEmpty) {
+        throw Exception('API Token未配置');
+      }
+
+      // 对 backupId 进行 URL 编码（路径含 /）
+      final encodedId = Uri.encodeComponent(backupId);
+
+      await _dio.download(
+        '/api/backup/download/$encodedId',
+        savePath,
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+        ),
+        onReceiveProgress: onProgress,
+      );
+
+      LoggerService.instance.i(
+        '备份下载成功: $backupId -> $savePath',
+        category: LogCategory.network,
+        tags: ['backup', 'download', 'success'],
+      );
+      return savePath;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '备份下载失败: $backupId',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'backup', 'download', 'failed'],
+      );
+      throw _handleError(e);
+    }
+  }
+
+  /// 删除服务器上的备份
+  ///
+  /// [backupId] 备份唯一标识（如 "2025-07-15/novel_app_backup.db"）
+  Future<void> deleteBackupOnServer({required String backupId}) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+
+      if (token == null || token.isEmpty) {
+        throw Exception('API Token未配置');
+      }
+
+      final encodedId = Uri.encodeComponent(backupId);
+
+      final response = await _dio.delete(
+        '/api/backup/delete/$encodedId',
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        LoggerService.instance.i(
+          '备份删除成功: $backupId',
+          category: LogCategory.network,
+          tags: ['backup', 'delete', 'success'],
+        );
+      } else {
+        throw Exception('备份删除失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '备份删除失败: $backupId',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'backup', 'delete', 'failed'],
+      );
+      throw _handleError(e);
+    }
+  }
 }

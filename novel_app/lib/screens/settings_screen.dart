@@ -13,10 +13,8 @@ import '../widgets/app_update_dialog.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/providers/service_providers.dart';
-import '../widgets/backup_confirm_dialog.dart';
-import '../widgets/backup_progress_dialog.dart';
-import '../utils/format_utils.dart';
 import '../core/database/database_connection.dart';
+import 'backup_management_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -288,7 +286,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ? '上次备份: $_lastBackupTime'
                 : '将数据库备份到服务器'),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: _handleBackup,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BackupManagementScreen(),
+                ),
+              ).then((_) => _loadLastBackupTime());
+            },
           ),
           const Divider(),
 
@@ -376,55 +381,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       },
     );
-  }
-
-  /// 处理数据备份
-  Future<void> _handleBackup() async {
-    try {
-      final backupService = ref.read(backupServiceProvider);
-
-      // 获取数据库文件
-      final dbFile = await backupService.getDatabaseFile();
-      final fileSize = await dbFile.length();
-      final fileName = dbFile.path.split('/').last;
-      final fileSizeText = FormatUtils.formatFileSize(fileSize);
-
-      // 显示确认对话框
-      if (!mounted) return;
-      final confirmed = await BackupConfirmDialog.show(
-        context: context,
-        fileName: fileName,
-        fileSize: fileSizeText,
-      );
-
-      if (!confirmed) return;
-
-      // 显示进度对话框并执行上传
-      if (!mounted) return;
-      // 获取已初始化的API服务实例
-      final apiService = ref.read(apiServiceWrapperProvider);
-      final result = await BackupProgressDialog.show(
-        context: context,
-        uploadTask: () => backupService.uploadBackup(
-          apiWrapper: apiService,
-          dbFile: dbFile,
-          onProgress: (sent, total) {
-            // 进度回调会在ProgressDialog内部处理
-          },
-        ),
-      );
-
-      if (result != null && mounted) {
-        // 上传成功
-        ToastUtils.show('备份成功: ${result.storedName}');
-        // 刷新备份时间
-        _loadLastBackupTime();
-      }
-    } catch (e) {
-      if (mounted) {
-        ToastUtils.show('备份失败: $e');
-      }
-    }
   }
 
   /// 处理数据库修复

@@ -499,6 +499,24 @@ class BackupUploadResponse(BaseModel):
     stored_name: str = Field(..., description="存储文件名")
 
 
+class BackupInfo(BaseModel):
+    """备份文件信息."""
+
+    filename: str = Field(..., description="原始文件名")
+    file_size: int = Field(..., description="文件大小(字节)")
+    stored_name: str = Field(..., description="存储文件名")
+    backup_id: str = Field(..., description="备份唯一标识(相对路径)")
+    uploaded_at: str = Field(..., description="上传时间(ISO格式)")
+
+
+class BackupListResponse(BaseModel):
+    """备份列表响应."""
+
+    backups: list[BackupInfo] = Field(
+        default_factory=list, description="备份列表(按时间倒序)"
+    )
+
+
 # ============================================================================
 # 小说同步功能相关API模式
 # ============================================================================
