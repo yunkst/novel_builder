@@ -427,6 +427,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   Widget _buildInputBar(HermesChatState chatState, HermesChatNotifier notifier) {
     final theme = Theme.of(context);
     final appColors = context.appColors;
+    final quickPrompts =
+        ScenarioQuickPrompts.forScenario(chatState.scenarioId);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -441,6 +443,9 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 快速输入提示词（仅在场景配置了提示词且非加载时显示）
+          if (quickPrompts.isNotEmpty && !chatState.isLoading)
+            _buildQuickPrompts(quickPrompts, theme, appColors),
           TextField(
             controller: _inputController,
             focusNode: _focusNode,
@@ -491,6 +496,44 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         ],
       ),
     );
+  }
+
+  /// 快速输入提示词 chip 行
+  Widget _buildQuickPrompts(
+    List<ScenarioQuickPrompt> prompts,
+    ThemeData theme,
+    AppColors appColors,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: prompts.map((p) {
+          return ActionChip(
+            avatar: Icon(Icons.auto_awesome, size: 14,
+                color: appColors.hermesAccent),
+            label: Text(p.label, style: const TextStyle(fontSize: 12)),
+            backgroundColor: appColors.hermesAccent.withValues(alpha: 0.08),
+            side: BorderSide(
+              color: appColors.hermesAccent.withValues(alpha: 0.2),
+            ),
+            onPressed: () => _insertPrompt(p.text),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// 将提示词追加到输入框末尾
+  void _insertPrompt(String text) {
+    final current = _inputController.text;
+    final sep = current.isEmpty ? '' : ' ';
+    _inputController.text = current + sep + text;
+    _inputController.selection = TextSelection.collapsed(
+      offset: _inputController.text.length,
+    );
+    _focusNode.requestFocus();
   }
 
   void _sendMessage(HermesChatNotifier notifier) {

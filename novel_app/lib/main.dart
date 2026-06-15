@@ -8,11 +8,13 @@ import 'screens/illustration_debug_screen.dart';
 import 'screens/webview_browser_screen.dart';
 import 'core/providers/service_providers.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/providers/agent_scenario_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/log_reporter_service.dart';
+import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/hermes/hermes_floating_button.dart';
 
 void main() async {
@@ -202,21 +204,21 @@ class NovelReaderApp extends ConsumerWidget {
   }
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver {
+  /// 浏览器 Tab 索引（统一进 IndexedStack 后也用于场景切换判定）
+  static const int _browserTabIndex = 3;
+
   int _selectedIndex = 0;
 
   // 为生图调试页面创建 GlobalKey，用于调用刷新方法
   final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
-
-  // Tab 页面缓存（不包含浏览器 Tab，浏览器按需构建避免内存占用）
-  final Map<int, Widget> _tabCache = {};
 
   void _onItemTapped(int index) {
     setState(() {
@@ -228,6 +230,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _refreshIllustrationDebugScreen();
       }
     });
+
+    // 根据当前 Tab 切换 Hermes Agent 场景：
+    // 浏览器 Tab 用网页提取场景，其余 Tab 用写作场景。
+    // 原来由 WebViewBrowserScreen 的 initState/deactivate 处理，
+    // 但改为 IndexedStack 常驻后 deactivate 不再触发，场景切换统一在这里进行。
+    ref.read(currentAgentScenarioProvider.notifier).state =
+        index == _browserTabIndex
+            ? ScenarioIds.webviewExtract
+            : ScenarioIds.writing;
   }
 
   /// 刷新生图调试页面列表
@@ -306,45 +317,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // 浏览器 Tab（索引3）按需构建，不放入 IndexedStack 避免内存占用
-    const int browserTabIndex = 3;
-
-    // 构建 Tab 内容
-    Widget buildTab(int index) {
-      if (index == browserTabIndex) {
-        // 浏览器 Tab 每次切换到时都重建
-        return const WebViewBrowserScreen();
-      }
-      // 其他 Tab 缓存，保持状态
-      return _tabCache.putIfAbsent(index, () {
-        switch (index) {
-          case 0:
-            return const BookshelfScreen();
-          case 1:
-            return const SearchScreen();
-          case 2:
-            return IllustrationDebugScreen(key: _debugScreenKey);
-          case 4:
-            return const SettingsScreen();
-          default:
-            return const SizedBox.shrink();
-        }
-      });
-    }
-
-    // 非 WebView 的 Tab 索引列表
-    final nonBrowserIndices = [0, 1, 2, 4];
-
+    // 所有 Tab（含浏览器）统一使用 IndexedStack 保持状态：
+    // 浏览器 Tab 此前每次切换都会销毁重建 WebView，导致浏览页面/历史丢失。
+    // IndexedStack 会保留各 Tab 的 element 与 State，切换 Tab 不再销毁 WebView。
     return Scaffold(
       body: HermesFloatingShell(
-        child: _selectedIndex == browserTabIndex
-            ? buildTab(browserTabIndex)
-            : IndexedStack(
-                index: nonBrowserIndices.contains(_selectedIndex)
-                    ? nonBrowserIndices.indexOf(_selectedIndex)
-                    : 0,
-                children: nonBrowserIndices.map((i) => buildTab(i)).toList(),
-              ),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            const BookshelfScreen(),
+            const SearchScreen(),
+            IllustrationDebugScreen(key: _debugScreenKey),
+            // active 标记当前浏览器是否可见：
+            // 仅在可见时拦截系统返回手势，避免 offstage 状态下误拦截其他 Tab 的返回键。
+            WebViewBrowserScreen(active: _selectedIndex == _browserTabIndex),
+            const SettingsScreen(),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

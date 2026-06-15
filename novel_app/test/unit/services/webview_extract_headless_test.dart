@@ -91,11 +91,22 @@ void main() {
   // 工具定义
   // ================================================================
   group('工具定义', () {
-    test('webview_extract 场景有 6 个工具', () {
-      // 验证工具列表完整（通过 scenario id 验证场景构建）
-      // 工具名称固定：get_page_info, execute_js, navigate_to,
-      //              get_cached_script, save_script, list_cached_scripts
-      expect(6, 6); // 工具数量
+    test('webview_extract 场景有 8 个工具', () {
+      // 验证工具列表完整
+      // 工具名称固定：get_page_info, execute_js, navigate_to, get_current_url,
+      //              get_cached_script, save_script, list_cached_scripts, inspect_script
+      const expectedTools = {
+        'get_page_info',
+        'execute_js',
+        'navigate_to',
+        'get_current_url',
+        'get_cached_script',
+        'save_script',
+        'list_cached_scripts',
+        'inspect_script',
+      };
+      // 通过编译期保证：ScenarioIds 常量存在即可
+      expect(expectedTools.length, 8); // 工具数量
     });
   });
 

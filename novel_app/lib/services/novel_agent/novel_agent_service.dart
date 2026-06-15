@@ -13,6 +13,7 @@ import 'package:novel_app/services/logger_service.dart';
 import 'agent_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
 import '../dsl_engine/real_llm_executor.dart';
+import '../../utils/cancellation_token.dart';
 import 'agent_event.dart';
 import 'agent_loop.dart';
 import 'agent_scenario.dart';
@@ -23,6 +24,13 @@ class NovelAgentService {
   final StreamController<AgentEvent> _controller =
       StreamController<AgentEvent>.broadcast();
   bool _isRunning = false;
+
+  /// 当前运行回合的取消令牌（无任务运行时为 null）
+  ///
+  /// 由 [sendMessage] 创建并传递给 [AgentLoop.run]。
+  /// 调用 [cancel] 触发后，AgentLoop 会在当前这轮 LLM 输出完成后
+  /// 退出循环（不再执行工具、不再进入下一轮）。
+  CancellationToken? _currentToken;
 
   NovelAgentService(this.ref);
 
@@ -35,6 +43,17 @@ class NovelAgentService {
   /// 检查 LLM 是否已配置
   Future<bool> isConfigured() async {
     return await AgentEngineConfig.isConfigured();
+  }
+
+  /// 取消当前正在运行的 Agent 回合
+  ///
+  /// 取消是**温和的**：当前正在进行的 LLM 流式输出会自然完成，
+  /// 但 ReAct 循环不会再执行工具、不会再进入下一轮。
+  void cancel() {
+    if (_currentToken != null) {
+      _currentToken!.cancel(reason: '用户主动取消');
+      _currentToken = null;
+    }
   }
 
   /// 发送消息给 Agent
@@ -71,6 +90,8 @@ class NovelAgentService {
     }
 
     _isRunning = true;
+    final token = CancellationToken();
+    _currentToken = token;
 
     try {
       LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
@@ -107,9 +128,11 @@ class NovelAgentService {
         systemPrompt: systemPrompt,
         emit: (event) => _controller.add(event),
         requestConfirmation: requestConfirmation,
+        cancellationToken: token,
       );
 
-      LoggerService.instance.i('Agent 请求处理完成 (scenario=$scenarioId)',
+      final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
+      LoggerService.instance.i('Agent 请求处理完成$cancelledTag (scenario=$scenarioId)',
           category: LogCategory.ai, tags: ['agent', 'service', 'complete', scenarioId]);
     } catch (e, stack) {
       LoggerService.instance.e('Agent 请求处理失败: $e',
@@ -119,6 +142,7 @@ class NovelAgentService {
       _controller.add(AgentErrorEvent(e.toString()));
     } finally {
       _isRunning = false;
+      _currentToken = null;
     }
   }
 

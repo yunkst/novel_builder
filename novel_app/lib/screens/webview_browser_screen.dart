@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import '../core/providers/agent_scenario_provider.dart';
 import '../core/providers/webview_providers.dart';
-import '../services/novel_agent/agent_scenario.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
@@ -16,8 +14,15 @@ import '../widgets/webview_add_novel_button.dart';
 /// - 顶部加载进度条（仅在加载中显示）
 /// - 主体：InAppWebView 内容
 /// - 系统返回手势：有历史时 WebView 后退，无历史时退出浏览器页面
+///
+/// [active] 标记当前浏览器是否为可见的 Tab。在 IndexedStack 常驻布局下，
+/// 浏览器即使不可见（offstage）仍挂载在树上，其 PopScope 也会参与返回键分发。
+/// 因此仅在 active 时拦截系统返回手势，避免在其他 Tab 误触发 WebView 后退。
 class WebViewBrowserScreen extends ConsumerStatefulWidget {
-  const WebViewBrowserScreen({super.key});
+  const WebViewBrowserScreen({super.key, this.active = true});
+
+  /// 当前是否为可见的 Tab
+  final bool active;
 
   @override
   ConsumerState<WebViewBrowserScreen> createState() =>
@@ -28,35 +33,14 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
   bool _addressBarFocused = false;
 
   @override
-  void initState() {
-    super.initState();
-    // 切换到 WebView 提取场景
-    ref.read(currentAgentScenarioProvider.notifier).state =
-        ScenarioIds.webviewExtract;
-  }
-
-  @override
-  void deactivate() {
-    // 离开浏览器时恢复写作场景（必须在 deactivate 中执行，此时 ref 仍有效）
-    ref.read(currentAgentScenarioProvider.notifier).state =
-        ScenarioIds.writing;
-    super.deactivate();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(webviewIsLoadingProvider);
     final progress = ref.watch(webviewLoadingProgressProvider);
     final notifier = ref.read(webviewControllerProvider.notifier);
 
     return PopScope(
-      // canPop=false 时拦截系统返回手势，由 onPopInvokedWithResult 处理
-      canPop: false,
+      // 仅在当前 Tab 可见时拦截系统返回手势；不可见时让返回键正常向上传递。
+      canPop: !widget.active,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         // WebView 有浏览历史 → 后退；没有历史 → 退出浏览器页面

@@ -7,6 +7,7 @@ library;
 import 'dart:convert';
 
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/utils/cancellation_token.dart';
 
 import '../dsl_engine/llm_provider.dart';
 import 'agent_event.dart';
@@ -54,6 +55,8 @@ class AgentLoop {
   /// [systemPrompt] 系统提示词
   /// [emit] 事件回调
   /// [requestConfirmation] 确认回调，返回 true 表示用户同意
+  /// [cancellationToken] 取消令牌；触发取消后，当前这轮 LLM 输出完成，
+  ///   但循环不再执行后续工具、不再进入下一轮（不中断底层 LLM HTTP）。
   Future<void> run({
     required List<ChatMessage> initialMessages,
     required String systemPrompt,
@@ -63,6 +66,7 @@ class AgentLoop {
       Map<String, dynamic> args,
       String toolCallId,
     ) requestConfirmation,
+    CancellationToken? cancellationToken,
   }) async {
     final messages = <ChatMessage>[
       ChatMessage(role: 'system', content: systemPrompt),
@@ -73,6 +77,16 @@ class AgentLoop {
         category: LogCategory.ai, tags: ['agent', 'loop_start', _scenario.id]);
 
     for (int round = 0; round < _config.maxRounds; round++) {
+      // 检查点 A：进入新一轮前（例如上一轮工具执行后被取消）
+      if (cancellationToken?.isCancelled == true) {
+        LoggerService.instance.i(
+            'Agent 循环已取消，不再进入第 $round 轮 (scenario=${_scenario.id})',
+            category: LogCategory.ai,
+            tags: ['agent', 'loop', 'cancelled', _scenario.id]);
+        emit(const AgentDoneEvent());
+        return;
+      }
+
       try {
         LoggerService.instance.d('Agent 循环第 $round 轮 (${_scenario.id})',
             category: LogCategory.ai, tags: ['agent', 'loop', _scenario.id]);
@@ -134,6 +148,17 @@ class AgentLoop {
         final toolCalls = streamingResult.buildToolCalls();
         final fullContent = streamingResult.fullContent;
 
+        // 检查点 B：本轮 LLM 流式输出已完整 emit，若已取消则不再执行工具 / 进入下一轮
+        // 满足"让 agent 输出完，但不继续下一个循环"的语义
+        if (cancellationToken?.isCancelled == true) {
+          LoggerService.instance.i(
+              'Agent 循环已取消（本轮 LLM 输出完，跳过工具与下一轮，scenario=${_scenario.id}）',
+              category: LogCategory.ai,
+              tags: ['agent', 'loop', 'cancelled', _scenario.id]);
+          emit(const AgentDoneEvent());
+          return;
+        }
+
         // contentLength=0 但 finishReason 不是 tool_calls 时，说明 LLM 异常返回空内容，需要告警
         // contentLength=0 + finishReason=tool_calls 是正常的 ReAct 行为（LLM 决定调用工具）
         final isAbnormalEmpty = fullContent.isEmpty &&
@@ -176,6 +201,16 @@ class AgentLoop {
 
         // 5. 执行每个工具调用
         for (final call in toolCalls) {
+          // 检查点 C：批量工具执行中途被取消，跳过剩余工具
+          if (cancellationToken?.isCancelled == true) {
+            LoggerService.instance.i(
+                'Agent 循环已取消，跳过工具 ${call.name} 及后续工具 (scenario=${_scenario.id})',
+                category: LogCategory.ai,
+                tags: ['agent', 'loop', 'cancelled', _scenario.id]);
+            emit(const AgentDoneEvent());
+            return;
+          }
+
           LoggerService.instance.d('工具调度: ${call.name} (scenario=${_scenario.id})',
               category: LogCategory.ai, tags: ['agent', 'tool', call.name, _scenario.id]);
           emit(ToolCallStartEvent(call.name, call.arguments, call.id));

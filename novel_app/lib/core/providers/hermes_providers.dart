@@ -384,6 +384,11 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
 
   /// 停止当前生成
   void cancelRequest() {
+    // 触发底层 Agent 循环取消：温和停止 —— 不中断当前这轮 LLM 流式输出，
+    // 但 ReAct 循环不再执行后续工具、不再进入下一轮。
+    // 配合 AgentLoop 的取消检查点，避免后台静默跑完 maxRounds。
+    _ref.read(novelAgentServiceProvider).cancel();
+
     // 本地 Agent：取消事件订阅
     _agentSub?.cancel();
     _agentSub = null;
