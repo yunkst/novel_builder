@@ -37,4 +37,6 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Run unit tests
-        run: flutter test --no-pub -j 1 test/unit/ test/bug/ test/verification/
+        run: |
+          rm -rf .dart_tool/sqflite_common_ffi 2>/dev/null || true
+          flutter test --no-pub --concurrency=1 test/unit/ test/bug/ test/verification/
