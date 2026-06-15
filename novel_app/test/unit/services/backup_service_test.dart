@@ -128,6 +128,11 @@ void main() {
       tempPath = p.join(dbDir, 'novel_app_restore_temp.db');
       bakPath = p.join(dbDir, 'novel_reader.db.bak');
 
+      // 确保数据库目录存在（sqflite_ffi 仅在首次打开数据库时创建该目录；
+      // 若本测试组在目录创建前执行，restoreBackup 的 mock 写临时文件会
+      // 触发 PathNotFoundException，在干净的 CI 环境上尤为明显）
+      await Directory(dbDir).create(recursive: true);
+
       // 清理上次测试残留
       try {
         await DatabaseConnection().close();

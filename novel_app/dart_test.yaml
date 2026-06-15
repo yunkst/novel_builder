@@ -1,10 +1,13 @@
 # 测试运行配置
 #
-# 限制并发为 1（串行执行），避免多个测试同时操作共享的文件数据库
-# （.dart_tool/sqflite_common_ffi/databases/novel_reader.db）导致竞态崩溃。
-#
-# 背景：BackupService.restoreBackup 和部分用例通过 DatabaseConnection()
-# 操作全局共享路径下的 novel_reader.db 文件。并行测试文件会互相干扰
+# 说明：backup_service_test 中的 restoreBackup 测试通过 DatabaseConnection()
+# 操作全局共享路径下的 novel_reader.db 文件。并发测试会互相干扰
 # （一个测试 rename/delete 文件时，另一个正好打开 → PathNotFoundException）。
-# 绝大多数测试使用 :memory: 或 mock，本身不慢；串行只让 CI 多花约 30s。
-concurrency: 1
+#
+# 解决方案：CI 中用 `flutter test -j 1` 串行执行（见 .github/workflows/flutter-ci.yml），
+# 本地开发也用 `-j 1` 避免竞态。
+#
+# 此文件作为说明性文档保留（flutter test 不读取 dart_test.yaml 中的 concurrency 设置）。
+#
+# 运行测试：
+#   flutter test --no-pub -j 1 test/unit/ test/bug/ test/verification/
