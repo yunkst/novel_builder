@@ -115,7 +115,7 @@ jobs:
         run: flutter build apk --release --split-per-abi
 
       - name: Compute SHA256 checksums
-        working-directory: build/app/outputs/flutter-apk
+        working-directory: novel_app/build/app/outputs/flutter-apk
         run: |
           sha256sum app-*-release.apk > SHA256SUMS.txt
           echo "===== SHA256SUMS.txt ====="
