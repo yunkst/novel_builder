@@ -8,11 +8,13 @@ import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/batch_sync_dialog.dart';
 import '../widgets/common/common_widgets.dart';
+import '../widgets/empty_states/empty_bookshelf.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../core/providers/ui_providers.dart';
 import '../dialogs/novel_edit_dialog.dart';
 
 class BookshelfScreen extends ConsumerStatefulWidget {
@@ -529,42 +531,14 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
               ),
               data: (bookshelf) {
                 if (bookshelf.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.library_books,
-                          size: 64,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.4),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          '书架是空的',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('你可以去搜索添加小说，或点击右下角按钮创建自己的小说'),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _showCreateNovelDialog,
-                          icon: const Icon(Icons.create),
-                          label: const Text('创建新小说'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            foregroundColor:
-                                Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  return EmptyBookshelfView(
+                    onSearch: () {
+                      // 切换到搜索 Tab
+                      ref
+                          .read(homeTabIndexNotifierProvider.notifier)
+                          .switchTo(HomeTabIndex.search);
+                    },
+                    onCreateNovel: _showCreateNovelDialog,
                   );
                 }
 

@@ -4,54 +4,82 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布 tag（如 v1.7.21），需已存在'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+# 避免同 tag 并发发布互相覆盖
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: novel_app
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 生成 changelog 需要完整历史
 
-      - name: Extract version from tag
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
+          echo "name=${TAG}" >> $GITHUB_OUTPUT
+          # 不带 v 前缀的纯版本号
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Extract version code from pubspec
         id: version
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG#v}
-          VERSION_CODE=$(grep -E "^version:" novel_app/pubspec.yaml | sed -E 's/.*\+//')
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
-          echo "## Novel Builder v${VERSION}" > release_body.md
-          echo "" >> release_body.md
-          echo "**版本代码**: ${VERSION_CODE}" >> release_body.md
-          echo "" >> release_body.md
-          echo "### 下载说明" >> release_body.md
-          echo "" >> release_body.md
-          echo "本版本按 CPU 架构拆分为多个 APK，请根据设备选择：" >> release_body.md
-          echo "" >> release_body.md
-          echo "- **app-arm64-v8a-release.apk** — 绝大多数现代手机（推荐）" >> release_body.md
-          echo "- **app-armeabi-v7a-release.apk** — 老旧 32 位设备" >> release_body.md
-          echo "- **app-x86_64-release.apk** — 模拟器 / ChromeOS" >> release_body.md
-          echo "" >> release_body.md
-          echo "> 💡 提示：在已安装的 App 内「设置 → 检查更新」会**自动**下载与本机架构匹配的 APK。" >> release_body.md
-          echo "" >> release_body.md
-          echo "### 安装步骤" >> release_body.md
-          echo "1. 下载对应架构的 APK" >> release_body.md
-          echo "2. 在 Android 设备上安装（允许「未知来源」）" >> release_body.md
-          echo "3. 首次启动配置后端 API 地址" >> release_body.md
-          echo "" >> release_body.md
-          echo "### 完整更新日志" >> release_body.md
-          echo "请查看 [CHANGELOG.md](https://github.com/yunkst/novel_builder/blob/master/CHANGELOG.md)" >> release_body.md
+          # pubspec.yaml: version: 1.7.20+69
+          # NOTE: defaults.working-directory = novel_app
+          VERSION_CODE=$(grep -E "^version:" pubspec.yaml | sed -E 's/.*\+([0-9]+).*/\1/')
+          if [ -z "$VERSION_CODE" ]; then
+            echo "❌ 无法从 pubspec.yaml 解析 version code"
+            exit 1
+          fi
+          echo "code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+
+      - name: Detect prerelease
+        id: prerelease
+        run: |
+          if [[ "${{ steps.tag.outputs.name }}" =~ -(alpha|beta|rc|pre) ]]; then
+            echo "flag=true" >> $GITHUB_OUTPUT
+          else
+            echo "flag=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Render release body
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          # 用实际版本号替换模板占位符，输出到 working-directory 根
+          # NOTE: defaults.working-directory = novel_app，所以 ../.github = 仓库根
+          sed "s|{{VERSION}}|v${VERSION}|g" \
+            ../.github/release_template.md > release_body.md
+          echo "===== 渲染后的 release_body.md ====="
+          cat release_body.md
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.18.0
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.24.5'
           channel: 'stable'
           cache: true
 
@@ -86,14 +114,23 @@ jobs:
       - name: Build per-architecture release APKs
         run: flutter build apk --release --split-per-abi
 
+      - name: Compute SHA256 checksums
+        working-directory: build/app/outputs/flutter-apk
+        run: |
+          sha256sum app-*-release.apk > SHA256SUMS.txt
+          echo "===== SHA256SUMS.txt ====="
+          cat SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          body_path: novel_app/release_body.md
+          draft: ${{ steps.prerelease.outputs.flag == 'true' }}
+          prerelease: ${{ steps.prerelease.outputs.flag == 'true' }}
           files: |
             novel_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             novel_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
             novel_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
-          body_path: novel_app/release_body.md
+            novel_app/build/app/outputs/flutter-apk/SHA256SUMS.txt

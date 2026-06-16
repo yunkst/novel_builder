@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
 import '../models/site_script.dart';
+import '../services/novel_agent/scenarios/webview_js_executor.dart';
 
 /// 脚本管理面板（通过 showModalBottomSheet 弹出）
 class SiteScriptPanel extends ConsumerWidget {
@@ -472,18 +473,45 @@ class _ScriptCard extends ConsumerWidget {
       return;
     }
 
+    // 校验脚本规范（与正式提取路径一致：必须含 {{URL}} 占位符等）
+    final validationError = WebViewJsExecutor.validateScript(scriptCode);
+    if (validationError != null) {
+      if (context.mounted) Navigator.pop(context); // 关闭加载框
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('脚本校验失败: $validationError')),
+        );
+      }
+      return;
+    }
+
     // 替换 {{URL}} 为测试 URL
     final resolvedScript = scriptCode.replaceAll('{{URL}}', testUrl);
 
-    // 执行脚本
+    // 提取 IIFE 函数体（Agent 生成的脚本是 async IIFE，
+    // 需拆出函数体供 callAsyncJavaScript 执行）
+    final functionBody =
+        WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
+
+    // 执行脚本（与正式提取路径一致：callAsyncJavaScript 完美支持 async/await；
+    // evaluateJavascript 在 WebView2 上不等待 Promise，async 脚本拿不到结果）
     String? resultStr;
     String? errorMsg;
     try {
-      resultStr = await controller
-          .evaluateJavascript(source: resolvedScript)
-          .timeout(const Duration(seconds: 30));
+      final result = await controller
+          .callAsyncJavaScript(functionBody: functionBody)
+          .timeout(const Duration(seconds: 60));
+
+      if (result == null) {
+        resultStr = WebViewJsExecutor.stringifyJsResult(null);
+      } else if (result.error != null) {
+        // JS Promise reject
+        errorMsg = result.error.toString();
+      } else {
+        resultStr = WebViewJsExecutor.stringifyJsResult(result.value);
+      }
     } on TimeoutException {
-      errorMsg = '脚本执行超时（>30秒）';
+      errorMsg = '脚本执行超时（>60秒）';
     } catch (e) {
       errorMsg = e.toString();
     }

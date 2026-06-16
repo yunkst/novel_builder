@@ -257,3 +257,46 @@ class DialogNotifier extends _$DialogNotifier {
     state = const DialogState.initial();
   }
 }
+
+// ==================== Home Tab Switcher ====================
+
+/// 底部导航 Tab 索引常量
+///
+/// 集中管理 HomePage IndexedStack 的 Tab 索引，方便跨页面引用。
+class HomeTabIndex {
+  const HomeTabIndex._();
+
+  /// 书架
+  static const int bookshelf = 0;
+
+  /// 搜索
+  static const int search = 1;
+
+  /// 生图调试
+  static const int illustration = 2;
+
+  /// 浏览器
+  static const int browser = 3;
+
+  /// 设置
+  static const int settings = 4;
+}
+
+/// 当前选中的底部导航 Tab
+///
+/// HomePage 监听此 Provider 切换 Tab；其他页面（如书架空状态引导）
+/// 可通过 ref.read(homeTabIndexNotifierProvider.notifier).state = ... 切换 Tab。
+@riverpod
+class HomeTabIndexNotifier extends _$HomeTabIndexNotifier {
+  @override
+  int build() {
+    return HomeTabIndex.bookshelf;
+  }
+
+  /// 跳转到指定 Tab
+  void switchTo(int index) {
+    if (state != index) {
+      state = index;
+    }
+  }
+}

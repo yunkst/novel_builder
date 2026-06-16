@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>章节内容获取流程 - Novel Reader</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    .header { margin-bottom: 2rem; }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #22d3ee;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    svg { width: 100%; min-width: 900px; display: block; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card-dot.orange { background: #fb923c; }
+
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .toolbar-toggle {
+      background: transparent;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      transition: color 0.2s, background 0.2s;
+    }
+    .toolbar-toggle:hover { color: #94a3b8; background: rgba(30, 41, 59, 0.5); }
+    .toolbar-actions { display: none; gap: 0.5rem; }
+    .toolbar.expanded .toolbar-actions { display: flex; }
+    .toolbar-actions button {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.375rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .toolbar-actions button:hover {
+      background: rgba(51, 65, 85, 0.8);
+      color: white;
+      border-color: #475569;
+    }
+
+    @media print {
+      body { background: #020617; padding: 1rem; }
+      .toolbar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Chapter Content Fetch Flow</h1>
+        <div class="toolbar">
+          <div class="toolbar-actions">
+            <button onclick="copyAsImage(this)">📋 Copy</button>
+            <button onclick="downloadPNG(this)">🖼️ PNG</button>
+            <button onclick="downloadPDF(this)">📄 PDF</button>
+          </div>
+          <button class="toolbar-toggle" onclick="this.parentElement.classList.toggle('expanded')" title="Export options" aria-label="Export options">⋯</button>
+        </div>
+      </div>
+      <p class="subtitle">WebView-first fallback chain for uncached chapters · Reader + Preload paths</p>
+    </div>
+
+    <!-- Main Diagram -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1180 980">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrowhead-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- =========================
+             LAYER LABELS (left side)
+             ========================= -->
+        <text x="20" y="100" fill="#64748b" font-size="9" font-weight="600">UI</text>
+        <text x="20" y="280" fill="#64748b" font-size="9" font-weight="600">CONTROLLER</text>
+        <text x="20" y="490" fill="#64748b" font-size="9" font-weight="600">CACHE LAYER</text>
+        <text x="20" y="650" fill="#64748b" font-size="9" font-weight="600">FALLBACK CHAIN</text>
+        <text x="20" y="800" fill="#64748b" font-size="9" font-weight="600">TASK QUEUE</text>
+
+        <!-- =========================
+             TITLE: READER PATH (left column)
+             ========================= -->
+        <rect x="80" y="60" width="320" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="240" y="80" fill="white" font-size="11" font-weight="600" text-anchor="middle">ReaderScreen</text>
+        <text x="240" y="96" fill="#94a3b8" font-size="9" text-anchor="middle">User taps chapter</text>
+        <text x="240" y="110" fill="#22d3ee" font-size="8" text-anchor="middle">reader_screen.dart</text>
+
+        <!-- Controller: ReaderContentController -->
+        <rect x="80" y="180" width="320" height="100" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="240" y="202" fill="white" font-size="11" font-weight="600" text-anchor="middle">ReaderContentController</text>
+        <text x="240" y="220" fill="#94a3b8" font-size="9" text-anchor="middle">.loadChapter(chapter, novel)</text>
+        <text x="240" y="236" fill="#94a3b8" font-size="8" text-anchor="middle">1. setLoading(true) · clearContent()</text>
+        <text x="240" y="250" fill="#94a3b8" font-size="8" text-anchor="middle">2. Try cache → fall through if miss</text>
+        <text x="240" y="264" fill="#22d3ee" font-size="8" text-anchor="middle">reader_content_controller.dart:86</text>
+
+        <!-- =========================
+             CACHE CHECK DECISION (left)
+             ========================= -->
+        <rect x="100" y="350" width="280" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="240" y="372" fill="white" font-size="11" font-weight="600" text-anchor="middle">ChapterRepository</text>
+        <text x="240" y="388" fill="#94a3b8" font-size="9" text-anchor="middle">.getCachedChapter(url)</text>
+        <text x="240" y="402" fill="#a78bfa" font-size="8" text-anchor="middle">SQLite · chapter_cache table</text>
+
+        <!-- Decision diamond: cache hit? -->
+        <polygon points="240,440 320,480 240,520 160,480" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="240" y="476" fill="white" font-size="10" font-weight="600" text-anchor="middle">cached?</text>
+        <text x="240" y="490" fill="#94a3b8" font-size="8" text-anchor="middle">hit / miss</text>
+
+        <!-- HIT label and arrow up -->
+        <text x="100" y="475" fill="#34d399" font-size="9" font-weight="600">HIT</text>
+        <path d="M 160 480 L 80 480 L 80 280" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)" stroke-dasharray="0"/>
+        <text x="100" y="296" fill="#34d399" font-size="8" text-anchor="middle">setContent()</text>
+        <text x="100" y="308" fill="#34d399" font-size="8" text-anchor="middle">+ return</text>
+
+        <!-- MISS label -->
+        <text x="345" y="475" fill="#fb7185" font-size="9" font-weight="600">MISS</text>
+
+        <!-- =========================
+             FALLBACK CHAIN (middle, vertical)
+             ========================= -->
+
+        <!-- _fetchChapterContent entry -->
+        <rect x="380" y="350" width="320" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="540" y="372" fill="white" font-size="11" font-weight="600" text-anchor="middle">_fetchChapterContent()</text>
+        <text x="540" y="388" fill="#94a3b8" font-size="9" text-anchor="middle">WebView-first fallback</text>
+        <text x="540" y="402" fill="#22d3ee" font-size="8" text-anchor="middle">reader_content_controller.dart:260</text>
+
+        <!-- MISS arrow from diamond to _fetchChapterContent -->
+        <line x1="320" y1="480" x2="378" y2="380" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Step 1: WebView attempt -->
+        <rect x="380" y="450" width="320" height="80" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="380" y="450" width="320" height="80" rx="6" fill="#0f172a" opacity="0"/>
+        <text x="540" y="470" fill="white" font-size="11" font-weight="600" text-anchor="middle">❶ HeadlessWebViewContentService</text>
+        <text x="540" y="486" fill="#94a3b8" font-size="9" text-anchor="middle">.fetchContent(chapterUrl)</text>
+        <text x="540" y="502" fill="#94a3b8" font-size="8" text-anchor="middle">• _isFetching lock? → return null</text>
+        <text x="540" y="516" fill="#94a3b8" font-size="8" text-anchor="middle">• no script? → return null</text>
+        <text x="540" y="528" fill="#22d3ee" font-size="7" text-anchor="middle">✓ unverified scripts now allowed</text>
+
+        <!-- Branch arrow: _fetchChapterContent → WebView -->
+        <line x1="540" y1="410" x2="540" y2="448" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- WebView success: content -->
+        <rect x="380" y="560" width="320" height="60" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="540" y="580" fill="white" font-size="11" font-weight="600" text-anchor="middle">content = webViewResult.content</text>
+        <text x="540" y="596" fill="#94a3b8" font-size="9" text-anchor="middle">fromCache=false (live extraction)</text>
+        <text x="540" y="610" fill="#34d399" font-size="8" text-anchor="middle">✓ validated len &gt; 50</text>
+
+        <line x1="540" y1="530" x2="540" y2="558" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="556" y="548" fill="#34d399" font-size="8">success</text>
+
+        <!-- Failure label arrow going right to API -->
+        <line x1="700" y1="490" x2="770" y2="490" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrowhead)" stroke-dasharray="4,4"/>
+        <text x="710" y="482" fill="#fb7185" font-size="8" text-anchor="middle">null / fail</text>
+
+        <!-- Step 2: API fallback -->
+        <rect x="780" y="450" width="280" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="920" y="470" fill="white" font-size="11" font-weight="600" text-anchor="middle">❷ ApiServiceWrapper</text>
+        <text x="920" y="486" fill="#94a3b8" font-size="9" text-anchor="middle">.getChapterContent(url)</text>
+        <text x="920" y="502" fill="#94a3b8" font-size="8" text-anchor="middle">GET /chapter-content</text>
+        <text x="920" y="516" fill="#94a3b8" font-size="8" text-anchor="middle">Backend FastAPI :3800</text>
+        <text x="920" y="528" fill="#fb7185" font-size="7" text-anchor="middle">⚠ 502 if backend down</text>
+
+        <line x1="920" y1="530" x2="920" y2="558" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- API return box -->
+        <rect x="780" y="560" width="280" height="60" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="920" y="580" fill="white" font-size="11" font-weight="600" text-anchor="middle">content = apiResponse</text>
+        <text x="920" y="596" fill="#94a3b8" font-size="9" text-anchor="middle">throw on network failure</text>
+        <text x="920" y="610" fill="#94a3b8" font-size="8" text-anchor="middle">caller catches and shows error</text>
+
+        <!-- =========================
+             POST-FETCH: VALIDATE + CACHE
+             ========================= -->
+        <!-- Both WebView and API results converge into validate -->
+        <line x1="540" y1="620" x2="540" y2="650" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="920" y1="620" x2="540" y2="650" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="540" y1="650" x2="380" y2="650" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="380" y1="650" x2="380" y2="680" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="380" y1="680" x2="240" y2="680" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Validate + cache -->
+        <rect x="80" y="650" width="320" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="240" y="670" fill="white" font-size="11" font-weight="600" text-anchor="middle">validate + cacheChapter()</text>
+        <text x="240" y="686" fill="#94a3b8" font-size="9" text-anchor="middle">trim().length ≥ 50 → write SQLite</text>
+        <text x="240" y="700" fill="#22d3ee" font-size="8" text-anchor="middle">reader_content_controller.dart:148-168</text>
+
+        <!-- UI render -->
+        <line x1="240" y1="600" x2="240" y2="648" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- =========================
+             TASK QUEUE (bottom, full width)
+             ========================= -->
+
+        <!-- Boundary -->
+        <rect x="60" y="750" width="1080" height="200" rx="12" fill="rgba(251, 146, 60, 0.05)" stroke="#fb923c" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="78" y="768" fill="#fb923c" font-size="10" font-weight="600">PreloadService — task queue (triggered after current chapter renders)</text>
+
+        <!-- enqueueTasks -->
+        <rect x="80" y="785" width="280" height="60" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="220" y="805" fill="white" font-size="11" font-weight="600" text-anchor="middle">enqueueTasks()</text>
+        <text x="220" y="821" fill="#94a3b8" font-size="9" text-anchor="middle">filterUncachedChapters()</text>
+        <text x="220" y="835" fill="#94a3b8" font-size="8" text-anchor="middle">后续章节优先 → 前序章节次之</text>
+
+        <!-- Queue: Deque + Set -->
+        <rect x="400" y="785" width="220" height="60" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="510" y="805" fill="white" font-size="11" font-weight="600" text-anchor="middle">Deque + _enqueuedUrls</text>
+        <text x="510" y="821" fill="#94a3b8" font-size="9" text-anchor="middle">FIFO + URL dedup</text>
+        <text x="510" y="835" fill="#94a3b8" font-size="8" text-anchor="middle">_processingCompleter = lock</text>
+
+        <!-- _processQueue loop -->
+        <rect x="660" y="785" width="220" height="60" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="770" y="805" fill="white" font-size="11" font-weight="600" text-anchor="middle">_processQueue()</text>
+        <text x="770" y="821" fill="#94a3b8" font-size="9" text-anchor="middle">while (_queue.isNotEmpty)</text>
+        <text x="770" y="835" fill="#94a3b8" font-size="8" text-anchor="middle">same WebView → API fallback</text>
+
+        <!-- Rate limiter -->
+        <rect x="920" y="785" width="200" height="60" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="1020" y="805" fill="white" font-size="11" font-weight="600" text-anchor="middle">RateLimiter</text>
+        <text x="1020" y="821" fill="#94a3b8" font-size="9" text-anchor="middle">30s/任务 (爬虫抓取)</text>
+        <text x="1020" y="835" fill="#34d399" font-size="8" text-anchor="middle">缓存命中 → reset</text>
+
+        <!-- Arrows between queue boxes -->
+        <line x1="360" y1="815" x2="398" y2="815" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <line x1="620" y1="815" x2="658" y2="815" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <line x1="880" y1="815" x2="918" y2="815" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Loop arrow (cycle) -->
+        <path d="M 770 845 L 770 880 L 510 880 L 510 847" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrowhead)" stroke-dasharray="3,3"/>
+        <text x="640" y="895" fill="#fb923c" font-size="8" text-anchor="middle">next task</text>
+
+        <!-- Trigger arrow from reader_screen to enqueueTasks -->
+        <path d="M 240 280 L 240 760 L 220 760 L 220 783" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="252" y="500" fill="#fb923c" font-size="8">await _startPreloadingChapters()</text>
+
+        <!-- Output: write to cache -->
+        <path d="M 770 845 L 770 920" fill="none" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="770" y1="920" x2="240" y2="920" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="500" y="913" fill="#94a3b8" font-size="8" text-anchor="middle">cacheChapter() → SQLite (preload fills cache for next chapter)</text>
+
+        <!-- =========================
+             HEADLESS WEBVIEW INTERNALS (right side, ref)
+             ========================= -->
+        <rect x="1000" y="60" width="160" height="280" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="1080" y="80" fill="white" font-size="11" font-weight="600" text-anchor="middle">WebView internals</text>
+        <text x="1080" y="100" fill="#a78bfa" font-size="8" text-anchor="middle">HeadlessInAppWebView</text>
+        <text x="1080" y="118" fill="#94a3b8" font-size="8" text-anchor="middle">loadUrl(chapterUrl)</text>
+        <text x="1080" y="134" fill="#94a3b8" font-size="8" text-anchor="middle">↓ onLoadStop</text>
+        <text x="1080" y="150" fill="#94a3b8" font-size="8" text-anchor="middle">callAsyncJavaScript(</text>
+        <text x="1080" y="164" fill="#94a3b8" font-size="8" text-anchor="middle">  chapter_content_js</text>
+        <text x="1080" y="178" fill="#94a3b8" font-size="8" text-anchor="middle">)</text>
+        <text x="1080" y="198" fill="#94a3b8" font-size="8" text-anchor="middle">WebViewJsExecutor:</text>
+        <text x="1080" y="212" fill="#94a3b8" font-size="7" text-anchor="middle">• validateScript</text>
+        <text x="1080" y="224" fill="#94a3b8" font-size="7" text-anchor="middle">• extractAsyncFunctionBody</text>
+        <text x="1080" y="236" fill="#94a3b8" font-size="7" text-anchor="middle">• stringifyJsResult</text>
+        <text x="1080" y="256" fill="#a78bfa" font-size="7" text-anchor="middle">script timeout 60s</text>
+        <text x="1080" y="270" fill="#a78bfa" font-size="7" text-anchor="middle">page load 30s</text>
+        <text x="1080" y="290" fill="#fb7185" font-size="7" text-anchor="middle">3 fails → verified=0</text>
+        <text x="1080" y="304" fill="#fb7185" font-size="7" text-anchor="middle">(advisory only)</text>
+
+        <!-- Connector to WebView internals -->
+        <line x1="700" y1="490" x2="998" y2="200" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+
+        <!-- =========================
+             LEGEND (bottom-left, outside the orange boundary)
+             ========================= -->
+        <text x="80" y="730" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="80" y="736" width="14" height="8" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="100" y="743" fill="#94a3b8" font-size="8">Frontend / Controller</text>
+
+        <rect x="240" y="736" width="14" height="8" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="260" y="743" fill="#94a3b8" font-size="8">Backend / Service</text>
+
+        <rect x="380" y="736" width="14" height="8" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="400" y="743" fill="#94a3b8" font-size="8">Data / WebView engine</text>
+
+        <rect x="540" y="736" width="14" height="8" rx="2" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
+        <text x="560" y="743" fill="#94a3b8" font-size="8">Task queue</text>
+
+        <line x1="660" y1="740" x2="676" y2="740" stroke="#34d399" stroke-width="1.5"/>
+        <text x="682" y="743" fill="#94a3b8" font-size="8">Success path</text>
+
+        <line x1="780" y1="740" x2="796" y2="740" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
+        <text x="802" y="743" fill="#94a3b8" font-size="8">Failure / fallback</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>当前章节加载 (同步)</h3>
+        </div>
+        <ul>
+          <li>• UI 触发 <code style="color:#22d3ee">loadChapter</code> → 查缓存</li>
+          <li>• 未命中 → 走 <b style="color:#22d3ee">WebView 优先</b> 降级链</li>
+          <li>• 验证 content 长度 ≥ 50，写入 SQLite</li>
+          <li>• 渲染段落，更新阅读进度，标记已读</li>
+          <li>• <b style="color:#22d3ee">修改后</b>：未验证脚本也能走 WebView</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot orange"></div>
+          <h3>预加载任务队列 (异步)</h3>
+        </div>
+        <ul>
+          <li>• 当前章节渲染后才触发 <code style="color:#fb923c">_startPreloadingChapters</code></li>
+          <li>• <b style="color:#fb923c">filterUncachedChapters</b> 过滤已缓存</li>
+          <li>• 后续章节优先入队 → 前序章节次之</li>
+          <li>• <b style="color:#fb923c">_processingCompleter</b> 互斥锁防并发</li>
+          <li>• <b style="color:#fb923c">30s/任务</b> 速率限制，缓存命中 reset</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>关键不变量 / 注意点</h3>
+        </div>
+        <ul>
+          <li>• <b style="color:#fb7185">_isFetching</b> 单例锁：并发 WebView 调用 → return null → 回退 API</li>
+          <li>• <b style="color:#fb7185">verified=0</b> 仅作历史标记，不再禁用</li>
+          <li>• 任务队列是<b style="color:#fb7185">内存</b>队列，App 关闭即清空</li>
+          <li>• 后端 502 时 → 走 webview 失败 → 整个章节读取失败</li>
+          <li>• <code style="color:#94a3b8">chapter_content_provider.dart</code> 仍走 API，是另一条独立路径</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      novel_app · Reader + Preload flow · after `verified` gate removal
+    </p>
+  </div>
+
+  <script>
+    async function copyAsImage(btn) {
+      const orig = btn.textContent;
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        btn.textContent = '✓ Copied!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+
+    async function downloadPNG(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const link = document.createElement('a');
+        link.download = 'chapter-fetch-flow.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.textContent = '✓ Done!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+
+    async function downloadPDF(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], hotfixes: ['px_scaling'] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('chapter-fetch-flow.pdf');
+        btn.textContent = '✓ Done!';
+      } catch (e) { btn.textContent = '✗ Failed'; }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+  </script>
+</body>
+</html>

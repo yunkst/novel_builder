@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/search_screen_providers.dart';
 import '../core/providers/service_providers.dart';
+import '../core/providers/ui_providers.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/empty_states/empty_search.dart';
 import '../widgets/url_input_dialog.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -168,9 +170,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             )
           else
-            const Expanded(
-              child: Center(
-                child: Text('输入关键词搜索小说'),
+            Expanded(
+              child: EmptySearchView(
+                onOpenSettings: () {
+                  // 切换到设置 Tab
+                  ref
+                      .read(homeTabIndexNotifierProvider.notifier)
+                      .switchTo(HomeTabIndex.settings);
+                },
               ),
             ),
         ],

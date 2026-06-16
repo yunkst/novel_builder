@@ -78,16 +78,6 @@ class HeadlessWebViewContentService {
     final script = await _scriptRepo.getByDomain(domain);
     if (script == null || !script.hasChapterContentJs) return null;
 
-    // 跳过未验证的脚本（曾被自动禁用）
-    if (!script.isVerified) {
-      LoggerService.instance.d(
-        'HeadlessWebView: 跳过未验证脚本 domain=$domain',
-        category: LogCategory.cache,
-        tags: ['headless-webview', 'skip-unverified'],
-      );
-      return null;
-    }
-
     // 2. 确保 WebView 就绪
     await _ensureWebView();
 

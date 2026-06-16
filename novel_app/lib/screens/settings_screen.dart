@@ -14,6 +14,7 @@ import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/providers/service_providers.dart';
 import '../core/database/database_connection.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import 'backup_management_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -165,6 +166,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BackendSettingsScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('新手引导'),
+            subtitle: const Text('重新查看首次启动引导'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const OnboardingScreen(isReviewMode: true),
+                  fullscreenDialog: true,
                 ),
               );
             },

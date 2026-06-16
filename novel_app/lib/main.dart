@@ -6,8 +6,11 @@ import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'screens/webview_browser_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'core/providers/service_providers.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/providers/onboarding_providers.dart';
+import 'core/providers/ui_providers.dart';
 import 'core/providers/agent_scenario_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'utils/video_cache_manager.dart';
@@ -110,7 +113,7 @@ class NovelReaderApp extends ConsumerWidget {
           theme: themeState.getLightTheme(),
           darkTheme: themeState.getDarkTheme(),
           themeMode: themeState.flutterThemeMode,
-          home: const HomePage(),
+          home: const _AppRoot(),
           debugShowCheckedModeBanner: true,
           builder: (context, child) {
             // 捕获并记录所有Widget错误
@@ -204,6 +207,38 @@ class NovelReaderApp extends ConsumerWidget {
   }
 }
 
+/// 应用根 Widget，根据 Onboarding 状态决定显示引导页还是主页
+class _AppRoot extends ConsumerWidget {
+  const _AppRoot();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboardingAsync = ref.watch(onboardingNotifierProvider);
+
+    return onboardingAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      data: (onboardingState) {
+        if (onboardingState.onboardingCompleted) {
+          return const HomePage();
+        }
+        return const OnboardingScreen();
+      },
+      error: (error, stack) {
+        // 加载失败时直接进入主页
+        LoggerService.instance.e(
+          '加载 Onboarding 状态失败，直接进入主页: $error',
+          stackTrace: stack.toString(),
+          category: LogCategory.general,
+          tags: ['onboarding', 'error', 'fallback'],
+        );
+        return const HomePage();
+      },
+    );
+  }
+}
+
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -215,21 +250,19 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   /// 浏览器 Tab 索引（统一进 IndexedStack 后也用于场景切换判定）
   static const int _browserTabIndex = 3;
 
-  int _selectedIndex = 0;
-
   // 为生图调试页面创建 GlobalKey，用于调用刷新方法
   final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
 
-  void _onItemTapped(int index) {
-    setState(() {
-      final previousIndex = _selectedIndex;
-      _selectedIndex = index;
+  void _onItemTapped(int index, WidgetRef ref) {
+    final previousIndex = ref.read(homeTabIndexNotifierProvider);
 
-      // 当切换到生图调试页面（索引2）且之前不在该页面时，触发刷新
-      if (index == 2 && previousIndex != 2) {
-        _refreshIllustrationDebugScreen();
-      }
-    });
+    // 当切换到生图调试页面（索引2）且之前不在该页面时，触发刷新
+    if (index == 2 && previousIndex != 2) {
+      _refreshIllustrationDebugScreen();
+    }
+
+    // 更新 Tab 索引（单一真相源：homeTabIndexNotifierProvider）
+    ref.read(homeTabIndexNotifierProvider.notifier).switchTo(index);
 
     // 根据当前 Tab 切换 Hermes Agent 场景：
     // 浏览器 Tab 用网页提取场景，其余 Tab 用写作场景。
@@ -317,27 +350,47 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    // 监听外部 Tab 切换请求（如书架空状态引导"去搜索"）。
+    // 用户点击底部导航时也会写回此 Provider，保持单一真相源。
+    final selectedIndex = ref.watch(homeTabIndexNotifierProvider);
+
+    // 响应外部/导航触发的 Tab 切换，执行副作用：
+    // 1) 进入生图 Tab 时刷新数据
+    // 2) 切换 Hermes Agent 场景
+    ref.listen<int>(homeTabIndexNotifierProvider, (previous, next) {
+      if (previous == null || previous == next) return;
+      if (next == 2 && previous != 2) {
+        _refreshIllustrationDebugScreen();
+      }
+      ref.read(currentAgentScenarioProvider.notifier).state =
+          next == _browserTabIndex
+              ? ScenarioIds.webviewExtract
+              : ScenarioIds.writing;
+    });
+
     // 所有 Tab（含浏览器）统一使用 IndexedStack 保持状态：
     // 浏览器 Tab 此前每次切换都会销毁重建 WebView，导致浏览页面/历史丢失。
     // IndexedStack 会保留各 Tab 的 element 与 State，切换 Tab 不再销毁 WebView。
     return Scaffold(
       body: HermesFloatingShell(
         child: IndexedStack(
-          index: _selectedIndex,
+          index: selectedIndex,
           children: [
             const BookshelfScreen(),
             const SearchScreen(),
             IllustrationDebugScreen(key: _debugScreenKey),
             // active 标记当前浏览器是否可见：
             // 仅在可见时拦截系统返回手势，避免 offstage 状态下误拦截其他 Tab 的返回键。
-            WebViewBrowserScreen(active: _selectedIndex == _browserTabIndex),
+            WebViewBrowserScreen(active: selectedIndex == _browserTabIndex),
             const SettingsScreen(),
           ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (index) {
+          _onItemTapped(index, ref);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.book),
