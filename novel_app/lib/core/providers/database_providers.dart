@@ -15,6 +15,7 @@ import '../../repositories/prompt_history_repository.dart';
 import '../../repositories/prompt_tag_category_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
 import '../../repositories/site_script_repository.dart';
+import '../../repositories/agent_memory_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/i_database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
@@ -178,4 +179,12 @@ NovelExportRepository novelExportRepository(Ref ref) {
 final siteScriptRepositoryProvider = Provider<SiteScriptRepository>((ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return SiteScriptRepository(dbConnection: dbConnection);
+});
+
+/// AgentMemoryRepository Provider
+///
+/// Agent 场景经验记忆的持久化操作
+final agentMemoryRepositoryProvider = Provider<AgentMemoryRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return AgentMemoryRepository(dbConnection: dbConnection);
 });

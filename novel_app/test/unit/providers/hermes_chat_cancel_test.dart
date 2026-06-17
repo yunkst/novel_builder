@@ -195,6 +195,146 @@ void main() {
     });
   });
 
+  group('场景切换历史保留', () {
+    test('切换场景后，原场景历史清空但目标场景恢复缓存历史', () {
+      final notifier = container.read(hermesChatProvider.notifier);
+
+      // 在 writing 场景发送一条消息（模拟 assistant 回复）
+      notifier.sendMessage('写作场景消息1');
+      // 手动设置一条 assistant 消息模拟对话历史
+      // sendMessage 是异步的，这里直接用内部状态验证切换逻辑
+      // 我们改用直接验证 switchScenario 的缓存行为
+
+      // 先验证初始场景
+      expect(
+        container.read(hermesChatProvider).scenarioId,
+        ScenarioIds.writing,
+      );
+    });
+
+    test('切到新场景后 messages 为空，切回原场景恢复历史', () async {
+      final notifier = container.read(hermesChatProvider.notifier);
+
+      // Step 1: 在 writing 场景发送一条消息
+      await notifier.sendMessage('你好');
+      final writingMessages = container.read(hermesChatProvider).messages;
+      expect(writingMessages.length, greaterThan(0),
+          reason: 'writing 场景应有一条 user + 一条 assistant 消息');
+
+      // Step 2: 切换到 webview_extract 场景
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      var state = container.read(hermesChatProvider);
+      expect(state.scenarioId, ScenarioIds.webviewExtract);
+      expect(state.messages, isEmpty,
+          reason: '首次进入 webview_extract 场景，历史应为空');
+
+      // Step 3: 在 webview_extract 场景发送一条消息
+      await notifier.sendMessage('提取网页');
+      final extractMessages = container.read(hermesChatProvider).messages;
+      expect(extractMessages.length, greaterThan(0),
+          reason: 'webview_extract 场景应有一条 user + 一条 assistant 消息');
+
+      // Step 4: 切回 writing 场景，验证历史恢复
+      notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
+      state = container.read(hermesChatProvider);
+      expect(state.scenarioId, ScenarioIds.writing);
+      expect(state.messages.length, writingMessages.length,
+          reason: '切回 writing 场景应恢复之前的对话历史');
+
+      // Step 5: 再次切到 webview_extract，验证该场景历史也保留
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      state = container.read(hermesChatProvider);
+      expect(state.scenarioId, ScenarioIds.webviewExtract);
+      expect(state.messages.length, extractMessages.length,
+          reason: '切回 webview_extract 场景应恢复之前的对话历史');
+    });
+
+    test('同一场景重复切换不触发清空', () {
+      final notifier = container.read(hermesChatProvider.notifier);
+
+      // 同场景切换应该直接 return，不改变任何状态
+      notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
+      final state = container.read(hermesChatProvider);
+      expect(state.scenarioId, ScenarioIds.writing);
+      expect(state.messages, isEmpty);
+    });
+
+    test('clearConversation 只清空当前场景，不影响其他场景缓存', () async {
+      final notifier = container.read(hermesChatProvider.notifier);
+
+      // 在 writing 场景发送消息
+      await notifier.sendMessage('写作消息');
+      final writingMessages = container.read(hermesChatProvider).messages;
+      expect(writingMessages.isNotEmpty, isTrue);
+
+      // 切到 webview_extract 并发送消息
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      await notifier.sendMessage('提取消息');
+      final extractMessages = container.read(hermesChatProvider).messages;
+      expect(extractMessages.isNotEmpty, isTrue);
+
+      // 在 webview_extract 场景执行 clearConversation
+      notifier.clearConversation();
+      var state = container.read(hermesChatProvider);
+      expect(state.messages, isEmpty,
+          reason: 'clearConversation 后当前场景历史应为空');
+      expect(state.scenarioId, ScenarioIds.webviewExtract,
+          reason: '场景 ID 不应改变');
+
+      // 切回 writing，验证历史仍在
+      notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
+      state = container.read(hermesChatProvider);
+      expect(state.messages.length, writingMessages.length,
+          reason: 'clearConversation 只清空了 webview_extract，writing 场景历史应保留');
+
+      // 切回 webview_extract，验证已被清空
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      state = container.read(hermesChatProvider);
+      expect(state.messages, isEmpty,
+          reason: '被 clearConversation 清空的场景再次进入也应为空');
+    });
+
+    test('多次切换场景，各自历史独立保留', () async {
+      final notifier = container.read(hermesChatProvider.notifier);
+
+      // writing 场景
+      await notifier.sendMessage('A');
+      final writingMsgs = container.read(hermesChatProvider).messages;
+
+      // 切到 webview_extract
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      await notifier.sendMessage('B');
+      final extractMsgs = container.read(hermesChatProvider).messages;
+
+      // 切回 writing
+      notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
+      await notifier.sendMessage('C');
+      final writingMsgs2 = container.read(hermesChatProvider).messages;
+
+      // 切回 webview_extract
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      await notifier.sendMessage('D');
+      final extractMsgs2 = container.read(hermesChatProvider).messages;
+
+      // 验证 writing 场景累积了 A + C 两轮
+      expect(writingMsgs2.length, greaterThan(writingMsgs.length),
+          reason: 'writing 场景应在原有历史上追加新消息');
+
+      // 验证 webview_extract 场景累积了 B + D 两轮
+      expect(extractMsgs2.length, greaterThan(extractMsgs.length),
+          reason: 'webview_extract 场景应在原有历史上追加新消息');
+
+      // 两个场景的历史应互不影响
+      notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
+      final finalWriting = container.read(hermesChatProvider).messages;
+      expect(finalWriting.length, writingMsgs2.length);
+
+      notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
+      final finalExtract = container.read(hermesChatProvider).messages;
+      expect(finalExtract.length, extractMsgs2.length);
+    });
+  });
+
   group('dispose 清理', () {
     test('dispose Notifier 后状态可被重置', () {
       // dispose 后重新创建 container

@@ -20,14 +20,21 @@ Novel App 发布脚本
   3.4 git push
   3.5 git push origin v{version}
 
+阶段 4 — CI 验证（提交后 10 分钟检查）:
+  4.1 等待 10 分钟
+  4.2 通过 gh run list 查询最新 CI run 状态
+  4.3 报告结果（success / failure / pending）
+
 预检中任何一步失败都会中断发布，因为这意味着 GitHub Actions 也会失败。
 可通过 SKIP_PREFLIGHT=1 环境变量跳过预检（不推荐）。
+可通过 SKIP_CI_CHECK=1 环境变量跳过 CI 等待和检查（不推荐）。
 """
 
 import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # 强制使用 UTF-8 输出（修复 Windows cmd 的 GBK 编码问题）
@@ -465,6 +472,98 @@ def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
         return False
 
 
+def wait_and_check_ci(project_root: Path, version: str, wait_seconds: int = 600) -> str:
+    """
+    阶段 4：等待 CI 构建完成并检查状态
+
+    等待 [wait_seconds] 秒（默认 10 分钟）后，
+    通过 gh CLI 查询最新 CI run 状态。
+
+    Args:
+        project_root: 项目根目录
+        version: 版本号
+        wait_seconds: 等待秒数（默认 600）
+
+    Returns:
+        CI 状态字符串: "success" / "failure" / "pending" / "unknown"
+    """
+    print("=" * 60)
+    print(f"阶段 4/4: 等待 CI 构建 ({wait_seconds // 60} 分钟) 并检查状态")
+    print("=" * 60)
+
+    # 1. 倒计时（每 60 秒打印一次进度）
+    minutes = wait_seconds // 60
+    for remaining_min in range(minutes, 0, -1):
+        print(f"  ⏳ 剩余等待时间: {remaining_min} 分钟...")
+        time.sleep(60)
+
+    # 2. 检查 gh CLI 是否可用
+    rc, _, _ = run_command(["gh", "--version"], project_root)
+    if rc != 0:
+        print("  ⚠️  gh CLI 未安装，请手动检查 GitHub Actions:")
+        print("     https://github.com/yunkst/novel_builder/actions")
+        return "unknown"
+
+    # 3. 查询最新 run 状态
+    print("  📡 正在查询 GitHub Actions 状态...")
+    rc, stdout, stderr = run_command(
+        ["gh", "run", "list", "--limit", "1", "--json",
+         "status,conclusion,name,displayTitle,url,createdAt"],
+        project_root,
+    )
+    if rc != 0:
+        print(f"  ⚠️  gh run list 执行失败: {stderr[:200]}")
+        print("     请手动检查: https://github.com/yunkst/novel_builder/actions")
+        return "unknown"
+
+    try:
+        import json
+        runs = json.loads(stdout) if stdout.strip() else []
+    except json.JSONDecodeError:
+        print(f"  ⚠️  gh run list 返回非 JSON 数据: {stdout[:200]}")
+        return "unknown"
+
+    if not runs:
+        print("  ⚠️  未找到 CI run")
+        return "unknown"
+
+    run = runs[0]
+    status = run.get("status", "unknown")
+    conclusion = run.get("conclusion")
+    name = run.get("displayTitle") or run.get("name", "unknown")
+    url = run.get("url", "")
+    created_at = run.get("createdAt", "")
+
+    print(f"  📋 最新 run: {name}")
+    print(f"     状态: {status}, 结果: {conclusion}")
+    print(f"     时间: {created_at}")
+    if url:
+        print(f"     链接: {url}")
+
+    # 4. 报告结果
+    if status in ("in_progress", "queued", "waiting", "pending", "requested"):
+        print(f"\n  🟡 CI 仍在进行中，请稍后手动检查: {url}")
+        return "pending"
+
+    if status == "completed":
+        if conclusion == "success":
+            print("\n  ✅ CI 构建成功！Release 已自动创建")
+            return "success"
+        elif conclusion == "failure":
+            print("\n  ❌ CI 构建失败")
+            print(f"     请查看日志: {url}")
+            return "failure"
+        elif conclusion == "cancelled":
+            print("\n  ⚠️  CI 被取消")
+            return "failure"
+        else:
+            print(f"\n  ⚠️  CI 结果未知: {conclusion}")
+            return "unknown"
+
+    print(f"\n  ⚠️  CI 状态未知: {status}")
+    return "unknown"
+
+
 def main():
     """主函数"""
     # 获取项目根目录
@@ -518,14 +617,42 @@ def main():
 
     print("=" * 60)
     if success:
-        print("🎉 发布成功!")
+        print("🎉 Git 操作完成，标签已推送到 origin")
         print(f"  版本: {version} (code: {version_code})")
-        print(f"  标签: v{version} 已推送到 origin")
-        print(f"  GitHub Actions 将自动构建 APK 并创建 Release")
-        print(f"  Release 页面: https://github.com/yunkst/novel_builder/releases/tag/v{version}")
+        print(f"  标签: v{version}")
+        print(f"  GitHub Actions 正在构建 Release APK...")
     else:
-        print("❌ 发布失败，请检查上方错误信息")
+        print("❌ Git 发布失败，请检查上方错误信息")
         sys.exit(1)
+
+    # ============================================================
+    # 阶段 4: 等待并检查 CI 状态
+    # ============================================================
+    skip_ci_check = os.getenv("SKIP_CI_CHECK", "").strip() in ("1", "true", "yes", "True", "YES")
+
+    if skip_ci_check:
+        print("\n" + "=" * 60)
+        print("⚠️  SKIP_CI_CHECK=1，跳过 CI 等待和检查")
+        print(f"   请手动检查: https://github.com/yunkst/novel_builder/actions")
+        print("=" * 60)
+        return
+
+    ci_status = wait_and_check_ci(project_root, version)
+
+    print("=" * 60)
+    if ci_status == "success":
+        print(f"🎉 发布成功! Release {version} 已上线")
+        print(f"  Release 页面: https://github.com/yunkst/novel_builder/releases/tag/v{version}")
+    elif ci_status == "failure":
+        print(f"❌ CI 构建失败，请修复后重新发布")
+        print(f"  修复后使用新版本号重新运行发布脚本")
+        sys.exit(2)
+    elif ci_status == "pending":
+        print(f"🟡 CI 仍在构建中")
+        print(f"  几分钟后手动检查: https://github.com/yunkst/novel_builder/actions")
+    else:
+        print(f"⚠️  CI 状态未知")
+        print(f"  请手动检查: https://github.com/yunkst/novel_builder/actions")
 
 
 if __name__ == "__main__":

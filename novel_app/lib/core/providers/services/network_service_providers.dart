@@ -22,6 +22,8 @@ import 'dart:io';
 import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/headless_webview_content_service.dart';
+import '../../../services/headless_webview_chapter_list_service.dart';
+import '../../../services/headless_webview_pool.dart';
 import '../../../services/scene_illustration_service.dart';
 import '../../../services/scene_illustration_cache_service.dart';
 import '../../../repositories/chapter_repository.dart';
@@ -224,7 +226,6 @@ Future<void> _initializeApiService(ApiServiceWrapper apiService) async {
 /// - 支持通过 progressStream 监听进度
 @Riverpod(keepAlive: true)
 PreloadService preloadService(Ref ref) {
-  final apiService = ref.watch(apiServiceWrapperProvider);
   final chapterRepository = ref.watch(chapterRepositoryProvider);
   final headlessService = ref.watch(headlessWebViewContentServiceProvider);
 
@@ -234,7 +235,6 @@ PreloadService preloadService(Ref ref) {
   final repository = chapterRepository as ChapterRepository;
 
   return PreloadService(
-    apiService: apiService,
     chapterRepository: repository,
     headlessService: headlessService,
   );
@@ -327,4 +327,28 @@ SceneIllustrationCacheService sceneIllustrationCacheService(Ref ref) {
 HeadlessWebViewContentService headlessWebViewContentService(Ref ref) {
   final scriptRepo = ref.watch(siteScriptRepositoryProvider);
   return HeadlessWebViewContentService(scriptRepo: scriptRepo);
+}
+
+/// HeadlessWebViewChapterListService Provider
+///
+/// 提供无头 WebView 章节列表获取服务实例。
+/// 当域名有 AI Agent 生成的 `chapter_list_js` 脚本时，
+/// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取章节列表。
+///
+/// **功能**:
+/// - 绕过 API 直接获取章节列表
+/// - 无脚本时返回 null
+/// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
+///
+/// **依赖**:
+/// - [siteScriptRepositoryProvider] - 站点脚本查询
+/// - [headlessWebViewPoolProvider] - 共享 headless WebView 池
+@Riverpod(keepAlive: true)
+HeadlessWebViewChapterListService headlessWebViewChapterListService(Ref ref) {
+  final scriptRepo = ref.watch(siteScriptRepositoryProvider);
+  final pool = ref.watch(headlessWebViewPoolProvider);
+  return HeadlessWebViewChapterListService(
+    scriptRepo: scriptRepo,
+    pool: pool,
+  );
 }

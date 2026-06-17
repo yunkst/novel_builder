@@ -306,5 +306,40 @@ final headlessWebViewContentServiceProvider =
 // ignore: unused_element
 typedef HeadlessWebViewContentServiceRef
     = ProviderRef<HeadlessWebViewContentService>;
+String _$headlessWebViewChapterListServiceHash() =>
+    r'8b5b2321e562a95fb7773e7c6b2f699cb7acb85a';
+
+/// HeadlessWebViewChapterListService Provider
+///
+/// 提供无头 WebView 章节列表获取服务实例。
+/// 当域名有 AI Agent 生成的 `chapter_list_js` 脚本时，
+/// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取章节列表。
+///
+/// **功能**:
+/// - 绕过 API 直接获取章节列表
+/// - 无脚本时返回 null
+/// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
+///
+/// **依赖**:
+/// - [siteScriptRepositoryProvider] - 站点脚本查询
+/// - [headlessWebViewPoolProvider] - 共享 headless WebView 池
+///
+/// Copied from [headlessWebViewChapterListService].
+@ProviderFor(headlessWebViewChapterListService)
+final headlessWebViewChapterListServiceProvider =
+    Provider<HeadlessWebViewChapterListService>.internal(
+  headlessWebViewChapterListService,
+  name: r'headlessWebViewChapterListServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$headlessWebViewChapterListServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HeadlessWebViewChapterListServiceRef
+    = ProviderRef<HeadlessWebViewChapterListService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

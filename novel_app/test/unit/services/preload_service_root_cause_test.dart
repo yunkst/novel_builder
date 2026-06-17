@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/services/preload_service.dart';
+import 'package:novel_app/services/headless_webview_content_service.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
@@ -9,6 +10,32 @@ import 'package:novel_app/models/chapter_content_result.dart';
 
 import '../../helpers/test_database_setup.dart';
 import 'test_helpers.mocks.dart' as test_mocks;
+
+/// Manual mock for HeadlessWebViewContentService
+class MockHeadlessWebViewContentService extends Mock
+    implements HeadlessWebViewContentService {
+  final Map<String, ChapterContentResult?> _stubs = {};
+  ChapterContentResult? Function(String)? _fallback;
+
+  void addStub(String url, ChapterContentResult? result) {
+    _stubs[url] = result;
+  }
+
+  void setFallback(ChapterContentResult? Function(String) fn) {
+    _fallback = fn;
+  }
+
+  @override
+  Future<ChapterContentResult?> fetchContent(String chapterUrl) async {
+    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl];
+    if (_fallback != null) return _fallback!(chapterUrl);
+    return super.noSuchMethod(
+      Invocation.method(#fetchContent, [chapterUrl]),
+      returnValue: Future<ChapterContentResult?>.value(null),
+      returnValueForMissingStub: Future<ChapterContentResult?>.value(null),
+    ) as Future<ChapterContentResult?>;
+  }
+}
 
 /// 根因定位测试
 ///
@@ -19,7 +46,7 @@ void main() {
   TestDatabaseSetup.init();
 
   late ChapterRepository chapterRepository;
-  late test_mocks.MockApiServiceWrapper mockApiService;
+  late MockHeadlessWebViewContentService mockHeadlessService;
   late PreloadService preloadService;
   late Database db;
 
@@ -29,10 +56,11 @@ void main() {
     db = await TestDatabaseSetup.createInMemoryDatabase();
     final connection = DatabaseConnection.forTesting(db);
     chapterRepository = ChapterRepository(dbConnection: connection);
-    mockApiService = test_mocks.MockApiServiceWrapper();
+    mockHeadlessService = MockHeadlessWebViewContentService();
     preloadService = PreloadService(
-      apiService: mockApiService,
+      apiService: test_mocks.MockApiServiceWrapper(),
       chapterRepository: chapterRepository,
+      headlessService: mockHeadlessService,
     );
   });
 
@@ -69,8 +97,7 @@ void main() {
         'https://example.com/ch2',
       ];
 
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: '内容'));
 
       await preloadService.enqueueTasks(
         novelUrl: testNovelUrl,
@@ -98,8 +125,7 @@ void main() {
         'https://example.com/ch3',
       ];
 
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: '内容'));
 
       await preloadService.enqueueTasks(
         novelUrl: testNovelUrl,
@@ -123,8 +149,7 @@ void main() {
     test('10个URL + currentIndex=0 → 9个后续章节入队', () async {
       final urls = List.generate(10, (i) => 'https://example.com/ch$i');
 
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: '内容'));
 
       await preloadService.enqueueTasks(
         novelUrl: testNovelUrl,
@@ -159,7 +184,7 @@ void main() {
 
       // Mock API
       for (final url in urls) {
-        when(mockApiService.getChapterContentWithSource(url))
+        when(mockHeadlessService.fetchContent(url))
             .thenAnswer((_) async => ChapterContentResult(content: '内容:$url'));
       }
 
@@ -193,9 +218,9 @@ void main() {
       final url2 = 'https://example.com/full2';
 
       // Mock
-      when(mockApiService.getChapterContentWithSource(url1))
+      when(mockHeadlessService.fetchContent(url1))
           .thenAnswer((_) async => ChapterContentResult(content: '缓存内容1'));
-      when(mockApiService.getChapterContentWithSource(url2))
+      when(mockHeadlessService.fetchContent(url2))
           .thenAnswer((_) async => ChapterContentResult(content: '缓存内容2'));
 
       // 入队（2个URL，currentIndex=0）
@@ -248,12 +273,12 @@ void main() {
       );
 
       // Mock - 基于URL返回不同内容，并添加延迟防止立即处理
-      when(mockApiService.getChapterContentWithSource(urls[1]))
+      when(mockHeadlessService.fetchContent(urls[1]))
           .thenAnswer((_) async {
         await Future.delayed(Duration(milliseconds: 200));
         return ChapterContentResult(content: '新缓存p2');
       });
-      when(mockApiService.getChapterContentWithSource(urls[3]))
+      when(mockHeadlessService.fetchContent(urls[3]))
           .thenAnswer((_) async {
         await Future.delayed(Duration(milliseconds: 200));
         return ChapterContentResult(content: '新缓存p4');

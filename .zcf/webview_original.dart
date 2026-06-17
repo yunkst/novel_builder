@@ -78,56 +78,91 @@ class WebViewExtractScenario implements AgentScenario {
   @override
   String buildSystemPrompt(AgentScenarioContext context) {
     final url = context.currentUrl ?? _currentUrl;
-    final buf = StringBuffer();
+    return '''
+## 当前页面
+URL: $url
 
-    buf.writeln('## 当前页面');
-    buf.writeln('URL: ' + url);
-    buf.writeln();
+## 工作目标
+为当前小说网站编写**可复用的 JavaScript 提取脚本**，经 execute_js 验证可用后，调用 save_script **保存到本地数据库**，以便今后访问同域名页面时直接复用，无需重新生成。
 
-    buf.writeln('## 工作目标');
-    buf.writeln('为当前小说网站编写可复用的 JS 提取脚本，经 execute_js 验证后 save_script 保存到本地数据库。');
-    buf.writeln('核心产出：目录提取（chapter_list_js）+ 内容提取（chapter_content_js），两段都必须测试通过。');
-    buf.writeln();
+**核心产出是「提取脚本」，不是提取到的内容。** 任务以 save_script 成功返回为完成标志：
+- 目录提取脚本（chapter_list_js）：提取小说标题 + 章节列表（含URL）
+- 内容提取脚本（chapter_content_js）：提取章节标题 + 正文
+两段脚本都必须测试通过，不可只测一段或只保存一段。
 
-    buf.writeln('## 工作流程');
-    buf.writeln('1. get_page_info → 获取 DOM 结构和页面类型');
-    buf.writeln('2. get_cached_script → 有缓存则 execute_js(run_id=...) 重跑验证，无则新生成');
-    buf.writeln('3. execute_js(script=...) 测试脚本，获取 __meta.run_id');
-    buf.writeln('4. save_script(domain, list_run_id, content_run_id) 零重传保存 → 完成');
-    buf.writeln();
+## 工作流程
+1. 调用 get_page_info 获取页面 DOM 结构和页面类型推断
+2. 调用 get_cached_script 查询该域名是否已有缓存脚本
+   - **若 found=true**：返回 list_run_id + content_run_id。直接用 execute_js(run_id=...) 重跑验证，**不要在上下文中保留脚本内容**（避免占 token）
+   - **若 found=false**：需要新生成脚本
+3. 生成两段 JS 脚本：
+   - 目录提取脚本：提取小说标题 + 章节列表（含URL），支持自动翻页
+   - 内容提取脚本：提取章节标题 + 正文，支持自动翻页拼接
+4. 调用 execute_js(script=...) 测试新脚本
+   - 执行成功后，**记住 __meta.run_id**（这是脚本的唯一句柄）
+5. 用 save_script 的 **run_id 模式**保存：save_script(domain, list_run_id=<run_id_1>, content_run_id=<run_id_2>)
+   - **零重传**——脚本内容不经过上下文，保存版本与测试版本天然一致
+   - 完成后任务完成
 
-    buf.writeln('## run_id 机制');
-    buf.writeln('- 不要在上下文保留完整脚本 → 用 run_id 句柄引用');
-    buf.writeln('- 重跑: execute_js(run_id=<id>) → 保存: save_script(domain, list_run_id=<id>, content_run_id=<id>)');
-    buf.writeln();
+## run_id 句柄机制（重要，避免反复搬运脚本）
+所有 execute_js / get_cached_script 的返回值都包含 `__meta.run_id` 或 `list_run_id` / `content_run_id`。
+- **不要**把完整脚本字符串塞进上下文
+- **不要**在 save_script 时重传 chapter_list_js / chapter_content_js
+- 重跑脚本：execute_js(run_id=<id>)
+- 保存脚本：save_script(domain, list_run_id=<id>, content_run_id=<id>)
+- 查看完整脚本（仅调试）：inspect_script(run_id=<id>)
 
-    buf.writeln('## JS 脚本规范');
-    buf.writeln('- 脚本是 async IIFE: (async function() { ... return JSON.stringify(result); })()');
-    buf.writeln('- 首行必须声明 `const PAGE_URL = \'{{URL}}\';`，禁止 window.location.href');
-    buf.writeln('- 目录返回: { "title": "...", "chapters": [{ "title": "...", "url": "..." }] }');
-    buf.writeln('- 内容返回: { "title": "...", "content": "..." }');
-    buf.writeln('- 翻页: 检测下一页 → 点击 → await new Promise(r => setTimeout(r, 1000)) → 继续');
-    buf.writeln('- 只使用标准 DOM API（querySelector, innerText），不依赖 jQuery/Vue/React');
-    buf.writeln('- 跳过广告段落（含本章未完、一秒记住等）');
-    buf.writeln();
+## 跨页面提取
+- 当前页面是**目录页**时，先提取章节 URL 列表
+- 如果某章节的 URL 与当前页不同（如 `/book/xxx/yyy.html`），调用 **navigate_to** 工具跳转到该 URL
+- 跳转后可调用 get_current_url 确认 WebView 实际 URL 已变更，再调用 get_page_info 探测新页面 DOM，编写内容提取脚本
+- 如果当前页本身就是章节内容页（pageType=chapter_content），直接提取正文
 
-    buf.writeln('## 错误处理');
-    buf.writeln('- 工具返回 error 时 → 先读 suggestion 字段');
-    buf.writeln('- 错误码: JS_SYNTAX_ERROR/REFERENCE_ERROR/TYPE_ERROR/TIMEOUT/RUNTIME_ERROR → 按 suggestion 修');
-    buf.writeln('- SCRIPT_VALIDATION_FAILED → 检查 {{URL}} 占位符和 PAGE_URL');
-    buf.writeln('- 同一错误连续 3 次 → 换完全不同的选择器/思路');
-    buf.writeln();
+## JS 脚本规范
+- 整个脚本是一个 async IIFE: `(async function() { ... return JSON.stringify(result); })()`
+- **必须**在脚本开头声明页面URL参数: `const PAGE_URL = '{{URL}}';`
+  - 目录脚本中 `PAGE_URL` 是章节列表页 URL
+  - 内容脚本中 `PAGE_URL` 是章节内容页 URL
+  - **禁止硬编码任何 URL**，所有 URL 相关操作必须通过 `PAGE_URL` 变量
+  - **禁止使用** `window.location.href` / `document.URL` / `location.href`，统一用 `PAGE_URL`
+  - 翻页时如果链接是相对路径，用 `new URL(href, PAGE_URL).href` 拼接完整URL
+- 目录脚本返回: `{ "title": "小说名", "chapters": [{ "title": "第1章 xxx", "url": "..." }] }`
+- 内容脚本返回: `{ "title": "章节名", "content": "正文..." }`
+- 翻页逻辑：检测下一页按钮 → 点击 → `await new Promise(r => setTimeout(r, 1000))` → 继续提取
+- 清理广告：移除含"本章未完"、"一秒记住"等关键词的段落
+- 使用标准 DOM API（querySelector、querySelectorAll、innerText），不依赖第三方库
 
-    if (_cachedMemories.isNotEmpty) {
-      buf.writeln('## 经验记忆');
-      buf.writeln('以下是以往对话中的经验记录，请优先参考：');
-      for (final m in _cachedMemories) {
-        buf.writeln('- ' + m);
-      }
-      buf.writeln();
-    }
+## 注意事项
+- 如果脚本执行失败，根据错误信息修正后重试
+- 优先使用 id 选择器和语义化 class
+- 章节URL必须是完整URL（含协议和域名），如果是相对路径请拼接完整
+- 内容提取时跳过广告段落（含"本章未完"、"一秒记住"、"笔趣阁"等关键词的行）
+- 如果页面不是小说目录页，直接告知用户
 
-    return buf.toString();
+## 错误处理策略
+收到工具返回的 error 响应时，**务必先阅读 suggestion 字段**获取修复建议，再决定下一步。
+
+**JS 错误码**（来自 execute_js）：
+- `JS_SYNTAX_ERROR`：语法错误 → 检查括号/引号配对，IIFE 格式是否完整
+- `JS_REFERENCE_ERROR`：引用了未定义变量 → 不要使用 jQuery/\$/underscore/Vue/React 等第三方库，只用原生 DOM API；检查变量名拼写
+- `JS_TYPE_ERROR`：访问了 null/undefined 属性 → 在 querySelector 后加 if(el) 判断
+- `JS_TIMEOUT`：脚本超时（>60秒）→ 检查死循环，用 await new Promise(r => setTimeout(r, 100)) 分批
+- `JS_RUNTIME_ERROR`：其他运行时错误 → 简化提取逻辑重试
+- `missing_param`：缺少参数 → 查看 missing 字段了解具体缺哪些
+
+**保存脚本错误**（来自 save_script）：
+- 注意字段名是**下划线格式**：domain / chapter_list_js / chapter_content_js
+- 如果缺参，查看 received_keys 和 missing 字段，不要反复重试同一个错误调用
+
+**脚本校验错误**（来自 execute_js / save_script）：
+- `SCRIPT_VALIDATION_FAILED`：脚本不符合参数化规范，查看 validation_error 和 script_type 定位问题
+  - 缺少 {{URL}} 占位符 → 在脚本开头加 `const PAGE_URL = '{{URL}}';`
+  - 硬编码 URL 过多 → 改用 PAGE_URL 变量拼接完整 URL
+  - 使用了 window.location.href/document.URL → 改用 PAGE_URL
+  - 脚本已校验通过的标志：{{URL}} 占位符 + PAGE_URL 变量 + 无 location.href
+
+**同一错误连续出现 3 次**时，**换一种完全不同的思路**重写脚本（如换选择器、简化提取逻辑、放弃某些字段），不要在同一个错误上死磕。
+''';
   }
 
   @override
@@ -140,58 +175,7 @@ class WebViewExtractScenario implements AgentScenario {
         _saveScriptTool,
         _listCachedScriptsTool,
         _inspectScriptTool,
-        patchMemoryToolDefinition,
       ];
-
-  /// 记忆缓存（每次构建 prompt 时复用，避免重复 IO）
-  List<String> _cachedMemories = const [];
-
-  @override
-  Future<List<String>> getMemories() async {
-    final repo = _ref.read(agentMemoryRepositoryProvider);
-    _cachedMemories = await repo.getAllByScenario(id);
-    return _cachedMemories;
-  }
-
-  @override
-  Future<MemoryPatchResult> patchMemory(String? oldText, String newText) async {
-    final repo = _ref.read(agentMemoryRepositoryProvider);
-    final all = await repo.getAllWithId(id);
-    final allContents = all.map((r) => r["content"] as String).toList();
-
-    if (allContents.isEmpty) {
-      await repo.addMemory(id, newText);
-      _cachedMemories = [..._cachedMemories, newText];
-      return MemoryPatchResult.ok("已添加（首次插入）");
-    }
-
-    if (oldText == null || oldText.isEmpty) {
-      await repo.addMemory(id, newText);
-      _cachedMemories = [..._cachedMemories, newText];
-      return MemoryPatchResult.ok("新记忆已添加");
-    }
-
-    if (newText.isEmpty) {
-      final hit1 = all.firstWhere((r) => r["content"] == oldText, orElse: () => <String, dynamic>{});
-      if (hit1.isEmpty) {
-        return MemoryPatchResult.error("未找到要删除的记忆", allContents);
-      }
-      await repo.deleteMemory(hit1["id"] as int);
-      _cachedMemories = List<String>.from(_cachedMemories)..remove(oldText);
-      return MemoryPatchResult.ok("记忆已删除");
-    }
-
-    final hit2 = all.firstWhere((r) => r["content"] == oldText, orElse: () => <String, dynamic>{});
-    if (hit2.isEmpty) {
-      return MemoryPatchResult.error("未找到匹配的记忆内容。现有记忆：", allContents);
-    }
-    await repo.updateMemory(hit2["id"] as int, newText);
-    final idx = _cachedMemories.indexOf(oldText);
-    if (idx >= 0) {
-      _cachedMemories = List<String>.from(_cachedMemories)..[idx] = newText;
-    }
-    return MemoryPatchResult.ok("记忆已更新");
-  }
 
   @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
@@ -200,11 +184,6 @@ class WebViewExtractScenario implements AgentScenario {
       category: LogCategory.ai,
       tags: ['agent', 'scenario', 'webview-extract', name],
     );
-
-    // patch_memory 由场景自行处理
-    if (name == 'patch_memory') {
-      return await _executePatchMemory(args);
-    }
 
     // Headless 模式：仅 WebView 类工具（get_page_info / execute_js / navigate_to）
     // 需要确保 Headless WebView 加载了 _currentUrl。
@@ -1542,19 +1521,4 @@ class WebViewExtractScenario implements AgentScenario {
       },
     },
   };
-
-  /// 执行 patch_memory 工具，序列化 MemoryPatchResult
-  Future<String> _executePatchMemory(Map<String, dynamic> args) async {
-    final oldText = args['oldText'] as String? ?? args['old_text'] as String?;
-    final newText = args['newText'] as String? ?? args['new_text'] as String? ?? '';
-    final result = await patchMemory(oldText, newText);
-    if (result.success) {
-      return jsonEncode({'success': true, 'message': result.message});
-    }
-    return jsonEncode({
-      'error': 'memory_not_found',
-      'message': result.message,
-      'allMemories': result.allMemories,
-    });
-  }
 }

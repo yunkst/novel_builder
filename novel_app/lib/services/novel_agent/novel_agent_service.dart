@@ -113,6 +113,9 @@ class NovelAgentService {
       // 构造循环
       final loop = AgentLoop(llm: llm, scenario: scenario);
 
+      // 加载场景经验记忆（在 buildSystemPrompt 前调用，让场景有缓存）
+      await scenario.getMemories();
+
       // 构造 system prompt（由场景生成）
       final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
 

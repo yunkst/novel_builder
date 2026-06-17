@@ -46,8 +46,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _backendHostController = TextEditingController();
   final TextEditingController _backendTokenController = TextEditingController();
-  final TextEditingController _aiApiUrlController = TextEditingController();
+  final TextEditingController _aiApiUrlController =
+      TextEditingController(text: 'https://api.deepseek.com');
   final TextEditingController _aiApiKeyController = TextEditingController();
+  final TextEditingController _aiModelController =
+      TextEditingController(text: 'deepseek-v4-pro');
 
   int _currentPage = 0;
   bool _isSaving = false;
@@ -59,6 +62,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _backendTokenController.dispose();
     _aiApiUrlController.dispose();
     _aiApiKeyController.dispose();
+    _aiModelController.dispose();
     super.dispose();
   }
 
@@ -158,11 +162,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     setState(() => _isSaving = true);
     try {
+      final model = _aiModelController.text.trim();
+
       // DSL Engine 配置（DifyService 的底层引擎）
       // 保存后 DslEngineConfig.isConfigured() 即返回 true
       final prefs = ref.read(preferencesServiceProvider);
       await prefs.setString('dsl_engine_api_url', apiUrl);
       await prefs.setString('dsl_engine_api_key', apiKey);
+      if (model.isNotEmpty) {
+        await prefs.setString('dsl_engine_model', model);
+      }
       await prefs.setBool('dsl_engine_enabled', true);
 
       LoggerService.instance.i(
@@ -528,7 +537,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             controller: _aiApiUrlController,
             decoration: const InputDecoration(
               labelText: 'LLM API 地址',
-              hintText: 'https://api.deepseek.com/v1',
+              hintText: 'https://api.deepseek.com',
               prefixIcon: Icon(Icons.api),
               border: OutlineInputBorder(),
               helperText: 'OpenAI 兼容接口地址',
@@ -548,6 +557,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             autocorrect: false,
             obscureText: true,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _aiModelController,
+            decoration: const InputDecoration(
+              labelText: '模型名（可留空）',
+              hintText: 'deepseek-chat / gpt-4o-mini / qwen-turbo ...',
+              prefixIcon: Icon(Icons.memory),
+              border: OutlineInputBorder(),
+              helperText: '不填则使用 LLM 服务商默认模型',
+            ),
+            autocorrect: false,
           ),
           const SizedBox(height: 20),
           // 解锁能力说明

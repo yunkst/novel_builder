@@ -117,9 +117,9 @@ class AiCapabilitiesSection extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'DeepSeek (api.deepseek.com) — 性价比高\n'
-            'OpenAI (api.openai.com) — 效果稳定\n'
-            '本地服务 (Ollama / vLLM) — 无需外部网络',
+            'DeepSeek  https://api.deepseek.com  · deepseek-v4-pro\n'
+            'OpenAI  https://api.openai.com/v1  · gpt-4o-mini\n'
+            '本地服务  http://localhost:11434/v1  · Ollama/vLLM',
             style: TextStyle(
               fontSize: 11,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),

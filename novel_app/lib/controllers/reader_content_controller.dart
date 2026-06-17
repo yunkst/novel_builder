@@ -3,6 +3,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/api_service_wrapper.dart';
 import '../services/headless_webview_content_service.dart';
+import '../services/headless_webview_errors.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_novel_repository.dart';
 import '../core/providers/reader_state_providers.dart';
@@ -256,9 +257,9 @@ class ReaderContentController {
 
   // ========== 私有方法 ==========
 
-  /// 获取章节内容（优先 Headless WebView → 回退后端 API）
+  /// 获取章节内容（纯 Headless WebView，不再回退后端 API）
   Future<String> _fetchChapterContent(String chapterUrl, bool forceRefresh) async {
-    // 尝试 Headless WebView（如有该域名的提取脚本）
+    // Headless WebView 获取章节内容
     if (_headlessService != null) {
       final webViewResult = await _headlessService!.fetchContent(chapterUrl);
       if (webViewResult != null && webViewResult.content.trim().isNotEmpty) {
@@ -271,7 +272,20 @@ class ReaderContentController {
       }
     }
 
-    // 回退到后端 API
-    return _apiService.getChapterContent(chapterUrl, forceRefresh: forceRefresh);
+    // 无脚本或 headless 失败，直接报错（不再回退后端 API）
+    throw NoExtractionScriptException(
+      _extractHost(chapterUrl) ?? '',
+      url: chapterUrl,
+    );
+  }
+
+  /// 从 URL 提取 host（用于错误信息）
+  static String? _extractHost(String url) {
+    try {
+      final host = Uri.parse(url).host;
+      return host.isNotEmpty ? host : null;
+    } catch (_) {
+      return null;
+    }
   }
 }

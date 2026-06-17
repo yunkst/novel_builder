@@ -1,9 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
+import '../../services/headless_webview_errors.dart';
 import '../../services/logger_service.dart';
-import 'service_providers.dart';
 import 'repository_providers.dart';
+import 'services/network_service_providers.dart';
 
 part 'chapter_content_provider.g.dart';
 
@@ -65,7 +66,6 @@ class ChapterContent extends _$ChapterContent {
     );
 
     try {
-      final apiService = ref.read(apiServiceWrapperProvider);
       final chapterRepository = ref.read(chapterRepositoryProvider);
 
       String content;
@@ -100,11 +100,22 @@ class ChapterContent extends _$ChapterContent {
         }
       }
 
-      // 缓存未命中或强制刷新，从API获取
-      content = await apiService.getChapterContent(
-        chapter.url,
-        forceRefresh: forceRefresh,
-      );
+      // 缓存未命中或强制刷新，用 Headless WebView 获取
+      final headlessService = ref.read(headlessWebViewContentServiceProvider);
+      final webViewResult = await headlessService.fetchContent(chapter.url);
+      if (webViewResult != null && webViewResult.content.trim().isNotEmpty) {
+        content = webViewResult.content;
+        LoggerService.instance.d(
+          '章节内容从 Headless WebView 获取成功',
+          category: LogCategory.database,
+          tags: ['provider', 'chapter-content', 'headless'],
+        );
+      } else {
+        throw NoExtractionScriptException(
+          _extractHost(chapter.url) ?? '',
+          url: chapter.url,
+        );
+      }
 
       // 验证内容并缓存（forceRefresh时cacheChapter的ConflictAlgorithm.replace会覆盖旧缓存）
       if (content.isNotEmpty && content.length > 50) {
@@ -164,5 +175,15 @@ class ChapterContent extends _$ChapterContent {
   /// 重置错误状态
   void clearError() {
     state = state.copyWith(errorMessage: '');
+  }
+}
+
+/// 从 URL 提取 host（用于错误信息）
+String? _extractHost(String url) {
+  try {
+    final host = Uri.parse(url).host;
+    return host.isNotEmpty ? host : null;
+  } catch (_) {
+    return null;
   }
 }

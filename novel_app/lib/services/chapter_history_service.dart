@@ -1,5 +1,5 @@
 import '../models/chapter.dart';
-import '../services/api_service_wrapper.dart';
+import '../services/headless_webview_content_service.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import 'logger_service.dart';
 
@@ -8,7 +8,7 @@ import 'logger_service.dart';
 /// 职责：
 /// - 获取历史章节内容（用于AI生成的上下文）
 /// - 统一历史章节加载逻辑
-/// - 支持缓存和API获取
+/// - 支持缓存和 Headless WebView 获取
 ///
 /// 使用方式：
 /// ```dart
@@ -18,7 +18,7 @@ import 'logger_service.dart';
 /// // 或手动指定依赖
 /// final service = ChapterHistoryService(
 ///   chapterRepo: _chapterRepo,
-///   apiService: _apiService,
+///   headlessService: _headlessService,
 /// );
 ///
 /// final historyContent = await service.fetchHistoryChaptersContent(
@@ -31,18 +31,18 @@ class ChapterHistoryService {
   static const LogCategory _category = LogCategory.database;
   static const List<String> _tags = ['history'];
   final IChapterRepository _chapterRepo;
-  final ApiServiceWrapper _apiService;
+  final HeadlessWebViewContentService? _headlessService;
 
   /// 创建 ChapterHistoryService 实例
   ///
   /// 参数:
   /// - [chapterRepo] 章节仓库（必需）
-  /// - [apiService] API服务（必需）
+  /// - [headlessService] Headless WebView 内容服务（可选，用于获取章节内容）
   ChapterHistoryService({
     required IChapterRepository chapterRepo,
-    required ApiServiceWrapper apiService,
+    HeadlessWebViewContentService? headlessService,
   })  : _chapterRepo = chapterRepo,
-        _apiService = apiService;
+        _headlessService = headlessService;
 
   /// 获取历史章节内容（最多前N章）
   ///
@@ -76,15 +76,10 @@ class ChapterHistoryService {
         final chapter = chapters[historyIndex];
 
         try {
-          // 尝试从缓存获取
-          var content = await _chapterRepo.getCachedChapter(chapter.url);
-
-          // 如果缓存未命中，从API获取
-          if (content == null || content.isEmpty) {
-            LoggerService.instance.d('缓存未命中，从API获取 - ${chapter.title}', category: _category, tags: _tags);
-            content = await _apiService.getChapterContent(chapter.url);
-          } else {
-            LoggerService.instance.d('从缓存加载 - ${chapter.title}', category: _category, tags: _tags);
+          final content = await _loadChapterContent(chapter);
+          if (content == null) {
+            LoggerService.instance.w('无提取脚本，跳过 - ${chapter.title}', category: _category, tags: _tags);
+            continue;
           }
 
           // 格式化为历史章节内容
@@ -125,10 +120,10 @@ class ChapterHistoryService {
         final chapter = chapters[historyIndex];
 
         try {
-          var content = await _chapterRepo.getCachedChapter(chapter.url) ??
-              await _apiService.getChapterContent(chapter.url);
-
-          historyContents.add(content);
+          final content = await _loadChapterContent(chapter);
+          if (content != null) {
+            historyContents.add(content);
+          }
         } catch (e) {
           LoggerService.instance.e('加载失败 - ${chapter.title}', category: _category, tags: _tags);
         }
@@ -136,5 +131,24 @@ class ChapterHistoryService {
     }
 
     return historyContents;
+  }
+
+  /// 加载单个章节内容：先查缓存，未命中时尝试 Headless WebView。
+  ///
+  /// 返回 `null` 表示无法获取（缓存未命中 + 无 headless 脚本）。
+  /// 抛异常表示 fetch 过程中出错（由调用方决定是否继续）。
+  Future<String?> _loadChapterContent(Chapter chapter) async {
+    final cached = await _chapterRepo.getCachedChapter(chapter.url);
+    if (cached != null && cached.isNotEmpty) {
+      LoggerService.instance.d('从缓存加载 - ${chapter.title}', category: _category, tags: _tags);
+      return cached;
+    }
+
+    if (_headlessService == null) return null;
+
+    LoggerService.instance.d('缓存未命中，尝试 Headless WebView - ${chapter.title}', category: _category, tags: _tags);
+    final result = await _headlessService!.fetchContent(chapter.url);
+    if (result == null || result.content.trim().isEmpty) return null;
+    return result.content;
   }
 }

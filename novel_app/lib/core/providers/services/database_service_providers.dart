@@ -106,10 +106,12 @@ ChapterLoader chapterLoader(Ref ref) {
   final apiService = ref.watch(apiServiceWrapperProvider);
   final chapterRepository = ref.watch(chapterRepositoryProvider);
   final novelRepository = ref.watch(novelRepositoryProvider);
+  final chapterListHeadlessService = ref.watch(headlessWebViewChapterListServiceProvider);
   return ChapterLoader(
     api: apiService,
     chapterRepository: chapterRepository,
     novelRepository: novelRepository,
+    chapterListHeadlessService: chapterListHeadlessService,
   );
 }
 

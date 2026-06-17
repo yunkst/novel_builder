@@ -1,5 +1,7 @@
 import '../../models/chapter.dart';
 import '../../services/api_service_wrapper.dart';
+import '../../services/headless_webview_chapter_list_service.dart';
+import '../../services/headless_webview_errors.dart';
 import '../../services/logger_service.dart';
 import '../../core/interfaces/repositories/i_chapter_repository.dart';
 import '../../core/interfaces/repositories/i_novel_repository.dart';
@@ -10,15 +12,18 @@ class ChapterLoader {
   final ApiServiceWrapper _api;
   final IChapterRepository _chapterRepo;
   final INovelRepository _novelRepo;
+  final HeadlessWebViewChapterListService _chapterListHeadlessService;
   final _log = LoggerService.instance;
 
   ChapterLoader({
     required ApiServiceWrapper api,
     required IChapterRepository chapterRepository,
     required INovelRepository novelRepository,
+    required HeadlessWebViewChapterListService chapterListHeadlessService,
   })  : _api = api,
         _chapterRepo = chapterRepository,
-        _novelRepo = novelRepository;
+        _novelRepo = novelRepository,
+        _chapterListHeadlessService = chapterListHeadlessService;
 
   /// 初始化API服务
   Future<void> initApi() async {
@@ -92,14 +97,14 @@ class ChapterLoader {
     }
   }
 
-  /// 从后端刷新章节列表
+  /// 从 headless WebView 刷新章节列表
   /// [novelUrl] 小说URL
-  /// [forceRefresh] 是否强制刷新
+  /// [forceRefresh] 是否强制刷新（保留接口兼容，当前由 headless 处理）
   /// 返回刷新后的章节列表
   Future<List<Chapter>> refreshFromBackend(String novelUrl,
       {bool forceRefresh = false}) async {
     _log.d(
-      '从后端刷新章节列表: $novelUrl',
+      '从 headless WebView 刷新章节列表: $novelUrl',
       category: LogCategory.network,
       tags: ['chapter-list', 'refresh'],
     );
@@ -110,14 +115,15 @@ class ChapterLoader {
         return await _chapterRepo.getCachedNovelChapters(novelUrl);
       }
 
-      // 从后端获取最新章节列表
-      final chapters = await _api.getChapters(novelUrl, forceRefresh: forceRefresh);
+      // 尝试 headless WebView 获取章节列表
+      final headlessChapters =
+          await _chapterListHeadlessService.fetchChapterList(novelUrl);
 
-      if (chapters.isNotEmpty) {
+      if (headlessChapters != null && headlessChapters.isNotEmpty) {
         // 缓存章节列表
-        await _chapterRepo.cacheNovelChapters(novelUrl, chapters);
+        await _chapterRepo.cacheNovelChapters(novelUrl, headlessChapters);
         _log.i(
-          '章节列表缓存在数据库: ${chapters.length}章',
+          '章节列表缓存在数据库: ${headlessChapters.length}章',
           category: LogCategory.database,
           tags: ['chapter', 'cache'],
         );
@@ -125,22 +131,21 @@ class ChapterLoader {
         // 重新从数据库获取合并后的章节列表（包括用户插入的章节）
         final mergedChapters = await _chapterRepo.getCachedNovelChapters(novelUrl);
         _log.i(
-          '从后端刷新章节列表完成: ${mergedChapters.length}章(含用户章节)',
+          '从 headless WebView 刷新章节列表完成: ${mergedChapters.length}章(含用户章节)',
           category: LogCategory.network,
           tags: ['chapter-list', 'refresh'],
         );
         return mergedChapters;
       }
 
-      _log.w(
-        '从后端获取的章节列表为空: $novelUrl',
-        category: LogCategory.network,
-        tags: ['chapter-list', 'refresh', 'empty'],
+      // headless 返回空（无脚本），抛出明确错误
+      throw NoExtractionScriptException(
+        _extractHost(novelUrl) ?? '',
+        url: novelUrl,
       );
-      return [];
     } catch (e, st) {
       _log.e(
-        '从后端刷新章节列表失败: $novelUrl - $e',
+        '刷新章节列表失败: $novelUrl - $e',
         stackTrace: st.toString(),
         category: LogCategory.network,
         tags: ['chapter-list', 'refresh'],
@@ -163,6 +168,16 @@ class ChapterLoader {
         tags: ['chapter', 'last-read'],
       );
       rethrow;
+    }
+  }
+
+  /// 从 URL 提取 host（用于错误信息）
+  static String? _extractHost(String url) {
+    try {
+      final host = Uri.parse(url).host;
+      return host.isNotEmpty ? host : null;
+    } catch (_) {
+      return null;
     }
   }
 }

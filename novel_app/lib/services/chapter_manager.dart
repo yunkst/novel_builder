@@ -1,5 +1,4 @@
 import 'dart:async';
-import '../models/chapter_content_result.dart';
 import 'logger_service.dart';
 
 /// 章节请求管理器单例
@@ -42,9 +41,9 @@ class ChapterManager {
     _initializeCleanupTimer();
   }
 
-  /// 待处理的网络请求，key为章节URL，value为`Future<ChapterContentResult>`
-  final Map<String, Future<ChapterContentResult>> _pendingRequests =
-      <String, Future<ChapterContentResult>>{};
+  /// 待处理的网络请求，key为章节URL，value为`Future<String>`
+  final Map<String, Future<String>> _pendingRequests =
+      <String, Future<String>>{};
 
   /// 请求时间戳，用于清理过期请求
   final Map<String, DateTime> _requestTimestamps = <String, DateTime>{};
@@ -58,68 +57,6 @@ class ChapterManager {
   /// 统计信息
   int _totalRequests = 0;
   int _deduplicatedRequests = 0;
-
-  /// 获取章节内容（带请求去重）
-  ///
-  /// [chapterUrl] 章节URL
-  /// [forceRefresh] 是否强制刷新，绕过所有缓存
-  /// [fetchFunction] 实际的网络获取函数
-  ///
-  /// 返回章节内容字符串
-  Future<String> getChapterContent(
-    String chapterUrl, {
-    bool forceRefresh = false,
-    required Future<String> Function() fetchFunction,
-  }) async {
-    _totalRequests++;
-
-    // 强制刷新总是创建新请求，不去重
-    if (forceRefresh) {
-      LoggerService.instance.i(
-        '强制刷新章节: $chapterUrl',
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      return await fetchFunction();
-    }
-
-    // 检查是否已有相同请求在进行中
-    if (_pendingRequests.containsKey(chapterUrl)) {
-      _deduplicatedRequests++;
-      LoggerService.instance.d(
-        '请求去重: 复用现有请求 - $chapterUrl',
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      final result = await _pendingRequests[chapterUrl]!;
-      return result.content;
-    }
-
-    // 创建新请求
-    LoggerService.instance.d(
-      '发起章节请求: $chapterUrl',
-      category: LogCategory.database,
-      tags: ['chapter'],
-    );
-    final requestFuture = _createRequest(chapterUrl, fetchFunction);
-    _pendingRequests[chapterUrl] = requestFuture.then((r) => ChapterContentResult(content: r, fromCache: false));
-    _requestTimestamps[chapterUrl] = DateTime.now();
-
-    try {
-      final result = await _pendingRequests[chapterUrl]!;
-      return result.content;
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '章节请求失败: $chapterUrl, 错误: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      rethrow;
-    } finally {
-      _cleanupRequest(chapterUrl);
-    }
-  }
 
   /// 检查章节是否有待处理的请求
   bool hasPendingRequest(String chapterUrl) {
@@ -176,103 +113,10 @@ class ChapterManager {
     );
   }
 
-  /// 创建网络请求
-  Future<String> _createRequest(
-      String chapterUrl, Future<String> Function() fetchFunction) async {
-    try {
-      return await fetchFunction();
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '网络请求失败: $chapterUrl, 错误: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      rethrow;
-    }
-  }
-
   /// 清理请求
   void _cleanupRequest(String chapterUrl) {
     _pendingRequests.remove(chapterUrl);
     _requestTimestamps.remove(chapterUrl);
-  }
-
-  /// 获取章节内容（带来源标识，带请求去重）
-  ///
-  /// [chapterUrl] 章节URL
-  /// [forceRefresh] 是否强制刷新，绕过所有缓存
-  /// [fetchFunction] 实际的网络获取函数
-  ///
-  /// 返回 ChapterContentResult（包含 content 和 fromCache）
-  Future<ChapterContentResult> getChapterContentWithSource(
-    String chapterUrl, {
-    bool forceRefresh = false,
-    required Future<ChapterContentResult> Function() fetchFunction,
-  }) async {
-    _totalRequests++;
-
-    if (forceRefresh) {
-      LoggerService.instance.i(
-        '强制刷新章节: $chapterUrl',
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      return await fetchFunction();
-    }
-
-    // 检查是否已有相同请求在进行中
-    if (_pendingRequests.containsKey(chapterUrl)) {
-      _deduplicatedRequests++;
-      LoggerService.instance.d(
-        '请求去重: 复用现有请求 - $chapterUrl',
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      return await _pendingRequests[chapterUrl]!;
-    }
-
-    LoggerService.instance.d(
-      '发起章节请求: $chapterUrl',
-      category: LogCategory.database,
-      tags: ['chapter'],
-    );
-
-    // 创建新请求并缓存 Future
-    final requestFuture = _createRequestWithSource(chapterUrl, fetchFunction);
-    _pendingRequests[chapterUrl] = requestFuture;
-    _requestTimestamps[chapterUrl] = DateTime.now();
-
-    try {
-      final result = await requestFuture;
-      return result;
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '章节请求失败: $chapterUrl, 错误: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      rethrow;
-    } finally {
-      _cleanupRequest(chapterUrl);
-    }
-  }
-
-  /// 创建网络请求（带来源）
-  Future<ChapterContentResult> _createRequestWithSource(
-      String chapterUrl, Future<ChapterContentResult> Function() fetchFunction) async {
-    try {
-      return await fetchFunction();
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '网络请求失败: $chapterUrl, 错误: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['chapter'],
-      );
-      rethrow;
-    }
   }
 
   /// 初始化清理定时器

@@ -13,9 +13,11 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 3. 分析 git diff 生成更新日志
 4. 提交代码并创建 `v{version}` annotated tag
 5. 推送 commit 和 tag 到远程仓库
+6. **等待 10 分钟**，然后检查 GitHub Actions CI 是否成功
 
 > **预检目的**：任何会导致 GitHub Actions 失败的问题都要在本地先发现，避免推送后再修。
 > 推送 tag 后，**GitHub Actions**（`.github/workflows/flutter-release.yml`）会自动完成 Release APK 构建并创建 GitHub Release。
+> **CI 检查**：push 后等待约 10 分钟（释放工作流构建时间），然后通过 `gh run list` 检查最新 CI run 状态，确认构建成功。
 
 ## 何时使用
 
@@ -61,6 +63,18 @@ python .claude/skills/novel-app-release/scripts/build_and_upload.py
 3. `git tag -a v{version} -m "Release {version}"` — 创建 annotated tag
 4. `git push` — 推送 commit
 5. `git push origin v{version}` — 推送 tag，触发 GitHub Actions
+
+#### 阶段 4：等待 CI 并验证（自动）
+
+提交后脚本会：
+1. 等待 **10 分钟**（600 秒）— 给 release workflow 充分的构建时间
+2. 通过 `gh run list --limit 1` 查询最新 CI run 状态
+3. 报告 CI 结果：
+   - ✅ `success` — 发布完成
+   - ❌ `failure` — 自动打印失败日志链接，提示修复后重新发布
+   - 🟡 `in_progress` / `queued` — 提示再等几分钟后手动检查
+
+可通过 `SKIP_CI_CHECK=1` 跳过 CI 验证（不推荐）。
 
 ### 自定义更新日志
 
@@ -139,6 +153,8 @@ PR / push 到 main 时（`.github/workflows/flutter-ci.yml`）还会跑：
 
 ### Q: 脚本执行后怎么确认 Release 是否成功？
 
+脚本会自动等待 10 分钟并通过 `gh run list` 检查 CI 状态。如需手动确认：
+
 1. 查看本地 tag：`git tag -l "v*"`
 2. 查看 GitHub Actions：`https://github.com/yunkst/novel_builder/actions`
 3. 查看 Release 页面：`https://github.com/yunkst/novel_builder/releases`
@@ -177,6 +193,7 @@ git reset --soft HEAD~1
 
 ## 变更记录
 
+- **2026-06-17**: 新增阶段 4（等待 10 分钟 + CI 检查），通过 `gh run list` 验证 release workflow 状态；支持 `SKIP_CI_CHECK=1` 跳过
 - **2026-06-13**: 新增预检阶段（flutter analyze + unit test + 本地 APK 打包），与 CI 流程完全对齐；支持 `SKIP_PREFLIGHT=1` 跳过；强化文档说明
 - **2026-06-12**: 移除本地 APK 构建和后端上传，改为纯 git 操作 + 依赖 GitHub Actions 构建；增加 commit push
 - **2026-06-12**: 初版：构建 APK + 上传到 backend

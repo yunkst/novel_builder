@@ -90,6 +90,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   /// 是否正在从 UI 手动切换（避免和自动切换冲突）
   bool _isSwitchingFromUI = false;
 
+  /// 按场景 ID 缓存对话历史，切换场景时保留/恢复各自的历史
+  final Map<String, List<HermesMessage>> _historyCache = {};
+
   /// 自动切换场景（由 Provider 变化触发）
   void _autoSwitchScenario(String scenarioId) {
     final info = AgentScenarioFactory.availableScenarios
@@ -274,7 +277,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     );
   }
 
-  /// 切换场景（清空对话历史）
+  /// 切换场景（按场景 ID 缓存/恢复对话历史）
   void switchScenario(String scenarioId, String displayName) {
     if (state.scenarioId == scenarioId) return;
 
@@ -297,9 +300,12 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     _ref.read(currentAgentScenarioProvider.notifier).state = scenarioId;
     _isSwitchingFromUI = false;
 
-    // 清空对话历史并设置新场景
+    // 保存当前场景的对话历史，恢复目标场景的对话历史
+    _historyCache[state.scenarioId] = state.messages;
+    final restored = _historyCache[scenarioId] ?? const [];
     _pendingSegments.clear();
     state = HermesChatState(
+      messages: restored,
       scenarioId: scenarioId,
       scenarioDisplayName: displayName,
     );
@@ -420,8 +426,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     _pendingSegments.clear();
   }
 
-  /// 清空会话
+  /// 清空当前场景的对话历史
   void clearConversation() {
+    _historyCache.remove(state.scenarioId);
     _pendingSegments.clear();
     state = HermesChatState(
       scenarioId: state.scenarioId,

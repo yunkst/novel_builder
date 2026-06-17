@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 26;
+  static const int currentVersion = 27;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -546,6 +546,22 @@ class DatabaseMigrations {
         await _addColumnIfNotExists(
             db, 'prompt_history', 'tag_group_ids', 'TEXT');
         _log('迁移 v25 → v26: 添加 prompt_history.tag_group_ids 列');
+        break;
+
+      // ========== 版本 27：Agent 场景经验记忆表 ==========
+      case 27:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS agent_memory (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scenario_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_agent_memory_scenario', 'agent_memory', 'scenario_id');
+        _log('迁移 v26 → v27: 创建 agent_memory 表');
         break;
     }
   }

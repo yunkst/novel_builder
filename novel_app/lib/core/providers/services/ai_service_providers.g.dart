@@ -138,7 +138,7 @@ final outlineServiceProvider = AutoDisposeProvider<OutlineService>.internal(
 // ignore: unused_element
 typedef OutlineServiceRef = AutoDisposeProviderRef<OutlineService>;
 String _$chapterHistoryServiceHash() =>
-    r'70f279098bfb6a53723cfc080a7cc4c498f3c808';
+    r'7f719fe06e7bbd9f97289185865e79613594a29e';
 
 /// ChapterHistoryService Provider
 ///
@@ -147,11 +147,11 @@ String _$chapterHistoryServiceHash() =>
 /// **功能**:
 /// - 获取历史章节内容
 /// - 统一历史章节加载逻辑
-/// - 支持缓存和API获取
+/// - 支持缓存和 Headless WebView 获取
 ///
 /// **依赖**:
 /// - [chapterRepositoryProvider] - 章节数据访问
-/// - [apiServiceWrapperProvider] - API服务
+/// - [headlessWebViewContentServiceProvider] - Headless WebView 内容服务
 ///
 /// **使用示例**:
 /// ```dart
@@ -165,7 +165,7 @@ String _$chapterHistoryServiceHash() =>
 ///
 /// **注意事项**:
 /// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 优先使用缓存，缓存未命中时从API获取
+/// - 优先使用缓存，缓存未命中时走 Headless WebView
 ///
 /// Copied from [chapterHistoryService].
 @ProviderFor(chapterHistoryService)

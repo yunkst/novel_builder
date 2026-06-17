@@ -12,15 +12,17 @@ class AgentSystemPrompt {
   ///
   /// [readingContext] 当前阅读上下文（小说名、章节名、URL）
   /// [novelUrl] 可选：覆盖 readingContext 中的 novelUrl
+  /// [memories] 经验记忆列表（每个场景各自维护）
   static String build({
     required ReadingContext readingContext,
     String? novelUrl,
+    List<String> memories = const [],
   }) {
     final effectiveNovelUrl = novelUrl ?? readingContext.novelUrl;
     final buffer = StringBuffer();
 
     buffer.writeln('你是 Novel Builder 的小说写作助手 Agent。');
-    buffer.writeln('你拥有直接操作小说数据库的能力，可以读取、修改、创建章节内容、角色信息、背景设定和大纲。');
+    buffer.writeln('你可以读取、修改、创建章节内容、角色信息、背景设定和大纲。');
     buffer.writeln();
 
     // 注入当前上下文
@@ -37,22 +39,20 @@ class AgentSystemPrompt {
     }
 
     buffer.writeln('## 工作原则');
-    buffer.writeln('1. 操作章节前，先调用 list_chapters 获取章节 ID 列表');
-    buffer.writeln('2. 使用 list_novels / list_chapters 返回的 id 字段作为其他工具的参数');
-    buffer.writeln('3. 修改章节前，先调用 read_chapter_content 了解当前内容');
-    buffer.writeln('4. 修改角色前，先调用 list_characters 确认角色是否存在');
-    buffer.writeln('5. 涉及写作风格/内容的修改，直接使用你的语言能力完成，不需要额外调用 AI');
-    buffer.writeln('6. 如果工具返回 xxx_not_found 错误，按 suggested_tool 提示重新获取 ID');
-    buffer.writeln('7. 操作完成后，向用户汇报你做了什么');
-    buffer.writeln('8. 如果用户要求不明确，先问清楚再操作');
-    buffer.writeln('9. 修改操作会触发用户确认，请告知用户即将进行的修改');
+    buffer.writeln('1. 先查后改：操作前先调用 list/list_chapters 获取 ID');
+    buffer.writeln('2. 使用工具返回的数字 ID（novelId/chapterId），不是 URL');
+    buffer.writeln('3. 修改操作完成后向用户汇报');
     buffer.writeln();
 
-    buffer.writeln('## 注意事项');
-    buffer.writeln('- 所有工具使用数字 ID（novelId / chapterId），不是 URL');
-    buffer.writeln('- 章节内容以空行分隔段落');
-    buffer.writeln('- 角色名区分大小写');
-    buffer.writeln('- 修改小说元数据时请谨慎，确保内容完整');
+    // 注入经验记忆
+    if (memories.isNotEmpty) {
+      buffer.writeln('## 经验记忆');
+      buffer.writeln('以下是你在以往对话中记录的重要经验，请优先参考：');
+      for (final m in memories) {
+        buffer.writeln('- $m');
+      }
+      buffer.writeln();
+    }
 
     return buffer.toString();
   }

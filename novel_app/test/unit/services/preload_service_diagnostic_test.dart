@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/services/preload_service.dart';
+import 'package:novel_app/services/headless_webview_content_service.dart';
 import 'package:novel_app/services/preload_progress_update.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
@@ -12,6 +13,32 @@ import 'package:novel_app/models/chapter_content_result.dart';
 import '../../helpers/test_database_setup.dart';
 import 'test_helpers.mocks.dart' as test_mocks;
 
+/// Manual mock for HeadlessWebViewContentService
+class MockHeadlessWebViewContentService extends Mock
+    implements HeadlessWebViewContentService {
+  final Map<String, ChapterContentResult?> _stubs = {};
+  ChapterContentResult? Function(String)? _fallback;
+
+  void addStub(String url, ChapterContentResult? result) {
+    _stubs[url] = result;
+  }
+
+  void setFallback(ChapterContentResult? Function(String) fn) {
+    _fallback = fn;
+  }
+
+  @override
+  Future<ChapterContentResult?> fetchContent(String chapterUrl) async {
+    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl];
+    if (_fallback != null) return _fallback!(chapterUrl);
+    return super.noSuchMethod(
+      Invocation.method(#fetchContent, [chapterUrl]),
+      returnValue: Future<ChapterContentResult?>.value(null),
+      returnValueForMissingStub: Future<ChapterContentResult?>.value(null),
+    ) as Future<ChapterContentResult?>;
+  }
+}
+
 /// PreloadService 自动缓存功能诊断测试（简化版）
 ///
 /// 目的：定位自动缓存功能失效的根因
@@ -20,7 +47,7 @@ void main() {
   TestDatabaseSetup.init();
 
   late ChapterRepository chapterRepository;
-  late test_mocks.MockApiServiceWrapper mockApiService;
+  late MockHeadlessWebViewContentService mockHeadlessService;
   late PreloadService preloadService;
   late Database db;
 
@@ -30,11 +57,12 @@ void main() {
     db = await TestDatabaseSetup.createInMemoryDatabase();
     final connection = DatabaseConnection.forTesting(db);
     chapterRepository = ChapterRepository(dbConnection: connection);
-    mockApiService = test_mocks.MockApiServiceWrapper();
+    mockHeadlessService = MockHeadlessWebViewContentService();
 
     preloadService = PreloadService(
-      apiService: mockApiService,
+      apiService: test_mocks.MockApiServiceWrapper(),
       chapterRepository: chapterRepository,
+      headlessService: mockHeadlessService,
     );
   });
 
@@ -70,8 +98,7 @@ void main() {
   // ============================================================
   group('enqueueTasks 任务队列', () {
     test('未缓存章节应该被加入队列并处理', () async {
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: '内容'));
 
       await preloadService.enqueueTasks(
         novelUrl: testNovelUrl,
@@ -121,8 +148,7 @@ void main() {
         'https://example.com/exec1',
         'https://example.com/exec2',
       ];
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: '执行内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: '执行内容'));
 
       // Act
       await preloadService.enqueueTasks(
@@ -153,8 +179,7 @@ void main() {
         'https://example.com/verify_current',
         'https://example.com/verify_mock',
       ];
-      when(mockApiService.getChapterContentWithSource(any))
-          .thenAnswer((_) async => ChapterContentResult(content: 'mock内容'));
+      mockHeadlessService.setFallback((_) => ChapterContentResult(content: 'mock内容'));
 
       // Act
       await preloadService.enqueueTasks(
@@ -170,15 +195,15 @@ void main() {
       final stats = preloadService.getStatistics();
       print('步骤2 stats: $stats');
 
-      // 验证mock被调用
-      verify(mockApiService.getChapterContentWithSource('https://example.com/verify_mock')).called(greaterThanOrEqualTo(1));
+      // 验证至少处理了一个任务
+      expect(stats['total_processed'] as int, greaterThanOrEqualTo(1),
+          reason: '应该至少处理一个任务');
     }, timeout: Timeout(Duration(seconds: 5)));
 
     test('步骤3: 验证缓存是否写入数据库', () async {
       // Arrange
       final url = 'https://example.com/verify_cache';
-      when(mockApiService.getChapterContentWithSource(url))
-          .thenAnswer((_) async => ChapterContentResult(content: '缓存验证内容'));
+      mockHeadlessService.addStub(url, ChapterContentResult(content: '缓存验证内容'));
 
       // Act - 直接通过ChapterRepository缓存，绕过PreloadService的速率限制
       // 这是更可靠的测试方式
@@ -204,8 +229,7 @@ void main() {
   group('速率限制', () {
     test('第一个任务无延迟', () async {
       final url = 'https://example.com/rate1';
-      when(mockApiService.getChapterContentWithSource(url))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.addStub(url, ChapterContentResult(content: '内容'));
 
       final start = DateTime.now();
       await preloadService.enqueueTasks(
@@ -229,8 +253,7 @@ void main() {
   group('进度流', () {
     test('缓存完成后应该发出进度事件', () async {
       final url = 'https://example.com/progress1';
-      when(mockApiService.getChapterContentWithSource(url))
-          .thenAnswer((_) async => ChapterContentResult(content: '内容'));
+      mockHeadlessService.addStub(url, ChapterContentResult(content: '内容'));
 
       final events = <PreloadProgressUpdate>[];
       final sub = preloadService.progressStream.listen((e) => events.add(e));

@@ -6,7 +6,6 @@ import 'rate_limiter.dart';
 import 'preload_task.dart';
 import 'preload_progress_update.dart';
 import '../repositories/chapter_repository.dart';
-import 'api_service_wrapper.dart';
 import 'headless_webview_content_service.dart';
 import 'logger_service.dart';
 
@@ -47,19 +46,16 @@ class PreloadService {
   int _totalFailed = 0;
 
   // 服务依赖（通过构造函数注入）
-  final ApiServiceWrapper _apiService;
   final ChapterRepository _chapterRepository;
   final HeadlessWebViewContentService? _headlessService;
 
   /// 构造函数
   ///
-  /// 通过依赖注入接收 ApiServiceWrapper 和 ChapterRepository
+  /// 通过依赖注入接收 ChapterRepository 和 HeadlessWebViewContentService
   PreloadService({
-    required ApiServiceWrapper apiService,
     required ChapterRepository chapterRepository,
     HeadlessWebViewContentService? headlessService,
-  })  : _apiService = apiService,
-        _chapterRepository = chapterRepository,
+  })  : _chapterRepository = chapterRepository,
         _headlessService = headlessService {
     _logInitialization();
   }
@@ -364,9 +360,9 @@ class PreloadService {
     clearQueue();
   }
 
-  /// 获取章节内容（优先 Headless WebView → 回退后端 API）
+  /// 获取章节内容（纯 Headless WebView，不再回退后端 API）
   Future<ChapterContentResult> _fetchChapterContent(String chapterUrl) async {
-    // 尝试 Headless WebView（如有该域名的提取脚本）
+    // Headless WebView（如有该域名的提取脚本）
     if (_headlessService != null) {
       final webViewResult = await _headlessService!.fetchContent(chapterUrl);
       if (webViewResult != null) {
@@ -379,7 +375,12 @@ class PreloadService {
       }
     }
 
-    // 回退到后端 API
-    return _apiService.getChapterContentWithSource(chapterUrl);
+    // 无脚本或 headless 失败，返回错误结果（不再回退后端 API）
+    LoggerService.instance.w(
+      '预加载: 无提取脚本或 headless 获取失败: $chapterUrl',
+      category: LogCategory.cache,
+      tags: ['preload', 'headless-webview', 'no-script'],
+    );
+    throw Exception('无提取脚本: $chapterUrl');
   }
 }

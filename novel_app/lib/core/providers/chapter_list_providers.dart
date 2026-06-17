@@ -302,7 +302,7 @@ class ChapterList extends _$ChapterList {
       }
     } catch (e, stackTrace) {
       LoggerService.instance.e(
-        '从后端刷新章节列表失败: $e',
+        '刷新章节列表失败: $e',
         stackTrace: stackTrace.toString(),
         category: LogCategory.ui,
         tags: ['chapter-list'],

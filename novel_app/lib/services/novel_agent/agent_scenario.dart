@@ -54,7 +54,97 @@ abstract class AgentScenario {
 
   /// 执行工具调用
   Future<String> executeTool(String name, Map<String, dynamic> args);
+
+  /// 获取当前场景的所有经验记忆
+  ///
+  /// 默认实现从 AgentMemoryRepository 读取，子类可覆盖。
+  /// 返回的列表会拼接到 system prompt 末尾。
+  Future<List<String>> getMemories() async => const [];
+
+  /// patch 记忆（增/改/删），由 patch_memory 工具调用
+  ///
+  /// 行为：
+  /// - oldText 为空（首次插入）→ 直接插入 newText，返回成功
+  /// - oldText 非空 + newText 为空 → 查找并删除
+  /// - oldText 非空 + newText 非空 → 查找并替换
+  ///   - 找到：更新成功
+  ///   - 找不到：返回错误 + 当前所有记忆内容（供 AI 修正）
+  /// 默认实现要求场景有 [scenarioId]，可被所有 AgentScenario 复用。
+  Future<MemoryPatchResult> patchMemory(
+    String? oldText,
+    String newText,
+  ) async {
+    // 默认空实现：子类应通过 Ref + Repository 提供具体逻辑
+    return MemoryPatchResult.error(
+      'patch_memory 在当前场景不可用',
+      const [],
+    );
+  }
 }
+
+/// patch_memory 工具的执行结果
+class MemoryPatchResult {
+  final bool success;
+  final String message;
+  final List<String> allMemories; // 报错时返回所有记忆，供 AI 修正
+
+  const MemoryPatchResult._({
+    required this.success,
+    required this.message,
+    required this.allMemories,
+  });
+
+  factory MemoryPatchResult.ok(String message) =>
+      MemoryPatchResult._(success: true, message: message, allMemories: const []);
+
+  factory MemoryPatchResult.error(String message, List<String> allMemories) =>
+      MemoryPatchResult._(success: false, message: message, allMemories: allMemories);
+}
+
+/// patch_memory 工具定义（OpenAI Function Calling schema）
+///
+/// 说明：这是 Agent 进化的核心机制。
+/// - 遇到坑、用户帮你解决的、研究好几轮才解决的记忆，用 patch_memory 记录下来
+/// - 遇到和记忆不符的，先 patch_memory 修改记忆
+/// - patch_memory(oldText="...", newText="...")：
+///   - oldText 为空 → 新增
+///   - newText 为空 → 删除
+///   - 两者都非空 → 替换
+///   - 找不到 oldText → 报错并返回所有记忆
+const Map<String, dynamic> patchMemoryToolDefinition = {
+  'type': 'function',
+  'function': {
+    'name': 'patch_memory',
+    'description':
+        '修改/添加/删除当前场景的经验记忆。\n'
+        '记忆会持久化到本地数据库，并在下次对话的 system prompt 中出现。\n'
+        '使用场景：\n'
+        '- 遇到坑、用户帮你解决、或者研究了好几轮才解决的记忆 → 记录下来\n'
+        '- 遇到和当前记忆不符的情况 → 修改记忆\n'
+        '- 旧的记忆不再适用 → 删除\n'
+        '参数说明：\n'
+        '- oldText 为空字符串或省略 → 新增 newText\n'
+        '- newText 为空字符串或省略 → 删除 oldText\n'
+        '- 两者都非空 → 查找 oldText 并替换为 newText\n'
+        '- 若 oldText 在记忆中没有完全匹配 → 报错并返回所有现有记忆内容',
+    'parameters': {
+      'type': 'object',
+      'properties': {
+        'oldText': {
+          'type': 'string',
+          'description':
+              '要被替换/删除的旧记忆内容（必须完全匹配）。为空表示新增。',
+        },
+        'newText': {
+          'type': 'string',
+          'description':
+              '新记忆内容。为空表示删除。',
+        },
+      },
+      'required': <String>[],
+    },
+  },
+};
 
 /// 已注册的场景 ID 常量
 abstract final class ScenarioIds {

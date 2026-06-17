@@ -9,11 +9,8 @@ import '../models/novel.dart' as local;
 import '../models/chapter.dart' as local;
 import '../models/character.dart';
 import '../extensions/api_novel_extension.dart';
-import '../extensions/api_chapter_extension.dart';
 import '../extensions/api_source_site_extension.dart';
-import 'chapter_manager.dart';
 import 'logger_service.dart';
-import '../models/chapter_content_result.dart';
 import '../utils/logging/log_scope.dart';
 import 'preferences_service.dart';
 
@@ -62,9 +59,6 @@ class ApiServiceWrapper {
   Dio _dio;
   DefaultApi _api;
   final Serializers _serializers = standardSerializers;
-
-  /// 章节管理器实例
-  final ChapterManager _chapterManager = ChapterManager();
 
   bool _initialized = false;
 
@@ -446,30 +440,6 @@ class ApiServiceWrapper {
     }, '获取源站列表');
   }
 
-  /// 获取章节列表
-  Future<List<local.Chapter>> getChapters(String novelUrl,
-      {bool forceRefresh = false}) async {
-    return _withRetry<List<local.Chapter>>(() async {
-      final token = await getToken();
-      final response = await _api.chaptersChaptersGet(
-        url: novelUrl,
-        forceRefresh: forceRefresh,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        final chapters = response.data?.toList() ?? [];
-        return chapters.asMap().entries.map((entry) {
-          final index = entry.key;
-          final chapter = entry.value;
-          return chapter.toLocalModel(chapterIndex: index);
-        }).toList();
-      } else {
-        throw Exception('获取章节列表失败: ${response.statusCode}');
-      }
-    }, '获取章节列表');
-  }
-
   /// 通过URL获取小说信息和章节列表
   ///
   /// [url] 小说详情页URL
@@ -514,74 +484,6 @@ class ApiServiceWrapper {
         throw Exception('获取小说信息失败: ${response.statusCode?.toString()}');
       }
     }, '获取小说信息');
-  }
-
-  /// 获取章节内容
-  ///
-  /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
-  Future<String> getChapterContent(String chapterUrl,
-      {bool forceRefresh = false}) async {
-    // 使用章节管理器进行请求去重和管理
-    return _chapterManager.getChapterContent(
-      chapterUrl,
-      forceRefresh: forceRefresh,
-      fetchFunction: () => _fetchChapterContentFromNetwork(chapterUrl,
-          forceRefresh: forceRefresh),
-    );
-  }
-
-  /// 从网络获取章节内容的实际实现
-  Future<String> _fetchChapterContentFromNetwork(String chapterUrl,
-      {bool forceRefresh = false}) async {
-    return _withRetry<String>(() async {
-      final token = await getToken();
-      final response = await _api.chapterContentChapterContentGet(
-        url: chapterUrl,
-        forceRefresh: forceRefresh,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data?.content ?? '';
-      } else {
-        throw Exception('获取章节内容失败: ${response.statusCode}');
-      }
-    }, '获取章节内容');
-  }
-
-  /// 获取章节内容（包含来源标识）
-  ///
-  /// [forceRefresh] 是否强制刷新，从源站重新获取内容（默认false）
-  Future<ChapterContentResult> getChapterContentWithSource(String chapterUrl,
-      {bool forceRefresh = false}) async {
-    return _chapterManager.getChapterContentWithSource(
-      chapterUrl,
-      forceRefresh: forceRefresh,
-      fetchFunction: () => _fetchChapterContentFromNetworkWithSource(chapterUrl,
-          forceRefresh: forceRefresh),
-    );
-  }
-
-  /// 从网络获取章节内容（包含来源标识）
-  Future<ChapterContentResult> _fetchChapterContentFromNetworkWithSource(
-      String chapterUrl, {bool forceRefresh = false}) async {
-    return _withRetry<ChapterContentResult>(() async {
-      final token = await getToken();
-      final response = await _api.chapterContentChapterContentGet(
-        url: chapterUrl,
-        forceRefresh: forceRefresh,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return ChapterContentResult(
-          content: response.data?.content ?? '',
-          fromCache: response.data?.fromCache ?? false,
-        );
-      } else {
-        throw Exception('获取章节内容失败: ${response.statusCode}');
-      }
-    }, '获取章节内容');
   }
 
   /// 统一错误处理

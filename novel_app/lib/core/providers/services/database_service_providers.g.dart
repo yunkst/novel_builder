@@ -55,7 +55,7 @@ final chapterServiceProvider = AutoDisposeProvider<ChapterService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterServiceRef = AutoDisposeProviderRef<ChapterService>;
-String _$chapterLoaderHash() => r'95ad263f74020c432fbfb4895da43f86e8d61d41';
+String _$chapterLoaderHash() => r'f324161e7dd8bc839455f25644e6915698005e8f';
 
 /// ChapterLoader Provider
 ///

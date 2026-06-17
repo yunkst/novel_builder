@@ -255,8 +255,13 @@ class AgentLoop {
             result = {'raw': rawResult};
           }
 
-          // 截断过长结果：错误响应优先保留 error/message/suggestion 字段
+          // 截断过长结果：错误响应优先保留 error/message/suggestion 字段；
+          // __meta（run_id 等关键元数据）始终保留到末尾，永不被截断。
           var resultStr = jsonEncode(result);
+
+          // 剥离 __meta：体积小但承载 run_id 等句柄，必须送达 LLM
+          final meta = result.remove('__meta');
+
           if (resultStr.length > _config.toolResultMaxChars) {
             if (result.containsKey('error')) {
               // 错误结果：优先保留错误信息，截断其余数据
@@ -285,6 +290,11 @@ class AgentLoop {
               resultStr =
                   '${resultStr.substring(0, _config.toolResultMaxChars)}... [truncated]';
             }
+          }
+
+          // __meta 拼到末尾：永远不被截断预算影响，保证 run_id 可见
+          if (meta != null) {
+            resultStr = '$resultStr\n\n__meta=${jsonEncode(meta)}';
           }
 
           messages.add(ChatMessage(

@@ -121,6 +121,13 @@ class FakeAgentScenario implements AgentScenario {
   String buildSystemPrompt(AgentScenarioContext context) => 'system-prompt';
 
   @override
+  Future<List<String>> getMemories() async => const [];
+
+  @override
+  Future<MemoryPatchResult> patchMemory(String? oldText, String newText) async =>
+      MemoryPatchResult.error('not available', const []);
+
+  @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
     if (toolDelay != null) {
       await Future<void>.delayed(toolDelay!);
@@ -385,6 +392,13 @@ class _CancelAfterFirstToolScenario implements AgentScenario {
   @override
   String buildSystemPrompt(AgentScenarioContext context) =>
       inner.buildSystemPrompt(context);
+
+  @override
+  Future<List<String>> getMemories() => inner.getMemories();
+
+  @override
+  Future<MemoryPatchResult> patchMemory(String? oldText, String newText) =>
+      inner.patchMemory(oldText, newText);
 
   @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {

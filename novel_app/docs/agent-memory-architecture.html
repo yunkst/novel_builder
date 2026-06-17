@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novel Builder — Agent 越用越聪明 架构图</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #22d3ee;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      min-width: 1000px;
+      display: block;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card-dot.orange { background: #fb923c; }
+
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .card ul {
+      list-style: none;
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .card li {
+      margin-bottom: 0.375rem;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #475569;
+      font-size: 0.75rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .toolbar-toggle {
+      background: transparent;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      transition: color 0.2s, background 0.2s;
+    }
+    .toolbar-toggle:hover { color: #94a3b8; background: rgba(30, 41, 59, 0.5); }
+    .toolbar-actions {
+      display: none;
+      gap: 0.5rem;
+    }
+    .toolbar.expanded .toolbar-actions { display: flex; }
+    .toolbar-actions button {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.375rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .toolbar-actions button:hover {
+      background: rgba(51, 65, 85, 0.8);
+      color: white;
+      border-color: #475569;
+    }
+
+    @media print {
+      body { background: #020617; padding: 1rem; }
+      .toolbar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Novel Builder — Agent "越用越聪明" 架构</h1>
+        <div class="toolbar">
+          <div class="toolbar-actions">
+            <button onclick="copyAsImage(this)">📋 Copy</button>
+            <button onclick="downloadPNG(this)">🖼️ PNG</button>
+            <button onclick="downloadPDF(this)">📄 PDF</button>
+          </div>
+          <button class="toolbar-toggle" onclick="this.parentElement.classList.toggle('expanded')" title="Export options" aria-label="Export options">⋯</button>
+        </div>
+      </div>
+      <p class="subtitle">用户主动触发反思 → LLM 提取记忆 → 用户审核 → 持久化 → 下次对话自动注入</p>
+    </div>
+
+    <!-- Main Diagram -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1200 820">
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrowhead-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrowhead-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrowhead-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrowhead-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ============================================================
+             REGION BOUNDARIES
+             ============================================================ -->
+
+        <!-- UI Layer Boundary -->
+        <rect x="20" y="20" width="1140" height="190" rx="12" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="40" y="42" fill="#22d3ee" font-size="10" font-weight="600">UI 层 (Flutter Widgets)</text>
+
+        <!-- State Layer Boundary -->
+        <rect x="20" y="230" width="1140" height="130" rx="12" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="40" y="252" fill="#22d3ee" font-size="10" font-weight="600">状态层 (Riverpod Providers)</text>
+
+        <!-- Service Layer Boundary -->
+        <rect x="20" y="380" width="1140" height="170" rx="12" fill="rgba(52, 211, 153, 0.03)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="40" y="402" fill="#34d399" font-size="10" font-weight="600">服务层 (Business Logic)</text>
+
+        <!-- Data Layer Boundary -->
+        <rect x="20" y="570" width="1140" height="140" rx="12" fill="rgba(167, 139, 250, 0.03)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="40" y="592" fill="#a78bfa" font-size="10" font-weight="600">数据层 (SQLite + Repository)</text>
+
+        <!-- ============================================================
+             ARROWS — drawn BEFORE boxes so they render behind
+             ============================================================ -->
+
+        <!-- Flow 1: 用户点击反思按钮 → HermesChatNotifier.triggerReview() -->
+        <line x1="310" y1="140" x2="310" y2="278" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+        <text x="320" y="215" fill="#22d3ee" font-size="8">triggerReview()</text>
+
+        <!-- Flow 2: HermesChatNotifier → AgentMemoryService.extractMemories() -->
+        <line x1="410" y1="330" x2="410" y2="428" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+        <text x="420" y="385" fill="#34d399" font-size="8">extractMemories()</text>
+
+        <!-- Flow 3: AgentMemoryService → LLM Provider (外部) -->
+        <line x1="555" y1="460" x2="555" y2="500" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <line x1="555" y1="500" x2="870" y2="500" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <line x1="870" y1="500" x2="870" y2="468" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="710" y="494" fill="#fbbf24" font-size="8">Review Prompt → LLM API</text>
+
+        <!-- Flow 4: AgentMemoryService → AgentMemoryRepository.upsert() -->
+        <line x1="555" y1="510" x2="555" y2="618" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+        <text x="565" y="570" fill="#a78bfa" font-size="8">upsertMemories()</text>
+
+        <!-- Flow 5: AgentMemoryRepository → SQLite agent_memory 表 -->
+        <line x1="660" y1="648" x2="750" y2="648" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+        <text x="705" y="640" fill="#a78bfa" font-size="8">INSERT/UPDATE</text>
+
+        <!-- Flow 6: 下次对话 → 记忆注入 system prompt -->
+        <path d="M 860 648 L 860 690 Q 860 710 840 710 L 310 710 Q 290 710 290 690 L 290 640 L 290 468" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrowhead-rose)"/>
+        <text x="580" y="704" fill="#fb7185" font-size="8">下次对话时注入 system prompt（自动）</text>
+
+        <!-- Flow 7: 反思结果 → 用户审核模态 -->
+        <line x1="310" y1="200" x2="310" y2="230" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+        <text x="320" y="220" fill="#22d3ee" font-size="8">emit ReviewProposed</text>
+
+        <!-- Flow 8: 用户确认 → 保存 -->
+        <line x1="460" y1="200" x2="460" y2="278" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+        <text x="470" y="245" fill="#22d3ee" font-size="8">confirmReview()</text>
+
+        <!-- Flow 9: AgentMemoryService → 去重检查 -->
+        <line x1="555" y1="460" x2="555" y2="460" stroke="#a78bfa" stroke-width="0" marker-end="url(#arrowhead-violet)"/>
+
+        <!-- Flow 10: NovelAgentService → AgentLoop → Scenario -->
+        <line x1="950" y1="468" x2="1020" y2="468" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+        <text x="985" y="462" fill="#34d399" font-size="8">run()</text>
+
+        <!-- Flow 11: AgentLoop → LLM (chatStreamWithTools) -->
+        <line x1="1080" y1="430" x2="1080" y2="380" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <line x1="1080" y1="380" x2="1130" y2="380" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="1095" y="410" fill="#fbbf24" font-size="7">LLM</text>
+
+        <!-- ============================================================
+             UI LAYER (y=20 to y=210)
+             ============================================================ -->
+
+        <!-- 反思按钮 -->
+        <rect x="40" y="70" width="220" height="60" rx="6" fill="#0f172a"/>
+        <rect x="40" y="70" width="220" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="150" y="95" fill="white" font-size="12" font-weight="600" text-anchor="middle">📝 反思对话按钮</text>
+        <text x="150" y="115" fill="#94a3b8" font-size="9" text-anchor="middle">ReviewButton Widget</text>
+
+        <!-- 反思模态 -->
+        <rect x="40" y="145" width="220" height="55" rx="6" fill="#0f172a"/>
+        <rect x="40" y="145" width="220" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="150" y="168" fill="white" font-size="12" font-weight="600" text-anchor="middle">反思审核模态</text>
+        <text x="150" y="188" fill="#94a3b8" font-size="9" text-anchor="middle">ReviewDialog (3阶段)</text>
+
+        <!-- 记忆库管理 -->
+        <rect x="300" y="70" width="220" height="55" rx="6" fill="#0f172a"/>
+        <rect x="300" y="70" width="220" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="410" y="93" fill="white" font-size="12" font-weight="600" text-anchor="middle">📚 记忆库管理</text>
+        <text x="410" y="113" fill="#94a3b8" font-size="9" text-anchor="middle">MemoryManagementScreen</text>
+
+        <!-- HermesChatDialog -->
+        <rect x="560" y="70" width="240" height="130" rx="6" fill="#0f172a"/>
+        <rect x="560" y="70" width="240" height="130" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="680" y="95" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatDialog</text>
+        <text x="680" y="115" fill="#94a3b8" font-size="9" text-anchor="middle">对话界面 + 场景切换器</text>
+        <text x="680" y="133" fill="#94a3b8" font-size="8" text-anchor="middle">• 消息气泡列表</text>
+        <text x="680" y="148" fill="#94a3b8" font-size="8" text-anchor="middle">• 流式输出展示</text>
+        <text x="680" y="163" fill="#94a3b8" font-size="8" text-anchor="middle">• 工具调用状态卡片</text>
+        <text x="680" y="183" fill="#22d3ee" font-size="7" text-anchor="middle">场景: writing / webview_extract</text>
+
+        <!-- ============================================================
+             STATE LAYER (y=230 to y=360)
+             ============================================================ -->
+
+        <!-- HermesChatNotifier -->
+        <rect x="40" y="280" width="280" height="70" rx="6" fill="#0f172a"/>
+        <rect x="40" y="280" width="280" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="180" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatNotifier</text>
+        <text x="180" y="325" fill="#94a3b8" font-size="9" text-anchor="middle">triggerReview() / confirmReview()</text>
+        <text x="180" y="340" fill="#94a3b8" font-size="8" text-anchor="middle">StateNotifier&lt;HermesChatState&gt;</text>
+
+        <!-- HermesChatState 扩展字段 -->
+        <rect x="360" y="280" width="260" height="70" rx="6" fill="#0f172a"/>
+        <rect x="360" y="280" width="260" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="490" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatState (扩展)</text>
+        <text x="490" y="322" fill="#94a3b8" font-size="8" text-anchor="middle">+ lastReviewedAtIndex: int?</text>
+        <text x="490" y="337" fill="#94a3b8" font-size="8" text-anchor="middle">+ reviewUi: ReviewUiState</text>
+
+        <!-- ============================================================
+             SERVICE LAYER (y=380 to y=550)
+             ============================================================ -->
+
+        <!-- AgentMemoryService -->
+        <rect x="40" y="430" width="260" height="80" rx="6" fill="#0f172a"/>
+        <rect x="40" y="430" width="260" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="170" y="455" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentMemoryService</text>
+        <text x="170" y="475" fill="#94a3b8" font-size="9" text-anchor="middle">extractMemories()</text>
+        <text x="170" y="492" fill="#94a3b8" font-size="8" text-anchor="middle">saveMemories()</text>
+        <text x="170" y="505" fill="#94a3b8" font-size="8" text-anchor="middle">_isDuplicateMemory()</text>
+
+        <!-- NovelAgentService (existing) -->
+        <rect x="340" y="430" width="240" height="80" rx="6" fill="#0f172a"/>
+        <rect x="340" y="430" width="240" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="460" y="455" fill="white" font-size="12" font-weight="600" text-anchor="middle">NovelAgentService</text>
+        <text x="460" y="475" fill="#94a3b8" font-size="9" text-anchor="middle">sendMessage()</text>
+        <text x="460" y="492" fill="#94a3b8" font-size="8" text-anchor="middle">cancel() / dispose()</text>
+        <text x="460" y="505" fill="#94a3b8" font-size="8" text-anchor="middle">StreamController&lt;AgentEvent&gt;</text>
+
+        <!-- AgentLoop (existing) -->
+        <rect x="620" y="430" width="220" height="80" rx="6" fill="#0f172a"/>
+        <rect x="620" y="430" width="220" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="730" y="455" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentLoop</text>
+        <text x="730" y="475" fill="#94a3b8" font-size="9" text-anchor="middle">ReAct 循环 (max 10轮)</text>
+        <text x="730" y="492" fill="#94a3b8" font-size="8" text-anchor="middle">ContextCompactor</text>
+        <text x="730" y="505" fill="#94a3b8" font-size="8" text-anchor="middle">CancellationToken</text>
+
+        <!-- AgentSystemPrompt (enhanced) -->
+        <rect x="880" y="430" width="240" height="80" rx="6" fill="#0f172a"/>
+        <rect x="880" y="430" width="240" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="1000" y="455" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentSystemPrompt</text>
+        <text x="1000" y="475" fill="#94a3b8" font-size="9" text-anchor="middle">buildEnhanced()</text>
+        <text x="1000" y="492" fill="#94a3b8" font-size="8" text-anchor="middle">注入偏好 + 纠正 + 模式</text>
+        <text x="1000" y="505" fill="#34d399" font-size="7" text-anchor="middle">新增方法</text>
+
+        <!-- ============================================================
+             SCENARIO COMPONENTS (y=380 to y=550, right side)
+             ============================================================ -->
+
+        <!-- WritingScenario -->
+        <rect x="880" y="340" width="120" height="50" rx="6" fill="#0f172a"/>
+        <rect x="880" y="340" width="120" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="940" y="362" fill="white" font-size="11" font-weight="600" text-anchor="middle">WritingScenario</text>
+        <text x="940" y="378" fill="#94a3b8" font-size="8" text-anchor="middle">12 个工具</text>
+
+        <!-- WebViewExtractScenario -->
+        <rect x="1020" y="340" width="120" height="50" rx="6" fill="#0f172a"/>
+        <rect x="1020" y="340" width="120" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="1080" y="362" fill="white" font-size="11" font-weight="600" text-anchor="middle">WebViewExtract</text>
+        <text x="1080" y="378" fill="#94a3b8" font-size="8" text-anchor="middle">8 个工具</text>
+
+        <!-- ============================================================
+             DATA LAYER (y=570 to y=710)
+             ============================================================ -->
+
+        <!-- AgentMemoryRepository -->
+        <rect x="40" y="620" width="260" height="60" rx="6" fill="#0f172a"/>
+        <rect x="40" y="620" width="260" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="170" y="645" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentMemoryRepository</text>
+        <text x="170" y="665" fill="#94a3b8" font-size="9" text-anchor="middle">upsert() / findByKey() / getByScenario()</text>
+
+        <!-- agent_memory 表 -->
+        <rect x="360" y="620" width="380" height="60" rx="6" fill="#0f172a"/>
+        <rect x="360" y="620" width="380" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="550" y="640" fill="white" font-size="12" font-weight="600" text-anchor="middle">agent_memory (SQLite 新表)</text>
+        <text x="550" y="658" fill="#94a3b8" font-size="8" text-anchor="middle">id | scenario_id | memory_type | key | content | trust_score | use_count | last_used_at</text>
+        <text x="550" y="673" fill="#a78bfa" font-size="7" text-anchor="middle">UNIQUE(scenario_id, key)</text>
+
+        <!-- 已有 Repository 层 -->
+        <rect x="780" y="620" width="220" height="60" rx="6" fill="#0f172a"/>
+        <rect x="780" y="620" width="220" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="890" y="645" fill="white" font-size="12" font-weight="600" text-anchor="middle">已有 Repository 层</text>
+        <text x="890" y="665" fill="#94a3b8" font-size="9" text-anchor="middle">Novel / Chapter / Character ...</text>
+
+        <!-- ============================================================
+             EXTERNAL SERVICES (y=20 to y=210, right side)
+             ============================================================ -->
+
+        <!-- LLM Provider -->
+        <rect x="880" y="70" width="180" height="55" rx="6" fill="#0f172a"/>
+        <rect x="880" y="70" width="180" height="55" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="970" y="93" fill="white" font-size="12" font-weight="600" text-anchor="middle">LLM Provider</text>
+        <text x="970" y="113" fill="#94a3b8" font-size="9" text-anchor="middle">OpenAI 兼容 API</text>
+
+        <!-- ============================================================
+             REVIEW FLOW ANNOTATION (numbered steps)
+             ============================================================ -->
+
+        <!-- Step labels -->
+        <circle cx="310" cy="140" r="10" fill="#22d3ee" opacity="0.3" stroke="#22d3ee" stroke-width="1"/>
+        <text x="310" y="144" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle">1</text>
+
+        <circle cx="310" cy="310" r="10" fill="#22d3ee" opacity="0.3" stroke="#22d3ee" stroke-width="1"/>
+        <text x="310" y="314" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle">2</text>
+
+        <circle cx="410" cy="385" r="10" fill="#34d399" opacity="0.3" stroke="#34d399" stroke-width="1"/>
+        <text x="410" y="389" fill="#34d399" font-size="9" font-weight="700" text-anchor="middle">3</text>
+
+        <circle cx="870" cy="500" r="10" fill="#fbbf24" opacity="0.3" stroke="#fbbf24" stroke-width="1"/>
+        <text x="870" y="504" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="middle">4</text>
+
+        <circle cx="310" cy="200" r="10" fill="#22d3ee" opacity="0.3" stroke="#22d3ee" stroke-width="1"/>
+        <text x="310" y="204" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle">5</text>
+
+        <circle cx="460" cy="310" r="10" fill="#22d3ee" opacity="0.3" stroke="#22d3ee" stroke-width="1"/>
+        <text x="460" y="314" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle">6</text>
+
+        <circle cx="555" cy="570" r="10" fill="#a78bfa" opacity="0.3" stroke="#a78bfa" stroke-width="1"/>
+        <text x="555" y="574" fill="#a78bfa" font-size="9" font-weight="700" text-anchor="middle">7</text>
+
+        <circle cx="580" cy="704" r="10" fill="#fb7185" opacity="0.3" stroke="#fb7185" stroke-width="1"/>
+        <text x="580" y="708" fill="#fb7185" font-size="9" font-weight="700" text-anchor="middle">8</text>
+
+        <!-- Flow step descriptions -->
+        <text x="30" y="748" fill="#64748b" font-size="8">
+          <tspan fill="#22d3ee" font-weight="600">①</tspan> 用户点击"反思"按钮
+          <tspan dx="20" fill="#22d3ee" font-weight="600">②</tspan> HermesChatNotifier 收集未反思消息
+          <tspan dx="20" fill="#34d399" font-weight="600">③</tspan> AgentMemoryService 调用 LLM 提取记忆
+          <tspan dx="20" fill="#fbbf24" font-weight="600">④</tspan> LLM 返回结构化记忆 JSON
+          <tspan dx="20" fill="#22d3ee" font-weight="600">⑤</tspan> 用户审核模态（勾选/取消）
+          <tspan dx="20" fill="#22d3ee" font-weight="600">⑥</tspan> 用户确认保存
+          <tspan dx="20" fill="#a78bfa" font-weight="600">⑦</tspan> AgentMemoryRepository 写入 SQLite
+          <tspan dx="20" fill="#fb7185" font-weight="600">⑧</tspan> 下次对话自动注入 system prompt
+        </text>
+
+        <!-- ============================================================
+             LEGEND (bottom-right)
+             ============================================================ -->
+        <text x="920" y="748" fill="white" font-size="10" font-weight="600">图例</text>
+
+        <rect x="920" y="758" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="942" y="766" fill="#94a3b8" font-size="8">UI / 状态层</text>
+
+        <rect x="920" y="774" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="942" y="782" fill="#94a3b8" font-size="8">服务层</text>
+
+        <rect x="920" y="790" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="942" y="798" fill="#94a3b8" font-size="8">数据层</text>
+
+        <rect x="1040" y="758" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="1062" y="766" fill="#94a3b8" font-size="8">外部 LLM</text>
+
+        <line x1="1040" y1="782" x2="1056" y2="782" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="1062" y="785" fill="#94a3b8" font-size="8">记忆注入路径</text>
+
+        <rect x="1040" y="792" width="16" height="10" rx="2" fill="rgba(34, 211, 238, 0.3)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="1062" y="800" fill="#94a3b8" font-size="8">新增组件</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>主动反思流程（8 步）</h3>
+        </div>
+        <ul>
+          <li>• 用户点击 📝 反思按钮</li>
+          <li>• Notifier 收集未反思消息</li>
+          <li>• AgentMemoryService 调用 LLM</li>
+          <li>• LLM 返回结构化记忆 JSON</li>
+          <li>• 用户审核（勾选/取消）</li>
+          <li>• 确认后写入 agent_memory 表</li>
+          <li>• 去重：相似度 > 80% 更新而非新增</li>
+          <li>• 下次对话自动注入 system prompt</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>agent_memory 表设计</h3>
+        </div>
+        <ul>
+          <li>• scenario_id: 'writing' | 'webview_extract'</li>
+          <li>• memory_type: preference | correction | pattern | fact</li>
+          <li>• key + content: 记忆键值对</li>
+          <li>• trust_score: 0.0-1.0 信任评分</li>
+          <li>• use_count: 被引用次数</li>
+          <li>• last_used_at: 上次引用时间</li>
+          <li>• UNIQUE(scenario_id, key) 防重复</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>与 Hermes Agent 的对比</h3>
+        </div>
+        <ul>
+          <li>• 主动触发 > 自动 Nudge（用户可控）</li>
+          <li>• SQLite > 文件存储（移动端友好）</li>
+          <li>• 用户审核 > 自动写入（透明可信）</li>
+          <li>• 2 场景 > 通用 Agent（精准聚焦）</li>
+          <li>• 无需 Curator（记忆量小）</li>
+          <li>• 无需 Honcho（用户画像简单）</li>
+          <li>• 无需轨迹压缩（不训练模型）</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      Novel Builder • Agent "越用越聪明" 架构设计 • 2026-06-16 • 基于 Hermes Agent 学习闭环简化设计
+    </p>
+  </div>
+
+  <script>
+    async function copyAsImage(btn) {
+      const orig = btn.textContent;
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        btn.textContent = '✓ Copied!';
+      } catch (e) {
+        btn.textContent = '✗ Failed';
+      }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+
+    async function downloadPNG(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const link = document.createElement('a');
+        link.download = 'novel-builder-agent-memory-architecture.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.textContent = '✓ Done!';
+      } catch (e) {
+        btn.textContent = '✗ Failed';
+      }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+
+    async function downloadPDF(btn) {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ ...';
+      try {
+        const el = document.getElementById('report-container');
+        const r = el.getBoundingClientRect();
+        const pad = 32;
+        const canvas = await html2canvas(document.body, { backgroundColor: '#020617', scale: 2, useCORS: true, ignoreElements: (e) => e.classList && e.classList.contains('toolbar'), x: r.left + window.scrollX - pad, y: r.top + window.scrollY - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], hotfixes: ['px_scaling'] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('novel-builder-agent-memory-architecture.pdf');
+        btn.textContent = '✓ Done!';
+      } catch (e) {
+        btn.textContent = '✗ Failed';
+      }
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+  </script>
+</body>
+</html>
