@@ -88,7 +88,7 @@ class AppUpdateService {
         version: release.versionNumber,
         downloadUrl: asset.browserDownloadUrl,
         fileSize: asset.size,
-        changelog: release.body,
+        changelog: _extractChangelog(release.body),
         createdAt: release.publishedAt,
       );
 
@@ -244,6 +244,39 @@ class AppUpdateService {
   /// 忽略此版本更新
   Future<void> ignoreVersion(String version) async {
     await PreferencesService.instance.setString(_ignoreVersionKey, version);
+  }
+
+  /// 从 GitHub Release body 中提取 changelog
+  ///
+  /// release body 格式约定：包含 `<!--CHANGELOG_START-->` 和 `<!--CHANGELOG_END-->`
+  /// 标记包围的段落。如果标记不存在，回退到标题 `## 📝 更新日志` 之后的内容。
+  /// 如果都匹配不到，返回完整 body 原始值。
+  static String _extractChangelog(String? body) {
+    if (body == null || body.isEmpty) return '';
+
+    // 优先匹配 HTML 注释标记
+    final startMarker = '<!--CHANGELOG_START-->';
+    final endMarker = '<!--CHANGELOG_END-->';
+    final startIdx = body.indexOf(startMarker);
+    final endIdx = body.indexOf(endMarker);
+
+    if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+      final content = body
+          .substring(startIdx + startMarker.length, endIdx)
+          .trim();
+      if (content.isNotEmpty) return content;
+    }
+
+    // 回退：匹配 ## 📝 更新日志 标题之后的内容
+    final headerMarker = '## 📝 更新日志';
+    final headerIdx = body.indexOf(headerMarker);
+    if (headerIdx != -1) {
+      final afterHeader = body.substring(headerIdx + headerMarker.length).trim();
+      if (afterHeader.isNotEmpty) return afterHeader;
+    }
+
+    // 最终回退：直接返回 body 原始值
+    return body;
   }
 
   /// 检查版本是否被忽略

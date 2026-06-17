@@ -26,6 +26,8 @@ sha256sum -c SHA256SUMS.txt
 2. 在 Android 设备上安装（允许「未知来源」）
 3. 首次启动配置后端 API 地址
 
-## 📝 完整更新日志
+## 📝 更新日志
 
-请查看 [CHANGELOG.md](https://github.com/yunkst/novel_builder/blob/master/CHANGELOG.md)
+<!--CHANGELOG_START-->
+{{CHANGELOG}}
+<!--CHANGELOG_END-->

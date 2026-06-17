@@ -65,14 +65,49 @@ jobs:
             echo "flag=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Extract changelog from tag message
+        id: changelog
+        run: |
+          # 从 tag 的 annotation message 提取 changelog
+          # 约定格式：第一行 "Release X.Y.Z"，空行后是 changelog 内容
+          TAG_MSG=$(git tag -l --format='%(contents)' "${{ steps.tag.outputs.name }}")
+          if [ -z "$TAG_MSG" ]; then
+            echo "  ⚠️  tag ${{ steps.tag.outputs.name }} 没有 annotation message"
+            CHANGELOG="Bug 修复和性能优化"
+          else
+            # 跳过第一行 "Release X.Y.Z"，跳过一个空行，取剩下的内容
+            CHANGELOG=$(echo "$TAG_MSG" | tail -n +3)
+            # 如果 tail 后为空（tag 只有标题没 changelog），给个默认
+            if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+              CHANGELOG="Bug 修复和性能优化"
+            fi
+          fi
+          {
+            echo "changelog<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          echo "===== 提取到的 changelog ====="
+          echo "$CHANGELOG"
+          echo "=============================="
+
       - name: Render release body
         env:
           VERSION: ${{ steps.tag.outputs.version }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
         run: |
-          # 用实际版本号替换模板占位符，输出到 working-directory 根
+          # 用实际版本号替换 {{VERSION}}，用 changelog 替换 {{CHANGELOG}}
+          # 用 Python 避免 sed 的特殊字符（/、&、\、换行）转义问题
           # NOTE: defaults.working-directory = novel_app，所以 ../.github = 仓库根
-          sed "s|{{VERSION}}|v${VERSION}|g" \
-            ../.github/release_template.md > release_body.md
+          python3 -c '
+          import os
+          with open("../.github/release_template.md", "r", encoding="utf-8") as f:
+              body = f.read()
+          body = body.replace("{{VERSION}}", "v" + os.environ["VERSION"])
+          body = body.replace("{{CHANGELOG}}", os.environ["CHANGELOG"])
+          with open("release_body.md", "w", encoding="utf-8") as f:
+              f.write(body)
+          '
           echo "===== 渲染后的 release_body.md ====="
           cat release_body.md
 
