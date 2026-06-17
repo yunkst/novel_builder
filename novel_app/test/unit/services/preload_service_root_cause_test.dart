@@ -58,7 +58,6 @@ void main() {
     chapterRepository = ChapterRepository(dbConnection: connection);
     mockHeadlessService = MockHeadlessWebViewContentService();
     preloadService = PreloadService(
-      apiService: test_mocks.MockApiServiceWrapper(),
       chapterRepository: chapterRepository,
       headlessService: mockHeadlessService,
     );

@@ -7,12 +7,14 @@ import 'package:novel_app/services/api_service_wrapper.dart';
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart';
 import 'package:novel_app/controllers/chapter_list/chapter_loader.dart';
+import 'package:novel_app/services/headless_webview_chapter_list_service.dart';
 
 // 生成Mock类
 @GenerateMocks([
   ApiServiceWrapper,
   IChapterRepository,
   INovelRepository,
+  HeadlessWebViewChapterListService,
 ])
 import 'custom_novel_init_failure_test.mocks.dart';
 
@@ -31,6 +33,7 @@ void main() {
         api: mockApi,
         chapterRepository: mockChapterRepo,
         novelRepository: mockNovelRepo,
+        chapterListHeadlessService: MockHeadlessWebViewChapterListService(),
       );
     });
 

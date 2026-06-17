@@ -60,7 +60,6 @@ void main() {
     mockHeadlessService = MockHeadlessWebViewContentService();
 
     preloadService = PreloadService(
-      apiService: test_mocks.MockApiServiceWrapper(),
       chapterRepository: chapterRepository,
       headlessService: mockHeadlessService,
     );
