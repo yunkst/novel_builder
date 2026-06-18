@@ -416,7 +416,7 @@ class _ChapterListScreenRiverpodState
           chapter: chapter,
           isLastRead: isLastRead,
           isUserChapter: isUserChapter,
-          isCached: state.cachedStatus[chapter.url] ?? false,
+          isCached: chapter.isCached,
           isRead: chapter.isRead,
           isAccompanied: chapter.isAccompanied,
           onTap: () => _navigateToReader(chapter, state),
@@ -453,7 +453,7 @@ class _ChapterListScreenRiverpodState
           index: index,
           isLastRead: isLastRead,
           isUserChapter: isUserChapter,
-          isCached: state.cachedStatus[chapter.url] ?? false,
+          isCached: chapter.isCached,
           isRead: chapter.isRead,
           isAccompanied: chapter.isAccompanied,
         );

@@ -367,9 +367,11 @@ class LlmStreamChunk {
 
 class LlmProvider {
   final LlmConfig config;
-  final LlmHttpClient? _httpClient; // null 时需在调用前注入
+  final LlmHttpClient _httpClient;
 
-  LlmProvider(this.config, {LlmHttpClient? httpClient})
+  /// 构造时必须注入 [httpClient]，编译期强制非空，
+  /// 杜绝运行时才发现 httpClient 缺失（替代原 _requireHttpClient null 检查）。
+  LlmProvider(this.config, {required LlmHttpClient httpClient})
       : _httpClient = httpClient;
 
   /// chat completions 端点 URL
@@ -425,7 +427,14 @@ class LlmProvider {
   static LlmResponse parseBlockingResponse(String rawBody) {
     final json = jsonDecode(rawBody) as Map<String, dynamic>;
     final choices = json['choices'] as List?;
-    if (choices == null || choices.isEmpty) return const LlmResponse();
+    if (choices == null || choices.isEmpty) {
+      LoggerService.instance.w(
+        'LLM 返回空响应（choices 为空）',
+        category: LogCategory.ai,
+        tags: ['dsl', 'llm', 'empty_response'],
+      );
+      return const LlmResponse();
+    }
     final first = choices.first as Map<String, dynamic>;
     final message = first['message'] as Map<String, dynamic>?;
     if (message == null) {
@@ -465,7 +474,7 @@ class LlmProvider {
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
     );
-    final client = _requireHttpClient();
+    final client = _httpClient;
     final body = buildRequestBody(
       messages: messages,
       model: model,
@@ -534,7 +543,7 @@ class LlmProvider {
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
     );
-    final client = _requireHttpClient();
+    final client = _httpClient;
     final body = buildRequestBody(
       messages: messages,
       model: model,
@@ -599,7 +608,7 @@ class LlmProvider {
       category: LogCategory.ai,
       tags: ['dsl', 'llm', 'stream-tools'],
     );
-    final client = _requireHttpClient();
+    final client = _httpClient;
     final body = buildRequestBody(
       messages: messages,
       model: model,
@@ -666,20 +675,6 @@ class LlmProvider {
       }
     }).where((chunk) => chunk.isContent || chunk.isToolCallDelta || chunk.isFinished);
   }
-
-  LlmHttpClient _requireHttpClient() {
-    if (_httpClient == null) {
-      LoggerService.instance.e(
-        'LlmProvider.httpClient 未设置',
-        stackTrace: StackTrace.current.toString(),
-        category: LogCategory.ai,
-        tags: ['dsl', 'llm'],
-      );
-      throw StateError(
-          'LlmProvider.httpClient not set. Use constructor injection.');
-    }
-    return _httpClient!;
-  }
 }
 
 // LineSplitter 是 dart:convert 提供的，但 stream_transformers 也可替代
@@ -730,6 +725,14 @@ class IoLlmHttpClient implements LlmHttpClient {
     headers.forEach((k, v) => request.headers.set(k, v));
     request.add(utf8.encode(body));
     final response = await request.close();
+    final statusCode = response.statusCode;
+    if (statusCode >= 400) {
+      LoggerService.instance.w(
+        'LLM HTTP 错误: $statusCode',
+        category: LogCategory.ai,
+        tags: ['dsl', 'llm', 'http', 'post_json'],
+      );
+    }
     return await response.transform(utf8.decoder).join();
   }
 
@@ -741,6 +744,14 @@ class IoLlmHttpClient implements LlmHttpClient {
     headers.forEach((k, v) => request.headers.set(k, v));
     request.add(utf8.encode(body));
     final response = await request.close();
+    final statusCode = response.statusCode;
+    if (statusCode >= 400) {
+      LoggerService.instance.w(
+        'LLM HTTP 错误: $statusCode',
+        category: LogCategory.ai,
+        tags: ['dsl', 'llm', 'http', 'post_json_stream'],
+      );
+    }
     yield* response.transform(utf8.decoder);
   }
 }

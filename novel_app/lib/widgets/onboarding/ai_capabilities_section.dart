@@ -39,8 +39,7 @@ class AiCapabilitiesSection extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '配置后解锁的能力',
-                style: TextStyle(
-                  fontSize: 13,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: aiColor,
                 ),
@@ -51,12 +50,11 @@ class AiCapabilitiesSection extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: aiColor.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _engineName,
-                  style: TextStyle(
-                    fontSize: 10,
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: aiColor,
                   ),
@@ -139,6 +137,7 @@ class AiCapabilitiesSection extends StatelessWidget {
     bool isLast = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
@@ -153,16 +152,14 @@ class AiCapabilitiesSection extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '$label  ',
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onSurface,
                     ),
                   ),
                   TextSpan(
                     text: detail,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),

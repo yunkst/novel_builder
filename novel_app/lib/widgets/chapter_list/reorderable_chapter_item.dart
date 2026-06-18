@@ -121,7 +121,7 @@ class ReorderableChapterListItem extends StatelessWidget {
             ),
             if (isUserChapter) const ChapterBadge(),
             if (isCached)
-              Icon(Icons.offline_pin, size: 16, color: colorScheme.primary),
+              Icon(Icons.download_done, size: 16, color: colorScheme.primary),
           ],
         ),
         onTap: () {

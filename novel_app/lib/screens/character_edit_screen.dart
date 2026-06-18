@@ -763,7 +763,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                   });
                 },
                 backgroundColor:
-                    Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    Theme.of(context).colorScheme.primaryContainer,
               );
             }).toList(),
           ),
@@ -795,7 +795,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                               .colorScheme
                               .onSurface
                               .withValues(alpha: 0.4)
-                          : Theme.of(context).primaryColor,
+                          : Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),
@@ -812,7 +812,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                         .colorScheme
                         .onSurface
                         .withValues(alpha: 0.4)
-                    : Theme.of(context).primaryColor,
+                    : Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -988,7 +988,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color:
-                          Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                          Theme.of(context).colorScheme.primaryContainer,
                       width: 2,
                     ),
                     boxShadow: [
@@ -1040,7 +1040,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
         shape: BoxShape.circle,
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         border: Border.all(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+          color: Theme.of(context).colorScheme.primaryContainer,
           width: 1,
         ),
       ),
@@ -1073,9 +1073,9 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+        color: Theme.of(context).colorScheme.primaryContainer,
         border: Border.all(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.primaryContainer,
           width: 2,
         ),
       ),
@@ -1085,7 +1085,7 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
           style: TextStyle(
             fontSize: size * 0.4,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
       ),

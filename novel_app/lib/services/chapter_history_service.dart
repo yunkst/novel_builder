@@ -1,5 +1,6 @@
 import '../models/chapter.dart';
 import '../services/headless_webview_content_service.dart';
+import '../services/headless_webview_errors.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import 'logger_service.dart';
 
@@ -147,8 +148,14 @@ class ChapterHistoryService {
     if (_headlessService == null) return null;
 
     LoggerService.instance.d('缓存未命中，尝试 Headless WebView - ${chapter.title}', category: _category, tags: _tags);
-    final result = await _headlessService!.fetchContent(chapter.url);
-    if (result == null || result.content.trim().isEmpty) return null;
-    return result.content;
+    final result = await _headlessService!.fetchContent(
+      chapter.url,
+      priority: FetchPriority.low, // 后台获取，不抢占阅读器
+    );
+    // busy 时直接返回 null（非关键路径）；noScript 也返回 null
+    if (result.isSuccess && result.content.content.trim().isNotEmpty) {
+      return result.content.content;
+    }
+    return null;
   }
 }

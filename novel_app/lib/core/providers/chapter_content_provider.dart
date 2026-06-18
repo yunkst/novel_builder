@@ -101,17 +101,66 @@ class ChapterContent extends _$ChapterContent {
       }
 
       // 缓存未命中或强制刷新，用 Headless WebView 获取
+      // 使用 high 优先级，可抢占预加载任务；遇到 busy 时有限重试
       final headlessService = ref.read(headlessWebViewContentServiceProvider);
-      final webViewResult = await headlessService.fetchContent(chapter.url);
-      if (webViewResult != null && webViewResult.content.trim().isNotEmpty) {
-        content = webViewResult.content;
-        LoggerService.instance.d(
-          '章节内容从 Headless WebView 获取成功',
+
+      const maxRetries = 3;
+      const retryDelay = Duration(seconds: 2);
+      FetchContentResult? lastResult;
+
+      for (var attempt = 0; attempt < maxRetries; attempt++) {
+        lastResult = await headlessService.fetchContent(
+          chapter.url,
+          priority: FetchPriority.high,
+        );
+
+        if (lastResult.isSuccess) {
+          content = lastResult.content.content;
+          LoggerService.instance.d(
+            '章节内容从 Headless WebView 获取成功',
+            category: LogCategory.database,
+            tags: ['provider', 'chapter-content', 'headless'],
+          );
+          break;
+        }
+
+        if (lastResult.isBusy) {
+          LoggerService.instance.w(
+            'ChapterContentProvider: WebView 忙碌，'
+            '第${attempt + 1}次重试（共$maxRetries次）',
+            category: LogCategory.database,
+            tags: ['provider', 'chapter-content', 'busy-retry'],
+          );
+          if (attempt < maxRetries - 1) {
+            await Future.delayed(retryDelay);
+          }
+          continue;
+        }
+
+        // isNoScript，无需重试
+        break;
+      }
+
+      // 检查最终结果
+      if (lastResult != null && lastResult.isSuccess) {
+        content = lastResult.content.content;
+      } else if (lastResult != null && lastResult.isNoScript) {
+        LoggerService.instance.w(
+          'ChapterContent 抛出 NoExtractionScriptException: url=${chapter.url}',
           category: LogCategory.database,
-          tags: ['provider', 'chapter-content', 'headless'],
+          tags: ['provider', 'chapter-content', 'no_script'],
+        );
+        throw NoExtractionScriptException(
+          _extractHost(chapter.url) ?? '',
+          url: chapter.url,
         );
       } else {
-        throw NoExtractionScriptException(
+        LoggerService.instance.w(
+          'ChapterContent 抛出 WebViewBusyException: url=${chapter.url}',
+          category: LogCategory.database,
+          tags: ['provider', 'chapter-content', 'busy_exception'],
+        );
+        throw WebViewBusyException(
           _extractHost(chapter.url) ?? '',
           url: chapter.url,
         );
@@ -130,6 +179,11 @@ class ChapterContent extends _$ChapterContent {
           tags: ['provider', 'chapter-content', 'api'],
         );
       } else {
+        LoggerService.instance.w(
+          'ChapterContent 内容长度校验失败: len=${content.length} (需 >50)',
+          category: LogCategory.database,
+          tags: ['provider', 'chapter-content', 'content_too_short'],
+        );
         throw Exception('获取到的章节内容为空或过短');
       }
 

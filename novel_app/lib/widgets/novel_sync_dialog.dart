@@ -209,12 +209,12 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
       case SyncStatus.uploading:
         return Icon(
           Icons.cloud_upload_rounded,
-          color: Theme.of(context).primaryColor,
+          color: Theme.of(context).colorScheme.primary,
         );
       case SyncStatus.downloading:
         return Icon(
           Icons.cloud_download_rounded,
-          color: Theme.of(context).primaryColor,
+          color: Theme.of(context).colorScheme.primary,
         );
       case SyncStatus.success:
         return Icon(Icons.check_circle, color: context.appColors.success);
@@ -317,7 +317,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
               : '正在从服务器下载小说数据...',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontSize: 13,
+            fontSize: 14,
           ),
         ),
       ],
@@ -346,7 +346,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
                     ? '小说数据已成功上传到服务器'
                     : '小说数据已成功下载到本地',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   color: context.appColors.onSuccessContainer,
                 ),
               ),
@@ -390,7 +390,7 @@ class _NovelSyncDialogState extends ConsumerState<NovelSyncDialog> {
                 child: Text(
                   _state.errorMessage ?? '未知错误',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     color: context.appColors.onErrorContainer,
                   ),
                 ),

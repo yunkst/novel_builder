@@ -69,7 +69,6 @@ class HermesMessageBubble extends StatelessWidget {
               _formatTime(message.timestamp),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                    fontSize: 10,
                   ),
             ),
           ],
@@ -90,11 +89,10 @@ class HermesMessageBubble extends StatelessWidget {
     final text = message.content;
     return Text(
       text,
-      style: TextStyle(
-        color: context.appColors.hermesOnBrand,
-        fontSize: 15,
-        height: 1.4,
-      ),
+      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+            color: context.appColors.hermesOnBrand,
+            height: 1.4,
+          ),
     );
   }
 
@@ -173,11 +171,10 @@ class HermesMessageBubble extends StatelessWidget {
   MarkdownStyleSheet _markdownStyle(BuildContext context) {
     final theme = Theme.of(context);
     return MarkdownStyleSheet(
-      p: TextStyle(
-        color: theme.colorScheme.onSurface,
-        fontSize: 15,
-        height: 1.4,
-      ),
+      p: theme.textTheme.bodyMedium!.copyWith(
+            color: theme.colorScheme.onSurface,
+            height: 1.4,
+          ),
       h1: TextStyle(
         color: theme.colorScheme.onSurface,
         fontSize: 20,
@@ -193,14 +190,13 @@ class HermesMessageBubble extends StatelessWidget {
         fontSize: 16,
         fontWeight: FontWeight.bold,
       ),
-      code: TextStyle(
+      code: theme.textTheme.bodyMedium?.copyWith(
         backgroundColor: theme.colorScheme.surfaceContainerHigh,
         color: theme.colorScheme.primary,
-        fontSize: 13,
       ),
       codeblockDecoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       blockquoteDecoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
@@ -257,7 +253,7 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -265,7 +261,7 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
         children: [
           // 标题栏（可点击展开/折叠）
           InkWell(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -339,7 +335,6 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
           label,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            fontSize: 10,
             fontWeight: FontWeight.w600,
           ),
         ),

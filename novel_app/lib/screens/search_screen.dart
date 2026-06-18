@@ -93,7 +93,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               ? '${sourceSitesState.selectedSiteIds.length}个源站'
                               : null,
                       suffixStyle: TextStyle(
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                         fontSize: 12,
                       ),
                     ),

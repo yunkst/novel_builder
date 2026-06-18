@@ -29,7 +29,6 @@ class ChapterListState {
   final int lastReadChapterIndex;
   final int currentPage;
   final int totalPages;
-  final Map<String, bool> cachedStatus;
   final bool isReorderingMode;
   final AiAccompanimentSettings? aiSettings;
 
@@ -41,14 +40,14 @@ class ChapterListState {
     this.lastReadChapterIndex = -1,
     this.currentPage = 1,
     this.totalPages = 1,
-    this.cachedStatus = const {},
     this.isReorderingMode = false,
     this.aiSettings,
   });
 
   /// 获取已缓存章节数量
-  int get cachedCount =>
-      cachedStatus.values.where((isCached) => isCached).length;
+  ///
+  /// 直接从 chapters 列表统计，数据源来自 getCachedNovelChapters 的 LEFT JOIN。
+  int get cachedCount => chapters.where((c) => c.isCached).length;
 
   ChapterListState copyWith({
     List<Chapter>? chapters,
@@ -58,7 +57,6 @@ class ChapterListState {
     int? lastReadChapterIndex,
     int? currentPage,
     int? totalPages,
-    Map<String, bool>? cachedStatus,
     bool? isReorderingMode,
     AiAccompanimentSettings? aiSettings,
   }) {
@@ -70,7 +68,6 @@ class ChapterListState {
       lastReadChapterIndex: lastReadChapterIndex ?? this.lastReadChapterIndex,
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
-      cachedStatus: cachedStatus ?? this.cachedStatus,
       isReorderingMode: isReorderingMode ?? this.isReorderingMode,
       aiSettings: aiSettings ?? this.aiSettings,
     );
@@ -271,26 +268,40 @@ class ChapterList extends _$ChapterList {
 
       if (confirmed != true) {
         // 用户选择不刷新，使用缓存
+        LoggerService.instance.d(
+          '用户拒绝刷新章节列表: novel=${novel.title}',
+          category: LogCategory.ui,
+          tags: ['provider', 'chapter-list', 'refresh_declined'],
+        );
         return;
       }
     }
 
     try {
       // 从后端获取最新章节列表
+      LoggerService.instance.d(
+        '章节列表缓存未命中/强制刷新，从后端获取: novel=${novel.title}',
+        category: LogCategory.ui,
+        tags: ['provider', 'chapter-list', 'backend_fetch_start'],
+      );
       final updatedChapters = await chapterLoader.refreshFromBackend(
         novel.url,
         forceRefresh: forceRefresh,
       );
 
       if (updatedChapters.isNotEmpty) {
+        LoggerService.instance.i(
+          '章节列表后端获取成功: novel=${novel.title} count=${updatedChapters.length}',
+          category: LogCategory.ui,
+          tags: ['provider', 'chapter-list', 'backend_fetch_success'],
+        );
         state = state.copyWith(
           chapters: updatedChapters,
           isLoading: false,
         );
         _updateTotalPages();
 
-        // 只加载当前页的缓存状态（性能优化）
-        await _loadCurrentPageCacheStatus();
+        // 缓存状态已由 getCachedNovelChapters 的 LEFT JOIN 填充到 Chapter.isCached
 
         // 显示更新成功提示
         // ToastUtils.show('章节列表已更新');
@@ -320,34 +331,9 @@ class ChapterList extends _$ChapterList {
   }
 
   /// 加载当前页章节的缓存状态
-  Future<void> _loadCurrentPageCacheStatus() async {
-    final pageChapters = _getCurrentPageChapters();
-    if (pageChapters.isEmpty) return;
-
-    try {
-      final chapterActionHandler = ref.watch(chapterActionHandlerProvider);
-
-      // 批量查询当前页章节的缓存状态
-      final chapterUrls = pageChapters.map((c) => c.url).toList();
-      final results = await chapterActionHandler.areChaptersCached(chapterUrls);
-
-      state = state.copyWith(
-        cachedStatus: {...state.cachedStatus, ...results},
-      );
-
-      LoggerService.instance.i(
-        '已加载当前页 ${results.length} 个章节的缓存状态',
-        category: LogCategory.ui,
-        tags: ['chapter-list'],
-      );
-    } catch (e) {
-      LoggerService.instance.w(
-        '加载当前页缓存状态失败: $e',
-        category: LogCategory.ui,
-        tags: ['chapter-list'],
-      );
-    }
-  }
+  ///
+  /// 已废弃：缓存状态现在直接来自 Chapter.isCached（getCachedNovelChapters 的 LEFT JOIN），
+  /// 无需单独加载。预加载进度通过 updateChapterCacheStatus 增量更新单个章节。
 
   /// 检查书架状态
   Future<void> _checkBookshelfStatus() async {
@@ -412,18 +398,6 @@ class ChapterList extends _$ChapterList {
     }
   }
 
-  /// 获取当前页章节
-  List<Chapter> _getCurrentPageChapters() {
-    if (state.chapters.isEmpty) return [];
-
-    final chaptersPerPage = ChapterConstants.chaptersPerPage;
-    final startIndex = (state.currentPage - 1) * chaptersPerPage;
-    final endIndex =
-        (startIndex + chaptersPerPage).clamp(0, state.chapters.length);
-
-    return state.chapters.sublist(startIndex, endIndex);
-  }
-
   /// 刷新章节列表
   /// [context] 可选的 BuildContext，用于显示刷新确认对话框
   Future<void> refreshChapters(BuildContext? context) async {
@@ -440,6 +414,12 @@ class ChapterList extends _$ChapterList {
       await novelRepository.addToBookshelf(novel);
     }
 
+    LoggerService.instance.i(
+      '切换书架状态: novel=${novel.title} → isInBookshelf=${!state.isInBookshelf}',
+      category: LogCategory.ui,
+      tags: ['provider', 'chapter-list', 'toggle_bookshelf'],
+    );
+
     await _checkBookshelfStatus();
   }
 
@@ -449,6 +429,8 @@ class ChapterList extends _$ChapterList {
     final databaseService = ref.read(databaseServiceProvider);
     try {
       await databaseService.clearNovelCache(novel.url);
+      // 重新加载章节列表，getCachedNovelChapters 的 LEFT JOIN 会返回 isCached=false
+      await _loadChapters();
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '清除缓存失败: $e',
@@ -477,16 +459,19 @@ class ChapterList extends _$ChapterList {
     if (page < 1 || page > state.totalPages) return;
 
     state = state.copyWith(currentPage: page);
-
-    // 加载新页面的缓存状态
-    _loadCurrentPageCacheStatus();
   }
 
   /// 更新章节缓存状态（用于预加载进度监听）
+  ///
+  /// 直接更新对应 Chapter 的 isCached 字段。预加载每完成一章触发一次。
   void updateChapterCacheStatus(String chapterUrl, bool isCached) {
-    final newCachedStatus = Map<String, bool>.from(state.cachedStatus);
-    newCachedStatus[chapterUrl] = isCached;
-    state = state.copyWith(cachedStatus: newCachedStatus);
+    final updatedChapters = state.chapters.map((c) {
+      if (c.url == chapterUrl) {
+        return c.copyWith(isCached: isCached);
+      }
+      return c;
+    }).toList();
+    state = state.copyWith(chapters: updatedChapters);
   }
 
   /// 重排章节
@@ -500,6 +485,12 @@ class ChapterList extends _$ChapterList {
     );
 
     state = state.copyWith(chapters: reorderedChapters);
+
+    LoggerService.instance.i(
+      '章节重排: novel=${novel.title} oldIndex=$oldIndex newIndex=$newIndex',
+      category: LogCategory.ui,
+      tags: ['provider', 'chapter-list', 'reorder'],
+    );
 
     // 保存重排后的顺序到数据库
     await _saveReorderedChapters();

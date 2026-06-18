@@ -501,10 +501,10 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.primaryContainer,
                 ),
               ),
               child: Column(
@@ -515,7 +515,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                       Icon(
                         Icons.access_time,
                         size: 16,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -523,7 +523,7 @@ class _GalleryViewScreenState extends ConsumerState<GalleryViewScreen>
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],

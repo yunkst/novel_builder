@@ -5,7 +5,6 @@
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
 /// - findTool 查找功能
-/// - isDestructive 判定（当前所有工具均非破坏性 — 已禁用确认）
 library;
 
 import 'dart:convert';
@@ -263,38 +262,6 @@ void main() {
         expect(AgentTools.findTool(name), isNotNull,
             reason: 'findTool("$name") 应该能找到');
       }
-    });
-  });
-
-  group('AgentTools.isDestructive', () {
-    test('当前已禁用工具确认 — 所有工具均非破坏性', () {
-      final allToolNames = [
-        'select_novel',
-        'update_chapter_content',
-        'create_custom_chapter',
-        'update_character',
-        'create_character',
-        'update_background_setting',
-        'update_outline',
-        'list_novels',
-        'read_chapter_content',
-        'list_chapters',
-        'search_in_chapters',
-        'list_characters',
-        'get_outline',
-      ];
-      for (final name in allToolNames) {
-        expect(AgentTools.isDestructive(name), false,
-            reason: '$name 当前不应该被标记为破坏性工具（已禁用确认）');
-      }
-    });
-
-    test('不存在的工具 → 非破坏性', () {
-      expect(AgentTools.isDestructive('non_existent'), false);
-    });
-
-    test('destructiveTools 集合当前为空（已禁用确认）', () {
-      expect(AgentTools.destructiveTools.length, 0);
     });
   });
 

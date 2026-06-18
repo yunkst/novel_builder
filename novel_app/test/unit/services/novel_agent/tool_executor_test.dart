@@ -957,29 +957,4 @@ void main() {
       expect(json['message'].toString(), contains('unknown_tool'));
     });
   });
-
-  // ========================================================================
-  // isDestructive
-  // ========================================================================
-  group('isDestructive', () {
-    test('当前已禁用工具确认 — 所有工具均非破坏性', () {
-      for (final name in [
-        'select_novel',
-        'update_chapter_content',
-        'create_custom_chapter',
-        'update_character',
-        'create_character',
-        'update_background_setting',
-        'update_outline',
-        'list_novels',
-        'read_chapter_content',
-        'list_chapters',
-        'search_in_chapters',
-        'list_characters',
-        'get_outline',
-      ]) {
-        expect(executor.isDestructive(name), false, reason: '$name');
-      }
-    });
-  });
 }

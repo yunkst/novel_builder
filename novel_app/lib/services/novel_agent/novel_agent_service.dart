@@ -55,6 +55,11 @@ class NovelAgentService {
   /// 但 ReAct 循环不会再执行工具、不会再进入下一轮。
   void cancel() {
     if (_currentToken != null) {
+      LoggerService.instance.i(
+        'Agent 已取消（用户主动）',
+        category: LogCategory.ai,
+        tags: ['agent', 'service', 'cancel'],
+      );
       _currentToken!.cancel(reason: '用户主动取消');
       _currentToken = null;
     }
@@ -66,17 +71,16 @@ class NovelAgentService {
   /// [history] 之前的对话历史（用于上下文）
   /// [scenarioId] 场景标识（'writing' | 'webview_extract' | ...）
   /// [scenarioContext] 场景上下文参数
-  /// [requestConfirmation] 确认回调
+  /// [messageOwners] 可选对齐信息：长度 = [history] 的长度，
+  ///   元素为 history 中每条消息对应的 HermesMessage 在 UI 列表中的索引。
+  ///   透传给 AgentLoop 用于压缩时反推被丢弃的 HermesMessage 区间，
+  ///   通知 UI 同步裁剪。
   Future<void> sendMessage({
     required String userInput,
     required List<ChatMessage> history,
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
-    required Future<bool> Function(
-      String toolName,
-      Map<String, dynamic> args,
-      String toolCallId,
-    ) requestConfirmation,
+    List<int>? messageOwners,
   }) async {
     if (_isRunning) {
       _controller.add(const AgentErrorEvent('Agent 正在运行中'));
@@ -135,8 +139,8 @@ class NovelAgentService {
         initialMessages: initialMessages,
         systemPrompt: systemPrompt,
         emit: (event) => _controller.add(event),
-        requestConfirmation: requestConfirmation,
         cancellationToken: token,
+        messageOwners: messageOwners,
       );
 
       final cancelledTag = token.isCancelled ? ' (cancelled)' : '';

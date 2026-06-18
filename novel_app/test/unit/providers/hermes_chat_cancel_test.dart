@@ -4,7 +4,6 @@
 /// - 取消后状态正确转入 idle（isLoading=false, streamingSegments 清空）
 /// - 取消后 partial 内容保留到 messages
 /// - 取消后可立即重发新消息（不被"Agent 正在运行中"拒绝）
-/// - switchScenario / dispose 也 clear _pendingConfirmations
 ///
 /// 运行:
 ///   cd novel_app
@@ -57,8 +56,7 @@ class MockNovelAgentService implements NovelAgentService {
     required List<dynamic> history,
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
-    required Future<bool> Function(String, Map<String, dynamic>, String)
-        requestConfirmation,
+    List<int>? messageOwners,
   }) async {
     sendMessageCallCount++;
     lastUserInput = userInput;

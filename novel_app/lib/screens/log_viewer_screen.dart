@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/logger_service.dart';
 import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/log_level_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
 
@@ -180,40 +181,12 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   }
 
   /// 获取日志级别的颜色
-  Color _getLevelColor(LogLevel level) {
-    switch (level) {
-      case LogLevel.debug:
-        return const Color(0xFF9E9E9E);
-      case LogLevel.info:
-        return Colors.blue;
-      case LogLevel.warning:
-        return Colors.orange;
-      case LogLevel.error:
-        return Colors.red;
-    }
-  }
+  Color _getLevelColor(LogLevel level) =>
+      LogLevelColors.levelColor(level, context.appColors);
 
   /// 获取日志分类的颜色
-  Color _getCategoryColor(LogCategory category) {
-    switch (category) {
-      case LogCategory.database:
-        return Colors.purple;
-      case LogCategory.network:
-        return Colors.cyan;
-      case LogCategory.ai:
-        return Colors.deepOrange;
-      case LogCategory.ui:
-        return Colors.green;
-      case LogCategory.cache:
-        return Colors.orange;
-      case LogCategory.character:
-        return Colors.pink;
-      case LogCategory.backup:
-        return Colors.indigo;
-      case LogCategory.general:
-        return const Color(0xFF9E9E9E);
-    }
-  }
+  Color _getCategoryColor(LogCategory category) =>
+      LogLevelColors.categoryColor(category);
 
   @override
   Widget build(BuildContext context) {
@@ -484,7 +457,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                     label: Text(
                                       log.category.label,
                                       style:
-                                          const TextStyle(fontSize: 10),
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                                     backgroundColor:
                                         _getCategoryColor(log.category)
@@ -499,8 +472,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                   ...log.tags.map((tag) => Chip(
                                         label: Text(
                                           tag,
-                                          style: const TextStyle(
-                                              fontSize: 10),
+                                          style:
+                                              Theme.of(context).textTheme.bodySmall,
                                         ),
                                         backgroundColor:
                                             Theme.of(context)
@@ -525,13 +498,15 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                               Text(
                                 LoggerService.formatTimestamp(
                                     log.timestamp),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.6),
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall!
+                                    .copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.6),
+                                    ),
                               ),
                               if (log.stackTrace != null &&
                                   log.stackTrace!.isNotEmpty)
@@ -544,8 +519,10 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                         const EdgeInsets.only(top: 4),
                                     child: Text(
                                       '查看堆栈信息',
-                                      style: TextStyle(
-                                        fontSize: 10,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall!
+                                          .copyWith(
                                         color: Theme.of(context)
                                             .colorScheme
                                             .primary,
@@ -632,8 +609,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
           child: SingleChildScrollView(
             child: Text(
               log.stackTrace ?? '无堆栈信息',
-              style: const TextStyle(
-                fontSize: 10,
+              style: Theme.of(context).textTheme.bodySmall!.copyWith(
                 fontFamily: 'monospace',
               ),
             ),

@@ -1,10 +1,12 @@
 /// 上下文压缩服务（P0 最小可用版）
 ///
 /// 参考 opencode 的混合策略实现：
-/// - 触发条件：消息总字符数 ≥ 阈值（默认 60K 字符，≈ 15K tokens）
+/// - 触发条件：消息总字符数 ≥ 阈值（默认 500K 字符，≈ 125K tokens，适配 128K 上下文窗口）
 /// - 压缩策略：保留 system + 最近 N 条消息，丢弃早期消息
 /// - 工具调用安全：保留尾部完整消息（含 tool_calls/toolCallId 关联）
 /// - 可关闭：通过 [CompactorConfig.enabled] 控制
+/// - UI 对齐：通过 [CompactorConfig.messageOwners] 把 LLM messages 索引映射回 HermesMessage 索引，
+///   压缩后通过 CompactionResult.droppedHermesRange 通知 UI 同步裁剪，避免 LLM 已"失忆"但 UI 仍展示历史造成的认知错位
 ///
 /// P1 计划：用 LLM 生成结构化摘要替代简单截断
 library;
@@ -22,12 +24,12 @@ class CompactorConfig {
 
   /// 上下文字符数阈值（超过此值触发压缩）
   ///
-  /// 默认 60000 字符 ≈ 15K tokens（中文约 1.5 字符/token）
+  /// 默认 500000 字符 ≈ 125K tokens（适配 GPT-4o/DeepSeek/Qwen 128K 上下文窗口）
   final int maxContextChars;
 
   /// 保留尾部字符数（最近的消息）
   ///
-  /// 默认 12000 字符 ≈ 3K tokens
+  /// 默认 100000 字符 ≈ 25K tokens（占总阈值的 20%，保证近期对话 + 工具结果不被丢）
   final int preserveTailChars;
 
   /// 工具输出截断长度（压缩时单个 tool 结果的最大字符数）
@@ -37,8 +39,8 @@ class CompactorConfig {
 
   const CompactorConfig({
     this.enabled = true,
-    this.maxContextChars = 60000,
-    this.preserveTailChars = 12000,
+    this.maxContextChars = 500000,
+    this.preserveTailChars = 100000,
     this.toolOutputMaxChars = 2000,
   });
 
@@ -80,6 +82,13 @@ class CompactionResult {
   /// 丢弃的消息条数
   final int droppedMessageCount;
 
+  /// 被丢弃的 HermesMessage 连续索引区间 [start, end)
+  ///
+  /// 当调用方传入 [ContextCompactor.compact] 的 [messageOwners] 时,
+  /// 会反推哪些 HermesMessage 被整体丢弃,填入此字段。
+  /// 为 null 表示无 UI 对齐信息(未传 messageOwners)。
+  final ({int start, int end})? droppedHermesRange;
+
   const CompactionResult({
     required this.messages,
     required this.removedChars,
@@ -87,6 +96,7 @@ class CompactionResult {
     required this.compactedChars,
     required this.keptMessageCount,
     required this.droppedMessageCount,
+    this.droppedHermesRange,
   });
 
   /// 压缩率（0-1，越大压缩越多）
@@ -117,11 +127,16 @@ class ContextCompactor {
   ///
   /// [messages] 当前消息列表（含 system prompt）
   /// [systemPrompt] 系统提示词（始终保留）
+  /// [messageOwners] 可选对齐信息：长度 = [messages] 的长度 + 2
+  ///   （前两位是 compact() 内部插入的 system prompt + 压缩提示），
+  ///   值为对应 HermesMessage 在 UI 列表中的索引，-1 表示无对应（system 消息）。
+  ///   传入后会在 [CompactionResult.droppedHermesRange] 反推被丢弃的 HermesMessage 区间。
   ///
   /// 返回 [CompactionResult]，包含重组后的消息列表
   CompactionResult compact({
     required List<ChatMessage> messages,
     required String systemPrompt,
+    List<int>? messageOwners,
   }) {
     final originalChars = _estimateTotalChars(messages);
 
@@ -145,10 +160,18 @@ class ContextCompactor {
     final droppedCount = splitIndex;
     final keptCount = messages.length - splitIndex;
 
+    // 3. 反推被丢弃的 HermesMessage 区间（仅当传入 owners 时）
+    final droppedHermesRange = _computeDroppedHermesRange(
+      messageOwners: messageOwners,
+      originalMessageCount: messages.length,
+      splitIndex: splitIndex,
+    );
+
     LoggerService.instance.i(
       '上下文压缩完成: $originalChars→$compactedChars 字 '
       '(释放 ${originalChars - compactedChars} 字, '
-      '保留 $keptCount 条, 丢弃 $droppedCount 条)',
+      '保留 $keptCount 条, 丢弃 $droppedCount 条'
+      '${droppedHermesRange != null ? ", UI 裁剪 Hermes[${droppedHermesRange.start},${droppedHermesRange.end})" : ""})',
       category: LogCategory.ai,
       tags: ['agent', 'compaction', 'complete'],
     );
@@ -160,7 +183,41 @@ class ContextCompactor {
       compactedChars: compactedChars,
       keptMessageCount: keptCount,
       droppedMessageCount: droppedCount,
+      droppedHermesRange: droppedHermesRange,
     );
+  }
+
+  /// 反推被丢弃的 HermesMessage 连续索引区间
+  ///
+  /// [messageOwners] 长度 = messages 长度（不含 compact 内部插入的 2 条 system），
+  ///   元素为对应 HermesMessage 索引，-1 表示 system 消息不映射到 UI。
+  /// [originalMessageCount] 压缩前 messages 列表总长度。
+  /// [splitIndex] 压缩保留的起始索引（[splitIndex..] 被保留，[0..splitIndex) 被丢弃）。
+  ///
+  /// 返回 null 当 messageOwners 为 null 或被丢弃的 Hermes 索引为空集合或离散无法表达为区间。
+  ({int start, int end})? _computeDroppedHermesRange({
+    required List<int>? messageOwners,
+    required int originalMessageCount,
+    required int splitIndex,
+  }) {
+    if (messageOwners == null || splitIndex == 0) return null;
+    if (messageOwners.length != originalMessageCount) return null;
+
+    // 收集被丢弃消息对应的 HermesMessage 索引（去重 + 排序 + 过滤 -1）
+    final droppedHermesIndices = <int>{};
+    for (int i = 0; i < splitIndex; i++) {
+      final owner = messageOwners[i];
+      if (owner >= 0) droppedHermesIndices.add(owner);
+    }
+
+    if (droppedHermesIndices.isEmpty) return null;
+
+    final sorted = droppedHermesIndices.toList()..sort();
+
+    // 必须能用单个连续区间 [start, end) 表达
+    if (sorted.length != sorted.last - sorted.first + 1) return null;
+
+    return (start: sorted.first, end: sorted.last + 1);
   }
 
   /// 从后向前选择保留边界

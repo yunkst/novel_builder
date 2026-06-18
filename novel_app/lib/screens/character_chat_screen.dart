@@ -476,12 +476,11 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
                   Expanded(
                     child: Text(
                       message.content,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color:
-                            Theme.of(context).colorScheme.onSecondaryContainer,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            height: 1.5,
+                            color:
+                                Theme.of(context).colorScheme.onSecondaryContainer,
+                          ),
                     ),
                   ),
                   // 流式输出指示器
@@ -514,11 +513,10 @@ class _CharacterChatScreenState extends ConsumerState<CharacterChatScreen> {
           ),
           child: Text(
             message.content,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  height: 1.5,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
           ),
         ),
       ),

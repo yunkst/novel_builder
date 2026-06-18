@@ -158,7 +158,7 @@ class _HermesScenarioConfigDialogState
               padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
               child: Row(
                 children: [
-                  Text(_scenarioIcon, style: const TextStyle(fontSize: 22)),
+                  Text(_scenarioIcon, style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(

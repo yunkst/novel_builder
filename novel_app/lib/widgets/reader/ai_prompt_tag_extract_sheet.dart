@@ -324,7 +324,7 @@ class _AIPromptTagExtractSheetState
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: context.appColors.onErrorContainer, fontSize: 13),
+              style: TextStyle(color: context.appColors.onErrorContainer, fontSize: 14),
             ),
           ),
         ],
@@ -505,7 +505,7 @@ class _ExtractedTagCard extends StatelessWidget {
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             ),
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 14),
           ),
         ),
       ],

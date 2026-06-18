@@ -280,8 +280,7 @@ abstract class BaseDialog extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                fontSize: 13,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: textColor,
               ),
             ),

@@ -279,7 +279,7 @@ class TextHighlighter {
       final endIndex = highlightedText.indexOf(endMarker, markerIndex);
       if (endIndex == -1) break;
 
-      // 添加高亮文本
+      // 添加高亮文本（兜底样式复用 [_defaultStyle]，避免重复定义）
       final highlightText = highlightedText.substring(
         markerIndex + marker.length,
         endIndex,
@@ -287,9 +287,9 @@ class TextHighlighter {
       spans.add(TextSpan(
         text: highlightText,
         style: highlightStyle ??
-            const TextStyle(
-              backgroundColor: Colors.yellow,
-              color: Colors.black,
+            TextStyle(
+              backgroundColor: _defaultStyle.backgroundColor,
+              color: _defaultStyle.textColor,
             ),
       ));
 

@@ -38,9 +38,6 @@ class WritingScenario implements AgentScenario {
       ];
 
   @override
-  Set<String> get destructiveTools => AgentTools.destructiveTools;
-
-  @override
   String buildSystemPrompt(AgentScenarioContext context) {
     _currentContext = context;
     final novelInfo = context.currentNovelTitle != null
@@ -91,8 +88,13 @@ class WritingScenario implements AgentScenario {
           currentNovelTitle: parsed['title'] as String?,
         );
       }
-    } catch (_) {
+    } catch (e) {
       // 解析失败，保持当前 context 不变
+      LoggerService.instance.e(
+        '解析 select_novel 结果失败: $result',
+        category: LogCategory.ai,
+        tags: ['agent', 'writing', 'sync_context', 'parse_failed'],
+      );
     }
   }
 
@@ -102,8 +104,18 @@ class WritingScenario implements AgentScenario {
     final newText = args['newText'] as String? ?? args['new_text'] as String? ?? '';
     final result = await patchMemory(oldText, newText);
     if (result.success) {
+      LoggerService.instance.i(
+        'patchMemory 成功: ${result.message}',
+        category: LogCategory.ai,
+        tags: ['agent', 'writing', 'patch_memory', 'success'],
+      );
       return jsonEncode({'success': true, 'message': result.message});
     }
+    LoggerService.instance.w(
+      'patchMemory 失败: ${result.message}',
+      category: LogCategory.ai,
+      tags: ['agent', 'writing', 'patch_memory', 'failed'],
+    );
     return jsonEncode({
       'error': 'memory_not_found',
       'message': result.message,
@@ -116,9 +128,19 @@ class WritingScenario implements AgentScenario {
 
   @override
   Future<List<String>> getMemories() async {
-    final repo = _ref.read(agentMemoryRepositoryProvider);
-    _cachedMemories = await repo.getAllByScenario(id);
-    return _cachedMemories;
+    try {
+      final repo = _ref.read(agentMemoryRepositoryProvider);
+      _cachedMemories = await repo.getAllByScenario(id);
+      return _cachedMemories;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载写作记忆失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ai,
+        tags: ['agent', 'writing', 'get_memories', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   @override

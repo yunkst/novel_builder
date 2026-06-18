@@ -36,7 +36,7 @@ class FakeLlmProvider extends LlmProvider {
           baseUrl: 'http://localhost',
           apiKey: 'test',
           defaultModel: 'test-model',
-        ));
+        ), httpClient: _FakeHttpClient());
 
   final List<ScriptedResponse> _script = [];
   int callCount = 0;
@@ -100,9 +100,6 @@ class FakeAgentScenario implements AgentScenario {
   @override
   final List<Map<String, dynamic>> tools = const [];
 
-  @override
-  final Set<String> destructiveTools;
-
   /// 每次工具执行前的延时（模拟慢工具）
   final Duration? toolDelay;
 
@@ -115,7 +112,7 @@ class FakeAgentScenario implements AgentScenario {
   /// Completer 列表，工具执行时若非空则等待对应 completer（用于精确控制时序）
   final List<Completer<void>> toolGateCompleters = [];
 
-  FakeAgentScenario({this.destructiveTools = const {}, this.toolDelay});
+  FakeAgentScenario({this.toolDelay});
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) => 'system-prompt';
@@ -166,14 +163,12 @@ String _encode(Object? v) {
 Future<List<AgentEvent>> runLoop(
   AgentLoop loop, {
   CancellationToken? token,
-  Future<bool> Function(String, Map<String, dynamic>, String)? confirm,
 }) async {
   final events = <AgentEvent>[];
   await loop.run(
     initialMessages: [const ChatMessage(role: 'user', content: 'hello')],
     systemPrompt: 'system-prompt',
     emit: events.add,
-    requestConfirmation: confirm ?? (_, __, ___) async => true,
     cancellationToken: token,
   );
   return events;
@@ -267,7 +262,6 @@ void main() {
             token.cancel(reason: '本轮输出后停止');
           }
         },
-        requestConfirmation: (_, __, ___) async => true,
         cancellationToken: token,
       );
 
@@ -324,7 +318,6 @@ void main() {
         initialMessages: [const ChatMessage(role: 'user', content: 'hello')],
         systemPrompt: 'system-prompt',
         emit: events.add,
-        requestConfirmation: (_, __, ___) async => true,
         cancellationToken: token,
       );
 
@@ -391,8 +384,6 @@ class _CancelAfterFirstToolScenario implements AgentScenario {
   @override
   List<Map<String, dynamic>> get tools => inner.tools;
   @override
-  Set<String> get destructiveTools => inner.destructiveTools;
-  @override
   String buildSystemPrompt(AgentScenarioContext context) =>
       inner.buildSystemPrompt(context);
 
@@ -416,4 +407,16 @@ class _CancelAfterFirstToolScenario implements AgentScenario {
     }
     return result;
   }
+}
+
+/// 占位 HTTP 客户端：FakeLlmProvider 已 override chatStreamWithTools，不发真实请求
+class _FakeHttpClient implements LlmHttpClient {
+  @override
+  Future<String> postJson(
+          String url, Map<String, String> headers, String body) =>
+      throw UnimplementedError();
+  @override
+  Stream<String> postJsonStream(
+          String url, Map<String, String> headers, String body) =>
+      throw UnimplementedError();
 }

@@ -4,6 +4,7 @@ import '../services/log_reporter_service.dart';
 import '../services/logger_service.dart';
 import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/log_level_colors.dart';
 import '../utils/toast_utils.dart';
 
 /// 日志上报设置页面
@@ -65,7 +66,9 @@ class _LogReportSettingsScreenState
             },
             secondary: Icon(
               reporter.enabled ? Icons.cloud_upload : Icons.cloud_off,
-              color: reporter.enabled ? appColors.hermesAccent : Colors.grey,
+              color: reporter.enabled
+                  ? appColors.hermesAccent
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const Divider(),
@@ -204,16 +207,6 @@ class _LogReportSettingsScreenState
     );
   }
 
-  Color _levelColor(LogLevel level) {
-    switch (level) {
-      case LogLevel.debug:
-        return const Color(0xFF9E9E9E);
-      case LogLevel.info:
-        return Colors.blue;
-      case LogLevel.warning:
-        return Colors.orange;
-      case LogLevel.error:
-        return Colors.red;
-    }
-  }
+  Color _levelColor(LogLevel level) =>
+      LogLevelColors.levelColor(level, context.appColors);
 }

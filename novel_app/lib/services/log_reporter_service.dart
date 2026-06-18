@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'logger_service.dart';
 import 'preferences_service.dart';
@@ -215,14 +216,19 @@ class LogReporterService {
 
   /// 从 SharedPreferences 加载配置
   Future<void> _loadConfig() async {
-    final prefs = PreferencesService.instance;
-    _enabled = await prefs.getBool(_keyEnabled, defaultValue: true);
-    _minLevelIndex = await prefs.getInt(_keyMinLevel, defaultValue: LogLevel.warning.index);
+    try {
+      final prefs = PreferencesService.instance;
+      _enabled = await prefs.getBool(_keyEnabled, defaultValue: true);
+      _minLevelIndex = await prefs.getInt(_keyMinLevel, defaultValue: LogLevel.warning.index);
 
-    // 读取上次上报时间
-    final lastMs = await prefs.getInt(_keyLastUploadTime, defaultValue: 0);
-    if (lastMs > 0) {
-      _lastUploadTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      // 读取上次上报时间
+      final lastMs = await prefs.getInt(_keyLastUploadTime, defaultValue: 0);
+      if (lastMs > 0) {
+        _lastUploadTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      }
+    } catch (e) {
+      // 加载失败用默认值继续（避免递归，用 debugPrint）
+      debugPrint('LogReporter: 加载配置失败: $e');
     }
   }
 
@@ -280,13 +286,17 @@ class LogReporterService {
         );
 
         _restartTimer(); // 恢复正常间隔
+        debugPrint('LogReporter: 上报成功 batch=${batch.length}');
         return true;
       }
 
+      debugPrint('LogReporter: 上报失败 reason=HTTP ${response.statusCode}');
       return _onUploadFailure('HTTP ${response.statusCode}');
     } on DioException catch (e) {
+      debugPrint('LogReporter: 上报失败 reason=网络错误: ${e.message ?? e.type.name}');
       return _onUploadFailure('网络错误: ${e.message ?? e.type.name}');
     } catch (e) {
+      debugPrint('LogReporter: 上报失败 reason=未知错误: $e');
       return _onUploadFailure('未知错误: $e');
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -281,10 +282,14 @@ class LoggerService {
   }
 
   /// 记录调试级别日志
+  ///
+  /// 注意：release 模式下直接返回，不写入队列，避免高频调试日志在 release 包
+  /// 占用内存与 SharedPreferences 存储。
   void d(String message,
       {String? stackTrace,
       LogCategory category = LogCategory.general,
       List<String> tags = const []}) {
+    if (kReleaseMode) return;
     _log(message, LogLevel.debug, stackTrace, category, tags);
   }
 
@@ -584,6 +589,8 @@ class LoggerService {
       }
     } catch (e) {
       // 加载失败不影响应用运行，仅打印错误
+      // 注意：此处不能用 LoggerService.instance（自指递归），用 debugPrint
+      debugPrint('LoggerService: 加载日志失败: $e');
       _logs.clear();
     }
   }
@@ -599,7 +606,8 @@ class LoggerService {
       await PreferencesService.instance.setString(_prefsKey, logsJson);
     } catch (e) {
       // 持久化失败不影响应用运行
-      // 实际场景中可以添加错误计数，避免频繁重试
+      // 注意：此处不能用 LoggerService.instance（自指递归），用 debugPrint
+      debugPrint('LoggerService: 持久化日志失败: $e');
     }
   }
 

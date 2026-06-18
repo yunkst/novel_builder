@@ -287,7 +287,7 @@ class DialogManager {
                     isSelected
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
-                    color: Theme.of(context).primaryColor,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   onTap: () {
                     setState(() {
@@ -295,7 +295,7 @@ class DialogManager {
                     });
                   },
                   tileColor: isSelected
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                      ? Theme.of(context).colorScheme.primaryContainer
                       : null,
                 );
               },
@@ -377,7 +377,7 @@ class DialogManager {
                 : Text(itemLabel!(item)),
             leading: Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
-              color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).colorScheme.outline,
+              color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
             ),
             onTap: () => Navigator.of(context).pop(item),
           );

@@ -24,8 +24,6 @@ class HermesChatState {
   final String? error;
 
   // ===== Agent 扩展字段 (Phase 3) =====
-  /// 当前是否等待用户确认
-  final PendingConfirmation? pendingConfirmation;
   /// 当前场景 ID
   final String scenarioId;
   /// 当前场景显示名
@@ -40,7 +38,6 @@ class HermesChatState {
     this.isLoading = false,
     this.streamingSegments = const [],
     this.error,
-    this.pendingConfirmation,
     this.scenarioId = ScenarioIds.writing,
     this.scenarioDisplayName = '小说写作助手',
     this.currentNovel,
@@ -51,8 +48,6 @@ class HermesChatState {
     bool? isLoading,
     List<HermesSegment>? streamingSegments,
     String? error,
-    PendingConfirmation? pendingConfirmation,
-    bool clearPendingConfirmation = false,
     String? scenarioId,
     String? scenarioDisplayName,
     CurrentNovel? currentNovel,
@@ -63,9 +58,6 @@ class HermesChatState {
       isLoading: isLoading ?? this.isLoading,
       streamingSegments: streamingSegments ?? this.streamingSegments,
       error: error,
-      pendingConfirmation: clearPendingConfirmation
-          ? null
-          : pendingConfirmation ?? this.pendingConfirmation,
       scenarioId: scenarioId ?? this.scenarioId,
       scenarioDisplayName: scenarioDisplayName ?? this.scenarioDisplayName,
       currentNovel:
@@ -133,7 +125,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       isLoading: true,
       streamingSegments: const [],
       error: null,
-      clearPendingConfirmation: true,
     );
 
     try {
@@ -234,16 +225,35 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
             streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
           );
 
-        case ConfirmationRequestedEvent e:
-          state = state.copyWith(pendingConfirmation: e.confirmation);
-
         case CompactionEvent e:
-          // 上下文压缩事件：记录到日志即可（UI 暂不展示）
-          LoggerService.instance.i(
-            'Hermes 收到压缩事件: ${e.description}',
-            category: LogCategory.ai,
-            tags: ['provider', 'hermes', 'compaction'],
-          );
+          // 上下文压缩事件：同步裁剪 UI 端 messages
+          if (e.droppedHermesRange != null) {
+            final range = e.droppedHermesRange!;
+            final currentMsgs = List<HermesMessage>.from(state.messages);
+            if (range.start < currentMsgs.length && range.end <= currentMsgs.length) {
+              currentMsgs.removeRange(range.start, range.end);
+              LoggerService.instance.i(
+                'Hermes UI 裁剪: 移除 messages[${range.start},${range.end}), '
+                '剩余 ${currentMsgs.length} 条',
+                category: LogCategory.ai,
+                tags: ['provider', 'hermes', 'compaction', 'ui-trim'],
+              );
+              state = state.copyWith(messages: currentMsgs);
+            } else {
+              LoggerService.instance.w(
+                'Hermes UI 裁剪越界: range=[${range.start},${range.end}), '
+                'messages.length=${currentMsgs.length}, 跳过裁剪',
+                category: LogCategory.ai,
+                tags: ['provider', 'hermes', 'compaction', 'out-of-bounds'],
+              );
+            }
+          } else {
+            LoggerService.instance.i(
+              'Hermes 收到压缩事件(无 UI 对齐): ${e.description}',
+              category: LogCategory.ai,
+              tags: ['provider', 'hermes', 'compaction'],
+            );
+          }
 
         case AgentDoneEvent _:
           _finalizeAgentResponse();
@@ -256,8 +266,14 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     // 构造历史消息（不含刚加入的 user message）
     // 关键：把 ToolCallSegment 转成 OpenAI 标准的 assistant(tool_calls) + tool 消息，
     // 否则跨回合时工具调用结果丢失，LLM 无法引用上一轮查询数据。
+    //
+    // 同步构造 owners：每条 history 消息对应的 HermesMessage 在 state.messages 中的索引，
+    // 用于压缩时反推被丢弃的 HermesMessage 区间，通知 UI 同步裁剪。
+    // assistant(tool_calls) 展开成 1 + N 条时，N 条 tool 消息共享同一个 owner（该 assistant）。
     final history = <ChatMessage>[];
-    for (final m in state.messages) {
+    final owners = <int>[];
+    for (int msgIdx = 0; msgIdx < state.messages.length; msgIdx++) {
+      final m = state.messages[msgIdx];
       if (m.role == HermesRole.assistant) {
         final toolCalls = m.toolCalls
             .map((c) => ToolCall(id: c.id, name: c.name, arguments: c.arguments))
@@ -269,18 +285,23 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
             content: m.content.isEmpty ? null : m.content,
             toolCalls: toolCalls,
           ));
+          owners.add(msgIdx);
           for (final c in withResults) {
             history.add(ChatMessage(role: 'tool', content: c.result, toolCallId: c.id));
+            owners.add(msgIdx); // tool 消息归属同一 assistant HermesMessage
           }
         } else {
           history.add(ChatMessage(role: m.role.name, content: m.content));
+          owners.add(msgIdx);
         }
       } else {
         history.add(ChatMessage(role: m.role.name, content: m.content));
+        owners.add(msgIdx);
       }
     }
     if (history.isNotEmpty && history.last.role == 'user') {
       history.removeLast();
+      owners.removeLast();
     }
 
     // 构造场景上下文
@@ -291,7 +312,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       history: history,
       scenarioId: scenarioId,
       scenarioContext: scenarioContext,
-      requestConfirmation: _requestConfirmation,
+      messageOwners: owners,
     );
   }
 
@@ -308,15 +329,16 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     // 取消正在运行的 Agent
     _agentSub?.cancel();
     _agentSub = null;
-    for (final c in _pendingConfirmations.values) {
-      if (!c.isCompleted) c.complete(false);
-    }
-    _pendingConfirmations.clear();
 
     // 同步 currentAgentScenarioProvider（手动切换时）
     _isSwitchingFromUI = true;
     _ref.read(currentAgentScenarioProvider.notifier).state = scenarioId;
     _isSwitchingFromUI = false;
+    LoggerService.instance.d(
+      'Hermes 手动切换场景标记已重置: scenario=$scenarioId',
+      category: LogCategory.ai,
+      tags: ['provider', 'hermes', 'scenario_switch', 'ui_flag'],
+    );
 
     // 保存当前场景的对话历史，恢复目标场景的对话历史
     _historyCache[state.scenarioId] = state.messages;
@@ -327,14 +349,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       scenarioId: scenarioId,
       scenarioDisplayName: displayName,
     );
-  }
-
-  /// 用户确认（暴露给 UI 层调用）
-  void respondToConfirmation(bool approved) {
-    final pending = state.pendingConfirmation;
-    if (pending == null) return;
-    pending.respond(approved);
-    state = state.copyWith(clearPendingConfirmation: true);
   }
 
   /// 切换当前小说（暴露给 UI 和 select_novel 工具使用）
@@ -349,27 +363,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     return novel;
   }
 
-  /// 内部确认回调（供 AgentLoop 调用）
-  Future<bool> _requestConfirmation(
-    String toolName,
-    Map<String, dynamic> args,
-    String toolCallId,
-  ) async {
-    final completer = Completer<bool>();
-    _pendingConfirmations[toolCallId] = completer;
-
-    try {
-      return await completer.future.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => false, // 30s 超时自动拒绝
-      );
-    } finally {
-      _pendingConfirmations.remove(toolCallId);
-    }
-  }
-
-  final Map<String, Completer<bool>> _pendingConfirmations = {};
-
   /// 解析 select_novel 工具返回的 JSON，自动同步 currentNovel 状态
   void _handleSelectNovelFromResult(String? result) {
     if (result == null) return;
@@ -380,8 +373,13 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       if (novelId == null) return;
       // 异步更新，不阻塞事件处理链路
       selectNovel(novelId);
-    } catch (_) {
+    } catch (e) {
       // 非 JSON 结果忽略
+      LoggerService.instance.e(
+        '解析 select_novel 结果失败: $result',
+        category: LogCategory.ai,
+        tags: ['provider', 'hermes', 'select_novel', 'parse_failed'],
+      );
     }
   }
 
@@ -422,7 +420,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       isLoading: false,
       streamingSegments: const [],
       error: error,
-      clearPendingConfirmation: true,
     );
     _pendingSegments.clear();
   }
@@ -435,6 +432,11 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
 
   /// 停止当前生成
   void cancelRequest() {
+    LoggerService.instance.i(
+      'Hermes 请求已取消',
+      category: LogCategory.ai,
+      tags: ['provider', 'hermes', 'cancel'],
+    );
     // 触发底层 Agent 循环取消：温和停止 —— 不中断当前这轮 LLM 流式输出，
     // 但 ReAct 循环不再执行后续工具、不再进入下一轮。
     // 配合 AgentLoop 的取消检查点，避免后台静默跑完 maxRounds。
@@ -443,12 +445,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     // 本地 Agent：取消事件订阅
     _agentSub?.cancel();
     _agentSub = null;
-
-    // 完成所有未确认的请求（视为拒绝）
-    for (final c in _pendingConfirmations.values) {
-      if (!c.isCompleted) c.complete(false);
-    }
-    _pendingConfirmations.clear();
 
     // 保留已生成的交替 segments
     if (_pendingSegments.isNotEmpty) {
@@ -459,13 +455,11 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
         messages: finalMessages,
         isLoading: false,
         streamingSegments: const [],
-        clearPendingConfirmation: true,
       );
     } else {
       state = state.copyWith(
         isLoading: false,
         streamingSegments: const [],
-        clearPendingConfirmation: true,
       );
     }
     _pendingSegments.clear();
@@ -473,6 +467,11 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
 
   /// 清空当前场景的对话历史
   void clearConversation() {
+    LoggerService.instance.i(
+      'Hermes 清空对话: scenario=${state.scenarioId}',
+      category: LogCategory.ai,
+      tags: ['provider', 'hermes', 'clear'],
+    );
     _historyCache.remove(state.scenarioId);
     _pendingSegments.clear();
     state = HermesChatState(
@@ -484,9 +483,6 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   @override
   void dispose() {
     _agentSub?.cancel();
-    for (final c in _pendingConfirmations.values) {
-      if (!c.isCompleted) c.complete(false);
-    }
     super.dispose();
   }
 }

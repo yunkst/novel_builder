@@ -59,6 +59,11 @@ class HeadlessWebViewPool {
   /// 抛异常表示初始化失败。
   Future<InAppWebViewController> acquire() async {
     _refCount++;
+    LoggerService.instance.d(
+      'HeadlessWebViewPool.acquire: refCount=$_refCount',
+      category: LogCategory.cache,
+      tags: ['headless-webview-pool', 'acquire'],
+    );
     try {
       await _ensureReady();
       return _controller!;
@@ -71,6 +76,11 @@ class HeadlessWebViewPool {
   /// 释放（仅减少引用计数，不真正销毁，因为通常保活整个 APP 生命周期）
   void release() {
     if (_refCount > 0) _refCount--;
+    LoggerService.instance.d(
+      'HeadlessWebViewPool.release: refCount=$_refCount',
+      category: LogCategory.cache,
+      tags: ['headless-webview-pool', 'release'],
+    );
   }
 
   /// 当前引用计数
@@ -78,6 +88,11 @@ class HeadlessWebViewPool {
 
   /// 销毁（理论上不需要，由 Riverpod 生命周期管理）
   void dispose() {
+    LoggerService.instance.i(
+      'HeadlessWebViewPool.dispose: refCount=$_refCount',
+      category: LogCategory.cache,
+      tags: ['headless-webview-pool', 'dispose'],
+    );
     _headlessWebView?.dispose();
     _headlessWebView = null;
     _controller = null;
@@ -95,6 +110,11 @@ class HeadlessWebViewPool {
         await Future.delayed(const Duration(milliseconds: 500));
         if (_controller != null) return;
       }
+      LoggerService.instance.w(
+        'HeadlessWebViewPool: 初始化超时（30s 轮询）',
+        category: LogCategory.cache,
+        tags: ['headless-webview-pool', 'init', 'timeout'],
+      );
       throw Exception('HeadlessWebViewPool 初始化超时');
     }
 

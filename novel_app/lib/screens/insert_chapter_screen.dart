@@ -724,8 +724,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         const SizedBox(height: 8),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 13,
+          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
             color: isActive
                 ? context.appColors.info
                 : Theme.of(context)
@@ -953,8 +952,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
                     _outline!.content.length > 300
                         ? '${_outline!.content.substring(0, 300)}...'
                         : _outline!.content,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface

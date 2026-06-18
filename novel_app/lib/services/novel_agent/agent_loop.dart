@@ -23,7 +23,7 @@ class AgentLoopConfig {
   final CompactorConfig compaction;
 
   const AgentLoopConfig({
-    this.maxRounds = 10,
+    this.maxRounds = 50,
     this.toolResultMaxChars = 2000,
     this.compaction = const CompactorConfig(),
   });
@@ -54,24 +54,32 @@ class AgentLoop {
   /// [initialMessages] 初始消息列表（不含 system prompt）
   /// [systemPrompt] 系统提示词
   /// [emit] 事件回调
-  /// [requestConfirmation] 确认回调，返回 true 表示用户同意
   /// [cancellationToken] 取消令牌；触发取消后，当前这轮 LLM 输出完成，
   ///   但循环不再执行后续工具、不再进入下一轮（不中断底层 LLM HTTP）。
+  /// [messageOwners] 可选对齐信息：长度 = [initialMessages] 的长度，
+  ///   元素为对应 HermesMessage 在 UI 列表中的索引，-1 表示 system 消息不映射。
+  ///   压缩时透传给 [ContextCompactor.compact]，用于反推被丢弃的 HermesMessage 区间，
+  ///   通过 [CompactionEvent.droppedHermesRange] 通知 UI 同步裁剪。
   Future<void> run({
     required List<ChatMessage> initialMessages,
     required String systemPrompt,
     required void Function(AgentEvent event) emit,
-    required Future<bool> Function(
-      String toolName,
-      Map<String, dynamic> args,
-      String toolCallId,
-    ) requestConfirmation,
     CancellationToken? cancellationToken,
+    List<int>? messageOwners,
   }) async {
     final messages = <ChatMessage>[
       ChatMessage(role: 'system', content: systemPrompt),
       ...initialMessages,
     ];
+
+    // owners 同步构建：[0] = -1 (system prompt), 其后 = initialMessages 对应的 owner
+    // 循环过程中新增的 assistant/tool 消息不映射到 UI，owner = -1
+    final owners = List<int>.filled(messages.length, -1);
+    if (messageOwners != null) {
+      for (int i = 0; i < messageOwners.length && i + 1 < owners.length; i++) {
+        owners[i + 1] = messageOwners[i];
+      }
+    }
 
     LoggerService.instance.i('Agent 循环开始 (scenario=${_scenario.id})',
         category: LogCategory.ai, tags: ['agent', 'loop_start', _scenario.id]);
@@ -94,8 +102,9 @@ class AgentLoop {
         // 0. 上下文压缩检查（每轮 LLM 调用前）
         //    防止 messages 无限增长导致超出 LLM 上下文窗口
         if (_compactor.needsCompaction(messages)) {
+          final preCompactionMsgCount = messages.length;
           LoggerService.instance.w(
-            '触发上下文压缩: 消息总量 ${_compactor.needsCompaction(messages) ? messages.length : 0} '
+            '触发上下文压缩: 消息总量 $preCompactionMsgCount '
             '条，超过阈值 (${_config.compaction.maxContextChars} 字符)',
             category: LogCategory.ai,
             tags: ['agent', 'compaction', 'triggered', _scenario.id],
@@ -103,15 +112,35 @@ class AgentLoop {
           final result = _compactor.compact(
             messages: messages,
             systemPrompt: systemPrompt,
+            messageOwners: owners,
           );
+          // 同步重置 owners：清空后重新填入 compact 后的新 messages 对应的 owners
+          // compact 后的 messages 结构：[system prompt, 压缩提示, ...尾部 messages]
+          // 前两条 owner 必为 -1
+          final compactedOwners = <int>[-1, -1];
+          // result.messages 的前 2 条是 compact 内部插入的 system,
+          // 第 3 条起对应原 messages[splitIndex..]，splitIndex = preCompactionMsgCount - droppedCount
+          final splitIndex = preCompactionMsgCount - result.droppedMessageCount;
+          for (int i = 2; i < result.messages.length; i++) {
+            final originalMsgIndex = (i - 2) + splitIndex;
+            if (originalMsgIndex < owners.length) {
+              compactedOwners.add(owners[originalMsgIndex]);
+            } else {
+              compactedOwners.add(-1);
+            }
+          }
           messages
             ..clear()
             ..addAll(result.messages);
+          owners
+            ..clear()
+            ..addAll(compactedOwners);
           emit(CompactionEvent(
             removedChars: result.removedChars,
             originalChars: result.originalChars,
             keptMessageCount: result.keptMessageCount,
             droppedMessageCount: result.droppedMessageCount,
+            droppedHermesRange: result.droppedHermesRange,
           ));
         }
 
@@ -157,6 +186,22 @@ class AgentLoop {
               tags: ['agent', 'loop', 'cancelled', _scenario.id]);
           emit(const AgentDoneEvent());
           return;
+        }
+
+        // 异常 finishReason（length 截断 / content_filter 审查）独立告警
+        if (streamFinishReason == 'length' ||
+            streamFinishReason == 'content_filter') {
+          LoggerService.instance.w(
+            'LLM finish_reason=$streamFinishReason (round $round, scenario=${_scenario.id})',
+            category: LogCategory.ai,
+            tags: [
+              'agent',
+              'llm',
+              'finish_reason',
+              streamFinishReason!,
+              _scenario.id,
+            ],
+          );
         }
 
         // contentLength=0 但 finishReason 不是 tool_calls 时，说明 LLM 异常返回空内容，需要告警
@@ -240,41 +285,16 @@ class AgentLoop {
 
           Map<String, dynamic> result;
 
-          // 破坏性操作确认
-          if (_scenario.destructiveTools.contains(call.name)) {
-            final approved = await requestConfirmation(
-              call.name,
-              call.arguments,
-              call.id,
-            );
-            if (!approved) {
-              result = {
-                'error': 'user_rejected',
-                'message': '用户拒绝执行此操作',
-              };
-              messages.add(ChatMessage(
-                role: 'tool',
-                content: jsonEncode(result),
-                toolCallId: call.id,
-              ));
-              emit(ToolCallEndEvent(
-                call.name,
-                call.id,
-                jsonEncode(result),
-                success: false,
-              ));
-              LoggerService.instance.i('用户拒绝工具: ${call.name} (scenario=${_scenario.id})',
-                  category: LogCategory.ai,
-                  tags: ['agent', 'tool', call.name, 'rejected', _scenario.id]);
-              continue;
-            }
-          }
-
           // 执行工具（委托给场景）
           final rawResult = await _scenario.executeTool(call.name, call.arguments);
           try {
             result = jsonDecode(rawResult) as Map<String, dynamic>;
           } catch (_) {
+            LoggerService.instance.w(
+              '工具结果 JSON 解析失败: ${call.name}, raw=${rawResult.length}字符',
+              category: LogCategory.ai,
+              tags: ['agent', 'tool', call.name, 'json_parse_failed'],
+            );
             result = {'raw': rawResult};
           }
 
@@ -286,6 +306,11 @@ class AgentLoop {
           final meta = result.remove('__meta');
 
           if (resultStr.length > _config.toolResultMaxChars) {
+            LoggerService.instance.d(
+              '工具结果截断: ${call.name} originalLen=${resultStr.length} → ${_config.toolResultMaxChars}',
+              category: LogCategory.ai,
+              tags: ['agent', 'tool', call.name, 'truncated'],
+            );
             if (result.containsKey('error')) {
               // 错误结果：优先保留错误信息，截断其余数据
               final errorInfo = <String, dynamic>{
@@ -361,8 +386,13 @@ class AgentLoop {
           emit(TextDeltaEvent(chunk.contentChunk!));
         }
       }
-    } catch (_) {
+    } catch (e) {
       // 总结失败也不影响
+      LoggerService.instance.w(
+        'Agent max_rounds 总结失败: $e',
+        category: LogCategory.ai,
+        tags: ['agent', 'max_rounds', 'summary_failed'],
+      );
     }
     emit(const AgentDoneEvent());
     LoggerService.instance.i('Agent 循环完成（达到最大轮数, scenario=${_scenario.id}）',

@@ -38,7 +38,13 @@ class ChapterSearchService {
       });
 
       return sortedResults;
-    } catch (e) {
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'searchInNovel 失败: novelUrl=$novelUrl keyword=$keyword - $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['search', 'in_novel', 'failed'],
+      );
       throw Exception('搜索失败: $e');
     }
   }
@@ -71,7 +77,13 @@ class ChapterSearchService {
       });
 
       return sortedResults;
-    } catch (e) {
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'searchInAllNovels 失败: keyword=$keyword - $e',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['search', 'all_novels', 'failed'],
+      );
       throw Exception('搜索失败: $e');
     }
   }

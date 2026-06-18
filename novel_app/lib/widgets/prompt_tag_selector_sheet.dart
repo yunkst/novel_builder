@@ -84,7 +84,7 @@ class _PromptTagSelectorSheetState
                       child: Text(
                         '已选 ${_selectedKeys.length}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: context.appColors.onInfoContainer,
                         ),
                       ),

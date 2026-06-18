@@ -95,6 +95,22 @@ void main() async {
 class NovelReaderApp extends ConsumerWidget {
   const NovelReaderApp({super.key});
 
+  /// 构建 Material 3 主题数据（统一 light/dark 两套 + loading/error 兜底）
+  ///
+  /// 亮/暗主题分别通过 [ThemeState] 提供（含 AppColors 扩展）；
+  /// loading/error 兜底场景使用固定 dark 主题（同样注入 AppColors.dark），
+  /// 保证 `context.appColors` 永远命中真实扩展而非兜底值。
+  ThemeData _buildFallbackThemeData() {
+    return ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.blue,
+        brightness: Brightness.dark,
+      ),
+      useMaterial3: true,
+      extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 监听主题提供者
@@ -125,6 +141,7 @@ class NovelReaderApp extends ConsumerWidget {
                 category: LogCategory.ui,
                 tags: ['widget', 'error', 'crash'],
               );
+              final theme = Theme.of(context);
               return MaterialApp(
                 home: Scaffold(
                   appBar: AppBar(title: const Text('Error Occurred')),
@@ -132,14 +149,15 @@ class NovelReaderApp extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error, size: 64, color: context.appColors.error),
+                        Icon(Icons.error,
+                            size: 64, color: context.appColors.error),
                         const SizedBox(height: 16),
                         const Text(
                             'An error occurred. Check console for details.'),
                         const SizedBox(height: 8),
                         Text(
                           errorDetails.exception.toString(),
-                          style: const TextStyle(fontSize: 12),
+                          style: theme.textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -156,14 +174,7 @@ class NovelReaderApp extends ConsumerWidget {
         // 加载中显示默认主题
         return MaterialApp(
           title: 'Novel App',
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
-          ),
+          theme: _buildFallbackThemeData(),
           home: const Center(
             child: CircularProgressIndicator(),
           ),
@@ -180,14 +191,7 @@ class NovelReaderApp extends ConsumerWidget {
         // 错误时显示错误信息
         return MaterialApp(
           title: 'Novel App',
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
-          ),
+          theme: _buildFallbackThemeData(),
           home: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

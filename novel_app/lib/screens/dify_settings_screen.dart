@@ -124,8 +124,7 @@ class _DifySettingsContentState extends State<DifySettingsContent> {
                   const SizedBox(height: 4),
                   Text(
                     '所有 Agent 场景的默认后端。场景级配置在 hermes 窗口右上角"场景配置"中设置，留空时回退到此默认。',
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/services/preload_service.dart';
 import 'package:novel_app/services/headless_webview_content_service.dart';
+import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
@@ -14,26 +15,39 @@ import 'test_helpers.mocks.dart' as test_mocks;
 /// Manual mock for HeadlessWebViewContentService
 class MockHeadlessWebViewContentService extends Mock
     implements HeadlessWebViewContentService {
-  final Map<String, ChapterContentResult?> _stubs = {};
-  ChapterContentResult? Function(String)? _fallback;
+  final Map<String, FetchContentResult> _stubs = {};
+  FetchContentResult Function(String)? _fallback;
 
   void addStub(String url, ChapterContentResult? result) {
-    _stubs[url] = result;
+    _stubs[url] = result == null
+        ? FetchContentResult.noScript()
+        : FetchContentResult.success(result);
   }
 
   void setFallback(ChapterContentResult? Function(String) fn) {
-    _fallback = fn;
+    _fallback = (url) {
+      final r = fn(url);
+      return r == null
+          ? FetchContentResult.noScript()
+          : FetchContentResult.success(r);
+    };
   }
 
   @override
-  Future<ChapterContentResult?> fetchContent(String chapterUrl) async {
-    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl];
+  Future<FetchContentResult> fetchContent(
+    String chapterUrl, {
+    FetchPriority priority = FetchPriority.low,
+  }) async {
+    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl]!;
     if (_fallback != null) return _fallback!(chapterUrl);
     return super.noSuchMethod(
-      Invocation.method(#fetchContent, [chapterUrl]),
-      returnValue: Future<ChapterContentResult?>.value(null),
-      returnValueForMissingStub: Future<ChapterContentResult?>.value(null),
-    ) as Future<ChapterContentResult?>;
+      Invocation.method(#fetchContent, [chapterUrl],
+          {#priority: priority}),
+      returnValue: Future<FetchContentResult>.value(
+          FetchContentResult.noScript()),
+      returnValueForMissingStub: Future<FetchContentResult>.value(
+          FetchContentResult.noScript()),
+    ) as Future<FetchContentResult>;
   }
 }
 
@@ -184,7 +198,7 @@ void main() {
       // Mock API
       for (final url in urls) {
         when(mockHeadlessService.fetchContent(url))
-            .thenAnswer((_) async => ChapterContentResult(content: '内容:$url'));
+            .thenAnswer((_) async => FetchContentResult.success(ChapterContentResult(content: '内容:$url')));
       }
 
       // 入队
@@ -218,9 +232,9 @@ void main() {
 
       // Mock
       when(mockHeadlessService.fetchContent(url1))
-          .thenAnswer((_) async => ChapterContentResult(content: '缓存内容1'));
+          .thenAnswer((_) async => FetchContentResult.success(ChapterContentResult(content: '缓存内容1')));
       when(mockHeadlessService.fetchContent(url2))
-          .thenAnswer((_) async => ChapterContentResult(content: '缓存内容2'));
+          .thenAnswer((_) async => FetchContentResult.success(ChapterContentResult(content: '缓存内容2')));
 
       // 入队（2个URL，currentIndex=0）
       await preloadService.enqueueTasks(
@@ -275,12 +289,12 @@ void main() {
       when(mockHeadlessService.fetchContent(urls[1]))
           .thenAnswer((_) async {
         await Future.delayed(Duration(milliseconds: 200));
-        return ChapterContentResult(content: '新缓存p2');
+        return FetchContentResult.success(ChapterContentResult(content: '新缓存p2'));
       });
       when(mockHeadlessService.fetchContent(urls[3]))
           .thenAnswer((_) async {
         await Future.delayed(Duration(milliseconds: 200));
-        return ChapterContentResult(content: '新缓存p4');
+        return FetchContentResult.success(ChapterContentResult(content: '新缓存p4'));
       });
 
       // 入队（currentIndex=1，当前章节是p2）

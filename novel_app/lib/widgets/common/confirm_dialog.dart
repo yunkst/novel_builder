@@ -178,10 +178,9 @@ class ConfirmDialog extends BaseDialog {
         Text(
           message,
           style: messageStyle ??
-              TextStyle(
-                fontSize: 15,
-                color: colorScheme.onSurface.withValues(alpha: 0.87),
-              ),
+              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.87),
+                  ),
           textAlign: textAlign ?? TextAlign.left,
         ),
       ],

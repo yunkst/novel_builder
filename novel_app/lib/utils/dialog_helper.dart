@@ -145,7 +145,7 @@ class DialogHelper {
                     isSelected
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
-                    color: Theme.of(context).primaryColor,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   onTap: () {
                     setState(() {
@@ -153,7 +153,7 @@ class DialogHelper {
                     });
                   },
                   tileColor: isSelected
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                      ? Theme.of(context).colorScheme.primaryContainer
                       : null,
                 );
               },

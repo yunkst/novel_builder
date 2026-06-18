@@ -43,7 +43,7 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                   Icon(
                     Icons.image_outlined,
                     size: 24,
-                    color: Theme.of(context).primaryColor,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: 12),
                   const Text(
@@ -185,7 +185,7 @@ class _IllustrationRequestDialogState extends State<IllustrationRequestDialog> {
                   ElevatedButton(
                     onPressed: _submitForm,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Theme.of(context).colorScheme.surface,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 24, vertical: 12),

@@ -14,7 +14,6 @@ import '../../core/providers/database_providers.dart';
 import '../../models/character.dart';
 import '../../models/outline.dart';
 import 'agent_scenario.dart';
-import 'agent_tools.dart';
 
 /// ID/位置解析结果
 class _IdResolveResult {
@@ -96,10 +95,6 @@ class ToolExecutor {
     }
   }
 
-  /// 是否破坏性操作（需要用户确认）
-  bool isDestructive(String toolName) =>
-      AgentTools.destructiveTools.contains(toolName);
-
   // ===== ID / 位置解析辅助方法 =====
 
   /// 解析当前小说 URL（从场景上下文中读取 currentNovelId）
@@ -110,6 +105,11 @@ class ToolExecutor {
   ) async {
     final currentNovelId = ctx?.currentNovelId;
     if (currentNovelId == null) {
+      LoggerService.instance.d(
+        '工具引导错误: no_current_novel',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'no_current_novel'],
+      );
       return _IdResolveResult.failure({
         'error': 'no_current_novel',
         'message':
@@ -126,6 +126,11 @@ class ToolExecutor {
     final repo = ref.read(novelRepositoryProvider);
     final novelUrl = await repo.getNovelUrlById(novelId);
     if (novelUrl == null) {
+      LoggerService.instance.d(
+        '工具引导错误: novel_not_found novelId=$novelId',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'novel_not_found'],
+      );
       return _IdResolveResult.failure({
         'error': 'novel_not_found',
         'message': '小说ID $novelId 不存在。请先调用 list_novels 查看书架中的所有小说及其ID。',
@@ -160,6 +165,11 @@ class ToolExecutor {
     final repo = ref.read(chapterRepositoryProvider);
     final chapters = await repo.getCachedNovelChapters(novelUrl);
     if (position < 1 || position > chapters.length) {
+      LoggerService.instance.d(
+        '工具引导错误: chapter_position_out_of_range position=$position total=${chapters.length}',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'chapter_position_out_of_range'],
+      );
       return _IdResolveResult.failure({
         'error': 'chapter_position_out_of_range',
         'message': chapters.isEmpty
@@ -378,6 +388,11 @@ class ToolExecutor {
     final repo = ref.read(chapterRepositoryProvider);
     final affected = await repo.updateChapterContent(chapterUrl, content);
     if (affected == 0) {
+      LoggerService.instance.d(
+        '工具引导错误: chapter_not_found position=$position',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_chapter_content', 'chapter_not_found'],
+      );
       return jsonEncode({
         'error': 'chapter_not_found',
         'message': '章节位置 $position 的数据库记录不存在或内容表无对应行。',
@@ -501,6 +516,11 @@ class ToolExecutor {
     final repo = ref.read(characterRepositoryProvider);
     final existing = await repo.findCharacterByName(novelUrl, name);
     if (existing == null) {
+      LoggerService.instance.d(
+        '工具引导错误: character_not_found name=$name',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_character', 'character_not_found'],
+      );
       return jsonEncode({
         'error': 'character_not_found',
         'message': '角色 "$name" 不存在。使用 create_character 创建新角色。',

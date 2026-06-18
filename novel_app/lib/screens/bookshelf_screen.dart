@@ -597,7 +597,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                             .colorScheme
                                             .tertiary
                                             .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                             color: Theme.of(context)
                                                 .colorScheme
@@ -606,8 +606,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                                       ),
                                       child: Text(
                                         '原创',
-                                        style: TextStyle(
-                                          fontSize: 10,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall!
+                                            .copyWith(
                                           color: Theme.of(context)
                                               .colorScheme
                                               .tertiary,

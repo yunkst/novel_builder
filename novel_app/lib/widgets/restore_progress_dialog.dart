@@ -188,7 +188,7 @@ class _RestoreProgressDialogState extends State<RestoreProgressDialog> {
           child: CircularProgressIndicator(strokeWidth: 2),
         );
       case RestoreState.restoring:
-        return Icon(Icons.restore, color: Theme.of(context).primaryColor);
+        return Icon(Icons.restore, color: Theme.of(context).colorScheme.primary);
       case RestoreState.completed:
         return Icon(Icons.check_circle, color: context.appColors.success);
       case RestoreState.failed:

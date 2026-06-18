@@ -76,13 +76,12 @@ class _BackgroundSummaryDialogState
           children: [
             Text(
               '将对当前背景设定进行AI总结',
-              style: TextStyle(
-                fontSize: 15,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.7),
-              ),
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.7),
+                  ),
             ),
             const SizedBox(height: 12),
             const Text('总结后将替换原有背景设定内容'),
@@ -288,7 +287,7 @@ class _BackgroundSummaryDialogState
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       widget.backgroundText,
-                      style: const TextStyle(fontSize: 15, height: 1.6),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(height: 1.6),
                     ),
                   ),
                   // 总结内容
@@ -296,7 +295,7 @@ class _BackgroundSummaryDialogState
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       _summaryResult,
-                      style: const TextStyle(fontSize: 15, height: 1.6),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(height: 1.6),
                     ),
                   ),
                 ],

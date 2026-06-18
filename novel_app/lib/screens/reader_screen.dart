@@ -318,12 +318,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       );
     }
 
-    await _contentController.loadChapter(
-      _currentChapter,
-      widget.novel,
-      forceRefresh: forceRefresh,
-      resetScrollPosition: resetScrollPosition,
-    );
+    // 暂停预加载，释放 WebView 给阅读器使用
+    final preloadService = ref.read(preloadServiceProvider);
+    preloadService.pause();
+
+    try {
+      await _contentController.loadChapter(
+        _currentChapter,
+        widget.novel,
+        forceRefresh: forceRefresh,
+        resetScrollPosition: resetScrollPosition,
+      );
+    } finally {
+      // 恢复预加载
+      preloadService.resume();
+    }
 
     // 标记章节为已读
     await _chapterRepo.markChapterAsRead(

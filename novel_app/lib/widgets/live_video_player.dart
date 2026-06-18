@@ -206,9 +206,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
                       const SizedBox(width: 2),
                       Text(
                         'LIVE',
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.surface,
-                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

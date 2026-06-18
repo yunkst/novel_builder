@@ -47,7 +47,7 @@ class IllustrationActionDialog extends StatelessWidget {
                 Icon(
                   Icons.touch_app,
                   size: 24,
-                  color: Theme.of(context).primaryColor,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 12),
                 const Text(
@@ -155,7 +155,7 @@ class _ActionCard extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
@@ -182,8 +182,7 @@ class _ActionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     description,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
@@ -232,18 +231,18 @@ class _PromptsDisplayCard extends StatelessWidget {
           // 标题行
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lightbulb,
-                color: Colors.brown,
+                color: context.appColors.onWarningContainer,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 '原始提示词',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.brown,
+                  color: context.appColors.onWarningContainer,
                 ),
               ),
             ],
@@ -255,11 +254,10 @@ class _PromptsDisplayCard extends StatelessWidget {
             child: SingleChildScrollView(
               child: SelectableText(
                 prompts,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  height: 1.5,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.5,
+                    ),
               ),
             ),
           ),

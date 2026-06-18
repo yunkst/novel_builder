@@ -441,7 +441,7 @@ class CharacterPreviewCard extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,8 +450,7 @@ class CharacterPreviewCard extends StatelessWidget {
             width: 60,
             child: Text(
               '${diff.label}:',
-              style: TextStyle(
-                fontSize: 13,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
@@ -475,8 +474,10 @@ class CharacterPreviewCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           diff.oldValue!,
-                          style: TextStyle(
-                            fontSize: 13,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium!
+                              .copyWith(
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
@@ -505,8 +506,10 @@ class CharacterPreviewCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           diff.newValue!,
-                          style: TextStyle(
-                            fontSize: 13,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium!
+                              .copyWith(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
@@ -527,8 +530,10 @@ class CharacterPreviewCard extends StatelessWidget {
                       ),
                       Text(
                         '已删除',
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium!
+                            .copyWith(
                           color: Theme.of(context).colorScheme.error,
                           fontWeight: FontWeight.bold,
                         ),
@@ -564,8 +569,7 @@ class CharacterPreviewCard extends StatelessWidget {
               padding: const EdgeInsets.only(left: 8, bottom: 2),
               child: Text(
                 item,
-                style: TextStyle(
-                  fontSize: 13,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),

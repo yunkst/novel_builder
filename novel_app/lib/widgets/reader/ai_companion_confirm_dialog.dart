@@ -219,10 +219,9 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
                 Expanded(
                   child: Text(
                     role.name,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ),
                 if (role.gender != null)
@@ -305,8 +304,7 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
           width: 80,
           child: Text(
             '$label:',
-            style: TextStyle(
-              fontSize: 13,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -315,7 +313,9 @@ class _AICompanionConfirmDialogState extends State<AICompanionConfirmDialog> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 13, height: 1.4),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              height: 1.4,
+            ),
           ),
         ),
       ],

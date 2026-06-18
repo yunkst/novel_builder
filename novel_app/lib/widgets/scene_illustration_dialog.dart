@@ -501,7 +501,7 @@ class _SceneIllustrationDialogState
                       .colorScheme
                       .error
                       .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                       color: Theme.of(context)
                           .colorScheme

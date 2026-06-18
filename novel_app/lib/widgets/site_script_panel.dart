@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../models/site_script.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 
@@ -35,7 +36,7 @@ class SiteScriptPanel extends ConsumerWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.outline,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -75,7 +76,8 @@ class SiteScriptPanel extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 40, color: Colors.red),
+                    Icon(Icons.error_outline,
+                        size: 40, color: context.appColors.error),
                     const SizedBox(height: 8),
                     Text('加载失败: $error'),
                     const SizedBox(height: 8),
@@ -165,6 +167,7 @@ class _ScriptCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final appColors = context.appColors;
     final bodySmall = Theme.of(context).textTheme.bodySmall;
 
     return Padding(
@@ -192,14 +195,14 @@ class _ScriptCard extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.15),
+                    color: appColors.successContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     '已验证',
                     style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.green.shade700,
+                      fontSize: 12,
+                      color: appColors.onSuccessContainer,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -211,11 +214,13 @@ class _ScriptCard extends ConsumerWidget {
           Row(
             children: [
               _buildScriptChip(
+                context,
                 '目录脚本',
                 script.hasChapterListJs,
               ),
               const SizedBox(width: 8),
               _buildScriptChip(
+                context,
                 '内容脚本',
                 script.hasChapterContentJs,
               ),
@@ -253,7 +258,7 @@ class _ScriptCard extends ConsumerWidget {
                 context,
                 icon: Icons.delete_outline,
                 label: '删除',
-                color: Colors.red,
+                color: appColors.error,
                 onTap: () => _showDeleteConfirm(context, ref, script),
               ),
             ],
@@ -263,18 +268,19 @@ class _ScriptCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildScriptChip(String label, bool hasScript) {
+  Widget _buildScriptChip(
+      BuildContext context, String label, bool hasScript) {
+    final appColors = context.appColors;
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: hasScript
-            ? Colors.green.withValues(alpha: 0.1)
-            : Colors.grey.withValues(alpha: 0.1),
+            ? appColors.successContainer
+            : colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: hasScript
-              ? Colors.green.withValues(alpha: 0.3)
-              : Colors.grey.withValues(alpha: 0.3),
+          color: hasScript ? appColors.success : colorScheme.outline,
         ),
       ),
       child: Row(
@@ -283,14 +289,16 @@ class _ScriptCard extends ConsumerWidget {
           Icon(
             hasScript ? Icons.check : Icons.close,
             size: 12,
-            color: hasScript ? Colors.green : Colors.grey,
+            color: hasScript ? appColors.success : colorScheme.outline,
           ),
           const SizedBox(width: 2),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              color: hasScript ? Colors.green.shade700 : Colors.grey.shade600,
+              color: hasScript
+                  ? appColors.onSuccessContainer
+                  : colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -348,12 +356,15 @@ class _ScriptCard extends ConsumerWidget {
           children: [
             Text(
               '域名: ${script.domain}',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '输入要验证的页面 URL（脚本中的 {{URL}} 将被替换为该 URL）:',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -364,13 +375,16 @@ class _ScriptCard extends ConsumerWidget {
                 hintText: 'https://example.com/book/123',
                 hintStyle: TextStyle(fontSize: 12),
               ),
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(fontSize: 14),
               autofocus: true,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               '提示：目录脚本填章节列表页 URL；内容脚本填章节内容页 URL。',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -555,7 +569,9 @@ class _ScriptCard extends ConsumerWidget {
           children: [
             Icon(
               success ? Icons.check_circle : Icons.error,
-              color: success ? Colors.green : Colors.red,
+              color: success
+                  ? context.appColors.success
+                  : context.appColors.error,
               size: 22,
             ),
             const SizedBox(width: 8),
@@ -568,23 +584,33 @@ class _ScriptCard extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildResultRow('脚本类型',
+              _buildResultRow(context, '脚本类型',
                   scriptType == 'chapter_list_js' ? '目录脚本' : '内容脚本'),
-              _buildResultRow('测试 URL', testUrl),
+              _buildResultRow(context, '测试 URL', testUrl),
               if (errorMsg != null)
-                _buildResultRow('错误信息', errorMsg, color: Colors.red),
+                _buildResultRow(context, '错误信息', errorMsg,
+                    color: context.appColors.error),
               if (resultStr != null) ...[
                 const SizedBox(height: 4),
-                const Text('返回结果:',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  '返回结果:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(8),
                   constraints: const BoxConstraints(maxHeight: 200),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ),
                   child: SingleChildScrollView(
                     child: SelectableText(
@@ -622,13 +648,20 @@ class _ScriptCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildResultRow(String label, String value, {Color? color}) {
+  Widget _buildResultRow(BuildContext context, String label, String value,
+      {Color? color}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
@@ -663,7 +696,7 @@ class _ScriptCard extends ConsumerWidget {
         content: Text(
           '确定要删除 ${script.domain} 的提取脚本吗？\n\n'
           '此操作不可撤销。',
-          style: const TextStyle(fontSize: 13),
+          style: const TextStyle(fontSize: 14),
         ),
         actions: [
           TextButton(
@@ -671,7 +704,8 @@ class _ScriptCard extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+                backgroundColor: context.appColors.error),
             onPressed: () {
               Navigator.pop(ctx);
               ref
@@ -736,10 +770,9 @@ class _ScriptDetailDialogState extends State<_ScriptDetailDialog>
                   Expanded(
                     child: Text(
                       script.domain,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -755,7 +788,7 @@ class _ScriptDetailDialogState extends State<_ScriptDetailDialog>
             // Tab 切换
             TabBar(
               controller: _tabController,
-              labelStyle: const TextStyle(fontSize: 13),
+              labelStyle: const TextStyle(fontSize: 14),
               tabs: const [
                 Tab(text: '目录脚本'),
                 Tab(text: '内容脚本'),
@@ -783,8 +816,8 @@ class _ScriptDetailDialogState extends State<_ScriptDetailDialog>
         child: Text(
           '$type 为空',
           style: TextStyle(
-            color: Colors.grey.shade500,
-            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 14,
           ),
         ),
       );

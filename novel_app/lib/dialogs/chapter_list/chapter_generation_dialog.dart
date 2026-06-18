@@ -62,7 +62,7 @@ class ChapterGenerationDialog extends StatelessWidget {
             Container(
               constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 border: Border.all(color: Theme.of(context).colorScheme.outline),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -76,7 +76,7 @@ class ChapterGenerationDialog extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.6,
-                        color: context.appColors.onSemantic,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     );
                   },

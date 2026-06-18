@@ -268,6 +268,11 @@ class BackupService {
       final fileSize = await tempFile.length();
       if (fileSize < 16) {
         await tempFile.delete();
+        LoggerService.instance.e(
+          '恢复失败: 文件过小 ($fileSize bytes < 16)',
+          category: LogCategory.backup,
+          tags: ['backup', 'restore', 'file_too_small'],
+        );
         throw Exception('下载的文件不是有效的 SQLite 数据库（文件过小）');
       }
 
@@ -276,6 +281,11 @@ class BackupService {
       final header = String.fromCharCodes(headerBytes);
       if (header != sqliteHeader) {
         await tempFile.delete();
+        LoggerService.instance.e(
+          '恢复失败: SQLite header 校验失败 (期望 "SQLite format 3\\0", 实际 "$header")',
+          category: LogCategory.backup,
+          tags: ['backup', 'restore', 'header_invalid'],
+        );
         throw Exception('下载的文件不是有效的 SQLite 数据库');
       }
 
@@ -366,7 +376,13 @@ class BackupService {
         if (await tempFile.exists()) {
           await tempFile.delete();
         }
-      } catch (_) {}
+      } catch (e) {
+        LoggerService.instance.d(
+          '清理临时文件失败（可忽略）: $tempFilePath - $e',
+          category: LogCategory.backup,
+          tags: ['backup', 'restore', 'cleanup_temp'],
+        );
+      }
       rethrow;
     }
   }

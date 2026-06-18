@@ -72,7 +72,7 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.4),
+              color: theme.colorScheme.outline,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -95,14 +95,14 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '共 $totalChapters 章',
                     style: TextStyle(
                       fontSize: 12,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -128,19 +128,20 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
           ),
           const SizedBox(height: 8),
 
-          // 来源 URL（灰色小字）
+          // 来源 URL（次要小字）
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.link, size: 12, color: Colors.grey.shade500),
+                Icon(Icons.link,
+                    size: 12, color: theme.colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     widget.sourceUrl,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade500,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -168,7 +169,7 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
                         '...还有 $remainingCount 章未显示',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -189,7 +190,7 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
                           '$chapterIndex',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -199,7 +200,7 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
                       Expanded(
                         child: Text(
                           chapter['title'] ?? '',
-                          style: const TextStyle(fontSize: 13),
+                          style: Theme.of(context).textTheme.bodyMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

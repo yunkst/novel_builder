@@ -7,7 +7,6 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
-import 'package:novel_app/widgets/hermes/hermes_confirmation_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import 'package:novel_app/widgets/hermes/hermes_novel_picker_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_scenario_config_dialog.dart';
@@ -62,14 +61,6 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           _scrollToBottom();
         });
       }
-
-      // Phase 4: 监听待处理的确认，弹出确认弹窗
-      if (next.pendingConfirmation != null &&
-          (prev?.pendingConfirmation?.toolCallId != next.pendingConfirmation!.toolCallId)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showConfirmationDialog(next.pendingConfirmation!, notifier);
-        });
-      }
     });
 
     return Dialog(
@@ -117,88 +108,99 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.auto_awesome, color: appColors.hermesOnBrand, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
+          // 第一排:场景名称(独立一行)
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, color: appColors.hermesOnBrand, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
                   chatState.scenarioDisplayName,
                   style: TextStyle(
                     color: appColors.hermesOnBrand,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          // 场景切换按钮
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.swap_horiz,
-              color: appColors.hermesOnBrandMuted,
-              size: 20,
-            ),
-            tooltip: '切换场景',
-            onSelected: (scenarioId) {
-              final info = AgentScenarioFactory.availableScenarios
-                  .where((s) => s.id == scenarioId)
-                  .firstOrNull;
-              if (info != null) {
-                notifier.switchScenario(info.id, info.displayName);
-              }
-            },
-            itemBuilder: (context) => AgentScenarioFactory.availableScenarios
-                .map((s) => PopupMenuItem(
-                      value: s.id,
-                      child: Row(
-                        children: [
-                          Text(s.icon, style: const TextStyle(fontSize: 16)),
-                          const SizedBox(width: 8),
-                          Text(s.displayName),
-                          if (s.id == chatState.scenarioId) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 16,
-                                color: Theme.of(context).colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    ))
-                .toList(),
-          ),
-          // 场景配置按钮
-          IconButton(
-            icon: Icon(Icons.tune,
-                color: appColors.hermesOnBrandMuted, size: 20),
-            tooltip: '场景配置',
-            onPressed: () => _showScenarioConfigDialog(chatState),
-          ),
-          IconButton(
-            icon: Icon(
-              _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              color: appColors.hermesOnBrandMuted,
-              size: 20,
-            ),
-            onPressed: () => setState(() => _isFullscreen = !_isFullscreen),
-            tooltip: _isFullscreen ? '退出全屏' : '全屏',
-          ),
-          IconButton(
-            icon: Icon(Icons.delete_outline,
-                color: appColors.hermesOnBrandMuted, size: 20),
-            onPressed: () {
-              notifier.clearConversation();
-            },
-            tooltip: '清空对话',
-          ),
-          IconButton(
-            icon: Icon(Icons.close,
-                color: appColors.hermesOnBrandMuted, size: 20),
-            onPressed: () => Navigator.pop(context),
+          const SizedBox(height: 8),
+          // 第二排:操作按钮(靠右)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // 场景切换按钮
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.swap_horiz,
+                  color: appColors.hermesOnBrandMuted,
+                  size: 20,
+                ),
+                tooltip: '切换场景',
+                onSelected: (scenarioId) {
+                  final info = AgentScenarioFactory.availableScenarios
+                      .where((s) => s.id == scenarioId)
+                      .firstOrNull;
+                  if (info != null) {
+                    notifier.switchScenario(info.id, info.displayName);
+                  }
+                },
+                itemBuilder: (context) => AgentScenarioFactory.availableScenarios
+                    .map((s) => PopupMenuItem(
+                          value: s.id,
+                          child: Row(
+                            children: [
+                              Text(s.icon, style: const TextStyle(fontSize: 16)),
+                              const SizedBox(width: 8),
+                              Text(s.displayName),
+                              if (s.id == chatState.scenarioId) ...[
+                                const Spacer(),
+                                Icon(Icons.check, size: 16,
+                                    color: Theme.of(context).colorScheme.primary),
+                              ],
+                            ],
+                          ),
+                        ))
+                    .toList(),
+              ),
+              // 场景配置按钮
+              IconButton(
+                icon: Icon(Icons.tune,
+                    color: appColors.hermesOnBrandMuted, size: 20),
+                tooltip: '场景配置',
+                onPressed: () => _showScenarioConfigDialog(chatState),
+              ),
+              IconButton(
+                icon: Icon(
+                  _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  color: appColors.hermesOnBrandMuted,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _isFullscreen = !_isFullscreen),
+                tooltip: _isFullscreen ? '退出全屏' : '全屏',
+              ),
+              IconButton(
+                icon: Icon(Icons.delete_outline,
+                    color: appColors.hermesOnBrandMuted, size: 20),
+                onPressed: () {
+                  notifier.clearConversation();
+                },
+                tooltip: '清空对话',
+              ),
+              IconButton(
+                icon: Icon(Icons.close,
+                    color: appColors.hermesOnBrandMuted, size: 20),
+                onPressed: () => Navigator.pop(context),
+                tooltip: '关闭',
+              ),
+            ],
           ),
         ],
       ),
@@ -227,28 +229,6 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         final message = chatState.messages[index];
         return HermesMessageBubble(message: message);
       },
-    );
-  }
-
-  /// Phase 4: 弹出确认弹窗
-  void _showConfirmationDialog(
-    PendingConfirmation confirmation,
-    HermesChatNotifier notifier,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => HermesConfirmationDialog(
-        toolName: confirmation.toolName,
-        args: confirmation.args,
-        toolCallId: confirmation.toolCallId,
-        description: describeToolAction(
-          confirmation.toolName,
-          confirmation.args,
-        ),
-        requestedAt: confirmation.requestedAt,
-        onRespond: notifier.respondToConfirmation,
-      ),
     );
   }
 
@@ -347,7 +327,10 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 12, color: c),
         const SizedBox(width: 3),
-        Text(text, style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: c)),
+        Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+              color: c,
+            )),
       ]),
     );
   }
@@ -482,8 +465,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                       ),
                       TextSpan(
                         text: currentNovel.title,
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: appColors.hermesAccent,
                         ),

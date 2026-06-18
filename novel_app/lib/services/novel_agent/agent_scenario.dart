@@ -63,9 +63,6 @@ abstract class AgentScenario {
   /// 工具定义列表（OpenAI Function Calling schema）
   List<Map<String, dynamic>> get tools;
 
-  /// 破坏性工具集合（需要用户确认）
-  Set<String> get destructiveTools;
-
   /// 构建系统提示词
   String buildSystemPrompt(AgentScenarioContext context);
 

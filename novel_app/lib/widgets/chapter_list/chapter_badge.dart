@@ -22,12 +22,11 @@ class ChapterBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: colorScheme.primary.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
+        style: Theme.of(context).textTheme.bodySmall!.copyWith(
           color: colorScheme.primary.withValues(alpha: 0.7),
           fontWeight: FontWeight.bold,
         ),

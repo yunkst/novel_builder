@@ -60,7 +60,14 @@ class HeadlessWebViewChapterListService {
   /// 返回 `List<Chapter>` 表示获取成功。
   /// 抛异常表示脚本执行失败。
   Future<List<Chapter>?> fetchChapterList(String novelUrl) async {
-    if (_isFetching) return null;
+    if (_isFetching) {
+      LoggerService.instance.d(
+        'HeadlessWebViewChapterList: 互斥命中，跳过 url=$novelUrl',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'mutex'],
+      );
+      return null;
+    }
 
     // 1. 查找该域名的提取脚本
     final domain = _extractDomain(novelUrl);
@@ -163,7 +170,13 @@ class HeadlessWebViewChapterListService {
           await Future.delayed(const Duration(milliseconds: 500));
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        LoggerService.instance.d(
+          'HeadlessWebViewChapterList: 页面加载轮询 getUrl 失败 $e',
+          category: LogCategory.cache,
+          tags: ['headless-webview', 'chapter-list', 'load_page', 'poll'],
+        );
+      }
     }
 
     LoggerService.instance.w(
@@ -198,9 +211,19 @@ class HeadlessWebViewChapterListService {
         WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
 
     // 执行
-    final result = await controller
-        .callAsyncJavaScript(functionBody: functionBody)
-        .timeout(const Duration(seconds: 60));
+    dynamic result;
+    try {
+      result = await controller
+          .callAsyncJavaScript(functionBody: functionBody)
+          .timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      LoggerService.instance.w(
+        'HeadlessWebViewChapterList: 脚本执行超时（60s） pageUrl=$pageUrl',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'execute_timeout'],
+      );
+      return [];
+    }
 
     if (result == null) return [];
 
@@ -218,7 +241,14 @@ class HeadlessWebViewChapterListService {
     final data = jsonDecode(jsonStr) as Map<String, dynamic>;
 
     final chaptersRaw = data['chapters'] as List<dynamic>?;
-    if (chaptersRaw == null || chaptersRaw.isEmpty) return [];
+    if (chaptersRaw == null || chaptersRaw.isEmpty) {
+      LoggerService.instance.w(
+        'HeadlessWebViewChapterList: 脚本返回空 chapters pageUrl=$pageUrl',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'empty_result'],
+      );
+      return [];
+    }
 
     final chapters = <Chapter>[];
     for (int i = 0; i < chaptersRaw.length; i++) {

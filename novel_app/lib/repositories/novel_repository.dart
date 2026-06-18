@@ -121,16 +121,27 @@ class NovelRepository extends BaseRepository implements INovelRepository {
   /// 更新最后阅读章节
   @override
   Future<int> updateLastReadChapter(String novelUrl, int chapterIndex) async {
-    final db = await database;
-    return await db.update(
-      'bookshelf',
-      {
-        'lastReadChapter': chapterIndex,
-        'lastReadTime': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'url = ?',
-      whereArgs: [novelUrl],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'bookshelf',
+        {
+          'lastReadChapter': chapterIndex,
+          'lastReadTime': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'url = ?',
+        whereArgs: [novelUrl],
+      );
+    } catch (e, stackTrace) {
+      // 高频操作（每次翻页都触发），失败必须可见
+      LoggerService.instance.e(
+        '更新最后阅读章节失败: novelUrl=$novelUrl chapterIndex=$chapterIndex - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'last_read', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 更新小说书名
@@ -175,13 +186,23 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       return 0;
     }
 
-    final db = await database;
-    return await db.update(
-      'bookshelf',
-      {'backgroundSetting': backgroundSetting},
-      where: 'url = ?',
-      whereArgs: [novelUrl],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'bookshelf',
+        {'backgroundSetting': backgroundSetting},
+        where: 'url = ?',
+        whereArgs: [novelUrl],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新背景设定失败: novelUrl=$novelUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'background', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 获取小说背景设定
@@ -253,16 +274,26 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       return 0;
     }
 
-    final db = await database;
-    return await db.update(
-      'bookshelf',
-      {
-        'aiAccompanimentEnabled': settings.autoEnabled ? 1 : 0,
-        'aiInfoNotificationEnabled': settings.infoNotificationEnabled ? 1 : 0,
-      },
-      where: 'url = ?',
-      whereArgs: [novelUrl],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'bookshelf',
+        {
+          'aiAccompanimentEnabled': settings.autoEnabled ? 1 : 0,
+          'aiInfoNotificationEnabled': settings.infoNotificationEnabled ? 1 : 0,
+        },
+        where: 'url = ?',
+        whereArgs: [novelUrl],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新AI伴读设置失败: novelUrl=$novelUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'ai_settings', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 根据 title 查找小说

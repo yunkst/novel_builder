@@ -7,8 +7,6 @@
 /// 4. 配置管理（baseUrl / apiKey / model）
 library;
 
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/llm_provider.dart';
 
@@ -122,7 +120,7 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [
@@ -144,7 +142,7 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Hello')],
@@ -159,7 +157,7 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Hello')],
@@ -179,7 +177,7 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Generate character')],
@@ -197,7 +195,7 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       expect(provider.chatCompletionsUrl,
           'https://api.deepseek.com/v1/chat/completions');
@@ -208,10 +206,22 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1/',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-      ));
+      ), httpClient: _FakeHttpClient());
 
       expect(provider.chatCompletionsUrl,
           'https://api.deepseek.com/v1/chat/completions');
     });
   });
+}
+
+/// 占位 HTTP 客户端：本测试只覆盖请求体构建/URL 拼接，不发真实请求
+class _FakeHttpClient implements LlmHttpClient {
+  @override
+  Future<String> postJson(
+          String url, Map<String, String> headers, String body) =>
+      throw UnimplementedError();
+  @override
+  Stream<String> postJsonStream(
+          String url, Map<String, String> headers, String body) =>
+      throw UnimplementedError();
 }

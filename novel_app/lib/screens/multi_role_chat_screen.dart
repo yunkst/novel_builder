@@ -516,11 +516,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
                   Expanded(
                     child: Text(
                       message.content,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: context.appColors.chatPrimaryText,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            height: 1.5,
+                            color: context.appColors.chatPrimaryText,
+                          ),
                     ),
                   ),
                   // 流式输出指示器
@@ -553,11 +552,10 @@ class _MultiRoleChatScreenState extends ConsumerState<MultiRoleChatScreen> {
           ),
           child: Text(
             message.content,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: context.appColors.chatPrimaryText,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  height: 1.5,
+                  color: context.appColors.chatPrimaryText,
+                ),
           ),
         ),
       ),

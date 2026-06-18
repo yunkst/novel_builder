@@ -40,27 +40,8 @@ enum AgentState {
   idle,
   thinking,
   executing,
-  waitingConfirm,
   done,
   error,
-}
-
-/// 确认请求
-class PendingConfirmation {
-  final String toolName;
-  final Map<String, dynamic> args;
-  final String toolCallId;
-  final String description;
-  final DateTime requestedAt;
-  final Future<bool> Function(bool approved) respond;
-
-  PendingConfirmation({
-    required this.toolName,
-    required this.args,
-    required this.toolCallId,
-    required this.description,
-    required this.respond,
-  }) : requestedAt = DateTime.now();
 }
 
 /// Agent 流式事件（sealed class）
@@ -96,12 +77,6 @@ class ToolCallEndEvent extends AgentEvent {
   });
 }
 
-/// 等待用户确认破坏性操作
-class ConfirmationRequestedEvent extends AgentEvent {
-  final PendingConfirmation confirmation;
-  const ConfirmationRequestedEvent(this.confirmation);
-}
-
 /// Agent 循环结束
 class AgentDoneEvent extends AgentEvent {
   const AgentDoneEvent();
@@ -115,7 +90,7 @@ class AgentErrorEvent extends AgentEvent {
 
 /// 上下文压缩事件
 ///
-/// 在 Agent 循环自动压缩消息列表时触发，UI 可用于展示压缩提示。
+/// 在 Agent 循环自动压缩消息列表时触发，UI 可用于同步裁剪历史消息。
 class CompactionEvent extends AgentEvent {
   /// 释放的字符数
   final int removedChars;
@@ -129,11 +104,19 @@ class CompactionEvent extends AgentEvent {
   /// 丢弃的消息条数
   final int droppedMessageCount;
 
+  /// 被丢弃的 HermesMessage 连续索引区间 [start, end)
+  ///
+  /// 当 [messageOwners] 透传时,压缩器会反推哪些 HermesMessage 被丢弃,
+  /// 填入此字段供 UI 端一次 `removeRange(start, end)` 完成裁剪。
+  /// 为 null 表示无 UI 对齐信息(未传 messageOwners),UI 不应裁剪。
+  final ({int start, int end})? droppedHermesRange;
+
   const CompactionEvent({
     required this.removedChars,
     required this.originalChars,
     required this.keptMessageCount,
     required this.droppedMessageCount,
+    this.droppedHermesRange,
   });
 
   /// 压缩率（0-1）

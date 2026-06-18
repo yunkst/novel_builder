@@ -246,8 +246,7 @@ class _PreloadQueueDebugScreenState
               Expanded(
                 child: Text(
                   item.label,
-                  style: TextStyle(
-                    fontSize: 10,
+                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -356,8 +355,7 @@ class _PreloadQueueDebugScreenState
                 child: Center(
                   child: Text(
                     '暂无活跃小说',
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                   ),
@@ -486,8 +484,7 @@ class _PreloadQueueDebugScreenState
                 child: Center(
                   child: Text(
                     '暂无进度更新',
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                   ),
@@ -516,8 +513,7 @@ class _PreloadQueueDebugScreenState
         children: [
           Text(
             timeStr,
-            style: TextStyle(
-              fontSize: 10,
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(
               fontFamily: 'monospace',
               color: colorScheme.onSurface.withValues(alpha: 0.5),
             ),

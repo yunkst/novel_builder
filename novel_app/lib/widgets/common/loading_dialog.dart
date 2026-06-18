@@ -283,10 +283,9 @@ class LoadingDialog extends BaseDialog {
           Flexible(
             child: Text(
               message,
-              style: TextStyle(
-                fontSize: 15,
-                color: messageColor ?? colorScheme.onSurface,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: messageColor ?? colorScheme.onSurface,
+                  ),
             ),
           ),
         ],
@@ -442,10 +441,9 @@ class _ProgressLoadingDialogWidgetState
                       Flexible(
                         child: Text(
                           widget.message,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: colorScheme.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                color: colorScheme.onSurface,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),

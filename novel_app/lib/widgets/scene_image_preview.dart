@@ -533,7 +533,7 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.primaryContainer,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(8),
               topRight: Radius.circular(8),
@@ -542,7 +542,7 @@ class _SceneImagePreviewState extends ConsumerState<SceneImagePreview> {
           child: Text(
             '${images.length} 张图片',
             style: TextStyle(
-              color: Theme.of(context).primaryColor,
+              color: Theme.of(context).colorScheme.primary,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),

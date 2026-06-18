@@ -17,7 +17,7 @@ class AiServiceFactory {
   static Future<WritingService> createWritingService() async {
     final config = await _buildLlmConfig();
     return WritingService(
-      provider: LlmProvider(config),
+      provider: LlmProvider(config, httpClient: IoLlmHttpClient()),
       defaultModel: config.defaultModel.isNotEmpty ? config.defaultModel : null,
     );
   }
@@ -26,7 +26,7 @@ class AiServiceFactory {
   static Future<InfoExtractionService> createInfoExtractionService() async {
     final config = await _buildLlmConfig();
     return InfoExtractionService(
-      provider: LlmProvider(config),
+      provider: LlmProvider(config, httpClient: IoLlmHttpClient()),
       defaultModel: config.defaultModel.isNotEmpty ? config.defaultModel : null,
     );
   }

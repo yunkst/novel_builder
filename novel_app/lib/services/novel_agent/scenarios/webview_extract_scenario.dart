@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/extraction_task_providers.dart';
+import 'package:novel_app/core/providers/webview_add_novel_providers.dart';
+import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 import '../agent_scenario.dart';
@@ -82,9 +84,6 @@ class WebViewExtractScenario implements AgentScenario {
 
   @override
   String get displayName => '网页小说提取';
-
-  @override
-  Set<String> get destructiveTools => {}; // 已禁用确认 — 所有工具自动执行
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) {
@@ -411,6 +410,11 @@ class WebViewExtractScenario implements AgentScenario {
         'dom': domResult ?? '',
       });
     } catch (e) {
+      LoggerService.instance.w(
+        'get_page_info 失败: $e (pageUrl=$_currentUrl)',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'get_page_info', 'error'],
+      );
       return jsonEncode({
         'error': 'PAGE_NOT_READY',
         'message': '页面尚未加载完成或 WebView 未初始化',
@@ -507,8 +511,13 @@ class WebViewExtractScenario implements AgentScenario {
           await Future.delayed(_domStabilizeDelay);
           return true;
         }
-      } catch (_) {
+      } catch (e) {
         // 轮询错误继续等待
+        LoggerService.instance.d(
+          '轮询 getUrl 失败: $e',
+          category: LogCategory.ai,
+          tags: ['agent', 'webview-extract', 'poll_url'],
+        );
       }
     }
     return false;
@@ -647,6 +656,14 @@ class WebViewExtractScenario implements AgentScenario {
         }
       } catch (_) {
         // 非 JSON 字符串，无法平铺，原样放在 result 字段
+        final preview = resultStr.length > 200
+            ? '${resultStr.substring(0, 200)}...'
+            : resultStr;
+        LoggerService.instance.d(
+          'JS 结果非 JSON: $preview',
+          category: LogCategory.ai,
+          tags: ['agent', 'webview-extract', 'execute_js', 'non_json'],
+        );
       }
 
       // 结果摘要（截断 300 字符）用于 RunStore 记录
@@ -833,7 +850,12 @@ class WebViewExtractScenario implements AgentScenario {
     Uri? uri;
     try {
       uri = Uri.parse(url);
-    } catch (_) {
+    } catch (e) {
+      LoggerService.instance.w(
+        'URL 解析失败: $url - $e',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'navigate_to', 'url_parse'],
+      );
       return jsonEncode({
         'error': 'INVALID_URL',
         'message': 'URL 格式不合法: $url',
@@ -998,15 +1020,31 @@ class WebViewExtractScenario implements AgentScenario {
       });
     }
 
-    // 查询数据库（通过 DatabaseConnection）
-    final dbConnection = _ref.read(databaseConnectionProvider);
-    final db = await dbConnection.database;
-    final results = await db.query(
-      'site_scripts',
-      where: 'domain = ?',
-      whereArgs: [effectiveDomain],
-      orderBy: 'last_used_at DESC',
-    );
+    /// 查询数据库（通过 DatabaseConnection）
+    final List<Map<String, dynamic>> results;
+    try {
+      final dbConnection = _ref.read(databaseConnectionProvider);
+      final db = await dbConnection.database;
+      results = await db.query(
+        'site_scripts',
+        where: 'domain = ?',
+        whereArgs: [effectiveDomain],
+        orderBy: 'last_used_at DESC',
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '查询缓存脚本失败: domain=$effectiveDomain - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['agent', 'webview-extract', 'get_cached_script', 'db_error'],
+      );
+      return jsonEncode({
+        'error': 'DB_QUERY_FAILED',
+        'message': '查询缓存脚本数据库失败: $e',
+        'domain': effectiveDomain,
+        'suggestion': '数据库可能被锁或损坏，请重试 get_cached_script',
+      });
+    }
 
     if (results.isEmpty) {
       return jsonEncode({
@@ -1080,6 +1118,22 @@ class WebViewExtractScenario implements AgentScenario {
   /// - 传 `domain` + `chapter_list_js` + `chapter_content_js` 完整脚本
   /// - 校验 `{{URL}}` 占位符后存库
   /// - 向后兼容现有测试和旧 AI 行为
+  /// 保存脚本后通知 UI 失效重读
+  ///
+  /// `_saveScript` 直接 `db.insert('site_scripts')` 写库，绕过了 Provider 状态管理。
+  /// 若不主动失效，三个 UI 入口都看不到新脚本：
+  /// - 脚本管理面板（`siteScriptListProvider`，StateNotifier 仅初始化加载一次）
+  /// - 「添加小说」FAB（`webviewCurrentSiteScriptProvider`，FutureProvider 仅在
+  ///   URL host 变化时重查；agent 写库后 URL 未变，不会自动失效）
+  ///
+  /// 因此在每次 insert 成功后调用本方法：
+  /// - `refresh()` 让脚本管理面板重新 `getAll()`
+  /// - `invalidate()` 强制 FAB 按钮按当前域名重查，立即出现
+  void _notifyScriptSaved() {
+    _ref.read(siteScriptListProvider.notifier).refresh();
+    _ref.invalidate(webviewCurrentSiteScriptProvider);
+  }
+
   Future<String> _saveScript(Map<String, dynamic> args) async {
     final listRunId = args['list_run_id'] as String?;
     final contentRunId = args['content_run_id'] as String?;
@@ -1147,22 +1201,38 @@ class WebViewExtractScenario implements AgentScenario {
       final now = DateTime.now().millisecondsSinceEpoch;
       final id = now.toString();
 
-      final dbConnection = _ref.read(databaseConnectionProvider);
-      final db = await dbConnection.database;
-      await db.insert('site_scripts', {
-        'id': id,
-        'domain': domain,
-        'url_pattern': urlPattern,
-        'chapter_list_js': chapterListJs,
-        'chapter_content_js': chapterContentJs,
-        'sample_url': _currentUrl,
-        'created_at': now,
-        'last_used_at': now,
-        'use_count': 0,
-        'verified': 0,
-      });
+      try {
+        final dbConnection = _ref.read(databaseConnectionProvider);
+        final db = await dbConnection.database;
+        await db.insert('site_scripts', {
+          'id': id,
+          'domain': domain,
+          'url_pattern': urlPattern,
+          'chapter_list_js': chapterListJs,
+          'chapter_content_js': chapterContentJs,
+          'sample_url': _currentUrl,
+          'created_at': now,
+          'last_used_at': now,
+          'use_count': 0,
+          'verified': 0,
+        });
+      } catch (e, stackTrace) {
+        LoggerService.instance.e(
+          '保存脚本到数据库失败 (run_id模式): domain=$domain - $e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.database,
+          tags: ['agent', 'webview-extract', 'save_script', 'db_error'],
+        );
+        return jsonEncode({
+          'error': 'DB_SAVE_FAILED',
+          'message': '保存脚本到数据库失败: $e',
+          'domain': domain,
+          'suggestion': '数据库可能被锁，请重试 save_script',
+        });
+      }
 
       _scriptSavedThisSession = true;
+      _notifyScriptSaved();
 
       LoggerService.instance.i(
         '保存提取脚本 (run_id 模式): domain=$domain, id=$id, listId=$listRunId, contentId=$contentRunId',
@@ -1245,22 +1315,38 @@ class WebViewExtractScenario implements AgentScenario {
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = now.toString();
 
-    final dbConnection = _ref.read(databaseConnectionProvider);
-    final db = await dbConnection.database;
-    await db.insert('site_scripts', {
-      'id': id,
-      'domain': domain,
-      'url_pattern': urlPattern,
-      'chapter_list_js': chapterListJs,
-      'chapter_content_js': chapterContentJs,
-      'sample_url': _currentUrl,
-      'created_at': now,
-      'last_used_at': now,
-      'use_count': 0,
-      'verified': 0,
-    });
+    try {
+      final dbConnection = _ref.read(databaseConnectionProvider);
+      final db = await dbConnection.database;
+      await db.insert('site_scripts', {
+        'id': id,
+        'domain': domain,
+        'url_pattern': urlPattern,
+        'chapter_list_js': chapterListJs,
+        'chapter_content_js': chapterContentJs,
+        'sample_url': _currentUrl,
+        'created_at': now,
+        'last_used_at': now,
+        'use_count': 0,
+        'verified': 0,
+      });
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '保存脚本到数据库失败 (兼容模式): domain=$domain - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['agent', 'webview-extract', 'save_script', 'db_error'],
+      );
+      return jsonEncode({
+        'error': 'DB_SAVE_FAILED',
+        'message': '保存脚本到数据库失败: $e',
+        'domain': domain,
+        'suggestion': '数据库可能被锁，请重试 save_script',
+      });
+    }
 
     _scriptSavedThisSession = true;
+    _notifyScriptSaved();
 
     LoggerService.instance.i(
       '保存提取脚本 (旧模式): domain=$domain, id=$id',
@@ -1626,8 +1712,18 @@ class WebViewExtractScenario implements AgentScenario {
     final newText = args['newText'] as String? ?? args['new_text'] as String? ?? '';
     final result = await patchMemory(oldText, newText);
     if (result.success) {
+      LoggerService.instance.i(
+        'patchMemory 成功: ${result.message}',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'patch_memory', 'success'],
+      );
       return jsonEncode({'success': true, 'message': result.message});
     }
+    LoggerService.instance.w(
+      'patchMemory 失败: ${result.message}',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'patch_memory', 'failed'],
+    );
     return jsonEncode({
       'error': 'memory_not_found',
       'message': result.message,

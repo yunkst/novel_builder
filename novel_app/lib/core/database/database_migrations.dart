@@ -135,7 +135,9 @@ class DatabaseMigrations {
 
     // 执行每个版本的迁移
     for (int version = fromVersion + 1; version <= toVersion; version++) {
+      _log('开始迁移 v${version - 1} → v$version...');
       await _migrateToVersion(db, version);
+      _log('迁移完成 v$version');
     }
 
     final duration = DateTime.now().difference(startTime);
@@ -582,21 +584,41 @@ class DatabaseMigrations {
   /// 安全添加列（如果不存在）
   static Future<void> _addColumnIfNotExists(
       Database db, String table, String column, String type) async {
-    final columns = await db.rawQuery("PRAGMA table_info($table)");
-    final hasColumn = columns.any((c) => c['name'] == column);
-    if (!hasColumn) {
-      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    try {
+      final columns = await db.rawQuery("PRAGMA table_info($table)");
+      final hasColumn = columns.any((c) => c['name'] == column);
+      if (!hasColumn) {
+        await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '添加列失败: $table.$column - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['migration', 'add_column', 'failed'],
+      );
+      rethrow;
     }
   }
 
   /// 安全创建索引（如果不存在）
   static Future<void> _createIndexIfNotExists(
       Database db, String indexName, String table, String column) async {
-    final indexes = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE '$indexName'");
-    if (indexes.isEmpty) {
-      await db.execute(
-          'CREATE INDEX $indexName ON $table($column)');
+    try {
+      final indexes = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE '$indexName'");
+      if (indexes.isEmpty) {
+        await db.execute(
+            'CREATE INDEX $indexName ON $table($column)');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '创建索引失败: $indexName on $table.$column - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['migration', 'create_index', 'failed'],
+      );
+      rethrow;
     }
   }
 
@@ -610,40 +632,50 @@ class DatabaseMigrations {
     String newColumn,
     String newColumnType,
   ) async {
-    // 检查旧字段是否存在，新字段是否不存在
-    final tableInfo = await db.rawQuery("PRAGMA table_info($table)");
-    final hasOldColumn = tableInfo.any((c) => c['name'] == oldColumn);
-    final hasNewColumn = tableInfo.any((c) => c['name'] == newColumn);
+    try {
+      // 检查旧字段是否存在，新字段是否不存在
+      final tableInfo = await db.rawQuery("PRAGMA table_info($table)");
+      final hasOldColumn = tableInfo.any((c) => c['name'] == oldColumn);
+      final hasNewColumn = tableInfo.any((c) => c['name'] == newColumn);
 
-    if (hasOldColumn && !hasNewColumn) {
-      // 获取当前表的完整列名列表
-      final columns = tableInfo.map((c) => c['name'] as String).toList();
+      if (hasOldColumn && !hasNewColumn) {
+        // 获取当前表的完整列名列表
+        final columns = tableInfo.map((c) => c['name'] as String).toList();
 
-      // 构建新列名列表（替换旧列为新列）
-      final newColumns = columns.map((col) {
-        if (col == oldColumn) return '$newColumn $newColumnType';
-        return col;
-      }).toList();
+        // 构建新列名列表（替换旧列为新列）
+        final newColumns = columns.map((col) {
+          if (col == oldColumn) return '$newColumn $newColumnType';
+          return col;
+        }).toList();
 
-      // 重建表
-      final columnList = columns.join(', ');
-      final newColumnList = newColumns.join(', ');
+        // 重建表
+        final columnList = columns.join(', ');
+        final newColumnList = newColumns.join(', ');
 
-      await db.execute('''
-        CREATE TABLE ${table}_new (
-          $newColumnList
-        )
-      ''');
+        await db.execute('''
+          CREATE TABLE ${table}_new (
+            $newColumnList
+          )
+        ''');
 
-      await db.execute('''
-        INSERT INTO ${table}_new ($columnList)
-        SELECT * FROM $table
-      ''');
+        await db.execute('''
+          INSERT INTO ${table}_new ($columnList)
+          SELECT * FROM $table
+        ''');
 
-      await db.execute('DROP TABLE $table');
-      await db.execute('ALTER TABLE ${table}_new RENAME TO $table');
+        await db.execute('DROP TABLE $table');
+        await db.execute('ALTER TABLE ${table}_new RENAME TO $table');
 
-      _log('数据库迁移: 重命名 $table.$oldColumn → $newColumn');
+        _log('数据库迁移: 重命名 $table.$oldColumn → $newColumn');
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        '重命名字段失败: $table.$oldColumn → $newColumn - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['migration', 'rename_column', 'failed'],
+      );
+      rethrow;
     }
   }
 

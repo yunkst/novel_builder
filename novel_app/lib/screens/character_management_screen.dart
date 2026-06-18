@@ -820,21 +820,20 @@ class _CharacterManagementScreenState
                                   horizontal: 10, vertical: 4), // 减少padding
                               decoration: BoxDecoration(
                                 color: Theme.of(context)
-                                    .primaryColor
-                                    .withValues(alpha: 0.8),
+                                    .colorScheme
+                                    .primary,
                                 borderRadius:
                                     BorderRadius.circular(12), // 稍微减小圆角
                                 border: Border.all(
                                   color: Theme.of(context)
-                                      .primaryColor
-                                      .withValues(alpha: 0.3),
+                                      .colorScheme
+                                      .primaryContainer,
                                   width: 1,
                                 ),
                               ),
                               child: Text(
                                 character.occupation ?? '未知职业',
-                                style: TextStyle(
-                                  fontSize: 10, // 缩小职业字号
+                                style: Theme.of(context).textTheme.bodySmall!.copyWith(
                                   fontWeight: FontWeight.w500,
                                   color: Theme.of(context).colorScheme.surface,
                                 ),

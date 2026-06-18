@@ -29,12 +29,28 @@ class CharacterRepository extends BaseRepository
   /// 返回新插入记录的ID
   @override
   Future<int> createCharacter(Character character) async {
-    final db = await database;
-    return await db.insert(
-      'characters',
-      character.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      final db = await database;
+      final id = await db.insert(
+        'characters',
+        character.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      LoggerService.instance.i(
+        '创建角色: ${character.name} (id=$id)',
+        category: LogCategory.character,
+        tags: ['character', 'create', 'success'],
+      );
+      return id;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '创建角色失败: ${character.name} - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'create', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 获取小说的所有角色
@@ -81,17 +97,33 @@ class CharacterRepository extends BaseRepository
   /// 返回受影响的行数
   @override
   Future<int> updateCharacter(Character character) async {
-    final db = await database;
-    final updatedCharacter = character.copyWith(
-      updatedAt: DateTime.now(),
-    );
+    try {
+      final db = await database;
+      final updatedCharacter = character.copyWith(
+        updatedAt: DateTime.now(),
+      );
 
-    return await db.update(
-      'characters',
-      updatedCharacter.toMap(),
-      where: 'id = ?',
-      whereArgs: [character.id],
-    );
+      final affected = await db.update(
+        'characters',
+        updatedCharacter.toMap(),
+        where: 'id = ?',
+        whereArgs: [character.id],
+      );
+      LoggerService.instance.i(
+        '更新角色: ${character.name} (id=${character.id}, affected=$affected)',
+        category: LogCategory.character,
+        tags: ['character', 'update', 'success'],
+      );
+      return affected;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新角色失败: ${character.name} (id=${character.id}) - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'update', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 删除角色
@@ -100,12 +132,28 @@ class CharacterRepository extends BaseRepository
   /// 返回受影响的行数
   @override
   Future<int> deleteCharacter(int id) async {
-    final db = await database;
-    return await db.delete(
-      'characters',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    try {
+      final db = await database;
+      final affected = await db.delete(
+        'characters',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      LoggerService.instance.i(
+        '删除角色: id=$id (affected=$affected)',
+        category: LogCategory.character,
+        tags: ['character', 'delete', 'success'],
+      );
+      return affected;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除角色失败: id=$id - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'delete', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 根据名称查找角色
@@ -296,12 +344,28 @@ class CharacterRepository extends BaseRepository
   /// 返回受影响的行数
   @override
   Future<int> deleteAllCharacters(String novelUrl) async {
-    final db = await database;
-    return await db.delete(
-      'characters',
-      where: 'novelUrl = ?',
-      whereArgs: [novelUrl],
-    );
+    try {
+      final db = await database;
+      final affected = await db.delete(
+        'characters',
+        where: 'novelUrl = ?',
+        whereArgs: [novelUrl],
+      );
+      LoggerService.instance.i(
+        '删除小说所有角色: novelUrl=$novelUrl (affected=$affected)',
+        category: LogCategory.character,
+        tags: ['character', 'delete_all', 'success'],
+      );
+      return affected;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除小说所有角色失败: novelUrl=$novelUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.character,
+        tags: ['character', 'delete_all', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   // ========== 角色图片管理 ==========
@@ -315,7 +379,7 @@ class CharacterRepository extends BaseRepository
   Future<int> updateCharacterCachedImage(
       int characterId, String? imageUrl) async {
     final db = await database;
-    return await db.update(
+    final affected = await db.update(
       'characters',
       {
         'cachedImageUrl': imageUrl,
@@ -324,6 +388,12 @@ class CharacterRepository extends BaseRepository
       where: 'id = ?',
       whereArgs: [characterId],
     );
+    LoggerService.instance.d(
+      '更新角色缓存图: id=$characterId (affected=$affected)',
+      category: LogCategory.cache,
+      tags: ['character', 'image', 'update'],
+    );
+    return affected;
   }
 
   /// 清除角色的缓存图片URL
@@ -333,7 +403,7 @@ class CharacterRepository extends BaseRepository
   @override
   Future<int> clearCharacterCachedImage(int characterId) async {
     final db = await database;
-    return await db.update(
+    final affected = await db.update(
       'characters',
       {
         'cachedImageUrl': null,
@@ -342,6 +412,12 @@ class CharacterRepository extends BaseRepository
       where: 'id = ?',
       whereArgs: [characterId],
     );
+    LoggerService.instance.d(
+      '清除角色缓存图: id=$characterId (affected=$affected)',
+      category: LogCategory.cache,
+      tags: ['character', 'image', 'clear'],
+    );
+    return affected;
   }
 
   /// 批量清除角色的缓存图片URL
@@ -351,7 +427,7 @@ class CharacterRepository extends BaseRepository
   @override
   Future<int> clearAllCharacterCachedImages(String novelUrl) async {
     final db = await database;
-    return await db.update(
+    final affected = await db.update(
       'characters',
       {
         'cachedImageUrl': null,
@@ -360,6 +436,12 @@ class CharacterRepository extends BaseRepository
       where: 'novelUrl = ?',
       whereArgs: [novelUrl],
     );
+    LoggerService.instance.d(
+      '清除全部角色缓存图: novelUrl=$novelUrl (affected=$affected)',
+      category: LogCategory.cache,
+      tags: ['character', 'image', 'clear_all'],
+    );
+    return affected;
   }
 
   /// 获取角色的缓存图片URL
@@ -411,12 +493,18 @@ class CharacterRepository extends BaseRepository
       updateData['cachedImageUrl'] = null;
     }
 
-    return await db.update(
+    final affected = await db.update(
       'characters',
       updateData,
       where: 'id = ?',
       whereArgs: [characterId],
     );
+    LoggerService.instance.i(
+      '更新角色头像: id=$characterId (affected=$affected)',
+      category: LogCategory.character,
+      tags: ['character', 'avatar', 'update'],
+    );
+    return affected;
   }
 
   /// 检查角色是否有头像缓存

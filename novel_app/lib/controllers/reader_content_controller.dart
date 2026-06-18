@@ -258,21 +258,68 @@ class ReaderContentController {
   // ========== 私有方法 ==========
 
   /// 获取章节内容（纯 Headless WebView，不再回退后端 API）
+  ///
+  /// 使用 [FetchPriority.high] 优先级，可抢占预加载任务。
+  /// 遇到 WebView 忙碌时有限重试（3 次，间隔 2 秒）。
   Future<String> _fetchChapterContent(String chapterUrl, bool forceRefresh) async {
-    // Headless WebView 获取章节内容
     if (_headlessService != null) {
-      final webViewResult = await _headlessService!.fetchContent(chapterUrl);
-      if (webViewResult != null && webViewResult.content.trim().isNotEmpty) {
-        LoggerService.instance.d(
-          'ReaderContentController: Headless WebView 获取成功',
-          category: LogCategory.ui,
-          tags: ['reader', 'headless-webview'],
+      const maxRetries = 3;
+      const retryDelay = Duration(seconds: 2);
+
+      for (var attempt = 0; attempt < maxRetries; attempt++) {
+        final result = await _headlessService!.fetchContent(
+          chapterUrl,
+          priority: FetchPriority.high,
         );
-        return webViewResult.content;
+
+        if (result.isSuccess) {
+          LoggerService.instance.d(
+            'ReaderContentController: Headless WebView 获取成功',
+            category: LogCategory.ui,
+            tags: ['reader', 'headless-webview'],
+          );
+          return result.content.content;
+        }
+
+        if (result.isBusy) {
+          // WebView 正忙，等待后重试
+          LoggerService.instance.w(
+            'ReaderContentController: WebView 忙碌，'
+            '第${attempt + 1}次重试（共$maxRetries次）',
+            category: LogCategory.ui,
+            tags: ['reader', 'headless-webview', 'busy-retry'],
+          );
+          if (attempt < maxRetries - 1) {
+            await Future.delayed(retryDelay);
+          }
+          continue;
+        }
+
+        // isNoScript: 真的没有脚本，不需要重试
+        break;
       }
+
+      // 所有重试耗尽或 noScript，做最后一次尝试以确定最终结果类型
+      final lastResult = await _headlessService!.fetchContent(
+        chapterUrl,
+        priority: FetchPriority.high,
+      );
+      if (lastResult.isSuccess) {
+        return lastResult.content.content;
+      }
+      if (lastResult.isNoScript) {
+        throw NoExtractionScriptException(
+          _extractHost(chapterUrl) ?? '',
+          url: chapterUrl,
+        );
+      }
+      // busy 状态耗尽重试
+      throw WebViewBusyException(
+        _extractHost(chapterUrl) ?? '',
+        url: chapterUrl,
+      );
     }
 
-    // 无脚本或 headless 失败，直接报错（不再回退后端 API）
     throw NoExtractionScriptException(
       _extractHost(chapterUrl) ?? '',
       url: chapterUrl,

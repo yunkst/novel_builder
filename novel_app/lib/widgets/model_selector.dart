@@ -221,8 +221,10 @@ class _ModelSelectorState extends ConsumerState<ModelSelector> {
                           ),
                           child: Text(
                             '默认',
-                            style: TextStyle(
-                              fontSize: 10,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
                                   .primary

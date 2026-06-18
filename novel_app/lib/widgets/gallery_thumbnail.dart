@@ -222,9 +222,8 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
         ),
         child: Text(
           imageCount > 99 ? '99+' : '$imageCount',
-          style: TextStyle(
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.surface,
-            fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
         ),

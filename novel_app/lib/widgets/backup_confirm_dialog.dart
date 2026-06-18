@@ -43,7 +43,7 @@ class BackupConfirmDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.backup_rounded, color: Theme.of(context).primaryColor),
+          Icon(Icons.backup_rounded, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           const Text('确认备份数据'),
         ],

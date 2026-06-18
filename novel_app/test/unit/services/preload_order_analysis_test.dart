@@ -3,6 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mockito/mockito.dart';
 import 'package:novel_app/services/preload_service.dart';
 import 'package:novel_app/services/headless_webview_content_service.dart';
+import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
@@ -14,28 +15,41 @@ import 'test_helpers.mocks.dart' as test_mocks;
 /// Manual mock for HeadlessWebViewContentService
 class MockHeadlessWebViewContentService extends Mock
     implements HeadlessWebViewContentService {
-  final Map<String, ChapterContentResult?> _stubs = {};
-  ChapterContentResult? Function(String)? _fallback;
+  final Map<String, FetchContentResult> _stubs = {};
+  FetchContentResult Function(String)? _fallback;
   final List<String> callOrder = [];
 
   void addStub(String url, ChapterContentResult? result) {
-    _stubs[url] = result;
+    _stubs[url] = result == null
+        ? FetchContentResult.noScript()
+        : FetchContentResult.success(result);
   }
 
   void setFallback(ChapterContentResult? Function(String) fn) {
-    _fallback = fn;
+    _fallback = (url) {
+      final r = fn(url);
+      return r == null
+          ? FetchContentResult.noScript()
+          : FetchContentResult.success(r);
+    };
   }
 
   @override
-  Future<ChapterContentResult?> fetchContent(String chapterUrl) async {
+  Future<FetchContentResult> fetchContent(
+    String chapterUrl, {
+    FetchPriority priority = FetchPriority.low,
+  }) async {
     callOrder.add(chapterUrl);
-    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl];
+    if (_stubs.containsKey(chapterUrl)) return _stubs[chapterUrl]!;
     if (_fallback != null) return _fallback!(chapterUrl);
     return super.noSuchMethod(
-      Invocation.method(#fetchContent, [chapterUrl]),
-      returnValue: Future<ChapterContentResult?>.value(null),
-      returnValueForMissingStub: Future<ChapterContentResult?>.value(null),
-    ) as Future<ChapterContentResult?>;
+      Invocation.method(#fetchContent, [chapterUrl],
+          {#priority: priority}),
+      returnValue: Future<FetchContentResult>.value(
+          FetchContentResult.noScript()),
+      returnValueForMissingStub: Future<FetchContentResult>.value(
+          FetchContentResult.noScript()),
+    ) as Future<FetchContentResult>;
   }
 }
 

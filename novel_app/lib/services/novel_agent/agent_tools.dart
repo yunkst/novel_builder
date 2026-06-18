@@ -6,8 +6,6 @@
 /// - 章节操作使用 `position`（list_chapters 返回的连续 1-based 顺序号）
 library;
 
-import 'package:novel_app/services/logger_service.dart';
-
 class AgentTools {
   AgentTools._();
 
@@ -34,9 +32,6 @@ class AgentTools {
     _getOutline,
   ];
 
-  /// 破坏性工具列表（已禁用确认 — 所有工具自动执行）
-  static const Set<String> destructiveTools = {};
-
   /// 查找工具定义（带日志）
   ///
   /// [name] 工具名
@@ -48,14 +43,6 @@ class AgentTools {
       }
     }
     return null;
-  }
-
-  /// 校验工具是否破坏性（带日志）
-  static bool isDestructive(String name) {
-    final destructive = destructiveTools.contains(name);
-    LoggerService.instance.d('工具元数据查询: $name (destructive=$destructive)',
-        category: LogCategory.ai, tags: ['agent', 'tool', 'metadata', name]);
-    return destructive;
   }
 
   // ===== 小说导航 =====

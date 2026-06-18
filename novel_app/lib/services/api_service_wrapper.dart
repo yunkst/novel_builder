@@ -382,6 +382,11 @@ class ApiServiceWrapper {
 
         // 如果是连接错误，尝试重新初始化并重试
         if (_isConnectionError(e)) {
+          LoggerService.instance.d(
+            '$operationName 重试 #$retryCount（连接错误）',
+            category: LogCategory.network,
+            tags: ['api', 'retry', operationName, 'connection'],
+          );
           await _reinitializeConnection();
           await Future.delayed(
               Duration(milliseconds: 1000 * retryCount)); // 指数退避
@@ -389,6 +394,11 @@ class ApiServiceWrapper {
         }
 
         // 其他错误也重试，但延迟更短
+        LoggerService.instance.d(
+          '$operationName 重试 #$retryCount（其它错误）',
+          category: LogCategory.network,
+          tags: ['api', 'retry', operationName],
+        );
         await Future.delayed(Duration(milliseconds: 500 * retryCount));
       }
     }
@@ -711,10 +721,10 @@ class ApiServiceWrapper {
     // 允许在未初始化时访问，因为有些测试需要这样做
     // 但在实际使用中应该先调用 init()
     if (!_initialized) {
-      LoggerService.instance.d(
+      LoggerService.instance.w(
         'Dio 实例访问时 ApiServiceWrapper 尚未初始化',
         category: LogCategory.network,
-        tags: ['debug', 'api', 'dio'],
+        tags: ['api', 'dio', 'not_initialized'],
       );
     }
     return _dio;

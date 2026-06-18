@@ -134,10 +134,6 @@ void main() {
           print('  [ERROR] ${event.error}');
         }
       },
-      requestConfirmation: (toolName, args, toolCallId) async {
-        // 自动批准所有工具调用（包括 save_script）
-        return true;
-      },
     );
 
     // 5. 验证结果

@@ -152,7 +152,7 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
         );
       case BackupState.uploading:
         return Icon(Icons.cloud_upload_rounded,
-            color: Theme.of(context).primaryColor);
+            color: Theme.of(context).colorScheme.primary);
       case BackupState.completed:
         return Icon(Icons.check_circle, color: context.appColors.success);
       case BackupState.failed:
@@ -262,17 +262,15 @@ class _BackupProgressDialogState extends State<BackupProgressDialog> {
           width: 80,
           child: Text(
             '$label:',
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 13,
             ),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
               fontWeight: FontWeight.w500,
             ),
           ),

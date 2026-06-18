@@ -36,7 +36,6 @@ void main() {
       expect(state.lastReadChapterIndex, -1);
       expect(state.currentPage, 1);
       expect(state.totalPages, 1);
-      expect(state.cachedStatus, isEmpty);
       expect(state.isReorderingMode, false);
     });
 
@@ -93,22 +92,6 @@ void main() {
       expect(newState.lastReadChapterIndex, 5);
     });
 
-    test('copyWith 应该正确更新 cachedStatus', () {
-      // Arrange
-      const state = ChapterListState();
-      final newCachedStatus = {
-        'https://example.com/chapter1': true,
-        'https://example.com/chapter2': false,
-      };
-
-      // Act
-      final newState = state.copyWith(cachedStatus: newCachedStatus);
-
-      // Assert
-      expect(newState.cachedStatus, newCachedStatus);
-      expect(newState.cachedStatus.length, 2);
-    });
-
     test('copyWith 应该正确更新 isReorderingMode', () {
       // Arrange
       const state = ChapterListState();
@@ -158,11 +141,11 @@ void main() {
     test('cachedCount 有缓存应该正确计算', () {
       // Arrange
       final state = ChapterListState(
-        cachedStatus: {
-          'url1': true,
-          'url2': true,
-          'url3': false,
-        },
+        chapters: [
+          Chapter(title: '第1章', url: 'url1', isCached: true),
+          Chapter(title: '第2章', url: 'url2', isCached: true),
+          Chapter(title: '第3章', url: 'url3', isCached: false),
+        ],
       );
 
       // Act
@@ -175,11 +158,11 @@ void main() {
     test('cachedCount 全部缓存应该返回总数', () {
       // Arrange
       final state = ChapterListState(
-        cachedStatus: {
-          'url1': true,
-          'url2': true,
-          'url3': true,
-        },
+        chapters: [
+          Chapter(title: '第1章', url: 'url1', isCached: true),
+          Chapter(title: '第2章', url: 'url2', isCached: true),
+          Chapter(title: '第3章', url: 'url3', isCached: true),
+        ],
       );
 
       // Act
@@ -192,11 +175,11 @@ void main() {
     test('cachedCount 全部未缓存应该返回0', () {
       // Arrange
       final state = ChapterListState(
-        cachedStatus: {
-          'url1': false,
-          'url2': false,
-          'url3': false,
-        },
+        chapters: [
+          Chapter(title: '第1章', url: 'url1', isCached: false),
+          Chapter(title: '第2章', url: 'url2', isCached: false),
+          Chapter(title: '第3章', url: 'url3', isCached: false),
+        ],
       );
 
       // Act

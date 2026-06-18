@@ -14,6 +14,7 @@ import 'package:mockito/mockito.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:novel_app/services/headless_webview_content_service.dart';
+import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/repositories/site_script_repository.dart';
 import 'package:novel_app/models/site_script.dart';
 import 'package:novel_app/services/logger_service.dart';
@@ -93,7 +94,7 @@ void main() {
       final result = await service.fetchContent(
         'https://www.example.com/chapter/1.html',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       verify(mockScriptRepo.getByDomain('www.example.com')).called(1);
     });
 
@@ -104,7 +105,7 @@ void main() {
       final result = await service.fetchContent(
         'https://www.example.com:8080/chapter/1.html',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       verify(mockScriptRepo.getByDomain('www.example.com')).called(1);
     });
 
@@ -115,7 +116,7 @@ void main() {
       final result = await service.fetchContent(
         'https://www.example.com/chapter/1.html?page=2&ref=home',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       verify(mockScriptRepo.getByDomain('www.example.com')).called(1);
     });
 
@@ -126,19 +127,19 @@ void main() {
       final result = await service.fetchContent(
         'https://m.alicesw.com/chapter/1.html',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       verify(mockScriptRepo.getByDomain('m.alicesw.com')).called(1);
     });
 
-    test('非法 URL → 返回 null', () async {
+    test('非法 URL → 返回 noScript', () async {
       final result = await service.fetchContent('not-a-valid-url');
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       // 非法 URL 不应调用 getByDomain
     });
 
-    test('空字符串 → 返回 null', () async {
+    test('空字符串 → 返回 noScript', () async {
       final result = await service.fetchContent('');
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
       // 空字符串不应调用 getByDomain
     });
   });
@@ -147,17 +148,17 @@ void main() {
   // fetchContent — 路由决策
   // ================================================================
   group('fetchContent 路由决策', () {
-    test('域名无脚本 → 返回 null', () async {
+    test('域名无脚本 → 返回 noScript', () async {
       when(mockScriptRepo.getByDomain('www.noscript.com'))
           .thenAnswer((_) async => null);
 
       final result = await service.fetchContent(
         'https://www.noscript.com/chapter/1.html',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
     });
 
-    test('有脚本但无 chapter_content_js → 返回 null', () async {
+    test('有脚本但无 chapter_content_js → 返回 noScript', () async {
       final script = _makeScript(
         domain: 'www.example.com',
         chapterContentJs: '', // 空的内容脚本
@@ -168,7 +169,7 @@ void main() {
       final result = await service.fetchContent(
         'https://www.example.com/chapter/1.html',
       );
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
     });
 
     test('有脚本但 verified=0 → 仍尝试 WebView（与 verified=1 行为一致）', () async {
@@ -179,23 +180,23 @@ void main() {
       expect(service, isNotNull);
     }, skip: '需要 flutter_inappwebview 平台实现（纯 Dart 测试环境不可用）');
 
-    test('有脚本且 verified=1 → 尝试 WebView（因无原生运行时抛异常，返回 null）', () async {
+    test('有脚本且 verified=1 → 尝试 WebView（因无原生运行时抛异常，返回 noScript）', () async {
       final script = _makeScript(domain: 'www.example.com');
       when(mockScriptRepo.getByDomain('www.example.com'))
           .thenAnswer((_) async => script);
 
       // 有 verified 脚本时会走到 _ensureWebView()，纯 Dart 测试中
       // HeadlessInAppWebView 无法初始化，会抛异常。
-      // fetchContent 的 catch 块会捕获异常并返回 null。
+      // fetchContent 的 catch 块会捕获异常并返回 noScript。
       final result = await service.fetchContent(
         'https://www.example.com/chapter/1.html',
       );
-      // 预期：WebView 初始化失败 → 异常被 catch → 返回 null
+      // 预期：WebView 初始化失败 → 异常被 catch → 返回 noScript
       // 同时会触发 _recordFailure
-      expect(result, isNull);
+      expect(result.isNoScript, isTrue);
     }, skip: '需要 flutter_inappwebview 平台实现（纯 Dart 测试环境不可用）');
 
-    test('_isFetching 为 true 时 → 直接返回 null（防并发）', () async {
+    test('_isFetching 为 true 时 → 高优先级可抢占', () async {
       // 这个测试验证并发保护：当已有请求在进行中时，新请求直接返回 null
       // 由于 _isFetching 是私有字段，通过连续两次调用间接验证
       final script = _makeScript(domain: 'www.example.com');
@@ -205,6 +206,7 @@ void main() {
       // 第一次调用会设置 _isFetching = true，然后因 WebView 失败重置
       // 在单测环境中，由于没有真正的 WebView，_isFetching 会在异常后重置
       // 这个测试主要验证字段存在且逻辑正确（编译期保证）
+      // 并发保护现已升级为优先级抢占机制：high 可抢占 low
       expect(service, isNotNull); // 服务正常创建
     });
   });

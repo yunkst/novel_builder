@@ -229,12 +229,11 @@ class _CharacterInputDialogState extends State<CharacterInputDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
-          title: const Text(
+          title: Text(
             '从大纲生成角色',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           subtitle: const Text(
             '利用已有大纲生成更符合故事设定的角色',

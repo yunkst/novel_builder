@@ -37,7 +37,7 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.video_library, color: Theme.of(context).primaryColor),
+          Icon(Icons.video_library, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           const Text('生成视频'),
         ],
@@ -133,7 +133,7 @@ class _VideoInputDialogState extends State<VideoInputDialog> {
         ElevatedButton(
           onPressed: _isLoading ? null : _onConfirm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Theme.of(context).colorScheme.surface,
           ),
           child: _isLoading
