@@ -191,7 +191,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.smart_toy),
             title: const Text('AI 配置'),
-            subtitle: const Text('配置 DSL Engine、Hermes Agent 和 AI 设定'),
+            subtitle: const Text('配置全局默认 LLM 和 AI 设定'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               Navigator.push(

@@ -1,6 +1,6 @@
 /// AgentTools 工具定义单元测试
 ///
-/// 验证 12 个工具的 OpenAI Function Calling schema：
+/// 验证 14 个工具的 OpenAI Function Calling schema：
 /// - 工具总数正确
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
@@ -15,8 +15,8 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 12 个工具', () {
-      expect(AgentTools.allTools.length, 12);
+    test('应该有 14 个工具', () {
+      expect(AgentTools.allTools.length, 14);
     });
 
     test('每个工具都有 type=function', () {
@@ -104,61 +104,68 @@ void main() {
       verifyToolSchema('list_novels');
     });
 
-    test('read_chapter_content — 需要 chapterId', () {
-      verifyToolSchema('read_chapter_content', required: ['chapterId']);
+    test('select_novel — 需要 novelId', () {
+      verifyToolSchema('select_novel', required: ['novelId']);
     });
 
-    test('list_chapters — 需要 novelId', () {
-      verifyToolSchema('list_chapters', required: ['novelId']);
+    test('create_novel — 需要 title, description 可选', () {
+      verifyToolSchema('create_novel',
+          required: ['title'], optional: ['description']);
     });
 
-    test('search_in_chapters — 需要 novelId + keyword', () {
-      verifyToolSchema('search_in_chapters',
-          required: ['novelId', 'keyword']);
+    test('read_chapter_content — 需要 position', () {
+      verifyToolSchema('read_chapter_content', required: ['position']);
     });
 
-    test('update_chapter_content — 需要 chapterId + content', () {
+    test('list_chapters — 无参数（从上下文读取当前小说）', () {
+      verifyToolSchema('list_chapters');
+    });
+
+    test('search_in_chapters — 需要 keyword', () {
+      verifyToolSchema('search_in_chapters', required: ['keyword']);
+    });
+
+    test('update_chapter_content — 需要 position + content', () {
       verifyToolSchema('update_chapter_content',
-          required: ['chapterId', 'content']);
+          required: ['position', 'content']);
     });
 
-    test('create_custom_chapter — 需要 novelId + title + content, index 可选', () {
+    test('create_custom_chapter — 需要 title + content, position 可选', () {
       verifyToolSchema('create_custom_chapter',
-          required: ['novelId', 'title', 'content'], optional: ['index']);
+          required: ['title', 'content'], optional: ['position']);
     });
 
-    test('list_characters — 需要 novelId', () {
-      verifyToolSchema('list_characters', required: ['novelId']);
+    test('list_characters — 无参数（从上下文读取当前小说）', () {
+      verifyToolSchema('list_characters');
     });
 
-    test('update_character — 需要 novelId + name, description/avatarUrl 可选', () {
+    test('update_character — 需要 name, description/avatarUrl 可选', () {
       verifyToolSchema('update_character',
-          required: ['novelId', 'name'],
+          required: ['name'],
           optional: ['description', 'avatarUrl']);
     });
 
-    test('create_character — 需要 novelId + name, description 可选', () {
+    test('create_character — 需要 name, description 可选', () {
       verifyToolSchema('create_character',
-          required: ['novelId', 'name'], optional: ['description']);
+          required: ['name'], optional: ['description']);
     });
 
-    test('update_background_setting — 需要 novelId + setting', () {
-      verifyToolSchema('update_background_setting',
-          required: ['novelId', 'setting']);
+    test('update_background_setting — 需要 setting', () {
+      verifyToolSchema('update_background_setting', required: ['setting']);
     });
 
-    test('update_outline — 需要 novelId + title + content', () {
+    test('update_outline — 需要 title + content', () {
       verifyToolSchema('update_outline',
-          required: ['novelId', 'title', 'content']);
+          required: ['title', 'content']);
     });
 
-    test('get_outline — 需要 novelId', () {
-      verifyToolSchema('get_outline', required: ['novelId']);
+    test('get_outline — 无参数（从上下文读取当前小说）', () {
+      verifyToolSchema('get_outline');
     });
   });
 
-  group('AgentTools — ID 类型验证', () {
-    test('chapterId 参数应为 integer 类型', () {
+  group('AgentTools — 参数类型验证', () {
+    test('position 参数应为 integer 类型', () {
       final tools = [
         'read_chapter_content',
         'update_chapter_content',
@@ -167,33 +174,29 @@ void main() {
         final tool = AgentTools.findTool(name);
         final props = tool!['function']['parameters']['properties']
             as Map<String, dynamic>;
-        final chapterId = props['chapterId'] as Map<String, dynamic>?;
-        expect(chapterId, isNotNull, reason: '$name 缺少 chapterId');
-        expect(chapterId!['type'], 'integer',
-            reason: '$name chapterId 应为 integer 类型');
+        final position = props['position'] as Map<String, dynamic>?;
+        expect(position, isNotNull, reason: '$name 缺少 position');
+        expect(position!['type'], 'integer',
+            reason: '$name position 应为 integer 类型');
       }
     });
 
-    test('novelId 参数应为 integer 类型', () {
-      final tools = [
-        'list_chapters',
-        'search_in_chapters',
-        'create_custom_chapter',
-        'list_characters',
-        'update_character',
-        'create_character',
-        'update_background_setting',
-        'update_outline',
-        'get_outline',
-      ];
-      for (final name in tools) {
-        final tool = AgentTools.findTool(name);
-        final props = tool!['function']['parameters']['properties']
+    test('novelId 参数（仅 select_novel 有）应为 integer 类型', () {
+      final tool = AgentTools.findTool('select_novel');
+      final props = tool!['function']['parameters']['properties']
+          as Map<String, dynamic>;
+      final novelId = props['novelId'] as Map<String, dynamic>?;
+      expect(novelId, isNotNull, reason: 'select_novel 缺少 novelId');
+      expect(novelId!['type'], 'integer',
+          reason: 'select_novel novelId 应为 integer 类型');
+    });
+
+    test('任何工具都不应有 chapterId 参数（已改为 position）', () {
+      for (final tool in AgentTools.allTools) {
+        final props = tool['function']['parameters']['properties']
             as Map<String, dynamic>;
-        final novelId = props['novelId'] as Map<String, dynamic>?;
-        expect(novelId, isNotNull, reason: '$name 缺少 novelId');
-        expect(novelId!['type'], 'integer',
-            reason: '$name novelId 应为 integer 类型');
+        expect(props.containsKey('chapterId'), false,
+            reason: '${tool['function']['name']} 不应再有 chapterId 参数');
       }
     });
 
@@ -214,6 +217,25 @@ void main() {
             reason: '${tool['function']['name']} 不应再有 novelUrl 参数');
       }
     });
+
+    test('除 select_novel 外，任何工具都不应有 novelId 参数', () {
+      for (final tool in AgentTools.allTools) {
+        final name = tool['function']['name'] as String;
+        if (name == 'select_novel') continue;
+        final props = tool['function']['parameters']['properties']
+            as Map<String, dynamic>;
+        expect(props.containsKey('novelId'), false,
+            reason: '$name 不应再有 novelId 参数（已改为上下文驱动）');
+      }
+    });
+
+    test('create_novel 不暴露 author 字段（硬编码为"原创"）', () {
+      final tool = AgentTools.findTool('create_novel');
+      final props = tool!['function']['parameters']['properties']
+          as Map<String, dynamic>;
+      expect(props.containsKey('author'), false,
+          reason: 'create_novel 不应暴露 author 字段，固定为"原创"');
+    });
   });
 
   group('AgentTools.findTool', () {
@@ -223,12 +245,18 @@ void main() {
       expect(tool!['function']['name'], 'list_novels');
     });
 
+    test('找到新增的 select_novel', () {
+      final tool = AgentTools.findTool('select_novel');
+      expect(tool, isNotNull);
+      expect(tool!['function']['name'], 'select_novel');
+    });
+
     test('找不到不存在的工具 → 返回 null', () {
       final tool = AgentTools.findTool('non_existent_tool');
       expect(tool, isNull);
     });
 
-    test('所有 12 个工具都能被 findTool 找到', () {
+    test('所有 14 个工具都能被 findTool 找到', () {
       final names =
           AgentTools.allTools.map((t) => t['function']['name'] as String).toList();
       for (final name in names) {
@@ -241,6 +269,7 @@ void main() {
   group('AgentTools.isDestructive', () {
     test('当前已禁用工具确认 — 所有工具均非破坏性', () {
       final allToolNames = [
+        'select_novel',
         'update_chapter_content',
         'create_custom_chapter',
         'update_character',

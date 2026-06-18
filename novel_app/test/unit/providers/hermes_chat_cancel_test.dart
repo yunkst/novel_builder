@@ -49,6 +49,9 @@ class MockNovelAgentService implements NovelAgentService {
   Future<bool> isConfigured() async => true;
 
   @override
+  Future<bool> isConfiguredForScenario(String scenarioId) async => true;
+
+  @override
   Future<void> sendMessage({
     required String userInput,
     required List<dynamic> history,

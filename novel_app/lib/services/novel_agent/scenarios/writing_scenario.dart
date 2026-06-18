@@ -20,6 +20,9 @@ class WritingScenario implements AgentScenario {
   final Ref _ref;
   late final ToolExecutor _executor = ToolExecutor(_ref);
 
+  /// 缓存当前场景上下文，供 executeTool 内部使用
+  AgentScenarioContext? _currentContext;
+
   WritingScenario(this._ref);
 
   @override
@@ -39,10 +42,16 @@ class WritingScenario implements AgentScenario {
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) {
+    _currentContext = context;
+    final novelInfo = context.currentNovelTitle != null
+        ? '\n\n## 当前小说\n${context.currentNovelTitle}\n'
+            '所有不传 novelId 的工具将作用于该小说。'
+        : '\n\n## 当前小说\n未选择。请先调用 list_novels 查看书架，'
+            '然后用 select_novel 选定目标。';
     return AgentSystemPrompt.build(
       readingContext: context.readingContext ?? const ReadingContext(),
       memories: _cachedMemories,
-    );
+    ) + novelInfo;
   }
 
   @override
@@ -56,7 +65,35 @@ class WritingScenario implements AgentScenario {
     if (name == 'patch_memory') {
       return await _executePatchMemory(args);
     }
-    return await _executor.execute(name, args);
+    // select_novel / create_novel 需要同步更新 _currentContext，
+    // 确保同一 LLM 响应中后续工具调用能作用于新小说
+    if (name == 'select_novel' || name == 'create_novel') {
+      final result = await _executor.execute(name, args, scenarioContext: _currentContext);
+      _syncCurrentContext(result);
+      return result;
+    }
+    return await _executor.execute(name, args, scenarioContext: _currentContext);
+  }
+
+  /// 写作场景无需"无 tool_call 注入"，直接结束
+  @override
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
+
+  /// 从 select_novel 工具结果中提取小说信息并同步到 _currentContext
+  void _syncCurrentContext(String result) {
+    try {
+      final parsed = jsonDecode(result) as Map<String, dynamic>;
+      if (parsed['success'] == true && parsed['novelId'] != null) {
+        _currentContext = AgentScenarioContext(
+          readingContext: _currentContext?.readingContext,
+          currentUrl: _currentContext?.currentUrl,
+          currentNovelId: parsed['novelId'] as int,
+          currentNovelTitle: parsed['title'] as String?,
+        );
+      }
+    } catch (_) {
+      // 解析失败，保持当前 context 不变
+    }
   }
 
   /// 执行 patch_memory 工具，序列化 MemoryPatchResult

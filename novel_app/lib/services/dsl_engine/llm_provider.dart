@@ -13,6 +13,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:novel_app/services/logger_service.dart';
 
@@ -707,5 +708,39 @@ class _LineSplitter extends StreamTransformerBase<String, String> {
       cancelOnError: false,
     );
     return controller.stream;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// IoLlmHttpClient: 使用 dart:io HttpClient 的真实 HTTP 客户端
+// （从已删除的 real_llm_executor.dart 迁移至此，与 LlmHttpClient 接口同文件）
+// ---------------------------------------------------------------------------
+
+/// 基于 dart:io HttpClient 的 LlmHttpClient 实现
+class IoLlmHttpClient implements LlmHttpClient {
+  final io.HttpClient _client = io.HttpClient();
+
+  IoLlmHttpClient();
+
+  @override
+  Future<String> postJson(
+      String url, Map<String, String> headers, String body) async {
+    final uri = Uri.parse(url);
+    final request = await _client.postUrl(uri);
+    headers.forEach((k, v) => request.headers.set(k, v));
+    request.add(utf8.encode(body));
+    final response = await request.close();
+    return await response.transform(utf8.decoder).join();
+  }
+
+  @override
+  Stream<String> postJsonStream(
+      String url, Map<String, String> headers, String body) async* {
+    final uri = Uri.parse(url);
+    final request = await _client.postUrl(uri);
+    headers.forEach((k, v) => request.headers.set(k, v));
+    request.add(utf8.encode(body));
+    final response = await request.close();
+    yield* response.transform(utf8.decoder);
   }
 }

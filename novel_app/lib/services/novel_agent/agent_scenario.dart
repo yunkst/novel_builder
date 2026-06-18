@@ -6,6 +6,11 @@ library;
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../core/providers/reading_context_providers.dart';
+import '../dsl_engine/llm_provider.dart' show ChatMessage;
+
+// 导出 ChatMessage：AgentScenario 接口方法签名依赖它，
+// 所有场景实现（implements AgentScenario）需可见。
+export '../dsl_engine/llm_provider.dart' show ChatMessage;
 
 /// Agent 场景上下文（动态参数，由调用方提供）
 class AgentScenarioContext {
@@ -24,11 +29,23 @@ class AgentScenarioContext {
   /// WebView controller，使 AI 提取进程不依赖可见 WebView 页面生命周期。
   final bool useHeadlessWebView;
 
+  /// 当前小说的数据库主键 ID（写作场景专用）
+  ///
+  /// AI 通过 `select_novel` 工具设置；该值确定所有隐式工具操作的目标小说。
+  /// 为 null 时调用需要小说的工具会返回 `no_current_novel` 错误，
+  /// 提示 AI 先调用 `list_novels` + `select_novel`。
+  final int? currentNovelId;
+
+  /// 当前小说的标题（写作场景专用，用于 system prompt 与 UI 展示）
+  final String? currentNovelTitle;
+
   const AgentScenarioContext({
     this.readingContext,
     this.webviewController,
     this.currentUrl,
     this.useHeadlessWebView = false,
+    this.currentNovelId,
+    this.currentNovelTitle,
   });
 }
 
@@ -54,6 +71,19 @@ abstract class AgentScenario {
 
   /// 执行工具调用
   Future<String> executeTool(String name, Map<String, dynamic> args);
+
+  /// 当本轮 LLM 响应无 tool_calls（即将结束循环）时的注入钩子
+  ///
+  /// 场景可返回一条提示消息（将作为 user 角色追加到 messages 并继续下一轮），
+  /// 用于在 Agent 漏掉关键步骤时（例如已生成脚本却忘记 save_script）"轻推"一次。
+  /// 返回 null 则正常结束循环。
+  ///
+  /// 防重复注入由场景内部负责（例如设置 `_injected` 标志，最多注入一次）。
+  ///
+  /// [messages] 当前完整对话历史（已包含本轮 assistant 消息）
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) async {
+    return null;
+  }
 
   /// 获取当前场景的所有经验记忆
   ///

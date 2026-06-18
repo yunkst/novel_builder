@@ -151,6 +151,12 @@ abstract class IChapterRepository {
   /// [chapterUrl] 章节的URL
   Future<void> deleteCustomChapter(String chapterUrl);
 
+  /// 将指定小说中 chapterIndex >= [fromIndex] 的所有章节的 chapterIndex +1
+  ///
+  /// 用于在指定位置插入新章节时，为新章节腾出 chapterIndex 空间。
+  /// 同时更新 novel_chapters 和 chapter_cache 两张表。
+  Future<void> shiftChapterIndicesFrom(String novelUrl, int fromIndex);
+
   // ========== 阅读状态 ==========
 
   /// 标记章节为已读

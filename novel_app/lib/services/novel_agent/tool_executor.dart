@@ -1,7 +1,7 @@
 /// 工具执行器 — Agent 工具 → Repository 调度
 ///
-/// 全面 ID 化：通过 novelId / chapterId 操作，由执行器内部解析为 URL
-/// 错误响应包含 suggested_tool，引导 AI 自助修复
+/// 上下文驱动：通过 [AgentScenarioContext] 读取当前小说，position 解析为 chapterUrl。
+/// 错误响应包含 suggested_tool，引导 AI 自助修复。
 library;
 
 import 'dart:convert';
@@ -13,9 +13,10 @@ import 'package:novel_app/services/logger_service.dart';
 import '../../core/providers/database_providers.dart';
 import '../../models/character.dart';
 import '../../models/outline.dart';
+import 'agent_scenario.dart';
 import 'agent_tools.dart';
 
-/// ID 解析结果
+/// ID/位置解析结果
 class _IdResolveResult {
   final String? url;
   final Map<String, dynamic>? errorJson;
@@ -29,40 +30,52 @@ class ToolExecutor {
   ToolExecutor(this.ref);
 
   /// 分发工具调用
-  Future<String> execute(String toolName, Map<String, dynamic> args) async {
+  ///
+  /// [scenarioContext] 写作场景专用，包含当前小说 ID。
+  /// 对于 `select_novel` 工具，返回的结果会包含 success 标记，
+  /// 上游（HermesChatNotifier）需自行维护状态。
+  Future<String> execute(
+    String toolName,
+    Map<String, dynamic> args, {
+    AgentScenarioContext? scenarioContext,
+  }) async {
     LoggerService.instance.d('执行工具: $toolName (args=${args.keys.toList()})',
         category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'exec']);
     try {
       switch (toolName) {
-        // ===== 小说 =====
+        // ===== 小说导航 =====
         case 'list_novels':
           return await _listNovels(args);
+        case 'select_novel':
+          return await _selectNovel(args);
+        case 'create_novel':
+          return await _createNovel(args);
         // ===== 章节读取 =====
         case 'read_chapter_content':
-          return await _readChapterContent(args);
+          return await _readChapterContent(args, scenarioContext);
         case 'list_chapters':
-          return await _listChapters(args);
+          return await _listChapters(args, scenarioContext);
         case 'search_in_chapters':
-          return await _searchInChapters(args);
+          return await _searchInChapters(args, scenarioContext);
         // ===== 章节写入 =====
         case 'update_chapter_content':
-          return await _updateChapterContent(args);
+          return await _updateChapterContent(args, scenarioContext);
         case 'create_custom_chapter':
-          return await _createCustomChapter(args);
+          return await _createCustomChapter(args, scenarioContext);
         // ===== 角色 =====
         case 'list_characters':
-          return await _listCharacters(args);
+          return await _listCharacters(args, scenarioContext);
         case 'update_character':
-          return await _updateCharacter(args);
+          return await _updateCharacter(args, scenarioContext);
         case 'create_character':
-          return await _createCharacter(args);
+          return await _createCharacter(args, scenarioContext);
         // ===== 设定 / 大纲 =====
         case 'update_background_setting':
-          return await _updateBackgroundSetting(args);
+          return await _updateBackgroundSetting(args, scenarioContext);
         case 'update_outline':
-          return await _updateOutline(args);
+          return await _updateOutline(args, scenarioContext);
         case 'get_outline':
-          return await _getOutline(args);
+          return await _getOutline(args, scenarioContext);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -74,8 +87,8 @@ class ToolExecutor {
     } catch (e, stack) {
       LoggerService.instance.e('工具执行失败: $toolName, error=$e',
           stackTrace: stack.toString(),
-          category: LogCategory.ai,
-          tags: ['agent', 'tool', toolName, 'error']);
+              category: LogCategory.ai,
+              tags: ['agent', 'tool', toolName, 'error']);
       return jsonEncode({
         'error': 'execution_failed',
         'message': e.toString(),
@@ -87,7 +100,26 @@ class ToolExecutor {
   bool isDestructive(String toolName) =>
       AgentTools.destructiveTools.contains(toolName);
 
-  // ===== ID 解析辅助方法 =====
+  // ===== ID / 位置解析辅助方法 =====
+
+  /// 解析当前小说 URL（从场景上下文中读取 currentNovelId）
+  ///
+  /// 未设置时返回 no_current_novel 错误，引导 AI 调用 list_novels + select_novel。
+  Future<_IdResolveResult> _resolveCurrentNovelUrl(
+    AgentScenarioContext? ctx,
+  ) async {
+    final currentNovelId = ctx?.currentNovelId;
+    if (currentNovelId == null) {
+      return _IdResolveResult.failure({
+        'error': 'no_current_novel',
+        'message':
+            '尚未选择当前小说。请先调用 list_novels 查看书架，然后用 select_novel 选定目标。',
+        'suggested_tool': 'list_novels',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+    return _resolveNovelUrl(currentNovelId);
+  }
 
   /// novelId → novelUrl 解析，失败时返回错误 JSON
   Future<_IdResolveResult> _resolveNovelUrl(int novelId) async {
@@ -104,15 +136,44 @@ class ToolExecutor {
     return _IdResolveResult.success(novelUrl);
   }
 
-  /// 构造小说上下文对象 {id, title} 用于返回结果
-  Future<Map<String, dynamic>?> _buildNovelContext(int novelId) async {
-    final repo = ref.read(novelRepositoryProvider);
-    final novel = await repo.getNovelById(novelId);
-    if (novel == null) return null;
-    return {'id': novel.id, 'title': novel.title};
+  /// 构造小说上下文对象 {id, title} 用于返回结果（同步，无 IO）
+  Map<String, dynamic>? _buildCurrentNovelContext(AgentScenarioContext? ctx) {
+    final currentNovelId = ctx?.currentNovelId;
+    if (currentNovelId == null) return null;
+    return {
+      'id': currentNovelId,
+      'title': ctx?.currentNovelTitle,
+    };
   }
 
-  // ===== 小说 =====
+  /// position → chapterUrl 解析
+  ///
+  /// position 是 1-based 的顺序号，依赖 list_chapters 返回的顺序（按 chapterIndex ASC 排序）。
+  Future<_IdResolveResult> _resolveChapterUrlByPosition(
+    AgentScenarioContext? ctx,
+    int position,
+  ) async {
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) return novelResolve;
+    final novelUrl = novelResolve.url!;
+
+    final repo = ref.read(chapterRepositoryProvider);
+    final chapters = await repo.getCachedNovelChapters(novelUrl);
+    if (position < 1 || position > chapters.length) {
+      return _IdResolveResult.failure({
+        'error': 'chapter_position_out_of_range',
+        'message': chapters.isEmpty
+            ? '当前小说没有任何章节。请先调用 list_chapters 确认。'
+            : '章节位置 $position 超出范围（当前小说共 ${chapters.length} 章）。'
+                '请先调用 list_chapters 查看有效位置。',
+        'suggested_tool': 'list_chapters',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+    return _IdResolveResult.success(chapters[position - 1].url);
+  }
+
+  // ===== 小说导航 =====
 
   Future<String> _listNovels(Map<String, dynamic> args) async {
     final repo = ref.read(novelRepositoryProvider);
@@ -131,61 +192,125 @@ class ToolExecutor {
     return jsonEncode({'novels': list, 'count': list.length});
   }
 
-  // ===== 章节读取 =====
-
-  Future<String> _readChapterContent(Map<String, dynamic> args) async {
-    final chapterId = args['chapterId'] as int;
-    final repo = ref.read(chapterRepositoryProvider);
-
-    // 直接通过 ID 查完整 Chapter（含 JOIN 信息）
-    final chapter = await repo.getChapterById(chapterId);
-    if (chapter == null) {
-      LoggerService.instance.w('章节不存在: id=$chapterId',
-          category: LogCategory.ai, tags: ['agent', 'tool', 'read_chapter_content', 'not_found']);
+  Future<String> _selectNovel(Map<String, dynamic> args) async {
+    final novelId = args['novelId'] as int;
+    final repo = ref.read(novelRepositoryProvider);
+    final novel = await repo.getNovelById(novelId);
+    if (novel == null) {
+      LoggerService.instance.w('select_novel: 小说不存在 id=$novelId',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'select_novel', 'not_found']);
       return jsonEncode({
-        'error': 'chapter_not_found',
-        'message':
-            '章节ID $chapterId 不存在。请先调用 list_chapters 查看小说的所有章节及其ID。',
-        'suggested_tool': 'list_chapters',
+        'error': 'novel_not_found',
+        'message': '小说ID $novelId 不存在。请先调用 list_novels。',
+        'suggested_tool': 'list_novels',
         'suggested_args': <String, dynamic>{},
       });
     }
+    LoggerService.instance.i('select_novel: id=$novelId, title="${novel.title}"',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'select_novel']);
+    return jsonEncode({
+      'success': true,
+      'novelId': novel.id,
+      'title': novel.title,
+      'message': '已切换到 "${novel.title}"。后续操作将作用于该小说。',
+    });
+  }
 
-    if (chapter.content == null || chapter.content!.isEmpty) {
-      LoggerService.instance.w('章节未缓存: id=$chapterId, title=${chapter.title}',
-          category: LogCategory.ai, tags: ['agent', 'tool', 'read_chapter_content', 'not_cached']);
+  Future<String> _createNovel(Map<String, dynamic> args) async {
+    final title = (args['title'] as String?)?.trim() ?? '';
+    final descriptionRaw = args['description'] as String?;
+    final description =
+        descriptionRaw != null && descriptionRaw.trim().isNotEmpty
+            ? descriptionRaw.trim()
+            : null;
+
+    if (title.isEmpty) {
+      LoggerService.instance.w('create_novel: 标题为空',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_novel', 'validation_failed']);
+      return jsonEncode({
+        'error': 'validation_failed',
+        'message': '小说标题不能为空。',
+      });
+    }
+
+    final dbService = ref.read(databaseServiceProvider);
+    final id = await dbService.createCustomNovel(
+      title,
+      '原创',
+      description: description,
+    );
+
+    LoggerService.instance.i('create_novel: "$title" (id=$id)',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'create_novel']);
+    return jsonEncode({
+      'success': true,
+      'novelId': id,
+      'title': title,
+      'message': '小说 "$title" 已创建并自动切换为当前工作小说。',
+    });
+  }
+
+  // ===== 章节读取 =====
+
+  Future<String> _readChapterContent(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final position = args['position'] as int;
+    final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
+    if (resolveResult.errorJson != null) {
+      return jsonEncode(resolveResult.errorJson);
+    }
+    final chapterUrl = resolveResult.url!;
+
+    final repo = ref.read(chapterRepositoryProvider);
+    final content = await repo.getCachedChapter(chapterUrl);
+    if (content == null || content.isEmpty) {
+      LoggerService.instance.w('章节未缓存: position=$position',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'read_chapter_content', 'not_cached']);
       return jsonEncode({
         'error': 'not_cached',
         'message':
-            '章节 "${chapter.title}" (ID: $chapterId) 存在但内容尚未缓存，无法读取。',
+            '位置 $position 的章节存在但内容尚未缓存，无法读取。',
         'suggested_action': '请告知用户该章节需要先加载/缓存。',
       });
     }
 
-    LoggerService.instance.i('读取章节成功: id=$chapterId (${chapter.content!.length} chars)',
+    LoggerService.instance.i('读取章节成功: position=$position (${content.length} chars)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'read_chapter_content']);
-    return chapter.content!;
+    return content;
   }
 
-  Future<String> _listChapters(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+  Future<String> _listChapters(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(chapterRepositoryProvider);
     final chapters = await repo.getCachedNovelChapters(novelUrl);
-    final list = chapters.map((c) => {
-          'id': c.id,
-          'title': c.title,
-          'index': c.chapterIndex,
-          'isCached': c.isCached,
-        }).toList();
+    final list = <Map<String, dynamic>>[];
+    for (var i = 0; i < chapters.length; i++) {
+      final c = chapters[i];
+      list.add({
+        'position': i + 1,
+        'title': c.title,
+        'chapterIndex': c.chapterIndex,
+        'isCached': c.isCached,
+        'isUserInserted': c.isUserInserted,
+      });
+    }
 
-    final novelContext = await _buildNovelContext(novelId);
-    LoggerService.instance.i('列出章节: novelId=$novelId (${list.length} 章)',
+    final novelContext = _buildCurrentNovelContext(ctx);
+    LoggerService.instance.i(
+        '列出章节: ${list.length} 章 (currentNovelId=${ctx?.currentNovelId})',
         category: LogCategory.ai, tags: ['agent', 'tool', 'list_chapters']);
     return jsonEncode({
       'novel': novelContext,
@@ -194,14 +319,16 @@ class ToolExecutor {
     });
   }
 
-  Future<String> _searchInChapters(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _searchInChapters(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final keyword = args['keyword'] as String;
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(chapterRepositoryProvider);
     final results = await repo.searchInCachedContent(
@@ -209,20 +336,22 @@ class ToolExecutor {
       novelUrl: novelUrl,
     );
 
-    // 解析每个结果项的 chapterId
-    final list = <Map<String, dynamic>>[];
-    for (final r in results) {
-      final cid = await repo.getChapterIdByUrl(r.chapterUrl);
-      list.add({
-        'chapterId': cid,
-        'chapterTitle': r.chapterTitle,
-        'matchedText': r.matchedText,
-        'matchCount': r.matchCount,
-      });
-    }
+    // 解析每个结果项的 position（按 list_chapters 顺序）
+    final chapters = await repo.getCachedNovelChapters(novelUrl);
+    final urlToPosition = <String, int>{
+      for (var i = 0; i < chapters.length; i++) chapters[i].url: i + 1,
+    };
 
-    final novelContext = await _buildNovelContext(novelId);
-    LoggerService.instance.i('章节搜索: novelId=$novelId, keyword="$keyword", ${list.length} 个匹配',
+    final list = results.map((r) => {
+          'position': urlToPosition[r.chapterUrl],
+          'chapterTitle': r.chapterTitle,
+          'matchedText': r.matchedText,
+          'matchCount': r.matchCount,
+        }).toList();
+
+    final novelContext = _buildCurrentNovelContext(ctx);
+    LoggerService.instance.i(
+        '章节搜索: keyword="$keyword", ${list.length} 个匹配',
         category: LogCategory.ai, tags: ['agent', 'tool', 'search_in_chapters']);
     return jsonEncode({
       'novel': novelContext,
@@ -233,59 +362,107 @@ class ToolExecutor {
 
   // ===== 章节写入 =====
 
-  Future<String> _updateChapterContent(Map<String, dynamic> args) async {
-    final chapterId = args['chapterId'] as int;
+  Future<String> _updateChapterContent(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final position = args['position'] as int;
     final content = args['content'] as String;
-    final repo = ref.read(chapterRepositoryProvider);
 
-    final affected = await repo.updateChapterContentById(chapterId, content);
+    final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
+    if (resolveResult.errorJson != null) {
+      return jsonEncode(resolveResult.errorJson);
+    }
+    final chapterUrl = resolveResult.url!;
+
+    final repo = ref.read(chapterRepositoryProvider);
+    final affected = await repo.updateChapterContent(chapterUrl, content);
     if (affected == 0) {
       return jsonEncode({
         'error': 'chapter_not_found',
-        'message':
-            '章节ID $chapterId 不存在。请先调用 list_chapters 查看小说的所有章节及其ID。',
+        'message': '章节位置 $position 的数据库记录不存在或内容表无对应行。',
         'suggested_tool': 'list_chapters',
         'suggested_args': <String, dynamic>{},
       });
     }
 
-    LoggerService.instance.i('更新章节内容: id=$chapterId (${content.length} chars)',
+    LoggerService.instance.i('更新章节内容: position=$position (${content.length} chars)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_chapter_content']);
     return jsonEncode({'success': true, 'message': '章节内容已更新'});
   }
 
-  Future<String> _createCustomChapter(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _createCustomChapter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final title = args['title'] as String;
     final content = args['content'] as String;
-    final index = args['index'] as int?;
+    final position = args['position'] as int?;
 
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(chapterRepositoryProvider);
-    final id = await repo.createCustomChapter(novelUrl, title, content, index);
-    LoggerService.instance.i('创建自定义章节: "$title" (id=$id)',
+    final chapters = await repo.getCachedNovelChapters(novelUrl);
+
+    // position 是 1-based 的目标插入位置
+    // 合法范围：1 ~ chapters.length + 1（末尾追加是合法值）
+    // 返回新章节在插入后的 position（用于后续章节操作）
+    int resultPosition;
+    int? insertIndex;
+    if (position != null) {
+      if (position < 1 || position > chapters.length + 1) {
+        return jsonEncode({
+          'error': 'chapter_position_out_of_range',
+          'message':
+              '插入位置 $position 超出范围（当前 ${chapters.length} 个章节，'
+              '合法插入位 1~${chapters.length + 1}）。',
+          'suggested_tool': 'list_chapters',
+          'suggested_args': <String, dynamic>{},
+        });
+      }
+      resultPosition = position;
+      if (position <= chapters.length) {
+        // 插入到 position 处，继承该位置原章节的 chapterIndex
+        // 后续章节需要全部 +1 让出新位置
+        insertIndex = chapters[position - 1].chapterIndex ?? position - 1;
+        await repo.shiftChapterIndicesFrom(novelUrl, insertIndex);
+      } else {
+        // position == chapters.length + 1：追加到末尾
+        insertIndex = null;
+      }
+    } else {
+      // 不传 position → 追加到末尾
+      resultPosition = chapters.length + 1;
+      insertIndex = null;
+    }
+
+    final id = await repo.createCustomChapter(novelUrl, title, content, insertIndex);
+
+    LoggerService.instance.i(
+        '创建自定义章节: "$title" (id=$id, insertIndex=$insertIndex, position=$resultPosition)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'create_custom_chapter']);
     return jsonEncode({
       'success': true,
       'message': '新章节 "$title" 已创建',
-      'chapterId': id,
+      'position': resultPosition,
     });
   }
 
   // ===== 角色 =====
 
-  Future<String> _listCharacters(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+  Future<String> _listCharacters(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(characterRepositoryProvider);
     final characters = await repo.getCharacters(novelUrl);
@@ -299,8 +476,8 @@ class ToolExecutor {
           'personality': c.personality,
         }).toList();
 
-    final novelContext = await _buildNovelContext(novelId);
-    LoggerService.instance.i('列出角色: novelId=$novelId (${list.length} 个)',
+    final novelContext = _buildCurrentNovelContext(ctx);
+    LoggerService.instance.i('列出角色: ${list.length} 个',
         category: LogCategory.ai, tags: ['agent', 'tool', 'list_characters']);
     return jsonEncode({
       'novel': novelContext,
@@ -309,15 +486,17 @@ class ToolExecutor {
     });
   }
 
-  Future<String> _updateCharacter(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _updateCharacter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final name = args['name'] as String;
 
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(characterRepositoryProvider);
     final existing = await repo.findCharacterByName(novelUrl, name);
@@ -326,7 +505,7 @@ class ToolExecutor {
         'error': 'character_not_found',
         'message': '角色 "$name" 不存在。使用 create_character 创建新角色。',
         'suggested_tool': 'list_characters',
-        'suggested_args': {'novelId': novelId},
+        'suggested_args': <String, dynamic>{},
       });
     }
 
@@ -341,15 +520,17 @@ class ToolExecutor {
     return jsonEncode({'success': true, 'message': '角色 "$name" 已更新'});
   }
 
-  Future<String> _createCharacter(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _createCharacter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final name = args['name'] as String;
 
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(characterRepositoryProvider);
 
@@ -357,7 +538,8 @@ class ToolExecutor {
     final existing = await repo.findCharacterByName(novelUrl, name);
     if (existing != null) {
       LoggerService.instance.w('角色已存在: "$name"',
-          category: LogCategory.ai, tags: ['agent', 'tool', 'create_character', 'duplicate']);
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_character', 'duplicate']);
       return jsonEncode({
         'error': 'duplicate',
         'message': '角色 "$name" 已存在。使用 update_character 更新。',
@@ -382,36 +564,46 @@ class ToolExecutor {
 
   // ===== 设定 / 大纲 =====
 
-  Future<String> _updateBackgroundSetting(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _updateBackgroundSetting(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final setting = args['setting'] as String;
 
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final currentNovelId = ctx!.currentNovelId!;
+
     final repo = ref.read(novelRepositoryProvider);
-    final affected = await repo.updateBackgroundSettingById(novelId, setting);
+    final affected = await repo.updateBackgroundSettingById(currentNovelId, setting);
     if (affected == 0) {
       return jsonEncode({
         'error': 'novel_not_found',
-        'message': '小说ID $novelId 不存在。请先调用 list_novels 查看书架中的所有小说及其ID。',
+        'message': '当前小说不存在。',
         'suggested_tool': 'list_novels',
         'suggested_args': <String, dynamic>{},
       });
     }
 
-    LoggerService.instance.i('更新背景设定: novelId=$novelId',
+    LoggerService.instance.i('更新背景设定: novelId=$currentNovelId',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_background_setting']);
     return jsonEncode({'success': true, 'message': '背景设定已更新'});
   }
 
-  Future<String> _updateOutline(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+  Future<String> _updateOutline(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
     final title = args['title'] as String;
     final content = args['content'] as String;
 
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(outlineRepositoryProvider);
     final outline = Outline(
@@ -427,24 +619,27 @@ class ToolExecutor {
     return jsonEncode({'success': true, 'message': '大纲已保存'});
   }
 
-  Future<String> _getOutline(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
-    final resolveResult = await _resolveNovelUrl(novelId);
-    if (resolveResult.errorJson != null) {
-      return jsonEncode(resolveResult.errorJson);
+  Future<String> _getOutline(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
     }
-    final novelUrl = resolveResult.url!;
+    final novelUrl = novelResolve.url!;
 
     final repo = ref.read(outlineRepositoryProvider);
     final outline = await repo.getOutlineByNovelUrl(novelUrl);
     if (outline == null) {
-      LoggerService.instance.w('大纲不存在: novelId=$novelId',
-          category: LogCategory.ai, tags: ['agent', 'tool', 'get_outline', 'not_found']);
+      LoggerService.instance.w('大纲不存在',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'get_outline', 'not_found']);
       return jsonEncode({'error': 'not_found', 'message': '暂无大纲'});
     }
 
-    final novelContext = await _buildNovelContext(novelId);
-    LoggerService.instance.i('获取大纲成功: novelId=$novelId',
+    final novelContext = _buildCurrentNovelContext(ctx);
+    LoggerService.instance.i('获取大纲成功',
         category: LogCategory.ai, tags: ['agent', 'tool', 'get_outline']);
     return jsonEncode({
       'novel': novelContext,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +11,7 @@ import '../../services/novel_agent/agent_scenario.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import '../../services/novel_agent/novel_agent_service.dart';
 import 'agent_scenario_provider.dart';
+import 'current_novel_provider.dart';
 import 'reading_context_providers.dart';
 import 'webview_providers.dart';
 
@@ -29,6 +31,10 @@ class HermesChatState {
   /// 当前场景显示名
   final String scenarioDisplayName;
 
+  // ===== 当前小说 (Agent 写作场景) =====
+  /// 当前 Agent 操作的目标小说（select_novel 工具设置）
+  final CurrentNovel? currentNovel;
+
   const HermesChatState({
     this.messages = const [],
     this.isLoading = false,
@@ -37,6 +43,7 @@ class HermesChatState {
     this.pendingConfirmation,
     this.scenarioId = ScenarioIds.writing,
     this.scenarioDisplayName = '小说写作助手',
+    this.currentNovel,
   });
 
   HermesChatState copyWith({
@@ -48,6 +55,8 @@ class HermesChatState {
     bool clearPendingConfirmation = false,
     String? scenarioId,
     String? scenarioDisplayName,
+    CurrentNovel? currentNovel,
+    bool clearCurrentNovel = false,
   }) {
     return HermesChatState(
       messages: messages ?? this.messages,
@@ -59,6 +68,8 @@ class HermesChatState {
           : pendingConfirmation ?? this.pendingConfirmation,
       scenarioId: scenarioId ?? this.scenarioId,
       scenarioDisplayName: scenarioDisplayName ?? this.scenarioDisplayName,
+      currentNovel:
+          clearCurrentNovel ? null : (currentNovel ?? this.currentNovel),
     );
   }
 }
@@ -144,6 +155,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     final readingContext = _ref.read(readingContextProvider);
     final webviewController = _ref.read(webviewControllerProvider);
     final currentUrl = _ref.read(webviewCurrentUrlProvider);
+    final currentNovel = _ref.read(currentNovelProvider);
 
     // webview_extract 场景使用 Headless WebView（不受页面生命周期影响）
     final useHeadless =
@@ -155,6 +167,8 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
       webviewController: useHeadless ? null : webviewController,
       currentUrl: currentUrl,
       useHeadlessWebView: useHeadless,
+      currentNovelId: currentNovel?.id,
+      currentNovelTitle: currentNovel?.title,
     );
   }
 
@@ -211,6 +225,10 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
               status: e.success ? AgentToolStatus.completed : AgentToolStatus.error,
               result: e.result,
             ));
+          }
+          // select_novel 成功后自动更新 currentNovel 状态
+          if (e.success && e.name == 'select_novel') {
+            _handleSelectNovelFromResult(e.result);
           }
           state = state.copyWith(
             streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
@@ -319,6 +337,18 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     state = state.copyWith(clearPendingConfirmation: true);
   }
 
+  /// 切换当前小说（暴露给 UI 和 select_novel 工具使用）
+  ///
+  /// 工具路径：由 _onToolResult 钩子解析 ToolCallEndEvent 自动调用
+  /// UI 路径：HermesNovelPickerDialog 直接调用
+  Future<CurrentNovel?> selectNovel(int novelId) async {
+    final novel = await selectCurrentNovel(_ref, novelId);
+    if (novel != null) {
+      state = state.copyWith(currentNovel: novel);
+    }
+    return novel;
+  }
+
   /// 内部确认回调（供 AgentLoop 调用）
   Future<bool> _requestConfirmation(
     String toolName,
@@ -339,6 +369,21 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   }
 
   final Map<String, Completer<bool>> _pendingConfirmations = {};
+
+  /// 解析 select_novel 工具返回的 JSON，自动同步 currentNovel 状态
+  void _handleSelectNovelFromResult(String? result) {
+    if (result == null) return;
+    try {
+      final parsed = jsonDecode(result) as Map<String, dynamic>;
+      if (parsed['success'] != true) return;
+      final novelId = parsed['novelId'] as int?;
+      if (novelId == null) return;
+      // 异步更新，不阻塞事件处理链路
+      selectNovel(novelId);
+    } catch (_) {
+      // 非 JSON 结果忽略
+    }
+  }
 
   void _finalizeAgentResponse({String? error}) {
     if (error != null) {

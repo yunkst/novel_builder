@@ -9,6 +9,8 @@ import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/widgets/hermes/hermes_confirmation_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
+import 'package:novel_app/widgets/hermes/hermes_novel_picker_dialog.dart';
+import 'package:novel_app/widgets/hermes/hermes_scenario_config_dialog.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天对话框
@@ -85,6 +87,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               _buildHeader(notifier),
               if (chatState.scenarioId == ScenarioIds.webviewExtract)
                 _buildWebViewInfoBar(),
+              if (chatState.scenarioId == ScenarioIds.writing)
+                _buildCurrentNovelBar(chatState),
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null) _buildErrorBar(chatState.error!),
               _buildContextTag(),
@@ -166,6 +170,13 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                       ),
                     ))
                 .toList(),
+          ),
+          // 场景配置按钮
+          IconButton(
+            icon: Icon(Icons.tune,
+                color: appColors.hermesOnBrandMuted, size: 20),
+            tooltip: '场景配置',
+            onPressed: () => _showScenarioConfigDialog(chatState),
           ),
           IconButton(
             icon: Icon(
@@ -420,6 +431,104 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  /// 写作场景专用：展示当前小说（Agent 工作上下文）
+  ///
+  /// 当 AI 调用 `select_novel` 工具切换小说后，UI 会自动更新展示。
+  /// 用户也可点击"切换"按钮手动选择。
+  Widget _buildCurrentNovelBar(HermesChatState chatState) {
+    final appColors = context.appColors;
+    final currentNovel = chatState.currentNovel;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: appColors.hermesAccent.withValues(alpha: 0.06),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.menu_book, size: 16, color: appColors.hermesAccent),
+          const SizedBox(width: 6),
+          Expanded(
+            child: currentNovel == null
+                ? Text(
+                    '尚未选择小说 — 请 AI 调用 select_novel 或点击右侧切换',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                        text: '当前小说：',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                      TextSpan(
+                        text: currentNovel.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: appColors.hermesAccent,
+                        ),
+                      ),
+                    ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+          TextButton.icon(
+            onPressed: () => _showNovelPickerDialog(chatState),
+            icon: const Icon(Icons.swap_horiz, size: 14),
+            label: const Text('切换', style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              minimumSize: const Size(0, 28),
+              foregroundColor: appColors.hermesAccent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 弹出小说选择对话框
+  Future<void> _showNovelPickerDialog(HermesChatState chatState) async {
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (_) => const HermesNovelPickerDialog(),
+    );
+    if (picked != null) {
+      await ref.read(hermesChatProvider.notifier).selectNovel(picked);
+    }
+  }
+
+  /// 弹出场景级 LLM 配置对话框
+  ///
+  /// 让用户为当前场景单独配置 LLM 后端（覆盖全局默认）。
+  /// 配置写入 SharedPreferences，下次 sendMessage 自动生效。
+  Future<void> _showScenarioConfigDialog(HermesChatState chatState) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => HermesScenarioConfigDialog(
+        scenarioId: chatState.scenarioId,
       ),
     );
   }

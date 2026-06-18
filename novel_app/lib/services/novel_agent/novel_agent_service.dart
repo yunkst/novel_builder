@@ -12,7 +12,6 @@ import 'package:novel_app/services/logger_service.dart';
 
 import 'agent_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
-import '../dsl_engine/real_llm_executor.dart';
 import '../../utils/cancellation_token.dart';
 import 'agent_event.dart';
 import 'agent_loop.dart';
@@ -43,6 +42,11 @@ class NovelAgentService {
   /// 检查 LLM 是否已配置
   Future<bool> isConfigured() async {
     return await AgentEngineConfig.isConfigured();
+  }
+
+  /// 检查指定场景的 LLM 是否已配置（考虑场景级回退链）
+  Future<bool> isConfiguredForScenario(String scenarioId) async {
+    return await AgentEngineConfig.isConfiguredForScenario(scenarioId);
   }
 
   /// 取消当前正在运行的 Agent 回合
@@ -81,10 +85,11 @@ class NovelAgentService {
       return;
     }
 
-    if (!await isConfigured()) {
+    if (!await isConfiguredForScenario(scenarioId)) {
       _controller.add(const AgentErrorEvent(
-          '请先在设置 → AI 配置中配置 LLM 后端（Agent 或 DSL Engine）'));
-      LoggerService.instance.w('Agent 拒绝请求（未配置 DSLEngine）',
+          '请先在 hermes 窗口右上角设置中配置 LLM 后端，或在设置 → AI 配置中配置全局默认 LLM'));
+      LoggerService.instance.w(
+          'Agent 拒绝请求（未配置 LLM）: scenario=$scenarioId',
           category: LogCategory.ai, tags: ['agent', 'service', 'not_configured']);
       return;
     }
@@ -97,11 +102,11 @@ class NovelAgentService {
       LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
           category: LogCategory.ai, tags: ['agent', 'service', 'request', scenarioId]);
 
-      // 构造 LLM Provider（使用 Agent 专属配置，为空则回退到 DSL Engine）
+      // 构造 LLM Provider（优先使用场景级配置，为空则回退到 Agent 全局 → DSL Engine）
       final config = LlmConfig(
-        baseUrl: await AgentEngineConfig.getEffectiveApiUrl(),
-        apiKey: await AgentEngineConfig.getEffectiveApiKey(),
-        defaultModel: await AgentEngineConfig.getEffectiveModel(),
+        baseUrl: await AgentEngineConfig.getEffectiveApiUrlForScenario(scenarioId),
+        apiKey: await AgentEngineConfig.getEffectiveApiKeyForScenario(scenarioId),
+        defaultModel: await AgentEngineConfig.getEffectiveModelForScenario(scenarioId),
         timeout: const Duration(seconds: 120),
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());

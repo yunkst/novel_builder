@@ -1,0 +1,7 @@
+{
+  "system_prompt": "帮我总结缩写当前章节小说内容，不要用markdown 格式，不要遗漏任何情节\n\n```当前章节小说内容：\n李明在山洞中修炼，突破至筑基期。他感受到灵力质变，体内经脉全部打通。\n```",
+  "user_message": "总结当前章节的内容",
+  "model": "deepseek-v4-pro",
+  "temperature": 0.7,
+  "max_tokens": 8192
+}

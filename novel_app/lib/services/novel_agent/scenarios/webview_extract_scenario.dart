@@ -52,6 +52,17 @@ class WebViewExtractScenario implements AgentScenario {
   /// 后续 execute_js 通过 run_id 重跑（零重抄）。
   final RunStore _runStore = RunStore();
 
+  /// 自上次 onNoToolCalls 检查以来，是否产生过工具调用
+  ///
+  /// 状态机核心：注入提示的前提是 agent "行动过"（产生过 tool_call）。
+  /// - true（调过工具）→ 结束时检查脚本是否存在，无脚本则注入并复位
+  /// - false（首次空响应 / 注入后仍无行动）→ 不注入，结束
+  /// executeTool 开头置 true，onNoToolCalls 注入后复位为 false。
+  bool _hadToolCallSinceLastCheck = false;
+
+  /// 本次会话是否已成功保存脚本（save_script 成功时置 true）
+  bool _scriptSavedThisSession = false;
+
   /// 普通 WebView 模式构造函数（向后兼容）
   WebViewExtractScenario(this._ref, this._webviewController, this._currentUrl)
     : _isHeadless = false;
@@ -130,6 +141,65 @@ class WebViewExtractScenario implements AgentScenario {
     return buf.toString();
   }
 
+  /// 无 tool_call 注入钩子：Agent 即将"无工具调用结束"时调用
+  ///
+  /// 注入前提：自上次检查以来 agent 必须产生过 tool_call（即"行动过"）。
+  /// 一个字段 `_hadToolCallSinceLastCheck` 统一表达所有终止条件：
+  /// - 首次无 tool_call（从未调过工具）→ 标记为 false → 不注入，直接结束
+  /// - agent 行动过 + 脚本已存在 → 正常结束
+  /// - agent 行动过 + 脚本不存在 → 注入提示，复位标记为 false
+  /// - 注入后再次结束：期间有新 tool_call → 标记为 true → 重新检查；无 → 结束
+  @override
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) async {
+    // 前提：agent 自上次检查以来必须"行动过"。
+    // 首次空响应、或注入后仍无新行动，都落入此分支 → 不注入。
+    if (!_hadToolCallSinceLastCheck) {
+      return null;
+    }
+
+    // agent 行动过了，检查脚本是否真的存在（内存标志短路，否则查库）
+    final hasScript = _scriptSavedThisSession || await _hasScriptInDb();
+    if (hasScript) {
+      return null; // 有脚本，正常结束
+    }
+
+    // 无脚本，注入提示；复位标记，等待下一轮是否有新行动
+    _hadToolCallSinceLastCheck = false;
+
+    LoggerService.instance.i(
+      'WebViewExtract 注入提示: agent 已行动但未保存脚本 (url=$_currentUrl)',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'injection', 'hint'],
+    );
+    return '系统检测：本次会话中尚未保存任何提取脚本到数据库。\n'
+        '请立即采取以下任一行动：\n'
+        '1) 若 execute_js 已成功解析出目录/正文，调用 save_script 保存脚本；\n'
+        '2) 若确实无法生成脚本，请说明具体原因（反爬、动态加载、需登录等）。';
+  }
+
+  /// 查询当前域名的 site_scripts 表是否有记录
+  Future<bool> _hasScriptInDb() async {
+    final domain = Uri.tryParse(_currentUrl)?.host ?? '';
+    if (domain.isEmpty) return false;
+    try {
+      final db = await _ref.read(databaseConnectionProvider).database;
+      final results = await db.query(
+        'site_scripts',
+        where: 'domain = ?',
+        whereArgs: [domain],
+        limit: 1,
+      );
+      return results.isNotEmpty;
+    } catch (e) {
+      LoggerService.instance.w(
+        '查询 site_scripts 失败: $e',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'db_query_error'],
+      );
+      return false;
+    }
+  }
+
   @override
   List<Map<String, dynamic>> get tools => [
         _getPageInfoTool,
@@ -195,6 +265,9 @@ class WebViewExtractScenario implements AgentScenario {
 
   @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
+    // 任意工具调用都视为 agent 在"行动"，标记供 onNoToolCalls 状态机判断
+    _hadToolCallSinceLastCheck = true;
+
     LoggerService.instance.d(
       'WebViewExtractScenario 执行工具: $name',
       category: LogCategory.ai,
@@ -1089,6 +1162,8 @@ class WebViewExtractScenario implements AgentScenario {
         'verified': 0,
       });
 
+      _scriptSavedThisSession = true;
+
       LoggerService.instance.i(
         '保存提取脚本 (run_id 模式): domain=$domain, id=$id, listId=$listRunId, contentId=$contentRunId',
         category: LogCategory.ai,
@@ -1184,6 +1259,8 @@ class WebViewExtractScenario implements AgentScenario {
       'use_count': 0,
       'verified': 0,
     });
+
+    _scriptSavedThisSession = true;
 
     LoggerService.instance.i(
       '保存提取脚本 (旧模式): domain=$domain, id=$id',

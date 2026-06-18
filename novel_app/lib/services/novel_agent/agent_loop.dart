@@ -184,8 +184,31 @@ class AgentLoop {
           );
         }
 
-        // 3. 无工具调用 → 结束
+        // 3. 无工具调用 → 先把本轮 assistant 消息入栈，再检查场景是否要注入提示
         if (toolCalls.isEmpty) {
+          // 把本轮 assistant 消息加入 messages
+          // （无 tool_calls 时后续不会自动加入，但 follow-up 注入后 LLM 需要看到上文）
+          if (fullContent.isNotEmpty) {
+            messages.add(ChatMessage(
+              role: 'assistant',
+              content: fullContent,
+            ));
+          }
+
+          // 场景注入钩子：允许场景在"即将结束"时追加一条 user 提示
+          // 让 Agent 再尝试一轮（例如提示"已生成脚本但未保存，请调 save_script"）
+          final injection = await _scenario.onNoToolCalls(messages);
+          if (injection != null) {
+            messages.add(ChatMessage(role: 'user', content: injection));
+            emit(TextDeltaEvent('\n\n$injection\n\n'));
+            LoggerService.instance.i(
+              'Agent 循环注入场景提示 (round $round, scenario=${_scenario.id})，继续下一轮',
+              category: LogCategory.ai,
+              tags: ['agent', 'loop', 'injection', _scenario.id],
+            );
+            continue; // 不结束，继续下一轮
+          }
+
           emit(const AgentDoneEvent());
           LoggerService.instance.i('Agent 循环完成（无工具调用，共 $round 轮, scenario=${_scenario.id}）',
               category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);

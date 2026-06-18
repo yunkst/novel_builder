@@ -488,6 +488,30 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     return ncId;
   }
 
+  /// 将指定小说中 chapterIndex >= [fromIndex] 的所有章节的 chapterIndex +1
+  ///
+  /// 用于 create_custom_chapter 在指定位置插入新章节时，
+  /// 为新章节腾出 chapterIndex 空间，确保 list_chapters 排序正确。
+  /// 同时更新 novel_chapters 和 chapter_cache 两张表。
+  @override
+  Future<void> shiftChapterIndicesFrom(String novelUrl, int fromIndex) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // novel_chapters 表
+      await txn.rawUpdate(
+        'UPDATE novel_chapters SET chapterIndex = chapterIndex + 1 '
+        'WHERE novelUrl = ? AND chapterIndex >= ?',
+        [novelUrl, fromIndex],
+      );
+      // chapter_cache 表
+      await txn.rawUpdate(
+        'UPDATE chapter_cache SET chapterIndex = chapterIndex + 1 '
+        'WHERE novelUrl = ? AND chapterIndex >= ?',
+        [novelUrl, fromIndex],
+      );
+    });
+  }
+
   /// 更新用户创建的章节内容
   @override
   Future<void> updateCustomChapter(

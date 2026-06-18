@@ -128,6 +128,9 @@ class FakeAgentScenario implements AgentScenario {
       MemoryPatchResult.error('not available', const []);
 
   @override
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
+
+  @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
     if (toolDelay != null) {
       await Future<void>.delayed(toolDelay!);
@@ -399,6 +402,10 @@ class _CancelAfterFirstToolScenario implements AgentScenario {
   @override
   Future<MemoryPatchResult> patchMemory(String? oldText, String newText) =>
       inner.patchMemory(oldText, newText);
+
+  @override
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) =>
+      inner.onNoToolCalls(messages);
 
   @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
