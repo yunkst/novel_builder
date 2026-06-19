@@ -726,14 +726,16 @@ class IoLlmHttpClient implements LlmHttpClient {
     request.add(utf8.encode(body));
     final response = await request.close();
     final statusCode = response.statusCode;
+    final responseBody = await response.transform(utf8.decoder).join();
     if (statusCode >= 400) {
       LoggerService.instance.w(
         'LLM HTTP 错误: $statusCode',
         category: LogCategory.ai,
+        stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
         tags: ['dsl', 'llm', 'http', 'post_json'],
       );
     }
-    return await response.transform(utf8.decoder).join();
+    return responseBody;
   }
 
   @override
@@ -746,12 +748,50 @@ class IoLlmHttpClient implements LlmHttpClient {
     final response = await request.close();
     final statusCode = response.statusCode;
     if (statusCode >= 400) {
+      // 错误响应通常很短，缓冲后一次性记录，避免流式碎片丢失诊断信息
+      final errorBody = await response.transform(utf8.decoder).join();
       LoggerService.instance.w(
         'LLM HTTP 错误: $statusCode',
         category: LogCategory.ai,
+        stackTrace: _buildHttpErrorContext(url, headers, body, errorBody),
         tags: ['dsl', 'llm', 'http', 'post_json_stream'],
       );
+      yield errorBody;
+      return;
     }
     yield* response.transform(utf8.decoder);
+  }
+
+  /// 构造 HTTP 错误诊断上下文（写入 stackTrace 字段，便于后续定位 4xx/5xx 根因）
+  ///
+  /// 记录：请求 URL、模型、消息数、请求体大小、以及 LLM 返回的错误响应体。
+  /// 不记录 apiKey 与完整 messages 内容，避免泄露敏感信息与日志膨胀。
+  static String _buildHttpErrorContext(
+      String url, Map<String, String> headers, String body, String responseBody) {
+    String model = 'unknown';
+    int messageCount = -1;
+    try {
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      model = decoded['model']?.toString() ?? 'unknown';
+      final messages = decoded['messages'];
+      if (messages is List) messageCount = messages.length;
+    } catch (_) {
+      // 请求体非合法 JSON 时忽略解析
+    }
+    final hasApiKey = headers['Authorization']?.isNotEmpty == true ||
+        headers['authorization']?.isNotEmpty == true;
+    // 限制错误响应体长度，避免超大错误页污染日志
+    final errorSnippet = responseBody.length > 1000
+        ? '${responseBody.substring(0, 1000)}...(truncated)'
+        : responseBody;
+    return [
+      'LLM HTTP 错误诊断上下文:',
+      '  url: $url',
+      '  model: $model',
+      '  messages: $messageCount 条',
+      '  requestBodySize: ${body.length} 字节',
+      '  apiKeyConfigured: $hasApiKey',
+      '  responseBody: $errorSnippet',
+    ].join('\n');
   }
 }

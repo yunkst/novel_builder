@@ -29,6 +29,7 @@ import '../core/providers/webview_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../utils/toast_utils.dart';
@@ -98,6 +99,11 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       final validationError =
           WebViewJsExecutor.validateScript(script.chapterListJs);
       if (validationError != null) {
+        LoggerService.instance.w(
+          'FAB添加小说: 脚本校验失败 domain=${script.domain} error=$validationError',
+          category: LogCategory.ai,
+          tags: ['headless-webview', 'fab-add-novel', 'validation'],
+        );
         _toast('脚本校验失败：$validationError', isError: true);
         return;
       }
@@ -117,10 +123,20 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
 
       // 解析返回值
       if (jsResult == null) {
+        LoggerService.instance.w(
+          'FAB添加小说: 脚本返回空值 domain=${script.domain} url=$currentUrl',
+          category: LogCategory.ai,
+          tags: ['headless-webview', 'fab-add-novel', 'null_result'],
+        );
         _toast('提取失败：脚本返回空值', isError: true);
         return;
       }
       if (jsResult.error != null) {
+        LoggerService.instance.w(
+          'FAB添加小说: JS执行错误 domain=${script.domain} error=${jsResult.error}',
+          category: LogCategory.ai,
+          tags: ['headless-webview', 'fab-add-novel', 'js-error'],
+        );
         _toast('提取失败：${jsResult.error}', isError: true);
         return;
       }
@@ -133,6 +149,11 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       final chaptersRaw = data['chapters'] as List<dynamic>?;
 
       if (extractedTitle.isEmpty || chaptersRaw == null || chaptersRaw.isEmpty) {
+        LoggerService.instance.w(
+          'FAB添加小说: 提取结果为空 domain=${script.domain} title=$extractedTitle chaptersCount=${chaptersRaw?.length ?? 0}',
+          category: LogCategory.ai,
+          tags: ['headless-webview', 'fab-add-novel', 'empty_result'],
+        );
         _toast('未提取到章节，请检查是否在章节目录页', isError: true);
         return;
       }
@@ -149,6 +170,11 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       }
 
       if (chapters.isEmpty) {
+        LoggerService.instance.w(
+          'FAB添加小说: 章节数据解析失败 domain=${script.domain}',
+          category: LogCategory.ai,
+          tags: ['headless-webview', 'fab-add-novel', 'parse_failed'],
+        );
         _toast('解析章节数据失败', isError: true);
         return;
       }
@@ -203,6 +229,11 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       await _saveChapters(currentUrl, chapters);
       _markScriptUsed(script.id);
 
+      LoggerService.instance.i(
+        'FAB添加小说: 成功 domain=${script.domain} title=$finalTitle chapters=${chapters.length}',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'fab-add-novel', 'success'],
+      );
       _toast('已添加到书架');
 
       // 8. 导航到章节列表
@@ -215,8 +246,18 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
         ));
       }
     } on TimeoutException {
+      LoggerService.instance.w(
+        'FAB添加小说: 提取超时(>60s) domain=${script.domain} url=$currentUrl',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'fab-add-novel', 'timeout'],
+      );
       _toast('提取超时，请重试', isError: true);
     } catch (e) {
+      LoggerService.instance.e(
+        'FAB添加小说: 提取异常 domain=${script.domain} error=$e',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'fab-add-novel', 'error'],
+      );
       _toast('提取失败：$e', isError: true);
     } finally {
       if (mounted) setState(() => _isExtracting = false);

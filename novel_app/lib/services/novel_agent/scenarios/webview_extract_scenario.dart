@@ -128,6 +128,14 @@ class WebViewExtractScenario implements AgentScenario {
     buf.writeln('- 同一错误连续 3 次 → 换完全不同的选择器/思路');
     buf.writeln();
 
+    buf.writeln('## 脚本实际使用日志');
+    buf.writeln('脚本在对话中 execute_js 跑通，不代表真实使用也能成功。用 get_script_logs 查看实际运行日志：');
+    buf.writeln('- get_script_logs(domain) → 查看脚本在阅读器/预加载等真实场景的运行日志');
+    buf.writeln('- 适用：execute_js 通过但用户反馈抓取失败（内容为空、超时、页面结构变化）');
+    buf.writeln('- 日志来源：阅读器获取章节内容、FAB 添加小说、预加载等非对话场景');
+    buf.writeln('- 默认返回 warning 及以上级别（只看问题），填 level=info 可看成功记录');
+    buf.writeln();
+
     if (_cachedMemories.isNotEmpty) {
       buf.writeln('## 经验记忆');
       buf.writeln('以下是以往对话中的经验记录，请优先参考：');
@@ -209,6 +217,7 @@ class WebViewExtractScenario implements AgentScenario {
         _saveScriptTool,
         _listCachedScriptsTool,
         _inspectScriptTool,
+        _getScriptLogsTool,
         patchMemoryToolDefinition,
       ];
 
@@ -310,6 +319,8 @@ class WebViewExtractScenario implements AgentScenario {
           result = await _listCachedScripts();
         case 'inspect_script':
           result = await _inspectScript(args);
+        case 'get_script_logs':
+          result = await _getScriptLogs(args);
         default:
           result = jsonEncode({
             'error': 'unknown_tool',
@@ -1426,6 +1437,96 @@ class WebViewExtractScenario implements AgentScenario {
     });
   }
 
+  /// 查询指定域名的提取脚本在实际使用中的运行日志
+  ///
+  /// AI 在对话中用 execute_js 测试脚本时，脚本能跑通不代表真实使用也能成功。
+  /// 本工具让 AI 查看 HeadlessWebView 在阅读器/FAB/预加载等真实场景中
+  /// 执行脚本时的错误、超时、空结果等日志，定位"脚本能跑通但实际抓取失败"的问题。
+  ///
+  /// 日志来源：
+  /// - HeadlessWebViewContentService（阅读器获取章节内容）
+  /// - HeadlessWebViewChapterListService（FAB 添加小说获取目录）
+  /// - 预加载服务
+  ///
+  /// 过滤策略：先按 tag `headless-webview` 过滤（覆盖 ContentService 和
+  /// ChapterListService 的日志），再按 domain 关键词 + 级别过滤。
+  Future<String> _getScriptLogs(Map<String, dynamic> args) async {
+    // 1. 解析参数
+    final domain = args['domain'] as String? ??
+        Uri.tryParse(_currentUrl)?.host ??
+        '';
+    final levelStr = args['level'] as String? ?? 'warning';
+    final limit = (args['limit'] as int?)?.clamp(1, 30) ?? 10;
+
+    if (domain.isEmpty) {
+      return jsonEncode({
+        'error': 'missing_domain',
+        'message': '无法确定域名',
+        'current_url': _currentUrl,
+        'suggestion': '请传入 domain 参数（如 "www.example.com"）',
+      });
+    }
+
+    // 2. 级别映射
+    final minLevel = _parseLogLevel(levelStr);
+
+    // 3. 从 LoggerService 获取日志
+    //    策略：先按 tag 'headless-webview' 过滤，再按 domain 关键词 + 级别过滤
+    final logs = LoggerService.instance.getLogsByTag('headless-webview');
+    final filtered = logs
+        .where((log) =>
+            log.level.index >= minLevel.index &&
+            log.message.contains(domain))
+        .toList();
+
+    // 按时间倒序（最新在前）
+    final sorted = filtered.reversed.take(limit).toList();
+
+    // 4. 格式化返回
+    if (sorted.isEmpty) {
+      return jsonEncode({
+        'found': false,
+        'domain': domain,
+        'message': '该域名无 headless-webview 运行日志（可能尚未在阅读器中使用过，或日志已被清理）',
+        'suggestion': '如果脚本刚保存，需要在阅读器中打开该网站的章节后才会产生运行日志',
+      });
+    }
+
+    return jsonEncode({
+      'found': true,
+      'domain': domain,
+      'count': sorted.length,
+      'total_matching': filtered.length,
+      'logs': sorted.map((log) {
+        final msg = log.message.length > 300
+            ? '${log.message.substring(0, 300)}...'
+            : log.message;
+        return {
+          'time': LoggerService.formatTimestamp(log.timestamp),
+          'level': log.level.label,
+          'message': msg,
+          'tags': log.tags.where((t) => t != 'headless-webview').toList(),
+        };
+      }).toList(),
+    });
+  }
+
+  /// 解析日志级别字符串为 LogLevel 枚举
+  LogLevel _parseLogLevel(String level) {
+    switch (level) {
+      case 'error':
+        return LogLevel.error;
+      case 'warning':
+        return LogLevel.warning;
+      case 'info':
+        return LogLevel.info;
+      case 'debug':
+        return LogLevel.debug;
+      default:
+        return LogLevel.warning;
+    }
+  }
+
   // ===== DOM 精简脚本 =====
 
   /// 在 WebView 中执行的 DOM 精简脚本
@@ -1652,6 +1753,39 @@ class WebViewExtractScenario implements AgentScenario {
           },
         },
         'required': ['run_id'],
+      },
+    },
+  };
+
+  static const _getScriptLogsTool = {
+    'type': 'function',
+    'function': {
+      'name': 'get_script_logs',
+      'description':
+          '查询指定域名的提取脚本在实际使用中的运行日志。'
+          '用于诊断"execute_js 能跑通但实际抓取失败"的问题——查看 HeadlessWebView '
+          '在阅读器/FAB/预加载等真实场景中执行脚本时的错误、超时、空结果、内容过短等记录。'
+          '返回最近 N 条匹配日志（按时间倒序），每条含时间戳、级别、消息摘要。'
+          '注意：日志来自真实使用场景（非当前对话），用于定位脚本上线后的问题。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'domain': {
+            'type': 'string',
+            'description': '要查询的域名（如 www.example.com）。不填则使用当前页面域名。',
+          },
+          'level': {
+            'type': 'string',
+            'enum': ['error', 'warning', 'info', 'debug'],
+            'description':
+                '日志级别下限过滤。默认 warning（含 error），只看问题。'
+                '填 info 可包含成功记录，填 error 只看错误。',
+          },
+          'limit': {
+            'type': 'integer',
+            'description': '返回条数上限，默认 10，最大 30（避免日志占满上下文）。',
+          },
+        },
       },
     },
   };

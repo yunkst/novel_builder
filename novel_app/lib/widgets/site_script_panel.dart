@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../models/site_script.dart';
+import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 
 /// 脚本管理面板（通过 showModalBottomSheet 弹出）
@@ -528,6 +529,21 @@ class _ScriptCard extends ConsumerWidget {
       errorMsg = '脚本执行超时（>60秒）';
     } catch (e) {
       errorMsg = e.toString();
+    }
+
+    // 记录执行日志（供 AI 通过 get_script_logs 查询，定位脚本面板试运行的失败）
+    if (errorMsg != null) {
+      LoggerService.instance.w(
+        '脚本面板验证失败: domain=${script.domain} scriptType=$scriptType url=$testUrl error=$errorMsg',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'script-panel-verify', 'failed'],
+      );
+    } else {
+      LoggerService.instance.i(
+        '脚本面板验证成功: domain=${script.domain} scriptType=$scriptType url=$testUrl resultLen=${resultStr?.length ?? 0}',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'script-panel-verify', 'success'],
+      );
     }
 
     if (context.mounted) Navigator.pop(context); // 关闭加载框
