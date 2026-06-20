@@ -16,7 +16,7 @@ import '../agent_tools.dart';
 import '../agent_system_prompt.dart';
 import '../tool_executor.dart';
 
-class WritingScenario implements AgentScenario {
+class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
   final Ref _ref;
   late final ToolExecutor _executor = ToolExecutor(_ref);
 

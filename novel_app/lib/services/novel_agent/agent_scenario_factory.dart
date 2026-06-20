@@ -28,14 +28,23 @@ class AgentScenarioFactory {
         return WritingScenario(_ref);
       case ScenarioIds.webviewExtract:
         if (context.useHeadlessWebView) {
-          // Headless 模式：从池获取 controller
+          // Headless 模式：从池获取 controller（排他占用）
           final pool = _ref.read(headlessWebViewPoolProvider);
           final controller = await pool.acquire();
-          return WebViewExtractScenario.headless(
-            _ref,
-            controller,
-            context.currentUrl ?? '',
-          );
+          try {
+            final scenario = WebViewExtractScenario.headless(
+              _ref,
+              controller,
+              context.currentUrl ?? '',
+            );
+            // 注入清理钩子：场景结束时释放 pool 使用权
+            scenario.setCleanupTask(() async => pool.release());
+            return scenario;
+          } catch (e) {
+            // 构造失败也要释放，避免阻塞后续 acquire
+            pool.release();
+            rethrow;
+          }
         }
         // 兼容：普通 WebView 模式
         if (context.webviewController == null) {

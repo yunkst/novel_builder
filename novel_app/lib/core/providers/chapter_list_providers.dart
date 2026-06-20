@@ -11,6 +11,8 @@ import '../../models/chapter.dart';
 import '../../models/ai_accompaniment_settings.dart';
 import '../../services/preload_progress_update.dart';
 import '../../services/logger_service.dart';
+import '../../services/headless_webview_errors.dart';
+import '../../utils/toast_utils.dart';
 import '../../constants/chapter_constants.dart';
 import 'service_providers.dart';
 import 'repository_providers.dart';
@@ -19,6 +21,18 @@ import 'database_providers.dart';
 import 'package:flutter/material.dart';
 
 part 'chapter_list_providers.g.dart';
+
+/// 从异常提取用户可读消息。
+///
+/// Headless WebView 相关异常（[NoExtractionScriptException]/
+/// [WebViewBusyException]/[PageLoadFailedException]）携带 `userMessage`，
+/// 直接展示原始 `toString()` 会暴露内部表示，故统一走此 helper。
+String _exceptionUserMessage(Object e) {
+  if (e is NoExtractionScriptException) return e.userMessage;
+  if (e is WebViewBusyException) return e.userMessage;
+  if (e is PageLoadFailedException) return e.userMessage;
+  return '加载章节列表失败: $e';
+}
 
 /// ChapterListScreen 状态类
 class ChapterListState {
@@ -117,7 +131,7 @@ class ChapterList extends _$ChapterList {
       );
       state = state.copyWith(
         isLoading: false,
-        errorMessage: '初始化失败: $e',
+        errorMessage: _exceptionUserMessage(e),
       );
     }
   }
@@ -145,7 +159,7 @@ class ChapterList extends _$ChapterList {
       );
       state = state.copyWith(
         isLoading: false,
-        errorMessage: '初始化API失败: $e',
+        errorMessage: _exceptionUserMessage(e),
       );
     }
   }
@@ -205,7 +219,7 @@ class ChapterList extends _$ChapterList {
       );
       state = state.copyWith(
         isLoading: false,
-        errorMessage: '加载章节列表失败: $e',
+        errorMessage: _exceptionUserMessage(e),
       );
     }
   }
@@ -236,7 +250,7 @@ class ChapterList extends _$ChapterList {
         );
         state = state.copyWith(
           isLoading: false,
-          errorMessage: '加载章节失败: $e',
+          errorMessage: _exceptionUserMessage(e),
         );
       }
       return;
@@ -318,13 +332,13 @@ class ChapterList extends _$ChapterList {
         category: LogCategory.ui,
         tags: ['chapter-list'],
       );
-      // 如果已经有缓存数据，不显示错误，只显示提示
+      // 如果已经有缓存数据，不切换到错误态，但 Toast 提示用户刷新失败
       if (state.chapters.isNotEmpty) {
-        // ToastUtils.show('更新章节列表失败: $e');
+        ToastUtils.showWarning(_exceptionUserMessage(e));
       } else {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: '加载章节列表失败: $e',
+          errorMessage: _exceptionUserMessage(e),
         );
       }
     }

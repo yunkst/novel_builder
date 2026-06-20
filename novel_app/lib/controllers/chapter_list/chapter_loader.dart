@@ -116,14 +116,15 @@ class ChapterLoader {
       }
 
       // 尝试 headless WebView 获取章节列表
-      final headlessChapters =
+      final result =
           await _chapterListHeadlessService.fetchChapterList(novelUrl);
 
-      if (headlessChapters != null && headlessChapters.isNotEmpty) {
+      if (result.isSuccess) {
+        final chapters = result.chapters;
         // 缓存章节列表
-        await _chapterRepo.cacheNovelChapters(novelUrl, headlessChapters);
+        await _chapterRepo.cacheNovelChapters(novelUrl, chapters);
         _log.i(
-          '章节列表缓存在数据库: ${headlessChapters.length}章',
+          '章节列表缓存在数据库: ${chapters.length}章',
           category: LogCategory.database,
           tags: ['chapter', 'cache'],
         );
@@ -138,11 +139,21 @@ class ChapterLoader {
         return mergedChapters;
       }
 
-      // headless 返回空（无脚本），抛出明确错误
-      throw NoExtractionScriptException(
-        _extractHost(novelUrl) ?? '',
-        url: novelUrl,
-      );
+      // 非成功态 → 根据具体原因抛出对应异常
+      final host = _extractHost(novelUrl) ?? '';
+
+      // WebView 正忙 → 可重试
+      if (result.isBusy) {
+        throw WebViewBusyException(host, url: novelUrl);
+      }
+
+      // 页面加载失败 → 可重试
+      if (result.isLoadFailed) {
+        throw PageLoadFailedException(novelUrl);
+      }
+
+      // 无脚本（含脚本返回空） → 不可重试，提示用户生成脚本
+      throw NoExtractionScriptException(host, url: novelUrl);
     } catch (e, st) {
       _log.e(
         '刷新章节列表失败: $novelUrl - $e',

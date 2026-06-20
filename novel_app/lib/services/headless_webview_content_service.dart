@@ -43,6 +43,7 @@ import '../repositories/site_script_repository.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import 'headless_webview_errors.dart';
+import 'webview_page_loader.dart';
 
 class HeadlessWebViewContentService {
   final SiteScriptRepository _scriptRepo;
@@ -57,6 +58,9 @@ class HeadlessWebViewContentService {
   InAppWebViewController? _controller;
   bool _isInitializing = false;
   bool _isFetching = false;
+
+  /// 共用页面加载工具（onLoadStop 事件驱动）
+  final WebViewPageLoader _pageLoader = WebViewPageLoader();
 
   // ===== 优先级抢占 =====
 
@@ -215,6 +219,15 @@ class HeadlessWebViewContentService {
       return FetchContentResult.success(
         ChapterContentResult(content: content, fromCache: false),
       );
+    } on PageLoadFailedException {
+      // 页面加载失败（onLoadStop 超时/错误）→ 区分于"真无脚本"，返回 loadFailed
+      _recordFailure(script.id);
+      LoggerService.instance.w(
+        'HeadlessWebView: 页面加载失败，返回 loadFailed domain=$domain url=$chapterUrl',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'fetch', 'load-failed'],
+      );
+      return FetchContentResult.loadFailed();
     } catch (e, stackTrace) {
       _recordFailure(script.id);
       LoggerService.instance.e(
@@ -241,6 +254,7 @@ class HeadlessWebViewContentService {
     _headlessWebView?.dispose();
     _headlessWebView = null;
     _controller = null;
+    _pageLoader.reset();
     _scriptFailureCount.clear();
   }
 
@@ -301,6 +315,8 @@ class HeadlessWebViewContentService {
             completer.complete(controller);
           }
         },
+        // 关键：创建时注册常驻 onLoadStop 回调，供 WebViewPageLoader 协调
+        onLoadStop: _pageLoader.onLoadStopCallback,
         initialSettings: InAppWebViewSettings(
           javaScriptEnabled: true,
           // 不加载图片，节省流量和时间
@@ -338,42 +354,16 @@ class HeadlessWebViewContentService {
     _isInitializing = false;
   }
 
-  /// 加载页面，等待 onLoadStop
+  /// 加载页面并等待 onLoadStop。
+  ///
+  /// 使用 [WebViewPageLoader]（onLoadStop 事件驱动）替代原 URL 轮询。
+  /// 超时（onLoadStop 未在 30s 内触发）时抛 [PageLoadFailedException]，
+  /// 由 [fetchContent] 的 catch 块映射为 `FetchContentResult.loadFailed()`。
   Future<void> _loadPage(String url) async {
-
-    // 注册一次性 onLoadStop 回调
-    // HeadlessInAppWebView 不支持动态添加回调，
-    // 所以用 getUrl 轮询检测页面加载完成
-    await _controller!.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
-    );
-
-    // 轮询等待页面加载（每 500ms 检查一次，最多 30s）
-    final start = DateTime.now();
-    while (DateTime.now().difference(start) < const Duration(seconds: 30)) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      try {
-        final currentUrl = await _controller!.getUrl();
-        if (currentUrl != null && currentUrl.toString() == url) {
-          // 给 DOM 一些稳定时间
-          await Future.delayed(const Duration(milliseconds: 500));
-          return;
-        }
-      } catch (e) {
-        // 轮询错误继续等待
-        LoggerService.instance.d(
-          'HeadlessWebView: 页面加载轮询 getUrl 失败 $e',
-          category: LogCategory.cache,
-          tags: ['headless-webview', 'load_page', 'poll'],
-        );
-      }
-    }
-
-    // 超时但不抛异常——页面可能已经部分加载，脚本可能仍能工作
-    LoggerService.instance.w(
-      'HeadlessWebView: 页面加载超时 url=$url',
-      category: LogCategory.cache,
-      tags: ['headless-webview', 'load-timeout'],
+    await _pageLoader.loadPage(
+      controller: _controller!,
+      url: url,
+      throwOnTimeout: true,
     );
   }
 

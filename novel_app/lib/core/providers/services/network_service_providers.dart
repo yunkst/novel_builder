@@ -331,24 +331,24 @@ HeadlessWebViewContentService headlessWebViewContentService(Ref ref) {
 
 /// HeadlessWebViewChapterListService Provider
 ///
-/// 提供无头 WebView 章节列表获取服务实例。
+/// 提供无头 WebView 章节列表获取服务实例。该服务**自管一个独立的
+/// HeadlessInAppWebView 实例**，与 HeadlessWebViewPool（Agent 场景）和
+/// HeadlessWebViewContentService（章节内容）各自隔离，避免章节列表加载时
+/// URL 被其它场景覆盖。
+///
 /// 当域名有 AI Agent 生成的 `chapter_list_js` 脚本时，
 /// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取章节列表。
 ///
 /// **功能**:
 /// - 绕过 API 直接获取章节列表
-/// - 无脚本时返回 null
+/// - 无脚本时返回 FetchChapterListResult.noScript()
+/// - 页面加载失败时返回 FetchChapterListResult.loadFailed()
 /// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
 ///
 /// **依赖**:
 /// - [siteScriptRepositoryProvider] - 站点脚本查询
-/// - [headlessWebViewPoolProvider] - 共享 headless WebView 池
 @Riverpod(keepAlive: true)
 HeadlessWebViewChapterListService headlessWebViewChapterListService(Ref ref) {
   final scriptRepo = ref.watch(siteScriptRepositoryProvider);
-  final pool = ref.watch(headlessWebViewPoolProvider);
-  return HeadlessWebViewChapterListService(
-    scriptRepo: scriptRepo,
-    pool: pool,
-  );
+  return HeadlessWebViewChapterListService(scriptRepo: scriptRepo);
 }

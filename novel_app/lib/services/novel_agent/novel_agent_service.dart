@@ -119,33 +119,38 @@ class NovelAgentService {
       final scenario =
           await AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
 
-      // 构造循环
-      final loop = AgentLoop(llm: llm, scenario: scenario);
+      try {
+        // 构造循环
+        final loop = AgentLoop(llm: llm, scenario: scenario);
 
-      // 加载场景经验记忆（在 buildSystemPrompt 前调用，让场景有缓存）
-      await scenario.getMemories();
+        // 加载场景经验记忆（在 buildSystemPrompt 前调用，让场景有缓存）
+        await scenario.getMemories();
 
-      // 构造 system prompt（由场景生成）
-      final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
+        // 构造 system prompt（由场景生成）
+        final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
 
-      // 构造初始消息
-      final initialMessages = [
-        ...history,
-        ChatMessage(role: 'user', content: userInput),
-      ];
+        // 构造初始消息
+        final initialMessages = [
+          ...history,
+          ChatMessage(role: 'user', content: userInput),
+        ];
 
-      // 运行循环
-      await loop.run(
-        initialMessages: initialMessages,
-        systemPrompt: systemPrompt,
-        emit: (event) => _controller.add(event),
-        cancellationToken: token,
-        messageOwners: messageOwners,
-      );
+        // 运行循环
+        await loop.run(
+          initialMessages: initialMessages,
+          systemPrompt: systemPrompt,
+          emit: (event) => _controller.add(event),
+          cancellationToken: token,
+          messageOwners: messageOwners,
+        );
 
-      final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
-      LoggerService.instance.i('Agent 请求处理完成$cancelledTag (scenario=$scenarioId)',
-          category: LogCategory.ai, tags: ['agent', 'service', 'complete', scenarioId]);
+        final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
+        LoggerService.instance.i('Agent 请求处理完成$cancelledTag (scenario=$scenarioId)',
+            category: LogCategory.ai, tags: ['agent', 'service', 'complete', scenarioId]);
+      } finally {
+        // 场景资源清理（如释放 HeadlessWebViewPool 使用权）
+        await scenario.cleanup();
+      }
     } catch (e, stack) {
       LoggerService.instance.e('Agent 请求处理失败: $e',
           stackTrace: stack.toString(),

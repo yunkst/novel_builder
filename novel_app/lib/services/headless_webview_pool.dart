@@ -1,37 +1,26 @@
 /// Headless WebView 池管理器
 ///
-/// 通用 Headless WebView 生命周期管理，供多个场景共享同一个后台 WebView 实例。
+/// 通用 Headless WebView 生命周期管理，**当前仅供 AI Agent `WebViewExtractScenario`
+/// 使用**。`HeadlessWebViewContentService`（章节内容）和
+/// `HeadlessWebViewChapterListService`（章节列表）各自自管独立的 WebView 实例，
+/// 不经过本池，以彻底避免并发 loadUrl 互相覆盖 URL 的问题。
 ///
-/// ## 设计背景
+/// ## 排他锁
 ///
-/// `HeadlessWebViewContentService` 内部自管一个 Headless WebView，专用于"已有脚本时
-/// 后台提取章节内容"。当 AI Agent `WebViewExtractScenario` 也要 Headless 化时，
-/// 不应再独立创建一个新的 Headless WebView（系统资源开销大、初始化慢）。
-/// 因此抽取本池，允许多个调用方共享：
-///
-/// - `HeadlessWebViewContentService`（已存在，迁移过来）
-/// - `WebViewExtractScenario`（改造中，Headless 模式）
-///
-/// ## 工作流程
-///
-/// ```
-/// acquire()
-///   → _controller != null → 直接返回
-///   → _isInitializing → 等待轮询
-///   → 创建 HeadlessInAppWebView → run() → 等待 onWebViewCreated
-/// ```
+/// `acquire()`/`release()` 之间形成临界区：同一时刻只有一个调用方持有 controller
+/// 的使用权。第二个 `acquire()` 会等待前一个 `release()` 后才返回，从而避免多个
+/// 调用方并发操作同一个 WebView（loadUrl / callAsyncJavaScript 互相覆盖）。
 ///
 /// ## 资源管理
 ///
 /// - 单例懒初始化，整个 APP 生命周期内只创建一次
 /// - 引用计数（_refCount）允许观察使用情况（当前不强制释放）
-/// - 单 flight：`acquire()` 并发调用会等待同一个初始化过程
+/// - 单 flight：`acquire()` 并发初始化会等待同一个初始化过程
 ///
 /// ## 与原有 service 的关系
 ///
-/// 本池与 `HeadlessWebViewContentService` 解耦：service 仍可独立持有自己的
-/// Headless WebView；本池专供 Agent 提取场景使用，避免耦合迁移成本。
-/// 后续如需统一，可以把 service 改为从池获取（向后兼容预留）。
+/// 本池与 `HeadlessWebViewContentService` / `HeadlessWebViewChapterListService`
+/// 解耦：这两个 service 各自独立持有 WebView；本池专供 Agent 提取场景使用。
 library;
 
 import 'dart:async';
@@ -48,24 +37,38 @@ class HeadlessWebViewPool {
   bool _isInitializing = false;
   int _refCount = 0;
 
+  // ===== 排他锁 =====
+
+  /// controller 是否正被某个调用方占用
+  bool _isInUse = false;
+
+  /// 等待获取使用权的调用方队列
+  final List<Completer<void>> _waitQueue = [];
+
+  /// 排他等待超时：避免某个调用方忘记 release 导致后续调用方永久阻塞。
+  static const Duration _acquireWaitTimeout = Duration(seconds: 30);
+
   /// 是否已就绪
   bool get isReady => _controller != null;
 
-  /// 获取一个 Headless WebView controller。
+  /// 获取一个 Headless WebView controller（排他占用，直到 [release]）。
   ///
-  /// 第一次调用会执行初始化（约 1-3 秒）；后续调用立即返回同一个 controller。
-  /// 并发调用会等待同一个初始化过程。
+  /// 第一次调用会执行初始化（约 1-3 秒）；后续调用复用同一个 controller。
+  /// 并发调用会排队等待前一个 [release] 后才返回（排他锁）。
   ///
-  /// 抛异常表示初始化失败。
+  /// 抛异常表示初始化失败或排他等待超时。
   Future<InAppWebViewController> acquire() async {
     _refCount++;
     LoggerService.instance.d(
-      'HeadlessWebViewPool.acquire: refCount=$_refCount',
+      'HeadlessWebViewPool.acquire: refCount=$_refCount isInUse=$_isInUse',
       category: LogCategory.cache,
       tags: ['headless-webview-pool', 'acquire'],
     );
     try {
       await _ensureReady();
+      // 排他等待：直到上一个持有者 release
+      await _waitForUseRight();
+      _isInUse = true;
       return _controller!;
     } catch (e) {
       _refCount--;
@@ -73,11 +76,41 @@ class HeadlessWebViewPool {
     }
   }
 
-  /// 释放（仅减少引用计数，不真正销毁，因为通常保活整个 APP 生命周期）
+  /// 等待获取使用权（排他锁的核心）。
+  Future<void> _waitForUseRight() async {
+    if (!_isInUse) return;
+
+    final waiter = Completer<void>();
+    _waitQueue.add(waiter);
+    try {
+      await waiter.future.timeout(_acquireWaitTimeout, onTimeout: () {
+        _waitQueue.remove(waiter);
+        throw TimeoutException('HeadlessWebViewPool acquire 排他等待超时');
+      });
+    } catch (e) {
+      _waitQueue.remove(waiter);
+      rethrow;
+    }
+  }
+
+  /// 释放使用权并唤醒下一个等待者；同时减少引用计数。
+  ///
+  /// 调用方必须在 `acquire()` 成功后的 finally 中调用本方法，
+  /// 否则会阻塞所有后续 acquire。
   void release() {
+    _isInUse = false;
     if (_refCount > 0) _refCount--;
+
+    // 唤醒下一个等待者
+    if (_waitQueue.isNotEmpty) {
+      final next = _waitQueue.removeAt(0);
+      if (!next.isCompleted) {
+        next.complete();
+      }
+    }
+
     LoggerService.instance.d(
-      'HeadlessWebViewPool.release: refCount=$_refCount',
+      'HeadlessWebViewPool.release: refCount=$_refCount isInUse=$_isInUse',
       category: LogCategory.cache,
       tags: ['headless-webview-pool', 'release'],
     );
@@ -86,6 +119,9 @@ class HeadlessWebViewPool {
   /// 当前引用计数
   int get refCount => _refCount;
 
+  /// controller 是否正被占用
+  bool get isInUse => _isInUse;
+
   /// 销毁（理论上不需要，由 Riverpod 生命周期管理）
   void dispose() {
     LoggerService.instance.i(
@@ -93,10 +129,16 @@ class HeadlessWebViewPool {
       category: LogCategory.cache,
       tags: ['headless-webview-pool', 'dispose'],
     );
+    // 唤醒所有等待者，避免悬挂 Completer
+    for (final w in _waitQueue) {
+      if (!w.isCompleted) w.complete();
+    }
+    _waitQueue.clear();
     _headlessWebView?.dispose();
     _headlessWebView = null;
     _controller = null;
     _refCount = 0;
+    _isInUse = false;
   }
 
   // ===== 内部 =====

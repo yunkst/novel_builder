@@ -88,6 +88,17 @@ abstract class AgentScenario {
   /// 返回的列表会拼接到 system prompt 末尾。
   Future<List<String>> getMemories() async => const [];
 
+  /// 场景结束时的资源清理钩子。
+  ///
+  /// 由 [NovelAgentService] 在 Agent 循环结束后（finally 中）调用。
+  /// 默认实现见 [AgentScenarioCleanupMixin]；webview_extract 场景在 Headless
+  /// 模式下由 [AgentScenarioFactory] 通过 [setCleanupTask] 注入释放
+  /// HeadlessWebViewPool 使用权的逻辑。
+  Future<void> cleanup();
+
+  /// 设置清理钩子（供 [AgentScenarioFactory] 注入 pool.release 等）。
+  void setCleanupTask(Future<void> Function()? task);
+
   /// patch 记忆（增/改/删），由 patch_memory 工具调用
   ///
   /// 行为：
@@ -106,6 +117,28 @@ abstract class AgentScenario {
       'patch_memory 在当前场景不可用',
       const [],
     );
+  }
+}
+
+/// Agent 场景清理钩子的默认实现 mixin。
+///
+/// 场景类通过 `with AgentScenarioCleanupMixin implements AgentScenario`
+/// 即可获得 [cleanup] / [setCleanupTask] 的默认实现，无需各自重复字段逻辑。
+mixin AgentScenarioCleanupMixin implements AgentScenario {
+  Future<void> Function()? _cleanupTask;
+
+  @override
+  void setCleanupTask(Future<void> Function()? task) {
+    _cleanupTask = task;
+  }
+
+  @override
+  Future<void> cleanup() async {
+    final task = _cleanupTask;
+    _cleanupTask = null;
+    if (task != null) {
+      await task();
+    }
   }
 }
 

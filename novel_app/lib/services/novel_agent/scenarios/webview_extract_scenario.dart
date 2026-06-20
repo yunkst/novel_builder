@@ -19,7 +19,8 @@ import '../agent_scenario.dart';
 import 'run_store.dart';
 import 'webview_js_executor.dart';
 
-class WebViewExtractScenario implements AgentScenario {
+class WebViewExtractScenario with AgentScenarioCleanupMixin
+    implements AgentScenario {
   final Ref _ref;
   final InAppWebViewController _webviewController;
   final String _currentUrl;

@@ -6,9 +6,11 @@
 /// - dispose 清理
 /// - dispose 后 acquire 应该重新创建（健壮性）
 /// - isReady 状态正确
+/// - isInUse 排他标志（release 后复位）
 ///
-/// 不覆盖（需集成测试）：
-/// - 真实的 HeadlessInAppWebView 初始化（需要 platform channel）
+/// 不覆盖（需集成测试 + 真实 platform channel）：
+/// - 真实的 HeadlessInAppWebView 初始化
+/// - 排他锁的真实并发等待（依赖 _ensureReady 成功）
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +33,7 @@ void main() {
       final pool = HeadlessWebViewPool();
       expect(pool.isReady, isFalse);
       expect(pool.refCount, 0);
+      expect(pool.isInUse, isFalse);
     });
 
     test('dispose 后 refCount 重置为 0', () {
@@ -38,6 +41,7 @@ void main() {
       pool.dispose();
       expect(pool.refCount, 0);
       expect(pool.isReady, isFalse);
+      expect(pool.isInUse, isFalse);
     });
   });
 
@@ -45,31 +49,36 @@ void main() {
   // 引用计数
   // ================================================================
   group('引用计数', () {
-    test('acquire 成功（即使 WebView 初始化失败）后 refCount 增加', () async {
+    test('acquire 失败（WebView 初始化失败）后 refCount 回退', () async {
       final pool = HeadlessWebViewPool();
 
       // 在纯 Dart 测试环境，HeadlessInAppWebView.run() 会抛异常
-      // acquire 的 try/catch 会回退 refCount（_ensureReady 失败时）
-      // 这里只验证 acquire 调用路径存在
       try {
         await pool.acquire();
       } catch (_) {
-        // 预期失败，不影响 refCount 回退
+        // 预期失败
       }
 
       // acquire 内部：refCount++ → 失败 → refCount-- → rethrow
-      // 所以 refCount 应该回到 0
+      expect(pool.refCount, 0);
+      // 初始化失败未走到 _isInUse = true
+      expect(pool.isInUse, isFalse);
+    });
+
+    test('release 不允许 refCount 减到负数', () {
+      final pool = HeadlessWebViewPool();
+      pool.release();
+      expect(pool.refCount, 0);
+
+      pool.release();
       expect(pool.refCount, 0);
     });
 
-    test('release 不允许减到负数', () {
+    test('release 复位 isInUse 标志', () {
       final pool = HeadlessWebViewPool();
-      // 初始 refCount = 0
+      // 直接 release 不应抛异常，且复位标志（初始即 false）
       pool.release();
-      expect(pool.refCount, 0);
-
-      pool.release();
-      expect(pool.refCount, 0);
+      expect(pool.isInUse, isFalse);
     });
   });
 
@@ -80,7 +89,6 @@ void main() {
     test('多次 dispose 不抛异常', () {
       final pool = HeadlessWebViewPool();
       pool.dispose();
-      // 第二次 dispose 不应抛异常
       expect(() => pool.dispose(), returnsNormally);
       expect(pool.refCount, 0);
     });
@@ -89,13 +97,11 @@ void main() {
       final pool = HeadlessWebViewPool();
       pool.dispose();
 
-      // 重新 acquire 会走初始化流程（在测试环境中会失败，但不应崩溃）
       try {
         await pool.acquire();
       } catch (_) {
         // 预期失败
       }
-      // dispose 已重置 _controller，所以 isReady 应为 false
       expect(pool.isReady, isFalse);
     });
   });

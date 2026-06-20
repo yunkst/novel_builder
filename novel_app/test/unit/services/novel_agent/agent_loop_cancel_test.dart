@@ -90,7 +90,7 @@ class ScriptedResponse {
 }
 
 /// 记录工具调用、可注入延时的假场景
-class FakeAgentScenario implements AgentScenario {
+class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario {
   @override
   final String id = 'fake';
 
@@ -365,7 +365,8 @@ void main() {
 }
 
 /// 在首次工具执行后触发取消的装饰场景
-class _CancelAfterFirstToolScenario implements AgentScenario {
+class _CancelAfterFirstToolScenario with AgentScenarioCleanupMixin
+    implements AgentScenario {
   final AgentScenario inner;
   final CancellationToken token;
   final void Function() onFirstExecuted;
@@ -397,6 +398,9 @@ class _CancelAfterFirstToolScenario implements AgentScenario {
   @override
   Future<String?> onNoToolCalls(List<ChatMessage> messages) =>
       inner.onNoToolCalls(messages);
+
+  @override
+  Future<void> cleanup() => inner.cleanup();
 
   @override
   Future<String> executeTool(String name, Map<String, dynamic> args) async {
