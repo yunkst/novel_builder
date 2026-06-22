@@ -69,22 +69,23 @@ jobs:
         id: changelog
         run: |
           # 从 tag 的 annotation message 提取 changelog
-          # 使用 git for-each-ref + %(body) 获取完整 body（%(contents) 可能只返回 subject）
-          TAG_BODY=$(git for-each-ref --format='%(body)' "refs/tags/${{ steps.tag.outputs.name }}")
-          if [ -z "$TAG_BODY" ]; then
-            # 回退：尝试 %(contents) 并跳过前两行（subject + 空行）
-            TAG_MSG=$(git tag -l --format='%(contents)' "${{ steps.tag.outputs.name }}")
-            if [ -z "$TAG_MSG" ]; then
-              echo "  ⚠️  tag ${{ steps.tag.outputs.name }} 没有 annotation message"
-              CHANGELOG="Bug 修复和性能优化"
-            else
-              CHANGELOG=$(echo "$TAG_MSG" | tail -n +3)
-              if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
-                CHANGELOG="Bug 修复和性能优化"
-              fi
-            fi
+          # 方案：用 git cat-file -p 直接读取 tag object 的原始内容（最可靠）
+          # %(contents) / %(body) 在 GitHub Actions runner 上对远程 tag 可能返回空值
+          TAG_REF="${{ steps.tag.outputs.name }}"
+          # 获取 tag object SHA
+          TAG_OBJ=$(git rev-parse "$TAG_REF"^{tag} 2>/dev/null || git rev-parse "$TAG_REF")
+          # cat-file -p 输出完整 tag message（header + body），body 从第一个空行后开始
+          TAG_RAW=$(git cat-file -p "$TAG_OBJ" 2>/dev/null || echo "")
+          if [ -z "$TAG_RAW" ]; then
+            echo "  ⚠️  tag $TAG_REF 没有 annotation message"
+            CHANGELOG="Bug 修复和性能优化"
           else
-            CHANGELOG="$TAG_BODY"
+            # cat-file -p 输出: header lines → 空行 → "Release X.Y.Z" → 空行 → changelog
+            # sed 取空行后的全部内容,再 tail -n +3 跳过 "Release X.Y.Z" 和空行
+            CHANGELOG=$(echo "$TAG_RAW" | sed -n '/^$/,$ p' | tail -n +3)
+            if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+              CHANGELOG="Bug 修复和性能优化"
+            fi
           fi
           {
             echo "changelog<<EOF"
