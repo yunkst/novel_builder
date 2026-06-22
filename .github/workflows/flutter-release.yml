@@ -67,24 +67,43 @@ jobs:
 
       - name: Extract changelog from tag message
         id: changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # 从 tag 的 annotation message 提取 changelog
-          # 方案：用 git cat-file -p 直接读取 tag object 的原始内容（最可靠）
-          # %(contents) / %(body) 在 GitHub Actions runner 上对远程 tag 可能返回空值
-          TAG_REF="${{ steps.tag.outputs.name }}"
-          # 获取 tag object SHA
-          TAG_OBJ=$(git rev-parse "$TAG_REF"^{tag} 2>/dev/null || git rev-parse "$TAG_REF")
-          # cat-file -p 输出完整 tag message（header + body），body 从第一个空行后开始
-          TAG_RAW=$(git cat-file -p "$TAG_OBJ" 2>/dev/null || echo "")
-          if [ -z "$TAG_RAW" ]; then
-            echo "  ⚠️  tag $TAG_REF 没有 annotation message"
+          # GitHub Actions checkout 会将 annotated tag 退化为 lightweight tag，
+          # 导致 %(body)/%(contents)/cat-file 等本地 git 命令均无法获取 message。
+          # 改用 GitHub API 直接读取 tag object，最可靠。
+          TAG_NAME="${{ steps.tag.outputs.name }}"
+          REPO="${{ github.repository }}"
+
+          # 通过 GitHub API 获取 tag object 的 message
+          TAG_DATA=$(gh api "repos/$REPO/git/refs/tags/$TAG_NAME" --jq '.object.sha' 2>/dev/null)
+          if [ -z "$TAG_DATA" ]; then
+            echo "  ⚠️  无法通过 API 获取 tag ref: $TAG_NAME"
             CHANGELOG="Bug 修复和性能优化"
           else
-            # cat-file -p 输出: header lines → 空行 → "Release X.Y.Z" → 空行 → changelog
-            # sed 取空行后的全部内容,再 tail -n +3 跳过 "Release X.Y.Z" 和空行
-            CHANGELOG=$(echo "$TAG_RAW" | sed -n '/^$/,$ p' | tail -n +3)
-            if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
-              CHANGELOG="Bug 修复和性能优化"
+            TAG_TYPE=$(gh api "repos/$REPO/git/tags/$TAG_DATA" --jq '.message // empty' 2>/dev/null)
+            if [ -z "$TAG_TYPE" ]; then
+              # ref 指向的可能不是 tag object 而是 commit (lightweight)
+              # 尝试直接从 ref 的 object 获取
+              OBJECT_URL=$(gh api "repos/$REPO/git/refs/tags/$TAG_NAME" --jq '.object.url' 2>/dev/null)
+              TAG_MSG=$(gh api "$OBJECT_URL" --jq '.message // .tag.message // empty' 2>/dev/null)
+              if [ -z "$TAG_MSG" ]; then
+                CHANGELOG="Bug 修复和性能优化"
+              else
+                # 跳过第一行 "Release X.Y.Z" 和空行
+                CHANGELOG=$(echo "$TAG_MSG" | tail -n +3)
+                if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+                  CHANGELOG="Bug 修复和性能优化"
+                fi
+              fi
+            else
+              # tag object 有 message 字段
+              CHANGELOG=$(echo "$TAG_TYPE" | tail -n +3)
+              if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+                CHANGELOG="Bug 修复和性能优化"
+              fi
             fi
           fi
           {
