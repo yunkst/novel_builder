@@ -1,23 +1,22 @@
 ---
 name: novel-app-release
-description: Use this skill when building and releasing the Novel Flutter app. This skill provides version management, changelog generation, pre-publish validation (analyze + unit tests + APK build), and git commit + tag + push. APK release build is handled by GitHub Actions automatically. Trigger this skill when user asks to "release app", "publish new version", or "deploy app update".
+description: Use this skill when building and releasing the Novel Flutter app. This skill provides version management, AI-driven changelog generation, pre-publish validation (analyze + unit tests + APK build), and git commit + tag + push. APK release build is handled by GitHub Actions automatically. Trigger this skill when user asks to "release app", "publish new version", or "deploy app update".
 ---
 
 # Novel App Release Skill
 
 ## Overview
 
-此技能用于自动化 Novel Flutter 应用的发布流程，**严格遵循 CI 流程**：
-1. **预检环节** — 在 `git commit` 之前先跑 `flutter analyze` + 单元测试 + 本地 APK 打包，与 GitHub Actions 检查项保持一致
-2. 从 `pubspec.yaml` 读取版本信息
-3. 分析 git diff 生成更新日志
-4. 提交代码并创建 `v{version}` annotated tag
-5. 推送 commit 和 tag 到远程仓库
-6. **等待 10 分钟**，然后检查 GitHub Actions CI 是否成功
+此技能用于自动化 Novel Flutter 应用的发布流程。**由 Claude 执行时,changelog 由 AI 分析代码变更后撰写**(高质量、语义化);脚本本身保留规则生成作为 CI / 纯手动运行的兜底。
 
-> **预检目的**：任何会导致 GitHub Actions 失败的问题都要在本地先发现，避免推送后再修。
-> 推送 tag 后，**GitHub Actions**（`.github/workflows/flutter-release.yml`）会自动完成 Release APK 构建并创建 GitHub Release。
-> **CI 检查**：push 后等待约 10 分钟（释放工作流构建时间），然后通过 `gh run list` 检查最新 CI run 状态，确认构建成功。
+发布流程:
+1. **确认版本号** — `pubspec.yaml` 的 `version` 已递增
+2. **生成更新日志** — Claude 分析 git diff/log,撰写面向用户的 changelog
+3. **运行发布脚本** — 预检(analyze + test + build)→ commit → tag → push → 等 CI
+4. **报告结果** — CI 成功即发布完成
+
+> 推送 tag 后,**GitHub Actions**(`.github/workflows/flutter-release.yml`)自动构建 Release APK 并创建 GitHub Release。
+> **CI 检查**:push 后等待约 10 分钟(释放构建时间),通过 `gh run list` 确认成功。
 
 ## 何时使用
 
@@ -28,115 +27,179 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 
 - **Git** — 需要能 push 到 origin
 - **Python 3.10+** — 运行发布脚本
-- **Flutter SDK 3.x (stable)** — **需要本地 Flutter**，用于预检 (analyze + test + build apk)
+- **Flutter SDK 3.x (stable)** — 预检需要(analyze + test + build apk)
 
-## 发布流程
+## 执行流程
 
-### 一键发布
+### 第一步:确认版本号已更新
+
+检查 `novel_app/pubspec.yaml` 的 `version: x.y.z+code`,`+code` 必须递增。若用户未更新,提醒或代为更新。
+
+```yaml
+# 例如
+version: 1.9.2+75  →  version: 1.9.3+76
+```
+
+### 第二步:生成更新日志(AI 驱动,核心)
+
+**这是本次发布用户能看到的核心信息,必须由你(Claude)分析代码后撰写,不要依赖脚本的机械生成。**
+
+#### 1. 收集变更信息
+
+```bash
+# 上次发布以来的 commit(如果有新 commit)
+LAST_TAG=$(git describe --tags --abbrev=0)
+git log --no-merges --pretty=format:"%h %s" $LAST_TAG..HEAD
+
+# 工作区未提交的改动(直接发布、未预先 commit 时主要看这个)
+git diff HEAD --stat
+git ls-files --others --exclude-standard
+# 必要时看具体 diff 内容理解改动语义
+git diff HEAD novel_app/lib
+```
+
+#### 2. 分析并起草 changelog
+
+读懂上述信息,**站在用户视角**描述"这次更新我能感知到什么变化":
+
+✅ **好的写法**(语义化、功能导向):
+```markdown
+### ✨ 新功能
+- 预加载队列新增历史记录追踪,调试面板可可视化查看队列状态
+
+### ♻️ 重构
+- 移除自定义 Deque 实现,改用标准 List,简化预加载队列逻辑
+```
+
+❌ **差的写法**(机械、文件导向,这是脚本兜底的水平,不要止步于此):
+```markdown
+### 🔧 其他
+- 优化服务层(5 个文件)
+- 优化界面(2 个文件)
+```
+
+#### 3. 写作原则
+
+| 原则 | 说明 |
+|------|------|
+| **语义化** | 描述功能/行为变化,不要罗列文件名 |
+| **用户视角** | 写"用户能感知什么",不是"改了哪些代码" |
+| **分组合并** | 相关改动合并成一条,避免碎片化 |
+| **精简措辞** | 每条一行,重点可加粗 |
+| **如实反映** | 没有实质改动就写"Bug 修复和性能优化",不要编造 |
+
+#### 4. 分类与 emoji
+
+| 类型 | emoji | 适用场景 |
+|------|-------|---------|
+| 新功能 | ✨ | 用户新能看到/用到的东西 |
+| 修复 | 🐛 | bug 修复 |
+| 优化/重构 | ⚡ / ♻️ | 性能、体验、内部重构 |
+| 文档/测试 | 📚 / ✅ | 通常不写入面向用户的日志 |
+
+#### 5. 注入 changelog
+
+把写好的内容通过 `CHANGELOG` 环境变量传给脚本(脚本会优先使用它,跳过规则生成):
+
+**bash / Git Bash**:
+```bash
+CHANGELOG="$(cat <<'EOF'
+### ✨ 新功能
+- 预加载队列新增历史记录追踪,调试面板可视化队列状态
+
+### ♻️ 重构
+- 移除自定义 Deque 实现,改用标准 List
+EOF
+)" python .claude/skills/novel-app-release/scripts/build_and_upload.py
+```
+
+**Windows PowerShell**:
+```powershell
+$env:CHANGELOG=@"
+### ✨ 新功能
+- 预加载队列新增历史记录追踪
+"@
+python .claude/skills/novel-app-release/scripts/build_and_upload.py
+```
+
+### 第三步:运行发布脚本
 
 ```bash
 python .claude/skills/novel-app-release/scripts/build_and_upload.py
 ```
 
-脚本执行 **3 个阶段**：
+脚本内部执行 4 个阶段(已包含上一步注入的 changelog):
 
-#### 阶段 1：预检（preflight）— 模拟 CI 流程
-
-| 步骤 | 命令 | 失败处理 |
+| 阶段 | 内容 | 失败处理 |
 |------|------|----------|
-| 1.1 静态分析 | `flutter analyze --no-fatal-infos` | 失败则中断，提示修复 |
-| 1.2 单元测试 | `flutter test --no-pub test/unit/ test/bug/ test/verification/` | 失败则中断，提示修复 |
-| 1.3 本地 Release APK 打包 | `flutter build apk --release` | 失败则中断，提示修复 |
+| 1. 预检 | `flutter analyze` + 单元测试 + 本地 Release APK 打包 | 任一失败即中断 |
+| 2. 版本识别 + changelog | 读 `pubspec.yaml` 版本;changelog 取自 `CHANGELOG` 环境变量(无则规则生成兜底) | — |
+| 3. git 操作 | `git add .` → `commit` → `tag -a v{version}` → `push` | 失败即中断 |
+| 4. CI 验证 | 等待 10 分钟 → `gh run list` 查 CI 状态 | 报告 success/failure/pending |
 
-> 上述三个命令与 `.github/workflows/flutter-ci.yml` + `flutter-release.yml` 中的步骤完全一致。
-> 任一失败都意味着 GitHub Actions 也会失败，必须先修复再发布。
+> 预检三步与 `.github/workflows/flutter-ci.yml` + `flutter-release.yml` 完全一致,任一失败 GitHub Actions 也会失败,必须先修复。
 
-#### 阶段 2：版本识别与变更日志
+#### changelog 写入载体
 
-1. 解析 `novel_app/pubspec.yaml` 中的 `version: x.y.z+code`
-2. 从 `novel_app/lib` 的 git diff 分析自动生成更新日志（可用 `CHANGELOG` 环境变量覆盖）
-
-#### 阶段 3：git 操作
-
-1. `git add .` — 添加所有变更文件
-2. `git commit -m "chore: 发布版本 {version}"` — 提交
-3. `git tag -a v{version} -m "Release {version}"` — 创建 annotated tag
-4. `git push` — 推送 commit
-5. `git push origin v{version}` — 推送 tag，触发 GitHub Actions
-
-#### 阶段 4：等待 CI 并验证（自动）
-
-提交后脚本会：
-1. 等待 **10 分钟**（600 秒）— 给 release workflow 充分的构建时间
-2. 通过 `gh run list --limit 1` 查询最新 CI run 状态
-3. 报告 CI 结果：
-   - ✅ `success` — 发布完成
-   - ❌ `failure` — 自动打印失败日志链接，提示修复后重新发布
-   - 🟡 `in_progress` / `queued` — 提示再等几分钟后手动检查
-
-可通过 `SKIP_CI_CHECK=1` 跳过 CI 验证（不推荐）。
-
-### 自定义更新日志
-
+脚本把 changelog 写进 **annotated tag message**:
 ```bash
-# Windows CMD
-set CHANGELOG=修复登录问题、优化阅读体验
+git tag -a v1.9.3 -m "Release 1.9.3
 
-# Windows PowerShell
-$env:CHANGELOG="修复登录问题、优化阅读体验"
-
-# Linux/Mac
-CHANGELOG="修复登录问题、优化阅读体验" python ...
+{changelog 内容}"
 ```
+GitHub Actions 的 `flutter-release.yml` 会用 `git tag -l --format='%(contents)'` 反向取出,渲染进 `.github/release_template.md` 的 `<!--CHANGELOG_START-->...<!--CHANGELOG_END-->` 标记,最终成为 GitHub Release body。App 端 `_extractChangelog()` 据此标记裁取并展示在更新弹窗。
 
-不设置 `CHANGELOG` 环境变量时，脚本会分析 `novel_app/lib` 的 git diff 自动生成。
+### 第四步:报告发布结果
 
-### 跳过预检（不推荐）
+根据脚本输出报告:
+- ✅ `success` — 发布完成,给出 Release 页面链接
+- ❌ `failure` — 打印失败日志链接,提示修复后用新版本号重发
+- 🟡 `pending` — 提示几分钟后手动检查 Actions 页面
 
-如果想跳过预检步骤（例如紧急修复、已知 CI 失败点）：
+## 脚本兜底机制(无需 Claude 介入时)
+
+若运行脚本时**未设置 `CHANGELOG` 环境变量**,脚本会用规则自动生成 changelog 作为兜底(CI 自动触发、纯手动跑脚本时适用):
+
+- **commit history**:上次 tag 到 HEAD 的非 chore commit,按 Conventional Commits 前缀分类(`feat`→✨、`fix`→🐛、`refactor`→♻️ 等)
+- **工作区 diff**:未提交/未跟踪的 `novel_app/` 代码变更,按 `lib/` 子目录归类成模块摘要(新增→✨、删除→♻️、修改→🔧)
+
+> ⚠️ 兜底输出是**文件/模块级**的机械摘要(如"优化服务层(5 个文件)"),语义质量有限。**Claude 执行时应始终走第二步(AI 生成),不要依赖兜底。**
+
+## 跳过预检(不推荐)
+
+紧急修复或已知 CI 失败点时:
 
 ```bash
 SKIP_PREFLIGHT=1 python .claude/skills/novel-app-release/scripts/build_and_upload.py
 ```
 
-> ⚠️ 跳过预检后 GitHub Actions 仍会运行同样的检查；如失败 tag 推上去也没用，发布实际上会失败。
+> ⚠️ 跳过预检后 GitHub Actions 仍会运行同样检查,失败则发布实际失败。
+
+可通过 `SKIP_CI_CHECK=1` 跳过 10 分钟 CI 等待(不推荐)。
 
 ## 版本管理
 
 ### 版本号格式
 
-`pubspec.yaml` 中：`version: 1.7.9+58`
+`pubspec.yaml` 中:`version: 1.9.3+76`
 
-- `1.7.9` — 版本名称
-- `58` — 版本代码，必须递增
-
-### 更新版本号
-
-发布前手动修改 `novel_app/pubspec.yaml`：
-
-```yaml
-# 小版本更新
-version: 1.7.8+57  →  version: 1.7.9+58
-
-# 大版本更新
-version: 1.7.8+57  →  version: 2.0.0+58
-```
+- `1.9.3` — 版本名称
+- `76` — 版本代码,必须递增
 
 ## GitHub Actions 流程
 
-tag `v*` 推送后自动触发（`.github/workflows/flutter-release.yml`）：
+tag `v*` 推送后自动触发(`.github/workflows/flutter-release.yml`):
 
 | 步骤 | 说明 | 本地是否预跑 |
 |------|------|--------------|
-| Checkout | 检出代码 | — |
-| Extract version | 从 tag 提取版本号 | — |
+| Checkout | 检出代码(fetch-depth=0) | — |
+| Extract changelog | 从 tag message 取 changelog | — |
+| Render release body | 套用 `release_template.md` | — |
 | Setup Flutter | 安装 Flutter SDK | — |
-| Install dependencies | `flutter pub get` | — |
-| Generate code | `dart run build_runner build` | — |
-| **Build release APK** | `flutter build apk --release` | ✅ |
-| Create GitHub Release | 上传 APK，生成 Release Notes | — |
+| **Build release APK** | `flutter build apk --release --split-per-abi` | ✅ |
+| Create GitHub Release | 上传 APK + SHA256,生成 Release | — |
 
-PR / push 到 main 时（`.github/workflows/flutter-ci.yml`）还会跑：
+PR / push 到 main 时(`.github/workflows/flutter-ci.yml`)还会跑:
 
 | 步骤 | 说明 | 本地是否预跑 |
 |------|------|--------------|
@@ -145,40 +208,32 @@ PR / push 到 main 时（`.github/workflows/flutter-ci.yml`）还会跑：
 
 ## 常见问题
 
-### Q: 预检失败了怎么办？
+### Q: 预检失败了怎么办?
 
-1. 阅读脚本输出，定位是 analyze / test / build apk 哪一步失败
-2. 修复代码（不要尝试跳过预检来掩盖问题）
+1. 阅读脚本输出,定位是 analyze / test / build apk 哪一步失败
+2. 修复代码(不要跳过预检掩盖问题)
 3. 重新运行脚本
 
-### Q: 脚本执行后怎么确认 Release 是否成功？
+### Q: 怎么确认 Release 成功?
 
-脚本会自动等待 10 分钟并通过 `gh run list` 检查 CI 状态。如需手动确认：
+脚本会自动等 10 分钟并检查 CI。手动确认:
+1. 本地 tag:`git tag -l "v*"`
+2. Actions:`https://github.com/yunkst/novel_builder/actions`
+3. Release:`https://github.com/yunkst/novel_builder/releases`
 
-1. 查看本地 tag：`git tag -l "v*"`
-2. 查看 GitHub Actions：`https://github.com/yunkst/novel_builder/actions`
-3. 查看 Release 页面：`https://github.com/yunkst/novel_builder/releases`
+### Q: 推送失败怎么办?
 
-### Q: 推送失败怎么办？
-
-通常是网络问题或远程仓库有新 commit。先 `git pull --rebase` 再重新运行脚本。
-
-如果 tag 已创建但推送失败：
+通常是网络或远程有新 commit。先 `git pull --rebase` 再重跑。tag 已建但推送失败时:
 ```bash
-git push origin v1.7.9
+git push origin v1.9.3
 ```
 
-### Q: 想回退一个错误发布？
+### Q: 想回退一个错误发布?
 
 ```bash
-# 删除本地 tag
-git tag -d v1.7.9
-
-# 删除远程 tag
-git push origin :refs/tags/v1.7.9
-
-# 回退 commit
-git reset --soft HEAD~1
+git tag -d v1.9.3                    # 删本地 tag
+git push origin :refs/tags/v1.9.3    # 删远程 tag
+git reset --soft HEAD~1              # 回退 commit
 ```
 
 ## 文件结构
@@ -188,12 +243,15 @@ git reset --soft HEAD~1
 ├── SKILL.md                    # 本文档
 ├── FIXES.md                    # 修复记录
 └── scripts/
-    └── build_and_upload.py     # 发布脚本（preflight + commit + tag + push）
+    └── build_and_upload.py     # 发布脚本(preflight + changelog兜底 + commit + tag + push)
 ```
 
 ## 变更记录
 
-- **2026-06-17**: 新增阶段 4（等待 10 分钟 + CI 检查），通过 `gh run list` 验证 release workflow 状态；支持 `SKIP_CI_CHECK=1` 跳过
-- **2026-06-13**: 新增预检阶段（flutter analyze + unit test + 本地 APK 打包），与 CI 流程完全对齐；支持 `SKIP_PREFLIGHT=1` 跳过；强化文档说明
-- **2026-06-12**: 移除本地 APK 构建和后端上传，改为纯 git 操作 + 依赖 GitHub Actions 构建；增加 commit push
-- **2026-06-12**: 初版：构建 APK + 上传到 backend
+- **2026-06-22**: changelog 生成改为 **AI 驱动**:SKILL.md 新增「第二步:生成更新日志」专章,指导 Claude 分析 git diff/log 撰写语义化 changelog 并通过 `CHANGELOG` 环境变量注入脚本;脚本规则生成降级为兜底机制(CI / 纯手动运行时);明确职责分工
+- **2026-06-22**: changelog 数据源扩展为双源(commit history + 工作区 diff);工作区 diff 按 novel_app/lib 子目录归类成模块摘要,无需预先 commit 也能产出 changelog
+- **2026-06-22**: 重写 changelog 自动生成:从 git diff 文件路径分析改为 Conventional Commits 分类,输出 Markdown 分组格式,自动跳过 chore/release/style/build commit;commit message 不再附加 changelog(仅 tag message 保留)
+- **2026-06-17**: 新增阶段 4(等待 10 分钟 + CI 检查),通过 `gh run list` 验证 release workflow 状态;支持 `SKIP_CI_CHECK=1` 跳过
+- **2026-06-13**: 新增预检阶段(flutter analyze + unit test + 本地 APK 打包),与 CI 流程完全对齐;支持 `SKIP_PREFLIGHT=1` 跳过
+- **2026-06-12**: 移除本地 APK 构建和后端上传,改为纯 git 操作 + 依赖 GitHub Actions 构建;增加 commit push
+- **2026-06-12**: 初版:构建 APK + 上传到 backend

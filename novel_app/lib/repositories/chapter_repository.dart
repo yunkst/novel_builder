@@ -16,7 +16,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   // 内存状态管理
   // 使用 LinkedHashSet 实现 LRU 淘汰：新访问的条目移到末尾，淘汰时从头部移除
   final LinkedHashSet<String> _cachedInMemory = LinkedHashSet<String>();
-  final Set<String> _preloading = <String>{};
   static const int _maxMemoryCacheSize = 1000;
 
   /// 检查章节是否已缓存（内存优先）
@@ -89,23 +88,10 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     }
   }
 
-  /// 标记章节正在预加载
-  @override
-  void markAsPreloading(String chapterUrl) {
-    _preloading.add(chapterUrl);
-  }
-
-  /// 检查章节是否正在预加载
-  @override
-  bool isPreloading(String chapterUrl) {
-    return _preloading.contains(chapterUrl);
-  }
-
   /// 清理内存状态
   @override
   void clearMemoryState() {
     _cachedInMemory.clear();
-    _preloading.clear();
     LoggerService.instance.i(
       'ChapterRepository内存状态已清理',
       category: LogCategory.database,
@@ -134,7 +120,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       );
 
       _addCachedInMemory(chapter.url);
-      _preloading.remove(chapter.url);
 
       return result;
     } catch (e, stackTrace) {
@@ -171,11 +156,10 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
   /// 删除章节缓存
   ///
-  /// 同时清理内存缓存和预加载状态，防止"幻读"
+  /// 同时清理内存缓存，防止"幻读"
   @override
   Future<int> deleteChapterCache(String chapterUrl) async {
     _removeFromMemoryCache(chapterUrl);
-    _preloading.remove(chapterUrl);
     final db = await database;
     final affected = await db.delete(
       'chapter_cache',
@@ -293,7 +277,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       );
       for (final row in urls) {
         _removeFromMemoryCache(row['chapterUrl'] as String);
-        _preloading.remove(row['chapterUrl'] as String);
       }
 
       final deleted = await db.delete(

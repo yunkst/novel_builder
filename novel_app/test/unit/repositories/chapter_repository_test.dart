@@ -50,17 +50,8 @@ void main() {
       );
     });
 
-    test('应该支持预加载状态管理', () {
-      final testUrl = 'https://example.com/chapter/test';
-
-      // 标记为预加载中
-      chapterRepository.markAsPreloading(testUrl);
-      expect(chapterRepository.isPreloading(testUrl), isTrue);
-
-      // 清理内存状态
-      chapterRepository.clearMemoryState();
-      expect(chapterRepository.isPreloading(testUrl), isFalse);
-    });
+    // 注：预加载状态管理（markAsPreloading/isPreloading）已迁移到 PreloadService，
+    // ChapterRepository 不再负责预加载状态，相关测试随之移除。
   });
 
   group('ChapterRepository新架构验证', () {

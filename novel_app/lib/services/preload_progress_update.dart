@@ -8,34 +8,38 @@ class PreloadProgressUpdate {
   /// 章节URL（可选，用于精确更新单个章节的缓存状态）
   final String? chapterUrl;
 
-  /// 是否正在预加载
-  final bool isPreloading;
+  /// 小说标题（可选，用于 UI 展示）
+  final String? novelTitle;
 
-  /// 已缓存章节数
-  final int cachedChapters;
-
-  /// 总章节数（估算值，队列长度 + 已缓存数）
-  final int totalChapters;
+  /// 章节索引（可选，用于 UI 展示 "第N章"）
+  final int? chapterIndex;
 
   /// 时间戳
   final DateTime timestamp;
+
+  /// 可读标题：优先 "小说标题 第N章"，回退 novelUrl
+  String get displayTitle {
+    if (novelTitle != null && chapterIndex != null) {
+      return '$novelTitle 第${chapterIndex! + 1}章';
+    }
+    if (novelTitle != null) return novelTitle!;
+    return chapterUrl ?? novelUrl;
+  }
 
   /// 创建预加载进度更新事件
   PreloadProgressUpdate({
     required this.novelUrl,
     this.chapterUrl,
-    required this.isPreloading,
-    required this.cachedChapters,
-    required this.totalChapters,
+    this.novelTitle,
+    this.chapterIndex,
   }) : timestamp = DateTime.now();
 
   @override
   String toString() {
     return 'PreloadProgressUpdate(novelUrl: $novelUrl, '
         'chapterUrl: $chapterUrl, '
-        'isPreloading: $isPreloading, '
-        'cachedChapters: $cachedChapters, '
-        'totalChapters: $totalChapters, '
+        'novelTitle: $novelTitle, '
+        'chapterIndex: $chapterIndex, '
         'timestamp: $timestamp)';
   }
 
@@ -46,17 +50,15 @@ class PreloadProgressUpdate {
     return other is PreloadProgressUpdate &&
         other.novelUrl == novelUrl &&
         other.chapterUrl == chapterUrl &&
-        other.isPreloading == isPreloading &&
-        other.cachedChapters == cachedChapters &&
-        other.totalChapters == totalChapters;
+        other.novelTitle == novelTitle &&
+        other.chapterIndex == chapterIndex;
   }
 
   @override
   int get hashCode {
     return novelUrl.hashCode ^
         (chapterUrl?.hashCode ?? 0) ^
-        isPreloading.hashCode ^
-        cachedChapters.hashCode ^
-        totalChapters.hashCode;
+        (novelTitle?.hashCode ?? 0) ^
+        (chapterIndex?.hashCode ?? 0);
   }
 }

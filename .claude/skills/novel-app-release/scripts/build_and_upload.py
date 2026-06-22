@@ -231,101 +231,321 @@ def run_preflight(project_root: Path) -> bool:
     return True
 
 
+def _find_previous_tag(project_root: Path) -> str | None:
+    """
+    找到最近一个发布 tag（vX.Y.Z 格式）。
+
+    Returns:
+        tag 名（如 "v1.9.1"），没有则返回 None
+    """
+    returncode, stdout, _ = run_command(
+        ["git", "tag", "-l", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-version:refname"],
+        project_root,
+    )
+    if returncode != 0 or not stdout.strip():
+        return None
+    tags = [t.strip() for t in stdout.strip().split("\n") if t.strip()]
+    # 第一个就是最新 tag
+    return tags[0] if tags else None
+
+
+def _get_commits_since_tag(project_root: Path, since_tag: str) -> list[str]:
+    """
+    获取 since_tag 之后到 HEAD 的所有 commit subject（一行一条）。
+
+    Returns:
+        commit subject 列表
+    """
+    returncode, stdout, _ = run_command(
+        ["git", "log", "--no-merges", "--pretty=format:%s", f"{since_tag}..HEAD"],
+        project_root,
+    )
+    if returncode != 0 or not stdout.strip():
+        return []
+    return [s.strip() for s in stdout.strip().split("\n") if s.strip()]
+
+
+# Conventional Commits 前缀 → 分类
+_CC_CATEGORIES: dict[str, str] = {
+    "feat": "✨ 新功能",
+    "fix": "🐛 修复",
+    "perf": "⚡ 性能优化",
+    "refactor": "♻️ 重构",
+    "docs": "📚 文档",
+    "test": "✅ 测试",
+    "ci": "👷 CI/CD",
+}
+
+# novel_app 路径前缀 → 模块中文名（按匹配优先级排序）
+_MODULE_PATTERNS: list[tuple[str, str]] = [
+    ("lib/screens/", "界面"),
+    ("lib/widgets/", "组件"),
+    ("lib/services/", "服务层"),
+    ("lib/repositories/", "数据访问层"),
+    ("lib/core/providers/", "状态管理"),
+    ("lib/controllers/", "控制器"),
+    ("lib/core/", "核心"),
+    ("lib/models/", "数据模型"),
+    ("lib/utils/", "工具类"),
+    ("lib/mixins/", "Mixin"),
+    ("lib/extensions/", "扩展"),
+]
+
+
+def _parse_commit_subject(subject: str) -> tuple[str, str] | None:
+    """
+    解析一条 commit subject，返回 (category_key, description) 或 None（表示应跳过）。
+
+    支持的格式：
+      - feat: xxx
+      - fix(scope): xxx
+      - ✨ feat(scope): xxx   (带 emoji 前缀)
+      - feat：xxx              (中文冒号)
+
+    也会匹配无前缀但有实际内容的中文描述。
+    """
+    import re
+
+    # 去掉行首 emoji（如 ✨ 🐛 等）
+    cleaned = re.sub(r"^[^\w\s#]\s*", "", subject).strip()
+
+    # 跳过发布 commit（chore: 发布版本 X.Y.Z / chore(release): ...）
+    if re.match(r"chore(?:\([^)]*\))?\s*[:：]\s*(?:发布版本|发布 app|release)", cleaned, re.IGNORECASE):
+        return None
+
+    # 匹配 conventional commit 前缀
+    m = re.match(r"^(\w+)(?:\([^)]*\))?\s*[:：]\s*(.+)$", cleaned)
+    if m:
+        prefix = m.group(1).lower()
+        desc = m.group(2).strip()
+        if prefix in _CC_CATEGORIES:
+            return (prefix, desc)
+        # chore / build / style 不写入 changelog
+        if prefix in ("chore", "build", "style"):
+            return None
+        # 未知前缀但描述不为空 → 归入"其他"
+        if desc:
+            return ("other", desc)
+        return None
+
+    # 无前缀：如果内容是中文或有一定长度，也纳入"其他"
+    if len(cleaned) >= 4 and not cleaned.startswith("Merge") and not cleaned.startswith("Revert"):
+        return ("other", cleaned)
+
+    return None
+
+
+def _classify_module(file_path: str) -> str | None:
+    """
+    将文件路径归类到模块中文名。
+
+    只关注 novel_app/ 下的 .dart 代码文件，其余（.claude/、.md、配置等）返回 None。
+    """
+    if not file_path.startswith("novel_app/"):
+        return None
+    if not file_path.endswith(".dart"):
+        return None
+    for prefix, label in _MODULE_PATTERNS:
+        if prefix in file_path:
+            return label
+    if "novel_app/test/" in file_path:
+        return "测试"
+    return None
+
+
+def _get_workdir_changes(project_root: Path) -> dict[str, dict[str, list[str]]]:
+    """
+    获取工作区相对 HEAD 的所有代码变更，按模块分组。
+
+    Returns:
+        {module: {"added": [basename...], "deleted": [...], "modified": [...]}}
+    """
+    changes: dict[str, dict[str, list[str]]] = {}
+
+    def _record(module: str, status: str, file_path: str) -> None:
+        import os
+        basename = os.path.splitext(os.path.basename(file_path))[0]
+        changes.setdefault(module, {"added": [], "deleted": [], "modified": []})
+        if basename not in changes[module][status]:
+            changes[module][status].append(basename)
+
+    # 1. 已跟踪文件的变更（含暂存区 + 工作区）
+    rc, stdout, _ = run_command(
+        ["git", "diff", "HEAD", "--name-status"],
+        project_root,
+    )
+    if rc == 0 and stdout.strip():
+        for line in stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) < 2:
+                continue
+            status_code, file_path = parts[0], parts[-1]
+            module = _classify_module(file_path)
+            if module is None:
+                continue
+            # status_code 可能是 A / M / D / R100 / C 等
+            if status_code.startswith("A"):
+                _record(module, "added", file_path)
+            elif status_code.startswith("D"):
+                _record(module, "deleted", file_path)
+            elif status_code.startswith("R"):
+                # 重命名视为删除旧 + 新增新（file_path 已是新名）
+                _record(module, "added", file_path)
+            else:
+                _record(module, "modified", file_path)
+
+    # 2. 未跟踪文件（视为新增）
+    rc2, stdout2, _ = run_command(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        project_root,
+    )
+    if rc2 == 0 and stdout2.strip():
+        for line in stdout2.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            module = _classify_module(line)
+            if module is None:
+                continue
+            _record(module, "added", line)
+
+    return changes
+
+
+def _workdir_to_entries(
+    changes: dict[str, dict[str, list[str]]],
+) -> dict[str, list[str]]:
+    """
+    将模块化变更转成 changelog 条目（按 Conventional Commits 分类）。
+
+    映射：新增→feat，删除→refactor，修改→other。
+    文件名展示：≤3 个全列，>3 个列前 3 + "等 N 个"。
+    """
+    entries: dict[str, list[str]] = {}
+
+    def _names(items: list[str]) -> str:
+        if len(items) <= 3:
+            return "、".join(items)
+        return f"{'、'.join(items[:3])} 等 {len(items)} 个"
+
+    for module, ops in changes.items():
+        added = ops.get("added", [])
+        deleted = ops.get("deleted", [])
+        modified = ops.get("modified", [])
+
+        if added:
+            entries.setdefault("feat", []).append(f"新增{module}（{_names(added)}）")
+        if deleted:
+            entries.setdefault("refactor", []).append(f"移除{module}（{_names(deleted)}）")
+        if modified:
+            if len(modified) == 1:
+                entries.setdefault("other", []).append(f"优化{module}（{modified[0]}）")
+            else:
+                entries.setdefault("other", []).append(f"优化{module}（{len(modified)} 个文件）")
+
+    return entries
+
+
 def analyze_git_changes(project_root: Path) -> str:
     """
-    分析 git 变更生成更新日志
+    分析 git 变更生成更新日志。
+
+    数据源（按优先级合并，输出合并后的 Markdown）：
+    1. commit history：上一个发布 tag 到 HEAD 的所有非 chore commit subject，
+       按 Conventional Commits 前缀分类
+    2. 工作区 diff：相对 HEAD 的所有代码变更（新增/删除/修改），
+       按模块路径分组，新增→feat，删除→refactor，修改→other
+
+    合并规则：
+    - 任一数据源有内容即输出
+    - 两者都有时，commit 条目在前，工作区变更追加在后（同一分类内合并）
+    - 都为空时降级为 "Bug 修复和性能优化"
 
     Args:
         project_root: 项目根目录
 
     Returns:
-        生成的更新日志
+        生成的更新日志（Markdown 文本）
     """
     print("正在分析代码变更...")
 
-    # 获取 novel_app 目录的变更文件列表
-    returncode, stdout, _ = run_command(
-        ["git", "diff", "--name-only", "novel_app/lib"],
-        project_root,
-    )
+    # ========== 数据源 1: commit history ==========
+    commit_grouped: dict[str, list[str]] = {}
+    prev_tag = _find_previous_tag(project_root)
 
-    if returncode != 0:
-        print("无法获取 git 变更，使用默认更新日志")
-        return "Bug修复和性能优化"
-
-    changed_files = stdout.strip().split("\n") if stdout.strip() else []
-    changed_files = [f for f in changed_files if f]  # 过滤空字符串
-
-    if not changed_files:
-        return "Bug修复和性能优化"
-
-    # 按模块分类变更
-    changes_by_category = {
-        "screens": [],
-        "widgets": [],
-        "services": [],
-        "providers": [],
-        "repositories": [],
-        "models": [],
-        "其他": [],
-    }
-
-    for file_path in changed_files:
-        if "screens/" in file_path:
-            changes_by_category["screens"].append(file_path)
-        elif "widgets/" in file_path:
-            changes_by_category["widgets"].append(file_path)
-        elif "services/" in file_path:
-            changes_by_category["services"].append(file_path)
-        elif "providers/" in file_path:
-            changes_by_category["providers"].append(file_path)
-        elif "repositories/" in file_path:
-            changes_by_category["repositories"].append(file_path)
-        elif "models/" in file_path:
-            changes_by_category["models"].append(file_path)
-        else:
-            changes_by_category["其他"].append(file_path)
-
-    # 分析具体文件变更获取更详细的信息
-    change_descriptions = []
-
-    for file_path in changed_files:
-        returncode, diff_content, _ = run_command(
-            ["git", "diff", file_path],
+    if prev_tag:
+        print(f"  上一个发布 tag: {prev_tag}")
+        commits = _get_commits_since_tag(project_root, prev_tag)
+    else:
+        print("  未找到上一个发布 tag，获取最近 50 条 commit")
+        rc, stdout, _ = run_command(
+            ["git", "log", "--no-merges", "--pretty=format:%s", "-50"],
             project_root,
         )
+        commits = [s.strip() for s in stdout.strip().split("\n") if s.strip()] if rc == 0 and stdout.strip() else []
 
-        if returncode == 0 and diff_content:
-            if " Future<void> _edit" in diff_content or "Future<void> _show" in diff_content:
-                if "编辑书名" in diff_content:
-                    change_descriptions.append("新增编辑书名功能")
-                elif "刷新确认" in diff_content:
-                    change_descriptions.append("优化刷新确认对话框")
+    for subject in commits:
+        parsed = _parse_commit_subject(subject)
+        if parsed is None:
+            continue
+        cat, desc = parsed
+        commit_grouped.setdefault(cat, []).append(desc)
 
-            if "chapter_list" in file_path.lower():
-                if "refresh" in diff_content.lower() and "context" in diff_content:
-                    if "优化刷新" not in change_descriptions:
-                        change_descriptions.append("优化章节列表刷新交互")
+    # commit 条目去重
+    for cat in commit_grouped:
+        seen, unique = set(), []
+        for d in commit_grouped[cat]:
+            if d not in seen:
+                seen.add(d)
+                unique.append(d)
+        commit_grouped[cat] = unique
 
-    # 如果没有从 diff 分析出具体变更，使用基于文件分类的通用描述
-    if not change_descriptions:
-        if changes_by_category["services"]:
-            change_descriptions.append("服务层优化")
-        if changes_by_category["screens"]:
-            change_descriptions.append("界面功能增强")
-        if changes_by_category["providers"]:
-            change_descriptions.append("状态管理优化")
-        if changes_by_category["widgets"]:
-            change_descriptions.append("组件优化")
+    # ========== 数据源 2: 工作区 diff ==========
+    workdir_changes = _get_workdir_changes(project_root)
+    workdir_grouped = _workdir_to_entries(workdir_changes) if workdir_changes else {}
 
-    # 组合最终的更新日志
-    if change_descriptions:
-        unique_descriptions = list(dict.fromkeys(change_descriptions))[:4]
-        changelog = "、".join(unique_descriptions)
-    else:
-        changelog = "Bug修复和性能优化"
+    has_commits = any(commit_grouped.values())
+    has_workdir = any(workdir_grouped.values())
 
-    print(f"生成的更新日志: {changelog}")
+    if not has_commits and not has_workdir:
+        print("  未找到有效 commit 或工作区改动，使用默认更新日志")
+        return "Bug 修复和性能优化"
+
+    # ========== 合并输出 ==========
+    category_order = ["feat", "fix", "perf", "refactor", "docs", "test", "ci", "other"]
+    category_labels = {**_CC_CATEGORIES, "other": "🔧 其他"}
+
+    # 合并每个分类：commit 条目优先（语义更精准），工作区条目补充在后
+    merged: dict[str, list[str]] = {}
+    for cat in category_order:
+        items = commit_grouped.get(cat, []) + workdir_grouped.get(cat, [])
+        if items:
+            merged[cat] = items
+
+    if has_workdir and not has_commits:
+        total_files = sum(
+            len(ops["added"]) + len(ops["deleted"]) + len(ops["modified"])
+            for ops in workdir_changes.values()
+        )
+        print(f"  工作区有 {len(workdir_changes)} 个模块、共 {total_files} 个文件未提交")
+    elif has_workdir and has_commits:
+        print(f"  工作区另有未提交改动，将作为补充合并")
+
+    lines: list[str] = []
+    for cat in category_order:
+        items = merged.get(cat)
+        if not items:
+            continue
+        label = category_labels.get(cat, "🔧 其他")
+        lines.append(f"### {label}")
+        for desc in items:
+            lines.append(f"- {desc}")
+        lines.append("")
+
+    changelog = "\n".join(lines).strip()
+    print(f"生成的更新日志:\n{changelog}")
     return changelog
 
 
@@ -342,7 +562,8 @@ def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
         是否成功完成所有操作
     """
     tag_name = f"v{version}"
-    commit_msg = f"chore: 发布版本 {version}\n\n{changelog}"
+    # commit message 保持简洁（详情在 tag message 里）
+    commit_msg = f"chore: 发布版本 {version}"
 
     print("-" * 50)
     print("正在提交代码变更...")

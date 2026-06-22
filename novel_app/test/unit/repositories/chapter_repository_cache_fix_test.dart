@@ -171,16 +171,20 @@ void main() {
       }
     });
 
-    test('clearMemoryState 应清空所有内存状态', () {
-      // 标记为预加载
-      repository.markAsPreloading(testChapterUrl);
-      expect(repository.isPreloading(testChapterUrl), isTrue);
+    test('clearMemoryState 应清空所有内存状态', () async {
+      // 先写入一章，使其进入内存缓存
+      await repository.cacheChapter(
+        testNovelUrl,
+        _makeChapter(testChapterUrl, index: 0),
+        'content',
+      );
+      expect(await repository.isChapterCached(testChapterUrl), isTrue);
 
-      // 清空
+      // 清空内存状态（只清内存，db 数据仍在，但下次查询需重新从 db 加载）
       repository.clearMemoryState();
 
-      // 验证
-      expect(repository.isPreloading(testChapterUrl), isFalse);
+      // 内存缓存已清空，但 db 中仍有数据，isChapterCached 会走 db 查询
+      expect(await repository.isChapterCached(testChapterUrl), isTrue);
     });
   });
 

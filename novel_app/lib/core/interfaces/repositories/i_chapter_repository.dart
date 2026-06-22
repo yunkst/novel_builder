@@ -26,17 +26,7 @@ abstract class IChapterRepository {
   Future<Map<String, bool>> getChaptersCacheStatus(List<String> chapterUrls);
 
   // ========== 预加载状态管理 ==========
-
-  /// 标记章节正在预加载
-  ///
-  /// [chapterUrl] 章节的URL
-  void markAsPreloading(String chapterUrl);
-
-  /// 检查章节是否正在预加载
-  ///
-  /// [chapterUrl] 章节的URL
-  /// 返回是否正在预加载
-  bool isPreloading(String chapterUrl);
+  // 注意：预加载状态由 PreloadService 内部维护，不属于 Repository 职责。
 
   /// 清理内存状态
   void clearMemoryState();

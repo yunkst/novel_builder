@@ -625,6 +625,12 @@ class _ChapterListScreenRiverpodState
       await ref
           .read(chapterListProvider(widget.novel).notifier)
           .reloadLastReadChapter();
+      // 刷新章节缓存标记：阅读期间被缓存的章节需要更新 isCached
+      // ReaderContentController 直接写入 chapter_cache 时不经过 PreloadService，
+      // 因此返回时需主动从本地数据库重新读取最新状态
+      await ref
+          .read(chapterListProvider(widget.novel).notifier)
+          .refreshCacheStatus();
       // 滚动到上次阅读位置
       _scrollToLastReadChapter();
     }

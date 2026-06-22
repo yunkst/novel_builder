@@ -993,14 +993,6 @@ class DatabaseService {
   Future<Map<String, bool>> getChaptersCacheStatus(List<String> chapterUrls) =>
       _chapterRepository.getChaptersCacheStatus(chapterUrls);
 
-  /// 标记章节正在预加载
-  void markAsPreloading(String chapterUrl) =>
-      _chapterRepository.markAsPreloading(chapterUrl);
-
-  /// 检查章节是否正在预加载
-  bool isPreloading(String chapterUrl) =>
-      _chapterRepository.isPreloading(chapterUrl);
-
   /// 清理内存状态
   void clearMemoryState() => _chapterRepository.clearMemoryState();
 

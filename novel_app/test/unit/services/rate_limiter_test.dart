@@ -7,7 +7,6 @@ import 'package:novel_app/services/rate_limiter.dart';
 /// - acquire 首次请求立即返回
 /// - acquire 连续请求需要等待
 /// - reset 后下一次请求立即返回
-/// - timeUntilNextRequest 和 canRequestImmediately
 void main() {
   group('RateLimiter - 速率限制器测试', () {
     late RateLimiter rateLimiter;
@@ -46,21 +45,8 @@ void main() {
       expect(sw.elapsedMilliseconds, lessThan(50));
     });
 
-    test('canRequestImmediately 首次应该为 true', () {
-      expect(rateLimiter.canRequestImmediately, true);
-    });
-
-    test('timeUntilNextRequest 首次应该为 Duration.zero', () {
-      expect(rateLimiter.timeUntilNextRequest, Duration.zero);
-    });
-
-    test('reset 应该清除上次请求时间', () async {
-      await rateLimiter.acquire();
-      expect(rateLimiter.canRequestImmediately, false);
-
-      rateLimiter.reset();
-      expect(rateLimiter.canRequestImmediately, true);
-    });
+    // 注：canRequestImmediately / timeUntilNextRequest 已从 RateLimiter 移除，
+    // 对应的 getter 测试随之移除。核心行为（acquire 等待 + reset 重置）由其余用例覆盖。
   });
 
   group('RateLimiter - 智能速率控制场景测试', () {

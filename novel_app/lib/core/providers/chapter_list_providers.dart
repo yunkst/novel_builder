@@ -533,6 +533,26 @@ class ChapterList extends _$ChapterList {
     }
   }
 
+  /// 刷新章节缓存状态（轻量级，仅从本地数据库刷新 isCached）
+  ///
+  /// 用户从阅读页面返回时，阅读期间新缓存的章节需要更新标记。
+  /// 只读取本地数据库的 getCachedNovelChapters（LEFT JOIN），
+  /// 不触发网络请求，不重置 loading/分页等其他状态。
+  Future<void> refreshCacheStatus() async {
+    final chapterLoader = ref.watch(chapterLoaderProvider);
+    try {
+      final freshChapters = await chapterLoader.loadChapters(novel.url);
+      state = state.copyWith(chapters: freshChapters);
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '刷新缓存状态失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list', 'refresh-cache-status'],
+      );
+    }
+  }
+
   /// 重新加载最后阅读位置
   Future<void> reloadLastReadChapter() async {
     await _loadLastReadChapter();

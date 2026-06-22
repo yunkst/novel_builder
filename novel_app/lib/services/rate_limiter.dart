@@ -55,24 +55,4 @@ class RateLimiter {
     );
   }
 
-  /// 获取距离下次可请求的时间
-  ///
-  /// 如果可以立即请求，返回Duration.zero
-  Duration get timeUntilNextRequest {
-    if (_lastRequestTime == null) {
-      return Duration.zero;
-    }
-
-    final elapsed = DateTime.now().difference(_lastRequestTime!);
-    if (elapsed >= interval) {
-      return Duration.zero;
-    }
-
-    return interval - elapsed;
-  }
-
-  /// 检查是否可以立即请求（无需等待）
-  bool get canRequestImmediately {
-    return timeUntilNextRequest == Duration.zero;
-  }
 }

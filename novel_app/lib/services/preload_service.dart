@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:collection';
 import '../models/chapter.dart';
-import '../utils/deque.dart';
 import 'rate_limiter.dart';
 import 'preload_task.dart';
 import 'preload_progress_update.dart';
+import 'preload_history_entry.dart';
 import '../repositories/chapter_repository.dart';
 import 'headless_webview_content_service.dart';
 import 'headless_webview_errors.dart';
@@ -12,22 +13,36 @@ import 'logger_service.dart';
 /// 全局预加载服务
 ///
 /// 负责管理章节预加载任务队列，支持：
-/// - 智能插队：当前小说的章节插入队列开头
-/// - 速率限制：30秒处理一个任务
-/// - 串行执行：全局唯一执行点
-/// - 去重机制：自动过滤重复和已缓存章节
-/// - 内存队列：App关闭自动清空
+/// - 智能排序：当前章节之后（后续章节）优先，当前章节之前（前序章节）次之
+/// - 抢占恢复：被阅读器抢占的任务放回队头，等待恢复后立即执行
+/// - 速率限制：缓存命中立即执行，爬虫抓取 30 秒间隔
+/// - 串行执行：全局唯一执行点，避免 WebView 资源竞争
+/// - 去重机制：自动过滤队列内重复 URL 和已缓存章节
+/// - 内存队列：App 关闭自动清空
 /// - 暂停/恢复：阅读器请求优先时可暂停预加载，释放 WebView
 ///
 /// 架构说明：
 /// - 使用依赖注入，通过 Riverpod Provider 管理
-/// - ApiServiceWrapper 和 ChapterRepository 通过构造函数注入
-/// - 不再使用单例模式，每次通过 Provider 获取实例
+/// - ChapterRepository 和 HeadlessWebViewContentService 通过构造函数注入
+/// - 通过 @Riverpod(keepAlive: true) 全局单例，App 生命周期内不销毁
 class PreloadService {
   // 核心组件
   final RateLimiter _rateLimiter = RateLimiter(interval: Duration(seconds: 30));
-  final Deque<PreloadTask> _queue = Deque<PreloadTask>();
-  final Set<String> _enqueuedUrls = {}; // 去重：已加入队列的URL
+
+  /// 有序任务队列（FIFO，支持 addFirst 抢占恢复）
+  final ListQueue<PreloadTask> _queue = ListQueue<PreloadTask>();
+
+  /// 去重集合：已入队的 chapterUrl（仅用于 O(1) 判断重复）
+  final Set<String> _enqueuedUrls = <String>{};
+
+  // 历史记录上限（避免内存膨胀）
+  static const int _historyLimit = 100;
+
+  /// 已处理（成功）历史，最新在前
+  final List<PreloadHistoryEntry> _processedHistory = [];
+
+  /// 已失败历史，最新在前
+  final List<PreloadHistoryEntry> _failedHistory = [];
 
   // 进度通知（供章节列表页面实时更新缓存状态）
   final StreamController<PreloadProgressUpdate> _progressController =
@@ -41,11 +56,15 @@ class PreloadService {
   String? _lastActiveNovel; // 最后活跃的小说URL
 
   // 执行状态
-  Completer<void>? _processingCompleter; // 🔒 使用Completer防止并发
+  bool _isRunning = false; // 🔒 串行锁：确保同一时间只有一个处理循环
   bool _shouldStop = false; // 停止标志（用于测试清理）
   bool _isPaused = false; // 暂停标志（阅读器请求优先时设置）
   int _totalProcessed = 0;
   int _totalFailed = 0;
+
+  /// 当前正在处理的任务（供 UI 展示处理状态详情）
+  PreloadTask? _currentTask;
+  PreloadTask? get currentTask => _currentTask;
 
   // 服务依赖（通过构造函数注入）
   final ChapterRepository _chapterRepository;
@@ -71,7 +90,10 @@ class PreloadService {
     );
   }
 
-  /// 添加预加载任务（智能插队）
+  /// 添加预加载任务
+  ///
+  /// 新任务追加到队尾（addLast），不插队。仅被阅读器抢占的任务
+  /// 才会通过 addFirst 放回队头，保证恢复后立即继续执行。
   ///
   /// [novelUrl] 小说URL
   /// [novelTitle] 小说标题
@@ -100,22 +122,14 @@ class PreloadService {
       return;
     }
 
-    // 查找当前章节在过滤后列表中的索引
-    final currentChapterUrl =
-        currentIndex >= 0 && currentIndex < chapterUrls.length
-            ? chapterUrls[currentIndex]
-            : null;
-    final filteredIndex = currentChapterUrl != null
-        ? uncachedUrls.indexOf(currentChapterUrl)
-        : -1;
-
-    // 创建任务列表（后续章节优先）
-    // 使用过滤后的索引，避免数组越界
+    // 用原始索引 + 未缓存 Set 创建任务（避免过滤后索引错位）
+    final uncachedSet = uncachedUrls.toSet();
     final tasks = _createTasks(
       novelUrl,
       novelTitle,
-      uncachedUrls,
-      filteredIndex >= 0 ? filteredIndex : (uncachedUrls.length - 1),
+      chapterUrls,
+      currentIndex,
+      uncachedSet,
     );
 
     // 去重并入队
@@ -148,48 +162,47 @@ class PreloadService {
     }
   }
 
-  /// 创建预加载任务（后续章节优先）
+  /// 创建预加载任务（后续章节优先，前序章节次之）
   ///
-  /// [currentIndex] 应该是基于 [chapterUrls] 的索引，必须保证在有效范围内
+  /// 基于 [chapterUrls] 的原始 [currentIndex] 分割前后序，
+  /// 通过 [uncachedSet] 跳过已缓存章节，避免索引映射错位。
   List<PreloadTask> _createTasks(
     String novelUrl,
     String novelTitle,
     List<String> chapterUrls,
     int currentIndex,
+    Set<String> uncachedSet,
   ) {
     final tasks = <PreloadTask>[];
 
-    // 边界检查：确保索引在有效范围内
-    if (chapterUrls.isEmpty) {
-      LoggerService.instance.w(
-        '章节列表为空，无法创建预加载任务',
-        category: LogCategory.cache,
-        tags: ['preload', 'warning'],
-      );
+    if (chapterUrls.isEmpty || uncachedSet.isEmpty) {
       return tasks;
     }
 
-    // 如果索引超出范围，默认使用最后一个章节
     final safeIndex = currentIndex.clamp(0, chapterUrls.length - 1);
 
     // 首先添加后续章节（优先级高）
     for (int i = safeIndex + 1; i < chapterUrls.length; i++) {
-      tasks.add(PreloadTask(
-        chapterUrl: chapterUrls[i],
-        novelUrl: novelUrl,
-        novelTitle: novelTitle,
-        chapterIndex: i,
-      ));
+      if (uncachedSet.contains(chapterUrls[i])) {
+        tasks.add(PreloadTask(
+          chapterUrl: chapterUrls[i],
+          novelUrl: novelUrl,
+          novelTitle: novelTitle,
+          chapterIndex: i,
+        ));
+      }
     }
 
     // 然后添加前序章节（优先级低）
     for (int i = safeIndex - 1; i >= 0; i--) {
-      tasks.add(PreloadTask(
-        chapterUrl: chapterUrls[i],
-        novelUrl: novelUrl,
-        novelTitle: novelTitle,
-        chapterIndex: i,
-      ));
+      if (uncachedSet.contains(chapterUrls[i])) {
+        tasks.add(PreloadTask(
+          chapterUrl: chapterUrls[i],
+          novelUrl: novelUrl,
+          novelTitle: novelTitle,
+          chapterIndex: i,
+        ));
+      }
     }
 
     return tasks;
@@ -197,16 +210,10 @@ class PreloadService {
 
   /// 串行处理队列（智能速率限制：缓存章节无等待，爬虫章节30秒间隔）
   ///
-  /// 🔒 并发安全: 使用 Completer 确保同一时间只有一个循环执行
+  /// 并发安全: 通过 _isRunning 标志确保同一时间只有一个循环执行
   Future<void> _processQueue() async {
-    // 🔒 原子检查: 如果已有Completer,说明正在处理
-    if (_processingCompleter != null) {
-      return;
-    }
-
-    // 🔒 创建新的Completer作为锁
-    final completer = Completer<void>();
-    _processingCompleter = completer;
+    if (_isRunning) return;
+    _isRunning = true;
 
     final startTime = DateTime.now();
 
@@ -215,11 +222,9 @@ class PreloadService {
         // 从队列头部取出任务
         final task = _queue.removeFirst();
         _enqueuedUrls.remove(task.chapterUrl);
+        _currentTask = task;
 
         try {
-          // 标记正在预加载
-          _chapterRepository.markAsPreloading(task.chapterUrl);
-
           // 获取内容 — 使用 low 优先级
           final result = await _fetchChapterContent(task.chapterUrl);
 
@@ -227,6 +232,7 @@ class PreloadService {
           if (result.isBusy) {
             _queue.addFirst(task);
             _enqueuedUrls.add(task.chapterUrl);
+            _currentTask = null;
             LoggerService.instance.i(
               'PreloadService: 任务被抢占，放回队列 url=${task.chapterUrl}',
               category: LogCategory.cache,
@@ -238,11 +244,13 @@ class PreloadService {
           if (result.isNoScript) {
             // 无脚本，跳过此任务
             _totalFailed++;
+            _addFailedHistory(task, 'noScript');
             LoggerService.instance.d(
               '预加载 noScript: url=${task.chapterUrl} domain=${Uri.tryParse(task.chapterUrl)?.host}',
               category: LogCategory.cache,
               tags: ['preload', 'no_script'],
             );
+            _currentTask = null;
             await _rateLimiter.acquire();
             continue;
           }
@@ -257,6 +265,7 @@ class PreloadService {
               task.novelUrl, chapter, result.content.content);
 
           _totalProcessed++;
+          _addProcessedHistory(task);
 
           // 每处理5个汇总一次进度
           if (_totalProcessed % 5 == 0) {
@@ -271,10 +280,11 @@ class PreloadService {
           _progressController.add(PreloadProgressUpdate(
             novelUrl: task.novelUrl,
             chapterUrl: task.chapterUrl,
-            isPreloading: _processingCompleter != null,
-            cachedChapters: 0,
-            totalChapters: 0,
+            novelTitle: task.novelTitle,
+            chapterIndex: task.chapterIndex,
           ));
+
+          _currentTask = null;
 
           // 根据来源控制速率
           if (result.content.fromCache) {
@@ -286,12 +296,14 @@ class PreloadService {
           }
         } catch (e, st) {
           _totalFailed++;
+          _addFailedHistory(task, e.toString());
           LoggerService.instance.e(
             '预加载单任务失败: url=${task.chapterUrl} - $e',
             stackTrace: st.toString(),
             category: LogCategory.cache,
             tags: ['preload', 'task_failed'],
           );
+          _currentTask = null;
           // 失败时也等待间隔
           await _rateLimiter.acquire();
         }
@@ -312,17 +324,14 @@ class PreloadService {
           tags: ['preload', 'complete'],
         );
       }
-
-      completer.complete(); // ✅ 标记完成
     } catch (e) {
       LoggerService.instance.e(
         '❌ 队列处理异常: $e',
         category: LogCategory.cache,
         tags: ['preload', 'error'],
       );
-      completer.completeError(e); // ✅ 标记失败
     } finally {
-      _processingCompleter = null; // ✅ 释放锁
+      _isRunning = false; // ✅ 释放锁
     }
   }
 
@@ -336,51 +345,93 @@ class PreloadService {
       'novel_states': _novelCurrentIndex,
       'total_processed': _totalProcessed,
       'total_failed': _totalFailed,
-      'enqueued_urls': _enqueuedUrls.length,
+      'enqueued_urls': _queue.length,
     };
+  }
+
+  /// 获取队列快照（按 FIFO 顺序，最先处理的在最前）
+  List<PreloadTask> getQueueSnapshot() =>
+      List<PreloadTask>.unmodifiable(_queue);
+
+  /// 获取已入队去重快照（与队列快照一致；保留 API 兼容）
+  List<PreloadTask> getEnqueuedSnapshot() =>
+      List<PreloadTask>.unmodifiable(_queue);
+
+  /// 获取已处理（成功）历史快照，最新在前
+  List<PreloadHistoryEntry> getProcessedHistory() =>
+      List.unmodifiable(_processedHistory);
+
+  /// 获取已失败历史快照，最新在前
+  List<PreloadHistoryEntry> getFailedHistory() =>
+      List.unmodifiable(_failedHistory);
+
+  /// 添加成功历史（最新在前，超限移除末尾）
+  void _addProcessedHistory(PreloadTask task) {
+    _processedHistory.insert(
+      0,
+      PreloadHistoryEntry(
+        novelTitle: task.novelTitle,
+        chapterIndex: task.chapterIndex,
+        chapterUrl: task.chapterUrl,
+        novelUrl: task.novelUrl,
+        time: DateTime.now(),
+      ),
+    );
+    if (_processedHistory.length > _historyLimit) {
+      _processedHistory.removeLast();
+    }
+  }
+
+  /// 添加失败历史（最新在前，超限移除末尾）
+  void _addFailedHistory(PreloadTask task, String error) {
+    _failedHistory.insert(
+      0,
+      PreloadHistoryEntry(
+        novelTitle: task.novelTitle,
+        chapterIndex: task.chapterIndex,
+        chapterUrl: task.chapterUrl,
+        novelUrl: task.novelUrl,
+        time: DateTime.now(),
+        error: error,
+      ),
+    );
+    if (_failedHistory.length > _historyLimit) {
+      _failedHistory.removeLast();
+    }
   }
 
   /// 清空队列（用于测试或强制重置）
   Future<void> clearQueue() async {
-    // 设置停止标志,让正在运行的任务退出循环
+    // 设置停止标志，让正在运行的循环在下一次条件检查时退出
     _shouldStop = true;
-
-    // 清空队列
     _queue.clear();
     _enqueuedUrls.clear();
+
+    // 等待正在运行的循环退出（队列已空 + _shouldStop，会很快结束）
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (_isRunning && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    if (_isRunning) {
+      LoggerService.instance.w(
+        'clearQueue: 等待处理退出超时（2s），强制重置 _isRunning',
+        category: LogCategory.cache,
+        tags: ['preload', 'force_reset'],
+      );
+      _isRunning = false;
+    }
+
+    // 清理其余状态
     _novelCurrentIndex.clear();
     _lastActiveNovel = null;
     _rateLimiter.reset();
     _totalProcessed = 0;
     _totalFailed = 0;
+    _processedHistory.clear();
+    _failedHistory.clear();
+    _currentTask = null;
 
-    // 等待正在运行的任务完成
-    if (_processingCompleter != null && !_processingCompleter!.isCompleted) {
-      try {
-        await _processingCompleter!.future.timeout(
-          Duration(seconds: 2),
-          onTimeout: () {
-            // 超时后强制重置
-            LoggerService.instance.w(
-              'clearQueue: 等待处理完成超时（2s），强制重置 _processingCompleter',
-              category: LogCategory.cache,
-              tags: ['preload', 'force_reset'],
-            );
-            _processingCompleter = null;
-          },
-        );
-      } catch (e) {
-        // 忽略错误,强制重置
-        LoggerService.instance.w(
-          'clearQueue: 等待处理完成异常: $e',
-          category: LogCategory.cache,
-          tags: ['preload', 'clear_queue', 'wait_failed'],
-        );
-      }
-    }
-
-    // 重置处理状态和停止标志
-    _processingCompleter = null;
+    // 重置停止和暂停标志
     _shouldStop = false;
     _isPaused = false;
 
@@ -393,11 +444,11 @@ class PreloadService {
 
   /// 暂停预加载处理
   ///
-  /// 当阅读器需要使用 WebView 时调用。
-  /// 当前正在执行的任务会在下一个检查点退出（被抢占返回 busy），
-  /// 队列处理暂停直到 [resume] 被调用。
+  /// 当阅读器需要使用 WebView 时调用。即使当前没有任务正在处理，
+  /// 也会设置暂停标志，避免 [enqueueTasks] 内部启动新的处理循环。
+  /// 队列处理在 [resume] 被调用之前不会启动。
   void pause() {
-    if (!_isPaused && isProcessing) {
+    if (!_isPaused) {
       _isPaused = true;
       LoggerService.instance.i(
         'PreloadService: 预加载已暂停（阅读器请求优先）',
@@ -430,7 +481,7 @@ class PreloadService {
   int get queueLength => _queue.length;
 
   /// 是否正在处理队列
-  bool get isProcessing => _processingCompleter != null;
+  bool get isProcessing => _isRunning;
 
   /// 释放资源
   void dispose() {

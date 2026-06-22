@@ -30,6 +30,9 @@ class PreloadTask {
     return '$novelTitle 第${chapterIndex + 1}章';
   }
 
+  /// 可读标题："小说标题 第N章"
+  String get displayTitle => '$novelTitle 第${chapterIndex + 1}章';
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
