@@ -601,14 +601,24 @@ def commit_and_push(project_root: Path, version: str, changelog: str) -> bool:
             print(f"        提交失败: {stdout}")
             return False
 
-        # 3. 创建 tag
+        # 3. 创建 tag（用临时文件传递 message，避免 Windows shell 多行参数丢失）
         print(f"  [3/5] 创建标签 {tag_name}...")
-        tag_result = subprocess.run(
-            ["git", "tag", "-a", tag_name, "-m", f"Release {version}\n\n{changelog}"],
-            cwd=project_root,
-            capture_output=True,
-            shell=True if os.name == "nt" else False,
-        )
+        tag_message = f"Release {version}\n\n{changelog}"
+        tag_msg_file = project_root / ".git" / "TAG_EDITMSG_TMP"
+        tag_msg_file.write_text(tag_message, encoding="utf-8")
+        try:
+            tag_result = subprocess.run(
+                ["git", "tag", "-a", tag_name, "-F", str(tag_msg_file)],
+                cwd=project_root,
+                capture_output=True,
+                shell=True if os.name == "nt" else False,
+            )
+        finally:
+            # 清理临时文件
+            try:
+                tag_msg_file.unlink(missing_ok=True)
+            except Exception:
+                pass
 
         if tag_result.returncode != 0:
             try:
