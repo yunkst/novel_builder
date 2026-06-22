@@ -69,18 +69,22 @@ jobs:
         id: changelog
         run: |
           # 从 tag 的 annotation message 提取 changelog
-          # 约定格式：第一行 "Release X.Y.Z"，空行后是 changelog 内容
-          TAG_MSG=$(git tag -l --format='%(contents)' "${{ steps.tag.outputs.name }}")
-          if [ -z "$TAG_MSG" ]; then
-            echo "  ⚠️  tag ${{ steps.tag.outputs.name }} 没有 annotation message"
-            CHANGELOG="Bug 修复和性能优化"
-          else
-            # 跳过第一行 "Release X.Y.Z"，跳过一个空行，取剩下的内容
-            CHANGELOG=$(echo "$TAG_MSG" | tail -n +3)
-            # 如果 tail 后为空（tag 只有标题没 changelog），给个默认
-            if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+          # 使用 git for-each-ref + %(body) 获取完整 body（%(contents) 可能只返回 subject）
+          TAG_BODY=$(git for-each-ref --format='%(body)' "refs/tags/${{ steps.tag.outputs.name }}")
+          if [ -z "$TAG_BODY" ]; then
+            # 回退：尝试 %(contents) 并跳过前两行（subject + 空行）
+            TAG_MSG=$(git tag -l --format='%(contents)' "${{ steps.tag.outputs.name }}")
+            if [ -z "$TAG_MSG" ]; then
+              echo "  ⚠️  tag ${{ steps.tag.outputs.name }} 没有 annotation message"
               CHANGELOG="Bug 修复和性能优化"
+            else
+              CHANGELOG=$(echo "$TAG_MSG" | tail -n +3)
+              if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+                CHANGELOG="Bug 修复和性能优化"
+              fi
             fi
+          else
+            CHANGELOG="$TAG_BODY"
           fi
           {
             echo "changelog<<EOF"
