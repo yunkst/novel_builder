@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/hermes_providers.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
+import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
@@ -176,6 +177,13 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                     color: appColors.hermesOnBrandMuted, size: 20),
                 tooltip: '场景配置',
                 onPressed: () => _showScenarioConfigDialog(chatState),
+              ),
+              // LLM 配置快速切换
+              IconButton(
+                icon: Icon(Icons.tune_outlined,
+                    color: appColors.hermesOnBrandMuted, size: 20),
+                tooltip: '切换 LLM 配置',
+                onPressed: () => _showLlmConfigSwitcher(chatState),
               ),
               IconButton(
                 icon: Icon(
@@ -511,6 +519,74 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       context: context,
       builder: (_) => HermesScenarioConfigDialog(
         scenarioId: chatState.scenarioId,
+      ),
+    );
+  }
+
+  /// 弹出 LLM 配置快速切换菜单
+  ///
+  /// 为当前场景快速切换激活的 LLM 配置。
+  Future<void> _showLlmConfigSwitcher(HermesChatState chatState) async {
+    final service = ref.read(llmConfigServiceProvider);
+    await service.ensureMigratedFromLegacy();
+    final configs = await service.getAllConfigs();
+    final activeConfig =
+        await service.getActiveConfig(scenarioId: chatState.scenarioId);
+
+    if (!mounted) return;
+    if (configs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无 LLM 配置，请先在设置中添加')),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('切换 LLM 配置'),
+        children: configs
+            .map((c) => SimpleDialogOption(
+                  onPressed: () async {
+                    await service.setActiveConfigForScenario(
+                        chatState.scenarioId, c.id);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        c.id == activeConfig?.id
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        size: 18,
+                        color: c.id == activeConfig?.id
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(c.name)),
+                      if (c.isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('默认',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary)),
+                        ),
+                    ],
+                  ),
+                ))
+            .toList(),
       ),
     );
   }

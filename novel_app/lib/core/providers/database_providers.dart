@@ -13,6 +13,7 @@ import '../../repositories/bookshelf_repository.dart';
 import '../../repositories/novel_export_repository.dart';
 import '../../repositories/prompt_history_repository.dart';
 import '../../repositories/prompt_tag_category_repository.dart';
+import '../../repositories/llm_config_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
 import '../../repositories/prompt_tag_history_repository.dart';
 import '../../repositories/site_script_repository.dart';
@@ -198,4 +199,12 @@ final siteScriptRepositoryProvider = Provider<SiteScriptRepository>((ref) {
 final agentMemoryRepositoryProvider = Provider<AgentMemoryRepository>((ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return AgentMemoryRepository(dbConnection: dbConnection);
+});
+
+/// LlmConfigRepository Provider
+///
+/// LLM 配置序列的持久化操作
+final llmConfigRepositoryProvider = Provider<LlmConfigRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return LlmConfigRepository(dbConnection: dbConnection);
 });

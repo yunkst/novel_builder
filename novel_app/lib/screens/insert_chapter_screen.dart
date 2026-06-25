@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
+import '../models/llm_config.dart';
 import '../core/theme/app_colors.dart';
 import '../widgets/streaming_status_indicator.dart';
 import '../core/providers/service_providers.dart';
@@ -83,6 +84,7 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   @override
   void initState() {
     super.initState();
+    difyStreamingRef = ref;
     _titleController = TextEditingController(text: widget.prefillTitle ?? '');
     _userInputController =
         TextEditingController(text: widget.prefillContent ?? '');
@@ -424,6 +426,9 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
             Text(isEmpty ? '创建新章节' : '插入新章节'),
           ],
         ),
+        actions: [
+          _buildLlmConfigSelector(),
+        ],
       ),
       body: _isLoadingOutline
           ? const Center(
@@ -438,6 +443,53 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
             )
           : _buildBody(),
       bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  /// 构建 LLM 配置选择器
+  Widget _buildLlmConfigSelector() {
+    return FutureBuilder<List<LlmConfig>>(
+      future: ref.read(llmConfigServiceProvider).getAllConfigs(),
+      builder: (context, snapshot) {
+        final configs = snapshot.data ?? const <LlmConfig>[];
+        return PopupMenuButton<int?>(
+          icon: const Icon(Icons.smart_toy_outlined),
+          tooltip: '选择 LLM 配置',
+          onSelected: (configId) async {
+            if (configId == null) return;
+            final service = ref.read(llmConfigServiceProvider);
+            await service.setActiveConfig(configId);
+            setState(() {});
+          },
+          itemBuilder: (context) {
+            return [
+              const PopupMenuItem<int?>(
+                value: null,
+                enabled: false,
+                child: Text('选择 LLM 配置',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              ...configs.map((c) => PopupMenuItem<int?>(
+                    value: c.id,
+                    child: Row(
+                      children: [
+                        Icon(
+                          c.isDefault ? Icons.star : Icons.star_border,
+                          size: 16,
+                          color: c.isDefault ? Colors.amber : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(c.name)),
+                        if (c.model.isNotEmpty)
+                          Text(c.model,
+                              style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
+                  )),
+            ];
+          },
+        );
+      },
     );
   }
 

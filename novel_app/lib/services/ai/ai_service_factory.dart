@@ -1,42 +1,39 @@
 /// AI Service 工厂
 ///
-/// 从 DslEngineConfig（SharedPreferences）读取 LLM 配置，
-/// 统一构建 WritingService。
-/// 替代 DifyWorkflowService._buildDslExecutor() 的职责。
+/// 从 LlmConfigService 读取激活的 LLM 配置，构建 WritingService。
 library;
 
-import '../dsl_engine/dsl_engine_config.dart';
+import '../../core/providers/services/ai_service_providers.dart';
 import '../dsl_engine/llm_provider.dart';
 import 'writing_service.dart';
 
 class AiServiceFactory {
   AiServiceFactory._();
 
-  /// 从 DslEngineConfig 构建 WritingService，未配置时抛异常
-  static Future<WritingService> createWritingService() async {
-    final config = await _buildLlmConfig();
-    return WritingService(
-      provider: LlmProvider(config, httpClient: IoLlmHttpClient()),
-      defaultModel: config.defaultModel.isNotEmpty ? config.defaultModel : null,
-    );
-  }
-
-  /// 读取 DSL Engine 配置构建 LlmConfig
+  /// 从 LlmConfigService 获取激活配置，构建 WritingService
   ///
-  /// 未配置 API URL 或 Key 时抛出明确异常（与原 DifyWorkflowService 行为一致）。
-  static Future<LlmConfig> _buildLlmConfig() async {
-    final apiUrl = await DslEngineConfig.getApiUrl();
-    final apiKey = await DslEngineConfig.getApiKey();
-    final model = await DslEngineConfig.getModel();
+  /// [riverpodRef] Riverpod 容器（WidgetRef 或 Ref）
+  /// [scenarioId] 可选场景 ID，指定场景级配置
+  /// 未配置时抛异常
+  static Future<WritingService> createWritingService(
+    dynamic riverpodRef, {
+    String? scenarioId,
+  }) async {
+    final configService = riverpodRef.read(llmConfigServiceProvider);
+    // 确保旧配置已迁移
+    await configService.ensureMigratedFromLegacy();
 
-    if (apiUrl.isEmpty || apiKey.isEmpty) {
-      throw Exception('请先在设置中配置 DSL Engine (API URL 和 API Key)');
+    final activeConfig =
+        await configService.getActiveConfig(scenarioId: scenarioId);
+    if (activeConfig == null) {
+      throw Exception('请先在设置中配置 LLM（添加至少一个配置）');
     }
 
-    return LlmConfig(
-      baseUrl: apiUrl,
-      apiKey: apiKey,
-      defaultModel: model,
+    final llmConfig = configService.buildLlmProviderConfig(activeConfig);
+    return WritingService(
+      provider: LlmProvider(llmConfig, httpClient: IoLlmHttpClient()),
+      defaultModel:
+          llmConfig.defaultModel.isNotEmpty ? llmConfig.defaultModel : null,
     );
   }
 }

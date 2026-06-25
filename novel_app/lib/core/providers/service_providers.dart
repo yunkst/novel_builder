@@ -36,14 +36,15 @@ export 'services/core_service_providers.dart'
 export 'services/ai_service_providers.dart'
     show
         difyServiceProvider,
-        characterCardServiceProvider;
+        llmConfigServiceProvider,
+        chapterHistoryServiceProvider,
+        invalidMarkupCleanerProvider;
 
 // 网络服务
 export 'services/network_service_providers.dart'
     show
         apiServiceWrapperProvider,
-        preloadServiceProvider,
-        sceneIllustrationServiceProvider;
+        preloadServiceProvider;
 
 // 数据库服务
 export 'services/database_service_providers.dart'
@@ -53,15 +54,10 @@ export 'services/database_service_providers.dart'
         chapterActionHandlerProvider,
         chapterReorderControllerProvider,
         chapterSearchServiceProvider,
-        cacheSearchServiceProvider,
-        characterExtractionServiceProvider;
+        cacheSearchServiceProvider;
 
 // 缓存服务
-export 'services/cache_service_providers.dart'
-    show
-        roleGalleryCacheServiceProvider,
-        characterAvatarSyncServiceProvider,
-        characterAvatarServiceProvider;
+export 'services/cache_service_providers.dart';
 
 // 同步服务
 export 'services/sync_service_providers.dart'

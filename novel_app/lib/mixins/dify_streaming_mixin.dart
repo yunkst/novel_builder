@@ -42,6 +42,12 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
   DateTime? _startTime;
   int _charCount = 0;
 
+  /// Riverpod 容器（WidgetRef 或 Ref），由 ConsumerState 子类在 initState 中设置
+  ///
+  /// 用于将容器传递给 DifyService → DifyWorkflowService → AiServiceFactory，
+  /// 以读取 LlmConfigService 的激活配置。
+  dynamic difyStreamingRef;
+
   /// 是否正在流式输出
   bool get isStreaming => _isStreaming;
 
@@ -109,7 +115,7 @@ mixin DifyStreamingMixin<T extends StatefulWidget> on State<T> {
     }
 
     try {
-      final difyService = DifyService();
+      final difyService = DifyService(ref: difyStreamingRef);
 
       // 调用DifyService的流式方法
       await difyService.runWorkflowStreaming(

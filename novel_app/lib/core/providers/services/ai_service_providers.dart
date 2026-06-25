@@ -21,6 +21,7 @@ import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
 import '../../../services/chapter_history_service.dart';
 import '../../../services/invalid_markup_cleaner.dart';
+import '../../../services/llm_config_service.dart';
 import '../database_providers.dart';
 import 'network_service_providers.dart';
 
@@ -125,4 +126,21 @@ InvalidMarkupCleaner invalidMarkupCleaner(Ref ref) {
     chapterRepo: chapterRepository,
     illustrationRepo: illustrationRepository,
   );
+}
+
+/// LlmConfigService Provider
+///
+/// 提供全局 LLM 配置服务实例，用于统一管理 LLM 配置序列。
+///
+/// **功能**:
+/// - 获取/设置激活配置（全局 + 场景级）
+/// - CRUD 配置
+/// - 旧配置迁移
+/// - 构建 LlmProvider 配置
+///
+/// **依赖**:
+/// - [llmConfigRepositoryProvider] - LLM 配置数据访问
+@Riverpod(keepAlive: true)
+LlmConfigService llmConfigService(Ref ref) {
+  return LlmConfigService(ref);
 }

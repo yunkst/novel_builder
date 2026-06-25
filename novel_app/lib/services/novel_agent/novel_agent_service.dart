@@ -9,8 +9,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 
-import 'agent_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
 import '../../utils/cancellation_token.dart';
 import 'agent_event.dart';
@@ -41,12 +41,18 @@ class NovelAgentService {
 
   /// 检查 LLM 是否已配置
   Future<bool> isConfigured() async {
-    return await AgentEngineConfig.isConfigured();
+    final configService = ref.read(llmConfigServiceProvider);
+    await configService.ensureMigratedFromLegacy();
+    final config = await configService.getActiveConfig();
+    return config != null;
   }
 
   /// 检查指定场景的 LLM 是否已配置（考虑场景级回退链）
   Future<bool> isConfiguredForScenario(String scenarioId) async {
-    return await AgentEngineConfig.isConfiguredForScenario(scenarioId);
+    final configService = ref.read(llmConfigServiceProvider);
+    await configService.ensureMigratedFromLegacy();
+    final config = await configService.getActiveConfig(scenarioId: scenarioId);
+    return config != null;
   }
 
   /// 取消当前正在运行的 Agent 回合
@@ -106,11 +112,21 @@ class NovelAgentService {
       LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
           category: LogCategory.ai, tags: ['agent', 'service', 'request', scenarioId]);
 
-      // 构造 LLM Provider（优先使用场景级配置，为空则回退到 Agent 全局 → DSL Engine）
+      // 构造 LLM Provider（从 LlmConfigService 获取激活配置，支持场景级覆盖）
+      final configService = ref.read(llmConfigServiceProvider);
+      await configService.ensureMigratedFromLegacy();
+      final activeConfig =
+          await configService.getActiveConfig(scenarioId: scenarioId);
+      if (activeConfig == null) {
+        _controller.add(const AgentErrorEvent(
+            '请先在 hermes 窗口右上角设置中配置 LLM 后端，或在设置 → AI 配置中配置全局默认 LLM'));
+        return;
+      }
+      final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
       final config = LlmConfig(
-        baseUrl: await AgentEngineConfig.getEffectiveApiUrlForScenario(scenarioId),
-        apiKey: await AgentEngineConfig.getEffectiveApiKeyForScenario(scenarioId),
-        defaultModel: await AgentEngineConfig.getEffectiveModelForScenario(scenarioId),
+        baseUrl: llmProviderConfig.baseUrl,
+        apiKey: llmProviderConfig.apiKey,
+        defaultModel: llmProviderConfig.defaultModel,
         timeout: const Duration(seconds: 120),
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());

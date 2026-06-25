@@ -5,6 +5,7 @@ import '../../core/providers/onboarding_providers.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/providers/ui_providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/llm_config.dart';
 import '../../services/logger_service.dart';
 import '../../utils/toast_utils.dart';
 import '../../widgets/onboarding/ai_capabilities_section.dart';
@@ -164,8 +165,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       final model = _aiModelController.text.trim();
 
-      // DSL Engine 配置（DifyService 的底层引擎）
-      // 保存后 DslEngineConfig.isConfigured() 即返回 true
+      // 保存到 llm_configs 表（新的多配置序列）
+      // 同时保留旧 key 写入，保证向后兼容
+      final configService = ref.read(llmConfigServiceProvider);
+      final now = DateTime.now();
+      final id = await configService.saveConfig(LlmConfig(
+        name: '默认配置',
+        apiUrl: apiUrl,
+        apiKey: apiKey,
+        model: model,
+        isDefault: true,
+        sortOrder: 0,
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await configService.setDefault(id);
+      await configService.setActiveConfig(id);
+
+      // 兼容旧 key（引导页写 dsl_engine_* 以兼容未迁移的旧逻辑）
       final prefs = ref.read(preferencesServiceProvider);
       await prefs.setString('dsl_engine_api_url', apiUrl);
       await prefs.setString('dsl_engine_api_key', apiKey);
@@ -175,7 +192,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await prefs.setBool('dsl_engine_enabled', true);
 
       LoggerService.instance.i(
-        '新手引导：已保存 DSL Engine 配置（AI 引擎）',
+        '新手引导：已保存 LLM 配置（AI 引擎）',
         category: LogCategory.ai,
         tags: ['onboarding', 'ai', 'config'],
       );

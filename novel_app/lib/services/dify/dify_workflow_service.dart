@@ -5,11 +5,12 @@ import '../logger_service.dart';
 /// 工作流服务（已切换到强类型 Dart Service）
 ///
 /// 内部委托给 WritingService 处理新建章节（cmd='' 流式分支）。
-/// 替代原 DslExecutor + yml 黑盒。保持对外接口 [executeStreaming] / [executeBlocking] 不变。
-///
 /// 路由规则：根据 inputs['cmd'] 分发到对应的强类型方法。当前仅保留 cmd=''（新建章节）。
 class DifyWorkflowService {
-  DifyWorkflowService();
+  /// Riverpod 容器（WidgetRef 或 Ref），用于通过 AiServiceFactory 获取 LLM 配置。
+  final dynamic _ref;
+
+  DifyWorkflowService({dynamic ref}) : _ref = ref;
 
   // ============================================================================
   // 流式执行（原 creater.yml 路径 → WritingService）
@@ -29,7 +30,10 @@ class DifyWorkflowService {
       tags: ['workflow', 'streaming'],
     );
     try {
-      final service = await AiServiceFactory.createWritingService();
+      if (_ref == null) {
+        throw Exception('DifyWorkflowService 需要传入 Riverpod 容器以获取 LLM 配置');
+      }
+      final service = await AiServiceFactory.createWritingService(_ref);
       final stream = _routeStreaming(service, inputs);
       await for (final chunk in stream) {
         onData(chunk);
@@ -62,19 +66,15 @@ class DifyWorkflowService {
   // cmd 路由
   // ============================================================================
 
-  /// 根据 inputs['cmd'] 路由到 WritingService 的对应流式方法
   Stream<String> _routeStreaming(
     WritingService service,
     Map<String, dynamic> inputs,
   ) {
     final cmd = (inputs['cmd'] as String?) ?? '';
-
-    // 公共字段读取辅助
     String s(String key) => (inputs[key] ?? '').toString();
 
     switch (cmd) {
       case '':
-        // cmd='' 当前仅服务新建章节（currentChapterContent 为空）
         return service.createChapter(
           aiWriterSetting: s('ai_writer_setting'),
           backgroundSetting: s('background_setting'),

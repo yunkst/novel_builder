@@ -5,23 +5,24 @@ import 'dify/dify_workflow_service.dart';
 ///
 /// 委托给：
 /// - [DifyConfigService]: AI 设定管理
-/// - [DifyWorkflowService]: 工作流调用（本地 DSL Engine 执行）
+/// - [DifyWorkflowService]: 工作流调用
 class DifyService {
   final DifyConfigService _config;
   late final DifyWorkflowService _workflow;
 
-  /// 构造函数 - 支持依赖注入
+  /// 构造函数
   ///
-  /// [config] 可选的配置服务实例，用于测试和依赖注入
-  DifyService({DifyConfigService? config})
+  /// [config] 可选的配置服务实例
+  /// [ref] Riverpod 容器（WidgetRef 或 Ref），用于 DifyWorkflowService 获取 LLM 配置
+  DifyService({DifyConfigService? config, dynamic ref})
       : _config = config ?? DifyConfigService() {
-    _workflow = DifyWorkflowService();
+    _workflow = DifyWorkflowService(ref: ref);
   }
 
-  /// 获取配置服务（用于测试和高级用法）
+  /// 获取配置服务
   DifyConfigService get config => _config;
 
-  /// 获取工作流服务（用于高级用法）
+  /// 获取工作流服务
   DifyWorkflowService get workflow => _workflow;
 
   // ============================================================================
