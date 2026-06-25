@@ -5,7 +5,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/novel.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
-import '../widgets/reader/background_summary_dialog.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
@@ -177,22 +176,6 @@ class _BackgroundSettingScreenState
     return result ?? false;
   }
 
-  /// 显示总结对话框
-  Future<void> _showSummaryDialog() async {
-    final updated = await showDialog<bool>(
-      context: context,
-      builder: (_) => BackgroundSummaryDialog(
-        novel: widget.novel,
-        backgroundText: _controller.text,
-      ),
-    );
-
-    // 如果已更新,重新加载数据
-    if (updated == true && mounted) {
-      await _reloadBackgroundSetting();
-    }
-  }
-
   /// 从数据库加载背景设定
   Future<void> _loadBackgroundSetting() async {
     try {
@@ -220,11 +203,6 @@ class _BackgroundSettingScreenState
         });
       }
     }
-  }
-
-  /// 重新加载背景设定（用于AI总结后刷新）
-  Future<void> _reloadBackgroundSetting() async {
-    await _loadBackgroundSetting();
   }
 
   /// Tab切换时的处理
@@ -414,12 +392,6 @@ class _BackgroundSettingScreenState
             ),
             backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             actions: [
-              // 总结按钮
-              IconButton(
-                icon: const Icon(Icons.summarize),
-                tooltip: 'AI总结',
-                onPressed: _showSummaryDialog,
-              ),
               // 保存按钮
               IconButton(
                 icon: _isSaving

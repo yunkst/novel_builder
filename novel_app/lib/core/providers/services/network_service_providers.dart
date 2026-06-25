@@ -23,8 +23,6 @@ import '../../../services/api_service_wrapper.dart';
 import '../../../services/preload_service.dart';
 import '../../../services/headless_webview_content_service.dart';
 import '../../../services/headless_webview_chapter_list_service.dart';
-import '../../../services/scene_illustration_service.dart';
-import '../../../services/scene_illustration_cache_service.dart';
 import '../../../repositories/chapter_repository.dart';
 import '../repository_providers.dart';
 import '../database_providers.dart';
@@ -238,64 +236,7 @@ PreloadService preloadService(Ref ref) {
   );
 }
 
-/// SceneIllustrationService Provider
-///
-/// 提供场景插图服务实例，负责场景图片的生成和管理。
-///
-/// **功能**:
-/// - 场景插图生成
-/// - 插图缓存管理
-/// - 图片 URL 处理
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [illustrationRepositoryProvider] - 插图数据访问
-/// - [apiServiceWrapperProvider] - API 服务
-///
-/// **使用示例**:
-/// ```dart
-/// final illustrationService = ref.watch(sceneIllustrationServiceProvider);
-/// final imageUrl = await illustrationService.generateIllustration(scene);
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 插图生成是异步操作
-@riverpod
-SceneIllustrationService sceneIllustrationService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final illustrationRepository = ref.watch(illustrationRepositoryProvider);
-  final apiService = ref.watch(apiServiceWrapperProvider);
-  return SceneIllustrationService(
-    chapterRepository: chapterRepository,
-    illustrationRepository: illustrationRepository,
-    apiService: apiService,
-  );
-}
-
-/// SceneIllustrationCacheService Provider
-///
-/// 提供场景插图缓存服务实例，管理场景插图的本地缓存。
-///
-/// **功能**:
-/// - 图片内存缓存和磁盘缓存
-/// - 预加载和批量缓存
-/// - 缓存有效期管理
-///
-/// **依赖**:
-/// - [apiServiceWrapperProvider] - API服务
-///
-/// **使用示例**:
-/// ```dart
-/// final cacheService = ref.read(sceneIllustrationCacheServiceProvider);
-/// await cacheService.init();
-/// final imageBytes = await cacheService.getImageBytes(filename);
-/// ```
-@Riverpod(keepAlive: true)
-SceneIllustrationCacheService sceneIllustrationCacheService(Ref ref) {
-  final apiService = ref.watch(apiServiceWrapperProvider);
-  return SceneIllustrationCacheService(apiService: apiService);
-}
+/// SceneIllustrationService 和 SceneIllustrationCacheService 已删除，相关 provider 已移除。
 
 /// HeadlessWebViewContentService Provider
 ///

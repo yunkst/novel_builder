@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/logger_service.dart';
 import '../utils/media_markup_parser.dart';
-import 'scene_image_preview.dart';
 
 class ParagraphWidget extends StatefulWidget {
   final String paragraph;
@@ -14,11 +12,6 @@ class ParagraphWidget extends StatefulWidget {
   final ValueChanged<int>? onTap;
   final ValueChanged<int>? onLongPress;
   final ValueChanged<String>? onContentChanged;
-  final Function(String taskId, String imageUrl, int imageIndex)? onImageTap;
-  final Function(String taskId)? onImageDelete;
-  final Function(String taskId)? generateVideoFromIllustration;
-  final int? modelWidth;
-  final int? modelHeight;
 
   const ParagraphWidget({
     super.key,
@@ -32,11 +25,6 @@ class ParagraphWidget extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.onContentChanged,
-    this.onImageTap,
-    this.onImageDelete,
-    this.generateVideoFromIllustration,
-    this.modelWidth,
-    this.modelHeight,
   });
 
   @override
@@ -50,8 +38,6 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.paragraph);
-    // 移除 listener，改为在 TextField 的 onChanged 中处理用户输入
-    // 这样可以避免程序更新 controller.text 时触发不必要的回调
   }
 
   @override
@@ -61,7 +47,6 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
     if (oldWidget.paragraph != widget.paragraph) {
       // 检查是否是用户编辑导致的更新（避免覆盖用户输入）
       if (_controller.text != widget.paragraph) {
-        // 使用 value 更新而不是直接设置 text，这样可以避免触发 TextField 的 onChanged
         _controller.value = TextEditingValue(
           text: widget.paragraph,
           selection: TextSelection.collapsed(offset: widget.paragraph.length),
@@ -78,105 +63,44 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 检查是否为插图标记
+    // 检查是否为插图标记 — 仅在编辑模式下展示原始标记文本
     if (MediaMarkupParser.isMediaMarkup(widget.paragraph)) {
-      return _buildIllustrationWidget();
+      return _buildMediaMarkupWidget();
     }
 
     return _buildTextWidget();
   }
 
-  Widget _buildIllustrationWidget() {
-    final markup = MediaMarkupParser.parseMediaMarkup(widget.paragraph).first;
-
-    if (!markup.isIllustration) {
-      return const SizedBox.shrink();
+  /// 插图标记展示（编辑模式下展示原始标记，阅读模式下隐藏）
+  Widget _buildMediaMarkupWidget() {
+    if (widget.isEditMode) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          widget.paragraph,
+          style: TextStyle(
+            fontSize: widget.fontSize * 0.9,
+            fontFamily: 'monospace',
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+      );
     }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildIllustrationTitle(),
-          _buildIllustrationContent(markup),
-          if (widget.isEditMode) _buildIllustrationMarkup(markup),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIllustrationTitle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      child: Text(
-        '插图 ${widget.index + 1}',
-        style: TextStyle(
-          fontSize: widget.fontSize * 0.8,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIllustrationContent(dynamic markup) {
-    return SceneImagePreview(
-      taskId: markup.id,
-      onImageTap: widget.onImageTap,
-      onDelete: widget.onImageDelete != null
-          ? (taskId) => widget.onImageDelete!(taskId)
-          : null,
-      onImageDeleted: () {
-        LoggerService.instance.i(
-          '单张图片删除成功: ${markup.id}',
-          category: LogCategory.ui,
-          tags: const ['paragraph'],
-        );
-      },
-      modelWidth: widget.modelWidth,
-      modelHeight: widget.modelHeight,
-    );
-  }
-
-  Widget _buildIllustrationMarkup(dynamic markup) {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          decoration: BoxDecoration(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-            border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.3)),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            MediaMarkupParser.createIllustrationMarkup(markup.id),
-            style: TextStyle(
-              fontSize: widget.fontSize * 0.9,
-              fontFamily: 'monospace',
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.7),
-            ),
-          ),
-        ),
-      ],
-    );
+    // 阅读模式下不渲染插图标记
+    return const SizedBox.shrink();
   }
 
   Widget _buildTextWidget() {
-    // 编辑模式使用TextField，阅读模式使用Text
     if (widget.isEditMode) {
       return _buildEditableText();
     }
-
     return _buildReadableText();
   }
 
@@ -193,7 +117,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
       ),
       child: TextField(
         controller: _controller,
-        onChanged: widget.onContentChanged, // 直接使用 onChanged 处理用户输入
+        onChanged: widget.onContentChanged,
         decoration: const InputDecoration(
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
@@ -210,7 +134,6 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
   }
 
   Widget _buildReadableText() {
-    // 应用文字亮度调节（仅阅读模式）
     final baseColor = Theme.of(context).textTheme.bodyLarge?.color ??
         Theme.of(context).colorScheme.onSurface;
     final effectiveColor = baseColor.withValues(alpha: widget.textBrightness);

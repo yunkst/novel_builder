@@ -1,13 +1,12 @@
 /// AI Service 工厂
 ///
 /// 从 DslEngineConfig（SharedPreferences）读取 LLM 配置，
-/// 统一构建 WritingService / InfoExtractionService。
+/// 统一构建 WritingService。
 /// 替代 DifyWorkflowService._buildDslExecutor() 的职责。
 library;
 
 import '../dsl_engine/dsl_engine_config.dart';
 import '../dsl_engine/llm_provider.dart';
-import 'info_extraction_service.dart';
 import 'writing_service.dart';
 
 class AiServiceFactory {
@@ -17,15 +16,6 @@ class AiServiceFactory {
   static Future<WritingService> createWritingService() async {
     final config = await _buildLlmConfig();
     return WritingService(
-      provider: LlmProvider(config, httpClient: IoLlmHttpClient()),
-      defaultModel: config.defaultModel.isNotEmpty ? config.defaultModel : null,
-    );
-  }
-
-  /// 从 DslEngineConfig 构建 InfoExtractionService，未配置时抛异常
-  static Future<InfoExtractionService> createInfoExtractionService() async {
-    final config = await _buildLlmConfig();
-    return InfoExtractionService(
       provider: LlmProvider(config, httpClient: IoLlmHttpClient()),
       defaultModel: config.defaultModel.isNotEmpty ? config.defaultModel : null,
     );

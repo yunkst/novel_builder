@@ -6,7 +6,6 @@ import '../core/providers/chapter_list_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../widgets/hermes/hermes_floating_button.dart';
 import '../core/providers/service_providers.dart';
-import '../core/providers/database_providers.dart';
 import '../widgets/chapter_list/chapter_list_header.dart';
 import '../widgets/chapter_list/chapter_list_item.dart';
 import '../widgets/chapter_list/reorderable_chapter_item.dart';
@@ -16,13 +15,9 @@ import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
 import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
-import 'character_management_screen.dart';
-import 'outline/outline_management_screen.dart';
 import 'background_setting_screen.dart';
 import 'insert_chapter_screen.dart';
 import 'chapter_generation_screen.dart';
-import '../widgets/ai_accompaniment_settings_dialog.dart';
-import '../models/ai_accompaniment_settings.dart';
 import '../widgets/novel_sync_dialog.dart';
 import '../core/providers/novel_sync_providers.dart';
 import '../core/providers/reading_context_providers.dart';
@@ -137,7 +132,6 @@ class _ChapterListScreenRiverpodState
           actions: [
             _buildReorderButton(state, notifier),
             _buildSearchButton(),
-            _buildCharacterButton(),
             _buildPopupMenu(state, notifier, context),
           ],
         ),
@@ -237,23 +231,6 @@ class _ChapterListScreenRiverpodState
     );
   }
 
-  /// 构建人物管理按钮
-  Widget _buildCharacterButton() {
-    return IconButton(
-      icon: const Icon(Icons.people),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                CharacterManagementScreen(novel: widget.novel),
-          ),
-        );
-      },
-      tooltip: '人物管理',
-    );
-  }
-
   /// 构建弹出菜单
   Widget _buildPopupMenu(
     ChapterListState state,
@@ -274,17 +251,6 @@ class _ChapterListScreenRiverpodState
           case 'refresh':
             notifier.refreshChapters(context);
             break;
-          case 'outline_management':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OutlineManagementScreen(
-                  novelUrl: widget.novel.url,
-                  novelTitle: widget.novel.title,
-                ),
-              ),
-            );
-            break;
           case 'background_setting':
             Navigator.push(
               context,
@@ -294,9 +260,6 @@ class _ChapterListScreenRiverpodState
                 ),
               ),
             );
-            break;
-          case 'ai_accompaniment_settings':
-            _openAiSettings(state);
             break;
           case 'upload_to_server':
             _handleUploadToServer();
@@ -342,32 +305,12 @@ class _ChapterListScreenRiverpodState
               ),
             ),
           const PopupMenuItem(
-            value: 'outline_management',
-            child: Row(
-              children: [
-                Icon(Icons.menu_book_outlined),
-                SizedBox(width: 8),
-                Text('大纲管理'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
             value: 'background_setting',
             child: Row(
               children: [
                 Icon(Icons.info_outline),
                 SizedBox(width: 8),
                 Text('背景设定'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'ai_accompaniment_settings',
-            child: Row(
-              children: [
-                Icon(Icons.psychology_outlined),
-                SizedBox(width: 8),
-                Text('AI伴读设置'),
               ],
             ),
           ),
@@ -581,27 +524,6 @@ class _ChapterListScreenRiverpodState
             child: const Text('确定'),
           ),
         ],
-      ),
-    );
-  }
-
-  /// 打开AI伴读设置对话框
-  void _openAiSettings(ChapterListState state) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AiAccompanimentSettingsDialog(
-        initialSettings: state.aiSettings ?? const AiAccompanimentSettings(),
-        onSave: (settings) async {
-          final databaseService = ref.read(databaseServiceProvider);
-          await databaseService.updateAiAccompanimentSettings(
-              widget.novel.url, settings);
-          // 重新加载设置
-          ref.invalidate(chapterListProvider(widget.novel));
-          // 显示保存成功提示
-          if (context.mounted) {
-            ToastUtils.show('AI伴读设置已保存');
-          }
-        },
       ),
     );
   }

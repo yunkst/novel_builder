@@ -7,7 +7,6 @@ import '../../models/chapter.dart';
 /// 职责：
 /// - 显示章节标题和编辑模式状态
 /// - 提供编辑模式切换
-/// - 沉浸体验入口
 /// - 更多功能菜单
 ///
 /// 依赖：
@@ -18,10 +17,8 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Chapter currentChapter;
   final List<Chapter> chapters;
   final bool isEditMode;
-  final bool isUpdatingRoleCards;
   final VoidCallback onToggleEditMode;
   final VoidCallback onSaveAndExitEditMode;
-  final VoidCallback onShowImmersiveSetup;
   final Function(String) onMenuAction;
 
   const ReaderAppBar({
@@ -30,10 +27,8 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.currentChapter,
     required this.chapters,
     required this.isEditMode,
-    required this.isUpdatingRoleCards,
     required this.onToggleEditMode,
     required this.onSaveAndExitEditMode,
-    required this.onShowImmersiveSetup,
     required this.onMenuAction,
   });
 
@@ -87,13 +82,6 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
             tooltip: '完成编辑并保存',
             icon: const Icon(Icons.check),
           ),
-        // 沉浸体验按钮
-        if (!isEditMode)
-          IconButton(
-            onPressed: onShowImmersiveSetup,
-            tooltip: '沉浸体验',
-            icon: const Icon(Icons.theater_comedy_outlined),
-          ),
         // 更多功能菜单
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
@@ -117,67 +105,6 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                   Icon(Icons.tune, size: 18),
                   SizedBox(width: 12),
                   Text('阅读设置'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'summarize',
-              child: Row(
-                children: [
-                  Icon(Icons.summarize, size: 18),
-                  SizedBox(width: 12),
-                  Text('总结'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'full_rewrite',
-              child: Row(
-                children: [
-                  Icon(Icons.auto_stories, size: 18),
-                  SizedBox(width: 12),
-                  Text('全文重写'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'update_character_cards',
-              enabled: !isUpdatingRoleCards,
-              child: Row(
-                children: [
-                  isUpdatingRoleCards
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).colorScheme.tertiary),
-                          ),
-                        )
-                      : const Icon(Icons.person_search, size: 18),
-                  const SizedBox(width: 12),
-                  Text(isUpdatingRoleCards ? '更新中...' : '更新角色卡'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'ai_companion',
-              child: Row(
-                children: [
-                  Icon(Icons.auto_stories, size: 18),
-                  SizedBox(width: 12),
-                  Text('AI伴读'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'ai_extract_tags',
-              child: Row(
-                children: [
-                  Icon(Icons.auto_awesome, size: 18),
-                  SizedBox(width: 12),
-                  Text('AI 提取标签'),
                 ],
               ),
             ),

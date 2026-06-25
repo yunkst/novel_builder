@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/bookshelf_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/illustration_debug_screen.dart';
 import 'screens/webview_browser_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'core/providers/service_providers.dart';
@@ -16,7 +15,6 @@ import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/log_reporter_service.dart';
-import 'services/llm_logger/llm_logger.dart';
 import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/hermes/hermes_floating_button.dart';
 
@@ -46,23 +44,6 @@ void main() async {
       stackTrace: stackTrace.toString(),
       category: LogCategory.general,
       tags: ['startup', 'log-reporter', 'error'],
-    );
-  }
-
-  // 初始化 LLM 调用日志服务
-  try {
-    await LlmLogger.instance.initialize();
-    LoggerService.instance.i(
-      'LlmLogger 初始化完成',
-      category: LogCategory.ai,
-      tags: ['startup', 'llm-logger'],
-    );
-  } catch (e, stackTrace) {
-    LoggerService.instance.e(
-      'LlmLogger 初始化失败: $e',
-      stackTrace: stackTrace.toString(),
-      category: LogCategory.ai,
-      tags: ['startup', 'llm-logger', 'error'],
     );
   }
 
@@ -269,39 +250,18 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver {
   /// 浏览器 Tab 索引（统一进 IndexedStack 后也用于场景切换判定）
-  static const int _browserTabIndex = 2;
-
-  // 为生图调试页面创建 GlobalKey，用于调用刷新方法
-  final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
+  static const int _browserTabIndex = 1;
 
   void _onItemTapped(int index, WidgetRef ref) {
-    final previousIndex = ref.read(homeTabIndexNotifierProvider);
-
-    // 当切换到生图调试页面（索引2）且之前不在该页面时，触发刷新
-    if (index == 2 && previousIndex != 2) {
-      _refreshIllustrationDebugScreen();
-    }
-
     // 更新 Tab 索引（单一真相源：homeTabIndexNotifierProvider）
     ref.read(homeTabIndexNotifierProvider.notifier).switchTo(index);
 
     // 根据当前 Tab 切换 Hermes Agent 场景：
     // 浏览器 Tab 用网页提取场景，其余 Tab 用写作场景。
-    // 原来由 WebViewBrowserScreen 的 initState/deactivate 处理，
-    // 但改为 IndexedStack 常驻后 deactivate 不再触发，场景切换统一在这里进行。
     ref.read(currentAgentScenarioProvider.notifier).state =
         index == _browserTabIndex
             ? ScenarioIds.webviewExtract
             : ScenarioIds.writing;
-  }
-
-  /// 刷新生图调试页面列表
-  void _refreshIllustrationDebugScreen() {
-    final debugScreenState = _debugScreenKey.currentState;
-    if (debugScreenState != null) {
-      // 通过动态调用刷新方法（不依赖具体类型）
-      (debugScreenState as dynamic).refreshData?.call();
-    }
   }
 
   @override
@@ -376,13 +336,9 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     final selectedIndex = ref.watch(homeTabIndexNotifierProvider);
 
     // 响应外部/导航触发的 Tab 切换，执行副作用：
-    // 1) 进入生图 Tab 时刷新数据
-    // 2) 切换 Hermes Agent 场景
+    // 切换 Hermes Agent 场景
     ref.listen<int>(homeTabIndexNotifierProvider, (previous, next) {
       if (previous == null || previous == next) return;
-      if (next == 1 && previous != 1) {
-        _refreshIllustrationDebugScreen();
-      }
       ref.read(currentAgentScenarioProvider.notifier).state =
           next == _browserTabIndex
               ? ScenarioIds.webviewExtract
@@ -398,7 +354,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           index: selectedIndex,
           children: [
             const BookshelfScreen(),
-            IllustrationDebugScreen(key: _debugScreenKey),
             // active 标记当前浏览器是否可见：
             // 仅在可见时拦截系统返回手势，避免 offstage 状态下误拦截其他 Tab 的返回键。
             WebViewBrowserScreen(active: selectedIndex == _browserTabIndex),
@@ -415,10 +370,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           NavigationDestination(
             icon: Icon(Icons.book),
             label: '书架',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.image),
-            label: '生图调试',
           ),
           NavigationDestination(
             icon: Icon(Icons.public),

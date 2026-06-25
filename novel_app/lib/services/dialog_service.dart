@@ -40,11 +40,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/ai_companion_response.dart';
-import '../widgets/reader/ai_companion_confirm_dialog.dart';
-import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
-import '../models/novel.dart';
 import '../utils/toast_utils.dart';
 
 /// 对话框服务类
@@ -122,83 +118,6 @@ class DialogService {
         ],
       ),
     );
-  }
-
-  // ============ AI伴读对话框 ============
-
-  /// 显示AI伴读确认对话框
-  ///
-  /// [context] 上下文
-  /// [response] AI伴读响应数据
-  ///
-  /// 返回用户是否确认更新
-  Future<bool> showAICompanionConfirm(
-    BuildContext context, {
-    required AICompanionResponse response,
-  }) async {
-    return await showAICompanionConfirmDialog(context, response);
-  }
-
-  /// 执行AI伴读更新
-  ///
-  /// [context] 上下文
-  /// [response] AI伴读响应数据
-  /// [novel] 小说对象
-  /// [isSilent] 是否为静默模式
-  Future<void> performAICompanionUpdates(
-    BuildContext context, {
-    required AICompanionResponse response,
-    required Novel novel,
-    bool isSilent = false,
-  }) async {
-    final databaseService = ref.read(databaseServiceProvider);
-
-    // 仅在非静默模式下显示更新进度
-    if (!isSilent) {
-      ToastUtils.showInfo(
-        '正在更新数据...',
-        context: context,
-        duration: const Duration(minutes: 5),
-      );
-    }
-
-    try {
-      // 1. 追加背景设定
-      if (response.background.isNotEmpty) {
-        await databaseService.appendBackgroundSetting(
-          novel.url,
-          response.background,
-        );
-      }
-
-      // 2. 批量更新或插入角色
-      if (response.roles.isNotEmpty) {
-        await databaseService.batchUpdateOrInsertCharacters(
-          novel.url,
-          response.roles,
-        );
-      }
-
-      // 3. 批量插入关系
-      if (response.relations.isNotEmpty) {
-        await databaseService.batchUpdateOrInsertRelationships(
-          novel.url,
-          response.relations,
-        );
-      }
-
-      // 4. 完成提示
-      if (!isSilent && context.mounted) {
-        ToastUtils.dismiss();
-        ToastUtils.showSuccess('AI伴读数据已更新', context: context);
-      }
-    } catch (e) {
-      if (!isSilent && context.mounted) {
-        ToastUtils.dismiss();
-        ToastUtils.showError('更新数据失败: $e', context: context);
-      }
-      rethrow;
-    }
   }
 
   // ============ Toast提示管理 ============

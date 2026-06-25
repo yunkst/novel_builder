@@ -9,32 +9,11 @@
 library;
 
 import 'package:flutter/material.dart';
-import '../models/ai_companion_response.dart';
-import '../widgets/reader/ai_companion_confirm_dialog.dart';
 
 /// 对话框服务
 ///
 /// 提供统一的对话框显示接口，方便测试和复用。
 class DialogService {
-  /// 显示AI伴读确认对话框
-  ///
-  /// [context] BuildContext
-  /// [response] AI伴读响应数据
-  /// 返回用户是否确认（true=确认，false=取消，null=对话框关闭）
-  Future<bool?> showAICompanionConfirmDialog(
-    BuildContext context,
-    AICompanionResponse response,
-  ) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AICompanionConfirmDialog(
-        response: response,
-        onConfirm: () => Navigator.of(context).pop(true),
-        onCancel: () => Navigator.of(context).pop(false),
-      ),
-    );
-  }
-
   /// 显示通用确认对话框
   ///
   /// [context] BuildContext

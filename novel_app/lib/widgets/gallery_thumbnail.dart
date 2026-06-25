@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/role_gallery.dart';
 import 'api_image_widget.dart';
-import '../services/role_gallery_cache_service.dart';
 import '../services/logger_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/services/network_service_providers.dart';
@@ -14,7 +13,6 @@ class GalleryThumbnail extends ConsumerStatefulWidget {
   final double? size;
   final bool showBadge;
   final bool enableAnimation;
-  final RoleGalleryCacheService? cacheService; // 可选的缓存服务实例
 
   const GalleryThumbnail({
     super.key,
@@ -23,7 +21,6 @@ class GalleryThumbnail extends ConsumerStatefulWidget {
     this.size = 60,
     this.showBadge = true,
     this.enableAnimation = true,
-    this.cacheService,
   });
 
   @override
@@ -41,7 +38,6 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
   void initState() {
     super.initState();
 
-    // 初始化动画控制器
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -54,7 +50,6 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
       curve: Curves.easeInOut,
     ));
 
-    // 加载图集数据
     _loadGallery();
   }
 
@@ -126,11 +121,8 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
               height: size,
               child: Stack(
                 children: [
-                  // 主要图片
                   _buildMainImage(size),
-                  // 徽标
                   if (widget.showBadge) _buildBadge(size),
-                  // 加载状态
                   if (_isLoading) _buildLoadingOverlay(size),
                 ],
               ),
@@ -153,7 +145,6 @@ class _GalleryThumbnailState extends ConsumerState<GalleryThumbnail>
           height: size,
           fit: BoxFit.cover,
           errorWidget: _buildErrorPlaceholder(size),
-          cacheService: widget.cacheService, // 传递缓存服务
         ),
       );
     } else {
@@ -284,14 +275,12 @@ class GalleryPreviewCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // 缩略图
               GalleryThumbnail(
                 roleId: roleId,
                 size: 50,
                 enableAnimation: enableAnimation,
               ),
               const SizedBox(width: 12),
-              // 标题和描述
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +306,6 @@ class GalleryPreviewCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // 箭头图标
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,

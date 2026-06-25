@@ -5,9 +5,7 @@ import 'dify_settings_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_report_settings_screen.dart';
 import 'log_viewer_screen.dart';
-import 'llm_log_list_screen.dart';
 import 'preload_queue_debug_screen.dart';
-import 'prompt_tag_management_screen.dart';
 import '../services/app_update_service.dart';
 import '../services/logger_service.dart';
 import '../widgets/app_update_dialog.dart';
@@ -229,23 +227,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const Divider(),
 
-          // 标签管理
-          ListTile(
-            leading: const Icon(Icons.label_outline),
-            title: const Text('标签管理'),
-            subtitle: const Text('管理章节生成时使用的提示词标签'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PromptTagManagementScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
           // 日志上报设置
           ListTile(
             leading: const Icon(Icons.cloud_upload_outlined),
@@ -274,23 +255,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LogViewerScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // AI 调用日志入口
-          ListTile(
-            leading: const Icon(Icons.psychology_outlined),
-            title: const Text('AI 调用日志'),
-            subtitle: const Text('查看最近的 LLM 请求与响应详情'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LlmLogListScreen(),
                 ),
               );
             },

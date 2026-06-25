@@ -8,25 +8,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/character.dart';
-import '../../services/character_image_cache_service.dart';
 import '../../services/logger_service.dart';
 import 'database_providers.dart';
 
 part 'character_screen_providers.g.dart';
 
-/// CharacterImageCacheService Provider
-///
-/// 提供角色图片缓存服务实例
-/// 使用 keepAlive: true 确保实例不会被销毁（单例模式）
-@Riverpod(keepAlive: true)
-CharacterImageCacheService characterImageCacheService(Ref ref) {
-  final service = CharacterImageCacheService();
-
-  // 注意：初始化需要在首次使用时手动调用，或在外部初始化
-  // 这里不自动初始化，避免 ProviderRef 没有 onFuture 方法的问题
-
-  return service;
-}
+/// CharacterImageCacheService 已删除，相关 provider 已移除。
 
 /// CharacterManagement Screen State
 ///

@@ -5,7 +5,6 @@ class ReaderActionButtons extends StatelessWidget {
   final bool hasSelectedParagraphs;
   final bool isAutoScrolling;
   final bool isAutoScrollPaused;
-  final VoidCallback onRewritePressed;
   final VoidCallback onToggleCloseupMode;
   final VoidCallback onToggleAutoScroll;
 
@@ -15,24 +14,12 @@ class ReaderActionButtons extends StatelessWidget {
     required this.hasSelectedParagraphs,
     required this.isAutoScrolling,
     this.isAutoScrollPaused = false,
-    required this.onRewritePressed,
     required this.onToggleCloseupMode,
     required this.onToggleAutoScroll,
   });
 
   @override
   Widget build(BuildContext context) {
-    // 如果在特写模式下且有选中段落，显示改写按钮
-    if (isCloseupMode && hasSelectedParagraphs) {
-      return FloatingActionButton.extended(
-        onPressed: onRewritePressed,
-        icon: const Icon(Icons.edit),
-        label: const Text('改写'),
-        backgroundColor: Colors.transparent,
-        heroTag: 'rewrite',
-      );
-    }
-
     // 正常阅读模式下，显示特写模式和自动滚屏按钮
     return Padding(
       padding: const EdgeInsets.only(bottom: 120.0), // 避免与底部章节切换按钮重叠

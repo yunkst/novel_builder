@@ -1,20 +1,2 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/character_avatar_service.dart';
-import '../../core/providers/services/cache_service_providers.dart';
-import '../../core/providers/database_providers.dart';
-
-/// CharacterAvatarService Provider
-///
-/// 提供CharacterAvatarService单例实例
-/// CharacterAvatarService负责角色头像管理
-/// @deprecated 请使用 cache_service_providers.dart 中的 characterAvatarServiceProvider
-@Deprecated(
-    '请使用 cache_service_providers.dart 中的 characterAvatarServiceProvider')
-final characterAvatarServiceProvider = Provider<CharacterAvatarService>((ref) {
-  final cacheService = ref.watch(characterImageCacheServiceProvider);
-  final characterRepository = ref.watch(characterRepositoryProvider);
-  return CharacterAvatarService(
-    characterRepository: characterRepository,
-    cacheService: cacheService,
-  );
-});
+// CharacterAvatarService 已删除，此文件已清空。
+// 请使用其他 Provider 获取角色相关功能。

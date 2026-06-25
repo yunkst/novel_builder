@@ -3,18 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/outline.dart';
-import '../models/prompt_history_selection.dart';
-import '../models/saved_tag_group.dart';
 import '../core/theme/app_colors.dart';
-import '../widgets/character_selector.dart';
 import '../widgets/streaming_status_indicator.dart';
-import '../widgets/prompt_history_bottom_sheet.dart';
-import '../widgets/prompt_tag_selector_sheet.dart';
-import '../widgets/selected_tags_view.dart';
-import '../models/tag_group.dart';
-import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
-import '../services/prompt_tag_service.dart';
+import '../core/providers/database_providers.dart';
 import '../mixins/dify_streaming_mixin.dart';
 import '../utils/toast_utils.dart';
 import '../services/preferences_service.dart';
@@ -29,7 +21,6 @@ import '../services/logger_service.dart';
 /// ## 大纲模式流程
 /// ### Step 0: 准备阶段
 /// - 用户输入章节创作意图（可选）
-/// - 选择参与的角色（可选）
 /// - 点击"确认"后，AI 开始生成章节细纲
 /// - 生成完成后自动跳转到 Step 1
 ///
@@ -43,33 +34,12 @@ import '../services/logger_service.dart';
 /// - **流式生成**：使用 DifyStreamingMixin 实现 AI 内容的流式输出
 /// - **并发防护**：防止重复生成请求
 /// - **前文缓存**：避免重复获取前文内容，提升性能
-/// - **角色关联**：支持选择参与章节的角色
 /// - **细纲编辑**：支持对 AI 生成的细纲进行手动调整
 ///
 /// ## 状态管理
 /// - 使用 Riverpod 管理数据库和服务依赖
 /// - 使用 StatefulWidget 管理页面状态
 /// - 使用 DifyStreamingMixin 管理流式生成状态
-///
-/// ## 使用示例
-/// ```dart
-/// final result = await Navigator.push(
-///   context,
-///   MaterialPageRoute(
-///     builder: (context) => InsertChapterScreen(
-///       novel: novel,
-///       afterIndex: 5,
-///       chapters: chapters,
-///     ),
-///   ),
-/// );
-///
-/// if (result != null) {
-///   final title = result['title'];
-///   final content = result['content'];
-///   final characterIds = result['characterIds'];
-/// }
-/// ```
 enum _InsertMode { manual, outline }
 
 /// 插入章节全屏页面
@@ -137,12 +107,6 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
 
   /// 当前步骤（0: 准备阶段, 1: 审核阶段）
   int _currentStep = 0;
-
-  /// 用户选择的参与角色 ID 列表
-  List<int> _selectedCharacterIds = [];
-
-  /// 选中的标签分组
-  List<TagGroup> _selectedTagGroups = [];
 
   /// 小说大纲对象
   Outline? _outline;
@@ -227,146 +191,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   // 步骤管理
   // ========================================================================
 
-  /// 弹出历史提示词面板，选择后填入 [controller] 并恢复标签
-  Future<void> _showPromptHistory(TextEditingController controller) async {
-    final selection = await showModalBottomSheet<PromptHistorySelection>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: const PromptHistoryBottomSheet(),
-      ),
-    );
-    if (selection == null || selection.promptText.isEmpty) return;
-
-    // 恢复文本
-    controller.text = selection.promptText;
-    controller.selection = TextSelection.fromPosition(
-      TextPosition(offset: selection.promptText.length),
-    );
-
-    // 恢复标签状态（自动过滤失效标签）
-    final validGroups = await _validateTagGroups(selection.tagGroups);
-    if (!mounted) return;
-    setState(() => _selectedTagGroups = validGroups);
-  }
-
-  /// 异步保存提示词到历史（去重 + 关联当前标签快照）
-  void _savePromptHistory(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-    final tagGroupsSnapshot = _selectedTagGroups
-        .map((g) => SavedTagGroup(
-              categoryId: g.categoryId,
-              name: g.name,
-            ))
-        .toList();
-    Future.microtask(() async {
-      try {
-        final repo = ref.read(promptHistoryRepositoryProvider);
-        await repo.addOrUpdate(trimmed, tagGroups: tagGroupsSnapshot);
-      } catch (e, stackTrace) {
-        LoggerService.instance.e(
-          '保存提示词历史失败: $e',
-          stackTrace: stackTrace.toString(),
-          category: LogCategory.database,
-          tags: ['chapter'],
-        );
-      }
-    });
-  }
-
-  /// 校验历史标签是否仍存在，过滤掉已删除的标签
-  Future<List<TagGroup>> _validateTagGroups(List<TagGroup> groups) async {
-    if (groups.isEmpty) return groups;
-    final tagRepo = ref.read(promptTagRepositoryProvider);
-    final valid = <TagGroup>[];
-    for (final g in groups) {
-      final exists = await tagRepo.search(g.name, categoryId: g.categoryId);
-      if (exists.isNotEmpty) {
-        valid.add(g);
-      }
-    }
-    final invalid = groups.length - valid.length;
-    if (invalid > 0) {
-      ToastUtils.showWarning('已自动移除 $invalid 个失效的历史标签');
-    }
-    return valid;
-  }
-
-  /// 打开标签选择面板
-  Future<void> _openTagSelector() async {
-    final result = await showModalBottomSheet<List<TagGroup>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: PromptTagSelectorSheet(
-          initialSelectedGroups: _selectedTagGroups,
-        ),
-      ),
-    );
-    if (result == null) return;
-    setState(() => _selectedTagGroups = result);
-  }
-
-  /// 移除已选标签
-  void _removeTag(TagGroup group) {
-    setState(() {
-      _selectedTagGroups = _selectedTagGroups
-          .where((g) => '${g.categoryId}:${g.name}' != '${group.categoryId}:${group.name}')
-          .toList();
-    });
-  }
-
-  /// 构建操作按钮 chip（标签选择 / 历史提示词）
-  Widget _buildActionChip({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// 处理确认按钮点击
   Future<void> _handleConfirm() async {
     // 大纲模式：生成细纲后进入下一步
     if (_currentMode == _InsertMode.outline && _currentStep == 0) {
-      // 用户输入现在是可选的，不再进行必填验证
-      final mergedInput = await _mergeTagPrompt(_userInputController.text);
-      _savePromptHistory(_userInputController.text);
-      if (mergedInput != _userInputController.text) {
-        _userInputController.text = mergedInput;
-      }
       _generateOutlineDraft();
       return;
     }
@@ -387,14 +215,11 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         return;
       }
 
-      _savePromptHistory(rawContent);
-      final merged = await _mergeTagPrompt(rawContent);
-
       if (!mounted) return;
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
-        'content': merged,
-        'characterIds': _selectedCharacterIds,
+        'content': rawContent,
+        'characterIds': <int>[],
       });
     }
 
@@ -406,25 +231,13 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
         return;
       }
 
-      _savePromptHistory(_userInputController.text);
-      final merged = await _mergeTagPrompt(_userInputController.text);
-
       if (!mounted) return;
       Navigator.pop(context, {
         'title': _titleController.text.trim(),
-        'content': merged,
-        'characterIds': _selectedCharacterIds,
+        'content': _userInputController.text.trim(),
+        'characterIds': <int>[],
       });
     }
-  }
-
-  /// 将选中标签的 prompt 拼接到输入前
-  Future<String> _mergeTagPrompt(String original) async {
-    if (_selectedTagGroups.isEmpty) return original;
-    final service = PromptTagService.byRef(ref);
-    final result =
-        await service.buildMergedUserInput(original, _selectedTagGroups);
-    return result.mergedInput;
   }
 
   // ========================================================================
@@ -830,86 +643,14 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 操作按钮行
-                  Row(
-                    children: [
-                      _buildActionChip(
-                        icon: Icons.label_outline,
-                        label: '选择标签',
-                        onTap: _openTagSelector,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionChip(
-                        icon: Icons.history,
-                        label: '历史提示词',
-                        onTap: () => _showPromptHistory(_userInputController),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _userInputController,
-                    decoration: const InputDecoration(
-                      labelText: '章节内容要求',
-                      hintText: '描述你想要的故事情节、人物对话、场景描述等...',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 8,
-                  ),
-                  SelectedTagsView(
-                    groups: _selectedTagGroups,
-                    onRemove: _removeTag,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 出场人物选择
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.people, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '出场人物（可选）',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  CharacterSelector(
-                    novelUrl: widget.novel.url,
-                    initialSelectedIds: _selectedCharacterIds,
-                    onSelectionChanged: (selectedIds) {
-                      setState(() {
-                        _selectedCharacterIds = selectedIds;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'AI将根据选中的角色特征来生成章节内容',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.appColors.onInfoContainer,
-                    ),
-                  ),
-                ],
+              child: TextField(
+                controller: _userInputController,
+                decoration: const InputDecoration(
+                  labelText: '章节内容要求',
+                  hintText: '描述你想要的故事情节、人物对话、场景描述等...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 8,
               ),
             ),
           ),
@@ -970,22 +711,6 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
           const SizedBox(height: 16),
 
           // 用户输入
-          Row(
-            children: [
-              _buildActionChip(
-                icon: Icons.label_outline,
-                label: '选择标签',
-                onTap: _openTagSelector,
-              ),
-              const SizedBox(width: 8),
-              _buildActionChip(
-                icon: Icons.history,
-                label: '历史提示词',
-                onTap: () => _showPromptHistory(_userInputController),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
           TextField(
             controller: _userInputController,
             decoration: const InputDecoration(
@@ -996,11 +721,6 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
             maxLines: 5,
             autofocus: true,
             enabled: !isStreaming, // 生成时禁用输入
-          ),
-
-          SelectedTagsView(
-            groups: _selectedTagGroups,
-            onRemove: _removeTag,
           ),
 
           const SizedBox(height: 12),
@@ -1118,44 +838,6 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
                           ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 角色选择
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.people, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '出场人物（可选）',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  CharacterSelector(
-                    novelUrl: widget.novel.url,
-                    initialSelectedIds: _selectedCharacterIds,
-                    onSelectionChanged: (selectedIds) {
-                      setState(() {
-                        _selectedCharacterIds = selectedIds;
-                      });
-                    },
                   ),
                 ],
               ),

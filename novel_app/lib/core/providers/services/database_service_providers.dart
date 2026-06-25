@@ -25,8 +25,6 @@ import 'package:riverpod/riverpod.dart';
 import '../../../services/chapter_service.dart';
 import '../../../services/chapter_search_service.dart';
 import '../../../services/cache_search_service.dart';
-import '../../../services/character_extraction_service.dart';
-import '../../../services/prompt_tag_service.dart';
 import '../../../controllers/chapter_list/chapter_loader.dart';
 import '../../../controllers/chapter_list/chapter_action_handler.dart';
 import '../../../controllers/chapter_list/chapter_reorder_controller.dart';
@@ -239,38 +237,4 @@ CacheSearchService cacheSearchService(Ref ref) {
   );
 }
 
-/// CharacterExtractionService Provider
-///
-/// 提供角色提取服务实例，用于从章节内容中提取角色相关的上下文。
-///
-/// **功能**:
-/// - 根据角色名搜索匹配章节
-/// - 提取匹配位置周围的上下文
-/// - 合并并去重上下文片段
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final extractionService = ref.watch(characterExtractionServiceProvider);
-/// final matches = await extractionService.searchChaptersByName(
-///   novelUrl: novelUrl,
-///   names: ['角色A', '别名B'],
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 搜索操作是异步的
-@riverpod
-CharacterExtractionService characterExtractionService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  return CharacterExtractionService(chapterRepository: chapterRepository);
-}
-
-/// PromptTagService Provider
-@riverpod
-PromptTagService promptTagService(Ref ref) {
-  return PromptTagService.byRef(ref);
-}
+/// CharacterExtractionService 和 PromptTagService 已删除，相关 provider 已移除。

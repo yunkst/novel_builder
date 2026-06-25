@@ -4,8 +4,8 @@
 ///
 /// **功能**:
 /// - Dify AI内容生成服务
-/// - 角色卡片AI生成服务
-/// - 角色信息提取服务
+/// - 章节历史服务
+/// - 无效标记清理服务
 ///
 /// **依赖**:
 /// - database_providers.dart - 数据库服务
@@ -19,7 +19,6 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
-import '../../../services/character_card_service.dart';
 import '../../../services/chapter_history_service.dart';
 import '../../../services/invalid_markup_cleaner.dart';
 import '../database_providers.dart';
@@ -58,40 +57,7 @@ DifyService difyService(Ref ref) {
   return DifyService();
 }
 
-/// CharacterCardService Provider
-///
-/// 提供角色卡片服务实例，处理角色卡片的更新和管理。
-///
-/// **功能**:
-/// - 角色卡片更新
-/// - AI生成角色信息
-/// - 角色信息保存
-///
-/// **依赖**:
-/// - [difyServiceProvider] - Dify AI服务
-/// - [characterRepositoryProvider] - 角色数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final cardService = ref.watch(characterCardServiceProvider);
-/// await cardService.updateCharacterCards(
-///   novel: novel,
-///   chapterContent: content,
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - AI生成是异步操作
-@riverpod
-CharacterCardService characterCardService(Ref ref) {
-  final difyService = ref.watch(difyServiceProvider);
-  final characterRepository = ref.watch(characterRepositoryProvider);
-  return CharacterCardService(
-    difyService: difyService,
-    characterRepository: characterRepository,
-  );
-}
+/// CharacterCardService 已删除，相关 provider 已移除。
 
 /// ChapterHistoryService Provider
 ///
