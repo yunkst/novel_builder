@@ -44,7 +44,8 @@ class PromptTagRepository extends BaseRepository
       args.add(categoryId);
     }
     if (kw.isNotEmpty) {
-      where.add('(name LIKE ? OR prompt_text LIKE ?)');
+      where.add('(name LIKE ? OR prompt_text LIKE ? OR reason LIKE ?)');
+      args.add('%$kw%');
       args.add('%$kw%');
       args.add('%$kw%');
     }
@@ -66,6 +67,7 @@ class PromptTagRepository extends BaseRepository
         final newId = await db.insert(_table, {
           'category_id': tag.categoryId,
           'name': tag.name,
+          'reason': tag.reason,
           'prompt_text': tag.promptText,
           'sort_order': tag.sortOrder,
           'created_at': now,
@@ -83,6 +85,7 @@ class PromptTagRepository extends BaseRepository
         {
           'category_id': tag.categoryId,
           'name': tag.name,
+          'reason': tag.reason,
           'prompt_text': tag.promptText,
           'sort_order': tag.sortOrder,
           'updated_at': now,
@@ -237,6 +240,39 @@ class PromptTagRepository extends BaseRepository
     if (maps.isEmpty) return null;
     final picked = maps[Random().nextInt(maps.length)];
     return picked['prompt_text'] as String?;
+  }
+
+  @override
+  Future<PromptTag?> getRandomTag(int categoryId, String name) async {
+    final db = await database;
+    LoggerService.instance.d(
+      'getRandomTag: 随机获取完整标签 (categoryId: $categoryId, name: $name)',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'random-tag'],
+    );
+    final maps = await db.query(
+      _table,
+      where: 'category_id = ? AND name = ?',
+      whereArgs: [categoryId, name],
+    );
+    if (maps.isEmpty) return null;
+    final picked = maps[Random().nextInt(maps.length)];
+    return PromptTag.fromMap(picked);
+  }
+
+  @override
+  Future<List<PromptTag>> getAll() async {
+    final db = await database;
+    LoggerService.instance.d(
+      'getAll: 获取所有标签',
+      category: LogCategory.database,
+      tags: ['prompt-tag', 'query', 'get-all'],
+    );
+    final maps = await db.query(
+      _table,
+      orderBy: 'sort_order ASC, id ASC',
+    );
+    return maps.map(PromptTag.fromMap).toList();
   }
 
   @override

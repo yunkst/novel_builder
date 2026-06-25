@@ -69,34 +69,6 @@ test.describe('Novel App E2E Tests', () => {
     }
   });
 
-  test('search functionality is accessible', async ({ page }) => {
-    // Wait for app to load
-    await page.waitForTimeout(3000);
-
-    // Look for search-related elements
-    const searchInputs = page.locator('input[type="text"], input[placeholder*="search"], .search-input');
-    const searchButtons = page.locator('button:has-text("搜索"), button:has-text("Search"), .search-button');
-
-    // Try to find and interact with search functionality
-    if (await searchInputs.count() > 0) {
-      await expect(searchInputs.first()).toBeVisible();
-      await searchInputs.first().fill('test');
-      await page.screenshot({ path: 'search-input.png' });
-    } else if (await searchButtons.count() > 0) {
-      await expect(searchButtons.first()).toBeVisible();
-      await searchButtons.first().click();
-      await page.waitForTimeout(1000);
-      await page.screenshot({ path: 'search-button.png' });
-    } else {
-      // Look for any text input fields
-      const textInputs = page.locator('input[type="text"], textarea');
-      if (await textInputs.count() > 0) {
-        await textInputs.first().fill('test search');
-        await page.screenshot({ path: 'text-input.png' });
-      }
-    }
-  });
-
   test('bookshelf section loads', async ({ page }) => {
     // Wait for app to load
     await page.waitForTimeout(3000);

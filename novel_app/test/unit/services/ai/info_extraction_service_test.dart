@@ -1,9 +1,10 @@
 /// InfoExtractionService 端到端测试
 ///
-/// 跑 InfoExtractionService 的 7 个核心方法，断言 LLM 调用的 (system, user) prompt
+/// 跑 InfoExtractionService 的核心方法，断言 LLM 调用的 (system, user) prompt
 /// 包含预期内容 + model/temperature/maxTokens 正确。
 ///
-/// 模板文本的精确字符级对比依赖 golden 录制（见 #33 的 plan 步骤）。
+/// 注意：结构化方法（immersiveScript/tagIntrospection/tagMatch）返回
+/// Map<String, dynamic>，测试前需设置 mock 返回合法 JSON。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -36,7 +37,7 @@ void main() {
     );
   });
 
-  Future<PromptSnapshot> runAndSnapshot(Future<String> future) async {
+  Future<PromptSnapshot> runAndSnapshot(Future<Object> future) async {
     // 注意：不能 clear()——future 在构造时已开始执行（async eager），
     // clear 会误删已记录的请求。setUp 每个测试重建 mockClient 已保证隔离。
     await future;
@@ -126,6 +127,8 @@ void main() {
   });
 
   test('immersiveScript: cmd="生成剧本" 新建剧本（无已有剧本）', () async {
+    // immersiveScript 返回 Map，mock 需返回合法 JSON
+    mockClient.setMockContent('{"play":"剧本内容","role_strategy":[{"name":"李明","strategy":"谨慎行动","clothes":"青衫"}]}');
     final snapshot = await runAndSnapshot(service.immersiveScript(
       chaptersContent: '李明在山洞中修炼，突然听到一声巨响',
       roles: '李明：青云门弟子，性格坚毅',
@@ -138,13 +141,16 @@ void main() {
     expect(_norm(snapshot.systemPrompt), contains('李明：青云门弟子'));
     expect(_norm(snapshot.userMessage), contains('我将扮演 ：李明'));
     expect(_norm(snapshot.userMessage), contains('设计一个悬疑开场'));
-    expect(_norm(snapshot.userMessage), contains('严格遵循json格式'));
+    // prompt 已不再包含冗余 JSON 格式指令（由 response_format 保障）
+    expect(_norm(snapshot.userMessage), isNot(contains('严格遵循json格式')));
     // 验证 structured output（response_format）已传入
     expect(snapshot.responseFormat, isNotNull);
     expect(snapshot.responseFormat!['type'], equals('json_schema'));
   });
 
   test('immersiveScript: cmd="生成剧本" 重新生成（有已有剧本）', () async {
+    // immersiveScript 返回 Map，mock 需返回合法 JSON
+    mockClient.setMockContent('{"play":"修改后的剧本","role_strategy":[{"name":"李明","strategy":"谨慎行动","clothes":"青衫"}]}');
     final snapshot = await runAndSnapshot(service.immersiveScript(
       chaptersContent: '李明在山洞中修炼',
       roles: '李明：青云门弟子',

@@ -269,17 +269,14 @@ class HomeTabIndex {
   /// 书架
   static const int bookshelf = 0;
 
-  /// 搜索
-  static const int search = 1;
-
   /// 生图调试
-  static const int illustration = 2;
+  static const int illustration = 1;
 
   /// 浏览器
-  static const int browser = 3;
+  static const int browser = 2;
 
   /// 设置
-  static const int settings = 4;
+  static const int settings = 3;
 }
 
 /// 当前选中的底部导航 Tab

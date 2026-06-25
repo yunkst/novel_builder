@@ -27,8 +27,3 @@ const int cacheCleanupThresholdMB = 400;
 ///
 /// 同时预加载的章节数量
 const int preloadConcurrency = 3;
-
-/// 搜索结果最大数量
-///
-/// 搜索 API 返回的最大结果数
-const int maxSearchResults = 50;

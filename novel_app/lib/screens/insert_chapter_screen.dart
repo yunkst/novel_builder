@@ -421,8 +421,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen>
   /// 将选中标签的 prompt 拼接到输入前
   Future<String> _mergeTagPrompt(String original) async {
     if (_selectedTagGroups.isEmpty) return original;
-    final service = PromptTagService(ref);
-    return service.buildMergedUserInput(original, _selectedTagGroups);
+    final service = PromptTagService.byRef(ref);
+    final result =
+        await service.buildMergedUserInput(original, _selectedTagGroups);
+    return result.mergedInput;
   }
 
   // ========================================================================

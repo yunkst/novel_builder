@@ -13,6 +13,8 @@ import 'package:novel_app/services/logger_service.dart';
 import '../../core/providers/database_providers.dart';
 import '../../models/character.dart';
 import '../../models/outline.dart';
+import '../../models/prompt_tag.dart';
+import '../../models/prompt_tag_category.dart';
 import 'agent_scenario.dart';
 
 /// ID/位置解析结果
@@ -75,6 +77,11 @@ class ToolExecutor {
           return await _updateOutline(args, scenarioContext);
         case 'get_outline':
           return await _getOutline(args, scenarioContext);
+        // ===== 提示标签 =====
+        case 'list_prompt_tags':
+          return await _listPromptTags(args);
+        case 'save_prompt_tag':
+          return await _savePromptTag(args);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -666,6 +673,180 @@ class ToolExecutor {
       'title': outline.title,
       'content': outline.content,
       'updatedAt': outline.updatedAt.toIso8601String(),
+    });
+  }
+
+  // ===== 提示标签 =====
+
+  Future<String> _listPromptTags(Map<String, dynamic> args) async {
+    final categoryName = (args['categoryName'] as String?)?.trim();
+
+    final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+
+    // 获取全部分类
+    final allCategories = await categoryRepo.getAll();
+
+    // 按分类名筛选
+    List<PromptTagCategory> categories;
+    if (categoryName != null && categoryName.isNotEmpty) {
+      categories = allCategories
+          .where((c) => c.name.toLowerCase() == categoryName.toLowerCase())
+          .toList();
+      if (categories.isEmpty) {
+        LoggerService.instance.d(
+          '工具引导错误: category_not_found categoryName=$categoryName',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'list_prompt_tags', 'category_not_found'],
+        );
+        return jsonEncode({
+          'error': 'category_not_found',
+          'message': '分类 "$categoryName" 不存在。可用分类：${allCategories.map((c) => c.name).join("、")}',
+          'available_categories': allCategories
+              .map((c) => {'id': c.id, 'name': c.name})
+              .toList(),
+        });
+      }
+    } else {
+      categories = allCategories;
+    }
+
+    // 按分类获取标签
+    final result = <Map<String, dynamic>>[];
+    for (final category in categories) {
+      final tags = await tagRepo.getByCategory(category.id!);
+      result.add({
+        'categoryId': category.id,
+        'categoryName': category.name,
+        'tags': tags
+            .map((t) => {
+                  'id': t.id,
+                  'name': t.name,
+                  'reason': t.reason,
+                  'promptText': t.promptText.length > 150
+                      ? '${t.promptText.substring(0, 150)}...'
+                      : t.promptText,
+                })
+            .toList(),
+        'tagCount': tags.length,
+      });
+    }
+
+    final totalTags =
+        result.fold<int>(0, (sum, c) => sum + (c['tagCount'] as int));
+    LoggerService.instance.i(
+        '列出提示标签: ${categories.length} 个分类, $totalTags 个标签',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'list_prompt_tags']);
+    return jsonEncode({
+      'categories': result,
+      'totalTags': totalTags,
+    });
+  }
+
+  Future<String> _savePromptTag(Map<String, dynamic> args) async {
+    final categoryName = (args['categoryName'] as String).trim();
+    final name = (args['name'] as String).trim();
+    final promptText = (args['promptText'] as String).trim();
+    final reason = (args['reason'] as String?)?.trim() ?? '';
+    final id = args['id'] as int?;
+
+    // 验证必填字段
+    if (name.isEmpty) {
+      return jsonEncode({
+        'error': 'validation_failed',
+        'message': '标签名称不能为空。',
+      });
+    }
+    if (promptText.isEmpty) {
+      return jsonEncode({
+        'error': 'validation_failed',
+        'message': '提示词文本不能为空。',
+      });
+    }
+
+    final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+
+    // 通过分类名查找 categoryId
+    final allCategories = await categoryRepo.getAll();
+    final category = allCategories
+        .where((c) => c.name.toLowerCase() == categoryName.toLowerCase())
+        .firstOrNull;
+    if (category == null || category.id == null) {
+      LoggerService.instance.d(
+        '工具引导错误: category_not_found categoryName=$categoryName',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'save_prompt_tag', 'category_not_found'],
+      );
+      return jsonEncode({
+        'error': 'category_not_found',
+        'message': '分类 "$categoryName" 不存在。可用分类：${allCategories.map((c) => c.name).join("、")}',
+        'available_categories': allCategories
+            .map((c) => {'id': c.id, 'name': c.name})
+            .toList(),
+      });
+    }
+    final categoryId = category.id!;
+
+    if (id != null) {
+      // 更新已有标签
+      final existingTags = await tagRepo.getByIds([id]);
+      if (existingTags.isEmpty) {
+        LoggerService.instance.d(
+          '工具引导错误: tag_not_found id=$id',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'save_prompt_tag', 'tag_not_found'],
+        );
+        return jsonEncode({
+          'error': 'tag_not_found',
+          'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+          'suggested_tool': 'list_prompt_tags',
+          'suggested_args': <String, dynamic>{},
+        });
+      }
+      final existing = existingTags.first;
+      final updated = existing.copyWith(
+        categoryId: categoryId,
+        name: name,
+        reason: reason.isNotEmpty ? reason : existing.reason,
+        promptText: promptText,
+        updatedAt: DateTime.now(),
+      );
+      await tagRepo.save(updated);
+
+      LoggerService.instance.i('更新提示标签: "$name" (id=$id)',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'save_prompt_tag']);
+      return jsonEncode({
+        'success': true,
+        'message': '标签 "$name" 已更新',
+        'tagId': id,
+      });
+    }
+
+    // 创建新标签
+    final sortOrder = await tagRepo.getNextSortOrder(categoryId);
+    final now = DateTime.now();
+    final newTag = PromptTag(
+      categoryId: categoryId,
+      name: name,
+      reason: reason,
+      promptText: promptText,
+      sortOrder: sortOrder,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final newId = await tagRepo.save(newTag);
+
+    LoggerService.instance.i(
+        '创建提示标签: "$name" (id=$newId, category="${category.name}")',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'save_prompt_tag']);
+    return jsonEncode({
+      'success': true,
+      'message': '标签 "$name" 已创建（分类：${category.name}）',
+      'tagId': newId,
     });
   }
 }

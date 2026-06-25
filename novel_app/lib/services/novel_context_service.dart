@@ -39,7 +39,8 @@ class NovelContext {
       'ai_writer_setting': aiWriterSetting ?? '',
       'background_setting': backgroundSetting,
       'next_chapter_overview': nextChapterOverview ?? '',
-      'characters_info': charactersInfo ?? '',
+      // 字段名与 _routeStreaming 的 s('roles') 对齐（WritingService/AiPromptBuilder 参数均为 roles）
+      'roles': charactersInfo ?? '',
     };
   }
 
@@ -52,11 +53,20 @@ class NovelContext {
   }
 
   /// 构建全文重写专用的输入参数
-  Map<String, String> buildFullRewriteInputs(String userInput) {
+  ///
+  /// [aiWriterSetting] 全局作家风格设定（来自 SharedPreferences ai_writer_prompt）
+  /// [roles] 出场人物设定（Character.formatForAI 格式化结果）
+  Map<String, String> buildFullRewriteInputs(
+    String userInput, {
+    String? aiWriterSetting,
+    String? roles,
+  }) {
     return buildBaseInputs(
       userInput: userInput,
       cmd: '',
       choiceContent: '',
+      aiWriterSetting: aiWriterSetting,
+      charactersInfo: roles,
     );
   }
 }

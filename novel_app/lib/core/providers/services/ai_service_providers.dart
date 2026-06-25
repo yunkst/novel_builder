@@ -6,7 +6,6 @@
 /// - Dify AI内容生成服务
 /// - 角色卡片AI生成服务
 /// - 角色信息提取服务
-/// - 大纲AI生成服务
 ///
 /// **依赖**:
 /// - database_providers.dart - 数据库服务
@@ -21,7 +20,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
 import '../../../services/character_card_service.dart';
-import '../../../services/outline_service.dart';
 import '../../../services/chapter_history_service.dart';
 import '../../../services/invalid_markup_cleaner.dart';
 import '../database_providers.dart';
@@ -93,37 +91,6 @@ CharacterCardService characterCardService(Ref ref) {
     difyService: difyService,
     characterRepository: characterRepository,
   );
-}
-
-/// OutlineService Provider
-///
-/// 提供大纲服务实例，处理小说大纲的管理和生成。
-///
-/// **功能**:
-/// - 大纲CRUD操作
-/// - 大纲AI生成
-/// - 章节细纲生成
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-///
-/// **使用示例**:
-/// ```dart
-/// final outlineService = ref.watch(outlineServiceProvider);
-/// await outlineService.saveOutline(
-///   novelUrl: novelUrl,
-///   title: title,
-///   content: content,
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - AI生成是异步操作
-@riverpod
-OutlineService outlineService(Ref ref) {
-  final outlineRepository = ref.watch(outlineRepositoryProvider);
-  return OutlineService(outlineRepo: outlineRepository);
 }
 
 /// ChapterHistoryService Provider

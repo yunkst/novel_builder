@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 27;
+  static const int currentVersion = 28;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -564,6 +564,28 @@ class DatabaseMigrations {
         await _createIndexIfNotExists(
             db, 'idx_agent_memory_scenario', 'agent_memory', 'scenario_id');
         _log('迁移 v26 → v27: 创建 agent_memory 表');
+        break;
+
+      // ========== 版本 28：prompt_tags 加 reason 列 + prompt_tag_history 表 ==========
+      case 28:
+        await _addColumnIfNotExists(
+            db, 'prompt_tags', 'reason', 'TEXT NOT NULL DEFAULT \'\'');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS prompt_tag_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tag_id INTEGER NOT NULL,
+          novel_url TEXT NOT NULL,
+          change_type TEXT NOT NULL,
+          old_value TEXT,
+          new_value TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (tag_id) REFERENCES prompt_tags(id) ON DELETE CASCADE
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_tag_history_tag_id', 'prompt_tag_history', 'tag_id');
+        _log('迁移 v27 → v28: prompt_tags 加 reason 列 + 创建 prompt_tag_history 表');
         break;
     }
   }

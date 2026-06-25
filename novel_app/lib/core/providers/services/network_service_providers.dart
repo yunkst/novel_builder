@@ -119,7 +119,6 @@ Dio dio(Ref ref) {
 /// ```dart
 /// // 方式1: 直接使用（已自动初始化）
 /// final apiService = ref.watch(apiServiceWrapperProvider);
-/// final novels = await apiService.searchNovels('keyword');
 ///
 /// // 方式2: 仅获取 Future（异步场景）
 /// final initFuture = ref.watch(apiServiceWrapperInitProvider);

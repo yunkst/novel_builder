@@ -30,6 +30,9 @@ class AgentTools {
     _updateBackgroundSetting,
     _updateOutline,
     _getOutline,
+    // ===== 提示标签 =====
+    _listPromptTags,
+    _savePromptTag,
   ];
 
   /// 查找工具定义（带日志）
@@ -348,6 +351,73 @@ class AgentTools {
         'type': 'object',
         'properties': <String, dynamic>{},
         'required': <String>[],
+      },
+    },
+  };
+
+  // ===== 提示标签 =====
+
+  static const _listPromptTags = {
+    'type': 'function',
+    'function': {
+      'name': 'list_prompt_tags',
+      'description':
+          '获取写作提示标签列表，支持按分类名筛选或获取全部。'
+          '标签按分类分组返回，每个标签包含名称、使用场景和提示词摘要。\n'
+          '使用场景：\n'
+          '- 用户想查看或了解可用的写作技巧标签\n'
+          '- 需要为写作选择合适的标签风格\n'
+          '- 想了解某个分类下有哪些标签',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'categoryName': {
+            'type': 'string',
+            'description': '分类名称筛选（如"风格"、"场景"、"人物"、"情节"）。不填则返回全部分类及其标签。',
+          },
+        },
+        'required': <String>[],
+      },
+    },
+  };
+
+  static const _savePromptTag = {
+    'type': 'function',
+    'function': {
+      'name': 'save_prompt_tag',
+      'description':
+          '创建新标签或更新已有标签。\n'
+          '- 传入 id 表示更新已有标签（仅更新传入的字段）\n'
+          '- 不传 id 表示创建新标签（自动获取排序序号）\n'
+          '- 通过分类名指定所属分类（如"风格"、"场景"、"人物"、"情节"）\n'
+          '使用场景：\n'
+          '- 用户想创建新的写作技巧标签\n'
+          '- 用户想修改已有标签的提示词或使用场景描述',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'id': {
+            'type': 'integer',
+            'description': '已有标签的 ID（从 list_prompt_tags 获取）。不传则创建新标签。',
+          },
+          'categoryName': {
+            'type': 'string',
+            'description': '所属分类名称（如"风格"、"场景"、"人物"、"情节"）',
+          },
+          'name': {
+            'type': 'string',
+            'description': '标签名称',
+          },
+          'reason': {
+            'type': 'string',
+            'description': '使用场景描述（简短一句话，说明何时该用这个标签）',
+          },
+          'promptText': {
+            'type': 'string',
+            'description': '标签的完整提示词文本',
+          },
+        },
+        'required': ['categoryName', 'name', 'promptText'],
       },
     },
   };

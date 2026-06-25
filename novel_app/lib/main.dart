@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/bookshelf_screen.dart';
-import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/illustration_debug_screen.dart';
 import 'screens/webview_browser_screen.dart';
@@ -17,6 +16,7 @@ import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/log_reporter_service.dart';
+import 'services/llm_logger/llm_logger.dart';
 import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/hermes/hermes_floating_button.dart';
 
@@ -46,6 +46,23 @@ void main() async {
       stackTrace: stackTrace.toString(),
       category: LogCategory.general,
       tags: ['startup', 'log-reporter', 'error'],
+    );
+  }
+
+  // 初始化 LLM 调用日志服务
+  try {
+    await LlmLogger.instance.initialize();
+    LoggerService.instance.i(
+      'LlmLogger 初始化完成',
+      category: LogCategory.ai,
+      tags: ['startup', 'llm-logger'],
+    );
+  } catch (e, stackTrace) {
+    LoggerService.instance.e(
+      'LlmLogger 初始化失败: $e',
+      stackTrace: stackTrace.toString(),
+      category: LogCategory.ai,
+      tags: ['startup', 'llm-logger', 'error'],
     );
   }
 
@@ -252,7 +269,7 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver {
   /// 浏览器 Tab 索引（统一进 IndexedStack 后也用于场景切换判定）
-  static const int _browserTabIndex = 3;
+  static const int _browserTabIndex = 2;
 
   // 为生图调试页面创建 GlobalKey，用于调用刷新方法
   final GlobalKey<State<StatefulWidget>> _debugScreenKey = GlobalKey();
@@ -354,7 +371,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    // 监听外部 Tab 切换请求（如书架空状态引导"去搜索"）。
+    // 监听外部 Tab 切换请求。
     // 用户点击底部导航时也会写回此 Provider，保持单一真相源。
     final selectedIndex = ref.watch(homeTabIndexNotifierProvider);
 
@@ -363,7 +380,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     // 2) 切换 Hermes Agent 场景
     ref.listen<int>(homeTabIndexNotifierProvider, (previous, next) {
       if (previous == null || previous == next) return;
-      if (next == 2 && previous != 2) {
+      if (next == 1 && previous != 1) {
         _refreshIllustrationDebugScreen();
       }
       ref.read(currentAgentScenarioProvider.notifier).state =
@@ -381,7 +398,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           index: selectedIndex,
           children: [
             const BookshelfScreen(),
-            const SearchScreen(),
             IllustrationDebugScreen(key: _debugScreenKey),
             // active 标记当前浏览器是否可见：
             // 仅在可见时拦截系统返回手势，避免 offstage 状态下误拦截其他 Tab 的返回键。
@@ -399,10 +415,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           NavigationDestination(
             icon: Icon(Icons.book),
             label: '书架',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            label: '搜索',
           ),
           NavigationDestination(
             icon: Icon(Icons.image),

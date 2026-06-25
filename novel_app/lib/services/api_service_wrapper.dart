@@ -5,11 +5,7 @@ import 'package:built_value/serializer.dart';
 import 'package:built_collection/built_collection.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import '../models/novel.dart' as local;
-import '../models/chapter.dart' as local;
 import '../models/character.dart';
-import '../extensions/api_novel_extension.dart';
-import '../extensions/api_source_site_extension.dart';
 import 'logger_service.dart';
 import '../utils/logging/log_scope.dart';
 import 'preferences_service.dart';
@@ -37,7 +33,6 @@ import 'preferences_service.dart';
 /// final apiService = ref.watch(apiServiceWrapperProvider);
 ///
 /// // 直接使用（已通过 Provider 初始化）
-/// final novels = await apiService.searchNovels('关键字');
 /// ```
 class ApiServiceWrapper {
   static const String _prefsHostKey = 'backend_host';
@@ -409,92 +404,6 @@ class ApiServiceWrapper {
   // ========================================================================
   // 小说相关 API
   // ========================================================================
-
-  /// 搜索小说
-  Future<List<local.Novel>> searchNovels(String keyword,
-      {List<String>? sites}) async {
-    return _withRetry<List<local.Novel>>(() async {
-      final token = await getToken();
-
-      final response = await _api.searchSearchGet(
-        keyword: keyword,
-        sites: sites?.join(','),
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data
-                ?.map((apiNovel) => apiNovel.toLocalModel())
-                .toList() ??
-            [];
-      } else {
-        throw Exception('搜索失败: ${response.statusCode}');
-      }
-    }, '搜索小说');
-  }
-
-  /// 获取源站列表
-  Future<List<Map<String, dynamic>>> getSourceSites() async {
-    return _withRetry<List<Map<String, dynamic>>>(() async {
-      final token = await getToken();
-
-      final response = await _api.getSourceSitesSourceSitesGet(
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data?.map((site) => site.toLocalModel()).toList() ?? [];
-      } else {
-        throw Exception('获取源站列表失败: ${response.statusCode}');
-      }
-    }, '获取源站列表');
-  }
-
-  /// 通过URL获取小说信息和章节列表
-  ///
-  /// [url] 小说详情页URL
-  /// 返回包含小说信息和章节列表的元组
-  Future<(local.Novel, List<local.Chapter>)> getNovelByUrl(String url) async {
-    return _withRetry<(local.Novel, List<local.Chapter>)>(() async {
-      final token = await getToken();
-
-      // 使用生成的API方法
-      final response = await _api.novelByUrlNovelByUrlGet(
-        url: url,
-        X_API_TOKEN: token,
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final novelWithChapters = response.data!;
-        final novelData = novelWithChapters.novel;
-        final chaptersData = novelWithChapters.chapters;
-
-        // 构建Novel对象
-        final novel = local.Novel(
-          title: novelData.title,
-          author: novelData.author,
-          url: url,
-          coverUrl: null,  // 后端暂不返回此字段
-          description: null,  // 后端暂不返回此字段
-        );
-
-        // 构建Chapter列表
-        final chapters = chaptersData.asMap().entries.map((entry) {
-          final index = entry.key;
-          final chapterData = entry.value;
-          return local.Chapter(
-            title: chapterData.title,
-            url: chapterData.url,
-            chapterIndex: index,
-          );
-        }).toList();
-
-        return (novel, chapters);
-      } else {
-        throw Exception('获取小说信息失败: ${response.statusCode?.toString()}');
-      }
-    }, '获取小说信息');
-  }
 
   /// 统一错误处理
   Exception _handleError(dynamic error) {

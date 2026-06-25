@@ -68,7 +68,6 @@ String _$apiServiceWrapperHash() => r'ad6a9ac48976ae344df490909fe83b8b99b7e523';
 /// ```dart
 /// // 方式1: 直接使用（已自动初始化）
 /// final apiService = ref.watch(apiServiceWrapperProvider);
-/// final novels = await apiService.searchNovels('keyword');
 ///
 /// // 方式2: 仅获取 Future（异步场景）
 /// final initFuture = ref.watch(apiServiceWrapperInitProvider);
@@ -124,7 +123,7 @@ final apiServiceWrapperInitProvider = FutureProvider<void>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ApiServiceWrapperInitRef = FutureProviderRef<void>;
-String _$preloadServiceHash() => r'691a0c3eb97bf993afff0c0b0a57d1f96b6807b1';
+String _$preloadServiceHash() => r'f8008e19770a7d08daa85df946bfa94b8a5e112c';
 
 /// PreloadService Provider
 ///
@@ -307,22 +306,26 @@ final headlessWebViewContentServiceProvider =
 typedef HeadlessWebViewContentServiceRef
     = ProviderRef<HeadlessWebViewContentService>;
 String _$headlessWebViewChapterListServiceHash() =>
-    r'8b5b2321e562a95fb7773e7c6b2f699cb7acb85a';
+    r'2f442b2e2e69dcd6956261b0e34cb9eedfd14860';
 
 /// HeadlessWebViewChapterListService Provider
 ///
-/// 提供无头 WebView 章节列表获取服务实例。
+/// 提供无头 WebView 章节列表获取服务实例。该服务**自管一个独立的
+/// HeadlessInAppWebView 实例**，与 HeadlessWebViewPool（Agent 场景）和
+/// HeadlessWebViewContentService（章节内容）各自隔离，避免章节列表加载时
+/// URL 被其它场景覆盖。
+///
 /// 当域名有 AI Agent 生成的 `chapter_list_js` 脚本时，
 /// 使用 HeadlessInAppWebView 直接加载页面并执行脚本获取章节列表。
 ///
 /// **功能**:
 /// - 绕过 API 直接获取章节列表
-/// - 无脚本时返回 null
+/// - 无脚本时返回 FetchChapterListResult.noScript()
+/// - 页面加载失败时返回 FetchChapterListResult.loadFailed()
 /// - 脚本健康度追踪：连续失败 3 次自动标记 unverified
 ///
 /// **依赖**:
 /// - [siteScriptRepositoryProvider] - 站点脚本查询
-/// - [headlessWebViewPoolProvider] - 共享 headless WebView 池
 ///
 /// Copied from [headlessWebViewChapterListService].
 @ProviderFor(headlessWebViewChapterListService)

@@ -14,6 +14,7 @@ import '../../repositories/novel_export_repository.dart';
 import '../../repositories/prompt_history_repository.dart';
 import '../../repositories/prompt_tag_category_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
+import '../../repositories/prompt_tag_history_repository.dart';
 import '../../repositories/site_script_repository.dart';
 import '../../repositories/agent_memory_repository.dart';
 import '../database/database_connection.dart';
@@ -144,6 +145,16 @@ IPromptTagRepository promptTagRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return PromptTagRepository(dbConnection: dbConnection);
 }
+
+/// PromptTagHistoryRepository Provider
+///
+/// 使用普通 Provider 定义（无需 build_runner 重新生成），
+/// 记录 AI 自省对 tag 的修改历史，支持回滚。
+final promptTagHistoryRepositoryProvider =
+    Provider<PromptTagHistoryRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return PromptTagHistoryRepository(dbConnection: dbConnection);
+});
 
 /// BookshelfRepository Provider
 ///

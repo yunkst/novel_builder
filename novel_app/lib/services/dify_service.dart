@@ -1,6 +1,7 @@
 import '../models/character.dart';
 import '../models/character_relationship.dart';
 import '../models/ai_companion_response.dart';
+import '../models/tag_introspection.dart';
 import 'dify/dify_config_service.dart';
 import 'dify/dify_workflow_service.dart';
 import 'dify/dify_character_service.dart';
@@ -183,6 +184,28 @@ class DifyService {
         userInput: userInput,
         chapterContent: chapterContent,
         tagCategories: tagCategories,
+      );
+
+  /// 标签自省：分析用户修改意见，诊断 tag 体系问题
+  Future<List<TagIntrospectionProblem>> introspectPromptTags({
+    required String usedTags,
+    required String generatedContent,
+    required String userFeedback,
+  }) =>
+      _creative.introspectPromptTags(
+        usedTags: usedTags,
+        generatedContent: generatedContent,
+        userFeedback: userFeedback,
+      );
+
+  /// 标签匹配：根据当前创作场景筛选适合的标签
+  Future<List<TagMatchResult>> matchPromptTags({
+    required String sceneDescription,
+    required String availableTags,
+  }) =>
+      _creative.matchPromptTags(
+        sceneDescription: sceneDescription,
+        availableTags: availableTags,
       );
 
   // ============================================================================

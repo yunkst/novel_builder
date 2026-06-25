@@ -1,6 +1,6 @@
 /// AI伴读响应数据模型
 ///
-/// 用于解析Dify工作流返回的结构化数据
+/// 用于解析阻塞式工作流返回的结构化数据
 ///
 /// 返回格式：
 /// ```json
@@ -17,6 +17,7 @@
 /// {@category AIModels}
 library;
 
+import '../utils/json_utils.dart';
 import 'character.dart';
 import 'character_update.dart';
 
@@ -208,49 +209,42 @@ class AICompanionResponse {
     required this.relations,
   });
 
-  /// 从Dify返回的outputs解析
+  /// 从工作流返回的 outputs 解析
   ///
-  /// Dify返回格式：
+  /// outputs 格式：
   /// ```json
   /// {
-  ///   "data": {
-  ///     "outputs": {
-  ///       "content": {
-  ///         "roles": [...],
-  ///         "background": "...",
-  ///         "summery": "...",
-  ///         "relations": [...]
-  ///       }
-  ///     }
+  ///   "content": {
+  ///     "roles": [...],
+  ///     "background": "...",
+  ///     "summery": "...",
+  ///     "relations": [...]
   ///   }
   /// }
   /// ```
   factory AICompanionResponse.fromOutputs(Map<String, dynamic> outputs) {
-    // 获取content字段
-    final content = outputs['content'];
-
-    if (content == null) {
-      throw Exception('返回数据缺少content字段');
-    }
-
-    if (content is! Map<String, dynamic>) {
-      throw Exception('content字段类型错误，期望Map<String, dynamic>');
+    // 获取 content 字段，支持 Map（结构化方法）和 String（纯文本方法）两种类型
+    final Map<String, dynamic> contentMap;
+    try {
+      contentMap = decodeContentField(outputs);
+    } on FormatException catch (e) {
+      throw Exception('content JSON 解析失败: $e');
     }
 
     // 解析roles数组
-    final List<dynamic> rolesData = content['roles'] ?? [];
+    final List<dynamic> rolesData = contentMap['roles'] ?? [];
     final List<AICompanionRole> roles = rolesData
         .map((e) => AICompanionRole.fromJson(e as Map<String, dynamic>))
         .toList();
 
     // 解析background字段
-    final String background = content['background']?.toString() ?? '';
+    final String background = contentMap['background']?.toString() ?? '';
 
     // 解析summery字段
-    final String summery = content['summery']?.toString() ?? '';
+    final String summery = contentMap['summery']?.toString() ?? '';
 
     // 解析relations数组
-    final List<dynamic> relationsData = content['relations'] ?? [];
+    final List<dynamic> relationsData = contentMap['relations'] ?? [];
     final List<AICompanionRelation> relations = relationsData
         .map((e) => AICompanionRelation.fromJson(e as Map<String, dynamic>))
         .toList();

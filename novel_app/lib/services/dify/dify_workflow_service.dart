@@ -10,6 +10,11 @@ import '../logger_service.dart';
 /// UI 调用点和 DifyService 门面零改动。
 ///
 /// 路由规则：根据 inputs['cmd'] 分发到对应的强类型方法。
+///
+/// 返回值说明：
+/// - 结构化方法（带 responseFormat）返回 `Map<String, dynamic>`
+/// - 纯文本方法返回 `String`
+/// [executeBlocking] 统一包装为 `{'content': Object}` 格式。
 class DifyWorkflowService {
   DifyWorkflowService();
 
@@ -140,7 +145,11 @@ class DifyWorkflowService {
   }
 
   /// 根据 inputs['cmd'] 路由到 InfoExtractionService 的对应阻塞方法
-  Future<String> _routeBlocking(
+  ///
+  /// 返回类型为 Object：
+  /// - 纯文本方法返回 String
+  /// - 结构化方法（immersiveScript/tagIntrospection/tagMatch）返回 `Map<String, dynamic>`
+  Future<Object> _routeBlocking(
     InfoExtractionService service,
     Map<String, dynamic> inputs,
   ) async {
@@ -194,6 +203,17 @@ class DifyWorkflowService {
           userChoiceRole: s('user_choice_role'),
           existingPlay: existingPlay,
           existingRoleStrategy: rawRoleStrategy,
+        );
+      case '标签自省':
+        return service.tagIntrospection(
+          usedTags: s('used_tags'),
+          generatedContent: s('generated_content'),
+          userFeedback: s('user_feedback'),
+        );
+      case '标签匹配':
+        return service.tagMatch(
+          sceneDescription: s('scene_description'),
+          availableTags: s('available_tags'),
         );
       default:
         throw UnimplementedError('未知的阻塞 cmd: "$cmd"');

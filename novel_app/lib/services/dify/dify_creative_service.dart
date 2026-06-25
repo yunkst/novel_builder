@@ -1,18 +1,20 @@
-import 'dart:convert';
 import '../../models/character.dart';
 import '../../models/character_relationship.dart';
 import '../../models/ai_companion_response.dart';
+import '../../models/tag_introspection.dart';
+import '../../utils/json_utils.dart';
 import '../../services/logger_service.dart';
 import 'dify_config_service.dart';
 import 'dify_workflow_service.dart';
 import 'dify_formatter.dart';
 
-/// Dify创作服务
+/// 创作服务
 ///
 /// 负责处理创作相关的AI操作，包括：
 /// - 生成沉浸体验剧本
 /// - AI伴读分析
 /// - 场景描写输入格式化
+/// - 标签提取/自省/匹配
 class DifyCreativeService {
   // ignore: unused_field
   final DifyConfigService _config;
@@ -72,7 +74,7 @@ class DifyCreativeService {
     final outputs = await _workflow.executeBlocking(inputs: inputs);
 
     LoggerService.instance.i(
-      '=== Dify API 返回数据: $outputs ===',
+      '=== 工作流返回数据: $outputs ===',
       category: LogCategory.ai,
       tags: ['info', 'dify'],
     );
@@ -124,7 +126,7 @@ class DifyCreativeService {
     final outputs = await _workflow.executeBlocking(inputs: inputs);
 
     LoggerService.instance.i(
-      '=== Dify API 返回数据: $outputs ===',
+      '=== 工作流返回数据: $outputs ===',
       category: LogCategory.ai,
       tags: ['info', 'dify'],
     );
@@ -217,59 +219,31 @@ class DifyCreativeService {
   }
 
   /// 解析沉浸体验剧本输出
+  ///
+  /// 使用 [_decodeContentMap] 统一解析 content 字段。
+  /// 结构化方法返回的 content 已经是 Map，无需二次 jsonDecode。
   Map<String, dynamic>? _parseImmersiveScriptOutput(
     Map<String, dynamic> outputs,
   ) {
-    // 检查是否有 content 字段包裹（Dify 返回的嵌套结构）
-    final content = outputs['content'] as Map<String, dynamic>?;
-    if (content != null) {
-      // Dify 返回的是 {content: {play, role_strategy}} 格式
-      final play = content['play'] as String?;
-      final roleStrategyRaw = content['role_strategy'];
+    final data = _decodeContentMap(outputs);
 
-      if (play == null || roleStrategyRaw == null) {
-        LoggerService.instance.e(
-          '❌ content字段解析失败: play=$play, role_strategy=$roleStrategyRaw',
-          category: LogCategory.ai,
-          tags: ['error', 'dify'],
-        );
-        LoggerService.instance.i(
-          '完整content数据: $content',
-          category: LogCategory.ai,
-          tags: ['info', 'dify'],
-        );
-        throw Exception('返回数据格式错误：content字段缺少play或role_strategy');
-      }
-
-      // 解析 role_strategy（支持字符串和数组两种格式）
-      final roleStrategy = _parseRoleStrategy(roleStrategyRaw);
-
-      // 返回扁平化的数据结构，与现有代码兼容
-      return {
-        'play': play,
-        'role_strategy': roleStrategy,
-      };
-    }
-
-    // 兼容非嵌套结构（直接返回 play 和 role_strategy）
-    final play = outputs['play'] as String?;
-    final roleStrategyRaw = outputs['role_strategy'];
+    final play = data['play'] as String?;
+    final roleStrategyRaw = data['role_strategy'];
 
     if (play == null || roleStrategyRaw == null) {
       LoggerService.instance.e(
-        '❌ 扁平结构解析失败: play=$play, role_strategy=$roleStrategyRaw',
+        '❌ 剧本输出解析失败: play=$play, role_strategy=$roleStrategyRaw',
         category: LogCategory.ai,
         tags: ['error', 'dify'],
       );
       LoggerService.instance.i(
-        '完整outputs数据: $outputs',
+        '完整数据: $data',
         category: LogCategory.ai,
         tags: ['info', 'dify'],
       );
       throw Exception('返回数据格式错误：缺少play或role_strategy字段');
     }
 
-    // 解析 role_strategy（支持字符串和数组两种格式）
     final roleStrategy = _parseRoleStrategy(roleStrategyRaw);
 
     return {
@@ -280,42 +254,25 @@ class DifyCreativeService {
 
   /// 解析 role_strategy（支持字符串和数组两种格式）
   ///
-  /// Dify可能返回：
-  /// 1. 字符串格式: "[{\"name\": \"...\", \"strategy\": \"...\"}]"
-  /// 2. 数组格式: [{"name": "...", "strategy": "..."}]
+  /// 可能返回：
+  /// 1. 数组格式: [{"name": "...", "strategy": "..."}] — 结构化方法直接返回
+  /// 2. 字符串格式: "[{\"name\": \"...\", \"strategy\": \"...\"}]" — 纯文本方法返回
   List<dynamic> _parseRoleStrategy(dynamic roleStrategyRaw) {
     if (roleStrategyRaw is List) {
-      // 已经是数组，直接返回
       return roleStrategyRaw;
     }
 
     if (roleStrategyRaw is String) {
-      // 是字符串，需要解析JSON
-      try {
-        final decoded = jsonDecode(roleStrategyRaw);
-        if (decoded is List) {
-          return decoded;
-        } else {
-          LoggerService.instance.e(
-            '❌ role_strategy字符串解析后不是数组: $decoded',
-            category: LogCategory.ai,
-            tags: ['error', 'dify'],
-          );
-          throw Exception('role_strategy格式错误：解析后不是数组');
-        }
-      } catch (e) {
-        LoggerService.instance.e(
-          '❌ role_strategy字符串解析失败: $e',
-          category: LogCategory.ai,
-          tags: ['error', 'dify'],
-        );
-        LoggerService.instance.i(
-          '原始字符串: $roleStrategyRaw',
-          category: LogCategory.ai,
-          tags: ['info', 'dify'],
-        );
-        throw Exception('role_strategy字符串解析失败: $e');
+      final decoded = safeJsonDecode(roleStrategyRaw);
+      if (decoded is List) {
+        return decoded;
       }
+      LoggerService.instance.e(
+        '❌ role_strategy字符串解析后不是数组: $decoded',
+        category: LogCategory.ai,
+        tags: ['error', 'dify'],
+      );
+      throw Exception('role_strategy格式错误：解析后不是数组');
     }
 
     LoggerService.instance.e(
@@ -418,7 +375,7 @@ class DifyCreativeService {
 
   /// AI 提取写作技巧标签
   ///
-  /// 调用 Dify 阻塞式工作流（cmd='提取标签'），返回解析后的标签列表。
+  /// 调用阻塞式工作流（cmd='提取标签'），返回解析后的标签列表。
   Future<List<ExtractedPromptTag>> extractPromptTags({
     required String userInput,
     required String chapterContent,
@@ -437,25 +394,15 @@ class DifyCreativeService {
 
   /// 解析标签提取输出
   ///
-  /// 兼容两种 Dify 输出格式：
-  /// - 嵌套: outputs['content']['tags']
-  /// - 扁平: outputs['tags']
+  /// 使用 [_decodeContentMap] 统一解析 content 字段，然后提取 tags 数组。
   List<ExtractedPromptTag> _parseExtractedTags(Map<String, dynamic>? outputs) {
     if (outputs == null) return const [];
 
-    // 优先取 content 嵌套结构，回退到扁平结构
-    final content = outputs['content'];
-    final tagsRaw = (content is Map) ? content['tags'] : null;
-    final List<dynamic> tagsList;
-    if (tagsRaw is List) {
-      tagsList = tagsRaw;
-    } else if (outputs['tags'] is List) {
-      tagsList = outputs['tags'] as List;
-    } else {
-      return const [];
-    }
+    final data = _decodeContentMap(outputs);
+    final tagsRaw = data['tags'];
+    if (tagsRaw is! List) return const [];
 
-    return tagsList
+    return tagsRaw
         .whereType<Map>()
         .map((m) {
           final map = m.cast<String, dynamic>();
@@ -467,6 +414,97 @@ class DifyCreativeService {
         })
         .where((t) => t.tag.isNotEmpty || t.promptText.isNotEmpty)
         .toList();
+  }
+
+  /// 标签自省
+  ///
+  /// [usedTags] 使用的标签展示文本（name+reason+promptText）
+  /// [generatedContent] AI 生成的内容
+  /// [userFeedback] 用户的修改意见
+  Future<List<TagIntrospectionProblem>> introspectPromptTags({
+    required String usedTags,
+    required String generatedContent,
+    required String userFeedback,
+  }) async {
+    final inputs = {
+      'cmd': '标签自省',
+      'used_tags': usedTags,
+      'generated_content': generatedContent,
+      'user_feedback': userFeedback,
+    };
+
+    final outputs = await _workflow.executeBlocking(inputs: inputs);
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('标签自省失败：未收到有效响应');
+    }
+
+    return _parseIntrospectionOutput(outputs);
+  }
+
+  /// 解析标签自省输出
+  List<TagIntrospectionProblem> _parseIntrospectionOutput(
+    Map<String, dynamic> outputs,
+  ) {
+    final parsed = _decodeContentMap(outputs);
+    final problemsRaw = parsed['problems'];
+    if (problemsRaw is! List) return const [];
+
+    return problemsRaw
+        .whereType<Map>()
+        .map((m) => TagIntrospectionProblem.fromJson(m.cast<String, dynamic>()))
+        .where((p) => p.type.isNotEmpty)
+        .toList();
+  }
+
+  /// 标签匹配
+  ///
+  /// [sceneDescription] 当前创作场景描述
+  /// [availableTags] 可用标签列表文本（name+reason+category_id）
+  Future<List<TagMatchResult>> matchPromptTags({
+    required String sceneDescription,
+    required String availableTags,
+  }) async {
+    final inputs = {
+      'cmd': '标签匹配',
+      'scene_description': sceneDescription,
+      'available_tags': availableTags,
+    };
+
+    final outputs = await _workflow.executeBlocking(inputs: inputs);
+    if (outputs == null || outputs.isEmpty) {
+      throw Exception('标签匹配失败：未收到有效响应');
+    }
+
+    return _parseMatchOutput(outputs);
+  }
+
+  /// 解析标签匹配输出
+  List<TagMatchResult> _parseMatchOutput(Map<String, dynamic> outputs) {
+    final parsed = _decodeContentMap(outputs);
+    final selectedRaw = parsed['selected_tags'];
+    if (selectedRaw is! List) return const [];
+
+    return selectedRaw
+        .whereType<Map>()
+        .map((m) => TagMatchResult.fromJson(m.cast<String, dynamic>()))
+        .where((r) => r.name.isNotEmpty)
+        .toList();
+  }
+
+  /// 解析 executeBlocking 返回的 content 字段为 Map
+  ///
+  /// 委托 [decodeContentField] 统一处理 Map/String 两种 content 类型。
+  Map<String, dynamic> _decodeContentMap(Map<String, dynamic> outputs) {
+    try {
+      return decodeContentField(outputs);
+    } on FormatException catch (e) {
+      LoggerService.instance.e(
+        '解析 content JSON 失败: $e',
+        category: LogCategory.ai,
+        tags: ['tag', 'parse', 'error'],
+      );
+      throw Exception('解析 content JSON 失败: $e');
+    }
   }
 }
 

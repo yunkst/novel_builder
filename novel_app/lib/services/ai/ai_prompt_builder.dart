@@ -650,8 +650,7 @@ class AiPromptBuilder {
       '\n'
       '\n'
       '{% endif %}\n'
-      '\n'
-      '输出内容不要包含任何markdown符号，严格遵循json格式';
+      '\n';
 
   /// 生成剧本的 structured output JSON Schema
   ///
@@ -700,7 +699,179 @@ class AiPromptBuilder {
     },
   };
 
-  // 1780652201290 "标签提取" system — cmd='提取标签'（独立 LLM）
+  // ========== 标签自省 — cmd='标签自省' ==========
+
+  /// 标签自省的 structured output JSON Schema
+  static const Map<String, dynamic> tagIntrospectionResponseSchema = {
+    'type': 'json_schema',
+    'json_schema': {
+      'name': 'tag_introspection',
+      'strict': true,
+      'schema': {
+        'type': 'object',
+        'additionalProperties': false,
+        'properties': {
+          'problems': {
+            'type': 'array',
+            'description': '发现的问题列表',
+            'items': {
+              'type': 'object',
+              'additionalProperties': false,
+              'properties': {
+                'type': {
+                  'type': 'string',
+                  'description':
+                      '问题类型: reason_adjust(使用场景调整) / prompt_clarify(提示词优化) / missing_tag(建议新增标签)',
+                  'enum': ['reason_adjust', 'prompt_clarify', 'missing_tag'],
+                },
+                'tag_name': {
+                  'type': 'string',
+                  'description': '受影响的标签名（reason_adjust/prompt_clarify 时必填）',
+                },
+                'current_reason': {
+                  'type': 'string',
+                  'description': '当前的使用场景描述（reason_adjust 时）',
+                },
+                'suggested_reason': {
+                  'type': 'string',
+                  'description': '建议的使用场景描述（reason_adjust 时）',
+                },
+                'current_prompt': {
+                  'type': 'string',
+                  'description': '当前的提示词（prompt_clarify 时）',
+                },
+                'suggested_prompt': {
+                  'type': 'string',
+                  'description': '建议的提示词（prompt_clarify/missing_tag 时）',
+                },
+                'suggested_tag': {
+                  'type': 'string',
+                  'description': '建议的新标签名（missing_tag 时）',
+                },
+                'suggested_category': {
+                  'type': 'string',
+                  'description': '建议的分类（missing_tag 时）',
+                },
+                'suggested_new_reason': {
+                  'type': 'string',
+                  'description': '新标签的使用场景描述（missing_tag 时）',
+                },
+                'analysis': {
+                  'type': 'string',
+                  'description': 'AI 给出的分析理由',
+                },
+              },
+              'required': ['type', 'analysis'],
+            },
+          },
+        },
+        'required': ['problems'],
+      },
+    },
+  };
+
+  static const String _tagIntrospectionSystemTpl =
+      '你是写作技巧标签的诊断专家。用户使用了写作标签来指导 AI 创作内容，但结果不理想。\n'
+      '请分析标签体系存在的问题。\n'
+      '\n'
+      '每个标签由三部分组成：\n'
+      '- name: 标签名（简洁关键词）\n'
+      '- reason: 使用场景描述（简短一句话，说明何时该用这个标签）\n'
+      '- promptText: 具体的写作技巧提示词\n'
+      '\n'
+      '三种问题类型：\n'
+      '\n'
+      '1. reason_adjust：标签的使用场景描述(reason)不够准确。\n'
+      '   - 场景描述太窄，导致应该选用时漏选\n'
+      '   - 场景描述太宽，导致不该选用时误选\n'
+      '   - 必须给出 tag_name、current_reason、suggested_reason\n'
+      '\n'
+      '2. prompt_clarify：标签的提示词(promptText)描述不够清晰精准，导致 LLM 无法正确执行。\n'
+      '   - 必须给出 tag_name、current_prompt、suggested_prompt\n'
+      '\n'
+      '3. missing_tag：当前标签库缺少某个写作技巧的标签。\n'
+      '   - 必须给出 suggested_tag、suggested_new_reason、suggested_prompt、suggested_category\n'
+      '\n'
+      '输出要求：\n'
+      '- suggested_prompt 必须紧扣标签名，具体且可操作，不要常见宽泛的要求，需要有明确的细节指导\n'
+      '- suggested_reason 必须是简短的一句话，描述此标签的适用场景\n';
+
+  static const String _tagIntrospectionUserTpl =
+      '<使用的标签>\n'
+      '{{ used_tags }}\n'
+      '</使用的标签>\n'
+      '\n'
+      '<AI 生成的内容>\n'
+      '{{ generated_content }}\n'
+      '</AI 生成的内容>\n'
+      '\n'
+      '<用户的修改意见>\n'
+      '{{ user_feedback }}\n'
+      '</用户的修改意见>\n';
+
+  // ========== 标签匹配 — cmd='标签匹配' ==========
+
+  /// 标签匹配的 structured output JSON Schema
+  static const Map<String, dynamic> tagMatchResponseSchema = {
+    'type': 'json_schema',
+    'json_schema': {
+      'name': 'tag_match',
+      'strict': true,
+      'schema': {
+        'type': 'object',
+        'additionalProperties': false,
+        'properties': {
+          'selected_tags': {
+            'type': 'array',
+            'description': '推荐选中的标签列表',
+            'items': {
+              'type': 'object',
+              'additionalProperties': false,
+              'properties': {
+                'name': {
+                  'type': 'string',
+                  'description': '标签名',
+                },
+                'category_id': {
+                  'type': 'integer',
+                  'description': '分类 ID',
+                },
+                'match_reason': {
+                  'type': 'string',
+                  'description': '为什么推荐这个标签',
+                },
+              },
+              'required': ['name', 'category_id', 'match_reason'],
+            },
+          },
+        },
+        'required': ['selected_tags'],
+      },
+    },
+  };
+
+  static const String _tagMatchSystemTpl =
+      '你是写作技巧标签的匹配专家。根据当前创作场景，从标签库中筛选出适合本次使用的标签。\n'
+      '\n'
+      '每个标签包含：\n'
+      '- name: 标签名\n'
+      '- reason: 使用场景描述\n'
+      '- category_id: 分类 ID\n'
+      '\n'
+      '筛选原则：\n'
+      '- 只选择 reason 与当前场景匹配的标签\n'
+      '- 如果 reason 为空，不选择该标签（无法判断适用性）\n'
+      '- 宁可少选不可多选，只选最相关的 3-5 个\n'
+      '- 为每个选中的标签说明匹配理由(match_reason)\n';
+
+  static const String _tagMatchUserTpl =
+      '<当前创作场景>\n'
+      '{{ scene_description }}\n'
+      '</当前创作场景>\n'
+      '\n'
+      '<可用标签列表>\n'
+      '{{ available_tags }}\n'
+      '</可用标签列表>\n';
   // 变量: tag_categories
   static const String _extractTagsSystemTpl = '''按照用户要求，提取文章中的写作技巧。
 对于每个写作技巧，给出一个对应的标签（简洁的关键词）
@@ -864,5 +1035,40 @@ class AiPromptBuilder {
         },
       ),
     );
+  }
+
+  // ========== 标签自省 & 标签匹配 build 方法 ==========
+
+  /// 构建标签自省 prompt
+  ///
+  /// [usedTags] 格式化后的标签展示文本（name+reason+promptText）
+  /// [generatedContent] AI 生成的原始内容
+  /// [userFeedback] 用户的修改意见
+  static ({String system, String user}) tagIntrospection({
+    required String usedTags,
+    required String generatedContent,
+    required String userFeedback,
+  }) {
+    final userPrompt = _tagIntrospectionUserTpl
+        .replaceAll('{{ used_tags }}', usedTags)
+        .replaceAll('{{ generated_content }}', generatedContent)
+        .replaceAll('{{ user_feedback }}', userFeedback);
+
+    return (system: _tagIntrospectionSystemTpl, user: userPrompt);
+  }
+
+  /// 构建标签匹配 prompt
+  ///
+  /// [sceneDescription] 当前创作场景描述
+  /// [availableTags] 可用标签列表（含 name+reason+category_id）
+  static ({String system, String user}) tagMatch({
+    required String sceneDescription,
+    required String availableTags,
+  }) {
+    final userPrompt = _tagMatchUserTpl
+        .replaceAll('{{ scene_description }}', sceneDescription)
+        .replaceAll('{{ available_tags }}', availableTags);
+
+    return (system: _tagMatchSystemTpl, user: userPrompt);
   }
 }

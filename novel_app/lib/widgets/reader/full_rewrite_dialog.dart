@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
+import '../../models/tag_group.dart';
+import '../../models/character.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../services/logger_service.dart';
+import '../../services/preferences_service.dart';
+import '../../services/prompt_tag_service.dart';
 import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
+import '../../widgets/prompt_tag_selector_sheet.dart';
+import '../../widgets/selected_tags_view.dart';
+import '../../widgets/reader/tag_introspection_entry_sheet.dart';
 import '../../core/providers/reader_screen_providers.dart';
+import '../../core/providers/database_providers.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 全文重写对话框
@@ -14,6 +22,7 @@ import '../../core/theme/app_colors.dart';
 /// 职责：
 /// - 提供全文重写功能的完整 UI
 /// - 支持用户输入重写要求
+/// - 支持标签选择（手动 + P1 智能匹配）
 /// - 使用 DifyStreamingMixin 进行流式生成
 /// - 支持替换全文、重新生成功能
 class FullRewriteDialog extends ConsumerStatefulWidget {
@@ -43,6 +52,12 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
   final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
   String _lastUserInput = '';
 
+  // 标签选择状态
+  List<TagGroup> _selectedTagGroups = [];
+
+  // 最近一次生成使用的 tag 详情（供自省用）
+  List<UsedTagDetail> _lastUsedTags = [];
+
   @override
   void initState() {
     super.initState();
@@ -62,71 +77,43 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
   // 显示重写要求输入对话框
   Future<void> _showRequirementDialog() async {
     final userInputController = TextEditingController(text: _lastUserInput);
-    final result = await showDialog<String>(
+    final result = await showDialog<_FullRewriteInputResult>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.auto_stories, color: context.appColors.success),
-            const SizedBox(width: 8),
-            Text('全文重写'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '将对整章内容进行重写',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+      builder: (dialogContext) => _FullRewriteInputDialog(
+        controller: userInputController,
+        selectedTagGroups: _selectedTagGroups,
+        onOpenTagSelector: () async {
+          final groups = await showModalBottomSheet<List<TagGroup>>(
+            context: dialogContext,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: PromptTagSelectorSheet(
+                initialSelectedGroups: _selectedTagGroups,
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: userInputController,
-              decoration: const InputDecoration(
-                labelText: '重写要求',
-                hintText: '例如：改变写作风格、增加细节描写、调整情节节奏等...',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              maxLines: 4,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '提示：AI将根据你的要求重新创作整章内容',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, userInputController.text);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.appColors.success,
-              foregroundColor: context.appColors.onSemantic,
-            ),
-            child: const Text('开始重写'),
-          ),
-        ],
+          );
+          return groups;
+        },
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
-      _lastUserInput = result;
-      _generateFullRewrite(result);
+    if (result != null) {
+      _lastUserInput = result.text;
+      _selectedTagGroups = result.selectedGroups;
+
+      // 合并标签 prompt 到用户输入
+      final tagService = PromptTagService.byRef(ref);
+      final mergedResult =
+          await tagService.buildMergedUserInput(result.text, _selectedTagGroups);
+      _lastUsedTags = mergedResult.usedTags;
+      _generateFullRewrite(mergedResult.mergedInput);
     } else {
       // 用户取消，关闭Dialog
       if (mounted) {
@@ -153,8 +140,22 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
         widget.content,
       );
 
-      // 构建全文重写的参数
-      final inputs = context.buildFullRewriteInputs(userInput);
+      // 获取作家设定（与 paragraph_rewrite_dialog 对齐）
+      final aiWriterSetting =
+          await PreferencesService.instance.getString('ai_writer_prompt');
+
+      // 获取角色信息（替换原来的硬编码缺失）
+      final characterRepo = ref.read(characterRepositoryProvider);
+      final characters =
+          await characterRepo.getCharacters(widget.novel.url);
+      final roles = Character.formatForAI(characters);
+
+      // 构建全文重写的参数（包含作家设定和角色信息）
+      final inputs = context.buildFullRewriteInputs(
+        userInput,
+        aiWriterSetting: aiWriterSetting,
+        roles: roles,
+      );
 
       // 显示结果弹窗
       _showResultDialog();
@@ -185,6 +186,27 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
         tags: ['rewrite', 'full', 'error'],
       );
     }
+  }
+
+  // 打开标签自省 Sheet
+  Future<void> _showTagIntrospection() async {
+    final result = _rewriteResultNotifier.value;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: TagIntrospectionEntrySheet(
+          usedTags: _lastUsedTags,
+          generatedContent: result,
+          novelUrl: widget.novel.url,
+        ),
+      ),
+    );
   }
 
   // 显示重写结果弹窗
@@ -241,12 +263,17 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    Icon(Icons.info_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         '你可以选择替换全文、重新生成或关闭',
-                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -266,7 +293,8 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
                           _showRequirementDialog();
                         },
                   icon: const Icon(Icons.refresh),
-                  label: Text(isGenerating ? '生成中...' : '重新生成'),
+                  label:
+                      Text(isGenerating ? '生成中...' : '重新生成'),
                 );
               },
             ),
@@ -302,6 +330,17 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
                 );
               },
             ),
+            // 标签自省入口：对生成结果不满意时触发 AI 诊断
+            Builder(builder: (ctx) {
+              return TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _showTagIntrospection();
+                },
+                icon: const Icon(Icons.psychology, size: 18),
+                label: const Text('需要改进'),
+              );
+            }),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('关闭'),
@@ -317,5 +356,152 @@ class _FullRewriteDialogState extends ConsumerState<FullRewriteDialog>
     // 这个Dialog的主要UI在_showRequirementDialog和_showResultDialog中
     // 这里返回一个空的Container，因为实际UI是通过showDialog显示的
     return const SizedBox.shrink();
+  }
+}
+
+// ============================================================================
+// 全文重写输入对话框（含标签选择）
+// ============================================================================
+
+/// 全文重写输入结果
+class _FullRewriteInputResult {
+  final String text;
+  final List<TagGroup> selectedGroups;
+
+  const _FullRewriteInputResult({
+    required this.text,
+    required this.selectedGroups,
+  });
+}
+
+/// 全文重写输入对话框
+///
+/// 包含重写要求输入 + 标签选择入口，参照 ParagraphRewriteDialog 的 _RewriteInputDialog
+class _FullRewriteInputDialog extends StatefulWidget {
+  final TextEditingController controller;
+  final List<TagGroup> selectedTagGroups;
+  final Future<List<TagGroup>?> Function() onOpenTagSelector;
+
+  const _FullRewriteInputDialog({
+    required this.controller,
+    required this.selectedTagGroups,
+    required this.onOpenTagSelector,
+  });
+
+  @override
+  State<_FullRewriteInputDialog> createState() =>
+      _FullRewriteInputDialogState();
+}
+
+class _FullRewriteInputDialogState extends State<_FullRewriteInputDialog> {
+  List<TagGroup> _currentSelectedGroups = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSelectedGroups = List.from(widget.selectedTagGroups);
+  }
+
+  Future<void> _openTagSelector() async {
+    final groups = await widget.onOpenTagSelector();
+    if (groups != null && mounted) {
+      setState(() {
+        _currentSelectedGroups = groups;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.auto_stories, color: context.appColors.success),
+          const SizedBox(width: 8),
+          const Text('全文重写'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '将对整章内容进行重写',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: widget.controller,
+            decoration: InputDecoration(
+              labelText: '重写要求',
+              hintText: '例如：改变写作风格、增加细节描写、调整情节节奏等...',
+              border: const OutlineInputBorder(),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 标签选择按钮
+                  IconButton(
+                    icon: const Icon(Icons.label_outline, size: 20),
+                    tooltip: '选择标签',
+                    onPressed: _openTagSelector,
+                  ),
+                ],
+              ),
+            ),
+            autofocus: true,
+            maxLines: 4,
+          ),
+          // 已选标签展示
+          if (_currentSelectedGroups.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SelectedTagsView(
+              groups: _currentSelectedGroups,
+              onRemove: (group) {
+                setState(() {
+                  _currentSelectedGroups = _currentSelectedGroups
+                      .where((g) =>
+                          !(g.categoryId == group.categoryId &&
+                              g.name == group.name))
+                      .toList();
+                });
+              },
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            '提示：AI将根据你的要求重新创作整章内容',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _FullRewriteInputResult(
+                text: widget.controller.text,
+                selectedGroups: _currentSelectedGroups,
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: context.appColors.success,
+            foregroundColor: context.appColors.onSemantic,
+          ),
+          child: const Text('开始重写'),
+        ),
+      ],
+    );
   }
 }

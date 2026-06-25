@@ -14,7 +14,9 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
+import 'dart:math';
 
+import 'package:novel_app/services/llm_logger/llm_logger.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 // -- 配置 --
@@ -720,6 +722,16 @@ class IoLlmHttpClient implements LlmHttpClient {
   @override
   Future<String> postJson(
       String url, Map<String, String> headers, String body) async {
+    // ★ LLM 日志拦截：记录请求
+    final logId = _generateLogId();
+    final stopwatch = Stopwatch()..start();
+    LlmLogger.instance.logRequest(
+      id: logId,
+      endpoint: url,
+      requestBody: body,
+      isStreaming: false,
+    );
+
     final uri = Uri.parse(url);
     final request = await _client.postUrl(uri);
     headers.forEach((k, v) => request.headers.set(k, v));
@@ -727,6 +739,26 @@ class IoLlmHttpClient implements LlmHttpClient {
     final response = await request.close();
     final statusCode = response.statusCode;
     final responseBody = await response.transform(utf8.decoder).join();
+
+    // ★ LLM 日志拦截：记录响应
+    stopwatch.stop();
+    if (statusCode >= 400) {
+      LlmLogger.instance.logResponse(
+        id: logId,
+        responseBody: responseBody,
+        durationMs: stopwatch.elapsedMilliseconds,
+        isSuccess: false,
+        errorMessage: 'HTTP $statusCode',
+      );
+    } else {
+      LlmLogger.instance.logResponse(
+        id: logId,
+        responseBody: responseBody,
+        durationMs: stopwatch.elapsedMilliseconds,
+        isSuccess: true,
+      );
+    }
+
     if (statusCode >= 400) {
       LoggerService.instance.w(
         'LLM HTTP 错误: $statusCode',
@@ -741,6 +773,17 @@ class IoLlmHttpClient implements LlmHttpClient {
   @override
   Stream<String> postJsonStream(
       String url, Map<String, String> headers, String body) async* {
+    // ★ LLM 日志拦截：记录流式请求
+    final logId = _generateLogId();
+    final stopwatch = Stopwatch()..start();
+    final responseBuffer = StringBuffer();
+    LlmLogger.instance.logRequest(
+      id: logId,
+      endpoint: url,
+      requestBody: body,
+      isStreaming: true,
+    );
+
     final uri = Uri.parse(url);
     final request = await _client.postUrl(uri);
     headers.forEach((k, v) => request.headers.set(k, v));
@@ -756,10 +799,57 @@ class IoLlmHttpClient implements LlmHttpClient {
         stackTrace: _buildHttpErrorContext(url, headers, body, errorBody),
         tags: ['dsl', 'llm', 'http', 'post_json_stream'],
       );
+      // ★ LLM 日志拦截：记录流式错误
+      stopwatch.stop();
+      LlmLogger.instance.logResponse(
+        id: logId,
+        responseBody: errorBody,
+        durationMs: stopwatch.elapsedMilliseconds,
+        isSuccess: false,
+        errorMessage: 'HTTP $statusCode',
+      );
       yield errorBody;
       return;
     }
-    yield* response.transform(utf8.decoder);
+    // ★ 流式拦截：收集所有 chunk，流结束后记录完整响应
+    yield* _wrapStreamWithLogging(
+      response.transform(utf8.decoder),
+      logId,
+      stopwatch,
+      responseBuffer,
+    );
+  }
+
+  /// 将流式响应包装，在流结束后记录完整响应到 LlmLogger
+  Stream<String> _wrapStreamWithLogging(
+    Stream<String> source,
+    String logId,
+    Stopwatch stopwatch,
+    StringBuffer buffer,
+  ) async* {
+    try {
+      await for (final chunk in source) {
+        buffer.write(chunk);
+        yield chunk;
+      }
+      // 流正常结束，记录完整响应
+      stopwatch.stop();
+      LlmLogger.instance.logResponse(
+        id: logId,
+        responseBody: buffer.toString(),
+        durationMs: stopwatch.elapsedMilliseconds,
+        isSuccess: true,
+      );
+    } catch (e) {
+      // 流异常中断
+      stopwatch.stop();
+      LlmLogger.instance.logError(
+        id: logId,
+        errorMessage: e.toString(),
+        durationMs: stopwatch.elapsedMilliseconds,
+      );
+      rethrow;
+    }
   }
 
   /// 构造 HTTP 错误诊断上下文（写入 stackTrace 字段，便于后续定位 4xx/5xx 根因）
@@ -794,4 +884,11 @@ class IoLlmHttpClient implements LlmHttpClient {
       '  responseBody: $errorSnippet',
     ].join('\n');
   }
+}
+
+/// 生成 LLM 日志记录 ID（时间戳 + 随机后缀）
+String _generateLogId() {
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  final rand = Random().nextInt(9999).toString().padLeft(4, '0');
+  return 'llm_${ts}_$rand';
 }

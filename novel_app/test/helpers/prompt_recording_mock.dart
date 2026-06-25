@@ -1,7 +1,11 @@
-/// Prompt 录制 Mock：记录 LLM 请求参数 + 返回固定响应
+/// 测试用 LLM 请求记录 Mock
 ///
-/// 用于 prompt 漂移检测：跑 Service 后，从 recordedRequests 提取最终发给 LLM 的
-/// (system_prompt, user_message, model, temperature, max_tokens)，与 golden 对比。
+/// 替换 LlmProvider 中的 HTTP 客户端，拦截请求并记录：
+/// - model / temperature / maxTokens
+/// - messages (system + user)
+/// - response_format（结构化输出方法使用）
+///
+/// 默认返回 'MOCK_LLM_RESPONSE'，可通过 [setMockContent] 自定义。
 library;
 
 import 'dart:convert';
@@ -11,8 +15,12 @@ import 'package:novel_app/services/dsl_engine/llm_provider.dart';
 class PromptRecordingMock implements LlmHttpClient {
   final List<RecordedRequest> recordedRequests = [];
 
+  /// 自定义 mock 返回内容（默认 'MOCK_LLM_RESPONSE'）
   String _mockContent = 'MOCK_LLM_RESPONSE';
 
+  /// 设置 mock 返回内容
+  ///
+  /// 用于结构化输出方法（如 immersiveScript），LLM 需返回合法 JSON。
   void setMockContent(String content) {
     _mockContent = content;
   }

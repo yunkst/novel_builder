@@ -94,49 +94,6 @@ final characterCardServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
-String _$outlineServiceHash() => r'b5fafecb21831f6a172511c4aec65c5318c19c5c';
-
-/// OutlineService Provider
-///
-/// 提供大纲服务实例，处理小说大纲的管理和生成。
-///
-/// **功能**:
-/// - 大纲CRUD操作
-/// - 大纲AI生成
-/// - 章节细纲生成
-///
-/// **依赖**:
-/// - [databaseServiceProvider] - 数据库访问
-///
-/// **使用示例**:
-/// ```dart
-/// final outlineService = ref.watch(outlineServiceProvider);
-/// await outlineService.saveOutline(
-///   novelUrl: novelUrl,
-///   title: title,
-///   content: content,
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - AI生成是异步操作
-///
-/// Copied from [outlineService].
-@ProviderFor(outlineService)
-final outlineServiceProvider = AutoDisposeProvider<OutlineService>.internal(
-  outlineService,
-  name: r'outlineServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$outlineServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef OutlineServiceRef = AutoDisposeProviderRef<OutlineService>;
 String _$chapterHistoryServiceHash() =>
     r'7f719fe06e7bbd9f97289185865e79613594a29e';
 

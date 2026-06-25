@@ -141,6 +141,7 @@ class _PromptTagManagementScreenState
     final tag = PromptTag(
       categoryId: _selectedCategoryId!,
       name: result.name,
+      reason: result.reason,
       promptText: result.prompt,
       sortOrder: _tags.length,
       createdAt: now,
@@ -155,6 +156,7 @@ class _PromptTagManagementScreenState
       context: context,
       builder: (context) => _TagEditDialog(
         initialName: tag.name,
+        initialReason: tag.reason,
         initialPrompt: tag.promptText,
       ),
     );
@@ -162,6 +164,7 @@ class _PromptTagManagementScreenState
     final tagRepo = ref.read(promptTagRepositoryProvider);
     await tagRepo.save(tag.copyWith(
       name: result.name,
+      reason: result.reason,
       promptText: result.prompt,
       updatedAt: DateTime.now(),
     ));
@@ -315,10 +318,39 @@ class _PromptTagManagementScreenState
                           itemBuilder: (context, index) {
                             final tag = _tags[index];
                             return ListTile(
-                              title: Text(
-                                tag.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w500),
+                              title: Row(
+                                children: [
+                                  Text(
+                                    tag.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  if (tag.reason.isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        tag.reason,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               subtitle: Text(
                                 tag.promptText,
@@ -435,14 +467,20 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
 
 class _TagEditResult {
   final String name;
+  final String reason;
   final String prompt;
-  _TagEditResult(this.name, this.prompt);
+  _TagEditResult(this.name, this.reason, this.prompt);
 }
 
 class _TagEditDialog extends StatefulWidget {
   final String initialName;
+  final String initialReason;
   final String initialPrompt;
-  const _TagEditDialog({this.initialName = '', this.initialPrompt = ''});
+  const _TagEditDialog({
+    this.initialName = '',
+    this.initialReason = '',
+    this.initialPrompt = '',
+  });
 
   @override
   State<_TagEditDialog> createState() => _TagEditDialogState();
@@ -450,18 +488,21 @@ class _TagEditDialog extends StatefulWidget {
 
 class _TagEditDialogState extends State<_TagEditDialog> {
   late TextEditingController _nameController;
+  late TextEditingController _reasonController;
   late TextEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
+    _reasonController = TextEditingController(text: widget.initialReason);
     _promptController = TextEditingController(text: widget.initialPrompt);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _reasonController.dispose();
     _promptController.dispose();
     super.dispose();
   }
@@ -480,6 +521,16 @@ class _TagEditDialogState extends State<_TagEditDialog> {
               autofocus: true,
               decoration: const InputDecoration(
                 labelText: '标签名称',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: '使用场景',
+                hintText: '简短一句话，说明何时该用这个标签',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -508,6 +559,7 @@ class _TagEditDialogState extends State<_TagEditDialog> {
               context,
               _TagEditResult(
                 _nameController.text.trim(),
+                _reasonController.text.trim(),
                 _promptController.text.trim(),
               ),
             );

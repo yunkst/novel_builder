@@ -14,7 +14,7 @@
 ## 模块职责
 
 Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的小说阅读体验。主要负责：
-- 小说搜索与发现
+- 小说搜索与发现（章节内容搜索，阅读器内）
 - 本地书架管理
 - 离线阅读体验
 - AI增强功能（角色聊天、特写生成）
@@ -33,7 +33,7 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
 2. **API服务初始化**: `ApiServiceWrapper().init()`
 3. **Provider容器初始化**: `ProviderContainer` 创建 Riverpod 容器
 4. **Material3主题设置**: 默认暗色主题
-5. **底部导航**: 书架、搜索、设置三个标签页
+5. **底部导航**: 书架、生图调试、浏览器、设置四个标签页
 
 ## 项目架构
 
@@ -232,7 +232,7 @@ class ChapterListScreen extends ConsumerWidget {
 **文件**: `lib/services/backend_api_service.dart`（已弃用，使用ApiServiceWrapper）
 
 **功能**:
-- 搜索小说 (`GET /search`)
+- 搜索小说 (`GET /search`) *(后端保留，App 已移除跨站点搜索入口)*
 - 获取章节列表 (`GET /chapters`)
 - 获取章节内容 (`GET /chapter-content`)
 
@@ -248,7 +248,6 @@ class ChapterListScreen extends ConsumerWidget {
 **使用方式**:
 ```dart
 final apiService = ref.watch(apiServiceProvider);
-final novels = await apiService.searchNovels(keyword);
 ```
 
 ### AI集成接口
@@ -661,17 +660,17 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 **数据存储**: 本地SQLite
 
-### 2. 搜索功能
+### 2. 章节内容搜索
 
-**Screen**: `lib/screens/search_screen.dart`
+**Screen**: 阅读器内 `chapter_search_screen.dart`
 
 **Service**:
-- `chapter_search_service.dart` - 章节搜索
+- `chapter_search_service.dart` - 章节内容搜索
 - `cache_search_service.dart` - 缓存搜索
 
-**Provider**: `core/providers/search_screen_providers.dart`
+**Provider**: `core/providers/chapter_search_providers.dart`
 
-**支持**: 跨站点搜索、结果过滤、搜索历史
+**支持**: 已缓存章节内容全文搜索、搜索结果高亮定位
 
 ### 3. 章节列表
 

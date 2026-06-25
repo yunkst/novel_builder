@@ -6,7 +6,7 @@ part of 'chapter_content_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chapterContentHash() => r'173c7b8b09d8969d48ed5f2063fe743d57d9dec6';
+String _$chapterContentHash() => r'007fcce109b4d8613e052aeb114a7f3f8a97edcf';
 
 /// ChapterContentProvider
 ///

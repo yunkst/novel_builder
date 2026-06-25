@@ -14,7 +14,6 @@ import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
-import '../core/providers/ui_providers.dart';
 import '../dialogs/novel_edit_dialog.dart';
 
 class BookshelfScreen extends ConsumerStatefulWidget {
@@ -532,12 +531,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
               data: (bookshelf) {
                 if (bookshelf.isEmpty) {
                   return EmptyBookshelfView(
-                    onSearch: () {
-                      // 切换到搜索 Tab
-                      ref
-                          .read(homeTabIndexNotifierProvider.notifier)
-                          .switchTo(HomeTabIndex.search);
-                    },
                     onCreateNovel: _showCreateNovelDialog,
                   );
                 }

@@ -66,36 +66,3 @@ class Outline {
         'createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 }
-
-/// 章节细纲草稿
-/// 临时模型，不持久化到数据库，仅在创建章节时使用
-class ChapterOutlineDraft {
-  final String title;
-  final String content;
-  final List<String> keyPoints;
-
-  const ChapterOutlineDraft({
-    required this.title,
-    required this.content,
-    required this.keyPoints,
-  });
-
-  /// 创建副本
-  ChapterOutlineDraft copyWith({
-    String? title,
-    String? content,
-    List<String>? keyPoints,
-  }) {
-    return ChapterOutlineDraft(
-      title: title ?? this.title,
-      content: content ?? this.content,
-      keyPoints: keyPoints ?? this.keyPoints,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'ChapterOutlineDraft(title: $title, content: ${content.substring(0, content.length > 50 ? 50 : content.length)}..., '
-        'keyPoints: $keyPoints)';
-  }
-}

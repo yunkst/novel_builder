@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tag_group.dart';
 import '../models/prompt_tag_category.dart';
 import '../core/providers/database_providers.dart';
+import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../utils/toast_utils.dart';
 
 /// 标签选择面板（分组模式）
 ///
-/// 横向 Scrollable Tab 切换分类 + 搜索 + 多选分组。
+/// 横向 Scrollable Tab 切换分类 + 搜索 + 智能匹配 + 多选分组。
 /// 同名标签聚合展示（name × count），选中后以 TagGroup 形式返回。
 /// 返回 `List<TagGroup>`（选中的分组），null 表示取消。
 class PromptTagSelectorSheet extends ConsumerStatefulWidget {
@@ -58,6 +60,7 @@ class _PromptTagSelectorSheetState
       builder: (context, scrollController) {
         return Column(
           children: [
+            // 拖拽指示条
             Container(
               margin: const EdgeInsets.symmetric(vertical: 8),
               width: 40,
@@ -67,6 +70,7 @@ class _PromptTagSelectorSheetState
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // 标题行
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Row(
@@ -96,6 +100,23 @@ class _PromptTagSelectorSheetState
                 ],
               ),
             ),
+            // 智能匹配按钮
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _showSmartMatchDialog,
+                  icon: const Icon(Icons.auto_fix_high, size: 18),
+                  label: const Text('智能匹配'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 搜索框
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
@@ -119,6 +140,7 @@ class _PromptTagSelectorSheetState
               ),
             ),
             const SizedBox(height: 8),
+            // 分类 Tab
             FutureBuilder<List<PromptTagCategory>>(
               future: categoryRepo.getAll(),
               builder: (context, snapshot) {
@@ -169,6 +191,7 @@ class _PromptTagSelectorSheetState
                 },
               ),
             ),
+            // 底部操作栏
             SafeArea(
               top: false,
               child: Padding(
@@ -199,10 +222,8 @@ class _PromptTagSelectorSheetState
     );
   }
 
-  /// 从当前选中 keys + 当前可见分组数据，构建返回结果
+  /// 从当前选中 keys 构建返回结果
   List<TagGroup> _buildSelectedGroups() {
-    // 需要从 _GroupedTagList 获取所有分组数据来匹配
-    // 简化：直接从 selectedKeys 构造 TagGroup
     return _selectedKeys.map((key) {
       final parts = key.split(':');
       final catId = int.parse(parts[0]);
@@ -215,8 +236,173 @@ class _PromptTagSelectorSheetState
       );
     }).toList();
   }
+
+  /// 弹出智能匹配对话框
+  Future<void> _showSmartMatchDialog() async {
+    final sceneController = TextEditingController();
+    final result = await showDialog<_SmartMatchResult>(
+      context: context,
+      builder: (ctx) => _SmartMatchDialog(controller: sceneController),
+    );
+    if (result == null || !mounted) return;
+
+    // 执行智能匹配
+    try {
+      final difyService = ref.read(difyServiceProvider);
+
+      // 准备可用标签列表（含 reason + category_id）
+      final tagRepo = ref.read(promptTagRepositoryProvider);
+      final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
+      final allTags = await tagRepo.getAll();
+      final categories = await categoryRepo.getAll();
+      final categoryMap = <int, String>{};
+      for (final cat in categories) {
+        if (cat.id != null) categoryMap[cat.id!] = cat.name;
+      }
+
+      // 格式化标签列表，过滤掉 reason 为空的（无法判断适用性）
+      final availableTagsBuffer = StringBuffer();
+      for (final tag in allTags) {
+        if (tag.reason.isEmpty) continue; // 无 reason 的标签跳过
+        availableTagsBuffer.writeln('【${tag.name}】');
+        availableTagsBuffer.writeln('场景：${tag.reason}');
+        availableTagsBuffer.writeln('category_id: ${tag.categoryId}');
+        availableTagsBuffer.writeln();
+      }
+
+      if (availableTagsBuffer.isEmpty) {
+        if (mounted) {
+          ToastUtils.showWarning('没有可用的标签（需要标签包含使用场景描述）',
+              context: context);
+        }
+        return;
+      }
+
+      final matchResults = await difyService.matchPromptTags(
+        sceneDescription: result.sceneDescription,
+        availableTags: availableTagsBuffer.toString(),
+      );
+
+      if (matchResults.isEmpty) {
+        if (mounted) {
+          ToastUtils.showInfo('未找到匹配的标签', context: context);
+        }
+        return;
+      }
+
+      // 将匹配结果转为 TagGroup 并自动勾选
+      if (!mounted) return;
+      final tagGroupRepo = ref.read(promptTagRepositoryProvider);
+      final newSelectedKeys = <String>{};
+      final matchMessages = <String>[];
+
+      for (final match in matchResults) {
+        // 查找匹配的 tag 来获取完整信息
+        final tags = await tagGroupRepo.search(match.name);
+        if (tags.isEmpty) continue;
+        final tag = tags.first;
+        final key = '${tag.categoryId}:${tag.name}';
+        newSelectedKeys.add(key);
+        matchMessages.add('• ${match.name}：${match.matchReason}');
+      }
+
+      setState(() {
+        _selectedKeys.addAll(newSelectedKeys);
+      });
+
+      if (mounted) {
+        ToastUtils.showSuccess(
+          '智能匹配推荐了 ${matchResults.length} 个标签',
+          context: context,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError('智能匹配失败: $e', context: context);
+      }
+    }
+  }
 }
 
+/// 智能匹配对话框结果
+class _SmartMatchResult {
+  final String sceneDescription;
+  _SmartMatchResult(this.sceneDescription);
+}
+
+/// 智能匹配输入对话框
+class _SmartMatchDialog extends StatefulWidget {
+  final TextEditingController controller;
+  const _SmartMatchDialog({required this.controller});
+
+  @override
+  State<_SmartMatchDialog> createState() => _SmartMatchDialogState();
+}
+
+class _SmartMatchDialogState extends State<_SmartMatchDialog> {
+  @override
+  void dispose() {
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.auto_fix_high, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          const Text('智能匹配'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '描述当前创作场景，AI 会根据标签的使用场景自动推荐合适的标签。',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: widget.controller,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: '例如：两人在山洞中对峙后爆发激烈冲突...',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            autofocus: true,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            final text = widget.controller.text.trim();
+            if (text.isEmpty) {
+              ToastUtils.showWarning('请输入场景描述', context: context);
+              return;
+            }
+            Navigator.pop(context, _SmartMatchResult(text));
+          },
+          icon: const Icon(Icons.search, size: 18),
+          label: const Text('匹配'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 分组标签列表
 class _GroupedTagList extends ConsumerStatefulWidget {
   const _GroupedTagList({
     required this.categoryId,

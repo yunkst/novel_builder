@@ -59,9 +59,7 @@ class _BackupManagementScreenState
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_backupList == null) {
-          _backupList = [];
-        }
+        _backupList ??= [];
         ToastUtils.showError('获取备份列表失败: $e');
       }
     }

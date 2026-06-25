@@ -4,20 +4,20 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i8;
-import 'dart:io' as _i12;
-import 'dart:typed_data' as _i10;
+import 'dart:io' as _i11;
+import 'dart:typed_data' as _i9;
 
 import 'package:dio/dio.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i11;
+import 'package:mockito/src/dummies.dart' as _i10;
 import 'package:novel_api/novel_api.dart' as _i2;
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart'
-    as _i13;
+    as _i12;
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart'
     as _i15;
-import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i5;
-import 'package:novel_app/models/chapter.dart' as _i9;
-import 'package:novel_app/models/novel.dart' as _i4;
+import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i4;
+import 'package:novel_app/models/chapter.dart' as _i13;
+import 'package:novel_app/models/novel.dart' as _i5;
 import 'package:novel_app/models/search_result.dart' as _i14;
 import 'package:novel_app/services/api_service_wrapper.dart' as _i7;
 import 'package:novel_app/services/headless_webview_chapter_list_service.dart'
@@ -58,19 +58,9 @@ class _FakeDio_1 extends _i1.SmartFake implements _i3.Dio {
         );
 }
 
-class _FakeNovel_2 extends _i1.SmartFake implements _i4.Novel {
-  _FakeNovel_2(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeImageToVideoResponse_3 extends _i1.SmartFake
+class _FakeImageToVideoResponse_2 extends _i1.SmartFake
     implements _i2.ImageToVideoResponse {
-  _FakeImageToVideoResponse_3(
+  _FakeImageToVideoResponse_2(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -79,9 +69,9 @@ class _FakeImageToVideoResponse_3 extends _i1.SmartFake
         );
 }
 
-class _FakeVideoStatusResponse_4 extends _i1.SmartFake
+class _FakeVideoStatusResponse_3 extends _i1.SmartFake
     implements _i2.VideoStatusResponse {
-  _FakeVideoStatusResponse_4(
+  _FakeVideoStatusResponse_3(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -90,9 +80,9 @@ class _FakeVideoStatusResponse_4 extends _i1.SmartFake
         );
 }
 
-class _FakeModelsResponse_5 extends _i1.SmartFake
+class _FakeModelsResponse_4 extends _i1.SmartFake
     implements _i2.ModelsResponse {
-  _FakeModelsResponse_5(
+  _FakeModelsResponse_4(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -101,9 +91,9 @@ class _FakeModelsResponse_5 extends _i1.SmartFake
         );
 }
 
-class _FakeBackupUploadResponse_6 extends _i1.SmartFake
+class _FakeBackupUploadResponse_5 extends _i1.SmartFake
     implements _i2.BackupUploadResponse {
-  _FakeBackupUploadResponse_6(
+  _FakeBackupUploadResponse_5(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -112,9 +102,19 @@ class _FakeBackupUploadResponse_6 extends _i1.SmartFake
         );
 }
 
-class _FakeAiAccompanimentSettings_7 extends _i1.SmartFake
-    implements _i5.AiAccompanimentSettings {
-  _FakeAiAccompanimentSettings_7(
+class _FakeAiAccompanimentSettings_6 extends _i1.SmartFake
+    implements _i4.AiAccompanimentSettings {
+  _FakeAiAccompanimentSettings_6(
+    Object parent,
+    Invocation parentInvocation,
+  ) : super(
+          parent,
+          parentInvocation,
+        );
+}
+
+class _FakeNovel_7 extends _i1.SmartFake implements _i5.Novel {
+  _FakeNovel_7(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -220,50 +220,6 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
         returnValue: _i8.Future<void>.value(),
         returnValueForMissingStub: _i8.Future<void>.value(),
       ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<List<_i4.Novel>> searchNovels(
-    String? keyword, {
-    List<String>? sites,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #searchNovels,
-          [keyword],
-          {#sites: sites},
-        ),
-        returnValue: _i8.Future<List<_i4.Novel>>.value(<_i4.Novel>[]),
-      ) as _i8.Future<List<_i4.Novel>>);
-
-  @override
-  _i8.Future<List<Map<String, dynamic>>> getSourceSites() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSourceSites,
-          [],
-        ),
-        returnValue: _i8.Future<List<Map<String, dynamic>>>.value(
-            <Map<String, dynamic>>[]),
-      ) as _i8.Future<List<Map<String, dynamic>>>);
-
-  @override
-  _i8.Future<(_i4.Novel, List<_i9.Chapter>)> getNovelByUrl(String? url) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getNovelByUrl,
-          [url],
-        ),
-        returnValue: _i8.Future<(_i4.Novel, List<_i9.Chapter>)>.value((
-          _FakeNovel_2(
-            this,
-            Invocation.method(
-              #getNovelByUrl,
-              [url],
-            ),
-          ),
-          <_i9.Chapter>[]
-        )),
-      ) as _i8.Future<(_i4.Novel, List<_i9.Chapter>)>);
 
   @override
   void dispose() => super.noSuchMethod(
@@ -419,14 +375,14 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
       ) as _i8.Future<Map<String, dynamic>>);
 
   @override
-  _i8.Future<_i10.Uint8List> getImageProxy(String? filename) =>
+  _i8.Future<_i9.Uint8List> getImageProxy(String? filename) =>
       (super.noSuchMethod(
         Invocation.method(
           #getImageProxy,
           [filename],
         ),
-        returnValue: _i8.Future<_i10.Uint8List>.value(_i10.Uint8List(0)),
-      ) as _i8.Future<_i10.Uint8List>);
+        returnValue: _i8.Future<_i9.Uint8List>.value(_i9.Uint8List(0)),
+      ) as _i8.Future<_i9.Uint8List>);
 
   @override
   _i8.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
@@ -445,7 +401,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue: _i8.Future<_i2.ImageToVideoResponse>.value(
-            _FakeImageToVideoResponse_3(
+            _FakeImageToVideoResponse_2(
           this,
           Invocation.method(
             #generateVideoFromImage,
@@ -467,7 +423,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           [imgName],
         ),
         returnValue: _i8.Future<_i2.VideoStatusResponse>.value(
-            _FakeVideoStatusResponse_4(
+            _FakeVideoStatusResponse_3(
           this,
           Invocation.method(
             #checkVideoStatus,
@@ -482,7 +438,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           #getVideoFileUrl,
           [imgName],
         ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
+        returnValue: _i8.Future<String>.value(_i10.dummyValue<String>(
           this,
           Invocation.method(
             #getVideoFileUrl,
@@ -517,7 +473,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           #getModels,
           [],
         ),
-        returnValue: _i8.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_5(
+        returnValue: _i8.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_4(
           this,
           Invocation.method(
             #getModels,
@@ -539,7 +495,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
 
   @override
   _i8.Future<_i2.BackupUploadResponse> uploadBackup({
-    required _i12.File? dbFile,
+    required _i11.File? dbFile,
     _i3.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
@@ -552,7 +508,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
           },
         ),
         returnValue: _i8.Future<_i2.BackupUploadResponse>.value(
-            _FakeBackupUploadResponse_6(
+            _FakeBackupUploadResponse_5(
           this,
           Invocation.method(
             #uploadBackup,
@@ -591,7 +547,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i8.Future<String>.value(_i11.dummyValue<String>(
+        returnValue: _i8.Future<String>.value(_i10.dummyValue<String>(
           this,
           Invocation.method(
             #downloadBackup,
@@ -622,7 +578,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i7.ApiServiceWrapper {
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockIChapterRepository extends _i1.Mock
-    implements _i13.IChapterRepository {
+    implements _i12.IChapterRepository {
   MockIChapterRepository() {
     _i1.throwOnMissingStub(this);
   }
@@ -658,24 +614,6 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i8.Future<Map<String, bool>>);
 
   @override
-  void markAsPreloading(String? chapterUrl) => super.noSuchMethod(
-        Invocation.method(
-          #markAsPreloading,
-          [chapterUrl],
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  bool isPreloading(String? chapterUrl) => (super.noSuchMethod(
-        Invocation.method(
-          #isPreloading,
-          [chapterUrl],
-        ),
-        returnValue: false,
-      ) as bool);
-
-  @override
   void clearMemoryState() => super.noSuchMethod(
         Invocation.method(
           #clearMemoryState,
@@ -687,7 +625,7 @@ class MockIChapterRepository extends _i1.Mock
   @override
   _i8.Future<int> cacheChapter(
     String? novelUrl,
-    _i9.Chapter? chapter,
+    _i13.Chapter? chapter,
     String? content,
   ) =>
       (super.noSuchMethod(
@@ -738,14 +676,14 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i8.Future<String?>);
 
   @override
-  _i8.Future<List<_i9.Chapter>> getCachedChapters(String? novelUrl) =>
+  _i8.Future<List<_i13.Chapter>> getCachedChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedChapters,
           [novelUrl],
         ),
-        returnValue: _i8.Future<List<_i9.Chapter>>.value(<_i9.Chapter>[]),
-      ) as _i8.Future<List<_i9.Chapter>>);
+        returnValue: _i8.Future<List<_i13.Chapter>>.value(<_i13.Chapter>[]),
+      ) as _i8.Future<List<_i13.Chapter>>);
 
   @override
   _i8.Future<int> deleteCachedChapters(String? novelUrl) => (super.noSuchMethod(
@@ -809,7 +747,7 @@ class MockIChapterRepository extends _i1.Mock
   @override
   _i8.Future<void> cacheNovelChapters(
     String? novelUrl,
-    List<_i9.Chapter>? chapters,
+    List<_i13.Chapter>? chapters,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -824,14 +762,14 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i8.Future<void>);
 
   @override
-  _i8.Future<List<_i9.Chapter>> getCachedNovelChapters(String? novelUrl) =>
+  _i8.Future<List<_i13.Chapter>> getCachedNovelChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedNovelChapters,
           [novelUrl],
         ),
-        returnValue: _i8.Future<List<_i9.Chapter>>.value(<_i9.Chapter>[]),
-      ) as _i8.Future<List<_i9.Chapter>>);
+        returnValue: _i8.Future<List<_i13.Chapter>>.value(<_i13.Chapter>[]),
+      ) as _i8.Future<List<_i13.Chapter>>);
 
   @override
   _i8.Future<int> createCustomChapter(
@@ -940,7 +878,7 @@ class MockIChapterRepository extends _i1.Mock
   @override
   _i8.Future<void> updateChaptersOrder(
     String? novelUrl,
-    List<_i9.Chapter>? chapters,
+    List<_i13.Chapter>? chapters,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -970,13 +908,13 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i8.Future<List<_i14.ChapterSearchResult>>);
 
   @override
-  _i8.Future<_i9.Chapter?> getChapterById(int? id) => (super.noSuchMethod(
+  _i8.Future<_i13.Chapter?> getChapterById(int? id) => (super.noSuchMethod(
         Invocation.method(
           #getChapterById,
           [id],
         ),
-        returnValue: _i8.Future<_i9.Chapter?>.value(),
-      ) as _i8.Future<_i9.Chapter?>);
+        returnValue: _i8.Future<_i13.Chapter?>.value(),
+      ) as _i8.Future<_i13.Chapter?>);
 
   @override
   _i8.Future<String?> getChapterUrlById(int? id) => (super.noSuchMethod(
@@ -1031,7 +969,7 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
   }
 
   @override
-  _i8.Future<int> addToBookshelf(_i4.Novel? novel) => (super.noSuchMethod(
+  _i8.Future<int> addToBookshelf(_i5.Novel? novel) => (super.noSuchMethod(
         Invocation.method(
           #addToBookshelf,
           [novel],
@@ -1049,13 +987,13 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
       ) as _i8.Future<int>);
 
   @override
-  _i8.Future<List<_i4.Novel>> getNovels() => (super.noSuchMethod(
+  _i8.Future<List<_i5.Novel>> getNovels() => (super.noSuchMethod(
         Invocation.method(
           #getNovels,
           [],
         ),
-        returnValue: _i8.Future<List<_i4.Novel>>.value(<_i4.Novel>[]),
-      ) as _i8.Future<List<_i4.Novel>>);
+        returnValue: _i8.Future<List<_i5.Novel>>.value(<_i5.Novel>[]),
+      ) as _i8.Future<List<_i5.Novel>>);
 
   @override
   _i8.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
@@ -1134,27 +1072,27 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
       ) as _i8.Future<int>);
 
   @override
-  _i8.Future<_i5.AiAccompanimentSettings> getAiAccompanimentSettings(
+  _i8.Future<_i4.AiAccompanimentSettings> getAiAccompanimentSettings(
           String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getAiAccompanimentSettings,
           [novelUrl],
         ),
-        returnValue: _i8.Future<_i5.AiAccompanimentSettings>.value(
-            _FakeAiAccompanimentSettings_7(
+        returnValue: _i8.Future<_i4.AiAccompanimentSettings>.value(
+            _FakeAiAccompanimentSettings_6(
           this,
           Invocation.method(
             #getAiAccompanimentSettings,
             [novelUrl],
           ),
         )),
-      ) as _i8.Future<_i5.AiAccompanimentSettings>);
+      ) as _i8.Future<_i4.AiAccompanimentSettings>);
 
   @override
   _i8.Future<int> updateAiAccompanimentSettings(
     String? novelUrl,
-    _i5.AiAccompanimentSettings? settings,
+    _i4.AiAccompanimentSettings? settings,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1168,16 +1106,16 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
       ) as _i8.Future<int>);
 
   @override
-  _i8.Future<_i4.Novel?> getNovelByTitle(String? title) => (super.noSuchMethod(
+  _i8.Future<_i5.Novel?> getNovelByTitle(String? title) => (super.noSuchMethod(
         Invocation.method(
           #getNovelByTitle,
           [title],
         ),
-        returnValue: _i8.Future<_i4.Novel?>.value(),
-      ) as _i8.Future<_i4.Novel?>);
+        returnValue: _i8.Future<_i5.Novel?>.value(),
+      ) as _i8.Future<_i5.Novel?>);
 
   @override
-  _i8.Future<_i4.Novel> createNovel({
+  _i8.Future<_i5.Novel> createNovel({
     required String? title,
     required String? author,
     String? description,
@@ -1196,7 +1134,7 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
             #backgroundSetting: backgroundSetting,
           },
         ),
-        returnValue: _i8.Future<_i4.Novel>.value(_FakeNovel_2(
+        returnValue: _i8.Future<_i5.Novel>.value(_FakeNovel_7(
           this,
           Invocation.method(
             #createNovel,
@@ -1210,16 +1148,16 @@ class MockINovelRepository extends _i1.Mock implements _i15.INovelRepository {
             },
           ),
         )),
-      ) as _i8.Future<_i4.Novel>);
+      ) as _i8.Future<_i5.Novel>);
 
   @override
-  _i8.Future<_i4.Novel?> getNovelById(int? id) => (super.noSuchMethod(
+  _i8.Future<_i5.Novel?> getNovelById(int? id) => (super.noSuchMethod(
         Invocation.method(
           #getNovelById,
           [id],
         ),
-        returnValue: _i8.Future<_i4.Novel?>.value(),
-      ) as _i8.Future<_i4.Novel?>);
+        returnValue: _i8.Future<_i5.Novel?>.value(),
+      ) as _i8.Future<_i5.Novel?>);
 
   @override
   _i8.Future<String?> getNovelUrlById(int? id) => (super.noSuchMethod(

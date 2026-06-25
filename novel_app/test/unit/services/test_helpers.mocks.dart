@@ -3,18 +3,15 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i7;
-import 'dart:io' as _i11;
-import 'dart:typed_data' as _i10;
+import 'dart:async' as _i5;
+import 'dart:io' as _i8;
+import 'dart:typed_data' as _i6;
 
 import 'package:dio/dio.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i9;
+import 'package:mockito/src/dummies.dart' as _i7;
 import 'package:novel_api/novel_api.dart' as _i2;
-import 'package:novel_app/models/chapter.dart' as _i8;
-import 'package:novel_app/models/chapter_content_result.dart' as _i5;
-import 'package:novel_app/models/novel.dart' as _i4;
-import 'package:novel_app/services/api_service_wrapper.dart' as _i6;
+import 'package:novel_app/services/api_service_wrapper.dart' as _i4;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -50,30 +47,9 @@ class _FakeDio_1 extends _i1.SmartFake implements _i3.Dio {
         );
 }
 
-class _FakeNovel_2 extends _i1.SmartFake implements _i4.Novel {
-  _FakeNovel_2(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeChapterContentResult_3 extends _i1.SmartFake
-    implements _i5.ChapterContentResult {
-  _FakeChapterContentResult_3(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeImageToVideoResponse_4 extends _i1.SmartFake
+class _FakeImageToVideoResponse_2 extends _i1.SmartFake
     implements _i2.ImageToVideoResponse {
-  _FakeImageToVideoResponse_4(
+  _FakeImageToVideoResponse_2(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -82,9 +58,9 @@ class _FakeImageToVideoResponse_4 extends _i1.SmartFake
         );
 }
 
-class _FakeVideoStatusResponse_5 extends _i1.SmartFake
+class _FakeVideoStatusResponse_3 extends _i1.SmartFake
     implements _i2.VideoStatusResponse {
-  _FakeVideoStatusResponse_5(
+  _FakeVideoStatusResponse_3(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -93,9 +69,9 @@ class _FakeVideoStatusResponse_5 extends _i1.SmartFake
         );
 }
 
-class _FakeModelsResponse_6 extends _i1.SmartFake
+class _FakeModelsResponse_4 extends _i1.SmartFake
     implements _i2.ModelsResponse {
-  _FakeModelsResponse_6(
+  _FakeModelsResponse_4(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -104,9 +80,9 @@ class _FakeModelsResponse_6 extends _i1.SmartFake
         );
 }
 
-class _FakeBackupUploadResponse_7 extends _i1.SmartFake
+class _FakeBackupUploadResponse_5 extends _i1.SmartFake
     implements _i2.BackupUploadResponse {
-  _FakeBackupUploadResponse_7(
+  _FakeBackupUploadResponse_5(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -118,7 +94,7 @@ class _FakeBackupUploadResponse_7 extends _i1.SmartFake
 /// A class which mocks [ApiServiceWrapper].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
+class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
   MockApiServiceWrapper() {
     _i1.throwOnMissingStub(this);
   }
@@ -148,14 +124,14 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
       ) as _i3.Dio);
 
   @override
-  _i7.Future<void> init() => (super.noSuchMethod(
+  _i5.Future<void> init() => (super.noSuchMethod(
         Invocation.method(
           #init,
           [],
         ),
-        returnValue: _i7.Future<void>.value(),
-        returnValueForMissingStub: _i7.Future<void>.value(),
-      ) as _i7.Future<void>);
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 
   @override
   Map<String, dynamic> getInitStatus() => (super.noSuchMethod(
@@ -167,25 +143,25 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
       ) as Map<String, dynamic>);
 
   @override
-  _i7.Future<String?> getHost() => (super.noSuchMethod(
+  _i5.Future<String?> getHost() => (super.noSuchMethod(
         Invocation.method(
           #getHost,
           [],
         ),
-        returnValue: _i7.Future<String?>.value(),
-      ) as _i7.Future<String?>);
+        returnValue: _i5.Future<String?>.value(),
+      ) as _i5.Future<String?>);
 
   @override
-  _i7.Future<String?> getToken() => (super.noSuchMethod(
+  _i5.Future<String?> getToken() => (super.noSuchMethod(
         Invocation.method(
           #getToken,
           [],
         ),
-        returnValue: _i7.Future<String?>.value(),
-      ) as _i7.Future<String?>);
+        returnValue: _i5.Future<String?>.value(),
+      ) as _i5.Future<String?>);
 
   @override
-  _i7.Future<void> setConfig({
+  _i5.Future<void> setConfig({
     required String? host,
     String? token,
   }) =>
@@ -198,110 +174,9 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             #token: token,
           },
         ),
-        returnValue: _i7.Future<void>.value(),
-        returnValueForMissingStub: _i7.Future<void>.value(),
-      ) as _i7.Future<void>);
-
-  @override
-  _i7.Future<List<_i4.Novel>> searchNovels(
-    String? keyword, {
-    List<String>? sites,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #searchNovels,
-          [keyword],
-          {#sites: sites},
-        ),
-        returnValue: _i7.Future<List<_i4.Novel>>.value(<_i4.Novel>[]),
-      ) as _i7.Future<List<_i4.Novel>>);
-
-  @override
-  _i7.Future<List<Map<String, dynamic>>> getSourceSites() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSourceSites,
-          [],
-        ),
-        returnValue: _i7.Future<List<Map<String, dynamic>>>.value(
-            <Map<String, dynamic>>[]),
-      ) as _i7.Future<List<Map<String, dynamic>>>);
-
-  @override
-  _i7.Future<List<_i8.Chapter>> getChapters(
-    String? novelUrl, {
-    bool? forceRefresh = false,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapters,
-          [novelUrl],
-          {#forceRefresh: forceRefresh},
-        ),
-        returnValue: _i7.Future<List<_i8.Chapter>>.value(<_i8.Chapter>[]),
-      ) as _i7.Future<List<_i8.Chapter>>);
-
-  @override
-  _i7.Future<(_i4.Novel, List<_i8.Chapter>)> getNovelByUrl(String? url) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getNovelByUrl,
-          [url],
-        ),
-        returnValue: _i7.Future<(_i4.Novel, List<_i8.Chapter>)>.value((
-          _FakeNovel_2(
-            this,
-            Invocation.method(
-              #getNovelByUrl,
-              [url],
-            ),
-          ),
-          <_i8.Chapter>[]
-        )),
-      ) as _i7.Future<(_i4.Novel, List<_i8.Chapter>)>);
-
-  @override
-  _i7.Future<String> getChapterContent(
-    String? chapterUrl, {
-    bool? forceRefresh = false,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapterContent,
-          [chapterUrl],
-          {#forceRefresh: forceRefresh},
-        ),
-        returnValue: _i7.Future<String>.value(_i9.dummyValue<String>(
-          this,
-          Invocation.method(
-            #getChapterContent,
-            [chapterUrl],
-            {#forceRefresh: forceRefresh},
-          ),
-        )),
-      ) as _i7.Future<String>);
-
-  @override
-  _i7.Future<_i5.ChapterContentResult> getChapterContentWithSource(
-    String? chapterUrl, {
-    bool? forceRefresh = false,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getChapterContentWithSource,
-          [chapterUrl],
-          {#forceRefresh: forceRefresh},
-        ),
-        returnValue: _i7.Future<_i5.ChapterContentResult>.value(
-            _FakeChapterContentResult_3(
-          this,
-          Invocation.method(
-            #getChapterContentWithSource,
-            [chapterUrl],
-            {#forceRefresh: forceRefresh},
-          ),
-        )),
-      ) as _i7.Future<_i5.ChapterContentResult>);
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 
   @override
   void dispose() => super.noSuchMethod(
@@ -313,7 +188,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
       );
 
   @override
-  _i7.Future<Map<String, dynamic>> generateRoleCardImages({
+  _i5.Future<Map<String, dynamic>> generateRoleCardImages({
     required String? roleId,
     required Map<String, dynamic>? roles,
     String? modelName,
@@ -329,22 +204,22 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
+  _i5.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRoleGallery,
           [roleId],
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<bool> deleteRoleImage({
+  _i5.Future<bool> deleteRoleImage({
     required String? roleId,
     required String? imageUrl,
   }) =>
@@ -357,11 +232,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             #imageUrl: imageUrl,
           },
         ),
-        returnValue: _i7.Future<bool>.value(false),
-      ) as _i7.Future<bool>);
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
 
   @override
-  _i7.Future<Map<String, dynamic>> generateMoreImages({
+  _i5.Future<Map<String, dynamic>> generateMoreImages({
     required String? roleId,
     required int? count,
     String? referenceImageUrl,
@@ -379,11 +254,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> createSceneIllustration({
+  _i5.Future<Map<String, dynamic>> createSceneIllustration({
     required String? chaptersContent,
     required String? taskId,
     required dynamic roles,
@@ -403,11 +278,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> getSceneIllustrationGallery(
+  _i5.Future<Map<String, dynamic>> getSceneIllustrationGallery(
           String? taskId) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -415,11 +290,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           [taskId],
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
+  _i5.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
     required String? taskId,
     required String? filename,
   }) =>
@@ -433,11 +308,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<Map<String, dynamic>> regenerateSceneIllustration({
+  _i5.Future<Map<String, dynamic>> regenerateSceneIllustration({
     required String? taskId,
     required int? count,
     String? model,
@@ -453,21 +328,21 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<_i10.Uint8List> getImageProxy(String? filename) =>
+  _i5.Future<_i6.Uint8List> getImageProxy(String? filename) =>
       (super.noSuchMethod(
         Invocation.method(
           #getImageProxy,
           [filename],
         ),
-        returnValue: _i7.Future<_i10.Uint8List>.value(_i10.Uint8List(0)),
-      ) as _i7.Future<_i10.Uint8List>);
+        returnValue: _i5.Future<_i6.Uint8List>.value(_i6.Uint8List(0)),
+      ) as _i5.Future<_i6.Uint8List>);
 
   @override
-  _i7.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
+  _i5.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
     required String? imgName,
     required String? userInput,
     String? modelName,
@@ -482,8 +357,8 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             #modelName: modelName,
           },
         ),
-        returnValue: _i7.Future<_i2.ImageToVideoResponse>.value(
-            _FakeImageToVideoResponse_4(
+        returnValue: _i5.Future<_i2.ImageToVideoResponse>.value(
+            _FakeImageToVideoResponse_2(
           this,
           Invocation.method(
             #generateVideoFromImage,
@@ -495,42 +370,42 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i7.Future<_i2.ImageToVideoResponse>);
+      ) as _i5.Future<_i2.ImageToVideoResponse>);
 
   @override
-  _i7.Future<_i2.VideoStatusResponse> checkVideoStatus(String? imgName) =>
+  _i5.Future<_i2.VideoStatusResponse> checkVideoStatus(String? imgName) =>
       (super.noSuchMethod(
         Invocation.method(
           #checkVideoStatus,
           [imgName],
         ),
-        returnValue: _i7.Future<_i2.VideoStatusResponse>.value(
-            _FakeVideoStatusResponse_5(
+        returnValue: _i5.Future<_i2.VideoStatusResponse>.value(
+            _FakeVideoStatusResponse_3(
           this,
           Invocation.method(
             #checkVideoStatus,
             [imgName],
           ),
         )),
-      ) as _i7.Future<_i2.VideoStatusResponse>);
+      ) as _i5.Future<_i2.VideoStatusResponse>);
 
   @override
-  _i7.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
+  _i5.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
         Invocation.method(
           #getVideoFileUrl,
           [imgName],
         ),
-        returnValue: _i7.Future<String>.value(_i9.dummyValue<String>(
+        returnValue: _i5.Future<String>.value(_i7.dummyValue<String>(
           this,
           Invocation.method(
             #getVideoFileUrl,
             [imgName],
           ),
         )),
-      ) as _i7.Future<String>);
+      ) as _i5.Future<String>);
 
   @override
-  _i7.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+  _i5.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
     required String? taskId,
     required int? count,
     String? modelName,
@@ -546,38 +421,38 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
 
   @override
-  _i7.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
+  _i5.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
         Invocation.method(
           #getModels,
           [],
         ),
-        returnValue: _i7.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_6(
+        returnValue: _i5.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_4(
           this,
           Invocation.method(
             #getModels,
             [],
           ),
         )),
-      ) as _i7.Future<_i2.ModelsResponse>);
+      ) as _i5.Future<_i2.ModelsResponse>);
 
   @override
-  _i7.Future<List<String>> getModelTitles({String? apiType}) =>
+  _i5.Future<List<String>> getModelTitles({String? apiType}) =>
       (super.noSuchMethod(
         Invocation.method(
           #getModelTitles,
           [],
           {#apiType: apiType},
         ),
-        returnValue: _i7.Future<List<String>>.value(<String>[]),
-      ) as _i7.Future<List<String>>);
+        returnValue: _i5.Future<List<String>>.value(<String>[]),
+      ) as _i5.Future<List<String>>);
 
   @override
-  _i7.Future<_i2.BackupUploadResponse> uploadBackup({
-    required _i11.File? dbFile,
+  _i5.Future<_i2.BackupUploadResponse> uploadBackup({
+    required _i8.File? dbFile,
     _i3.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
@@ -589,8 +464,8 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i7.Future<_i2.BackupUploadResponse>.value(
-            _FakeBackupUploadResponse_7(
+        returnValue: _i5.Future<_i2.BackupUploadResponse>.value(
+            _FakeBackupUploadResponse_5(
           this,
           Invocation.method(
             #uploadBackup,
@@ -601,20 +476,20 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i7.Future<_i2.BackupUploadResponse>);
+      ) as _i5.Future<_i2.BackupUploadResponse>);
 
   @override
-  _i7.Future<List<Map<String, dynamic>>> getBackupList() => (super.noSuchMethod(
+  _i5.Future<List<Map<String, dynamic>>> getBackupList() => (super.noSuchMethod(
         Invocation.method(
           #getBackupList,
           [],
         ),
-        returnValue: _i7.Future<List<Map<String, dynamic>>>.value(
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
             <Map<String, dynamic>>[]),
-      ) as _i7.Future<List<Map<String, dynamic>>>);
+      ) as _i5.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i7.Future<String> downloadBackup({
+  _i5.Future<String> downloadBackup({
     required String? backupId,
     required String? savePath,
     _i3.ProgressCallback? onProgress,
@@ -629,7 +504,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i7.Future<String>.value(_i9.dummyValue<String>(
+        returnValue: _i5.Future<String>.value(_i7.dummyValue<String>(
           this,
           Invocation.method(
             #downloadBackup,
@@ -641,17 +516,17 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i7.Future<String>);
+      ) as _i5.Future<String>);
 
   @override
-  _i7.Future<void> deleteBackupOnServer({required String? backupId}) =>
+  _i5.Future<void> deleteBackupOnServer({required String? backupId}) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteBackupOnServer,
           [],
           {#backupId: backupId},
         ),
-        returnValue: _i7.Future<void>.value(),
-        returnValueForMissingStub: _i7.Future<void>.value(),
-      ) as _i7.Future<void>);
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 }

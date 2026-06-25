@@ -92,7 +92,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
     final buf = StringBuffer();
 
     buf.writeln('## 当前页面');
-    buf.writeln('URL: ' + url);
+    buf.writeln('URL: $url');
     buf.writeln();
 
     buf.writeln('## 工作目标');
@@ -141,7 +141,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
       buf.writeln('## 经验记忆');
       buf.writeln('以下是以往对话中的经验记录，请优先参考：');
       for (final m in _cachedMemories) {
-        buf.writeln('- ' + m);
+        buf.writeln('- $m');
       }
       buf.writeln();
     }

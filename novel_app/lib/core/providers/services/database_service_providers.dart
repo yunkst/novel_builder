@@ -272,5 +272,5 @@ CharacterExtractionService characterExtractionService(Ref ref) {
 /// PromptTagService Provider
 @riverpod
 PromptTagService promptTagService(Ref ref) {
-  return PromptTagService(ref);
+  return PromptTagService.byRef(ref);
 }

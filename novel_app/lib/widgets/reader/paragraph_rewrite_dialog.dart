@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 import '../../models/tag_group.dart';
+import '../../models/character.dart';
 import '../../models/prompt_history_selection.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/rewrite_service.dart';
 import '../../services/prompt_tag_service.dart';
+import '../../services/preferences_service.dart';
 import '../../services/logger_service.dart';
 import '../../mixins/dify_streaming_mixin.dart';
 import '../../utils/media_markup_parser.dart';
@@ -16,8 +17,10 @@ import '../../widgets/streaming_status_indicator.dart';
 import '../../widgets/streaming_content_display.dart';
 import '../../widgets/prompt_tag_selector_sheet.dart';
 import '../../widgets/prompt_history_bottom_sheet.dart';
+import '../../widgets/reader/tag_introspection_entry_sheet.dart';
 import '../../utils/toast_utils.dart';
 import '../../core/providers/reader_screen_providers.dart';
+import '../../core/providers/database_providers.dart';
 
 /// 段落改写对话框
 ///
@@ -68,6 +71,9 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
 
   // 标签选择状态
   List<TagGroup> _selectedTagGroups = [];
+
+  // 最近一次生成使用的 tag 详情（供自省用）
+  List<UsedTagDetail> _lastUsedTags = [];
 
   @override
   void initState() {
@@ -172,10 +178,11 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
     if (result != null) {
       _lastRewriteInput = result.text;
       _selectedTagGroups = result.selectedGroups;
-      final service = PromptTagService(ref);
-      final mergedInput =
+      final service = PromptTagService.byRef(ref);
+      final mergedResult =
           await service.buildMergedUserInput(result.text, _selectedTagGroups);
-      _generateRewrite(selectedText, mergedInput);
+      _lastUsedTags = mergedResult.usedTags;
+      _generateRewrite(selectedText, mergedResult.mergedInput);
     } else {
       if (mounted) Navigator.pop(context);
     }
@@ -195,12 +202,15 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
         widget.content,
       );
 
-      // 特写功能不使用角色选择
-      const String rolesInfo = '无特定角色出场';
+      // 获取角色信息（从数据库查询小说全部角色）
+      final characterRepo = ref.read(characterRepositoryProvider);
+      final characters =
+          await characterRepo.getCharacters(widget.novel.url);
+      final String rolesInfo = Character.formatForAI(characters);
 
-      // 获取AI作家设定
-      final prefs = await SharedPreferences.getInstance();
-      final aiWriterSetting = prefs.getString('ai_writer_prompt') ?? '';
+      // 获取AI作家设定（统一使用 PreferencesService）
+      final aiWriterSetting =
+          await PreferencesService.instance.getString('ai_writer_prompt');
 
       // 使用 RewriteService 构建输入参数
       final inputs = _rewriteService.buildRewriteInputsWithHistory(
@@ -254,6 +264,26 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
           ),
         );
       },
+    );
+  }
+
+  // 打开标签自省 Sheet
+  Future<void> _showTagIntrospection() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: TagIntrospectionEntrySheet(
+          usedTags: _lastUsedTags,
+          generatedContent: _rewriteResult,
+          novelUrl: widget.novel.url,
+        ),
+      ),
     );
   }
 
@@ -600,6 +630,16 @@ class _ParagraphRewriteDialogState extends ConsumerState<ParagraphRewriteDialog>
                 },
           icon: const Icon(Icons.check),
           label: const Text('替换'),
+        ),
+        // 标签自省入口：对生成结果不满意时触发 AI 诊断
+        TextButton.icon(
+          onPressed: (_rewriteResult.isEmpty || isStreaming)
+              ? null
+              : () {
+                  _showTagIntrospection();
+                },
+          icon: const Icon(Icons.psychology, size: 18),
+          label: const Text('需要改进'),
         ),
         TextButton(
           onPressed: () {

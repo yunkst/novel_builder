@@ -37,7 +37,6 @@ lib/core/providers/
 ├── chapter_list_providers.dart         # 章节列表 Providers
 ├── chapter_search_providers.dart       # 章节搜索 Providers
 ├── chapter_content_provider.dart       # 章节内容 Providers
-├── search_screen_providers.dart        # 搜索页面 Providers
 ├── reader_screen_providers.dart        # 阅读器页面 Providers
 ├── character_screen_providers.dart     # 角色管理 Providers
 ├── chat_scene_management_providers.dart # 聊天场景管理 Providers
@@ -106,10 +105,6 @@ lib/core/providers/
 - `generatedContentProvider` - 生成的内容
 - `preloadProgressProvider` - 预加载进度
 
-#### 搜索功能 (`search_screen_providers.dart`)
-- `searchScreenNotifierProvider` - 搜索状态管理
-- `sourceSitesNotifierProvider` - 源站列表管理
-
 #### 角色管理 (`character_screen_providers.dart`)
 - `characterImageCacheServiceProvider` - 角色图片缓存
 - `characterManagementStateProvider` - 角色列表状态
@@ -143,7 +138,6 @@ lib/core/providers/
 | `maxCacheSizeMB` | 500 | 最大缓存大小（MB） |
 | `cacheCleanupThresholdMB` | 400 | 缓存清理阈值（MB） |
 | `preloadConcurrency` | 3 | 预加载并发数 |
-| `maxSearchResults` | 50 | 搜索结果最大数量 |
 
 ## 使用指南
 
@@ -207,15 +201,11 @@ onPressed: () {
 
 ```dart
 @override
-Widget build(BuildContext context) {
-  ref.listen<String>(searchQueryProvider, (previous, next) {
-    if (next.isNotEmpty) {
-      // 执行搜索
-      ref.read(searchScreenNotifierProvider.notifier).searchNovels(
-        apiService,
-        next,
-        selectedSites,
-      );
+Widget build(BuildContext context, WidgetRef ref) {
+  ref.listen<int>(homeTabIndexNotifierProvider, (previous, next) {
+    if (next != previous) {
+      // 响应 Tab 切换
+      debugPrint('切换到 Tab: $next');
     }
   });
 

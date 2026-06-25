@@ -316,7 +316,7 @@ final characterExtractionServiceProvider =
 // ignore: unused_element
 typedef CharacterExtractionServiceRef
     = AutoDisposeProviderRef<CharacterExtractionService>;
-String _$promptTagServiceHash() => r'd787cf7963d1d3cca7282f5e8ab778d361e40f82';
+String _$promptTagServiceHash() => r'fb3e8788244d61e0aeec408d4d4e308ed3a275fa';
 
 /// PromptTagService Provider
 ///
