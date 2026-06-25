@@ -7,15 +7,13 @@ part of 'reader_screen_notifier.dart';
 // **************************************************************************
 
 String _$readerScreenNotifierHash() =>
-    r'a231b6bec3dd9c495749a3d9a7f7a2741e086b15';
+    r'0d5da8cd427718a9d4c6e9a73216fbaab7691cc2';
 
 /// ReaderScreenNotifier
 ///
 /// 管理阅读器屏幕的业务逻辑，包括：
 /// - 对话框状态管理
-/// - AI伴读功能
 /// - 章节内容刷新
-/// - 角色卡更新
 ///
 /// Copied from [ReaderScreenNotifier].
 @ProviderFor(ReaderScreenNotifier)

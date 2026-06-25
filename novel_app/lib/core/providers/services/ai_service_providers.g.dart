@@ -49,54 +49,10 @@ final difyServiceProvider = Provider<DifyService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DifyServiceRef = ProviderRef<DifyService>;
-String _$characterCardServiceHash() =>
-    r'828f0c7a640794330fa6c941f600abce0c23c7c8';
-
-/// CharacterCardService Provider
-///
-/// 提供角色卡片服务实例，处理角色卡片的更新和管理。
-///
-/// **功能**:
-/// - 角色卡片更新
-/// - AI生成角色信息
-/// - 角色信息保存
-///
-/// **依赖**:
-/// - [difyServiceProvider] - Dify AI服务
-/// - [characterRepositoryProvider] - 角色数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final cardService = ref.watch(characterCardServiceProvider);
-/// await cardService.updateCharacterCards(
-///   novel: novel,
-///   chapterContent: content,
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - AI生成是异步操作
-///
-/// Copied from [characterCardService].
-@ProviderFor(characterCardService)
-final characterCardServiceProvider =
-    AutoDisposeProvider<CharacterCardService>.internal(
-  characterCardService,
-  name: r'characterCardServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$characterCardServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CharacterCardServiceRef = AutoDisposeProviderRef<CharacterCardService>;
 String _$chapterHistoryServiceHash() =>
     r'7f719fe06e7bbd9f97289185865e79613594a29e';
 
+/// CharacterCardService 已删除，相关 provider 已移除。
 /// ChapterHistoryService Provider
 ///
 /// 提供章节历史服务实例，用于获取历史章节内容（AI生成上下文）。

@@ -177,92 +177,10 @@ final preloadServiceProvider = Provider<PreloadService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PreloadServiceRef = ProviderRef<PreloadService>;
-String _$sceneIllustrationServiceHash() =>
-    r'7f60bc634b8c313ac540eaa0d11a7c96193bd800';
-
-/// SceneIllustrationService Provider
-///
-/// 提供场景插图服务实例，负责场景图片的生成和管理。
-///
-/// **功能**:
-/// - 场景插图生成
-/// - 插图缓存管理
-/// - 图片 URL 处理
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [illustrationRepositoryProvider] - 插图数据访问
-/// - [apiServiceWrapperProvider] - API 服务
-///
-/// **使用示例**:
-/// ```dart
-/// final illustrationService = ref.watch(sceneIllustrationServiceProvider);
-/// final imageUrl = await illustrationService.generateIllustration(scene);
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 插图生成是异步操作
-///
-/// Copied from [sceneIllustrationService].
-@ProviderFor(sceneIllustrationService)
-final sceneIllustrationServiceProvider =
-    AutoDisposeProvider<SceneIllustrationService>.internal(
-  sceneIllustrationService,
-  name: r'sceneIllustrationServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$sceneIllustrationServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef SceneIllustrationServiceRef
-    = AutoDisposeProviderRef<SceneIllustrationService>;
-String _$sceneIllustrationCacheServiceHash() =>
-    r'0a4a41925c35fee4fbc518e2e0c465de5bc35b3c';
-
-/// SceneIllustrationCacheService Provider
-///
-/// 提供场景插图缓存服务实例，管理场景插图的本地缓存。
-///
-/// **功能**:
-/// - 图片内存缓存和磁盘缓存
-/// - 预加载和批量缓存
-/// - 缓存有效期管理
-///
-/// **依赖**:
-/// - [apiServiceWrapperProvider] - API服务
-///
-/// **使用示例**:
-/// ```dart
-/// final cacheService = ref.read(sceneIllustrationCacheServiceProvider);
-/// await cacheService.init();
-/// final imageBytes = await cacheService.getImageBytes(filename);
-/// ```
-///
-/// Copied from [sceneIllustrationCacheService].
-@ProviderFor(sceneIllustrationCacheService)
-final sceneIllustrationCacheServiceProvider =
-    Provider<SceneIllustrationCacheService>.internal(
-  sceneIllustrationCacheService,
-  name: r'sceneIllustrationCacheServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$sceneIllustrationCacheServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef SceneIllustrationCacheServiceRef
-    = ProviderRef<SceneIllustrationCacheService>;
 String _$headlessWebViewContentServiceHash() =>
     r'26a8a40b4f21f416141880f61921ed366e05dabd';
 
+/// SceneIllustrationService 和 SceneIllustrationCacheService 已删除，相关 provider 已移除。
 /// HeadlessWebViewContentService Provider
 ///
 /// 提供无头 WebView 内容获取服务实例。

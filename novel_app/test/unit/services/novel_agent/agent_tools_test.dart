@@ -1,6 +1,6 @@
 /// AgentTools 工具定义单元测试
 ///
-/// 验证 14 个工具的 OpenAI Function Calling schema：
+/// 验证 16 个工具的 OpenAI Function Calling schema：
 /// - 工具总数正确
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
@@ -14,8 +14,8 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 14 个工具', () {
-      expect(AgentTools.allTools.length, 14);
+    test('应该有 16 个工具', () {
+      expect(AgentTools.allTools.length, 16);
     });
 
     test('每个工具都有 type=function', () {

@@ -6,30 +6,6 @@ part of 'character_screen_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$characterImageCacheServiceHash() =>
-    r'a0922279449db6986f2d33ed5209a360c1b526dc';
-
-/// CharacterImageCacheService Provider
-///
-/// 提供角色图片缓存服务实例
-/// 使用 keepAlive: true 确保实例不会被销毁（单例模式）
-///
-/// Copied from [characterImageCacheService].
-@ProviderFor(characterImageCacheService)
-final characterImageCacheServiceProvider =
-    Provider<CharacterImageCacheService>.internal(
-  characterImageCacheService,
-  name: r'characterImageCacheServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$characterImageCacheServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CharacterImageCacheServiceRef = ProviderRef<CharacterImageCacheService>;
 String _$relationshipCountCacheHash() =>
     r'65dd262eb42624d2d5933ce6957faa78835bd34b';
 
@@ -240,6 +216,7 @@ abstract class _$CharacterManagementState
   );
 }
 
+/// CharacterImageCacheService 已删除，相关 provider 已移除。
 /// CharacterManagement Screen State
 ///
 /// 管理角色列表屏幕的状态
@@ -248,6 +225,7 @@ abstract class _$CharacterManagementState
 @ProviderFor(CharacterManagementState)
 const characterManagementStateProvider = CharacterManagementStateFamily();
 
+/// CharacterImageCacheService 已删除，相关 provider 已移除。
 /// CharacterManagement Screen State
 ///
 /// 管理角色列表屏幕的状态
@@ -255,6 +233,7 @@ const characterManagementStateProvider = CharacterManagementStateFamily();
 /// Copied from [CharacterManagementState].
 class CharacterManagementStateFamily
     extends Family<AsyncValue<List<Character>>> {
+  /// CharacterImageCacheService 已删除，相关 provider 已移除。
   /// CharacterManagement Screen State
   ///
   /// 管理角色列表屏幕的状态
@@ -262,6 +241,7 @@ class CharacterManagementStateFamily
   /// Copied from [CharacterManagementState].
   const CharacterManagementStateFamily();
 
+  /// CharacterImageCacheService 已删除，相关 provider 已移除。
   /// CharacterManagement Screen State
   ///
   /// 管理角色列表屏幕的状态
@@ -299,6 +279,7 @@ class CharacterManagementStateFamily
   String? get name => r'characterManagementStateProvider';
 }
 
+/// CharacterImageCacheService 已删除，相关 provider 已移除。
 /// CharacterManagement Screen State
 ///
 /// 管理角色列表屏幕的状态
@@ -307,6 +288,7 @@ class CharacterManagementStateFamily
 class CharacterManagementStateProvider
     extends AutoDisposeAsyncNotifierProviderImpl<CharacterManagementState,
         List<Character>> {
+  /// CharacterImageCacheService 已删除，相关 provider 已移除。
   /// CharacterManagement Screen State
   ///
   /// 管理角色列表屏幕的状态
