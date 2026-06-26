@@ -162,38 +162,24 @@ class DialogState {
   /// 加载对话框消息
   final String? loadingMessage;
 
-  /// 是否显示AI伴读确认对话框
-  final bool isAICompanionConfirm;
-
-  /// AI伴读响应数据（当isAICompanionConfirm=true时有效）
-  final dynamic aiCompanionResponse;
-
   const DialogState({
     this.isLoading = false,
     this.loadingMessage,
-    this.isAICompanionConfirm = false,
-    this.aiCompanionResponse,
   });
 
   /// 创建初始状态
   const DialogState.initial()
       : isLoading = false,
-        loadingMessage = null,
-        isAICompanionConfirm = false,
-        aiCompanionResponse = null;
+        loadingMessage = null;
 
   /// 复制并更新部分字段
   DialogState copyWith({
     bool? isLoading,
     String? loadingMessage,
-    bool? isAICompanionConfirm,
-    dynamic aiCompanionResponse,
   }) {
     return DialogState(
       isLoading: isLoading ?? this.isLoading,
       loadingMessage: loadingMessage ?? this.loadingMessage,
-      isAICompanionConfirm: isAICompanionConfirm ?? this.isAICompanionConfirm,
-      aiCompanionResponse: aiCompanionResponse ?? this.aiCompanionResponse,
     );
   }
 }
@@ -231,24 +217,6 @@ class DialogNotifier extends _$DialogNotifier {
     state = state.copyWith(
       isLoading: false,
       loadingMessage: null,
-    );
-  }
-
-  /// 显示AI伴读确认对话框
-  ///
-  /// [response] AI伴读响应数据
-  void showAICompanionConfirm(dynamic response) {
-    state = state.copyWith(
-      isAICompanionConfirm: true,
-      aiCompanionResponse: response,
-    );
-  }
-
-  /// 隐藏AI伴读确认对话框
-  void hideAICompanionConfirm() {
-    state = state.copyWith(
-      isAICompanionConfirm: false,
-      aiCompanionResponse: null,
     );
   }
 

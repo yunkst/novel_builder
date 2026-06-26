@@ -2194,16 +2194,4 @@ class MockDifyService extends _i1.Mock implements _i32.DifyService {
         returnValue: _i18.Future<void>.value(),
         returnValueForMissingStub: _i18.Future<void>.value(),
       ) as _i18.Future<void>);
-
-  @override
-  _i18.Future<Map<String, dynamic>?> runWorkflowBlocking(
-          {required Map<String, dynamic>? inputs}) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #runWorkflowBlocking,
-          [],
-          {#inputs: inputs},
-        ),
-        returnValue: _i18.Future<Map<String, dynamic>?>.value(),
-      ) as _i18.Future<Map<String, dynamic>?>);
 }

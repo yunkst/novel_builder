@@ -20,7 +20,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
 import '../../../services/chapter_history_service.dart';
-import '../../../services/invalid_markup_cleaner.dart';
 import '../../../services/llm_config_service.dart';
 import '../database_providers.dart';
 import 'network_service_providers.dart';
@@ -96,37 +95,7 @@ ChapterHistoryService chapterHistoryService(Ref ref) {
   );
 }
 
-/// InvalidMarkupCleaner Provider
-///
-/// 提供无效媒体标记清理服务实例，用于清理章节内容中的无效标记。
-///
-/// **功能**:
-/// - 检测无效媒体标记（插图、视频等）
-/// - 自动清理无效标记
-/// - 验证标记在数据库中是否存在
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [illustrationRepositoryProvider] - 插图数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final cleaner = ref.watch(invalidMarkupCleanerProvider);
-/// final cleanedContent = await cleaner.cleanInvalidMarkups(chapterContent);
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 清理失败时返回原内容，避免破坏章节内容
-@riverpod
-InvalidMarkupCleaner invalidMarkupCleaner(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final illustrationRepository = ref.watch(illustrationRepositoryProvider);
-  return InvalidMarkupCleaner(
-    chapterRepo: chapterRepository,
-    illustrationRepo: illustrationRepository,
-  );
-}
+/// InvalidMarkupCleaner Provider 已删除（无任何调用方，清理逻辑现由 ChapterRepository 内联处理）。
 
 /// LlmConfigService Provider
 ///

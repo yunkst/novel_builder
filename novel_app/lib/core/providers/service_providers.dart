@@ -37,8 +37,7 @@ export 'services/ai_service_providers.dart'
     show
         difyServiceProvider,
         llmConfigServiceProvider,
-        chapterHistoryServiceProvider,
-        invalidMarkupCleanerProvider;
+        chapterHistoryServiceProvider;
 
 // 网络服务
 export 'services/network_service_providers.dart'

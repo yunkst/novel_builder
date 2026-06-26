@@ -5,6 +5,7 @@ library;
 
 import '../../core/providers/services/ai_service_providers.dart';
 import '../dsl_engine/llm_provider.dart';
+import '../llm_config_service.dart';
 import 'writing_service.dart';
 
 class AiServiceFactory {
@@ -26,7 +27,7 @@ class AiServiceFactory {
     final activeConfig =
         await configService.getActiveConfig(scenarioId: scenarioId);
     if (activeConfig == null) {
-      throw Exception('请先在设置中配置 LLM（添加至少一个配置）');
+      throw Exception(LlmConfigService.notConfiguredMessage);
     }
 
     final llmConfig = configService.buildLlmProviderConfig(activeConfig);

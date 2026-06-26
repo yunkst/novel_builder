@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/core/providers/services/ai_service_providers.dart';
+import 'package:novel_app/services/llm_config_service.dart';
 
 import '../dsl_engine/llm_provider.dart';
 import '../../utils/cancellation_token.dart';
@@ -38,22 +39,6 @@ class NovelAgentService {
 
   /// 事件流
   Stream<AgentEvent> get events => _controller.stream;
-
-  /// 检查 LLM 是否已配置
-  Future<bool> isConfigured() async {
-    final configService = ref.read(llmConfigServiceProvider);
-    await configService.ensureMigratedFromLegacy();
-    final config = await configService.getActiveConfig();
-    return config != null;
-  }
-
-  /// 检查指定场景的 LLM 是否已配置（考虑场景级回退链）
-  Future<bool> isConfiguredForScenario(String scenarioId) async {
-    final configService = ref.read(llmConfigServiceProvider);
-    await configService.ensureMigratedFromLegacy();
-    final config = await configService.getActiveConfig(scenarioId: scenarioId);
-    return config != null;
-  }
 
   /// 取消当前正在运行的 Agent 回合
   ///
@@ -95,23 +80,11 @@ class NovelAgentService {
       return;
     }
 
-    if (!await isConfiguredForScenario(scenarioId)) {
-      _controller.add(const AgentErrorEvent(
-          '请先在 hermes 窗口右上角设置中配置 LLM 后端，或在设置 → AI 配置中配置全局默认 LLM'));
-      LoggerService.instance.w(
-          'Agent 拒绝请求（未配置 LLM）: scenario=$scenarioId',
-          category: LogCategory.ai, tags: ['agent', 'service', 'not_configured']);
-      return;
-    }
-
     _isRunning = true;
     final token = CancellationToken();
     _currentToken = token;
 
     try {
-      LoggerService.instance.d('Agent 请求处理: "$userInput" (history=${history.length}条, scenario=$scenarioId)',
-          category: LogCategory.ai, tags: ['agent', 'service', 'request', scenarioId]);
-
       // 构造 LLM Provider（从 LlmConfigService 获取激活配置，支持场景级覆盖）
       final configService = ref.read(llmConfigServiceProvider);
       await configService.ensureMigratedFromLegacy();
@@ -119,14 +92,13 @@ class NovelAgentService {
           await configService.getActiveConfig(scenarioId: scenarioId);
       if (activeConfig == null) {
         _controller.add(const AgentErrorEvent(
-            '请先在 hermes 窗口右上角设置中配置 LLM 后端，或在设置 → AI 配置中配置全局默认 LLM'));
+            LlmConfigService.notConfiguredMessage));
         return;
       }
-      final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
       final config = LlmConfig(
-        baseUrl: llmProviderConfig.baseUrl,
-        apiKey: llmProviderConfig.apiKey,
-        defaultModel: llmProviderConfig.defaultModel,
+        baseUrl: activeConfig.apiUrl,
+        apiKey: activeConfig.apiKey,
+        defaultModel: activeConfig.model,
         timeout: const Duration(seconds: 120),
       );
       final llm = LlmProvider(config, httpClient: IoLlmHttpClient());

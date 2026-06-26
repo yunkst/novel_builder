@@ -44,10 +44,4 @@ class DifyService {
         onDone: onDone,
         enableDebugLog: enableDebugLog,
       );
-
-  /// 通用的阻塞式工作流执行方法
-  Future<Map<String, dynamic>?> runWorkflowBlocking({
-    required Map<String, dynamic> inputs,
-  }) =>
-      _workflow.executeBlocking(inputs: inputs);
 }

@@ -34,7 +34,7 @@ final toastNotifierProvider =
 );
 
 typedef _$ToastNotifier = AutoDisposeNotifier<ToastState>;
-String _$dialogNotifierHash() => r'05514a5db5a053720d17897138cda2f4e1b568fc';
+String _$dialogNotifierHash() => r'51cb43fac3ca0d4956523af424ea6ab28d7ba154';
 
 /// 对话框状态管理器
 ///

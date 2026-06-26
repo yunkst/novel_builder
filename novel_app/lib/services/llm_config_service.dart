@@ -19,6 +19,13 @@ class LlmConfigService {
   static const String _migratedKey = 'llm_configs_migrated';
   static const String _scenarioPrefix = 'active_llm_profile_';
 
+  /// 统一未配置错误消息（AgentErrorEvent / Exception 共用）
+  static const String notConfiguredMessage =
+      '请先在设置中配置 LLM（添加至少一个配置）';
+
+  /// 迁移完成的内存标记，避免热路径重复读 SharedPreferences
+  bool _migrationChecked = false;
+
   LlmConfigService(this._ref);
 
   // ── 查询 ──
@@ -109,14 +116,10 @@ class LlmConfigService {
   Future<int> saveConfig(app.LlmConfig config) async {
     final repo = _ref.read(llmConfigRepositoryProvider);
     final id = await repo.save(config);
-    // 如果是第一条或标记为默认，设置默认
-    if (config.isDefault) {
+
+    // 标记为默认，或新建了表里的唯一一条配置时，保证存在默认
+    if (config.isDefault || (config.id == null && await repo.count() == 1)) {
       await repo.setDefault(id);
-    } else {
-      final count = await repo.count();
-      if (count == 1) {
-        await repo.setDefault(id);
-      }
     }
     return id;
   }
@@ -124,6 +127,15 @@ class LlmConfigService {
   Future<void> deleteConfig(int id) async {
     final repo = _ref.read(llmConfigRepositoryProvider);
     await repo.delete(id);
+    // 删除后若仍有配置但无默认，挑第一条补为默认，保证「有配置必有默认」不变量
+    // （与 saveConfig 新建唯一配置时自动设默认对称）
+    final defaultConfig = await repo.getDefault();
+    if (defaultConfig == null) {
+      final all = await repo.getAll();
+      if (all.isNotEmpty) {
+        await repo.setDefault(all.first.id!);
+      }
+    }
   }
 
   Future<void> setDefault(int id) async {
@@ -142,8 +154,14 @@ class LlmConfigService {
   /// 4. 遍历 AgentEngineConfig 的场景覆盖，为每个有覆盖的场景创建配置或设置引用
   /// 5. 标记迁移完成
   Future<void> ensureMigratedFromLegacy() async {
+    // 内存缓存：迁移检查只执行一次
+    if (_migrationChecked) return;
+
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_migratedKey) == true) return;
+    if (prefs.getBool(_migratedKey) == true) {
+      _migrationChecked = true;
+      return;
+    }
 
     LoggerService.instance.i('开始从旧配置迁移到 llm_configs 表...',
         category: LogCategory.ai, tags: ['llm_config', 'migration']);
@@ -206,6 +224,7 @@ class LlmConfigService {
 
     // 标记迁移完成
     await prefs.setBool(_migratedKey, true);
+    _migrationChecked = true;
     LoggerService.instance.i('旧配置迁移完成',
         category: LogCategory.ai, tags: ['llm_config', 'migration', 'done']);
   }

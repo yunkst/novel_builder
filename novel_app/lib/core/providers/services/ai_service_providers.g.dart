@@ -97,50 +97,9 @@ final chapterHistoryServiceProvider =
 // ignore: unused_element
 typedef ChapterHistoryServiceRef
     = AutoDisposeProviderRef<ChapterHistoryService>;
-String _$invalidMarkupCleanerHash() =>
-    r'91250692eab8f3441876c0c0d227dfb08eeb8d6e';
-
-/// InvalidMarkupCleaner Provider
-///
-/// 提供无效媒体标记清理服务实例，用于清理章节内容中的无效标记。
-///
-/// **功能**:
-/// - 检测无效媒体标记（插图、视频等）
-/// - 自动清理无效标记
-/// - 验证标记在数据库中是否存在
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [illustrationRepositoryProvider] - 插图数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final cleaner = ref.watch(invalidMarkupCleanerProvider);
-/// final cleanedContent = await cleaner.cleanInvalidMarkups(chapterContent);
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 清理失败时返回原内容，避免破坏章节内容
-///
-/// Copied from [invalidMarkupCleaner].
-@ProviderFor(invalidMarkupCleaner)
-final invalidMarkupCleanerProvider =
-    AutoDisposeProvider<InvalidMarkupCleaner>.internal(
-  invalidMarkupCleaner,
-  name: r'invalidMarkupCleanerProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$invalidMarkupCleanerHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef InvalidMarkupCleanerRef = AutoDisposeProviderRef<InvalidMarkupCleaner>;
 String _$llmConfigServiceHash() => r'0c3a3e6b43fe97db8dec09a97d5f304ea84055aa';
 
+/// InvalidMarkupCleaner Provider 已删除（无任何调用方，清理逻辑现由 ChapterRepository 内联处理）。
 /// LlmConfigService Provider
 ///
 /// 提供全局 LLM 配置服务实例，用于统一管理 LLM 配置序列。

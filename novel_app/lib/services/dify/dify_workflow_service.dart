@@ -50,18 +50,6 @@ class DifyWorkflowService {
     }
   }
 
-  /// 阻塞式执行（保留接口，但当前无任何阻塞式 AI 功能）
-  Future<Map<String, dynamic>?> executeBlocking({
-    required Map<String, dynamic> inputs,
-  }) async {
-    LoggerService.instance.w(
-      'executeBlocking 已被调用但当前未实现任何阻塞式 AI 功能: cmd=${inputs['cmd']}',
-      category: LogCategory.ai,
-      tags: ['workflow', 'blocking', 'deprecated'],
-    );
-    return null;
-  }
-
   // ============================================================================
   // cmd 路由
   // ============================================================================
