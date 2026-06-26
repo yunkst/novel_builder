@@ -28,6 +28,11 @@ class ChapterActionHandler {
       tags: ['chapter-list', 'insert'],
     );
     try {
+      // [关键] 必须在 createCustomChapter 之前先腾出位置
+      // 否则新章节的 chapterIndex 会与原章节冲突，导致排序错乱
+      if (insertIndex >= 0) {
+        await _chapterRepo.shiftChapterIndicesFrom(novelUrl, insertIndex);
+      }
       await _chapterRepo.createCustomChapter(
         novelUrl,
         title,

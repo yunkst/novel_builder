@@ -5,7 +5,6 @@ import 'chapter_badge.dart';
 
 /// 可重排章节列表项组件（重排模式）
 /// 显示章节序号、拖拽手柄，用于章节重排功能
-/// 支持显示AI伴读状态（紫色边框）
 class ReorderableChapterListItem extends StatelessWidget {
   final Chapter chapter;
   final int index;
@@ -13,7 +12,6 @@ class ReorderableChapterListItem extends StatelessWidget {
   final bool isUserChapter;
   final bool isCached; // 是否已缓存
   final bool isRead; // 是否已读
-  final bool isAccompanied; // 是否已AI伴读
 
   const ReorderableChapterListItem({
     required this.chapter,
@@ -22,7 +20,6 @@ class ReorderableChapterListItem extends StatelessWidget {
     required this.isUserChapter,
     required this.isCached,
     this.isRead = false,
-    this.isAccompanied = false,
     super.key,
   });
 
@@ -32,17 +29,14 @@ class ReorderableChapterListItem extends StatelessWidget {
     return Container(
       key: ValueKey(chapter.url),
       decoration: BoxDecoration(
-        // 背景色优先级: 已伴读 > 用户插入
-        color: isAccompanied
-            ? colorScheme.tertiary.withValues(alpha: 0.05)
-            : (isUserChapter
-                ? colorScheme.primary.withValues(alpha: 0.05)
-                : colorScheme.tertiary.withValues(alpha: 0.05)),
-        border: isAccompanied
+        color: isUserChapter
+            ? colorScheme.primary.withValues(alpha: 0.05)
+            : colorScheme.tertiary.withValues(alpha: 0.05),
+        border: isUserChapter
             ? Border(
-                // 已伴读: 紫色左边框 + 橙色外框
+                // 用户插入: 蓝色左边框 + 橙色外框
                 left: BorderSide(
-                  color: colorScheme.tertiary.withValues(alpha: 0.3),
+                  color: colorScheme.primary.withValues(alpha: 0.3),
                   width: 3,
                 ),
                 right: BorderSide(
@@ -58,31 +52,11 @@ class ReorderableChapterListItem extends StatelessWidget {
                   width: 1,
                 ),
               )
-            : (isUserChapter
-                ? Border(
-                    // 用户插入: 蓝色左边框 + 橙色外框
-                    left: BorderSide(
-                      color: colorScheme.primary.withValues(alpha: 0.3),
-                      width: 3,
-                    ),
-                    right: BorderSide(
-                      color: colorScheme.tertiary.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                    top: BorderSide(
-                      color: colorScheme.tertiary.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                    bottom: BorderSide(
-                      color: colorScheme.tertiary.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                  )
-                : Border.all(
-                    // 普通: 橙色外框
-                    color: colorScheme.tertiary.withValues(alpha: 0.5),
-                    width: 1,
-                  )),
+            : Border.all(
+                // 普通: 橙色外框
+                color: colorScheme.tertiary.withValues(alpha: 0.5),
+                width: 1,
+              ),
       ),
       margin: const EdgeInsets.symmetric(vertical: 2),
       child: ListTile(

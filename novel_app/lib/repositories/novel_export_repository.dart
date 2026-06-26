@@ -140,7 +140,6 @@ class NovelExportRepository {
         chapterIndex: chapter.chapterIndex,
         isUserInserted: chapter.isUserInserted,
         readAt: chapter.readAt,
-        isAccompanied: chapter.isAccompanied,
       ));
     }
 
@@ -316,11 +315,6 @@ class NovelExportRepository {
       // 恢复阅读状态
       if (chapterData.readAt != null) {
         await _chapterRepository.markChapterAsRead(novelUrl, chapter.url);
-      }
-
-      // 恢复伴读状态
-      if (chapterData.isAccompanied) {
-        await _chapterRepository.markChapterAsAccompanied(novelUrl, chapter.url);
       }
 
       count++;

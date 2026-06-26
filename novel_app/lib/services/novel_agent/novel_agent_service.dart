@@ -2,6 +2,9 @@
 ///
 /// Phase 2: 封装 AgentLoop，提供面向 UI 的接口
 /// 重构: 支持多场景切换，通过 scenarioId 和 AgentScenarioContext 分派
+///
+/// 隔离改造: 去掉全局 _isRunning 互斥锁，改为按 scenarioId 跟踪运行状态。
+/// 不同场景可以并行运行 Agent，同场景内串行（拒绝并发请求）。
 library;
 
 import 'dart:async';
@@ -23,37 +26,51 @@ class NovelAgentService {
   final Ref ref;
   final StreamController<AgentEvent> _controller =
       StreamController<AgentEvent>.broadcast();
-  bool _isRunning = false;
 
-  /// 当前运行回合的取消令牌（无任务运行时为 null）
+  /// 按场景跟踪运行状态（替代全局 _isRunning 互斥锁）
   ///
-  /// 由 [sendMessage] 创建并传递给 [AgentLoop.run]。
-  /// 调用 [cancel] 触发后，AgentLoop 会在当前这轮 LLM 输出完成后
-  /// 退出循环（不再执行工具、不再进入下一轮）。
-  CancellationToken? _currentToken;
+  /// 对应 Hermes 的同会话串行化：同一个 session_key 同时只有一个 AIAgent 在跑。
+  /// 但不同 session_key 之间完全并行。
+  final Map<String, bool> _runningByScenario = {};
+
+  /// 按场景跟踪取消令牌
+  final Map<String, CancellationToken> _tokensByScenario = {};
 
   NovelAgentService(this.ref);
 
-  /// 是否正在运行
-  bool get isRunning => _isRunning;
+  /// 是否有指定场景正在运行
+  bool isRunningFor(String scenarioId) => _runningByScenario[scenarioId] == true;
+
+  /// 是否有任何场景正在运行
+  bool get isRunning => _runningByScenario.values.any((v) => v);
 
   /// 事件流
   Stream<AgentEvent> get events => _controller.stream;
 
-  /// 取消当前正在运行的 Agent 回合
+  /// 取消指定场景的 Agent 回合
   ///
-  /// 取消是**温和的**：当前正在进行的 LLM 流式输出会自然完成，
-  /// 但 ReAct 循环不会再执行工具、不会再进入下一轮。
-  void cancel() {
-    if (_currentToken != null) {
+  /// 只取消目标场景，不影响其他场景的运行。
+  /// 对应 Hermes 的线程局部中断：只中断目标线程，不误杀其他会话。
+  void cancelFor(String scenarioId) {
+    final token = _tokensByScenario[scenarioId];
+    if (token != null) {
       LoggerService.instance.i(
-        'Agent 已取消（用户主动）',
+        'Agent 已取消（场景 $scenarioId）',
         category: LogCategory.ai,
-        tags: ['agent', 'service', 'cancel'],
+        tags: ['agent', 'service', 'cancel', scenarioId],
       );
-      _currentToken!.cancel(reason: '用户主动取消');
-      _currentToken = null;
+      token.cancel(reason: '用户主动取消 (scenario=$scenarioId)');
+      _tokensByScenario.remove(scenarioId);
     }
+  }
+
+  /// 取消所有正在运行的 Agent
+  void cancelAll() {
+    for (final entry in _tokensByScenario.entries) {
+      entry.value.cancel(reason: '取消所有 (scenario=${entry.key})');
+    }
+    _tokensByScenario.clear();
+    _runningByScenario.clear();
   }
 
   /// 发送消息给 Agent
@@ -73,16 +90,20 @@ class NovelAgentService {
     required AgentScenarioContext scenarioContext,
     List<int>? messageOwners,
   }) async {
-    if (_isRunning) {
-      _controller.add(const AgentErrorEvent('Agent 正在运行中'));
-      LoggerService.instance.w('Agent 拒绝请求（已在运行中）',
-          category: LogCategory.ai, tags: ['agent', 'service', 'busy']);
+    // 同场景串行：拒绝并发请求，但不同场景可以并行
+    if (_runningByScenario[scenarioId] == true) {
+      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
+      LoggerService.instance.w(
+        'Agent 拒绝请求（场景 $scenarioId 已在运行中）',
+        category: LogCategory.ai,
+        tags: ['agent', 'service', 'busy', scenarioId],
+      );
       return;
     }
 
-    _isRunning = true;
+    _runningByScenario[scenarioId] = true;
     final token = CancellationToken();
-    _currentToken = token;
+    _tokensByScenario[scenarioId] = token;
 
     try {
       // 构造 LLM Provider（从 LlmConfigService 获取激活配置，支持场景级覆盖）
@@ -128,8 +149,11 @@ class NovelAgentService {
         );
 
         final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
-        LoggerService.instance.i('Agent 请求处理完成$cancelledTag (scenario=$scenarioId)',
-            category: LogCategory.ai, tags: ['agent', 'service', 'complete', scenarioId]);
+        LoggerService.instance.i(
+          'Agent 请求处理完成$cancelledTag (scenario=$scenarioId)',
+          category: LogCategory.ai,
+          tags: ['agent', 'service', 'complete', scenarioId],
+        );
       } finally {
         // 场景资源清理（如释放 HeadlessWebViewPool 使用权）
         await scenario.cleanup();
@@ -138,11 +162,11 @@ class NovelAgentService {
       LoggerService.instance.e('Agent 请求处理失败: $e',
           stackTrace: stack.toString(),
           category: LogCategory.ai,
-          tags: ['agent', 'service', 'error']);
+          tags: ['agent', 'service', 'error', scenarioId]);
       _controller.add(AgentErrorEvent(e.toString()));
     } finally {
-      _isRunning = false;
-      _currentToken = null;
+      _runningByScenario.remove(scenarioId);
+      _tokensByScenario.remove(scenarioId);
     }
   }
 

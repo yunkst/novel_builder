@@ -1037,19 +1037,6 @@ class DatabaseService {
   Future<int> getCachedChaptersCount(String novelUrl) =>
       _chapterRepository.getCachedChaptersCount(novelUrl);
 
-  /// 检查章节是否已伴读
-  Future<bool> isChapterAccompanied(String novelUrl, String chapterUrl) =>
-      _chapterRepository.isChapterAccompanied(novelUrl, chapterUrl);
-
-  /// 标记章节为已伴读
-  Future<void> markChapterAsAccompanied(String novelUrl, String chapterUrl) =>
-      _chapterRepository.markChapterAsAccompanied(novelUrl, chapterUrl);
-
-  /// 重置章节伴读标记
-  Future<void> resetChapterAccompaniedFlag(
-          String novelUrl, String chapterUrl) =>
-      _chapterRepository.resetChapterAccompaniedFlag(novelUrl, chapterUrl);
-
   /// 缓存小说章节列表
   Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters) =>
       _chapterRepository.cacheNovelChapters(novelUrl, chapters);

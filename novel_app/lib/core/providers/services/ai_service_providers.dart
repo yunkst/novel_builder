@@ -4,7 +4,6 @@
 ///
 /// **功能**:
 /// - 章节生成服务（本地 LLM Provider 流式调用）
-/// - 章节历史服务
 /// - LLM 配置管理
 ///
 /// **依赖**:
@@ -19,10 +18,8 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/dify_service.dart';
-import '../../../services/chapter_history_service.dart';
 import '../../../services/llm_config_service.dart';
 import '../database_providers.dart';
-import 'network_service_providers.dart';
 
 part 'ai_service_providers.g.dart';
 
@@ -45,46 +42,6 @@ part 'ai_service_providers.g.dart';
 DifyService difyService(Ref ref) {
   return DifyService(ref: ref);
 }
-
-/// CharacterCardService 已删除，相关 provider 已移除。
-
-/// ChapterHistoryService Provider
-///
-/// 提供章节历史服务实例，用于获取历史章节内容（AI生成上下文）。
-///
-/// **功能**:
-/// - 获取历史章节内容
-/// - 统一历史章节加载逻辑
-/// - 支持缓存和 Headless WebView 获取
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [headlessWebViewContentServiceProvider] - Headless WebView 内容服务
-///
-/// **使用示例**:
-/// ```dart
-/// final historyService = ref.watch(chapterHistoryServiceProvider);
-/// final historyContent = await historyService.fetchHistoryChaptersContent(
-///   chapters: widget.chapters,
-///   currentChapter: widget.currentChapter,
-///   maxHistoryCount: 2,
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 优先使用缓存，缓存未命中时走 Headless WebView
-@riverpod
-ChapterHistoryService chapterHistoryService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final headlessService = ref.watch(headlessWebViewContentServiceProvider);
-  return ChapterHistoryService(
-    chapterRepo: chapterRepository,
-    headlessService: headlessService,
-  );
-}
-
-/// InvalidMarkupCleaner Provider 已删除（无任何调用方，清理逻辑现由 ChapterRepository 内联处理）。
 
 /// LlmConfigService Provider
 ///

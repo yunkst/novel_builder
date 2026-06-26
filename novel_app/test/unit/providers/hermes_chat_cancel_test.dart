@@ -27,7 +27,8 @@ class MockNovelAgentService implements NovelAgentService {
   final _controller = StreamController<AgentEvent>.broadcast();
   Completer<void>? _currentCompleter;
   int sendMessageCallCount = 0;
-  int cancelCallCount = 0;
+  int cancelForCallCount = 0;
+  int cancelAllCallCount = 0;
   String lastUserInput = '';
   String lastScenarioId = '';
   bool _running = false;
@@ -40,6 +41,9 @@ class MockNovelAgentService implements NovelAgentService {
 
   @override
   bool get isRunning => _running;
+
+  @override
+  bool isRunningFor(String scenarioId) => _running;
 
   @override
   Stream<AgentEvent> get events => _controller.stream;
@@ -61,13 +65,13 @@ class MockNovelAgentService implements NovelAgentService {
     _currentCompleter = completer;
 
     try {
-      // 发一个文本增量模拟流式输出
+      await Future<void>.delayed(Duration.zero);
       _controller.add(const TextDeltaEvent('回复内容'));
       if (delay != null) {
         await Future<void>.delayed(delay!);
-        // 延迟后检查 Completer 是否在等待中被 cancel 完成
       }
       _controller.add(const AgentDoneEvent());
+      await Future<void>.delayed(Duration.zero);
     } finally {
       _running = false;
       if (!completer.isCompleted) {
@@ -77,8 +81,17 @@ class MockNovelAgentService implements NovelAgentService {
   }
 
   @override
-  void cancel() {
-    cancelCallCount++;
+  void cancelFor(String scenarioId) {
+    cancelForCallCount++;
+    if (_currentCompleter != null && !_currentCompleter!.isCompleted) {
+      _currentCompleter!.complete();
+    }
+    _currentCompleter = null;
+  }
+
+  @override
+  void cancelAll() {
+    cancelAllCallCount++;
     if (_currentCompleter != null && !_currentCompleter!.isCompleted) {
       _currentCompleter!.complete();
     }
@@ -140,11 +153,12 @@ void main() {
       expect(state.streamingSegments, isEmpty);
     });
 
-    test('cancelRequest 应该调用 agentService.cancel()', () {
+    test('cancelRequest 应该重置 session 状态', () {
       final notifier = container.read(hermesChatProvider.notifier);
-      expect(mockService.cancelCallCount, 0);
       notifier.cancelRequest();
-      expect(mockService.cancelCallCount, 1);
+      // cancelRequest 现在调用 session.cancel()，会重置 session 状态
+      final state = container.read(hermesChatProvider);
+      expect(state.isLoading, isFalse);
     });
   });
 
@@ -191,11 +205,11 @@ void main() {
   });
 
   group('场景切换历史保留', () {
-    test('切换场景后，原场景历史清空但目标场景恢复缓存历史', () {
+    test('切换场景后，原场景历史清空但目标场景恢复缓存历史', () async {
       final notifier = container.read(hermesChatProvider.notifier);
 
       // 在 writing 场景发送一条消息（模拟 assistant 回复）
-      notifier.sendMessage('写作场景消息1');
+      await notifier.sendMessage('写作场景消息1');
       // 手动设置一条 assistant 消息模拟对话历史
       // sendMessage 是异步的，这里直接用内部状态验证切换逻辑
       // 我们改用直接验证 switchScenario 的缓存行为

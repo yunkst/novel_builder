@@ -15,7 +15,9 @@ import '../../models/character.dart';
 import '../../models/outline.dart';
 import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
+import '../../utils/content_sanitizer.dart';
 import 'agent_scenario.dart';
+import 'tool_arg_parser.dart';
 
 /// ID/位置解析结果
 class _IdResolveResult {
@@ -61,8 +63,6 @@ class ToolExecutor {
         // ===== 章节写入 =====
         case 'update_chapter_content':
           return await _updateChapterContent(args, scenarioContext);
-        case 'create_custom_chapter':
-          return await _createCustomChapter(args, scenarioContext);
         // ===== 角色 =====
         case 'list_characters':
           return await _listCharacters(args, scenarioContext);
@@ -210,7 +210,9 @@ class ToolExecutor {
   }
 
   Future<String> _selectNovel(Map<String, dynamic> args) async {
-    final novelId = args['novelId'] as int;
+    final parser = ToolArgParser(args);
+    final (novelId, novelIdErr) = parser.requireInt('novelId');
+    if (novelIdErr != null) return novelIdErr;
     final repo = ref.read(novelRepositoryProvider);
     final novel = await repo.getNovelById(novelId);
     if (novel == null) {
@@ -235,22 +237,10 @@ class ToolExecutor {
   }
 
   Future<String> _createNovel(Map<String, dynamic> args) async {
-    final title = (args['title'] as String?)?.trim() ?? '';
-    final descriptionRaw = args['description'] as String?;
-    final description =
-        descriptionRaw != null && descriptionRaw.trim().isNotEmpty
-            ? descriptionRaw.trim()
-            : null;
-
-    if (title.isEmpty) {
-      LoggerService.instance.w('create_novel: 标题为空',
-          category: LogCategory.ai,
-          tags: ['agent', 'tool', 'create_novel', 'validation_failed']);
-      return jsonEncode({
-        'error': 'validation_failed',
-        'message': '小说标题不能为空。',
-      });
-    }
+    final parser = ToolArgParser(args);
+    final (title, titleErr) = parser.requireString('title');
+    if (titleErr != null) return titleErr;
+    final (description, _) = parser.nullableString('description');
 
     final dbService = ref.read(databaseServiceProvider);
     final id = await dbService.createCustomNovel(
@@ -275,7 +265,9 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final position = args['position'] as int;
+    final parser = ToolArgParser(args);
+    final (position, posErr) = parser.requireInt('position');
+    if (posErr != null) return posErr;
     final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
     if (resolveResult.errorJson != null) {
       return jsonEncode(resolveResult.errorJson);
@@ -340,7 +332,9 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final keyword = args['keyword'] as String;
+    final parser = ToolArgParser(args);
+    final (keyword, kwErr) = parser.requireString('keyword');
+    if (kwErr != null) return kwErr;
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
     if (novelResolve.errorJson != null) {
       return jsonEncode(novelResolve.errorJson);
@@ -383,8 +377,12 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final position = args['position'] as int;
-    final content = args['content'] as String;
+    final parser = ToolArgParser(args);
+    final (position, posErr) = parser.requireInt('position');
+    if (posErr != null) return posErr;
+    final (rawContent, contentErr) = parser.requireString('content');
+    if (contentErr != null) return contentErr;
+    final content = ContentSanitizer.sanitize(rawContent);
 
     final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
     if (resolveResult.errorJson != null) {
@@ -411,67 +409,6 @@ class ToolExecutor {
     LoggerService.instance.i('更新章节内容: position=$position (${content.length} chars)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_chapter_content']);
     return jsonEncode({'success': true, 'message': '章节内容已更新'});
-  }
-
-  Future<String> _createCustomChapter(
-    Map<String, dynamic> args,
-    AgentScenarioContext? ctx,
-  ) async {
-    final title = args['title'] as String;
-    final content = args['content'] as String;
-    final position = args['position'] as int?;
-
-    final novelResolve = await _resolveCurrentNovelUrl(ctx);
-    if (novelResolve.errorJson != null) {
-      return jsonEncode(novelResolve.errorJson);
-    }
-    final novelUrl = novelResolve.url!;
-
-    final repo = ref.read(chapterRepositoryProvider);
-    final chapters = await repo.getCachedNovelChapters(novelUrl);
-
-    // position 是 1-based 的目标插入位置
-    // 合法范围：1 ~ chapters.length + 1（末尾追加是合法值）
-    // 返回新章节在插入后的 position（用于后续章节操作）
-    int resultPosition;
-    int? insertIndex;
-    if (position != null) {
-      if (position < 1 || position > chapters.length + 1) {
-        return jsonEncode({
-          'error': 'chapter_position_out_of_range',
-          'message':
-              '插入位置 $position 超出范围（当前 ${chapters.length} 个章节，'
-              '合法插入位 1~${chapters.length + 1}）。',
-          'suggested_tool': 'list_chapters',
-          'suggested_args': <String, dynamic>{},
-        });
-      }
-      resultPosition = position;
-      if (position <= chapters.length) {
-        // 插入到 position 处，继承该位置原章节的 chapterIndex
-        // 后续章节需要全部 +1 让出新位置
-        insertIndex = chapters[position - 1].chapterIndex ?? position - 1;
-        await repo.shiftChapterIndicesFrom(novelUrl, insertIndex);
-      } else {
-        // position == chapters.length + 1：追加到末尾
-        insertIndex = null;
-      }
-    } else {
-      // 不传 position → 追加到末尾
-      resultPosition = chapters.length + 1;
-      insertIndex = null;
-    }
-
-    final id = await repo.createCustomChapter(novelUrl, title, content, insertIndex);
-
-    LoggerService.instance.i(
-        '创建自定义章节: "$title" (id=$id, insertIndex=$insertIndex, position=$resultPosition)',
-        category: LogCategory.ai, tags: ['agent', 'tool', 'create_custom_chapter']);
-    return jsonEncode({
-      'success': true,
-      'message': '新章节 "$title" 已创建',
-      'position': resultPosition,
-    });
   }
 
   // ===== 角色 =====
@@ -512,7 +449,9 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final name = args['name'] as String;
+    final parser = ToolArgParser(args);
+    final (name, nameErr) = parser.requireString('name');
+    if (nameErr != null) return nameErr;
 
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
     if (novelResolve.errorJson != null) {
@@ -536,9 +475,11 @@ class ToolExecutor {
       });
     }
 
+    final (description, _) = parser.nullableString('description');
+    final (avatarUrl, _) = parser.nullableString('avatarUrl');
     final updated = existing.copyWith(
-      appearanceFeatures: args['description'] as String? ?? existing.appearanceFeatures,
-      cachedImageUrl: args['avatarUrl'] as String? ?? existing.cachedImageUrl,
+      appearanceFeatures: description ?? existing.appearanceFeatures,
+      cachedImageUrl: avatarUrl ?? existing.cachedImageUrl,
     );
     await repo.updateCharacter(updated);
 
@@ -551,7 +492,9 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final name = args['name'] as String;
+    final parser = ToolArgParser(args);
+    final (name, nameErr) = parser.requireString('name');
+    if (nameErr != null) return nameErr;
 
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
     if (novelResolve.errorJson != null) {
@@ -573,10 +516,11 @@ class ToolExecutor {
       });
     }
 
+    final (charDesc, _) = parser.nullableString('description');
     final character = Character(
       novelUrl: novelUrl,
       name: name,
-      appearanceFeatures: args['description'] as String? ?? '',
+      appearanceFeatures: charDesc ?? '',
     );
     final id = await repo.createCharacter(character);
 
@@ -595,7 +539,9 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final setting = args['setting'] as String;
+    final parser = ToolArgParser(args);
+    final (setting, settingErr) = parser.requireString('setting');
+    if (settingErr != null) return settingErr;
 
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
     if (novelResolve.errorJson != null) {
@@ -623,8 +569,11 @@ class ToolExecutor {
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
   ) async {
-    final title = args['title'] as String;
-    final content = args['content'] as String;
+    final parser = ToolArgParser(args);
+    final (title, titleErr) = parser.requireString('title');
+    if (titleErr != null) return titleErr;
+    final (content, contentErr) = parser.requireString('content');
+    if (contentErr != null) return contentErr;
 
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
     if (novelResolve.errorJson != null) {
@@ -679,7 +628,8 @@ class ToolExecutor {
   // ===== 提示标签 =====
 
   Future<String> _listPromptTags(Map<String, dynamic> args) async {
-    final categoryName = (args['categoryName'] as String?)?.trim();
+    final parser = ToolArgParser(args);
+    final (categoryName, _) = parser.optionalString('categoryName');
 
     final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
     final tagRepo = ref.read(promptTagRepositoryProvider);
@@ -745,25 +695,17 @@ class ToolExecutor {
   }
 
   Future<String> _savePromptTag(Map<String, dynamic> args) async {
-    final categoryName = (args['categoryName'] as String).trim();
-    final name = (args['name'] as String).trim();
-    final promptText = (args['promptText'] as String).trim();
-    final reason = (args['reason'] as String?)?.trim() ?? '';
-    final id = args['id'] as int?;
-
-    // 验证必填字段
-    if (name.isEmpty) {
-      return jsonEncode({
-        'error': 'validation_failed',
-        'message': '标签名称不能为空。',
-      });
-    }
-    if (promptText.isEmpty) {
-      return jsonEncode({
-        'error': 'validation_failed',
-        'message': '提示词文本不能为空。',
-      });
-    }
+    final parser = ToolArgParser(args);
+    final (categoryName, cnErr) = parser.requireString('categoryName');
+    if (cnErr != null) return cnErr;
+    final (name, nameErr) = parser.requireString('name');
+    if (nameErr != null) return nameErr;
+    final (promptText, ptErr) = parser.requireString('promptText');
+    if (ptErr != null) return ptErr;
+    final (reasonRaw, _) = parser.optionalString('reason');
+    final reason = reasonRaw ?? '';
+    final (id, idErr) = parser.optionalInt('id');
+    if (idErr != null) return idErr;
 
     final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
     final tagRepo = ref.read(promptTagRepositoryProvider);

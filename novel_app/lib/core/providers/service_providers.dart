@@ -36,8 +36,7 @@ export 'services/core_service_providers.dart'
 export 'services/ai_service_providers.dart'
     show
         difyServiceProvider,
-        llmConfigServiceProvider,
-        chapterHistoryServiceProvider;
+        llmConfigServiceProvider;
 
 // 网络服务
 export 'services/network_service_providers.dart'
@@ -48,7 +47,6 @@ export 'services/network_service_providers.dart'
 // 数据库服务
 export 'services/database_service_providers.dart'
     show
-        chapterServiceProvider,
         chapterLoaderProvider,
         chapterActionHandlerProvider,
         chapterReorderControllerProvider,

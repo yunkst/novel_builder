@@ -29,13 +29,11 @@ void main() {
 
   group('ChapterActionHandler', () {
     group('insertChapter', () {
-      test('应调用 repository.createCustomChapter', () async {
-        when(mockRepo.createCustomChapter(
-          'novel_url',
-          '新章节',
-          '章节内容',
-          5,
-        )).thenAnswer((_) async => 1);
+      test('应先调用 shiftChapterIndicesFrom 再调用 createCustomChapter', () async {
+        when(mockRepo.shiftChapterIndicesFrom(any, any))
+            .thenAnswer((_) async {});
+        when(mockRepo.createCustomChapter(any, any, any, any))
+            .thenAnswer((_) async => 1);
 
         await handler.insertChapter(
           novelUrl: 'novel_url',
@@ -44,15 +42,52 @@ void main() {
           insertIndex: 5,
         );
 
-        verify(mockRepo.createCustomChapter(
-          'novel_url',
-          '新章节',
-          '章节内容',
-          5,
-        )).called(1);
+        // 验证调用顺序：先 shift 再 create
+        verifyInOrder([
+          mockRepo.shiftChapterIndicesFrom('novel_url', 5),
+          mockRepo.createCustomChapter('novel_url', '新章节', '章节内容', 5),
+        ]);
+      });
+
+      test('中间位置插入时应先 shift 再 create', () async {
+        when(mockRepo.shiftChapterIndicesFrom(any, any))
+            .thenAnswer((_) async {});
+        when(mockRepo.createCustomChapter(any, any, any, any))
+            .thenAnswer((_) async => 1);
+
+        await handler.insertChapter(
+          novelUrl: 'novel_url',
+          title: '中间插入',
+          content: '内容',
+          insertIndex: 3,
+        );
+
+        verify(mockRepo.shiftChapterIndicesFrom('novel_url', 3)).called(1);
+        verify(mockRepo.createCustomChapter('novel_url', '中间插入', '内容', 3))
+            .called(1);
+      });
+
+      test('insertIndex 为 0 时也应先 shift', () async {
+        when(mockRepo.shiftChapterIndicesFrom(any, any))
+            .thenAnswer((_) async {});
+        when(mockRepo.createCustomChapter(any, any, any, any))
+            .thenAnswer((_) async => 1);
+
+        await handler.insertChapter(
+          novelUrl: 'novel_url',
+          title: '首位置插入',
+          content: '内容',
+          insertIndex: 0,
+        );
+
+        verify(mockRepo.shiftChapterIndicesFrom('novel_url', 0)).called(1);
+        verify(mockRepo.createCustomChapter('novel_url', '首位置插入', '内容', 0))
+            .called(1);
       });
 
       test('repository 抛出异常时应 rethrow', () async {
+        when(mockRepo.shiftChapterIndicesFrom(any, any))
+            .thenAnswer((_) async {});
         when(mockRepo.createCustomChapter(any, any, any, any))
             .thenThrow(Exception('数据库错误'));
 

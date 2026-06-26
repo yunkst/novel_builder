@@ -114,7 +114,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
           'content': content,
           'chapterIndex': chapter.chapterIndex,
           'cachedAt': DateTime.now().millisecondsSinceEpoch,
-          'isAccompanied': chapter.isAccompanied ? 1 : 0,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -301,59 +300,6 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     }
   }
 
-  /// 检查章节是否已伴读
-  @override
-  Future<bool> isChapterAccompanied(String novelUrl, String chapterUrl) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'chapter_cache',
-      columns: ['isAccompanied'],
-      where: 'novelUrl = ? AND chapterUrl = ?',
-      whereArgs: [novelUrl, chapterUrl],
-    );
-
-    if (maps.isNotEmpty) {
-      return maps.first['isAccompanied'] == 1;
-    }
-    return false;
-  }
-
-  /// 标记章节为已伴读
-  @override
-  Future<void> markChapterAsAccompanied(
-      String novelUrl, String chapterUrl) async {
-    final db = await database;
-    await db.update(
-      'chapter_cache',
-      {'isAccompanied': 1},
-      where: 'novelUrl = ? AND chapterUrl = ?',
-      whereArgs: [novelUrl, chapterUrl],
-    );
-    LoggerService.instance.i(
-      '章节已标记为伴读: $chapterUrl',
-      category: LogCategory.database,
-      tags: ['ai_accompaniment', 'mark'],
-    );
-  }
-
-  /// 重置章节伴读标记
-  @override
-  Future<void> resetChapterAccompaniedFlag(
-      String novelUrl, String chapterUrl) async {
-    final db = await database;
-    await db.update(
-      'chapter_cache',
-      {'isAccompanied': 0},
-      where: 'novelUrl = ? AND chapterUrl = ?',
-      whereArgs: [novelUrl, chapterUrl],
-    );
-    LoggerService.instance.i(
-      '章节伴读标记已重置: $chapterUrl',
-      category: LogCategory.database,
-      tags: ['ai_accompaniment', 'reset'],
-    );
-  }
-
   /// 缓存小说章节列表
   ///
   /// 批量导入章节列表元数据到 novel_chapters 表。
@@ -394,7 +340,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
         nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
         nc.chapterIndex, nc.isUserInserted, nc.insertedAt,
         nc.readAt,
-        cc.content, cc.isAccompanied
+        cc.content
       FROM novel_chapters nc
       LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
       WHERE nc.novelUrl = ?
@@ -411,7 +357,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
         chapterIndex: maps[i]['chapterIndex'],
         isUserInserted: maps[i]['isUserInserted'] == 1,
         readAt: maps[i]['readAt'] as int?,
-        isAccompanied: (maps[i]['isAccompanied'] ?? 0) == 1,
+        isAccompanied: false,
       );
     });
   }
@@ -842,7 +788,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       SELECT
         nc.id, nc.novelUrl, nc.chapterUrl, nc.title,
         nc.chapterIndex, nc.isUserInserted, nc.readAt,
-        cc.content, cc.isAccompanied
+        cc.content
       FROM novel_chapters nc
       LEFT JOIN chapter_cache cc ON nc.chapterUrl = cc.chapterUrl
       WHERE nc.id = ?
@@ -857,7 +803,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       chapterIndex: maps.first['chapterIndex'] as int?,
       isUserInserted: (maps.first['isUserInserted'] as int?) == 1,
       readAt: maps.first['readAt'] as int?,
-      isAccompanied: (maps.first['isAccompanied'] ?? 0) == 1,
+      isAccompanied: false,
     );
   }
 

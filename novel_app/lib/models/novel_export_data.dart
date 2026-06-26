@@ -14,7 +14,6 @@ class ChapterExportData {
   final int? chapterIndex;
   final bool isUserInserted;
   final int? readAt;
-  final bool isAccompanied;
 
   const ChapterExportData({
     required this.title,
@@ -23,7 +22,6 @@ class ChapterExportData {
     this.chapterIndex,
     this.isUserInserted = false,
     this.readAt,
-    this.isAccompanied = false,
   });
 
   /// 从Chapter模型创建
@@ -35,7 +33,6 @@ class ChapterExportData {
       chapterIndex: chapter.chapterIndex,
       isUserInserted: chapter.isUserInserted,
       readAt: chapter.readAt,
-      isAccompanied: chapter.isAccompanied,
     );
   }
 
@@ -49,7 +46,6 @@ class ChapterExportData {
       chapterIndex: chapterIndex,
       isUserInserted: isUserInserted,
       readAt: readAt,
-      isAccompanied: isAccompanied,
     );
   }
 
@@ -62,7 +58,6 @@ class ChapterExportData {
       'chapterIndex': chapterIndex,
       'isUserInserted': isUserInserted,
       'readAt': readAt,
-      'isAccompanied': isAccompanied,
     };
   }
 
@@ -75,7 +70,6 @@ class ChapterExportData {
       chapterIndex: json['chapterIndex'] as int?,
       isUserInserted: json['isUserInserted'] as bool? ?? false,
       readAt: json['readAt'] as int?,
-      isAccompanied: json['isAccompanied'] as bool? ?? false,
     );
   }
 }

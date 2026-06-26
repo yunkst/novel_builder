@@ -6,55 +6,6 @@ part of 'database_service_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chapterServiceHash() => r'746bbf694057fed1932ea1b8cfef5ad846412f45';
-
-/// ChapterService Provider
-///
-/// 提供章节服务实例，处理章节数据的业务逻辑。
-///
-/// **功能**:
-/// - 章节 CRUD 操作
-/// - 章节索引管理
-/// - 用户插入章节保护
-/// - 历史章节查询和处理
-/// - 角色信息格式化
-/// - AI请求参数构建
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [characterRepositoryProvider] - 角色数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final chapterService = ref.watch(chapterServiceProvider);
-/// final inputs = await chapterService.buildChapterGenerationInputs(
-///   novel: novel,
-///   chapters: chapters,
-///   afterIndex: 0,
-///   userInput: '要求',
-///   characterIds: [1, 2],
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 依赖 Repository 接口，支持测试和依赖替换
-///
-/// Copied from [chapterService].
-@ProviderFor(chapterService)
-final chapterServiceProvider = AutoDisposeProvider<ChapterService>.internal(
-  chapterService,
-  name: r'chapterServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$chapterServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ChapterServiceRef = AutoDisposeProviderRef<ChapterService>;
 String _$chapterLoaderHash() => r'f324161e7dd8bc839455f25644e6915698005e8f';
 
 /// ChapterLoader Provider

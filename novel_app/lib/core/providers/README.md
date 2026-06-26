@@ -57,7 +57,6 @@ lib/core/providers/
 | `apiServiceWrapperProvider` | ApiServiceWrapper | 后端 API 服务封装 | ✓ |
 | `difyServiceProvider` | DifyService | Dify AI 服务，流式响应 | ✓ |
 | `preloadServiceProvider` | PreloadService | 章节预加载服务 | ✓ |
-| `chapterServiceProvider` | ChapterService | 章节业务逻辑服务 | ✗ |
 | `chapterLoaderProvider` | ChapterLoader | 章节加载器 | ✗ |
 | `chapterActionHandlerProvider` | ChapterActionHandler | 章节操作处理器 | ✗ |
 | `chapterReorderControllerProvider` | ChapterReorderController | 章节重排控制器 | ✗ |
@@ -219,10 +218,10 @@ Widget build(BuildContext context, WidgetRef ref) {
 
 ```dart
 @riverpod
-ChapterService chapterService(ChapterServiceRef ref) {
+ChapterLoader chapterLoader(ChapterLoaderRef ref) {
   // 使用 ref.watch 建立依赖关系
-  final databaseService = ref.watch(databaseServiceProvider);
-  return ChapterService(databaseService: databaseService);
+  final chapterRepository = ref.watch(chapterRepositoryProvider);
+  return ChapterLoader(chapterRepository: chapterRepository);
 }
 ```
 

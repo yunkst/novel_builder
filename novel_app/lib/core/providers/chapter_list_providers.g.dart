@@ -204,7 +204,7 @@ class _PreloadProgressProviderElement
   Novel get novel => (origin as PreloadProgressProvider).novel;
 }
 
-String _$chapterListHash() => r'a48279f7d97d01af0f4bca3e18c5c2fc9a4151bc';
+String _$chapterListHash() => r'7da7227892459359958c4f5acbae7f0304206c94';
 
 abstract class _$ChapterList
     extends BuildlessAutoDisposeNotifier<ChapterListState> {
@@ -373,42 +373,5 @@ class _ChapterListProviderElement
   @override
   Novel get novel => (origin as ChapterListProvider).novel;
 }
-
-String _$chapterGenerationHash() => r'36ff47287eb4690778fe19fb758e6356a38b4abc';
-
-/// 生成章节相关的状态
-///
-/// Copied from [ChapterGeneration].
-@ProviderFor(ChapterGeneration)
-final chapterGenerationProvider =
-    AutoDisposeNotifierProvider<ChapterGeneration, bool>.internal(
-  ChapterGeneration.new,
-  name: r'chapterGenerationProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$chapterGenerationHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$ChapterGeneration = AutoDisposeNotifier<bool>;
-String _$generatedContentHash() => r'5e0490a42b0d893b900e04db648f55130f0fb57b';
-
-/// 生成章节内容的状态
-///
-/// Copied from [GeneratedContent].
-@ProviderFor(GeneratedContent)
-final generatedContentProvider =
-    AutoDisposeNotifierProvider<GeneratedContent, String>.internal(
-  GeneratedContent.new,
-  name: r'generatedContentProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$generatedContentHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$GeneratedContent = AutoDisposeNotifier<String>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:novel_app/core/providers/hermes_chat_state.dart';
 import 'package:novel_app/core/providers/hermes_providers.dart';
+import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
+import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
@@ -51,10 +54,10 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(hermesChatProvider);
-    final notifier = ref.read(hermesChatProvider.notifier);
+    final chatState = ref.watch(currentChatStateProvider);
+    final session = ref.read(currentSessionProvider);
 
-    ref.listen(hermesChatProvider, (prev, next) {
+    ref.listen(currentChatStateProvider, (prev, next) {
       final prevCount = prev?.messages.length ?? 0;
       final nextCount = next.messages.length;
       if (nextCount > prevCount || (next.isLoading && next.streamingSegments.isNotEmpty)) {
@@ -76,7 +79,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHeader(notifier),
+              _buildHeader(session),
               if (chatState.scenarioId == ScenarioIds.webviewExtract)
                 _buildWebViewInfoBar(),
               if (chatState.scenarioId == ScenarioIds.writing)
@@ -84,7 +87,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null) _buildErrorBar(chatState.error!),
               _buildContextTag(),
-              _buildInputBar(chatState, notifier),
+              _buildInputBar(chatState, session),
             ],
           ),
         ),
@@ -92,8 +95,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     );
   }
 
-  Widget _buildHeader(HermesChatNotifier notifier) {
-    final chatState = ref.watch(hermesChatProvider);
+  Widget _buildHeader(ScenarioSession? session) {
+    final chatState = ref.watch(currentChatStateProvider);
     final appColors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -150,7 +153,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                       .where((s) => s.id == scenarioId)
                       .firstOrNull;
                   if (info != null) {
-                    notifier.switchScenario(info.id, info.displayName);
+                    ref.read(hermesChatProvider.notifier).switchScenario(info.id, info.displayName);
                   }
                 },
                 itemBuilder: (context) => AgentScenarioFactory.availableScenarios
@@ -198,7 +201,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                 icon: Icon(Icons.delete_outline,
                     color: appColors.hermesOnBrandMuted, size: 20),
                 onPressed: () {
-                  notifier.clearConversation();
+                  session?.clearConversation();
                 },
                 tooltip: '清空对话',
               ),
@@ -247,7 +250,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     final theme = Theme.of(context);
     final appColors = context.appColors;
     final currentUrl = ref.watch(webviewCurrentUrlProvider);
-    final chatState = ref.watch(hermesChatProvider);
+    final chatState = ref.watch(currentChatStateProvider);
 
     // 从历史消息的 ToolCallSegment 统计
     int pageInfoCount = 0;
@@ -345,7 +348,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
 
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
-    final chatState = ref.watch(hermesChatProvider);
+    final chatState = ref.watch(currentChatStateProvider);
 
     return Center(
       child: Column(
@@ -591,7 +594,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     );
   }
 
-  Widget _buildInputBar(HermesChatState chatState, HermesChatNotifier notifier) {
+  Widget _buildInputBar(HermesChatState chatState, ScenarioSession? session) {
     final theme = Theme.of(context);
     final appColors = context.appColors;
     final quickPrompts =
@@ -640,7 +643,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
             children: [
               if (chatState.isLoading)
                 FilledButton.icon(
-                  onPressed: () => notifier.cancelRequest(),
+                  onPressed: () => session?.cancel(),
                   icon: const Icon(Icons.stop, size: 18),
                   label: const Text('停止'),
                   style: FilledButton.styleFrom(
@@ -650,7 +653,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                 )
               else
                 FilledButton.icon(
-                  onPressed: () => _sendMessage(notifier),
+                  onPressed: () => _sendMessage(session),
                   icon: const Icon(Icons.send, size: 18),
                   label: const Text('发送'),
                   style: FilledButton.styleFrom(
@@ -703,12 +706,12 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     _focusNode.requestFocus();
   }
 
-  void _sendMessage(HermesChatNotifier notifier) {
+  void _sendMessage(ScenarioSession? session) {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
     _inputController.clear();
-    notifier.sendMessage(text);
+    session?.sendMessage(text);
 
     _focusNode.requestFocus();
   }

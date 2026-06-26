@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分流螺旋 · Bifurcating Spirals — AI Architecture</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --anthropic-dark: #141413;
+            --anthropic-light: #faf9f5;
+            --anthropic-mid-gray: #b0aea5;
+            --anthropic-light-gray: #e8e6dc;
+            --anthropic-orange: #d97757;
+            --anthropic-blue: #6a9bcc;
+            --anthropic-green: #788c5d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--anthropic-light) 0%, #f5f3ee 100%);
+            min-height: 100vh;
+            color: var(--anthropic-dark);
+        }
+        .container { display: flex; min-height: 100vh; padding: 20px; gap: 20px; }
+        .sidebar {
+            width: 320px; flex-shrink: 0;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+            padding: 24px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(20,20,19,0.1);
+            overflow-y: auto; overflow-x: hidden;
+        }
+        .sidebar h1 { font-family:'Lora',serif; font-size:22px; font-weight:500; color:var(--anthropic-dark); margin-bottom:4px; }
+        .sidebar .subtitle { color:var(--anthropic-mid-gray); font-size:13px; margin-bottom:6px; line-height:1.4; }
+        .sidebar .arch-note { color:var(--anthropic-dark); font-size:11px; margin-bottom:24px; line-height:1.5; background:rgba(217,119,87,0.06); padding:10px; border-radius:6px; border-left:3px solid var(--anthropic-orange); }
+        .control-section { margin-bottom:24px; }
+        .control-section h3 { font-size:15px; font-weight:600; color:var(--anthropic-dark); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+        .control-section h3::before { content:'•'; color:var(--anthropic-orange); font-weight:bold; }
+        .seed-input {
+            width:100%; background:var(--anthropic-light); padding:10px;
+            border-radius:8px; font-family:'Courier New',monospace; font-size:14px;
+            margin-bottom:10px; border:1px solid var(--anthropic-light-gray); text-align:center;
+        }
+        .seed-input:focus { outline:none; border-color:var(--anthropic-orange); box-shadow:0 0 0 2px rgba(217,119,87,0.1); background:white; }
+        .seed-controls { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+        .control-group { margin-bottom:16px; }
+        .control-group label { display:block; font-size:13px; font-weight:500; color:var(--anthropic-dark); margin-bottom:6px; }
+        .slider-container { display:flex; align-items:center; gap:10px; }
+        .slider-container input[type="range"] {
+            flex:1; height:4px; background:var(--anthropic-light-gray); border-radius:2px; outline:none; -webkit-appearance:none;
+        }
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none; width:14px; height:14px; background:var(--anthropic-orange); border-radius:50%; cursor:pointer; transition:all 0.2s ease;
+        }
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover { transform:scale(1.15); background:#c86641; }
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width:14px; height:14px; background:var(--anthropic-orange); border-radius:50%; border:none; cursor:pointer;
+        }
+        .value-display { font-family:'Courier New',monospace; font-size:11px; color:var(--anthropic-mid-gray); min-width:50px; text-align:right; }
+        .color-group { margin-bottom:12px; }
+        .color-group label { display:block; font-size:11px; color:var(--anthropic-mid-gray); margin-bottom:3px; }
+        .color-picker-container { display:flex; align-items:center; gap:8px; }
+        .color-picker-container input[type="color"] { width:28px; height:28px; border:none; border-radius:6px; cursor:pointer; background:none; padding:0; }
+        .color-value { font-family:'Courier New',monospace; font-size:11px; color:var(--anthropic-mid-gray); }
+        .button {
+            background:var(--anthropic-orange); color:white; border:none; padding:9px 14px;
+            border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s ease; width:100%;
+        }
+        .button:hover { background:#c86641; transform:translateY(-1px); }
+        .button:active { transform:translateY(0); }
+        .button.secondary { background:var(--anthropic-blue); }
+        .button.secondary:hover { background:#5a8bb8; }
+        .button.tertiary { background:var(--anthropic-green); }
+        .button.tertiary:hover { background:#6b7b52; }
+        .button-row { display:flex; gap:8px; }
+        .button-row .button { flex:1; }
+        .canvas-area { flex:1; display:flex; align-items:center; justify-content:center; min-width:0; }
+        #canvas-container {
+            width:100%; max-width:1000px; border-radius:12px; overflow:hidden;
+            box-shadow:0 20px 40px rgba(20,20,19,0.1); background:#1a1a2e;
+        }
+        #canvas-container canvas { display:block; width:100%!important; height:auto!important; }
+        .loading { display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--anthropic-mid-gray); }
+        @media (max-width:600px) {
+            .container { flex-direction:column; }
+            .sidebar { width:100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>分流螺旋</h1>
+            <div class="subtitle">Bifurcating Spirals — Novel Builder AI 架构</div>
+            <div class="arch-note">
+                <b>共享源泉</b> LlmProvider 分流为两股生命：<br>
+                🟧 <b>管道流</b> 章节生成（WritingService 直线流）<br>
+                🟦 <b>螺旋流</b> Hermes Agent（ReAct 循环）<br>
+                🟩 <b>引力井</b> 工具系统（14 写作 + 9 WebView）<br>
+                🟫 <b>沉积层</b> 记忆与经验
+            </div>
+
+            <div class="control-section">
+                <h3>Seed</h3>
+                <input type="number" id="seed-input" class="seed-input" value="42" onchange="updateSeed()">
+                <div class="seed-controls">
+                    <button class="button secondary" onclick="previousSeed()">← Prev</button>
+                    <button class="button secondary" onclick="nextSeed()">Next →</button>
+                </div>
+                <button class="button tertiary" onclick="randomSeedAndUpdate()">↻ Random</button>
+            </div>
+
+            <div class="control-section">
+                <h3>参数</h3>
+                <div class="control-group">
+                    <label>管道粒子数</label>
+                    <div class="slider-container">
+                        <input type="range" id="pipeParticles" min="20" max="200" step="10" value="80" oninput="updateParam('pipeParticles', this.value)">
+                        <span class="value-display" id="pipeParticles-value">80</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>螺旋轨道数</label>
+                    <div class="slider-container">
+                        <input type="range" id="spiralOrbits" min="3" max="12" step="1" value="6" oninput="updateParam('spiralOrbits', this.value)">
+                        <span class="value-display" id="spiralOrbits-value">6</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>引力井强度</label>
+                    <div class="slider-container">
+                        <input type="range" id="wellStrength" min="0.2" max="2.0" step="0.1" value="1.0" oninput="updateParam('wellStrength', this.value)">
+                        <span class="value-display" id="wellStrength-value">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>流速</label>
+                    <div class="slider-container">
+                        <input type="range" id="flowSpeed" min="0.3" max="3.0" step="0.1" value="1.0" oninput="updateParam('flowSpeed', this.value)">
+                        <span class="value-display" id="flowSpeed-value">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>上下文压缩</label>
+                    <div class="slider-container">
+                        <input type="range" id="compaction" min="0" max="0.8" step="0.05" value="0.3" oninput="updateParam('compaction', this.value)">
+                        <span class="value-display" id="compaction-value">0.30</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>色谱</h3>
+                <div class="color-group">
+                    <label>LLM 核心</label>
+                    <div class="color-picker-container">
+                        <input type="color" id="colorCore" value="#e8c547" onchange="updateColor('colorCore', this.value)">
+                        <span class="color-value" id="colorCore-value">#e8c547</span>
+                    </div>
+                </div>
+                <div class="color-group">
+                    <label>管道流（章节生成）</label>
+                    <div class="color-picker-container">
+                        <input type="color" id="colorPipe" value="#d97757" onchange="updateColor('colorPipe', this.value)">
+                        <span class="color-value" id="colorPipe-value">#d97757</span>
+                    </div>
+                </div>
+                <div class="color-group">
+                    <label>螺旋流（Hermes Agent）</label>
+                    <div class="color-picker-container">
+                        <input type="color" id="colorSpiral" value="#6a9bcc" onchange="updateColor('colorSpiral', this.value)">
+                        <span class="color-value" id="colorSpiral-value">#6a9bcc</span>
+                    </div>
+                </div>
+                <div class="color-group">
+                    <label>引力井（工具系统）</label>
+                    <div class="color-picker-container">
+                        <input type="color" id="colorWell" value="#788c5d" onchange="updateColor('colorWell', this.value)">
+                        <span class="color-value" id="colorWell-value">#788c5d</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>操作</h3>
+                <div class="button-row">
+                    <button class="button" onclick="resetParameters()">重置</button>
+                    <button class="button secondary" onclick="downloadPNG()">下载 PNG</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-area">
+            <div id="canvas-container">
+                <div class="loading">正在初始化生成式架构...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ═══════════════════════════════════════════════════════════
+    // PARAMETERS
+    // ═══════════════════════════════════════════════════════════
+    let params = {
+        seed: 42,
+        pipeParticles: 80,
+        spiralOrbits: 6,
+        wellStrength: 1.0,
+        flowSpeed: 1.0,
+        compaction: 0.3,
+        colorCore: '#e8c547',
+        colorPipe: '#d97757',
+        colorSpiral: '#6a9bcc',
+        colorWell: '#788c5d'
+    };
+    let defaultParams = JSON.parse(JSON.stringify(params));
+
+    // ═══════════════════════════════════════════════════════════
+    // SYSTEM STATE
+    // ═══════════════════════════════════════════════════════════
+    let pipePs = [];      // pipeline particles
+    let spiralPs = [];    // spiral particles
+    let wells = [];       // gravity wells (tools)
+    let sedimentLayers = [];
+    let coreGlow = 0;
+    let frameNum = 0;
+    let cfgRings = [];    // configuration chromatography rings
+
+    // Architecture geometry
+    const W = 1200, H = 1200;
+    let coreX, coreY;
+    let pipeEndX, pipeEndY;
+    let spiralCenterX, spiralCenterY;
+
+    // ═══════════════════════════════════════════════════════════
+    // SETUP
+    // ═══════════════════════════════════════════════════════════
+    function setup() {
+        let canvas = createCanvas(W, H);
+        canvas.parent('canvas-container');
+        colorMode(RGB, 255);
+        document.querySelector('.loading').style.display = 'none';
+        initializeSystem();
+    }
+
+    function initializeSystem() {
+        randomSeed(params.seed);
+        noiseSeed(params.seed);
+        frameNum = 0;
+
+        // Core position — top center
+        coreX = W / 2;
+        coreY = H * 0.18;
+
+        // Pipeline goes left-down
+        pipeEndX = W * 0.15;
+        pipeEndY = H * 0.82;
+
+        // Spiral goes right
+        spiralCenterX = W * 0.72;
+        spiralCenterY = H * 0.55;
+
+        // --- Initialize pipeline particles ---
+        pipePs = [];
+        for (let i = 0; i < params.pipeParticles; i++) {
+            pipePs.push(createPipeParticle(i / params.pipeParticles));
+        }
+
+        // --- Initialize spiral particles ---
+        spiralPs = [];
+        let orbits = params.spiralOrbits;
+        for (let o = 0; o < orbits; o++) {
+            let count = 12 + floor(random(6));
+            for (let j = 0; j < count; j++) {
+                spiralPs.push(createSpiralParticle(o, j / count));
+            }
+        }
+
+        // --- Initialize gravity wells (tools) ---
+        wells = [];
+        // Writing tools cluster (14 tools)
+        let wellCount = 8 + floor(random(5));
+        for (let i = 0; i < wellCount; i++) {
+            wells.push(createWell(i, wellCount, 'writing'));
+        }
+        // WebView tools cluster (9 tools)
+        let wvCount = 5 + floor(random(3));
+        for (let i = 0; i < wvCount; i++) {
+            wells.push(createWell(i, wvCount, 'webview'));
+        }
+
+        // --- Configuration chromatography rings ---
+        cfgRings = [];
+        for (let i = 0; i < 4; i++) {
+            cfgRings.push({
+                radius: 30 + i * 22,
+                rotation: random(TWO_PI),
+                speed: (0.003 + random(0.004)) * (i % 2 === 0 ? 1 : -1),
+                dashCount: 3 + floor(random(4)),
+                opacity: 180 - i * 30,
+            });
+        }
+
+        // --- Sediment layers ---
+        sedimentLayers = [];
+        let layerY = H * 0.88;
+        for (let i = 0; i < 5; i++) {
+            let pts = [];
+            let segCount = 60;
+            for (let s = 0; s <= segCount; s++) {
+                let x = (s / segCount) * W;
+                let yOff = noise(s * 0.05, i * 10) * 25 - 12;
+                pts.push({ x, y: layerY + yOff });
+            }
+            sedimentLayers.push({
+                pts,
+                baseY: layerY,
+                opacity: 120 - i * 18,
+                thickness: 3 + random(4),
+                drift: random(0.0005, 0.002)
+            });
+            layerY += 12 + random(8);
+        }
+
+        background(26, 26, 46);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PARTICLE FACTORIES
+    // ═══════════════════════════════════════════════════════════
+    function createPipeParticle(t) {
+        // t: 0-1 initial progress along the pipeline curve
+        return {
+            t: t,
+            speed: (0.001 + random(0.002)) * params.flowSpeed,
+            offset: random(-8, 8),
+            size: 2 + random(3),
+            alpha: 160 + random(80),
+            trail: [],
+            trailMax: 8 + floor(random(12))
+        };
+    }
+
+    function createSpiralParticle(orbitIdx, phaseInOrbit) {
+        let baseAngle = phaseInOrbit * TWO_PI + orbitIdx * 0.8;
+        let baseRadius = 60 + orbitIdx * 38;
+        return {
+            orbitIdx,
+            angle: baseAngle,
+            baseRadius,
+            radius: baseRadius,
+            speed: (0.008 + random(0.006)) * params.flowSpeed * (orbitIdx % 2 === 0 ? 1 : -1),
+            size: 1.5 + random(2.5),
+            alpha: 140 + random(80),
+            wobble: random(6),
+            wobbleSpeed: random(0.02, 0.06),
+            phase: random(TWO_PI),
+            trail: [],
+            trailMax: 14 + floor(random(10)),
+            compactionFade: 1.0
+        };
+    }
+
+    function createWell(idx, total, type) {
+        let angle, dist;
+        if (type === 'writing') {
+            angle = -PI * 0.6 + (idx / total) * PI * 0.8;
+            dist = 160 + random(100);
+        } else {
+            angle = PI * 0.4 + (idx / total) * PI * 0.6;
+            dist = 140 + random(120);
+        }
+        return {
+            x: spiralCenterX + cos(angle) * dist,
+            y: spiralCenterY + sin(angle) * dist,
+            radius: 8 + random(14),
+            strength: (0.5 + random(0.8)) * params.wellStrength,
+            type,
+            pulse: random(TWO_PI),
+            pulseSpeed: 0.02 + random(0.03),
+            orbitPhase: random(TWO_PI),
+            label: type === 'writing'
+                ? ['read_chapter','list_novels','update_content','create_character','update_outline','search_chapters','select_novel','patch_memory','list_characters','update_character','create_novel','get_outline','list_tags','save_tag'][idx % 14]
+                : ['get_page_info','execute_js','navigate_to','save_script','get_cached_script','list_scripts','inspect_script','get_script_logs','get_current_url'][idx % 9]
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PIPELINE CURVE (Bézier from core to pipe end)
+    // ═══════════════════════════════════════════════════════════
+    function pipePoint(t) {
+        // Cubic bezier: core → control1 → control2 → pipeEnd
+        let cx1 = coreX - 120, cy1 = coreY + 160;
+        let cx2 = pipeEndX + 80, cy2 = pipeEndY - 100;
+        let x = bezierPoint(coreX, cx1, cx2, pipeEndX, t);
+        let y = bezierPoint(coreY, cy1, cy2, pipeEndY, t);
+        return { x, y };
+    }
+
+    function pipeTangent(t) {
+        let cx1 = coreX - 120, cy1 = coreY + 160;
+        let cx2 = pipeEndX + 80, cy2 = pipeEndY - 100;
+        let dx = bezierTangent(coreX, cx1, cx2, pipeEndX, t);
+        let dy = bezierTangent(coreY, cy1, cy2, pipeEndY, t);
+        let a = atan2(dy, dx);
+        return { nx: -sin(a), ny: cos(a) };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DRAW
+    // ═══════════════════════════════════════════════════════════
+    function draw() {
+        frameNum++;
+
+        // Fading background for trails
+        noStroke();
+        fill(26, 26, 46, 18);
+        rect(0, 0, W, H);
+
+        // --- Draw sediment layers (bottom, static with drift) ---
+        drawSediment();
+
+        // --- Draw pipeline curve path (subtle) ---
+        drawPipelinePath();
+
+        // --- Draw gravity wells ---
+        drawWells();
+
+        // --- Draw configuration chromatography rings around core ---
+        drawConfigRings();
+
+        // --- Draw core ---
+        drawCore();
+
+        // --- Update and draw pipeline particles ---
+        drawPipelineParticles();
+
+        // --- Update and draw spiral particles ---
+        drawSpiralParticles();
+
+        // --- Draw labels ---
+        drawLabels();
+
+        // --- Draw connection lines (core → branches) ---
+        drawBranchLines();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DRAW HELPERS
+    // ═══════════════════════════════════════════════════════════
+
+    function drawCore() {
+        coreGlow = sin(frameNum * 0.03) * 0.3 + 0.7;
+        let c = color(params.colorCore);
+
+        // Outer glow
+        for (let r = 50; r > 0; r -= 5) {
+            let a = map(r, 50, 0, 0, 60) * coreGlow;
+            fill(red(c), green(c), blue(c), a);
+            noStroke();
+            ellipse(coreX, coreY, r * 2, r * 2);
+        }
+
+        // Inner core
+        fill(red(c), green(c), blue(c), 220 * coreGlow);
+        ellipse(coreX, coreY, 30, 30);
+
+        // Core label
+        fill(255, 255, 255, 200);
+        textAlign(CENTER, CENTER);
+        textSize(9);
+        textFont('Poppins');
+        text('LlmProvider', coreX, coreY);
+    }
+
+    function drawConfigRings() {
+        let c = color(params.colorCore);
+        for (let ring of cfgRings) {
+            ring.rotation += ring.speed;
+            for (let d = 0; d < ring.dashCount; d++) {
+                let startA = ring.rotation + (d / ring.dashCount) * TWO_PI;
+                let endA = startA + (TWO_PI / ring.dashCount) * 0.55;
+                noFill();
+                stroke(red(c), green(c), blue(c), ring.opacity * 0.5);
+                strokeWeight(1.5);
+                arc(coreX, coreY, ring.radius * 2, ring.radius * 2, startA, endA);
+            }
+        }
+        // Ring labels
+        noStroke();
+        fill(red(c), green(c), blue(c), 100);
+        textSize(7);
+        textAlign(CENTER, CENTER);
+        text('LlmConfigService', coreX, coreY + 55);
+        text('场景级 → 全局 → 遗留 → 默认', coreX, coreY + 66);
+    }
+
+    function drawPipelinePath() {
+        let c = color(params.colorPipe);
+        noFill();
+        stroke(red(c), green(c), blue(c), 30);
+        strokeWeight(2);
+        beginShape();
+        for (let t = 0; t <= 1; t += 0.02) {
+            let p = pipePoint(t);
+            vertex(p.x, p.y);
+        }
+        endShape();
+    }
+
+    function drawPipelineParticles() {
+        let c = color(params.colorPipe);
+        for (let p of pipePs) {
+            p.t += p.speed;
+            if (p.t > 1) {
+                p.t = 0;
+                p.trail = [];
+            }
+
+            let pos = pipePoint(p.t);
+            let tang = pipeTangent(p.t);
+            let px = pos.x + tang.nx * p.offset;
+            let py = pos.y + tang.ny * p.offset;
+
+            // Add to trail
+            p.trail.push({ x: px, y: py });
+            if (p.trail.length > p.trailMax) p.trail.shift();
+
+            // Draw trail
+            for (let i = 1; i < p.trail.length; i++) {
+                let a = map(i, 0, p.trail.length, 0, p.alpha * 0.7);
+                stroke(red(c), green(c), blue(c), a);
+                strokeWeight(p.size * (i / p.trail.length));
+                line(p.trail[i - 1].x, p.trail[i - 1].y, p.trail[i].x, p.trail[i].y);
+            }
+
+            // Draw particle
+            noStroke();
+            fill(red(c), green(c), blue(c), p.alpha);
+            ellipse(px, py, p.size, p.size);
+        }
+    }
+
+    function drawSpiralParticles() {
+        let c = color(params.colorSpiral);
+        for (let p of spiralPs) {
+            p.angle += p.speed;
+            let wobble = sin(frameNum * p.wobbleSpeed + p.phase) * p.wobble;
+            p.radius = p.baseRadius + wobble;
+
+            // Compaction: outer orbits fade more
+            let maxOrbit = params.spiralOrbits;
+            let orbitAge = p.orbitIdx / maxOrbit;
+            p.compactionFade = 1.0 - orbitAge * params.compaction;
+            p.compactionFade = max(0.1, p.compactionFade);
+
+            let sx = spiralCenterX + cos(p.angle) * p.radius;
+            let sy = spiralCenterY + sin(p.angle) * p.radius;
+
+            // Gravity well influence
+            for (let w of wells) {
+                let dx = w.x - sx;
+                let dy = w.y - sy;
+                let dist = sqrt(dx * dx + dy * dy);
+                if (dist < w.radius * 6 && dist > 1) {
+                    let force = w.strength * 20 / (dist * dist) * w.radius;
+                    sx += dx / dist * force;
+                    sy += dy / dist * force;
+                }
+            }
+
+            // Trail
+            p.trail.push({ x: sx, y: sy });
+            if (p.trail.length > p.trailMax) p.trail.shift();
+
+            let fadeAlpha = p.alpha * p.compactionFade;
+
+            // Draw trail
+            for (let i = 1; i < p.trail.length; i++) {
+                let a = map(i, 0, p.trail.length, 0, fadeAlpha * 0.5);
+                stroke(red(c), green(c), blue(c), a);
+                strokeWeight(p.size * (i / p.trail.length) * p.compactionFade);
+                line(p.trail[i - 1].x, p.trail[i - 1].y, p.trail[i].x, p.trail[i].y);
+            }
+
+            // Draw particle
+            noStroke();
+            fill(red(c), green(c), blue(c), fadeAlpha);
+            ellipse(sx, sy, p.size * p.compactionFade, p.size * p.compactionFade);
+        }
+    }
+
+    function drawWells() {
+        let cw = color(params.colorWell);
+        for (let w of wells) {
+            w.pulse += w.pulseSpeed;
+            let pulseR = w.radius + sin(w.pulse) * 3;
+
+            // Glow
+            noStroke();
+            for (let r = pulseR * 3; r > pulseR; r -= 4) {
+                let a = map(r, pulseR * 3, pulseR, 0, 25);
+                fill(red(cw), green(cw), blue(cw), a);
+                ellipse(w.x, w.y, r * 2, r * 2);
+            }
+
+            // Core dot
+            fill(red(cw), green(cw), blue(cw), 180);
+            ellipse(w.x, w.y, pulseR * 0.8, pulseR * 0.8);
+
+            // Tiny orbit ring
+            noFill();
+            stroke(red(cw), green(cw), blue(cw), 40);
+            strokeWeight(0.5);
+            let orbitR = pulseR * 2.2 + sin(w.pulse * 0.5) * 4;
+            ellipse(w.x, w.y, orbitR * 2, orbitR * 2);
+
+            // Label (only for some, to avoid clutter)
+            if (w.radius > 12) {
+                noStroke();
+                fill(red(cw), green(cw), blue(cw), 120);
+                textSize(6);
+                textAlign(CENTER, CENTER);
+                textFont('Courier New');
+                text(w.label, w.x, w.y + pulseR + 8);
+            }
+        }
+    }
+
+    function drawSediment() {
+        for (let i = 0; i < sedimentLayers.length; i++) {
+            let layer = sedimentLayers[i];
+            let cSed = color(params.colorPipe);
+            let cSed2 = color(params.colorSpiral);
+            let mix = i / sedimentLayers.length;
+
+            noFill();
+            stroke(
+                lerp(red(cSed), red(cSed2), mix),
+                lerp(green(cSed), green(cSed2), mix),
+                lerp(blue(cSed), blue(cSed2), mix),
+                layer.opacity * 0.4
+            );
+            strokeWeight(layer.thickness);
+
+            beginShape();
+            for (let p of layer.pts) {
+                let driftY = sin(frameNum * layer.drift + p.x * 0.01) * 3;
+                vertex(p.x, p.y + driftY);
+            }
+            endShape();
+        }
+    }
+
+    function drawBranchLines() {
+        // Subtle connection from core to spiral center
+        let cP = color(params.colorPipe);
+        let cS = color(params.colorSpiral);
+
+        // Core → pipeline direction
+        stroke(red(cP), green(cP), blue(cP), 25);
+        strokeWeight(1);
+        let pp = pipePoint(0.05);
+        line(coreX - 15, coreY + 10, pp.x, pp.y);
+
+        // Core → spiral direction
+        stroke(red(cS), green(cS), blue(cS), 25);
+        let spiralEntry = {
+            x: spiralCenterX + cos(-PI * 0.7) * 40,
+            y: spiralCenterY + sin(-PI * 0.7) * 40
+        };
+        line(coreX + 15, coreY + 10, spiralEntry.x, spiralEntry.y);
+    }
+
+    function drawLabels() {
+        noStroke();
+        textFont('Poppins');
+
+        // Pipeline label
+        let pp = pipePoint(0.5);
+        fill(217, 119, 87, 180);
+        textSize(11);
+        textAlign(CENTER, CENTER);
+        text('WritingService', pp.x - 50, pp.y - 20);
+        textSize(8);
+        fill(217, 119, 87, 120);
+        text('prompt → LLM 流式 → 章节', pp.x - 50, pp.y - 6);
+
+        // Spiral label
+        fill(106, 155, 204, 180);
+        textSize(11);
+        textAlign(CENTER, CENTER);
+        text('Hermes Agent', spiralCenterX, spiralCenterY - 12);
+        textSize(8);
+        fill(106, 155, 204, 120);
+        text('ReAct 循环: 思考 → 工具 → 反思', spiralCenterX, spiralCenterY + 2);
+
+        // Tool clusters label
+        fill(120, 140, 93, 140);
+        textSize(9);
+        textAlign(LEFT, CENTER);
+        let wLeft = wells.filter(w => w.type === 'writing');
+        if (wLeft.length > 0) {
+            text('14 写作工具', wLeft[0].x - 30, wLeft[0].y - wLeft[0].radius - 16);
+        }
+        let wRight = wells.filter(w => w.type === 'webview');
+        if (wRight.length > 0) {
+            text('9 WebView 工具', wRight[0].x - 10, wRight[0].y - wRight[0].radius - 16);
+        }
+
+        // Sediment label
+        fill(180, 170, 160, 80);
+        textSize(8);
+        textAlign(CENTER, CENTER);
+        text('记忆沉积层 (patch_memory + 经验积累)', W / 2, H * 0.855);
+
+        // Output labels
+        fill(217, 119, 87, 100);
+        textSize(8);
+        textAlign(CENTER, CENTER);
+        text('章节内容输出', pipeEndX + 20, pipeEndY + 15);
+
+        fill(106, 155, 204, 100);
+        text('Agent 响应', spiralCenterX, spiralCenterY + params.spiralOrbits * 38 + 50);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UI HANDLERS
+    // ═══════════════════════════════════════════════════════════
+    function updateParam(name, value) {
+        let v = parseFloat(value);
+        params[name] = v;
+        document.getElementById(name + '-value').textContent =
+            name === 'compaction' ? v.toFixed(2) : v;
+
+        // Rebuild system when structural params change
+        if (['pipeParticles', 'spiralOrbits', 'wellStrength'].includes(name)) {
+            initializeSystem();
+        }
+    }
+
+    function updateColor(colorId, value) {
+        params[colorId] = value;
+        document.getElementById(colorId + '-value').textContent = value;
+    }
+
+    function updateSeedDisplay() {
+        document.getElementById('seed-input').value = params.seed;
+    }
+
+    function updateSeed() {
+        let input = document.getElementById('seed-input');
+        let newSeed = parseInt(input.value);
+        if (newSeed && newSeed > 0) {
+            params.seed = newSeed;
+            initializeSystem();
+        } else {
+            updateSeedDisplay();
+        }
+    }
+
+    function previousSeed() {
+        params.seed = Math.max(1, params.seed - 1);
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function nextSeed() {
+        params.seed++;
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function randomSeedAndUpdate() {
+        params.seed = Math.floor(Math.random() * 999999) + 1;
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function resetParameters() {
+        params = JSON.parse(JSON.stringify(defaultParams));
+
+        document.getElementById('pipeParticles').value = params.pipeParticles;
+        document.getElementById('pipeParticles-value').textContent = params.pipeParticles;
+        document.getElementById('spiralOrbits').value = params.spiralOrbits;
+        document.getElementById('spiralOrbits-value').textContent = params.spiralOrbits;
+        document.getElementById('wellStrength').value = params.wellStrength;
+        document.getElementById('wellStrength-value').textContent = params.wellStrength;
+        document.getElementById('flowSpeed').value = params.flowSpeed;
+        document.getElementById('flowSpeed-value').textContent = params.flowSpeed;
+        document.getElementById('compaction').value = params.compaction;
+        document.getElementById('compaction-value').textContent = params.compaction.toFixed(2);
+
+        document.getElementById('colorCore').value = params.colorCore;
+        document.getElementById('colorCore-value').textContent = params.colorCore;
+        document.getElementById('colorPipe').value = params.colorPipe;
+        document.getElementById('colorPipe-value').textContent = params.colorPipe;
+        document.getElementById('colorSpiral').value = params.colorSpiral;
+        document.getElementById('colorSpiral-value').textContent = params.colorSpiral;
+        document.getElementById('colorWell').value = params.colorWell;
+        document.getElementById('colorWell-value').textContent = params.colorWell;
+
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function downloadPNG() {
+        saveCanvas('bifurcating-spirals-seed' + params.seed, 'png');
+    }
+
+    window.addEventListener('load', function() {
+        updateSeedDisplay();
+    });
+    </script>
+</body>
+</html>

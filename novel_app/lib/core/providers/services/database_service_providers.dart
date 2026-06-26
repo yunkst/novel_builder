@@ -3,7 +3,6 @@
 /// 此文件定义所有数据库相关服务的 Provider。
 ///
 /// **功能**:
-/// - 章节CRUD操作服务
 /// - 章节加载器
 /// - 章节操作处理器
 /// - 章节重排控制器
@@ -12,7 +11,6 @@
 ///
 /// **依赖**:
 /// - database_providers.dart - 数据库服务
-/// - ai_service_providers.dart - AI服务
 /// - network_service_providers.dart - 网络服务
 ///
 /// **相关 Providers**:
@@ -22,7 +20,6 @@ library;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
-import '../../../services/chapter_service.dart';
 import '../../../services/chapter_search_service.dart';
 import '../../../services/cache_search_service.dart';
 import '../../../controllers/chapter_list/chapter_loader.dart';
@@ -32,47 +29,6 @@ import '../database_providers.dart';
 import 'network_service_providers.dart';
 
 part 'database_service_providers.g.dart';
-
-/// ChapterService Provider
-///
-/// 提供章节服务实例，处理章节数据的业务逻辑。
-///
-/// **功能**:
-/// - 章节 CRUD 操作
-/// - 章节索引管理
-/// - 用户插入章节保护
-/// - 历史章节查询和处理
-/// - 角色信息格式化
-/// - AI请求参数构建
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [characterRepositoryProvider] - 角色数据访问
-///
-/// **使用示例**:
-/// ```dart
-/// final chapterService = ref.watch(chapterServiceProvider);
-/// final inputs = await chapterService.buildChapterGenerationInputs(
-///   novel: novel,
-///   chapters: chapters,
-///   afterIndex: 0,
-///   userInput: '要求',
-///   characterIds: [1, 2],
-/// );
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 依赖 Repository 接口，支持测试和依赖替换
-@riverpod
-ChapterService chapterService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final characterRepository = ref.watch(characterRepositoryProvider);
-  return ChapterService(
-    chapterRepository: chapterRepository,
-    characterRepository: characterRepository,
-  );
-}
 
 /// ChapterLoader Provider
 ///

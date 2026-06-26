@@ -2,6 +2,12 @@
 ///
 /// 用于解析阻塞式工作流返回的结构化数据
 ///
+/// ⚠️ [AICompanionResponse] 及 [fromOutputs] 已废弃 —
+/// 角色提取已走 Agent 工具路径（list_characters / create_character 等），
+/// 不再使用阻塞式工作流 JSON 解析。
+///
+/// [AICompanionRole] 和 [AICompanionRelation] 仍被 Repository 层引用，保留。
+///
 /// 返回格式：
 /// ```json
 /// {
@@ -185,6 +191,7 @@ class AICompanionRelation {
   }
 }
 
+@Deprecated('角色提取已走 Agent 工具路径，不再使用阻塞式工作流解析。保留供历史调用点编译。')
 class AICompanionResponse {
   /// 需要更新的角色信息
   ///
@@ -222,6 +229,7 @@ class AICompanionResponse {
   ///   }
   /// }
   /// ```
+  @Deprecated('角色提取已走 Agent 工具路径，不再使用 fromOutputs。')
   factory AICompanionResponse.fromOutputs(Map<String, dynamic> outputs) {
     // 获取 content 字段，支持 Map（结构化方法）和 String（纯文本方法）两种类型
     final Map<String, dynamic> contentMap;

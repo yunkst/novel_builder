@@ -293,31 +293,31 @@ void main() {
       expect(created.description, isNull);
     });
 
-    test('title 为空字符串 → validation_failed', () async {
+    test('title 为空字符串 → empty_param', () async {
       final result = await executor.execute(
         'create_novel',
         {'title': ''},
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'validation_failed');
-      expect(json['message'].toString(), contains('标题'));
+      // ToolArgParser.requireString 对 trim 后空字符串返回 empty_param
+      expect(json['error'], 'empty_param');
+      expect(json['message'].toString(), contains('title'));
     });
 
-    test('title 仅含空白 → validation_failed', () async {
+    test('title 仅含空白 → empty_param', () async {
       final result = await executor.execute(
         'create_novel',
         {'title': '   '},
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'validation_failed');
+      expect(json['error'], 'empty_param');
     });
 
-    test('title 缺失 → validation_failed', () async {
-      // title 是 required 但 execute 不会预校验，
-      // 我们的实现会捕获 null 并返回 validation_failed
+    test('title 缺失 → missing_required_param', () async {
+      // ToolArgParser.requireString 对缺失参数返回 missing_required_param
       final result = await executor.execute('create_novel', {});
       final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'validation_failed');
+      expect(json['error'], 'missing_required_param');
     });
 
     test('可连续创建多本小说（间隔 1ms 避免 timestamp 冲突）', () async {
@@ -589,80 +589,6 @@ void main() {
 
       expect(json['error'], 'chapter_position_out_of_range');
       expect(json['suggested_tool'], 'list_chapters');
-    });
-  });
-
-  // ========================================================================
-  // create_custom_chapter
-  // ========================================================================
-  group('create_custom_chapter', () {
-    test('创建自定义章节（不带 position，追加到末尾）', () async {
-      final novelId = await insertNovel();
-      final ctx = _ctx(novelId);
-
-      final result = await executor.execute(
-        'create_custom_chapter',
-        {'title': '新章节', 'content': '新内容'},
-        scenarioContext: ctx,
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-
-      expect(json['success'], true);
-      // 返回值是 position（不是 chapterId），可用于后续章节操作
-      expect(json['position'], isA<int>());
-      expect(json['position'], greaterThan(0));
-
-      // 验证数据库
-      final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
-      expect(chapters.any((c) => c.title == '新章节'), true);
-    });
-
-    test('创建自定义章节（指定 position，插入到指定位置）', () async {
-      final novelId = await insertNovel();
-      // 准备：已有 2 章
-      await insertChapter(chapterUrl: 'chA', title: 'A章', chapterIndex: 0);
-      await insertChapter(chapterUrl: 'chB', title: 'B章', chapterIndex: 1);
-      final ctx = _ctx(novelId);
-
-      final result = await executor.execute(
-        'create_custom_chapter',
-        {'title': '新章', 'content': '内容', 'position': 2},
-        scenarioContext: ctx,
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-
-      expect(json['success'], true);
-      expect(json['position'], 2);
-
-      // 验证排序：新章应在第 2 位，原 B章 后移到第 3 位
-      final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
-      final titles = chapters.map((c) => c.title).toList();
-      expect(titles[1], '新章');
-      expect(titles[2], 'B章');
-    });
-
-    test('position 超出范围 → chapter_position_out_of_range', () async {
-      final novelId = await insertNovel();
-      final ctx = _ctx(novelId);
-
-      final result = await executor.execute(
-        'create_custom_chapter',
-        {'title': 'X', 'content': 'Y', 'position': 999},
-        scenarioContext: ctx,
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'chapter_position_out_of_range');
-    });
-
-    test('无上下文 → no_current_novel + suggested_tool', () async {
-      final result = await executor.execute(
-        'create_custom_chapter',
-        {'title': 'X', 'content': 'Y'},
-        scenarioContext: _noNovelContext,
-      );
-      final json = jsonDecode(result) as Map<String, dynamic>;
-      expect(json['error'], 'no_current_novel');
-      expect(json['suggested_tool'], 'list_novels');
     });
   });
 

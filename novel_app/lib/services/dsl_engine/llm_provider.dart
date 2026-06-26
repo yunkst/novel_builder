@@ -18,6 +18,7 @@ import 'dart:math';
 
 import 'package:novel_app/services/llm_logger/llm_logger.dart';
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/utils/json_utils.dart';
 
 // -- 配置 --
 
@@ -525,7 +526,102 @@ class LlmProvider {
     return response.content;
   }
 
-  /// 流式调用：返回 chunk 流
+  /// 结构化 JSON 调用 — 自动启用 json_object 模式 + 解析
+  ///
+  /// 适用于需要 LLM 返回结构化 JSON 的场景（如角色提取、关系提取等）。
+  ///
+  /// 设计要点：
+  /// - 使用 `response_format: { type: "json_object" }` 强制合法 JSON
+  /// - 自动在 system prompt 末尾追加 JSON schema 提示（DeepSeek 必须）
+  /// - 解析时使用 [safeJsonDecode]（去除 markdown 包裹）
+  /// - 支持解析失败自动重试
+  ///
+  /// **注意**：DeepSeek-V4-Pro 支持 json_object 但不支持 json_schema strict，
+  /// 因此 [schemaDescription] 只是自然语言提示，不保证字段完全匹配。
+  /// 调用方应在 Dart 侧做字段校验。
+  ///
+  /// [fromJson] — 从 `Map<String, dynamic>` 构造目标类型
+  /// [schemaDescription] — JSON 结构描述（如 '格式: {"roles": [...], "background": "..."}'）
+  /// [retryOnParseError] — JSON 解析失败时自动重试次数（默认 1 次）
+  /// [temperature] — 默认 0.3（低温度更确定性）
+  Future<T?> chatForJson<T>({
+    required List<ChatMessage> messages,
+    required T Function(Map<String, dynamic>) fromJson,
+    String schemaDescription = '',
+    int retryOnParseError = 1,
+    String? model,
+    int? maxTokens,
+    double? temperature,
+  }) async {
+    // 找到 system 消息，追加 schema 提示
+    final systemIdx = messages.indexWhere((m) => m.role == 'system');
+    final enrichedMessages = List<ChatMessage>.from(messages);
+    if (systemIdx >= 0) {
+      final original = messages[systemIdx];
+      enrichedMessages[systemIdx] = ChatMessage(
+        role: 'system',
+        content: '${original.content ?? ''}\n\n'
+            '你必须返回合法的 JSON 对象。$schemaDescription',
+      );
+    } else {
+      enrichedMessages.insert(
+        0,
+        ChatMessage(
+          role: 'system',
+          content: '你必须返回合法的 JSON 对象。$schemaDescription',
+        ),
+      );
+    }
+
+    for (var attempt = 0; attempt <= retryOnParseError; attempt++) {
+      try {
+        final response = await chat(
+          messages: enrichedMessages,
+          model: model,
+          maxTokens: maxTokens,
+          temperature: temperature ?? 0.3,
+          responseFormat: const {'type': 'json_object'},
+        );
+
+        if (response.content.trim().isEmpty) {
+          LoggerService.instance.w(
+            'chatForJson: LLM 返回空内容 (attempt $attempt)',
+            category: LogCategory.ai,
+            tags: ['dsl', 'llm', 'chatForJson', 'empty'],
+          );
+          continue;
+        }
+
+        // safeJsonDecode 已处理 markdown 包裹
+        final json = safeJsonDecode(response.content);
+        if (json is! Map<String, dynamic>) {
+          LoggerService.instance.w(
+            'chatForJson: JSON 不是对象 (attempt $attempt, type=${json.runtimeType})',
+            category: LogCategory.ai,
+            tags: ['dsl', 'llm', 'chatForJson', 'not_object'],
+          );
+          continue;
+        }
+
+        return fromJson(json);
+      } on FormatException catch (e) {
+        LoggerService.instance.w(
+          'chatForJson: JSON 解析失败 (attempt $attempt): $e',
+          category: LogCategory.ai,
+          tags: ['dsl', 'llm', 'chatForJson', 'parse_error'],
+        );
+        if (attempt == retryOnParseError) rethrow;
+      } catch (e) {
+        LoggerService.instance.e(
+          'chatForJson: 调用失败 (attempt $attempt): $e',
+          category: LogCategory.ai,
+          tags: ['dsl', 'llm', 'chatForJson', 'error'],
+        );
+        if (attempt == retryOnParseError) rethrow;
+      }
+    }
+    return null;
+  }
   Stream<String> chatStream({
     required List<ChatMessage> messages,
     String? model,

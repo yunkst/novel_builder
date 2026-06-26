@@ -8,7 +8,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
-import '../../models/ai_accompaniment_settings.dart';
 import '../../services/preload_progress_update.dart';
 import '../../services/logger_service.dart';
 import '../../services/headless_webview_errors.dart';
@@ -44,7 +43,6 @@ class ChapterListState {
   final int currentPage;
   final int totalPages;
   final bool isReorderingMode;
-  final AiAccompanimentSettings? aiSettings;
 
   const ChapterListState({
     this.chapters = const [],
@@ -55,7 +53,6 @@ class ChapterListState {
     this.currentPage = 1,
     this.totalPages = 1,
     this.isReorderingMode = false,
-    this.aiSettings,
   });
 
   /// 获取已缓存章节数量
@@ -72,7 +69,6 @@ class ChapterListState {
     int? currentPage,
     int? totalPages,
     bool? isReorderingMode,
-    AiAccompanimentSettings? aiSettings,
   }) {
     return ChapterListState(
       chapters: chapters ?? this.chapters,
@@ -83,7 +79,6 @@ class ChapterListState {
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
       isReorderingMode: isReorderingMode ?? this.isReorderingMode,
-      aiSettings: aiSettings ?? this.aiSettings,
     );
   }
 }
@@ -114,7 +109,6 @@ class ChapterList extends _$ChapterList {
         _initApiAndLoadChapters(),
         _checkBookshelfStatus(),
         _loadLastReadChapter(),
-        _loadAiSettings(),
       ]);
 
       LoggerService.instance.i(
@@ -386,22 +380,6 @@ class ChapterList extends _$ChapterList {
     }
   }
 
-  /// 加载AI伴读设置
-  Future<void> _loadAiSettings() async {
-    final novelRepository = ref.read(novelRepositoryProvider);
-    try {
-      final settings =
-          await novelRepository.getAiAccompanimentSettings(novel.url);
-      state = state.copyWith(aiSettings: settings);
-    } catch (e) {
-      LoggerService.instance.w(
-        '加载AI伴读设置失败: $e',
-        category: LogCategory.ui,
-        tags: ['chapter-list'],
-      );
-    }
-  }
-
   /// 计算总页数
   void _updateTotalPages() {
     if (state.chapters.isEmpty) {
@@ -565,40 +543,6 @@ class ChapterList extends _$ChapterList {
 @riverpod
 Novel currentNovel(Ref ref) {
   throw UnimplementedError('currentNovel must be overridden');
-}
-
-/// 生成章节相关的状态
-@riverpod
-class ChapterGeneration extends _$ChapterGeneration {
-  @override
-  bool build() {
-    return false;
-  }
-
-  void setGenerating(bool isGenerating) {
-    state = isGenerating;
-  }
-}
-
-/// 生成章节内容的状态
-@riverpod
-class GeneratedContent extends _$GeneratedContent {
-  @override
-  String build() {
-    return '';
-  }
-
-  void setContent(String content) {
-    state = content;
-  }
-
-  void appendContent(String content) {
-    state += content;
-  }
-
-  void clear() {
-    state = '';
-  }
 }
 
 /// 预加载进度监听 Provider

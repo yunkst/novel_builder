@@ -72,27 +72,6 @@ abstract class IChapterRepository {
   /// 返回受影响的行数
   Future<int> deleteCachedChapters(String novelUrl);
 
-  // ========== AI伴读标记 ==========
-
-  /// 检查章节是否已伴读
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapterUrl] 章节的URL
-  /// 返回是否已伴读
-  Future<bool> isChapterAccompanied(String novelUrl, String chapterUrl);
-
-  /// 标记章节为已伴读
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapterUrl] 章节的URL
-  Future<void> markChapterAsAccompanied(String novelUrl, String chapterUrl);
-
-  /// 重置章节伴读标记
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapterUrl] 章节的URL
-  Future<void> resetChapterAccompaniedFlag(String novelUrl, String chapterUrl);
-
   // ========== 章节列表管理 ==========
 
   /// 缓存小说章节列表

@@ -21,7 +21,6 @@ class AgentTools {
     _searchInChapters,
     // ===== 章节写入 =====
     _updateChapterContent,
-    _createCustomChapter,
     // ===== 角色 =====
     _listCharacters,
     _updateCharacter,
@@ -198,40 +197,6 @@ class AgentTools {
           },
         },
         'required': ['position', 'content'],
-      },
-    },
-  };
-
-  static const _createCustomChapter = {
-    'type': 'function',
-    'function': {
-      'name': 'create_custom_chapter',
-      'description':
-          '在当前小说中创建一个全新的自定义章节。返回新章节的 position，'
-          '可用于后续章节操作（如 read_chapter_content、update_chapter_content）。\n'
-          'position 参数说明：\n'
-          '- 不填或省略 → 追加到末尾\n'
-          '- 填 1 → 插入到第 1 章位置（原第 1 章及后续章节后移）\n'
-          '- 填 N → 插入到第 N 章位置（原第 N 章及后续章节后移）\n'
-          '- 合法范围：1 ~ 当前章节数 + 1',
-      'parameters': {
-        'type': 'object',
-        'properties': {
-          'title': {
-            'type': 'string',
-            'description': '新章节的标题',
-          },
-          'content': {
-            'type': 'string',
-            'description': '新章节的正文内容',
-          },
-          'position': {
-            'type': 'integer',
-            'description': '插入位置（1-based 顺序号）。新章节将出现在该位置，'
-                '原该位置及之后的章节自动后移。不填则追加到末尾。',
-          },
-        },
-        'required': ['title', 'content'],
       },
     },
   };

@@ -695,56 +695,6 @@ class MockIChapterRepository extends _i1.Mock
       ) as _i8.Future<int>);
 
   @override
-  _i8.Future<bool> isChapterAccompanied(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #isChapterAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<bool>.value(false),
-      ) as _i8.Future<bool>);
-
-  @override
-  _i8.Future<void> markChapterAsAccompanied(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #markChapterAsAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
-  _i8.Future<void> resetChapterAccompaniedFlag(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #resetChapterAccompaniedFlag,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i8.Future<void>.value(),
-        returnValueForMissingStub: _i8.Future<void>.value(),
-      ) as _i8.Future<void>);
-
-  @override
   _i8.Future<void> cacheNovelChapters(
     String? novelUrl,
     List<_i13.Chapter>? chapters,

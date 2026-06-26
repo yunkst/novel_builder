@@ -3,25 +3,25 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i18;
-import 'dart:io' as _i31;
-import 'dart:typed_data' as _i29;
+import 'dart:async' as _i17;
+import 'dart:io' as _i30;
+import 'dart:typed_data' as _i28;
 
 import 'package:dio/dio.dart' as _i14;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i30;
+import 'package:mockito/src/dummies.dart' as _i29;
 import 'package:novel_api/novel_api.dart' as _i13;
 import 'package:novel_app/models/ai_accompaniment_settings.dart' as _i11;
-import 'package:novel_app/models/ai_companion_response.dart' as _i21;
-import 'package:novel_app/models/bookshelf.dart' as _i26;
-import 'package:novel_app/models/chapter.dart' as _i20;
+import 'package:novel_app/models/ai_companion_response.dart' as _i20;
+import 'package:novel_app/models/bookshelf.dart' as _i25;
+import 'package:novel_app/models/chapter.dart' as _i19;
 import 'package:novel_app/models/character.dart' as _i12;
-import 'package:novel_app/models/character_relationship.dart' as _i22;
-import 'package:novel_app/models/chat_scene.dart' as _i25;
-import 'package:novel_app/models/novel.dart' as _i19;
-import 'package:novel_app/models/outline.dart' as _i24;
-import 'package:novel_app/models/scene_illustration.dart' as _i23;
-import 'package:novel_app/models/search_result.dart' as _i27;
+import 'package:novel_app/models/character_relationship.dart' as _i21;
+import 'package:novel_app/models/chat_scene.dart' as _i24;
+import 'package:novel_app/models/novel.dart' as _i18;
+import 'package:novel_app/models/outline.dart' as _i23;
+import 'package:novel_app/models/scene_illustration.dart' as _i22;
+import 'package:novel_app/models/search_result.dart' as _i26;
 import 'package:novel_app/repositories/bookshelf_repository.dart' as _i9;
 import 'package:novel_app/repositories/chapter_repository.dart' as _i3;
 import 'package:novel_app/repositories/character_relation_repository.dart'
@@ -31,11 +31,10 @@ import 'package:novel_app/repositories/chat_scene_repository.dart' as _i8;
 import 'package:novel_app/repositories/illustration_repository.dart' as _i6;
 import 'package:novel_app/repositories/novel_repository.dart' as _i2;
 import 'package:novel_app/repositories/outline_repository.dart' as _i7;
-import 'package:novel_app/services/api_service_wrapper.dart' as _i28;
-import 'package:novel_app/services/database_service.dart' as _i17;
-import 'package:novel_app/services/dify/dify_config_service.dart' as _i15;
-import 'package:novel_app/services/dify/dify_workflow_service.dart' as _i16;
-import 'package:novel_app/services/dify_service.dart' as _i32;
+import 'package:novel_app/services/api_service_wrapper.dart' as _i27;
+import 'package:novel_app/services/database_service.dart' as _i16;
+import 'package:novel_app/services/dify/dify_workflow_service.dart' as _i15;
+import 'package:novel_app/services/dify_service.dart' as _i31;
 import 'package:sqflite/sqflite.dart' as _i10;
 
 // ignore_for_file: type=lint
@@ -235,20 +234,9 @@ class _FakeBackupUploadResponse_16 extends _i1.SmartFake
         );
 }
 
-class _FakeDifyConfigService_17 extends _i1.SmartFake
-    implements _i15.DifyConfigService {
-  _FakeDifyConfigService_17(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeDifyWorkflowService_18 extends _i1.SmartFake
-    implements _i16.DifyWorkflowService {
-  _FakeDifyWorkflowService_18(
+class _FakeDifyWorkflowService_17 extends _i1.SmartFake
+    implements _i15.DifyWorkflowService {
+  _FakeDifyWorkflowService_17(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -260,7 +248,7 @@ class _FakeDifyWorkflowService_18 extends _i1.SmartFake
 /// A class which mocks [DatabaseService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
+class MockDatabaseService extends _i1.Mock implements _i16.DatabaseService {
   MockDatabaseService() {
     _i1.throwOnMissingStub(this);
   }
@@ -345,25 +333,25 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
       ) as _i9.BookshelfRepository);
 
   @override
-  _i18.Future<_i10.Database> get database => (super.noSuchMethod(
+  _i17.Future<_i10.Database> get database => (super.noSuchMethod(
         Invocation.getter(#database),
-        returnValue: _i18.Future<_i10.Database>.value(_FakeDatabase_8(
+        returnValue: _i17.Future<_i10.Database>.value(_FakeDatabase_8(
           this,
           Invocation.getter(#database),
         )),
-      ) as _i18.Future<_i10.Database>);
+      ) as _i17.Future<_i10.Database>);
 
   @override
-  _i18.Future<int> addToBookshelf(_i19.Novel? novel) => (super.noSuchMethod(
+  _i17.Future<int> addToBookshelf(_i18.Novel? novel) => (super.noSuchMethod(
         Invocation.method(
           #addToBookshelf,
           [novel],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> createCustomNovel(
+  _i17.Future<int> createCustomNovel(
     String? title,
     String? author, {
     String? description,
@@ -377,47 +365,47 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
           ],
           {#description: description},
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> removeFromBookshelf(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<int> removeFromBookshelf(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #removeFromBookshelf,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<_i19.Novel>> getBookshelf() => (super.noSuchMethod(
+  _i17.Future<List<_i18.Novel>> getBookshelf() => (super.noSuchMethod(
         Invocation.method(
           #getBookshelf,
           [],
         ),
-        returnValue: _i18.Future<List<_i19.Novel>>.value(<_i19.Novel>[]),
-      ) as _i18.Future<List<_i19.Novel>>);
+        returnValue: _i17.Future<List<_i18.Novel>>.value(<_i18.Novel>[]),
+      ) as _i17.Future<List<_i18.Novel>>);
 
   @override
-  _i18.Future<List<_i19.Novel>> getNovels() => (super.noSuchMethod(
+  _i17.Future<List<_i18.Novel>> getNovels() => (super.noSuchMethod(
         Invocation.method(
           #getNovels,
           [],
         ),
-        returnValue: _i18.Future<List<_i19.Novel>>.value(<_i19.Novel>[]),
-      ) as _i18.Future<List<_i19.Novel>>);
+        returnValue: _i17.Future<List<_i18.Novel>>.value(<_i18.Novel>[]),
+      ) as _i17.Future<List<_i18.Novel>>);
 
   @override
-  _i18.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<bool> isInBookshelf(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #isInBookshelf,
           [novelUrl],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<int> updateLastReadChapter(
+  _i17.Future<int> updateLastReadChapter(
     String? novelUrl,
     int? chapterIndex,
   ) =>
@@ -429,11 +417,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapterIndex,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> updateBackgroundSetting(
+  _i17.Future<int> updateBackgroundSetting(
     String? novelUrl,
     String? backgroundSetting,
   ) =>
@@ -445,11 +433,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             backgroundSetting,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> appendBackgroundSetting(
+  _i17.Future<int> appendBackgroundSetting(
     String? novelUrl,
     String? newBackground,
   ) =>
@@ -461,37 +449,37 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             newBackground,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<String?> getBackgroundSetting(String? novelUrl) =>
+  _i17.Future<String?> getBackgroundSetting(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getBackgroundSetting,
           [novelUrl],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<int> getLastReadChapter(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<int> getLastReadChapter(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #getLastReadChapter,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<_i11.AiAccompanimentSettings> getAiAccompanimentSettings(
+  _i17.Future<_i11.AiAccompanimentSettings> getAiAccompanimentSettings(
           String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getAiAccompanimentSettings,
           [novelUrl],
         ),
-        returnValue: _i18.Future<_i11.AiAccompanimentSettings>.value(
+        returnValue: _i17.Future<_i11.AiAccompanimentSettings>.value(
             _FakeAiAccompanimentSettings_9(
           this,
           Invocation.method(
@@ -499,10 +487,10 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             [novelUrl],
           ),
         )),
-      ) as _i18.Future<_i11.AiAccompanimentSettings>);
+      ) as _i17.Future<_i11.AiAccompanimentSettings>);
 
   @override
-  _i18.Future<int> updateAiAccompanimentSettings(
+  _i17.Future<int> updateAiAccompanimentSettings(
     String? novelUrl,
     _i11.AiAccompanimentSettings? settings,
   ) =>
@@ -514,38 +502,38 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             settings,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> isChapterCached(String? chapterUrl) => (super.noSuchMethod(
+  _i17.Future<bool> isChapterCached(String? chapterUrl) => (super.noSuchMethod(
         Invocation.method(
           #isChapterCached,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<List<String>> filterUncachedChapters(List<String>? chapterUrls) =>
+  _i17.Future<List<String>> filterUncachedChapters(List<String>? chapterUrls) =>
       (super.noSuchMethod(
         Invocation.method(
           #filterUncachedChapters,
           [chapterUrls],
         ),
-        returnValue: _i18.Future<List<String>>.value(<String>[]),
-      ) as _i18.Future<List<String>>);
+        returnValue: _i17.Future<List<String>>.value(<String>[]),
+      ) as _i17.Future<List<String>>);
 
   @override
-  _i18.Future<Map<String, bool>> getChaptersCacheStatus(
+  _i17.Future<Map<String, bool>> getChaptersCacheStatus(
           List<String>? chapterUrls) =>
       (super.noSuchMethod(
         Invocation.method(
           #getChaptersCacheStatus,
           [chapterUrls],
         ),
-        returnValue: _i18.Future<Map<String, bool>>.value(<String, bool>{}),
-      ) as _i18.Future<Map<String, bool>>);
+        returnValue: _i17.Future<Map<String, bool>>.value(<String, bool>{}),
+      ) as _i17.Future<Map<String, bool>>);
 
   @override
   void clearMemoryState() => super.noSuchMethod(
@@ -557,9 +545,9 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
       );
 
   @override
-  _i18.Future<int> cacheChapter(
+  _i17.Future<int> cacheChapter(
     String? novelUrl,
-    _i20.Chapter? chapter,
+    _i19.Chapter? chapter,
     String? content,
   ) =>
       (super.noSuchMethod(
@@ -571,11 +559,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             content,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> updateChapterContent(
+  _i17.Future<int> updateChapterContent(
     String? chapterUrl,
     String? content,
   ) =>
@@ -587,71 +575,71 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             content,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> deleteChapterCache(String? chapterUrl) =>
+  _i17.Future<int> deleteChapterCache(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteChapterCache,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<String?> getCachedChapter(String? chapterUrl) =>
+  _i17.Future<String?> getCachedChapter(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedChapter,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<String?> getChapterContent(String? chapterUrl) =>
+  _i17.Future<String?> getChapterContent(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getChapterContent,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<List<_i20.Chapter>> getCachedChapters(String? novelUrl) =>
+  _i17.Future<List<_i19.Chapter>> getCachedChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedChapters,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<_i20.Chapter>>.value(<_i20.Chapter>[]),
-      ) as _i18.Future<List<_i20.Chapter>>);
+        returnValue: _i17.Future<List<_i19.Chapter>>.value(<_i19.Chapter>[]),
+      ) as _i17.Future<List<_i19.Chapter>>);
 
   @override
-  _i18.Future<int> deleteCachedChapters(String? novelUrl) =>
+  _i17.Future<int> deleteCachedChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteCachedChapters,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<void> clearNovelCache(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<void> clearNovelCache(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #clearNovelCache,
           [novelUrl],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<void> markChapterAsRead(
+  _i17.Future<void> markChapterAsRead(
     String? novelUrl,
     String? chapterUrl,
   ) =>
@@ -663,74 +651,24 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapterUrl,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<int> getCachedChaptersCount(String? novelUrl) =>
+  _i17.Future<int> getCachedChaptersCount(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedChaptersCount,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> isChapterAccompanied(
+  _i17.Future<void> cacheNovelChapters(
     String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #isChapterAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
-
-  @override
-  _i18.Future<void> markChapterAsAccompanied(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #markChapterAsAccompanied,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
-
-  @override
-  _i18.Future<void> resetChapterAccompaniedFlag(
-    String? novelUrl,
-    String? chapterUrl,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #resetChapterAccompaniedFlag,
-          [
-            novelUrl,
-            chapterUrl,
-          ],
-        ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
-
-  @override
-  _i18.Future<void> cacheNovelChapters(
-    String? novelUrl,
-    List<_i20.Chapter>? chapters,
+    List<_i19.Chapter>? chapters,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -740,34 +678,34 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapters,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<List<_i20.Chapter>> getCachedNovelChapters(String? novelUrl) =>
+  _i17.Future<List<_i19.Chapter>> getCachedNovelChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedNovelChapters,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<_i20.Chapter>>.value(<_i20.Chapter>[]),
-      ) as _i18.Future<List<_i20.Chapter>>);
+        returnValue: _i17.Future<List<_i19.Chapter>>.value(<_i19.Chapter>[]),
+      ) as _i17.Future<List<_i19.Chapter>>);
 
   @override
-  _i18.Future<List<_i20.Chapter>> getChapters(String? novelUrl) =>
+  _i17.Future<List<_i19.Chapter>> getChapters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getChapters,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<_i20.Chapter>>.value(<_i20.Chapter>[]),
-      ) as _i18.Future<List<_i20.Chapter>>);
+        returnValue: _i17.Future<List<_i19.Chapter>>.value(<_i19.Chapter>[]),
+      ) as _i17.Future<List<_i19.Chapter>>);
 
   @override
-  _i18.Future<void> updateChaptersOrder(
+  _i17.Future<void> updateChaptersOrder(
     String? novelUrl,
-    List<_i20.Chapter>? chapters,
+    List<_i19.Chapter>? chapters,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -777,12 +715,12 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapters,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<int> createCustomChapter(
+  _i17.Future<int> createCustomChapter(
     String? novelUrl,
     String? title,
     String? content, [
@@ -798,11 +736,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             index,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> insertUserChapter(
+  _i17.Future<int> insertUserChapter(
     String? novelUrl,
     String? title,
     String? content, [
@@ -818,11 +756,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             index,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<void> updateCustomChapter(
+  _i17.Future<void> updateCustomChapter(
     String? chapterUrl,
     String? title,
     String? content,
@@ -836,93 +774,93 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             content,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<void> deleteCustomChapter(String? chapterUrl) =>
+  _i17.Future<void> deleteCustomChapter(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteCustomChapter,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<void> deleteUserChapter(String? chapterUrl) =>
+  _i17.Future<void> deleteUserChapter(String? chapterUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteUserChapter,
           [chapterUrl],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<void> clearAllCache() => (super.noSuchMethod(
+  _i17.Future<void> clearAllCache() => (super.noSuchMethod(
         Invocation.method(
           #clearAllCache,
           [],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<int> createCharacter(_i12.Character? character) =>
+  _i17.Future<int> createCharacter(_i12.Character? character) =>
       (super.noSuchMethod(
         Invocation.method(
           #createCharacter,
           [character],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<_i12.Character>> getCharacters(String? novelUrl) =>
+  _i17.Future<List<_i12.Character>> getCharacters(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCharacters,
           [novelUrl],
         ),
         returnValue:
-            _i18.Future<List<_i12.Character>>.value(<_i12.Character>[]),
-      ) as _i18.Future<List<_i12.Character>>);
+            _i17.Future<List<_i12.Character>>.value(<_i12.Character>[]),
+      ) as _i17.Future<List<_i12.Character>>);
 
   @override
-  _i18.Future<_i12.Character?> getCharacter(int? id) => (super.noSuchMethod(
+  _i17.Future<_i12.Character?> getCharacter(int? id) => (super.noSuchMethod(
         Invocation.method(
           #getCharacter,
           [id],
         ),
-        returnValue: _i18.Future<_i12.Character?>.value(),
-      ) as _i18.Future<_i12.Character?>);
+        returnValue: _i17.Future<_i12.Character?>.value(),
+      ) as _i17.Future<_i12.Character?>);
 
   @override
-  _i18.Future<int> updateCharacter(_i12.Character? character) =>
+  _i17.Future<int> updateCharacter(_i12.Character? character) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateCharacter,
           [character],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> deleteCharacter(int? id) => (super.noSuchMethod(
+  _i17.Future<int> deleteCharacter(int? id) => (super.noSuchMethod(
         Invocation.method(
           #deleteCharacter,
           [id],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<_i12.Character?> findCharacterByName(
+  _i17.Future<_i12.Character?> findCharacterByName(
     String? novelUrl,
     String? name,
   ) =>
@@ -934,28 +872,28 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             name,
           ],
         ),
-        returnValue: _i18.Future<_i12.Character?>.value(),
-      ) as _i18.Future<_i12.Character?>);
+        returnValue: _i17.Future<_i12.Character?>.value(),
+      ) as _i17.Future<_i12.Character?>);
 
   @override
-  _i18.Future<_i12.Character> updateOrInsertCharacter(
+  _i17.Future<_i12.Character> updateOrInsertCharacter(
           _i12.Character? newCharacter) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateOrInsertCharacter,
           [newCharacter],
         ),
-        returnValue: _i18.Future<_i12.Character>.value(_FakeCharacter_10(
+        returnValue: _i17.Future<_i12.Character>.value(_FakeCharacter_10(
           this,
           Invocation.method(
             #updateOrInsertCharacter,
             [newCharacter],
           ),
         )),
-      ) as _i18.Future<_i12.Character>);
+      ) as _i17.Future<_i12.Character>);
 
   @override
-  _i18.Future<List<_i12.Character>> batchUpdateCharacters(
+  _i17.Future<List<_i12.Character>> batchUpdateCharacters(
           List<_i12.Character>? newCharacters) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -963,50 +901,50 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
           [newCharacters],
         ),
         returnValue:
-            _i18.Future<List<_i12.Character>>.value(<_i12.Character>[]),
-      ) as _i18.Future<List<_i12.Character>>);
+            _i17.Future<List<_i12.Character>>.value(<_i12.Character>[]),
+      ) as _i17.Future<List<_i12.Character>>);
 
   @override
-  _i18.Future<List<String>> getCharacterNames(String? novelUrl) =>
+  _i17.Future<List<String>> getCharacterNames(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCharacterNames,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<String>>.value(<String>[]),
-      ) as _i18.Future<List<String>>);
+        returnValue: _i17.Future<List<String>>.value(<String>[]),
+      ) as _i17.Future<List<String>>);
 
   @override
-  _i18.Future<bool> characterExists(int? id) => (super.noSuchMethod(
+  _i17.Future<bool> characterExists(int? id) => (super.noSuchMethod(
         Invocation.method(
           #characterExists,
           [id],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<List<_i12.Character>> getCharactersByIds(List<int>? ids) =>
+  _i17.Future<List<_i12.Character>> getCharactersByIds(List<int>? ids) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCharactersByIds,
           [ids],
         ),
         returnValue:
-            _i18.Future<List<_i12.Character>>.value(<_i12.Character>[]),
-      ) as _i18.Future<List<_i12.Character>>);
+            _i17.Future<List<_i12.Character>>.value(<_i12.Character>[]),
+      ) as _i17.Future<List<_i12.Character>>);
 
   @override
-  _i18.Future<int> deleteAllCharacters(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<int> deleteAllCharacters(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #deleteAllCharacters,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> updateCharacterCachedImage(
+  _i17.Future<int> updateCharacterCachedImage(
     int? characterId,
     String? imageUrl,
   ) =>
@@ -1018,41 +956,41 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             imageUrl,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> clearCharacterCachedImage(int? characterId) =>
+  _i17.Future<int> clearCharacterCachedImage(int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #clearCharacterCachedImage,
           [characterId],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> clearAllCharacterCachedImages(String? novelUrl) =>
+  _i17.Future<int> clearAllCharacterCachedImages(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #clearAllCharacterCachedImages,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<String?> getCharacterCachedImage(int? characterId) =>
+  _i17.Future<String?> getCharacterCachedImage(int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCharacterCachedImage,
           [characterId],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<int> updateCharacterAvatar(
+  _i17.Future<int> updateCharacterAvatar(
     int? characterId, {
     String? imageUrl,
     String? originalFilename,
@@ -1068,22 +1006,22 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             #originalImageUrl: originalImageUrl,
           },
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> hasCharacterAvatar(int? characterId) => (super.noSuchMethod(
+  _i17.Future<bool> hasCharacterAvatar(int? characterId) => (super.noSuchMethod(
         Invocation.method(
           #hasCharacterAvatar,
           [characterId],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<int> batchUpdateOrInsertCharacters(
+  _i17.Future<int> batchUpdateOrInsertCharacters(
     String? novelUrl,
-    List<_i21.AICompanionRole>? aiRoles,
+    List<_i20.AICompanionRole>? aiRoles,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1093,79 +1031,79 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             aiRoles,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> createRelationship(
-          _i22.CharacterRelationship? relationship) =>
+  _i17.Future<int> createRelationship(
+          _i21.CharacterRelationship? relationship) =>
       (super.noSuchMethod(
         Invocation.method(
           #createRelationship,
           [relationship],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<_i22.CharacterRelationship>> getRelationships(
+  _i17.Future<List<_i21.CharacterRelationship>> getRelationships(
           int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRelationships,
           [characterId],
         ),
-        returnValue: _i18.Future<List<_i22.CharacterRelationship>>.value(
-            <_i22.CharacterRelationship>[]),
-      ) as _i18.Future<List<_i22.CharacterRelationship>>);
+        returnValue: _i17.Future<List<_i21.CharacterRelationship>>.value(
+            <_i21.CharacterRelationship>[]),
+      ) as _i17.Future<List<_i21.CharacterRelationship>>);
 
   @override
-  _i18.Future<List<_i22.CharacterRelationship>> getOutgoingRelationships(
+  _i17.Future<List<_i21.CharacterRelationship>> getOutgoingRelationships(
           int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getOutgoingRelationships,
           [characterId],
         ),
-        returnValue: _i18.Future<List<_i22.CharacterRelationship>>.value(
-            <_i22.CharacterRelationship>[]),
-      ) as _i18.Future<List<_i22.CharacterRelationship>>);
+        returnValue: _i17.Future<List<_i21.CharacterRelationship>>.value(
+            <_i21.CharacterRelationship>[]),
+      ) as _i17.Future<List<_i21.CharacterRelationship>>);
 
   @override
-  _i18.Future<List<_i22.CharacterRelationship>> getIncomingRelationships(
+  _i17.Future<List<_i21.CharacterRelationship>> getIncomingRelationships(
           int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getIncomingRelationships,
           [characterId],
         ),
-        returnValue: _i18.Future<List<_i22.CharacterRelationship>>.value(
-            <_i22.CharacterRelationship>[]),
-      ) as _i18.Future<List<_i22.CharacterRelationship>>);
+        returnValue: _i17.Future<List<_i21.CharacterRelationship>>.value(
+            <_i21.CharacterRelationship>[]),
+      ) as _i17.Future<List<_i21.CharacterRelationship>>);
 
   @override
-  _i18.Future<int> updateRelationship(
-          _i22.CharacterRelationship? relationship) =>
+  _i17.Future<int> updateRelationship(
+          _i21.CharacterRelationship? relationship) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateRelationship,
           [relationship],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> deleteRelationship(int? relationshipId) =>
+  _i17.Future<int> deleteRelationship(int? relationshipId) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteRelationship,
           [relationshipId],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> relationshipExists(
+  _i17.Future<bool> relationshipExists(
     int? sourceId,
     int? targetId,
     String? type,
@@ -1179,43 +1117,43 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             type,
           ],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<int> getRelationshipCount(int? characterId) =>
+  _i17.Future<int> getRelationshipCount(int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRelationshipCount,
           [characterId],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<int>> getRelatedCharacterIds(int? characterId) =>
+  _i17.Future<List<int>> getRelatedCharacterIds(int? characterId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRelatedCharacterIds,
           [characterId],
         ),
-        returnValue: _i18.Future<List<int>>.value(<int>[]),
-      ) as _i18.Future<List<int>>);
+        returnValue: _i17.Future<List<int>>.value(<int>[]),
+      ) as _i17.Future<List<int>>);
 
   @override
-  _i18.Future<List<_i22.CharacterRelationship>> getAllRelationships(
+  _i17.Future<List<_i21.CharacterRelationship>> getAllRelationships(
           String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getAllRelationships,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<_i22.CharacterRelationship>>.value(
-            <_i22.CharacterRelationship>[]),
-      ) as _i18.Future<List<_i22.CharacterRelationship>>);
+        returnValue: _i17.Future<List<_i21.CharacterRelationship>>.value(
+            <_i21.CharacterRelationship>[]),
+      ) as _i17.Future<List<_i21.CharacterRelationship>>);
 
   @override
-  _i18.Future<List<_i22.CharacterRelationship>> getRelationshipsByCharacterIds(
+  _i17.Future<List<_i21.CharacterRelationship>> getRelationshipsByCharacterIds(
     int? sourceId,
     int? targetId,
   ) =>
@@ -1227,14 +1165,14 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             targetId,
           ],
         ),
-        returnValue: _i18.Future<List<_i22.CharacterRelationship>>.value(
-            <_i22.CharacterRelationship>[]),
-      ) as _i18.Future<List<_i22.CharacterRelationship>>);
+        returnValue: _i17.Future<List<_i21.CharacterRelationship>>.value(
+            <_i21.CharacterRelationship>[]),
+      ) as _i17.Future<List<_i21.CharacterRelationship>>);
 
   @override
-  _i18.Future<int> batchUpdateOrInsertRelationships(
+  _i17.Future<int> batchUpdateOrInsertRelationships(
     String? novelUrl,
-    List<_i21.AICompanionRelation>? aiRelations,
+    List<_i20.AICompanionRelation>? aiRelations,
   ) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1244,22 +1182,22 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             aiRelations,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> insertSceneIllustration(
-          _i23.SceneIllustration? illustration) =>
+  _i17.Future<int> insertSceneIllustration(
+          _i22.SceneIllustration? illustration) =>
       (super.noSuchMethod(
         Invocation.method(
           #insertSceneIllustration,
           [illustration],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> updateSceneIllustrationStatus(
+  _i17.Future<int> updateSceneIllustrationStatus(
     int? id,
     String? status, {
     List<String>? images,
@@ -1277,20 +1215,20 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             #prompts: prompts,
           },
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> deleteSceneIllustration(int? id) => (super.noSuchMethod(
+  _i17.Future<int> deleteSceneIllustration(int? id) => (super.noSuchMethod(
         Invocation.method(
           #deleteSceneIllustration,
           [id],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> deleteSceneIllustrationsByChapter(
+  _i17.Future<int> deleteSceneIllustrationsByChapter(
     String? novelUrl,
     String? chapterId,
   ) =>
@@ -1302,11 +1240,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapterId,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<_i23.SceneIllustration>> getSceneIllustrationsByChapter(
+  _i17.Future<List<_i22.SceneIllustration>> getSceneIllustrationsByChapter(
     String? novelUrl,
     String? chapterId,
   ) =>
@@ -1318,23 +1256,23 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapterId,
           ],
         ),
-        returnValue: _i18.Future<List<_i23.SceneIllustration>>.value(
-            <_i23.SceneIllustration>[]),
-      ) as _i18.Future<List<_i23.SceneIllustration>>);
+        returnValue: _i17.Future<List<_i22.SceneIllustration>>.value(
+            <_i22.SceneIllustration>[]),
+      ) as _i17.Future<List<_i22.SceneIllustration>>);
 
   @override
-  _i18.Future<_i23.SceneIllustration?> getSceneIllustrationByTaskId(
+  _i17.Future<_i22.SceneIllustration?> getSceneIllustrationByTaskId(
           String? taskId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getSceneIllustrationByTaskId,
           [taskId],
         ),
-        returnValue: _i18.Future<_i23.SceneIllustration?>.value(),
-      ) as _i18.Future<_i23.SceneIllustration?>);
+        returnValue: _i17.Future<_i22.SceneIllustration?>.value(),
+      ) as _i17.Future<_i22.SceneIllustration?>);
 
   @override
-  _i18.Future<Map<String, dynamic>> getSceneIllustrationsPaginated({
+  _i17.Future<Map<String, dynamic>> getSceneIllustrationsPaginated({
     required int? page,
     required int? limit,
   }) =>
@@ -1348,22 +1286,22 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<List<_i23.SceneIllustration>> getPendingSceneIllustrations() =>
+  _i17.Future<List<_i22.SceneIllustration>> getPendingSceneIllustrations() =>
       (super.noSuchMethod(
         Invocation.method(
           #getPendingSceneIllustrations,
           [],
         ),
-        returnValue: _i18.Future<List<_i23.SceneIllustration>>.value(
-            <_i23.SceneIllustration>[]),
-      ) as _i18.Future<List<_i23.SceneIllustration>>);
+        returnValue: _i17.Future<List<_i22.SceneIllustration>>.value(
+            <_i22.SceneIllustration>[]),
+      ) as _i17.Future<List<_i22.SceneIllustration>>);
 
   @override
-  _i18.Future<int> batchUpdateSceneIllustrations(
+  _i17.Future<int> batchUpdateSceneIllustrations(
     List<int>? ids,
     String? status,
   ) =>
@@ -1375,21 +1313,21 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             status,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> getIllustrationCount(String? novelUrl) =>
+  _i17.Future<int> getIllustrationCount(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getIllustrationCount,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> getCompletedIllustrationCount(
+  _i17.Future<int> getCompletedIllustrationCount(
     String? novelUrl,
     String? chapterId,
   ) =>
@@ -1401,57 +1339,57 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             chapterId,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> taskExists(String? taskId) => (super.noSuchMethod(
+  _i17.Future<bool> taskExists(String? taskId) => (super.noSuchMethod(
         Invocation.method(
           #taskExists,
           [taskId],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<int> saveOutline(_i24.Outline? outline) => (super.noSuchMethod(
+  _i17.Future<int> saveOutline(_i23.Outline? outline) => (super.noSuchMethod(
         Invocation.method(
           #saveOutline,
           [outline],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<_i24.Outline?> getOutlineByNovelUrl(String? novelUrl) =>
+  _i17.Future<_i23.Outline?> getOutlineByNovelUrl(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getOutlineByNovelUrl,
           [novelUrl],
         ),
-        returnValue: _i18.Future<_i24.Outline?>.value(),
-      ) as _i18.Future<_i24.Outline?>);
+        returnValue: _i17.Future<_i23.Outline?>.value(),
+      ) as _i17.Future<_i23.Outline?>);
 
   @override
-  _i18.Future<List<_i24.Outline>> getAllOutlines() => (super.noSuchMethod(
+  _i17.Future<List<_i23.Outline>> getAllOutlines() => (super.noSuchMethod(
         Invocation.method(
           #getAllOutlines,
           [],
         ),
-        returnValue: _i18.Future<List<_i24.Outline>>.value(<_i24.Outline>[]),
-      ) as _i18.Future<List<_i24.Outline>>);
+        returnValue: _i17.Future<List<_i23.Outline>>.value(<_i23.Outline>[]),
+      ) as _i17.Future<List<_i23.Outline>>);
 
   @override
-  _i18.Future<int> deleteOutline(String? novelUrl) => (super.noSuchMethod(
+  _i17.Future<int> deleteOutline(String? novelUrl) => (super.noSuchMethod(
         Invocation.method(
           #deleteOutline,
           [novelUrl],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> updateOutlineContent(
+  _i17.Future<int> updateOutlineContent(
     String? novelUrl,
     String? title,
     String? content,
@@ -1465,110 +1403,110 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             content,
           ],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<int> insertChatScene(_i25.ChatScene? scene) =>
+  _i17.Future<int> insertChatScene(_i24.ChatScene? scene) =>
       (super.noSuchMethod(
         Invocation.method(
           #insertChatScene,
           [scene],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<void> updateChatScene(_i25.ChatScene? scene) =>
+  _i17.Future<void> updateChatScene(_i24.ChatScene? scene) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateChatScene,
           [scene],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<void> deleteChatScene(int? id) => (super.noSuchMethod(
+  _i17.Future<void> deleteChatScene(int? id) => (super.noSuchMethod(
         Invocation.method(
           #deleteChatScene,
           [id],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<List<_i25.ChatScene>> getAllChatScenes() => (super.noSuchMethod(
+  _i17.Future<List<_i24.ChatScene>> getAllChatScenes() => (super.noSuchMethod(
         Invocation.method(
           #getAllChatScenes,
           [],
         ),
         returnValue:
-            _i18.Future<List<_i25.ChatScene>>.value(<_i25.ChatScene>[]),
-      ) as _i18.Future<List<_i25.ChatScene>>);
+            _i17.Future<List<_i24.ChatScene>>.value(<_i24.ChatScene>[]),
+      ) as _i17.Future<List<_i24.ChatScene>>);
 
   @override
-  _i18.Future<_i25.ChatScene?> getChatSceneById(int? id) => (super.noSuchMethod(
+  _i17.Future<_i24.ChatScene?> getChatSceneById(int? id) => (super.noSuchMethod(
         Invocation.method(
           #getChatSceneById,
           [id],
         ),
-        returnValue: _i18.Future<_i25.ChatScene?>.value(),
-      ) as _i18.Future<_i25.ChatScene?>);
+        returnValue: _i17.Future<_i24.ChatScene?>.value(),
+      ) as _i17.Future<_i24.ChatScene?>);
 
   @override
-  _i18.Future<List<_i25.ChatScene>> searchChatScenes(String? query) =>
+  _i17.Future<List<_i24.ChatScene>> searchChatScenes(String? query) =>
       (super.noSuchMethod(
         Invocation.method(
           #searchChatScenes,
           [query],
         ),
         returnValue:
-            _i18.Future<List<_i25.ChatScene>>.value(<_i25.ChatScene>[]),
-      ) as _i18.Future<List<_i25.ChatScene>>);
+            _i17.Future<List<_i24.ChatScene>>.value(<_i24.ChatScene>[]),
+      ) as _i17.Future<List<_i24.ChatScene>>);
 
   @override
-  _i18.Future<List<_i26.Bookshelf>> getBookshelves() => (super.noSuchMethod(
+  _i17.Future<List<_i25.Bookshelf>> getBookshelves() => (super.noSuchMethod(
         Invocation.method(
           #getBookshelves,
           [],
         ),
         returnValue:
-            _i18.Future<List<_i26.Bookshelf>>.value(<_i26.Bookshelf>[]),
-      ) as _i18.Future<List<_i26.Bookshelf>>);
+            _i17.Future<List<_i25.Bookshelf>>.value(<_i25.Bookshelf>[]),
+      ) as _i17.Future<List<_i25.Bookshelf>>);
 
   @override
-  _i18.Future<int> createBookshelf(String? name) => (super.noSuchMethod(
+  _i17.Future<int> createBookshelf(String? name) => (super.noSuchMethod(
         Invocation.method(
           #createBookshelf,
           [name],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> deleteBookshelf(int? bookshelfId) => (super.noSuchMethod(
+  _i17.Future<bool> deleteBookshelf(int? bookshelfId) => (super.noSuchMethod(
         Invocation.method(
           #deleteBookshelf,
           [bookshelfId],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<List<_i19.Novel>> getNovelsByBookshelf(int? bookshelfId) =>
+  _i17.Future<List<_i18.Novel>> getNovelsByBookshelf(int? bookshelfId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getNovelsByBookshelf,
           [bookshelfId],
         ),
-        returnValue: _i18.Future<List<_i19.Novel>>.value(<_i19.Novel>[]),
-      ) as _i18.Future<List<_i19.Novel>>);
+        returnValue: _i17.Future<List<_i18.Novel>>.value(<_i18.Novel>[]),
+      ) as _i17.Future<List<_i18.Novel>>);
 
   @override
-  _i18.Future<void> addNovelToBookshelf(
+  _i17.Future<void> addNovelToBookshelf(
     String? novelUrl,
     int? bookshelfId,
   ) =>
@@ -1580,12 +1518,12 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             bookshelfId,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<bool> removeNovelFromBookshelf(
+  _i17.Future<bool> removeNovelFromBookshelf(
     String? novelUrl,
     int? bookshelfId,
   ) =>
@@ -1597,11 +1535,11 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             bookshelfId,
           ],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<void> moveNovelToBookshelf(
+  _i17.Future<void> moveNovelToBookshelf(
     String? novelUrl,
     int? fromBookshelfId,
     int? toBookshelfId,
@@ -1615,32 +1553,32 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             toBookshelfId,
           ],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
+  _i17.Future<List<int>> getBookshelvesByNovel(String? novelUrl) =>
       (super.noSuchMethod(
         Invocation.method(
           #getBookshelvesByNovel,
           [novelUrl],
         ),
-        returnValue: _i18.Future<List<int>>.value(<int>[]),
-      ) as _i18.Future<List<int>>);
+        returnValue: _i17.Future<List<int>>.value(<int>[]),
+      ) as _i17.Future<List<int>>);
 
   @override
-  _i18.Future<int> getNovelCountByBookshelf(int? bookshelfId) =>
+  _i17.Future<int> getNovelCountByBookshelf(int? bookshelfId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getNovelCountByBookshelf,
           [bookshelfId],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<bool> isNovelInBookshelf(
+  _i17.Future<bool> isNovelInBookshelf(
     String? novelUrl,
     int? bookshelfId,
   ) =>
@@ -1652,32 +1590,32 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
             bookshelfId,
           ],
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<void> reorderBookshelves(List<int>? bookshelfIds) =>
+  _i17.Future<void> reorderBookshelves(List<int>? bookshelfIds) =>
       (super.noSuchMethod(
         Invocation.method(
           #reorderBookshelves,
           [bookshelfIds],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
-  _i18.Future<int> updateBookshelf(_i26.Bookshelf? bookshelf) =>
+  _i17.Future<int> updateBookshelf(_i25.Bookshelf? bookshelf) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateBookshelf,
           [bookshelf],
         ),
-        returnValue: _i18.Future<int>.value(0),
-      ) as _i18.Future<int>);
+        returnValue: _i17.Future<int>.value(0),
+      ) as _i17.Future<int>);
 
   @override
-  _i18.Future<List<_i27.ChapterSearchResult>> searchInCachedContent(
+  _i17.Future<List<_i26.ChapterSearchResult>> searchInCachedContent(
     String? keyword, {
     String? novelUrl,
   }) =>
@@ -1687,26 +1625,26 @@ class MockDatabaseService extends _i1.Mock implements _i17.DatabaseService {
           [keyword],
           {#novelUrl: novelUrl},
         ),
-        returnValue: _i18.Future<List<_i27.ChapterSearchResult>>.value(
-            <_i27.ChapterSearchResult>[]),
-      ) as _i18.Future<List<_i27.ChapterSearchResult>>);
+        returnValue: _i17.Future<List<_i26.ChapterSearchResult>>.value(
+            <_i26.ChapterSearchResult>[]),
+      ) as _i17.Future<List<_i26.ChapterSearchResult>>);
 
   @override
-  _i18.Future<List<_i27.CachedNovelInfo>> getCachedNovels() =>
+  _i17.Future<List<_i26.CachedNovelInfo>> getCachedNovels() =>
       (super.noSuchMethod(
         Invocation.method(
           #getCachedNovels,
           [],
         ),
-        returnValue: _i18.Future<List<_i27.CachedNovelInfo>>.value(
-            <_i27.CachedNovelInfo>[]),
-      ) as _i18.Future<List<_i27.CachedNovelInfo>>);
+        returnValue: _i17.Future<List<_i26.CachedNovelInfo>>.value(
+            <_i26.CachedNovelInfo>[]),
+      ) as _i17.Future<List<_i26.CachedNovelInfo>>);
 }
 
 /// A class which mocks [ApiServiceWrapper].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
+class MockApiServiceWrapper extends _i1.Mock implements _i27.ApiServiceWrapper {
   MockApiServiceWrapper() {
     _i1.throwOnMissingStub(this);
   }
@@ -1736,14 +1674,14 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
       ) as _i14.Dio);
 
   @override
-  _i18.Future<void> init() => (super.noSuchMethod(
+  _i17.Future<void> init() => (super.noSuchMethod(
         Invocation.method(
           #init,
           [],
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
   Map<String, dynamic> getInitStatus() => (super.noSuchMethod(
@@ -1755,25 +1693,25 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
       ) as Map<String, dynamic>);
 
   @override
-  _i18.Future<String?> getHost() => (super.noSuchMethod(
+  _i17.Future<String?> getHost() => (super.noSuchMethod(
         Invocation.method(
           #getHost,
           [],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<String?> getToken() => (super.noSuchMethod(
+  _i17.Future<String?> getToken() => (super.noSuchMethod(
         Invocation.method(
           #getToken,
           [],
         ),
-        returnValue: _i18.Future<String?>.value(),
-      ) as _i18.Future<String?>);
+        returnValue: _i17.Future<String?>.value(),
+      ) as _i17.Future<String?>);
 
   @override
-  _i18.Future<void> setConfig({
+  _i17.Future<void> setConfig({
     required String? host,
     String? token,
   }) =>
@@ -1786,9 +1724,9 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             #token: token,
           },
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 
   @override
   void dispose() => super.noSuchMethod(
@@ -1800,7 +1738,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
       );
 
   @override
-  _i18.Future<Map<String, dynamic>> generateRoleCardImages({
+  _i17.Future<Map<String, dynamic>> generateRoleCardImages({
     required String? roleId,
     required Map<String, dynamic>? roles,
     String? modelName,
@@ -1816,22 +1754,22 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
+  _i17.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
       (super.noSuchMethod(
         Invocation.method(
           #getRoleGallery,
           [roleId],
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<bool> deleteRoleImage({
+  _i17.Future<bool> deleteRoleImage({
     required String? roleId,
     required String? imageUrl,
   }) =>
@@ -1844,11 +1782,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             #imageUrl: imageUrl,
           },
         ),
-        returnValue: _i18.Future<bool>.value(false),
-      ) as _i18.Future<bool>);
+        returnValue: _i17.Future<bool>.value(false),
+      ) as _i17.Future<bool>);
 
   @override
-  _i18.Future<Map<String, dynamic>> generateMoreImages({
+  _i17.Future<Map<String, dynamic>> generateMoreImages({
     required String? roleId,
     required int? count,
     String? referenceImageUrl,
@@ -1866,11 +1804,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<Map<String, dynamic>> createSceneIllustration({
+  _i17.Future<Map<String, dynamic>> createSceneIllustration({
     required String? chaptersContent,
     required String? taskId,
     required dynamic roles,
@@ -1890,11 +1828,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<Map<String, dynamic>> getSceneIllustrationGallery(
+  _i17.Future<Map<String, dynamic>> getSceneIllustrationGallery(
           String? taskId) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1902,11 +1840,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           [taskId],
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
+  _i17.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
     required String? taskId,
     required String? filename,
   }) =>
@@ -1920,11 +1858,11 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<Map<String, dynamic>> regenerateSceneIllustration({
+  _i17.Future<Map<String, dynamic>> regenerateSceneIllustration({
     required String? taskId,
     required int? count,
     String? model,
@@ -1940,21 +1878,21 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<_i29.Uint8List> getImageProxy(String? filename) =>
+  _i17.Future<_i28.Uint8List> getImageProxy(String? filename) =>
       (super.noSuchMethod(
         Invocation.method(
           #getImageProxy,
           [filename],
         ),
-        returnValue: _i18.Future<_i29.Uint8List>.value(_i29.Uint8List(0)),
-      ) as _i18.Future<_i29.Uint8List>);
+        returnValue: _i17.Future<_i28.Uint8List>.value(_i28.Uint8List(0)),
+      ) as _i17.Future<_i28.Uint8List>);
 
   @override
-  _i18.Future<_i13.ImageToVideoResponse> generateVideoFromImage({
+  _i17.Future<_i13.ImageToVideoResponse> generateVideoFromImage({
     required String? imgName,
     required String? userInput,
     String? modelName,
@@ -1969,7 +1907,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             #modelName: modelName,
           },
         ),
-        returnValue: _i18.Future<_i13.ImageToVideoResponse>.value(
+        returnValue: _i17.Future<_i13.ImageToVideoResponse>.value(
             _FakeImageToVideoResponse_13(
           this,
           Invocation.method(
@@ -1982,16 +1920,16 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i18.Future<_i13.ImageToVideoResponse>);
+      ) as _i17.Future<_i13.ImageToVideoResponse>);
 
   @override
-  _i18.Future<_i13.VideoStatusResponse> checkVideoStatus(String? imgName) =>
+  _i17.Future<_i13.VideoStatusResponse> checkVideoStatus(String? imgName) =>
       (super.noSuchMethod(
         Invocation.method(
           #checkVideoStatus,
           [imgName],
         ),
-        returnValue: _i18.Future<_i13.VideoStatusResponse>.value(
+        returnValue: _i17.Future<_i13.VideoStatusResponse>.value(
             _FakeVideoStatusResponse_14(
           this,
           Invocation.method(
@@ -1999,25 +1937,25 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             [imgName],
           ),
         )),
-      ) as _i18.Future<_i13.VideoStatusResponse>);
+      ) as _i17.Future<_i13.VideoStatusResponse>);
 
   @override
-  _i18.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
+  _i17.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
         Invocation.method(
           #getVideoFileUrl,
           [imgName],
         ),
-        returnValue: _i18.Future<String>.value(_i30.dummyValue<String>(
+        returnValue: _i17.Future<String>.value(_i29.dummyValue<String>(
           this,
           Invocation.method(
             #getVideoFileUrl,
             [imgName],
           ),
         )),
-      ) as _i18.Future<String>);
+      ) as _i17.Future<String>);
 
   @override
-  _i18.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
+  _i17.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
     required String? taskId,
     required int? count,
     String? modelName,
@@ -2033,39 +1971,39 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
           },
         ),
         returnValue:
-            _i18.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i18.Future<Map<String, dynamic>>);
+            _i17.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i17.Future<Map<String, dynamic>>);
 
   @override
-  _i18.Future<_i13.ModelsResponse> getModels() => (super.noSuchMethod(
+  _i17.Future<_i13.ModelsResponse> getModels() => (super.noSuchMethod(
         Invocation.method(
           #getModels,
           [],
         ),
         returnValue:
-            _i18.Future<_i13.ModelsResponse>.value(_FakeModelsResponse_15(
+            _i17.Future<_i13.ModelsResponse>.value(_FakeModelsResponse_15(
           this,
           Invocation.method(
             #getModels,
             [],
           ),
         )),
-      ) as _i18.Future<_i13.ModelsResponse>);
+      ) as _i17.Future<_i13.ModelsResponse>);
 
   @override
-  _i18.Future<List<String>> getModelTitles({String? apiType}) =>
+  _i17.Future<List<String>> getModelTitles({String? apiType}) =>
       (super.noSuchMethod(
         Invocation.method(
           #getModelTitles,
           [],
           {#apiType: apiType},
         ),
-        returnValue: _i18.Future<List<String>>.value(<String>[]),
-      ) as _i18.Future<List<String>>);
+        returnValue: _i17.Future<List<String>>.value(<String>[]),
+      ) as _i17.Future<List<String>>);
 
   @override
-  _i18.Future<_i13.BackupUploadResponse> uploadBackup({
-    required _i31.File? dbFile,
+  _i17.Future<_i13.BackupUploadResponse> uploadBackup({
+    required _i30.File? dbFile,
     _i14.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
@@ -2077,7 +2015,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i18.Future<_i13.BackupUploadResponse>.value(
+        returnValue: _i17.Future<_i13.BackupUploadResponse>.value(
             _FakeBackupUploadResponse_16(
           this,
           Invocation.method(
@@ -2089,21 +2027,21 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i18.Future<_i13.BackupUploadResponse>);
+      ) as _i17.Future<_i13.BackupUploadResponse>);
 
   @override
-  _i18.Future<List<Map<String, dynamic>>> getBackupList() =>
+  _i17.Future<List<Map<String, dynamic>>> getBackupList() =>
       (super.noSuchMethod(
         Invocation.method(
           #getBackupList,
           [],
         ),
-        returnValue: _i18.Future<List<Map<String, dynamic>>>.value(
+        returnValue: _i17.Future<List<Map<String, dynamic>>>.value(
             <Map<String, dynamic>>[]),
-      ) as _i18.Future<List<Map<String, dynamic>>>);
+      ) as _i17.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i18.Future<String> downloadBackup({
+  _i17.Future<String> downloadBackup({
     required String? backupId,
     required String? savePath,
     _i14.ProgressCallback? onProgress,
@@ -2118,7 +2056,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i18.Future<String>.value(_i30.dummyValue<String>(
+        returnValue: _i17.Future<String>.value(_i29.dummyValue<String>(
           this,
           Invocation.method(
             #downloadBackup,
@@ -2130,49 +2068,40 @@ class MockApiServiceWrapper extends _i1.Mock implements _i28.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i18.Future<String>);
+      ) as _i17.Future<String>);
 
   @override
-  _i18.Future<void> deleteBackupOnServer({required String? backupId}) =>
+  _i17.Future<void> deleteBackupOnServer({required String? backupId}) =>
       (super.noSuchMethod(
         Invocation.method(
           #deleteBackupOnServer,
           [],
           {#backupId: backupId},
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 }
 
 /// A class which mocks [DifyService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDifyService extends _i1.Mock implements _i32.DifyService {
+class MockDifyService extends _i1.Mock implements _i31.DifyService {
   MockDifyService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i15.DifyConfigService get config => (super.noSuchMethod(
-        Invocation.getter(#config),
-        returnValue: _FakeDifyConfigService_17(
-          this,
-          Invocation.getter(#config),
-        ),
-      ) as _i15.DifyConfigService);
-
-  @override
-  _i16.DifyWorkflowService get workflow => (super.noSuchMethod(
+  _i15.DifyWorkflowService get workflow => (super.noSuchMethod(
         Invocation.getter(#workflow),
-        returnValue: _FakeDifyWorkflowService_18(
+        returnValue: _FakeDifyWorkflowService_17(
           this,
           Invocation.getter(#workflow),
         ),
-      ) as _i16.DifyWorkflowService);
+      ) as _i15.DifyWorkflowService);
 
   @override
-  _i18.Future<void> runWorkflowStreaming({
+  _i17.Future<void> runWorkflowStreaming({
     required Map<String, dynamic>? inputs,
     required dynamic Function(String)? onData,
     dynamic Function(String)? onError,
@@ -2191,7 +2120,7 @@ class MockDifyService extends _i1.Mock implements _i32.DifyService {
             #enableDebugLog: enableDebugLog,
           },
         ),
-        returnValue: _i18.Future<void>.value(),
-        returnValueForMissingStub: _i18.Future<void>.value(),
-      ) as _i18.Future<void>);
+        returnValue: _i17.Future<void>.value(),
+        returnValueForMissingStub: _i17.Future<void>.value(),
+      ) as _i17.Future<void>);
 }

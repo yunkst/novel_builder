@@ -5,12 +5,12 @@ import '../../models/novel.dart';
 /// 当章节列表为空时显示，提供创建章节或从源网站获取章节的操作
 class EmptyChaptersView extends StatelessWidget {
   final Novel novel;
-  final VoidCallback onGenerateChapter;
+  final VoidCallback onCreateChapter;
   final VoidCallback onLoadFromSource;
 
   const EmptyChaptersView({
     required this.novel,
-    required this.onGenerateChapter,
+    required this.onCreateChapter,
     required this.onLoadFromSource,
     super.key,
   });
@@ -47,9 +47,9 @@ class EmptyChaptersView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: onGenerateChapter,
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('AI生成章节'),
+            onPressed: onCreateChapter,
+            icon: const Icon(Icons.edit_note),
+            label: const Text('新建章节'),
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,

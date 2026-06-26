@@ -12,12 +12,10 @@ import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
 import '../constants/chapter_constants.dart';
 import '../utils/toast_utils.dart';
-import '../services/logger_service.dart';
 import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
 import 'background_setting_screen.dart';
 import 'insert_chapter_screen.dart';
-import 'chapter_generation_screen.dart';
 import '../widgets/novel_sync_dialog.dart';
 import '../core/providers/novel_sync_providers.dart';
 import '../core/providers/reading_context_providers.dart';
@@ -42,11 +40,6 @@ class ChapterListScreenRiverpod extends ConsumerStatefulWidget {
 class _ChapterListScreenRiverpodState
     extends ConsumerState<ChapterListScreenRiverpod> {
   final ScrollController _scrollController = ScrollController();
-
-  // 生成章节相关的状态
-  final ValueNotifier<bool> _isGeneratingNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<String> _generatedContentNotifier =
-      ValueNotifier<String>('');
 
   // 标记是否已经设置了监听
   bool _hasSetupListener = false;
@@ -76,8 +69,6 @@ class _ChapterListScreenRiverpodState
   @override
   void dispose() {
     _scrollController.dispose();
-    _isGeneratingNotifier.dispose();
-    _generatedContentNotifier.dispose();
     super.dispose();
   }
 
@@ -151,7 +142,7 @@ class _ChapterListScreenRiverpodState
                         child: state.chapters.isEmpty
                             ? EmptyChaptersView(
                                 novel: widget.novel,
-                                onGenerateChapter: () =>
+                                onCreateChapter: () =>
                                     _showInsertChapterDialog(0),
                                 onLoadFromSource: () =>
                                     notifier.refreshChapters(context),
@@ -361,7 +352,6 @@ class _ChapterListScreenRiverpodState
           isUserChapter: isUserChapter,
           isCached: chapter.isCached,
           isRead: chapter.isRead,
-          isAccompanied: chapter.isAccompanied,
           onTap: () => _navigateToReader(chapter, state),
           onLongPress: () => ref
               .read(chapterListProvider(widget.novel).notifier)
@@ -398,7 +388,6 @@ class _ChapterListScreenRiverpodState
           isUserChapter: isUserChapter,
           isCached: chapter.isCached,
           isRead: chapter.isRead,
-          isAccompanied: chapter.isAccompanied,
         );
       },
     );
@@ -603,11 +592,7 @@ class _ChapterListScreenRiverpodState
   }
 
   /// 显示插入章节对话框
-  Future<void> _showInsertChapterDialog(
-    int afterIndex, {
-    String? prefillTitle,
-    String? prefillContent,
-  }) async {
+  Future<void> _showInsertChapterDialog(int afterIndex) async {
     final state = ref.read(chapterListProvider(widget.novel));
 
     final result = await Navigator.push<Map<String, dynamic>>(
@@ -617,137 +602,18 @@ class _ChapterListScreenRiverpodState
           novel: widget.novel,
           afterIndex: afterIndex,
           chapters: state.chapters,
-          prefillTitle: prefillTitle,
-          prefillContent: prefillContent,
         ),
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
-      await _generateNewChapter(
-        afterIndex,
-        result['title']!,
-        result['content']!,
-        result['characterIds'] as List<int>? ?? [],
-      );
-    }
-  }
+    if (result == null || result.isEmpty || !mounted) return;
 
-  /// 生成新章节
-  Future<void> _generateNewChapter(
-    int afterIndex,
-    String title,
-    String userInput,
-    List<int> characterIds,
-  ) async {
-    // 在后台开始生成内容
-    _callDifyToGenerateChapter(afterIndex, userInput, characterIds);
-
-    // 显示全屏生成页面并等待用户操作
-    final result = await ChapterGenerationScreen.show(
-      context: context,
-      title: title,
-      generatedContentNotifier: _generatedContentNotifier,
-      isGeneratingNotifier: _isGeneratingNotifier,
-    );
-
-    if (result == null) {
-      // 用户取消
-      return;
-    } else if (result == false) {
-      // 用户选择重试
-      _showInsertChapterDialog(
-        afterIndex,
-        prefillTitle: title,
-        prefillContent: userInput,
-      );
-      return;
-    }
-
-    // 用户选择插入
-    final content = _generatedContentNotifier.value;
-    if (content.isNotEmpty) {
-      await _insertGeneratedChapter(afterIndex, title, content);
-    }
-  }
-
-  /// 调用Dify生成章节
-  Future<void> _callDifyToGenerateChapter(
-    int afterIndex,
-    String userInput,
-    List<int> characterIds,
-  ) async {
-    _isGeneratingNotifier.value = true;
-    _generatedContentNotifier.value = '';
+    final title = result['title'] as String;
+    final content = result['content'] as String;
+    final insertIndex = state.chapters.isEmpty ? 0 : afterIndex + 1;
 
     try {
-      final difyService = ref.read(difyServiceProvider);
-      final chapterService = ref.read(chapterServiceProvider);
-
-      // 构建完整的 inputs
-      final state = ref.read(chapterListProvider(widget.novel));
-      final inputs = await chapterService.buildChapterGenerationInputs(
-        novel: widget.novel,
-        chapters: state.chapters,
-        afterIndex: afterIndex,
-        userInput: userInput,
-        characterIds: characterIds,
-      );
-
-      // 直接调用 DifyService 进行流式生成
-      await difyService.runWorkflowStreaming(
-        inputs: inputs,
-        onData: (data) {
-          if (mounted) {
-            _generatedContentNotifier.value += data;
-          }
-        },
-        onError: (error) {
-          LoggerService.instance.e(
-            '章节生成失败: $error',
-            category: LogCategory.ai,
-            tags: ['chapter', 'generate', 'failed'],
-          );
-          if (mounted) {
-            ToastUtils.showError('生成失败: $error');
-          }
-        },
-        onDone: () {
-          _isGeneratingNotifier.value = false;
-        },
-        enableDebugLog: false,
-      );
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '章节生成异常: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.ai,
-        tags: ['chapter', 'generate', 'error'],
-      );
-      _isGeneratingNotifier.value = false;
-      if (mounted) {
-        ToastUtils.showError('生成失败: $e');
-      }
-    }
-  }
-
-  /// 插入生成的章节
-  Future<void> _insertGeneratedChapter(
-    int afterIndex,
-    String title,
-    String content,
-  ) async {
-    try {
-      final state = ref.read(chapterListProvider(widget.novel));
       final chapterActionHandler = ref.read(chapterActionHandlerProvider);
-
-      // 统一使用insertUserChapter方法
-      final insertIndex = state.chapters.isEmpty ? 0 : afterIndex + 1;
-      LoggerService.instance.i(
-        'AI生成章节：使用insertUserChapter插入到位置$insertIndex',
-        category: LogCategory.ui,
-        tags: ['chapter-list', 'chapter', 'insert'],
-      );
 
       await chapterActionHandler.insertChapter(
         novelUrl: widget.novel.url,
@@ -756,7 +622,7 @@ class _ChapterListScreenRiverpodState
         insertIndex: insertIndex,
       );
 
-      // 重新加载章节列表
+      // 刷新章节列表
       if (mounted) {
         await ref
             .read(chapterListProvider(widget.novel).notifier)

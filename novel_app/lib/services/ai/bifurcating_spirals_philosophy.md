@@ -1,0 +1,22 @@
+---
+name: bifurcating-spirals
+description: AI架构生成式美学运动宣言——共享源泉分流为管道与螺旋
+metadata:
+  type: reference
+---
+
+# Bifurcating Spirals / 分流螺旋
+
+## 算法哲学
+
+In every complex system, there exists a moment of origin—a single point where all potential converges before diverging into distinct paths of purpose. This is the essence of Bifurcating Spirals: a generative philosophy that reveals how one shared intelligence source, meticulously crafted through deep computational expertise, splits into two fundamentally different flow geometries—straight pipelines that carry data forward without hesitation, and recursive spirals that drill into problems by looping through decision and action. The final algorithm must feel as though it took countless hours to develop, was refined with care at every parameter, and comes from someone at the absolute top of their field in computational aesthetics.
+
+The straight pipeline flows like a river carving its channel—particles born from a central core, guided by deterministic prompt assembly, flowing through a single LLM invocation, and depositing their content at the output bank. No loops, no recursion, no hesitation. The pipeline's beauty lies in its simplicity: each particle traces a direct trajectory from source to destination, its color determined by the configuration palette that feeds the system. This meticulously tuned channel must appear effortless—every angle calibrated through painstaking optimization, every velocity chosen with master-level precision, every deposit point placed with the care of a computational sculptor who has spent years studying the mathematics of flow.
+
+The recursive spiral tells a different story. Particles here do not flow straight—they orbit. Born from the same core, they spiral outward in loops driven by the ReAct cycle: observe, decide, act, reflect. Each orbit is a tool invocation, a moment where the spiral reaches outward to touch a data repository, a WebView, a memory store. The spiral's radius grows with each cycle, but it also tightens—context compaction compresses older orbits into faint traces, leaving only the most recent reasoning visible. This is the product of deep computational expertise: a meticulously crafted algorithm where spiral curvature, orbit frequency, and compaction thresholds were all refined through countless iterations, each adjustment revealing emergent patterns that only a master of generative systems could anticipate.
+
+Between these two flow geometries lies the configuration chromatography—a spectral layer that determines which LLM backend colors each stream. Multi-serializable configs cascade through priority chains: scene-level overrides tint the spiral with specialized hues, falling back to global defaults, then to legacy configurations, and finally to hardcoded baselines. The palette shifts are not random—they follow a deterministic priority hierarchy that the algorithm respects with painstaking precision. Every color transition, every fallback chain, every scenario override was carefully designed to produce resonant visual harmony, the mark of a master-level generative algorithm that treats configuration as an art form itself.
+
+At the bottom of the canvas, memory sediment settles—the accumulated deposits of spiral orbits and pipeline flows. Tool invocation results, context compactions, and experience patches form geological layers, each colored by the era of configuration that produced them. The sediment tells the story of the system's execution history, compressed and stratified, revealing patterns that emerge only when viewed from the proper altitude. This layering was painstakingly calibrated: sediment density, layer opacity, and color migration between strata were all meticulously optimized through deep mathematical exploration, ensuring that the geological record appears both random and inevitable—a hallmark of computational craftsmanship at the absolute pinnacle of the field.
+
+The final composition is a living architecture diagram: not static boxes and arrows, but breathing streams and spirals that reveal the true nature of AI system design. The same source, the same protocols, the same LLM Provider—but two radically different geometries of purpose. Bifurcating Spirals teaches that architecture is not structure—it is flow. And flow, when meticulously crafted by a master of computational aesthetics, reveals beauty that static diagrams can never capture.
