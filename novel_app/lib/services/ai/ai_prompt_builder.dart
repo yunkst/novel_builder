@@ -12,7 +12,7 @@ class AiModelParams {
   final double temperature;
 
   const AiModelParams({
-    this.model = 'deepseek-v4-pro',
+    this.model = '',
     this.maxTokens = 8192,
     this.temperature = 0.7,
   });
@@ -99,6 +99,67 @@ class AiPromptBuilder {
     return (
       system: _render(_writingSystemTpl, vars),
       user: _render(_writingUserTpl, vars),
+    );
+  }
+
+  // ── 生成细纲模板 ──
+
+  // cmd='生成细纲' system — 基于大纲和前文生成章节细纲
+  // 变量: history, outline, outline_item
+  static const String _subOutlineSystemTpl = '''你需要帮助用户基于大纲和之前的剧情，帮助用户完成细纲的创作
+
+步骤：
+1. 阅读大纲和最近小说的剧情，分析当前剧情发展到哪里
+2. 结合用户的需求 ，确定当前章节的主要剧情内容
+3. 分割出大纲中当前章节的部分
+4. 结合用户需求，拓展这部分大纲，生成一份细纲内容
+
+要求：
+1. 纯文本内容，不要出现 markdown 等特殊符号标记
+
+{% if history %}
+前几章内容：
+{{ history }}
+{% else %}
+没有历史章节，需要生成第一章的细纲
+{% endif %}
+
+{% if outline %}
+<大纲>
+{{ outline }}
+</大纲>
+{% endif %}
+
+{% if outline_item %}
+<已有细纲>
+{{ outline_item }}
+</已有细纲>
+{% endif %}''';
+
+  // cmd='生成细纲' user
+  // 变量: user_input
+  static const String _subOutlineUserTpl = '''
+
+按照以下要求进行细纲创作：
+{{ user_input }}
+''';
+
+  /// 生成章节细纲（cmd='生成细纲'）
+  static ({String system, String user}) subOutlineDraft({
+    required String historyChaptersContent,
+    required String outline,
+    required String outlineItem,
+    required String userInput,
+  }) {
+    final vars = <String, Object?>{
+      'history': historyChaptersContent,
+      'outline': outline,
+      'outline_item': outlineItem,
+      'user_input': userInput,
+    };
+    return (
+      system: _render(_subOutlineSystemTpl, vars),
+      user: _render(_subOutlineUserTpl, vars),
     );
   }
 }

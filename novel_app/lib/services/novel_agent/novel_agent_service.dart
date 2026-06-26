@@ -12,7 +12,7 @@ import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 import 'package:novel_app/services/llm_config_service.dart';
 
-import '../dsl_engine/llm_provider.dart';
+import '../ai/ai_service_factory.dart';
 import '../../utils/cancellation_token.dart';
 import 'agent_event.dart';
 import 'agent_loop.dart';
@@ -95,13 +95,8 @@ class NovelAgentService {
             LlmConfigService.notConfiguredMessage));
         return;
       }
-      final config = LlmConfig(
-        baseUrl: activeConfig.apiUrl,
-        apiKey: activeConfig.apiKey,
-        defaultModel: activeConfig.model,
-        timeout: const Duration(seconds: 120),
-      );
-      final llm = LlmProvider(config, httpClient: IoLlmHttpClient());
+      final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
+      final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
 
       // 构造场景（异步，可能需要初始化 Headless WebView）
       final scenario =

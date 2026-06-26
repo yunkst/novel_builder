@@ -1,26 +1,21 @@
-import 'dify/dify_config_service.dart';
 import 'dify/dify_workflow_service.dart';
 
-/// AI 工作流服务 - 门面类
+/// 章节生成服务 - 门面类（本地 LLM Provider 流式调用，不再依赖远程 Dify）
 ///
 /// 委托给：
-/// - [DifyConfigService]: AI 设定管理
-/// - [DifyWorkflowService]: 工作流调用
+/// - [DifyWorkflowService]: cmd 路由 + WritingService 流式调用
+///
+/// 重命名计划：计划在 2.0 版本重命名为 ChapterGenerationService，
+/// 当前保留 DifyService 旧名以保持 API 稳定。
 class DifyService {
-  final DifyConfigService _config;
   late final DifyWorkflowService _workflow;
 
   /// 构造函数
   ///
-  /// [config] 可选的配置服务实例
   /// [ref] Riverpod 容器（WidgetRef 或 Ref），用于 DifyWorkflowService 获取 LLM 配置
-  DifyService({DifyConfigService? config, dynamic ref})
-      : _config = config ?? DifyConfigService() {
+  DifyService({dynamic ref}) {
     _workflow = DifyWorkflowService(ref: ref);
   }
-
-  /// 获取配置服务
-  DifyConfigService get config => _config;
 
   /// 获取工作流服务
   DifyWorkflowService get workflow => _workflow;

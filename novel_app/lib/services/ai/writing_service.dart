@@ -41,6 +41,22 @@ class WritingService {
     return _stream(prompt);
   }
 
+  /// 生成章节细纲（cmd='生成细纲'，基于大纲和前文生成细纲草稿）
+  Stream<String> createOutlineDraft({
+    required String historyChaptersContent,
+    required String outline,
+    required String outlineItem,
+    required String userInput,
+  }) {
+    final prompt = AiPromptBuilder.subOutlineDraft(
+      historyChaptersContent: historyChaptersContent,
+      outline: outline,
+      outlineItem: outlineItem,
+      userInput: userInput,
+    );
+    return _stream(prompt);
+  }
+
   // ── 内部：统一流式调用 ──
 
   Stream<String> _stream(({String system, String user}) prompt) {

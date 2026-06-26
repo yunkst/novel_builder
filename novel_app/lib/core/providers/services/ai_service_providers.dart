@@ -3,9 +3,9 @@
 /// 此文件定义所有AI相关服务的 Provider。
 ///
 /// **功能**:
-/// - Dify AI内容生成服务
+/// - 章节生成服务（本地 LLM Provider 流式调用）
 /// - 章节历史服务
-/// - 无效标记清理服务
+/// - LLM 配置管理
 ///
 /// **依赖**:
 /// - database_providers.dart - 数据库服务
@@ -26,35 +26,24 @@ import 'network_service_providers.dart';
 
 part 'ai_service_providers.g.dart';
 
-/// DifyService Provider
+/// 章节生成服务 Provider
 ///
-/// 提供全局 Dify AI 服务实例，用于 AI 内容生成和流式响应。
+/// 提供全局章节生成服务实例，用于 AI 新建章节和大纲细纲的流式生成。
+/// 内部委托给本地 LLM Provider（不再依赖远程 Dify）。
 ///
 /// **功能**:
-/// - 流式 AI 响应处理
-/// - 特写功能内容生成
-/// - SSE 解析器支持
-/// - 多轮对话管理
+/// - 流式 AI 章节生成
+/// - 大纲细纲流式生成
 ///
 /// **依赖**:
-/// - 无（独立服务）
-///
-/// **使用示例**:
-/// ```dart
-/// final difyService = ref.watch(difyServiceProvider);
-/// final stream = difyService.streamGenerate('提示词');
-/// await for (final chunk in stream) {
-///   print('收到: ${chunk.content}');
-/// }
-/// ```
+/// - [llmConfigServiceProvider] - LLM 配置（通过 DifyService → DifyWorkflowService → AiServiceFactory）
 ///
 /// **注意事项**:
 /// - 使用 `keepAlive: true` 确保实例不会被销毁（单例模式）
-/// - 需要配置 Dify URL 和 Token
-/// - 支持流式和阻塞两种响应模式
+/// - 需要在设置中配置 LLM API URL 和 Key
 @Riverpod(keepAlive: true)
 DifyService difyService(Ref ref) {
-  return DifyService();
+  return DifyService(ref: ref);
 }
 
 /// CharacterCardService 已删除，相关 provider 已移除。

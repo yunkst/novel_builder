@@ -27,7 +27,6 @@ class LlmConfig {
   final String defaultModel;
   final int maxTokens;
   final double temperature;
-  final Duration timeout;
 
   const LlmConfig({
     this.baseUrl = '',
@@ -35,7 +34,6 @@ class LlmConfig {
     this.defaultModel = '',
     this.maxTokens = 4096,
     this.temperature = 0.7,
-    this.timeout = const Duration(seconds: 60),
   });
 
   LlmConfig copyWith({
@@ -44,7 +42,6 @@ class LlmConfig {
     String? defaultModel,
     int? maxTokens,
     double? temperature,
-    Duration? timeout,
   }) {
     return LlmConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -52,7 +49,6 @@ class LlmConfig {
       defaultModel: defaultModel ?? this.defaultModel,
       maxTokens: maxTokens ?? this.maxTokens,
       temperature: temperature ?? this.temperature,
-      timeout: timeout ?? this.timeout,
     );
   }
 }

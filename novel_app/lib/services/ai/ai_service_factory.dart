@@ -11,6 +11,13 @@ import 'writing_service.dart';
 class AiServiceFactory {
   AiServiceFactory._();
 
+  /// 从 LlmConfig（llm_provider 层）构建 LlmProvider
+  ///
+  /// 统一 LlmProvider 的构造方式，供 WritingService 和 NovelAgentService 共用。
+  static LlmProvider buildLlmProvider(LlmConfig llmConfig) {
+    return LlmProvider(llmConfig, httpClient: IoLlmHttpClient());
+  }
+
   /// 从 LlmConfigService 获取激活配置，构建 WritingService
   ///
   /// [riverpodRef] Riverpod 容器（WidgetRef 或 Ref）
@@ -32,7 +39,7 @@ class AiServiceFactory {
 
     final llmConfig = configService.buildLlmProviderConfig(activeConfig);
     return WritingService(
-      provider: LlmProvider(llmConfig, httpClient: IoLlmHttpClient()),
+      provider: buildLlmProvider(llmConfig),
       defaultModel:
           llmConfig.defaultModel.isNotEmpty ? llmConfig.defaultModel : null,
     );

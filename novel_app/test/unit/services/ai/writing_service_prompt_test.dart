@@ -77,5 +77,15 @@ void main() {
       ));
       expectPromptMatch(snapshot, await _readGolden('cmd_empty_create'));
     });
+
+    test('createOutlineDraft: cmd="生成细纲"', () async {
+      final snapshot = await runAndSnapshot(service.createOutlineDraft(
+        historyChaptersContent: '',
+        outline: '第一卷：踏上征途',
+        outlineItem: '',
+        userInput: '为下一章生成细纲',
+      ));
+      expectPromptMatch(snapshot, await _readGolden('cmd_generate_sub_outline'));
+    });
   });
 }

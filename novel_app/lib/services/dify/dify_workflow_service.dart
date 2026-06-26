@@ -4,8 +4,8 @@ import '../logger_service.dart';
 
 /// 工作流服务（已切换到强类型 Dart Service）
 ///
-/// 内部委托给 WritingService 处理新建章节（cmd='' 流式分支）。
-/// 路由规则：根据 inputs['cmd'] 分发到对应的强类型方法。当前仅保留 cmd=''（新建章节）。
+/// 内部委托给 WritingService 处理新建章节（cmd='' 流式分支）和细纲生成（cmd='生成细纲'）。
+/// 路由规则：根据 inputs['cmd'] 分发到对应的强类型方法。
 class DifyWorkflowService {
   /// Riverpod 容器（WidgetRef 或 Ref），用于通过 AiServiceFactory 获取 LLM 配置。
   final dynamic _ref;
@@ -69,6 +69,13 @@ class DifyWorkflowService {
           historyChaptersContent: s('history_chapters_content'),
           roles: s('roles'),
           nextChapterOverview: s('next_chapter_overview'),
+          userInput: s('user_input'),
+        );
+      case '生成细纲':
+        return service.createOutlineDraft(
+          historyChaptersContent: s('history_chapters_content'),
+          outline: s('outline'),
+          outlineItem: s('outline_item'),
           userInput: s('user_input'),
         );
       default:
