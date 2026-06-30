@@ -152,24 +152,4 @@ class CancellationToken {
     _callbacks.clear();
   }
 
-  /// 抛出异常如果已取消
-  ///
-  /// 如果令牌已取消，抛出 [OperationCancelledException]
-  void throwIfCancelled() {
-    if (_isCancelled) {
-      throw OperationCancelledException(_cancelReason ?? '操作已取消');
-    }
-  }
-}
-
-/// 操作取消异常
-class OperationCancelledException implements Exception {
-  final String message;
-  final DateTime cancelledAt;
-
-  OperationCancelledException(this.message) : cancelledAt = DateTime.now();
-
-  @override
-  String toString() =>
-      'OperationCancelledException: $message (取消时间: $cancelledAt)';
 }

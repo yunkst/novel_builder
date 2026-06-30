@@ -1,34 +1,25 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/database_service.dart';
 import '../../repositories/character_repository.dart';
 import '../../repositories/character_relation_repository.dart';
 import '../../repositories/novel_repository.dart';
 import '../../repositories/chapter_repository.dart';
-import '../../repositories/illustration_repository.dart';
 import '../../repositories/outline_repository.dart';
-import '../../repositories/chat_scene_repository.dart';
 import '../../repositories/bookshelf_repository.dart';
 import '../../repositories/novel_export_repository.dart';
-import '../../repositories/prompt_history_repository.dart';
 import '../../repositories/prompt_tag_category_repository.dart';
 import '../../repositories/llm_config_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
-import '../../repositories/prompt_tag_history_repository.dart';
 import '../../repositories/site_script_repository.dart';
 import '../../repositories/agent_memory_repository.dart';
 import '../database/database_connection.dart';
-import '../interfaces/i_database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
 import '../interfaces/repositories/i_chapter_repository.dart';
 import '../interfaces/repositories/i_character_repository.dart';
 import '../interfaces/repositories/i_character_relation_repository.dart';
 import '../interfaces/repositories/i_bookshelf_repository.dart';
-import '../interfaces/repositories/i_illustration_repository.dart';
 import '../interfaces/repositories/i_outline_repository.dart';
-import '../interfaces/repositories/i_chat_scene_repository.dart';
-import '../interfaces/repositories/i_prompt_history_repository.dart';
 import '../interfaces/repositories/i_prompt_tag_category_repository.dart';
 import '../interfaces/repositories/i_prompt_tag_repository.dart';
 
@@ -44,24 +35,6 @@ DatabaseConnection databaseConnection(Ref ref) {
   ref.onDispose(() => connection.close());
   return connection;
 }
-
-/// IDatabaseConnection接口Provider
-///
-/// 提供接口类型的数据库连接，便于依赖注入和测试
-@riverpod
-IDatabaseConnection iDatabaseConnection(Ref ref) {
-  return ref.watch(databaseConnectionProvider);
-}
-
-/// DatabaseService Provider
-///
-/// 提供全局单例 DatabaseService 实例（向后兼容）
-/// 注意：新代码建议使用 databaseConnectionProvider
-// ignore: deprecated_member_use_from_same_package
-final databaseServiceProvider = Provider<DatabaseService>((ref) {
-  // ignore: deprecated_member_use_from_same_package
-  return DatabaseService();
-});
 
 /// NovelRepository Provider
 ///
@@ -99,15 +72,6 @@ ICharacterRelationRepository characterRelationRepository(Ref ref) {
   return CharacterRelationRepository(dbConnection: dbConnection);
 }
 
-/// IllustrationRepository Provider
-///
-/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
-@riverpod
-IIllustrationRepository illustrationRepository(Ref ref) {
-  final dbConnection = ref.watch(databaseConnectionProvider);
-  return IllustrationRepository(dbConnection: dbConnection);
-}
-
 /// OutlineRepository Provider
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
@@ -115,22 +79,6 @@ IIllustrationRepository illustrationRepository(Ref ref) {
 IOutlineRepository outlineRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return OutlineRepository(dbConnection: dbConnection);
-}
-
-/// ChatSceneRepository Provider
-///
-/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
-@riverpod
-IChatSceneRepository chatSceneRepository(Ref ref) {
-  final dbConnection = ref.watch(databaseConnectionProvider);
-  return ChatSceneRepository(dbConnection: dbConnection);
-}
-
-/// PromptHistoryRepository Provider
-@riverpod
-IPromptHistoryRepository promptHistoryRepository(Ref ref) {
-  final dbConnection = ref.watch(databaseConnectionProvider);
-  return PromptHistoryRepository(dbConnection: dbConnection);
 }
 
 /// PromptTagCategoryRepository Provider
@@ -146,16 +94,6 @@ IPromptTagRepository promptTagRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return PromptTagRepository(dbConnection: dbConnection);
 }
-
-/// PromptTagHistoryRepository Provider
-///
-/// 使用普通 Provider 定义（无需 build_runner 重新生成），
-/// 记录 AI 自省对 tag 的修改历史，支持回滚。
-final promptTagHistoryRepositoryProvider =
-    Provider<PromptTagHistoryRepository>((ref) {
-  final dbConnection = ref.watch(databaseConnectionProvider);
-  return PromptTagHistoryRepository(dbConnection: dbConnection);
-});
 
 /// BookshelfRepository Provider
 ///

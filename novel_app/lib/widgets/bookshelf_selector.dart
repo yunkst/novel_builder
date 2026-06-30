@@ -37,13 +37,13 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
   }
 
   Future<void> _loadBookshelves() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final bookshelves = await databaseService.getBookshelves();
+      final bookshelves = await bookshelfRepository.getBookshelves();
       if (mounted) {
         setState(() {
           _bookshelves = bookshelves;
@@ -66,7 +66,7 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
   }
 
   Future<void> _showCreateBookshelfDialog() async {
-    final databaseService = ref.read(databaseServiceProvider);
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
     final nameController = TextEditingController();
 
     final result = await showDialog<String>(
@@ -121,14 +121,14 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
 
     if (result != null) {
       try {
-        await databaseService.createBookshelf(result);
+        await bookshelfRepository.createBookshelf(result);
         if (mounted) {
-          ErrorHelper.showSuccessWithLog(
-            context,
+          LoggerService.instance.i(
             '书架创建成功',
             category: LogCategory.database,
             tags: ['bookshelf', 'create', 'success'],
           );
+          ToastUtils.showSuccess('书架创建成功', context: context);
           _loadBookshelves(); // 重新加载书架列表
         }
       } catch (e, stackTrace) {
@@ -145,7 +145,6 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
   }
 
   void _showBookshelfMenu(Bookshelf bookshelf) {
-    final databaseService = ref.read(databaseServiceProvider);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -193,7 +192,10 @@ class _BookshelfSelectorState extends ConsumerState<BookshelfSelector> {
                   );
 
                   if (confirmed == true) {
-                    final success = await databaseService.deleteBookshelf(
+                    final bookshelfRepository =
+                        ref.read(bookshelfRepositoryProvider);
+                    final success =
+                        await bookshelfRepository.deleteBookshelf(
                       bookshelf.id,
                     );
                     if (!mounted) return;

@@ -153,42 +153,5 @@ void main() {
         );
       });
     });
-
-    group('areChaptersCached', () {
-      test('应委托给 repository.getChaptersCacheStatus', () async {
-        final mockResult = {
-          'ch1': true,
-          'ch2': false,
-          'ch3': true,
-        };
-        when(mockRepo.getChaptersCacheStatus(['ch1', 'ch2', 'ch3']))
-            .thenAnswer((_) async => mockResult);
-
-        final result =
-            await handler.areChaptersCached(['ch1', 'ch2', 'ch3']);
-
-        expect(result, mockResult);
-        verify(mockRepo.getChaptersCacheStatus(['ch1', 'ch2', 'ch3'])).called(1);
-      });
-
-      test('空 URL 列表应正常返回', () async {
-        when(mockRepo.getChaptersCacheStatus([]))
-            .thenAnswer((_) async => {});
-
-        final result = await handler.areChaptersCached([]);
-
-        expect(result, isEmpty);
-      });
-
-      test('repository 异常时应 rethrow', () async {
-        when(mockRepo.getChaptersCacheStatus(any))
-            .thenThrow(Exception('查询失败'));
-
-        expect(
-          () => handler.areChaptersCached(['ch1']),
-          throwsException,
-        );
-      });
-    });
   });
 }

@@ -94,7 +94,7 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
 
   /// 构建所有匹配项的高亮显示
   List<Widget> _buildMatchHighlights(ChapterSearchResult result) {
-    if (!result.hasHighlight || result.matchPositions.isEmpty) {
+    if (result.matchPositions.isEmpty) {
       return const [
         SizedBox.shrink(),
       ];
@@ -375,7 +375,7 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                     title: Row(
                       children: [
                         Expanded(
-                          child: result.hasHighlight
+                          child: result.matchPositions.isNotEmpty
                               ? TitleHighlight(
                                   title: result.chapterTitle,
                                   keywords: result.searchKeywords,
@@ -416,7 +416,7 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            '缓存于 ${result.cachedDate.toString().substring(0, 19).replaceAll('-', '/')}',
+                            '缓存于 ${result.cachedAt.toString().substring(0, 19).replaceAll('-', '/')}',
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context)

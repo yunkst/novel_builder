@@ -12,6 +12,7 @@ import 'package:novel_app/services/logger_service.dart';
 
 import '../../core/providers/database_providers.dart';
 import '../../models/character.dart';
+import '../../models/novel.dart';
 import '../../models/outline.dart';
 import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
@@ -242,12 +243,16 @@ class ToolExecutor {
     if (titleErr != null) return titleErr;
     final (description, _) = parser.nullableString('description');
 
-    final dbService = ref.read(databaseServiceProvider);
-    final id = await dbService.createCustomNovel(
-      title,
-      '原创',
+    final novelRepository = ref.read(novelRepositoryProvider);
+    final novel = Novel(
+      title: title,
+      author: '原创',
+      url: 'custom://custom_novel_${DateTime.now().millisecondsSinceEpoch}',
+      coverUrl: null,
       description: description,
+      backgroundSetting: null,
     );
+    final id = await novelRepository.addToBookshelf(novel);
 
     LoggerService.instance.i('create_novel: "$title" (id=$id)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'create_novel']);
@@ -356,7 +361,9 @@ class ToolExecutor {
     final list = results.map((r) => {
           'position': urlToPosition[r.chapterUrl],
           'chapterTitle': r.chapterTitle,
-          'matchedText': r.matchedText,
+          'matchedText': r.matchPositions.isNotEmpty
+              ? r.content.substring(r.matchPositions.first.start, r.matchPositions.first.end)
+              : '',
           'matchCount': r.matchCount,
         }).toList();
 

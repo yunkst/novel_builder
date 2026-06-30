@@ -109,6 +109,9 @@ const testTools = [
 // ============================================================================
 
 void main() {
+  // 环境守卫：需要真实 LLM 后端，未配置时 skip 全部测试
+  final bool hasLlmConfig = apiBaseUrl.isNotEmpty && apiKey.isNotEmpty;
+
   group('chatStreamWithTools 真实 API — 纯文本流式', () {
     late LlmProvider provider;
 
@@ -124,6 +127,10 @@ void main() {
     });
 
     test('应收到多个文本 chunk（流式工作）', () async {
+      if (!hasLlmConfig) {
+        markTestSkipped('需要配置 TEST_API_BASE_URL 和 TEST_API_KEY 环境变量');
+        return;
+      }
       final chunks = <LlmStreamChunk>[];
 
       await for (final chunk in provider.chatStreamWithTools(
@@ -174,6 +181,10 @@ void main() {
     });
 
     test('LLM 应调用工具，tool_calls delta 被正确聚合', () async {
+      if (!hasLlmConfig) {
+        markTestSkipped('需要配置 TEST_API_BASE_URL 和 TEST_API_KEY 环境变量');
+        return;
+      }
       final chunks = <LlmStreamChunk>[];
       final streamingResult = StreamingResult();
 
@@ -232,6 +243,10 @@ void main() {
     }, timeout: const Timeout(Duration(minutes: 2)));
 
     test('带参数的工具调用：arguments 应被完整拼接', () async {
+      if (!hasLlmConfig) {
+        markTestSkipped('需要配置 TEST_API_BASE_URL 和 TEST_API_KEY 环境变量');
+        return;
+      }
       final chunks = <LlmStreamChunk>[];
       final streamingResult = StreamingResult();
 
@@ -291,6 +306,10 @@ void main() {
     });
 
     test('纯文本：逐 chunk emit TextDeltaEvent → AgentDoneEvent', () async {
+      if (!hasLlmConfig) {
+        markTestSkipped('需要配置 TEST_API_BASE_URL 和 TEST_API_KEY 环境变量');
+        return;
+      }
       // 模拟 AgentLoop.run() 中消费流的核心逻辑
       final events = <AgentEvent>[];
       final streamingResult = StreamingResult();
@@ -337,6 +356,10 @@ void main() {
 
     test('工具调用：TextDelta → ToolCallStart/End → 再轮 TextDelta → Done',
         () async {
+      if (!hasLlmConfig) {
+        markTestSkipped('需要配置 TEST_API_BASE_URL 和 TEST_API_KEY 环境变量');
+        return;
+      }
       // 模拟 AgentLoop 的完整 ReAct 消费逻辑
       // 第一轮：LLM 决定调用工具
       final round1Events = <AgentEvent>[];

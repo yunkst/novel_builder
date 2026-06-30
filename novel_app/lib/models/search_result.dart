@@ -33,19 +33,6 @@ class ChapterSearchResult {
 
   /// 获取章节索引文本
   String get chapterIndexText => '第 ${chapterIndex + 1} 章';
-
-  /// 获取匹配的文本片段
-  String get matchedText {
-    if (matchPositions.isEmpty) return '';
-    final pos = matchPositions.first;
-    return content.substring(pos.start, pos.end);
-  }
-
-  /// 获取缓存日期
-  DateTime get cachedDate => cachedAt;
-
-  /// 是否有高亮匹配
-  bool get hasHighlight => matchPositions.isNotEmpty;
 }
 
 /// 匹配位置信息
@@ -58,26 +45,5 @@ class MatchPosition {
     required this.start,
     required this.end,
     required this.matchedText,
-  });
-}
-
-/// 缓存的小说信息
-class CachedNovelInfo {
-  final String novelUrl;
-  final String novelTitle;
-  final String novelAuthor;
-  final String? coverUrl;
-  final String? description;
-  final int chapterCount;
-  final DateTime lastUpdated;
-
-  const CachedNovelInfo({
-    required this.novelUrl,
-    required this.novelTitle,
-    required this.novelAuthor,
-    this.coverUrl,
-    this.description,
-    required this.chapterCount,
-    required this.lastUpdated,
   });
 }

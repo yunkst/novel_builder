@@ -289,11 +289,10 @@ class MockProviderHelper {
   /// 使用示例:
   /// ```dart
   /// final mockRepo = MockNovelRepository();
-  /// final mockService = MockDatabaseService();
   ///
   /// final overrides = MockProviderHelper.createOverrides({
   ///   novelRepositoryProvider: mockRepo,
-  ///   databaseServiceProvider: mockService,
+  /// });
   /// });
   ///
   /// final container = ProviderContainer(overrides: overrides);

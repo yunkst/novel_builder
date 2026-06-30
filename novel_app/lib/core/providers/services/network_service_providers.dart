@@ -24,7 +24,6 @@ import '../../../services/preload_service.dart';
 import '../../../services/headless_webview_content_service.dart';
 import '../../../services/headless_webview_chapter_list_service.dart';
 import '../../../repositories/chapter_repository.dart';
-import '../repository_providers.dart';
 import '../database_providers.dart';
 import '../../../services/logger_service.dart';
 

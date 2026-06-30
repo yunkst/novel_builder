@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/logger_service.dart';
-import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/services/network_service_providers.dart';
 
@@ -74,9 +73,9 @@ class _BackendSettingsScreenState extends ConsumerState<BackendSettingsScreen> {
         Navigator.pop(context);
       }
     } catch (e, stackTrace) {
-      ErrorHelper.logError(
+      LoggerService.instance.e(
         '保存后端配置失败',
-        stackTrace: stackTrace,
+        stackTrace: stackTrace.toString(),
         category: LogCategory.network,
         tags: ['backend', 'settings', 'save', 'failed'],
       );

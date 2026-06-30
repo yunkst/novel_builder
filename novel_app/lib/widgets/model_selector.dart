@@ -266,32 +266,3 @@ class _ModelSelectorState extends ConsumerState<ModelSelector> {
     );
   }
 }
-
-/// 简化版模型选择器，用于快速集成
-class SimpleModelSelector extends StatelessWidget {
-  /// 当前选中的模型
-  final String? selectedModel;
-
-  /// 模型选择变化回调
-  final ValueChanged<String?> onModelChanged;
-
-  /// API类型
-  final String? apiType;
-
-  const SimpleModelSelector({
-    super.key,
-    this.selectedModel,
-    required this.onModelChanged,
-    this.apiType,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ModelSelector(
-      selectedModel: selectedModel,
-      onModelChanged: onModelChanged,
-      apiType: apiType,
-      hintText: '选择模型',
-    );
-  }
-}

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'package:novel_app/services/api_service_wrapper.dart';
-import 'package:novel_app/services/chapter_manager.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,9 +35,6 @@ void initTests() {
 
   // 设置SharedPreferences Mock（用于测试本地存储操作）
   SharedPreferences.setMockInitialValues({});
-
-  // 设置ChapterManager为测试模式(禁用定时器)
-  ChapterManager.setTestMode(true);
 
   // 初始化SQLite FFI（用于测试环境）
   sqfliteFfiInit();
@@ -119,7 +115,7 @@ Future<Database> createInMemoryDatabase() async {
       version: 21, // 与主数据库版本保持一致
       onCreate: (Database db, int version) async {
         // 这里需要重新创建表结构
-        // 为了简化，我们直接从DatabaseService复制创建逻辑
+        // 创建测试表结构（与 DatabaseMigrations 保持一致）
         await _createTestDatabaseSchema(db, version);
       },
       onUpgrade: _onUpgradeTestDatabase,

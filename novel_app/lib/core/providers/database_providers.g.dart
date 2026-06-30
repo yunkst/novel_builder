@@ -29,29 +29,6 @@ final databaseConnectionProvider = Provider<DatabaseConnection>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DatabaseConnectionRef = ProviderRef<DatabaseConnection>;
-String _$iDatabaseConnectionHash() =>
-    r'cf5b77a1084c78147e4f4fd35831b163c6fa74ac';
-
-/// IDatabaseConnection接口Provider
-///
-/// 提供接口类型的数据库连接，便于依赖注入和测试
-///
-/// Copied from [iDatabaseConnection].
-@ProviderFor(iDatabaseConnection)
-final iDatabaseConnectionProvider =
-    AutoDisposeProvider<IDatabaseConnection>.internal(
-  iDatabaseConnection,
-  name: r'iDatabaseConnectionProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$iDatabaseConnectionHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef IDatabaseConnectionRef = AutoDisposeProviderRef<IDatabaseConnection>;
 String _$novelRepositoryHash() => r'db78c68a09195a23080e8da3fa820491d1b1227d';
 
 /// NovelRepository Provider
@@ -142,30 +119,6 @@ final characterRelationRepositoryProvider =
 // ignore: unused_element
 typedef CharacterRelationRepositoryRef
     = AutoDisposeProviderRef<ICharacterRelationRepository>;
-String _$illustrationRepositoryHash() =>
-    r'7b06c45523f227a39e04d2c1b4d249ad41b486c0';
-
-/// IllustrationRepository Provider
-///
-/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
-///
-/// Copied from [illustrationRepository].
-@ProviderFor(illustrationRepository)
-final illustrationRepositoryProvider =
-    AutoDisposeProvider<IIllustrationRepository>.internal(
-  illustrationRepository,
-  name: r'illustrationRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$illustrationRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef IllustrationRepositoryRef
-    = AutoDisposeProviderRef<IIllustrationRepository>;
 String _$outlineRepositoryHash() => r'2729584c4249fb2abd7fc024f86002df82fa90a5';
 
 /// OutlineRepository Provider
@@ -188,51 +141,6 @@ final outlineRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef OutlineRepositoryRef = AutoDisposeProviderRef<IOutlineRepository>;
-String _$chatSceneRepositoryHash() =>
-    r'533f26c9557fd2b10c89ed7d025c9a45c0f539a2';
-
-/// ChatSceneRepository Provider
-///
-/// 使用IDatabaseConnection接口注入，支持测试和依赖替换
-///
-/// Copied from [chatSceneRepository].
-@ProviderFor(chatSceneRepository)
-final chatSceneRepositoryProvider =
-    AutoDisposeProvider<IChatSceneRepository>.internal(
-  chatSceneRepository,
-  name: r'chatSceneRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$chatSceneRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ChatSceneRepositoryRef = AutoDisposeProviderRef<IChatSceneRepository>;
-String _$promptHistoryRepositoryHash() =>
-    r'8dec5743a9b2498ec36322d0ca00d3cf7dc45e7e';
-
-/// PromptHistoryRepository Provider
-///
-/// Copied from [promptHistoryRepository].
-@ProviderFor(promptHistoryRepository)
-final promptHistoryRepositoryProvider =
-    AutoDisposeProvider<IPromptHistoryRepository>.internal(
-  promptHistoryRepository,
-  name: r'promptHistoryRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$promptHistoryRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef PromptHistoryRepositoryRef
-    = AutoDisposeProviderRef<IPromptHistoryRepository>;
 String _$promptTagCategoryRepositoryHash() =>
     r'cbc4e912675859cba31c3ec93dc79163a8597b48';
 

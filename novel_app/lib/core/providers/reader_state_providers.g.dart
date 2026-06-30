@@ -28,30 +28,8 @@ final chapterContentStateNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$ChapterContentStateNotifier
     = AutoDisposeNotifier<ChapterContentState>;
-String _$readingProgressStateNotifierHash() =>
-    r'b357b428aa6b04d5cb959d3095e7335d973cb03b';
-
-/// ReadingProgressStateNotifier
-///
-/// 管理阅读进度（滚动位置、字符索引等）
-///
-/// Copied from [ReadingProgressStateNotifier].
-@ProviderFor(ReadingProgressStateNotifier)
-final readingProgressStateNotifierProvider = AutoDisposeNotifierProvider<
-    ReadingProgressStateNotifier, ReadingProgressState>.internal(
-  ReadingProgressStateNotifier.new,
-  name: r'readingProgressStateNotifierProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$readingProgressStateNotifierHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$ReadingProgressStateNotifier
-    = AutoDisposeNotifier<ReadingProgressState>;
 String _$interactionStateNotifierHash() =>
-    r'd3e7f97042ac5d2cc0dee0d300bf4bcb0b8b04aa';
+    r'd763cb2ed140c2d1e16a623d7499d6068c9dfed7';
 
 /// InteractionStateNotifier
 ///

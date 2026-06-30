@@ -14,7 +14,6 @@ import '../../services/headless_webview_errors.dart';
 import '../../utils/toast_utils.dart';
 import '../../constants/chapter_constants.dart';
 import 'service_providers.dart';
-import 'repository_providers.dart';
 import 'database_providers.dart';
 
 import 'package:flutter/material.dart';
@@ -417,10 +416,9 @@ class ChapterList extends _$ChapterList {
 
   /// 清除缓存
   Future<void> clearCache() async {
-    // clearNovelCache 涉及多个表的清理操作，暂时保留使用 DatabaseService
-    final databaseService = ref.read(databaseServiceProvider);
+    final chapterRepository = ref.read(chapterRepositoryProvider);
     try {
-      await databaseService.clearNovelCache(novel.url);
+      await chapterRepository.deleteCachedChapters(novel.url);
       // 重新加载章节列表，getCachedNovelChapters 的 LEFT JOIN 会返回 isCached=false
       await _loadChapters();
     } catch (e, stackTrace) {
@@ -535,14 +533,6 @@ class ChapterList extends _$ChapterList {
   Future<void> reloadLastReadChapter() async {
     await _loadLastReadChapter();
   }
-}
-
-/// ChapterListScreen 的 Novel 参数 Provider
-///
-/// 用于在屏幕中传递 novel 参数
-@riverpod
-Novel currentNovel(Ref ref) {
-  throw UnimplementedError('currentNovel must be overridden');
 }
 
 /// 预加载进度监听 Provider

@@ -1105,13 +1105,6 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
       'verified': row['verified'],
       'url_pattern': row['url_pattern'],
       'sample_url': row['sample_url'],
-      // 元信息：所有候选脚本（供 AI 选择，但脚本内容不返回）
-      'candidates': results.map((r) => {
-        'id': r['id'],
-        'use_count': r['use_count'],
-        'verified': r['verified'],
-        'last_used_at': r['last_used_at'],
-      }).toList(),
       'message':
           '已加载缓存脚本到 RunStore。用 execute_js(run_id=$listRunId) 重跑目录脚本，execute_js(run_id=$contentRunId) 重跑内容脚本',
     });
@@ -1210,24 +1203,19 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
         });
       }
 
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final id = now.toString();
-
+      String id;
+      bool isInsert;
       try {
-        final dbConnection = _ref.read(databaseConnectionProvider);
-        final db = await dbConnection.database;
-        await db.insert('site_scripts', {
-          'id': id,
-          'domain': domain,
-          'url_pattern': urlPattern,
-          'chapter_list_js': chapterListJs,
-          'chapter_content_js': chapterContentJs,
-          'sample_url': _currentUrl,
-          'created_at': now,
-          'last_used_at': now,
-          'use_count': 0,
-          'verified': 0,
-        });
+        final siteScriptRepo = _ref.read(siteScriptRepositoryProvider);
+        final result = await siteScriptRepo.upsertByDomain(
+          domain: domain!, // 已通过上面的 missing 检查保证非空
+          chapterListJs: chapterListJs,
+          chapterContentJs: chapterContentJs,
+          urlPattern: urlPattern,
+          sampleUrl: _currentUrl,
+        );
+        id = result.id;
+        isInsert = result.isInsert;
       } catch (e, stackTrace) {
         LoggerService.instance.e(
           '保存脚本到数据库失败 (run_id模式): domain=$domain - $e',
@@ -1247,17 +1235,20 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
       _notifyScriptSaved();
 
       LoggerService.instance.i(
-        '保存提取脚本 (run_id 模式): domain=$domain, id=$id, listId=$listRunId, contentId=$contentRunId',
+        '保存提取脚本 (run_id 模式): domain=$domain, id=$id, isInsert=$isInsert, listId=$listRunId, contentId=$contentRunId',
         category: LogCategory.ai,
-        tags: ['agent', 'webview-extract', 'save_script', 'run_id'],
+        tags: ['agent', 'webview-extract', 'save_script', 'run_id', isInsert ? 'insert' : 'update'],
       );
 
       return jsonEncode({
         'success': true,
         'id': id,
         'domain': domain,
-        'message': '脚本已保存（通过 run_id 引用，测试版本与保存版本一致）',
+        'message': isInsert
+            ? '脚本已保存（通过 run_id 引用，测试版本与保存版本一致）'
+            : '脚本已更新（覆盖同域名旧版本，verified 已重置）',
         'source_run_ids': {'list': listRunId, 'content': contentRunId},
+        if (!isInsert) 'note': 'verified 已重置为 0，新脚本需重新验证',
       });
     }
 
@@ -1324,24 +1315,19 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
     }
 
     // {{URL}} 占位符原样存入数据库，不做替换
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final id = now.toString();
-
+    String id;
+    bool isInsert;
     try {
-      final dbConnection = _ref.read(databaseConnectionProvider);
-      final db = await dbConnection.database;
-      await db.insert('site_scripts', {
-        'id': id,
-        'domain': domain,
-        'url_pattern': urlPattern,
-        'chapter_list_js': chapterListJs,
-        'chapter_content_js': chapterContentJs,
-        'sample_url': _currentUrl,
-        'created_at': now,
-        'last_used_at': now,
-        'use_count': 0,
-        'verified': 0,
-      });
+      final siteScriptRepo = _ref.read(siteScriptRepositoryProvider);
+      final result = await siteScriptRepo.upsertByDomain(
+        domain: domain!, // 已通过上面的 missing 检查保证非空
+        chapterListJs: chapterListJs,
+        chapterContentJs: chapterContentJs,
+        urlPattern: urlPattern,
+        sampleUrl: _currentUrl,
+      );
+      id = result.id;
+      isInsert = result.isInsert;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '保存脚本到数据库失败 (兼容模式): domain=$domain - $e',
@@ -1361,16 +1347,17 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin
     _notifyScriptSaved();
 
     LoggerService.instance.i(
-      '保存提取脚本 (旧模式): domain=$domain, id=$id',
+      '保存提取脚本 (旧模式): domain=$domain, id=$id, isInsert=$isInsert',
       category: LogCategory.ai,
-      tags: ['agent', 'webview-extract', 'save_script', 'legacy'],
+      tags: ['agent', 'webview-extract', 'save_script', 'legacy', isInsert ? 'insert' : 'update'],
     );
 
     return jsonEncode({
       'success': true,
       'id': id,
       'domain': domain,
-      'message': '脚本已保存',
+      'message': isInsert ? '脚本已保存' : '脚本已更新（覆盖同域名旧版本，verified 已重置）',
+      if (!isInsert) 'note': 'verified 已重置为 0，新脚本需重新验证',
     });
   }
 

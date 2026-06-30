@@ -1,9 +1,8 @@
 import '../../../models/novel.dart';
-import '../../../models/ai_accompaniment_settings.dart';
 
 /// 小说数据仓库接口
 ///
-/// 负责小说元数据、阅读进度和AI伴读设置的数据访问操作
+/// 负责小说元数据和阅读进度的数据访问操作
 abstract class INovelRepository {
   /// 添加小说到书架
   ///
@@ -61,20 +60,6 @@ abstract class INovelRepository {
   /// [novelUrl] 小说的URL
   /// 返回章节索引，如果不存在则返回0
   Future<int> getLastReadChapter(String novelUrl);
-
-  /// 获取小说的AI伴读设置
-  ///
-  /// [novelUrl] 小说的URL
-  /// 返回AI伴读设置对象，如果不存在则返回默认设置
-  Future<AiAccompanimentSettings> getAiAccompanimentSettings(String novelUrl);
-
-  /// 更新小说的AI伴读设置
-  ///
-  /// [novelUrl] 小说的URL
-  /// [settings] AI伴读设置对象
-  /// 返回受影响的行数
-  Future<int> updateAiAccompanimentSettings(
-      String novelUrl, AiAccompanimentSettings settings);
 
   /// 根据 title 查找小说
   ///

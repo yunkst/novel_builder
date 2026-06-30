@@ -1,10 +1,9 @@
 import '../../../models/character.dart';
-import '../../../models/ai_companion_response.dart';
 
 /// 角色数据仓库接口
 ///
 /// 负责角色的数据访问操作，包括角色的CRUD操作、
-/// 角色搜索和查询、角色图片管理、批量更新操作（用于AI伴读）
+/// 角色搜索和查询、角色图片管理
 ///
 /// 注意：关系管理方法已移至 ICharacterRelationRepository
 abstract class ICharacterRepository {
@@ -134,14 +133,4 @@ abstract class ICharacterRepository {
   /// [characterId] 角色ID
   /// 返回是否有头像缓存
   Future<bool> hasCharacterAvatar(int characterId);
-
-  // ========== AI伴读批量操作 ==========
-
-  /// 批量更新或插入角色（用于AI伴读）
-  ///
-  /// [novelUrl] 小说URL
-  /// [aiRoles] AI返回的角色更新列表
-  /// 返回成功更新的角色数量
-  Future<int> batchUpdateOrInsertCharacters(
-      String novelUrl, List<AICompanionRole> aiRoles);
 }

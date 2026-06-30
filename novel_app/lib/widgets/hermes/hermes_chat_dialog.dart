@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/hermes_chat_state.dart';
-import 'package:novel_app/core/providers/hermes_providers.dart';
+import 'package:novel_app/core/providers/agent_scenario_provider.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
+import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
-import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
@@ -153,7 +153,9 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                       .where((s) => s.id == scenarioId)
                       .firstOrNull;
                   if (info != null) {
-                    ref.read(hermesChatProvider.notifier).switchScenario(info.id, info.displayName);
+                    // 切换场景：设置当前 scenario + 懒创建目标 session
+                    ref.read(currentAgentScenarioProvider.notifier).state = info.id;
+                    ref.read(scenarioSessionsProvider.notifier).get(info.id);
                   }
                 },
                 itemBuilder: (context) => AgentScenarioFactory.availableScenarios
@@ -509,7 +511,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       builder: (_) => const HermesNovelPickerDialog(),
     );
     if (picked != null) {
-      await ref.read(hermesChatProvider.notifier).selectNovel(picked);
+      final session = ref.read(currentSessionProvider);
+      await session?.selectNovel(picked);
     }
   }
 

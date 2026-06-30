@@ -1,10 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/character_relationship.dart';
-import '../models/ai_companion_response.dart';
 import '../services/logger_service.dart';
 import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import 'base_repository.dart';
-import '../models/character.dart';
 
 /// 人物关系数据仓库
 ///
@@ -305,120 +303,5 @@ class CharacterRelationRepository extends BaseRepository
     ''', [characterId, characterId, characterId]);
 
     return result.map((row) => row['related_id'] as int).toList();
-  }
-
-  // ========== AI伴读批量操作 ==========
-
-  /// 批量更新或插入关系（用于AI伴读）
-  ///
-  /// [novelUrl] 小说URL
-  /// [aiRelations] AI返回的关系更新列表
-  /// [getCharactersFn] 获取小说所有角色的函数
-  /// 返回成功更新的关系数量
-  @override
-  Future<int> batchUpdateOrInsertRelationships(
-    String novelUrl,
-    List<AICompanionRelation> aiRelations,
-    Future<List<Character>> Function(String) getCharactersFn,
-  ) async {
-    if (isWebPlatform) {
-      return 0;
-    }
-
-    if (aiRelations.isEmpty) {
-      LoggerService.instance.w(
-        'AI返回关系列表为空，跳过更新',
-        category: LogCategory.ai,
-        tags: ['relationship', 'batch', 'empty'],
-      );
-      return 0;
-    }
-
-    // 获取小说的所有角色，建立名称到ID的映射
-    final allCharacters = await getCharactersFn(novelUrl);
-    final Map<String, int> characterNameToId = {
-      for (var c in allCharacters)
-        if (c.id != null) c.name: c.id!,
-    };
-
-    int successCount = 0;
-
-    for (final aiRelation in aiRelations) {
-      try {
-        // 查找source和target的角色ID
-        final sourceId = characterNameToId[aiRelation.source];
-        final targetId = characterNameToId[aiRelation.target];
-
-        if (sourceId == null) {
-          LoggerService.instance.w(
-            '未找到source角色: ${aiRelation.source}，跳过关系: $aiRelation',
-            category: LogCategory.ai,
-            tags: ['relationship', 'character_not_found'],
-          );
-          continue;
-        }
-
-        if (targetId == null) {
-          LoggerService.instance.w(
-            '未找到target角色: ${aiRelation.target}，跳过关系: $aiRelation',
-            category: LogCategory.ai,
-            tags: ['relationship', 'character_not_found'],
-          );
-          continue;
-        }
-
-        // 查找是否已存在相同source和target的关系
-        final existingRelations =
-            await getRelationshipsByCharacterIds(sourceId, targetId);
-
-        if (existingRelations.isNotEmpty) {
-          // 更新现有关系的type
-          final existingRelation = existingRelations.first;
-          final updatedRelation = existingRelation.copyWith(
-            relationshipType: aiRelation.type,
-            updatedAt: DateTime.now(),
-          );
-
-          await updateRelationship(updatedRelation);
-          successCount++;
-          LoggerService.instance.i(
-            '更新关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
-            category: LogCategory.ai,
-            tags: ['relationship', 'update', 'success'],
-          );
-        } else {
-          // 创建新关系
-          final newRelation = CharacterRelationship(
-            sourceCharacterId: sourceId,
-            targetCharacterId: targetId,
-            relationshipType: aiRelation.type,
-          );
-
-          await createRelationship(newRelation);
-          successCount++;
-          LoggerService.instance.i(
-            '新增关系: ${aiRelation.source} -> ${aiRelation.target} (${aiRelation.type})',
-            category: LogCategory.ai,
-            tags: ['relationship', 'create', 'success'],
-          );
-        }
-      } catch (e, stackTrace) {
-        LoggerService.instance.e(
-          '更新/插入关系失败: ${aiRelation.source} -> ${aiRelation.target} - $e',
-          stackTrace: stackTrace.toString(),
-          category: LogCategory.ai,
-          tags: ['relationship', 'error'],
-        );
-        // 继续处理其他关系
-        continue;
-      }
-    }
-
-    LoggerService.instance.i(
-      '批量更新关系完成: $successCount/${aiRelations.length}',
-      category: LogCategory.ai,
-      tags: ['relationship', 'batch', 'success'],
-    );
-    return successCount;
   }
 }

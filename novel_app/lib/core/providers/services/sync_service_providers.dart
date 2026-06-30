@@ -18,7 +18,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/novel_sync_service.dart';
 import 'network_service_providers.dart';
-import '../repository_providers.dart';
+import '../database_providers.dart';
 
 part 'sync_service_providers.g.dart';
 

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import '../models/chapter.dart';
 import '../models/character.dart';
 import '../models/character_relationship.dart';
@@ -371,38 +370,4 @@ class NovelExportData {
     );
   }
 
-  /// 转换为JSON字符串
-  String toJsonString() {
-    return const JsonEncoder.withIndent('  ').convert(toJson());
-  }
-
-  /// 从JSON字符串创建
-  factory NovelExportData.fromJsonString(String jsonString) {
-    final json = jsonDecode(jsonString) as Map<String, dynamic>;
-    return NovelExportData.fromJson(json);
-  }
-
-  /// 获取导出统计信息
-  Map<String, int> get statistics {
-    return {
-      'chapters': chapters.length,
-      'characters': characters.length,
-      'relationships': relationships.length,
-      'hasOutline': outline != null ? 1 : 0,
-    };
-  }
-
-  /// 获取导出摘要描述
-  String get summary {
-    final stats = statistics;
-    final parts = <String>[
-      '${stats['chapters']} 章节内容',
-      '${stats['characters']} 角色',
-      '${stats['relationships']} 关系',
-    ];
-    if (outline != null) {
-      parts.add('大纲');
-    }
-    return parts.join('、');
-  }
 }

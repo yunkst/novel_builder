@@ -1,13 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/novel.dart';
-import '../models/ai_accompaniment_settings.dart';
 import '../services/logger_service.dart';
 import '../core/interfaces/repositories/i_novel_repository.dart';
 import 'base_repository.dart';
 
 /// 小说数据仓库
 ///
-/// 负责小说元数据、阅读进度和AI伴读设置的数据库操作
+/// 负责小说元数据和阅读进度的数据库操作
 class NovelRepository extends BaseRepository implements INovelRepository {
   /// 构造函数 - 接受数据库连接实例
   NovelRepository({required super.dbConnection});
@@ -237,63 +236,6 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       return maps.first['lastReadChapter'] as int? ?? 0;
     }
     return 0;
-  }
-
-  /// 获取小说的AI伴读设置
-  @override
-  Future<AiAccompanimentSettings> getAiAccompanimentSettings(
-      String novelUrl) async {
-    if (isWebPlatform) {
-      return const AiAccompanimentSettings();
-    }
-
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'bookshelf',
-      columns: ['aiAccompanimentEnabled', 'aiInfoNotificationEnabled'],
-      where: 'url = ?',
-      whereArgs: [novelUrl],
-    );
-
-    if (maps.isEmpty) {
-      return const AiAccompanimentSettings();
-    }
-
-    return AiAccompanimentSettings(
-      autoEnabled: (maps[0]['aiAccompanimentEnabled'] as int) == 1,
-      infoNotificationEnabled:
-          (maps[0]['aiInfoNotificationEnabled'] as int) == 1,
-    );
-  }
-
-  /// 更新小说的AI伴读设置
-  @override
-  Future<int> updateAiAccompanimentSettings(
-      String novelUrl, AiAccompanimentSettings settings) async {
-    if (isWebPlatform) {
-      return 0;
-    }
-
-    try {
-      final db = await database;
-      return await db.update(
-        'bookshelf',
-        {
-          'aiAccompanimentEnabled': settings.autoEnabled ? 1 : 0,
-          'aiInfoNotificationEnabled': settings.infoNotificationEnabled ? 1 : 0,
-        },
-        where: 'url = ?',
-        whereArgs: [novelUrl],
-      );
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '更新AI伴读设置失败: novelUrl=$novelUrl - $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['novel', 'ai_settings', 'failed'],
-      );
-      rethrow;
-    }
   }
 
   /// 根据 title 查找小说

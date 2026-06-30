@@ -121,7 +121,7 @@ final List<TestScenario> testScenarios = [
   TestScenario(
     name: '数据库: 创建关系',
     status: TestStatus.integration,
-    description: 'DatabaseService.createRelationship正确插入数据',
+    description: 'CharacterRelationRepository.createRelationship正确插入数据',
     notes: '需要真实SQLite数据库环境',
   ),
   TestScenario(
@@ -133,13 +133,13 @@ final List<TestScenario> testScenarios = [
   TestScenario(
     name: '数据库: 更新关系',
     status: TestStatus.integration,
-    description: 'DatabaseService.updateRelationship正确更新数据',
+    description: 'CharacterRelationRepository.updateRelationship正确更新数据',
     notes: '需要真实SQLite数据库环境',
   ),
   TestScenario(
     name: '数据库: 删除关系',
     status: TestStatus.integration,
-    description: 'DatabaseService.deleteRelationship正确删除数据',
+    description: 'CharacterRelationRepository.deleteRelationship正确删除数据',
     notes: '需要真实SQLite数据库环境',
   ),
   TestScenario(

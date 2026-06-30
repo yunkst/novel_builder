@@ -55,7 +55,7 @@ lib/core/providers/
 | `loggerServiceProvider` | LoggerService | 日志服务，支持多级别日志和分类 | ✓ |
 | `preferencesServiceProvider` | PreferencesService | SharedPreferences 封装，存储用户偏好 | ✓ |
 | `apiServiceWrapperProvider` | ApiServiceWrapper | 后端 API 服务封装 | ✓ |
-| `difyServiceProvider` | DifyService | Dify AI 服务，流式响应 | ✓ |
+| `llmConfigServiceProvider` | LlmConfigService | LLM 配置管理服务 | ✓ |
 | `preloadServiceProvider` | PreloadService | 章节预加载服务 | ✓ |
 | `chapterLoaderProvider` | ChapterLoader | 章节加载器 | ✗ |
 | `chapterActionHandlerProvider` | ChapterActionHandler | 章节操作处理器 | ✗ |

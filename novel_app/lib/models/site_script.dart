@@ -72,10 +72,6 @@ class SiteScript {
   DateTime get createdAtDateTime =>
       DateTime.fromMillisecondsSinceEpoch(createdAt);
 
-  /// 最后使用时间（DateTime）
-  DateTime get lastUsedAtDateTime =>
-      DateTime.fromMillisecondsSinceEpoch(lastUsedAt);
-
   /// 复制并修改字段
   SiteScript copyWith({
     String? id,

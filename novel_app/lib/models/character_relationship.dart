@@ -70,38 +70,6 @@ class CharacterRelationship {
     );
   }
 
-  /// 判断是否为同一个关系
-  bool isSameRelationship(CharacterRelationship other) {
-    return id != null && id == other.id;
-  }
-
-  /// 获取关系的反向类型描述
-  ///
-  /// 例如："师父" -> "徒弟"
-  /// 注意：这是启发式方法，不一定准确
-  String getReverseTypeHint() {
-    final type = relationshipType.toLowerCase();
-    if (type.contains('师父') || type.contains('老师') || type.contains('师傅')) {
-      return '徒弟';
-    } else if (type.contains('徒弟') || type.contains('学生')) {
-      return '师父';
-    } else if (type.contains('父')) {
-      return relationshipType.replaceAll('父', '子');
-    } else if (type.contains('母')) {
-      return relationshipType.replaceAll('母', '女');
-    } else if (type.contains('夫')) {
-      return relationshipType.replaceAll('夫', '妻');
-    } else if (type.contains('妻')) {
-      return relationshipType.replaceAll('妻', '夫');
-    } else if (type.contains('兄')) {
-      return relationshipType.replaceAll('兄', '弟');
-    } else if (type.contains('姐')) {
-      return relationshipType.replaceAll('姐', '妹');
-    }
-    // 无法推断，返回原类型
-    return relationshipType;
-  }
-
   @override
   String toString() {
     return 'CharacterRelationship(id: $id, source: $sourceCharacterId, target: $targetCharacterId, type: $relationshipType)';

@@ -4,6 +4,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-06-29**: DatabaseService 门面彻底删除，所有调用改为直接使用 Repository Provider；删除 PaginationController、repository_providers.dart（合并入 database_providers.dart）等死代码；清理 Dify 残留引用
 - **2026-06-11**: 更新文档，移除 Dify 引用，DSL Engine + Hermes Agent 成为 AI 主力
 - **2026-06-09**: 移除 Dify 云端依赖（v1.7.4），仅保留本地 DSL Engine
 - **2026-06-05**: DSL Engine 客户端 Dify 工作流复刻（v1.7.0）
@@ -75,26 +76,23 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `di/` - 依赖注入（API服务Provider）
   - `database/` - 数据库连接和初始化
   - `interfaces/` - 接口定义（IDatabaseConnection等）
-  - `providers/` - Riverpod状态管理Providers（50+个文件）
+  - `providers/` - Riverpod状态管理Providers（30+个文件）
     - `service_providers.dart` - 服务层Provider
-    - `repository_providers.dart` - Repository层Provider
-    - `reader_screen_providers.dart` - 阅读器状态Provider
+    - `database_providers.dart` - 数据库连接 + 全部 Repository Provider（统一入口）
     - `bookshelf_providers.dart` - 书架状态Provider
     - `chapter_list_providers.dart` - 章节列表状态Provider
     - `services/` - 各类服务Provider
 
 **业务逻辑层**:
-- `controllers/` - 控制器层（8个文件）
-  - `pagination_controller.dart` - 分页控制器
+- `controllers/` - 控制器层（5个文件）
   - `reader_content_controller.dart` - 阅读器内容控制器
   - `reader_interaction_controller.dart` - 阅读器交互控制器
   - `chapter_list/` - 章节列表相关控制器
     - `chapter_action_handler.dart` - 章节操作处理器
     - `chapter_reorder_controller.dart` - 章节重排控制器
     - `chapter_loader.dart` - 章节加载器
-    - `outline_integration_handler.dart` - 大纲集成处理器
 
-- `repositories/` - 数据访问层（9个Repository类）
+- `repositories/` - 数据访问层（17个Repository类）
   - `base_repository.dart` - Repository基类
   - `novel_repository.dart` - 小说数据访问
   - `chapter_repository.dart` - 章节数据访问
@@ -104,35 +102,40 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `outline_repository.dart` - 大纲数据访问
   - `chat_scene_repository.dart` - 聊天场景数据访问
   - `bookshelf_repository.dart` - 书架分类数据访问
+  - `llm_config_repository.dart` - LLM配置数据访问
+  - `prompt_history_repository.dart` - 提示词历史数据访问
+  - `prompt_tag_repository.dart` - 提示词标签数据访问
+  - `prompt_tag_category_repository.dart` - 标签分类数据访问
+  - `prompt_tag_history_repository.dart` - 标签历史数据访问
+  - `agent_memory_repository.dart` - Agent记忆数据访问
+  - `novel_export_repository.dart` - 小说导出数据访问
+  - `site_script_repository.dart` - 站点脚本数据访问
 
-- `services/` - 业务服务层（45+个文件）
-  - `chapter_service.dart` - 章节业务服务
+- `services/` - 业务服务层（42+个文件）
   - `chapter_history_service.dart` - 章节历史服务
   - `chapter_search_service.dart` - 章节搜索服务
-  - `character_avatar_service.dart` - 角色头像服务
-  - `character_card_service.dart` - 角色卡片服务
-  - `rewrite_service.dart` - 内容改写服务
-  - `outline_service.dart` - 大纲业务服务
-  - `scene_illustration_service.dart` - 场景插图服务
   - `backup_service.dart` - 备份服务
   - `preferences_service.dart` - 偏好设置服务
-  - `database_service.dart` - 数据库服务（@Deprecated，使用Repository Providers）
-  - `dify_service.dart` - Dify AI服务
-  - `dify_sse_parser.dart` - SSE流式解析器
-  - `stream_state_manager.dart` - 流式状态管理器
+  - `reader_settings_service.dart` - 阅读器设置服务
+  - `novel_context_service.dart` - 小说上下文服务
+  - `llm_config_service.dart` - LLM配置服务
+  - `api_service_wrapper.dart` - API服务包装器
+  - `dsl_engine/` - DSL Engine 本地工作流引擎
+  - `novel_agent/` - Hermes Agent 智能对话
+  - `llm_logger/` - LLM调用日志
 
 **UI层**:
-- `screens/` - 完整页面界面（25+个Screen）
-- `widgets/` - 可复用UI组件（60+个Widget）
-- `dialogs/` - 对话框组件（4个对话框）
+- `screens/` - 完整页面界面（16个Screen）
+- `widgets/` - 可复用UI组件（44+个Widget）
+- `dialogs/` - 对话框组件（1个对话框）
 
 **辅助层**:
-- `models/` - 数据模型（19个Model类）
-- `utils/` - 工具类（20+个工具类）
+- `models/` - 数据模型（23个Model类）
+- `utils/` - 工具类（13个工具类）
 - `constants/` - 常量定义
 - `config/` - 配置文件
-- `mixins/` - Mixin复用代码（6个Mixin）
-- `extensions/` - API扩展方法（3个Extension）
+- `mixins/` - Mixin复用代码（1个Mixin）
+- `extensions/` - API扩展方法（已删除，功能合并入其他模块）
 
 **生成代码**:
 - `generated/` - OpenAPI生成的API客户端代码（70+个文件）
@@ -175,10 +178,10 @@ final loggerServiceProvider = Provider<LoggerService>((ref) {
 });
 ```
 
-#### 2. Repository Providers (`core/providers/repository_providers.dart`)
+#### 2. Repository Providers (`core/providers/database_providers.dart`)
 
 ```dart
-// Repository Providers（通过DatabaseConnection注入）
+// Repository Providers（通过DatabaseConnection注入，统一入口）
 final databaseConnectionProvider = Provider<IDatabaseConnection>((ref) {
   return DatabaseConnection();
 });
@@ -228,15 +231,7 @@ class ChapterListScreen extends ConsumerWidget {
 
 ### API服务层
 
-#### Backend API Service
-**文件**: `lib/services/backend_api_service.dart`（已弃用，使用ApiServiceWrapper）
-
-**功能**:
-- 搜索小说 (`GET /search`) *(后端保留，App 已移除跨站点搜索入口)*
-- 获取章节列表 (`GET /chapters`)
-- 获取章节内容 (`GET /chapter-content`)
-
-#### API Service Wrapper（推荐）
+#### API Service Wrapper
 **文件**: `lib/services/api_service_wrapper.dart`
 
 **职责**:
@@ -252,8 +247,8 @@ final apiService = ref.watch(apiServiceProvider);
 
 ### AI集成接口
 
-#### Dify Service
-**文件**: `lib/services/dify_service.dart`
+#### DSL Engine（本地工作流引擎）
+**文件**: `lib/services/dsl_engine/`
 
 **功能**:
 - 流式AI响应处理
@@ -261,10 +256,13 @@ final apiService = ref.watch(apiServiceProvider);
 - 角色聊天对话
 - 大纲生成辅助
 
-**SSE处理**:
-- `lib/services/dify_sse_parser.dart` - SSE流式解析器
-- `lib/services/stream_state_manager.dart` - 流式状态管理器
-- `lib/mixins/dify_streaming_mixin.dart` - 流式响应Mixin
+#### Hermes Agent（LLM 直连对话）
+**文件**: `lib/services/novel_agent/`、`lib/core/providers/hermes_providers.dart`
+
+**功能**:
+- 角色对话（单角色 / 多角色）
+- 沉浸式聊天
+- 流式输出支持
 
 ## 关键依赖与配置
 
@@ -453,21 +451,20 @@ class ChapterOutlineDraft {
 
 ### AI模型
 
-#### AIAccompanimentSettings
-**文件**: `lib/models/ai_accompaniment_settings.dart`
+#### LlmConfig
+**文件**: `lib/models/llm_config.dart`
 
-AI特写设置（API配置、提示词等）。
+LLM 配置模型（API URL、Key、模型名称等）。
 
-#### AICompanionResponse
-**文件**: `lib/models/ai_companion_response.dart`
+#### HermesMessage
+**文件**: `lib/models/hermes_message.dart`
 
-AI伴侣响应模型。
+Hermes Agent 对话消息模型。
 
 ### 其他模型
 
 - **SearchResult** - 搜索结果封装
 - **Bookshelf** - 书架分类模型（id, name, icon, color）
-- **ChatMessage** - 聊天消息模型
 - **RoleGallery** - 角色画廊模型
 - **AppVersion** - 应用版本信息
 
@@ -562,7 +559,7 @@ class DatabaseConnection implements IDatabaseConnection {
 
 **架构说明**:
 
-DatabaseService 现在作为门面类（Facade），将所有数据库操作委托给专门的Repository类：
+所有数据库操作通过专门的 Repository 类完成，Repository Provider 统一在 `database_providers.dart` 中注册。DatabaseService 门面类已删除，所有调用点改为直接使用 Repository Provider。
 
 #### Repository层列表
 
@@ -625,25 +622,6 @@ class NovelListScreen extends ConsumerWidget {
 }
 ```
 
-**兼容方式（@Deprecated）**:
-```dart
-// ⚠️ 已弃用，建议使用Repository Providers
-final databaseService = DatabaseService();
-final novels = await databaseService.novelRepository.getNovelsInBookshelf();
-```
-
-### 数据库服务
-
-**文件**: `lib/services/database_service.dart`
-
-**职责**:
-- 管理数据库连接和初始化
-- 提供统一的对外接口（向后兼容）
-- 协调各个Repository的数据库实例
-- 处理数据库迁移
-
-**状态**: @Deprecated - 新代码应该直接使用Repository Providers
-
 ## 核心功能
 
 ### 1. 书架管理
@@ -666,7 +644,6 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 **Service**:
 - `chapter_search_service.dart` - 章节内容搜索
-- `cache_search_service.dart` - 缓存搜索
 
 **Provider**: `core/providers/chapter_search_providers.dart`
 
@@ -680,7 +657,6 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 - `chapter_list/chapter_action_handler.dart` - 章节操作
 - `chapter_list/chapter_reorder_controller.dart` - 章节重排
 - `chapter_list/chapter_loader.dart` - 章节加载
-- `chapter_list/outline_integration_handler.dart` - 大纲集成
 
 **Provider**: `core/providers/chapter_list_providers.dart`
 
@@ -702,7 +678,7 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 - `reader_content_controller.dart` - 内容管理
 - `reader_interaction_controller.dart` - 交互处理
 
-**Provider**: `core/providers/reader_screen_providers.dart`
+**Provider**: `core/providers/reader_state_providers.dart`、`core/providers/reader_settings_state.dart`
 
 **功能**:
 - 章节阅读（段落式渲染）
@@ -718,12 +694,7 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 ### 5. 角色管理
 
-**Screens**:
-- `character_management_screen.dart` - 角色列表
-- `character_edit_screen.dart` - 角色编辑
-- `character_chat_screen.dart` - 单角色聊天
-- `multi_role_chat_screen.dart` - 多角色聊天
-- `character_relationship_screen.dart` - 关系图
+**Widget**: `lib/widgets/hermes/` - Hermes 对话组件（支持角色对话场景）
 
 **Repository**: `character_repository.dart`, `character_relation_repository.dart`
 
@@ -731,13 +702,9 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 - 角色信息管理
 - 角色头像（AI生成/自定义）
 - 角色关系可视化（力导向图）
-- 多角色对话
+- 多角色对话（通过 Hermes Agent）
 
 ### 6. 大纲管理
-
-**Screens**:
-- `outline/create_outline_screen.dart` - 创建大纲
-- `outline/outline_management_screen.dart` - 大纲管理
 
 **Repository**: `outline_repository.dart`
 
@@ -752,32 +719,27 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 **子页面**:
 - `backend_settings_screen.dart` - 后端API配置
-- `dify_settings_screen.dart` - Dify AI配置
+- `llm_config_management_screen.dart` - LLM配置管理
+- `dify_settings_screen.dart` - AI配置页面（已改为 DSL Engine / LLM 配置入口）
 
 **存储**: SharedPreferences
 
 **功能**:
 - API地址配置
-- Dify工作流配置
+- LLM API URL / Key / 模型配置（DSL Engine + Hermes Agent）
 - 阅读设置（字体、字号、行间距）
 - 主题设置
 
 ### 8. 插图管理
 
-**Screen**: `lib/screens/illustration_debug_screen.dart`
-
-**Service**:
-- `scene_illustration_service.dart` - 插图业务服务
-- `scene_illustration_cache_service.dart` - 插图缓存服务
-
 **Repository**: `illustration_repository.dart`
 
 **功能**:
-- AI场景插图生成
-- 插图缓存管理
+- AI场景插图数据管理
+- 插图缓存
 - 插图与章节关联
 
-### 10. 备份与恢复
+### 9. 备份与恢复
 
 **Service**: `lib/services/backup_service.dart`
 
@@ -808,8 +770,7 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 
 ### 缓存相关服务
 
-- `chapter_service.dart` - 章节缓存协调
-- `chapter_manager.dart` - 章节管理器（已弃用）
+- `chapter_history_service.dart` - 章节缓存协调
 - `preload_service.dart` - 预加载服务
 
 ## AI集成功能
@@ -817,15 +778,11 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 ### DSL Engine（本地 Dify 工作流复刻）
 
 **核心组件** (`lib/services/dsl_engine/`):
-- `dsl_parser.dart` - YAML DSL 解析器
-- `graph_engine.dart` - 工作流图执行引擎
-- `variable_pool.dart` - 变量上下文管理
-- `llm_provider.dart` - OpenAI 兼容的 LLM 调用
-- `dsl_executor.dart` - 统一执行入口（streaming + blocking）
-- `dsl_engine_config.dart` - SharedPreferences 配置管理
+- `llm_provider.dart` - OpenAI 兼容的 LLM 调用（含 ChatMessage 模型）
+
+**说明**: DSL Engine 已大幅精简，仅保留 LLM 调用核心；结构化工作流能力迁移至 Hermes Agent（`lib/services/novel_agent/`）。
 
 **用途**:
-- 结构化信息提取（角色、关系、背景）
 - 创意写作（段落重写、全文重写）
 - 章节/背景摘要生成
 - 场景插图提示词生成
@@ -840,32 +797,20 @@ final novels = await databaseService.novelRepository.getNovelsInBookshelf();
 **核心组件**:
 - `lib/core/providers/hermes_providers.dart` - Riverpod Provider
 - `lib/widgets/hermes/` - 对话 UI 组件
-- `lib/services/hermes_client.dart` - API 客户端
+- `lib/services/novel_agent/` - Agent 执行引擎（agent_loop、agent_scenario 等）
 
 **用途**:
 - 角色对话（单角色 / 多角色）
 - 沉浸式聊天
 - 流式输出支持
 
-### DifyService（Facade 层，已重构）
-
-**Service**: `lib/services/dify_service.dart`
-- 保留类名和接口不变（12+ 调用点零改动）
-- 内部委托给 DSL Engine 执行
-- 构造函数无参（不再依赖 DifyConfigService）
-
-**Streaming Mixin**: `lib/mixins/dify_streaming_mixin.dart`
-- 流式响应处理复用
-- 错误处理和重连
-- 已移除 `<<COMPLETE_CONTENT>>` 标记处理
+**兼容层**:
+- `HermesChatNotifier` 保留为兼容层（仍被测试使用），`hermes_chat_dialog.dart` 的写入路径已改为直接使用 ScenarioSession
 
 ### AI相关Widget
 
 - `widgets/streaming_content_display.dart` - 流式内容显示
 - `widgets/streaming_status_indicator.dart` - 状态指示器
-- `widgets/reader/ai_companion_confirm_dialog.dart` - AI特写确认对话框
-- `widgets/illustration_request_dialog.dart` - 插图请求对话框
-- `widgets/illustration_action_dialog.dart` - 插图操作对话框
 
 ## 控制器层
 
@@ -877,36 +822,27 @@ Controller负责协调业务逻辑，连接UI层和数据层。
 
 **文件位置**: `lib/controllers/`
 
-1. **pagination_controller.dart** - 分页控制器
-   - 通用分页逻辑
-   - 加载状态管理
-   - 支持下拉刷新和上拉加载
-
-2. **reader_content_controller.dart** - 阅读器内容控制器
+1. **reader_content_controller.dart** - 阅读器内容控制器
    - 章节内容管理
    - 段落渲染控制
    - 编辑模式切换
 
-3. **reader_interaction_controller.dart** - 阅读器交互控制器
+2. **reader_interaction_controller.dart** - 阅读器交互控制器
    - 用户交互处理
    - AI功能触发
    - 手势控制
 
-4. **chapter_list/chapter_action_handler.dart** - 章节操作处理器
+3. **chapter_list/chapter_action_handler.dart** - 章节操作处理器
    - 章节删除、缓存等操作
    - 批量操作支持
 
-5. **chapter_list/chapter_reorder_controller.dart** - 章节重排控制器
+4. **chapter_list/chapter_reorder_controller.dart** - 章节重排控制器
    - 拖拽重排序
    - 重排序状态管理
 
-6. **chapter_list/chapter_loader.dart** - 章节加载器
+5. **chapter_list/chapter_loader.dart** - 章节加载器
    - 章节列表加载
    - 最后阅读位置加载
-
-7. **chapter_list/outline_integration_handler.dart** - 大纲集成处理器
-   - 大纲数据集成
-   - 章节细纲显示
 
 ## Mixins
 
@@ -914,39 +850,13 @@ Controller负责协调业务逻辑，连接UI层和数据层。
 
 **文件位置**: `lib/mixins/`
 
-1. **dify_streaming_mixin.dart** - Dify流式响应Mixin
-   - SSE流式处理
-   - 状态更新
-
-2. **loading_state_mixin.dart** - 加载状态Mixin
-   - 统一加载状态管理
-
-3. **reader/auto_scroll_mixin.dart** - 阅读器自动滚动Mixin
+1. **reader/auto_scroll_mixin.dart** - 阅读器自动滚动Mixin
    - 自动滚动控制
    - 滚动速度调节
 
-4. **stream_subscription_mixin.dart** - 流订阅Mixin
-   - Stream生命周期管理
-
-5. **text_editing_controller_mixin.dart** - 文本编辑器Mixin
-   - TextEditingController管理
-
 ## 扩展方法
 
-### API扩展
-
-**文件位置**: `lib/extensions/`
-
-1. **api_novel_extension.dart** - Novel模型扩展
-   - API Novel → 本地Novel转换
-   - 便捷构造方法
-
-2. **api_chapter_extension.dart** - Chapter模型扩展
-   - API Chapter → 本地Chapter转换
-   - 缓存状态判断
-
-3. **api_source_site_extension.dart** - 源站点扩展
-   - 站点信息处理
+**说明**: `lib/extensions/` 目录已删除，API 模型转换功能已合并入其他模块。
 
 ## 测试与质量
 
@@ -1019,7 +929,7 @@ flutter pub get
 dart run tool/clean_test_database.dart
 
 # 强制重建数据库
-dart run tool/run tool/force_rebuild_database.dart
+dart run tool/force_rebuild_database.dart
 ```
 
 **Python迁移脚本**:
@@ -1113,7 +1023,7 @@ flutter analyze lib/generated/api/
 1. 创建 `lib/repositories/your_repository.dart`
 2. 继承 `BaseRepository`
 3. 注入 `IDatabaseConnection`
-4. 在 `lib/core/providers/repository_providers.dart` 中添加Provider
+4. 在 `lib/core/providers/database_providers.dart` 中添加Provider
 5. 使用 `ref.watch(yourRepositoryProvider)` 访问
 
 ### Q: 数据库版本如何升级？
@@ -1132,29 +1042,28 @@ flutter analyze lib/generated/api/
 - `lib/main.dart` - 应用入口
 
 **架构层**:
-- `lib/core/providers/` - Riverpod状态管理（50+个文件）
-- `lib/repositories/` - 数据访问层（9个Repository）
-- `lib/controllers/` - 控制器层（8个Controller）
-- `lib/services/` - 业务服务层（45+个Service）
+- `lib/core/providers/` - Riverpod状态管理（30+个文件）
+- `lib/repositories/` - 数据访问层（17个Repository）
+- `lib/controllers/` - 控制器层（5个Controller）
+- `lib/services/` - 业务服务层（42+个Service）
 
 **UI层**:
-- `lib/screens/` - 完整页面（25+个Screen）
-- `lib/widgets/` - UI组件（60+个Widget）
-- `lib/dialogs/` - 对话框（4个Dialog）
+- `lib/screens/` - 完整页面（16个Screen）
+- `lib/widgets/` - UI组件（44+个Widget）
+- `lib/dialogs/` - 对话框（1个Dialog）
 
 **数据层**:
-- `lib/models/` - 数据模型（19个Model）
+- `lib/models/` - 数据模型（23个Model）
 - `lib/core/database/` - 数据库连接
 - `lib/core/interfaces/` - 接口定义
 
 **工具层**:
-- `lib/utils/` - 工具类（20+个工具）
+- `lib/utils/` - 工具类（13个工具）
 - `lib/constants/` - 常量定义
 - `lib/config/` - 配置文件
 
 **复用代码**:
-- `lib/mixins/` - Mixin（6个）
-- `lib/extensions/` - 扩展方法（3个）
+- `lib/mixins/` - Mixin（1个）
 
 ### 配置文件
 
@@ -1223,7 +1132,7 @@ flutter analyze lib/generated/api/
 3. **创建Repository**（如需要）
    - 创建 `lib/repositories/your_repository.dart`
    - 继承 `BaseRepository`
-   - 在 `repository_providers.dart` 中注册Provider
+   - 在 `database_providers.dart` 中注册Provider
 
 4. **创建Service**（如需要）
    - 创建 `lib/services/your_service.dart`
@@ -1277,8 +1186,8 @@ flutter analyze lib/generated/api/
    - 修改 `lib/services/api_service_wrapper.dart`
    - 适配新的API变更
 
-4. **添加扩展方法**（如需要）
-   - 修改 `lib/extensions/api_xxx_extension.dart`
+4. **添加转换方法**（如需要）
+   - 在 API 模型类中添加便捷转换方法
    - 方便API模型转换
 
 5. **测试集成功能**
@@ -1426,7 +1335,7 @@ flutter analyze lib/generated/api/
 
 ### Phase 1: 初始架构
 - Provider状态管理
-- DatabaseService单例
+- DatabaseService单例（已删除，改为 Repository Provider 直连）
 - 紧耦合的Service层
 
 ### Phase 2: 代码质量改进（当前）
@@ -1435,6 +1344,8 @@ flutter analyze lib/generated/api/
 - ✅ DatabaseConnection接口化
 - ✅ Controller层解耦
 - ✅ 依赖注入通过Providers
+- ✅ DatabaseService门面删除，全部改为 Repository Provider
+- ✅ Dify云端链路完全删除，DSL Engine + Hermes Agent 成为主力
 
 ### 未来计划
 - 添加更多集成测试
@@ -1460,5 +1371,5 @@ flutter analyze lib/generated/api/
 ---
 
 **文档维护**: 本文档应随代码变更同步更新
-**最后更新**: 2026-02-04
+**最后更新**: 2026-06-29
 **文档状态**: ✅ 已验证

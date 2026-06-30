@@ -34,34 +34,6 @@ final toastNotifierProvider =
 );
 
 typedef _$ToastNotifier = AutoDisposeNotifier<ToastState>;
-String _$dialogNotifierHash() => r'51cb43fac3ca0d4956523af424ea6ab28d7ba154';
-
-/// 对话框状态管理器
-///
-/// **职责**:
-/// - 管理对话框显示状态
-/// - 提供显示各类对话框的接口
-/// - UI层通过ref.listen监听状态变化并显示对话框
-///
-/// **架构原则**:
-/// - Notifier只管理状态，不直接显示对话框
-/// - UI层通过ref.listen监听状态变化并显示
-/// - 用户操作后通过Notifier方法更新状态
-///
-/// Copied from [DialogNotifier].
-@ProviderFor(DialogNotifier)
-final dialogNotifierProvider =
-    AutoDisposeNotifierProvider<DialogNotifier, DialogState>.internal(
-  DialogNotifier.new,
-  name: r'dialogNotifierProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$dialogNotifierHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$DialogNotifier = AutoDisposeNotifier<DialogState>;
 String _$homeTabIndexNotifierHash() =>
     r'ae5b68787619996beffce4a6588df8070b02985d';
 

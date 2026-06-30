@@ -100,65 +100,6 @@ class ChapterContentStateNotifier extends _$ChapterContentStateNotifier {
   }
 }
 
-/// ReadingProgressState
-///
-/// 阅读进度状态
-class ReadingProgressState {
-  final double scrollPosition;
-  final int characterIndex;
-  final int firstVisibleParagraphIndex;
-
-  const ReadingProgressState({
-    this.scrollPosition = 0.0,
-    this.characterIndex = 0,
-    this.firstVisibleParagraphIndex = 0,
-  });
-
-  ReadingProgressState copyWith({
-    double? scrollPosition,
-    int? characterIndex,
-    int? firstVisibleParagraphIndex,
-  }) {
-    return ReadingProgressState(
-      scrollPosition: scrollPosition ?? this.scrollPosition,
-      characterIndex: characterIndex ?? this.characterIndex,
-      firstVisibleParagraphIndex:
-          firstVisibleParagraphIndex ?? this.firstVisibleParagraphIndex,
-    );
-  }
-}
-
-/// ReadingProgressStateNotifier
-///
-/// 管理阅读进度（滚动位置、字符索引等）
-@riverpod
-class ReadingProgressStateNotifier extends _$ReadingProgressStateNotifier {
-  @override
-  ReadingProgressState build() {
-    return const ReadingProgressState();
-  }
-
-  /// 更新滚动位置
-  void updateScrollPosition(double position) {
-    state = state.copyWith(scrollPosition: position);
-  }
-
-  /// 更新字符索引
-  void updateCharacterIndex(int index) {
-    state = state.copyWith(characterIndex: index);
-  }
-
-  /// 更新第一可见段落索引
-  void updateFirstVisibleParagraphIndex(int index) {
-    state = state.copyWith(firstVisibleParagraphIndex: index);
-  }
-
-  /// 重置进度
-  void reset() {
-    state = const ReadingProgressState();
-  }
-}
-
 /// InteractionState
 ///
 /// 用户交互状态（特写模式、段落选择等）
@@ -254,11 +195,6 @@ class InteractionStateNotifier extends _$InteractionStateNotifier {
     if (state.selectedParagraphIndices.isNotEmpty) {
       state = state.copyWith(selectedParagraphIndices: []);
     }
-  }
-
-  /// 批量设置选中的段落
-  void setSelectedParagraphIndices(List<int> indices) {
-    state = state.copyWith(selectedParagraphIndices: List.from(indices));
   }
 
   /// 检查数组是否连续

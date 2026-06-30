@@ -1,7 +1,7 @@
 /// LLM 配置服务
 ///
 /// 统一管理 LLM 配置序列的读取、切换和迁移。
-/// 所有 AI 调用路径（WritingService、Hermes Agent）都通过此服务获取 LLM 配置。
+/// 所有 AI 调用路径（Hermes Agent）都通过此服务获取 LLM 配置。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,13 +145,13 @@ class LlmConfigService {
 
   // ── 旧配置迁移 ──
 
-  /// 首次运行时从旧 DslEngineConfig 迁移数据到 llm_configs 表
+  /// 首次运行时从旧 SharedPreferences 裸 key 迁移数据到 llm_configs 表
   ///
   /// 迁移逻辑：
   /// 1. 检查 _migratedKey 是否已标记
-  /// 2. 读取旧 DslEngineConfig 的 apiUrl/apiKey/model
+  /// 2. 读取旧 dsl_engine_* SharedPreferences 裸 key（apiUrl/apiKey/model）
   /// 3. 如果有有效数据，创建一条默认配置
-  /// 4. 遍历 AgentEngineConfig 的场景覆盖，为每个有覆盖的场景创建配置或设置引用
+  /// 4. 遍历 agent_*_scenario SharedPreferences 裸 key，为每个有覆盖的场景创建配置
   /// 5. 标记迁移完成
   Future<void> ensureMigratedFromLegacy() async {
     // 内存缓存：迁移检查只执行一次

@@ -40,8 +40,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     if (confirmed == true) {
       try {
         // 从数据库中删除小说（这会删除bookshelf表中的记录）
-        final databaseService = ref.read(databaseServiceProvider);
-        await databaseService.removeFromBookshelf(novel.url);
+        final novelRepository = ref.read(novelRepositoryProvider);
+        await novelRepository.removeFromBookshelf(novel.url);
         if (mounted) {
           ToastUtils.showSuccess('已从书架移除', context: context);
         }
@@ -387,12 +387,16 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
 
     if (result != null) {
       try {
-        final databaseService = ref.read(databaseServiceProvider);
-        await databaseService.createCustomNovel(
-          result['title']!,
-          result['author']!,
+        final novelRepository = ref.read(novelRepositoryProvider);
+        final novel = Novel(
+          title: result['title']!,
+          author: result['author']!,
+          url: 'custom://custom_novel_${DateTime.now().millisecondsSinceEpoch}',
+          coverUrl: null,
           description: result['description'],
+          backgroundSetting: null,
         );
+        await novelRepository.addToBookshelf(novel);
         if (mounted) {
           ToastUtils.showSuccess('小说创建成功！', context: context);
         }

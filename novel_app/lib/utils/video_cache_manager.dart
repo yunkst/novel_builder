@@ -271,20 +271,4 @@ class VideoCacheManager {
     );
   }
 
-  /// 获取缓存状态信息
-  static Map<String, dynamic> getCacheInfo() {
-    return {
-      'cachedCount': _controllers.length,
-      'maxCacheSize': _maxCachedControllers,
-      'activeVideo': _activeVideoUrl,
-      'cachedUrls': _controllers.keys.toList(),
-      'disposedFlags': _disposedFlags,
-    };
-  }
-
-  /// 检查是否有活跃视频在播放
-  static bool get hasActiveVideo => _activeVideoUrl != null;
-
-  /// 获取当前活跃视频URL
-  static String? get activeVideoUrl => _activeVideoUrl;
 }

@@ -81,17 +81,4 @@ class ReaderSettingsStateNotifier extends _$ReaderSettingsStateNotifier {
         ReaderSettingsState(textBrightness: newBrightness));
   }
 
-  /// 重新加载设置
-  Future<void> reload() async {
-    final service = ReaderSettingsService.instance;
-    final fontSize = await service.getFontSize();
-    final scrollSpeed = await service.getScrollSpeed();
-    final textBrightness = await service.getTextBrightness();
-
-    state = AsyncData(ReaderSettingsState(
-      fontSize: fontSize,
-      scrollSpeed: scrollSpeed,
-      textBrightness: textBrightness,
-    ));
-  }
 }

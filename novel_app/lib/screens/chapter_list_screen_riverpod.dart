@@ -573,7 +573,7 @@ class _ChapterListScreenRiverpodState
         final indexInPage = state.lastReadChapterIndex - startIndex;
 
         // 5. 计算滚动位置
-        final itemHeight = ChapterConstants.listItemHeight;
+        final itemHeight = 56.0;
         final targetOffset = indexInPage * itemHeight;
 
         // 获取可视区域高度

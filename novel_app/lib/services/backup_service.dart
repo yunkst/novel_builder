@@ -140,7 +140,21 @@ class BackupService {
 
     final now = DateTime.now();
     final difference = now.difference(lastBackup);
-    return FormatUtils.formatTimeDifference(difference);
+
+    // 内联时间差格式化
+    if (difference.inSeconds < 60) {
+      return '刚刚';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}分钟前';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}小时前';
+    } else if (difference.inDays == 1) {
+      return '昨天';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}天前';
+    } else {
+      return FormatUtils.formatDateTime(lastBackup, showTime: false);
+    }
   }
 
   /// 获取服务器备份列表

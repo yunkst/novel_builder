@@ -167,9 +167,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _loadChapterContent(resetScrollPosition: false);
       // 新系统不需要 _loadIllustrations()
     } catch (e, stackTrace) {
-      ErrorHelper.logError(
+      LoggerService.instance.e(
         '初始化API并加载内容失败',
-        stackTrace: stackTrace,
+        stackTrace: stackTrace.toString(),
         category: LogCategory.cache,
         tags: ['initialization', 'load-content'],
       );
@@ -255,9 +255,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         currentIndex: currentIndex,
       );
     } catch (e, stackTrace) {
-      ErrorHelper.logError(
+      LoggerService.instance.e(
         '预加载启动失败',
-        stackTrace: stackTrace,
+        stackTrace: stackTrace.toString(),
         category: LogCategory.cache,
         tags: ['preload', 'chapter'],
       );

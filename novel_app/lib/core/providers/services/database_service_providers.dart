@@ -21,7 +21,6 @@ library;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart';
 import '../../../services/chapter_search_service.dart';
-import '../../../services/cache_search_service.dart';
 import '../../../controllers/chapter_list/chapter_loader.dart';
 import '../../../controllers/chapter_list/chapter_action_handler.dart';
 import '../../../controllers/chapter_list/chapter_reorder_controller.dart';
@@ -159,38 +158,6 @@ ChapterReorderController chapterReorderController(Ref ref) {
 ChapterSearchService chapterSearchService(Ref ref) {
   final chapterRepository = ref.watch(chapterRepositoryProvider);
   return ChapterSearchService(chapterRepository: chapterRepository);
-}
-
-/// CacheSearchService Provider
-///
-/// 提供缓存搜索服务实例，支持缓存内容的搜索和分页。
-///
-/// **功能**:
-/// - 缓存内容搜索
-/// - 搜索结果分页
-/// - 搜索建议
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [databaseServiceProvider] - 数据库服务（用于 getCachedNovels）
-///
-/// **使用示例**:
-/// ```dart
-/// final cacheSearch = ref.watch(cacheSearchServiceProvider);
-/// final results = await cacheSearch.searchInCache(keyword: '关键词');
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 搜索操作是异步的
-@riverpod
-CacheSearchService cacheSearchService(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  final databaseService = ref.watch(databaseServiceProvider);
-  return CacheSearchService(
-    chapterRepository: chapterRepository,
-    databaseService: databaseService,
-  );
 }
 
 /// CharacterExtractionService 和 PromptTagService 已删除，相关 provider 已移除。

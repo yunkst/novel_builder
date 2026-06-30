@@ -98,34 +98,4 @@ class ChapterActionHandler {
     }
   }
 
-  /// 批量检查章节是否已缓存
-  ///
-  /// [chapterUrls] 章节URL列表
-  /// 返回 Map&lt;chapterUrl, isCached&gt;
-  ///
-  /// 性能优化：使用单次SQL查询替代逐个查询
-  Future<Map<String, bool>> areChaptersCached(List<String> chapterUrls) async {
-    _log.d(
-      '批量检查章节缓存状态, 共 ${chapterUrls.length} 章',
-      category: LogCategory.ui,
-      tags: ['chapter-list', 'cache-check'],
-    );
-    try {
-      final result = await _chapterRepo.getChaptersCacheStatus(chapterUrls);
-      _log.i(
-        '批量缓存状态查询完成, 共 ${chapterUrls.length} 章',
-        category: LogCategory.database,
-        tags: ['chapter', 'cache'],
-      );
-      return result;
-    } catch (e, st) {
-      _log.e(
-        '批量检查章节缓存状态失败 - $e',
-        stackTrace: st.toString(),
-        category: LogCategory.database,
-        tags: ['chapter', 'cache'],
-      );
-      rethrow;
-    }
-  }
 }

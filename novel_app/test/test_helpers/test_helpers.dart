@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
-import 'package:novel_app/services/database_service.dart';
 import 'package:novel_app/services/api_service_wrapper.dart';
-import 'package:novel_app/services/dify_service.dart';
 
 /// 测试辅助函数库
 ///
@@ -48,8 +46,6 @@ class TestHelpers {
 
 /// Mock类定义
 @GenerateMocks([
-  DatabaseService,
   ApiServiceWrapper,
-  DifyService,
 ])
 void main() {}

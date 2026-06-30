@@ -179,35 +179,4 @@ class ThemeNotifier extends _$ThemeNotifier {
     }
   }
 
-  /// 切换到亮色模式
-  Future<void> setLightMode() async {
-    await setThemeMode(AppThemeMode.light);
-  }
-
-  /// 切换到暗色模式
-  Future<void> setDarkMode() async {
-    await setThemeMode(AppThemeMode.dark);
-  }
-
-  /// 切换到系统模式
-  Future<void> setSystemMode() async {
-    await setThemeMode(AppThemeMode.system);
-  }
-
-  /// 在亮色和暗色之间切换
-  Future<void> toggleTheme() async {
-    final current = await future;
-
-    AppThemeMode newMode;
-    if (current.themeMode == AppThemeMode.light) {
-      newMode = AppThemeMode.dark;
-    } else if (current.themeMode == AppThemeMode.dark) {
-      newMode = AppThemeMode.light;
-    } else {
-      // 系统模式下，切换到亮色
-      newMode = AppThemeMode.light;
-    }
-
-    await setThemeMode(newMode);
-  }
 }

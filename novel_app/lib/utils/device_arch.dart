@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:riverpod/riverpod.dart';
 
 import '../services/logger_service.dart';
 
@@ -85,13 +84,3 @@ class DeviceArchDetector {
     }
   }
 }
-
-/// Riverpod Provider：设备架构
-///
-/// 使用方式：
-/// ```dart
-/// final arch = ref.watch(deviceArchProvider);
-/// ```
-final deviceArchProvider = FutureProvider<DeviceArch>((ref) async {
-  return DeviceArchDetector.getCurrent();
-});

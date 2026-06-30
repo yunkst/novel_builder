@@ -104,7 +104,7 @@ class NovelExportRepository {
       );
 
       LoggerService.instance.i(
-        '小说数据导出完成: ${novel.title}, ${exportData.summary}',
+        '小说数据导出完成: ${novel.title}',
         category: LogCategory.database,
         tags: ['export', 'novel', 'success'],
       );

@@ -180,47 +180,5 @@ final chapterSearchServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterSearchServiceRef = AutoDisposeProviderRef<ChapterSearchService>;
-String _$cacheSearchServiceHash() =>
-    r'7ce33b02bd80bfcae67f649ff478efd1b0363459';
-
-/// CacheSearchService Provider
-///
-/// 提供缓存搜索服务实例，支持缓存内容的搜索和分页。
-///
-/// **功能**:
-/// - 缓存内容搜索
-/// - 搜索结果分页
-/// - 搜索建议
-///
-/// **依赖**:
-/// - [chapterRepositoryProvider] - 章节数据访问
-/// - [databaseServiceProvider] - 数据库服务（用于 getCachedNovels）
-///
-/// **使用示例**:
-/// ```dart
-/// final cacheSearch = ref.watch(cacheSearchServiceProvider);
-/// final results = await cacheSearch.searchInCache(keyword: '关键词');
-/// ```
-///
-/// **注意事项**:
-/// - 不使用 `keepAlive`，每次使用时创建新实例
-/// - 搜索操作是异步的
-///
-/// Copied from [cacheSearchService].
-@ProviderFor(cacheSearchService)
-final cacheSearchServiceProvider =
-    AutoDisposeProvider<CacheSearchService>.internal(
-  cacheSearchService,
-  name: r'cacheSearchServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$cacheSearchServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CacheSearchServiceRef = AutoDisposeProviderRef<CacheSearchService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

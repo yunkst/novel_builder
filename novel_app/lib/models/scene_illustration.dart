@@ -1,5 +1,4 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'dart:math';
 
 part 'scene_illustration.g.dart';
 
@@ -78,20 +77,6 @@ class SceneIllustration {
       'completed_at': completedAt?.toIso8601String(),
     };
   }
-
-  // 生成唯一任务ID（静态方法，在创建前调用）
-  static String generateTaskId() {
-    return '${Random().nextInt(0xFFFFFFFF)}-${Random().nextInt(0xFFFF)}';
-  }
-
-  // 是否已完成
-  bool get isCompleted => status == 'completed';
-
-  // 是否正在处理
-  bool get isProcessing => status == 'processing' || status == 'pending';
-
-  // 是否失败
-  bool get isFailed => status == 'failed';
 
   // 复制并更新状态
   SceneIllustration copyWith({

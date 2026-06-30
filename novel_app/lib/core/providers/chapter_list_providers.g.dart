@@ -6,26 +6,6 @@ part of 'chapter_list_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentNovelHash() => r'eb3f11bb130c340d4ce14cecbe9caf17116461d5';
-
-/// ChapterListScreen 的 Novel 参数 Provider
-///
-/// 用于在屏幕中传递 novel 参数
-///
-/// Copied from [currentNovel].
-@ProviderFor(currentNovel)
-final currentNovelProvider = AutoDisposeProvider<Novel>.internal(
-  currentNovel,
-  name: r'currentNovelProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$currentNovelHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CurrentNovelRef = AutoDisposeProviderRef<Novel>;
 String _$preloadProgressHash() => r'dbf149df8f45977d02fa916bbe473dd817cfbd40';
 
 /// Copied from Dart SDK
@@ -204,7 +184,7 @@ class _PreloadProgressProviderElement
   Novel get novel => (origin as PreloadProgressProvider).novel;
 }
 
-String _$chapterListHash() => r'7da7227892459359958c4f5acbae7f0304206c94';
+String _$chapterListHash() => r'380744655dfa631062a67cdd4d8eb2fd70891a93';
 
 abstract class _$ChapterList
     extends BuildlessAutoDisposeNotifier<ChapterListState> {
