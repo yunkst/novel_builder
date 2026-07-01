@@ -18,9 +18,6 @@ import 'package:novel_api/src/model/app_version_response.dart';
 import 'package:novel_api/src/model/backup_upload_response.dart';
 import 'package:novel_api/src/model/chapter.dart';
 import 'package:novel_api/src/model/chapter_content.dart';
-import 'package:novel_api/src/model/chapter_sync_data.dart';
-import 'package:novel_api/src/model/character_relation_sync_data.dart';
-import 'package:novel_api/src/model/character_sync_data.dart';
 import 'package:novel_api/src/model/enhanced_scene_illustration_request.dart';
 import 'package:novel_api/src/model/http_validation_error.dart';
 import 'package:novel_api/src/model/image_to_video_request.dart';
@@ -28,15 +25,7 @@ import 'package:novel_api/src/model/image_to_video_response.dart';
 import 'package:novel_api/src/model/image_with_model.dart';
 import 'package:novel_api/src/model/models_response.dart';
 import 'package:novel_api/src/model/novel.dart';
-import 'package:novel_api/src/model/novel_sync_data.dart';
-import 'package:novel_api/src/model/novel_sync_delete_response.dart';
-import 'package:novel_api/src/model/novel_sync_download_request.dart';
-import 'package:novel_api/src/model/novel_sync_download_response.dart';
-import 'package:novel_api/src/model/novel_sync_list_response.dart';
-import 'package:novel_api/src/model/novel_sync_upload_request.dart';
-import 'package:novel_api/src/model/novel_sync_upload_response.dart';
 import 'package:novel_api/src/model/novel_with_chapters.dart';
-import 'package:novel_api/src/model/outline_sync_data.dart';
 import 'package:novel_api/src/model/role_card_generate_request.dart';
 import 'package:novel_api/src/model/role_card_task_status_response.dart';
 import 'package:novel_api/src/model/role_gallery_response.dart';
@@ -61,9 +50,6 @@ part 'serializers.g.dart';
   BackupUploadResponse,
   Chapter,
   ChapterContent,
-  ChapterSyncData,
-  CharacterRelationSyncData,
-  CharacterSyncData,
   EnhancedSceneIllustrationRequest,
   HTTPValidationError,
   ImageToVideoRequest,
@@ -71,15 +57,7 @@ part 'serializers.g.dart';
   ImageWithModel,
   ModelsResponse,
   Novel,
-  NovelSyncData,
-  NovelSyncDeleteResponse,
-  NovelSyncDownloadRequest,
-  NovelSyncDownloadResponse,
-  NovelSyncListResponse,
-  NovelSyncUploadRequest,
-  NovelSyncUploadResponse,
   NovelWithChapters,
-  OutlineSyncData,
   RoleCardGenerateRequest,
   RoleCardTaskStatusResponse,
   RoleGalleryResponse,

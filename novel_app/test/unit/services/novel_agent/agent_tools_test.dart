@@ -14,8 +14,8 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 15 个工具', () {
-      expect(AgentTools.allTools.length, 15);
+    test('应该有 17 个工具', () {
+      expect(AgentTools.allTools.length, 17);
     });
 
     test('每个工具都有 type=function', () {
@@ -124,9 +124,9 @@ void main() {
       verifyToolSchema('search_in_chapters', required: ['keyword']);
     });
 
-    test('update_chapter_content — 需要 position + content', () {
+    test('update_chapter_content — 需要 position + rewriteInstruction', () {
       verifyToolSchema('update_chapter_content',
-          required: ['position', 'content']);
+          required: ['position', 'rewriteInstruction']);
     });
 
     test('list_characters — 无参数（从上下文读取当前小说）', () {

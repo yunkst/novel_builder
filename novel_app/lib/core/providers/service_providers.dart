@@ -53,8 +53,3 @@ export 'services/database_service_providers.dart'
 
 // 缓存服务
 export 'services/cache_service_providers.dart';
-
-// 同步服务
-export 'services/sync_service_providers.dart'
-    show
-        novelSyncServiceProvider;

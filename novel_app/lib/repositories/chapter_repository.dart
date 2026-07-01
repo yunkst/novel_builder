@@ -1,17 +1,24 @@
 import 'dart:collection';
 import 'package:sqflite/sqflite.dart';
 import '../models/chapter.dart';
+import '../models/chapter_version.dart';
 import '../models/search_result.dart';
 import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
+import '../core/interfaces/repositories/i_chapter_version_repository.dart';
 
 /// 章节数据仓库
 ///
 /// 负责章节内容缓存、章节列表管理和用户自定义章节的数据库操作
 class ChapterRepository extends BaseRepository implements IChapterRepository {
-  /// 构造函数 - 通过依赖注入接收数据库连接
-  ChapterRepository({required super.dbConnection});
+  final IChapterVersionRepository _versionRepo;
+
+  /// 构造函数 - 通过依赖注入接收数据库连接和版本仓库
+  ChapterRepository({
+    required super.dbConnection,
+    required IChapterVersionRepository versionRepo,
+  }) : _versionRepo = versionRepo;
 
   // 内存状态管理
   // 使用 LinkedHashSet 实现 LRU 淘汰：新访问的条目移到末尾，淘汰时从头部移除
@@ -133,9 +140,43 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 更新章节内容
+  ///
+  /// 在覆盖之前自动将旧内容保存为历史版本，
+  /// 然后执行版本淘汰（每章最多保留 5 个版本）。
+  ///
+  /// [chapterUrl] 章节URL
+  /// [content] 新内容
+  /// [source] 版本来源：'edit'（用户编辑）| 'ai_rewrite'（AI改写）| 'restore'（还原操作）
   @override
-  Future<int> updateChapterContent(String chapterUrl, String content) async {
+  Future<int> updateChapterContent(String chapterUrl, String content,
+      {String source = 'edit'}) async {
     final db = await database;
+
+    // 1. 读取旧内容
+    final oldRows = await db.query(
+      'chapter_cache',
+      columns: ['content'],
+      where: 'chapterUrl = ?',
+      whereArgs: [chapterUrl],
+    );
+
+    // 2. 如果旧内容存在且与新内容不同，保存到版本表
+    if (oldRows.isNotEmpty) {
+      final oldContent = oldRows.first['content'] as String?;
+      if (oldContent != null && oldContent.isNotEmpty && oldContent != content) {
+        await _versionRepo.saveVersion(ChapterVersion(
+          chapterUrl: chapterUrl,
+          content: oldContent,
+          source: source,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          contentLength: oldContent.length,
+        ));
+        // 3. 版本淘汰
+        await _versionRepo.evictOldestVersions(chapterUrl, maxCount: 5);
+      }
+    }
+
+    // 4. 执行原有的 UPDATE
     final affected = await db.update(
       'chapter_cache',
       {
@@ -155,10 +196,12 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
   /// 删除章节缓存
   ///
-  /// 同时清理内存缓存，防止"幻读"
+  /// 同时清理内存缓存和版本历史，防止"幻读"
   @override
   Future<int> deleteChapterCache(String chapterUrl) async {
     _removeFromMemoryCache(chapterUrl);
+    // 级联删除版本历史
+    await _versionRepo.deleteVersionsByChapter(chapterUrl);
     final db = await database;
     final affected = await db.delete(
       'chapter_cache',
@@ -262,7 +305,7 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
 
   /// 删除小说的所有缓存章节
   ///
-  /// 同时清理内存缓存中该小说的所有条目，防止"幻读"
+  /// 同时清理内存缓存和版本历史，防止"幻读"
   @override
   Future<int> deleteCachedChapters(String novelUrl) async {
     try {
@@ -277,6 +320,9 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
       for (final row in urls) {
         _removeFromMemoryCache(row['chapterUrl'] as String);
       }
+
+      // 级联删除版本历史
+      await _versionRepo.deleteVersionsByNovel(novelUrl);
 
       final deleted = await db.delete(
         'chapter_cache',

@@ -558,22 +558,26 @@ void main() {
   // update_chapter_content
   // ========================================================================
   group('update_chapter_content', () {
-    test('通过 position 更新章节内容后可读取', () async {
+    test('通过 position 更新章节内容 — 未配置 LLM 时返回友好错误', () async {
       final novelId = await insertNovel();
       await insertChapter(content: '旧内容');
       final ctx = _ctx(novelId);
 
       final result = await executor.execute(
         'update_chapter_content',
-        {'position': 1, 'content': '新内容'},
+        {'position': 1, 'rewriteInstruction': '改写为悬疑风格'},
         scenarioContext: ctx,
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
 
-      expect(json['success'], true);
+      // 测试环境未配置 LLM，position 已正确解析到章节，
+      // LLM 调用链因无配置而失败（具体错误码取决于配置加载路径，统一断言非成功）
+      expect(json['success'], isNull);
+      expect(json.containsKey('error'), isTrue);
 
+      // 原文未被修改
       final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
-      expect(chapters.first.content, '新内容');
+      expect(chapters.first.content, '旧内容');
     });
 
     test('position 不存在 → chapter_position_out_of_range + suggested_tool', () async {
@@ -582,7 +586,7 @@ void main() {
 
       final result = await executor.execute(
         'update_chapter_content',
-        {'position': 999, 'content': '新内容'},
+        {'position': 999, 'rewriteInstruction': '新内容'},
         scenarioContext: ctx,
       );
       final json = jsonDecode(result) as Map<String, dynamic>;

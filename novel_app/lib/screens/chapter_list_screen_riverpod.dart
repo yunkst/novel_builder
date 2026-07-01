@@ -16,8 +16,6 @@ import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
 import 'background_setting_screen.dart';
 import 'insert_chapter_screen.dart';
-import '../widgets/novel_sync_dialog.dart';
-import '../core/providers/novel_sync_providers.dart';
 import '../core/providers/reading_context_providers.dart';
 
 /// 章节列表页面 - Riverpod版本
@@ -252,12 +250,6 @@ class _ChapterListScreenRiverpodState
               ),
             );
             break;
-          case 'upload_to_server':
-            _handleUploadToServer();
-            break;
-          case 'download_from_server':
-            _handleDownloadFromServer();
-            break;
         }
       },
       itemBuilder: (context) {
@@ -302,27 +294,6 @@ class _ChapterListScreenRiverpodState
                 Icon(Icons.info_outline),
                 SizedBox(width: 8),
                 Text('背景设定'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'upload_to_server',
-            child: Row(
-              children: [
-                Icon(Icons.cloud_upload_outlined, color: context.appColors.info),
-                SizedBox(width: 8),
-                Text('上传到服务器'),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'download_from_server',
-            child: Row(
-              children: [
-                Icon(Icons.cloud_download_outlined, color: context.appColors.success),
-                SizedBox(width: 8),
-                Text('从服务器下载'),
               ],
             ),
           ),
@@ -724,190 +695,6 @@ class _ChapterListScreenRiverpodState
       if (mounted) {
         ToastUtils.showError('删除章节失败: $e');
       }
-    }
-  }
-
-  /// 处理上传到服务器
-  Future<void> _handleUploadToServer() async {
-    // 显示确认对话框
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.cloud_upload_outlined, color: context.appColors.info),
-            const SizedBox(width: 8),
-            const Text('上传到服务器'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('将上传以下小说的所有数据到服务器：'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.novel.title,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  if (widget.novel.author.isNotEmpty)
-                    Text(
-                      widget.novel.author,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '将同步：章节内容、角色信息、角色关系、大纲数据',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('上传'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    // 显示同步对话框
-    final result = await NovelSyncDialog.show(
-      context: context,
-      novel: widget.novel,
-      operation: SyncOperation.upload,
-    );
-
-    if (result != null && result.success && mounted) {
-      ToastUtils.showSuccess('小说上传成功');
-    }
-  }
-
-  /// 处理从服务器下载
-  Future<void> _handleDownloadFromServer() async {
-    // 显示确认对话框
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.cloud_download_outlined, color: context.appColors.success),
-            const SizedBox(width: 8),
-            const Text('从服务器下载'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('将从服务器下载以下小说的数据：'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.novel.title,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  if (widget.novel.author.isNotEmpty)
-                    Text(
-                      widget.novel.author,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: context.appColors.warningContainer,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: context.appColors.warningContainer),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber, color: context.appColors.onWarningContainer, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '下载将覆盖本地的章节数据',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.appColors.onWarningContainer,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.appColors.success,
-              foregroundColor: context.appColors.onSemantic,
-            ),
-            child: const Text('下载'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    // 显示同步对话框
-    final result = await NovelSyncDialog.show(
-      context: context,
-      novel: widget.novel,
-      operation: SyncOperation.download,
-    );
-
-    if (result != null && result.success && mounted) {
-      // 刷新章节列表
-      await ref
-          .read(chapterListProvider(widget.novel).notifier)
-          .refreshChapters(context);
-      ToastUtils.showSuccess('小说下载成功');
     }
   }
 }

@@ -5,6 +5,7 @@ import 'package:novel_app/services/preload_service.dart';
 import 'package:novel_app/services/headless_webview_content_service.dart';
 import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
+import 'package:novel_app/repositories/chapter_version_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
 import 'package:novel_app/models/chapter_content_result.dart';
@@ -72,7 +73,7 @@ void main() {
   setUp(() async {
     db = await TestDatabaseSetup.createInMemoryDatabase();
     final connection = DatabaseConnection.forTesting(db);
-    chapterRepository = ChapterRepository(dbConnection: connection);
+    chapterRepository = ChapterRepository(dbConnection: connection, versionRepo: ChapterVersionRepository(dbConnection: connection));
     mockHeadlessService = MockHeadlessWebViewContentService();
     preloadService = PreloadService(
       chapterRepository: chapterRepository,

@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../core/providers/reading_context_providers.dart';
+import '../../repositories/agent_memory_repository.dart';
 import '../dsl_engine/llm_provider.dart' show ChatMessage;
 
 // 导出 ChatMessage：AgentScenario 接口方法签名依赖它，
@@ -101,18 +102,20 @@ abstract class AgentScenario {
 
   /// patch 记忆（增/改/删），由 patch_memory 工具调用
   ///
+  /// 用编号定位（1-based，来自 system prompt「## 经验记忆」段的 [N] 标记），
+  /// 不依赖全文匹配，避免 LLM 难以逐字复现记忆原文。
+  ///
   /// 行为：
-  /// - oldText 为空（首次插入）→ 直接插入 newText，返回成功
-  /// - oldText 非空 + newText 为空 → 查找并删除
-  /// - oldText 非空 + newText 非空 → 查找并替换
-  ///   - 找到：更新成功
-  ///   - 找不到：返回错误 + 当前所有记忆内容（供 AI 修正）
-  /// 默认实现要求场景有 [scenarioId]，可被所有 AgentScenario 复用。
+  /// - index 为空/≤0 + newText 非空 → 新增（内容已存在则跳过，幂等返回成功）
+  /// - index 给定 + newText 为空 → 删除第 index 条
+  /// - index 给定 + newText 非空 → 替换第 index 条（与其它记忆重复则拒绝）
+  /// - index 越界 → 返回错误 + 当前所有记忆的编号列表（供 AI 修正）
+  ///
+  /// 默认实现不可用，子类应通过 [AgentMemoryPatchMixin] 获得统一实现。
   Future<MemoryPatchResult> patchMemory(
-    String? oldText,
+    int? index,
     String newText,
   ) async {
-    // 默认空实现：子类应通过 Ref + Repository 提供具体逻辑
     return MemoryPatchResult.error(
       'patch_memory 在当前场景不可用',
       const [],
@@ -142,6 +145,94 @@ mixin AgentScenarioCleanupMixin implements AgentScenario {
   }
 }
 
+/// patch_memory 的统一实现 mixin
+///
+/// 提供 `_cachedMemories` 缓存与编号定位的 patch 逻辑，供所有 AgentScenario 复用，
+/// 消除各场景的重复实现。子类通过 `with AgentMemoryPatchMixin`（配合
+/// `implements AgentScenario`）获得能力，只需在 `getMemories`/`patchMemory`
+/// 中注入 [AgentMemoryRepository] 调用 [loadMemories]/[patchMemoryImpl] 即可。
+///
+/// 编号稳定性：`getAllByScenario` 与 `getAllWithId` 均按 `created_at ASC` 排序，
+/// system prompt 的 `[N]` 编号 = patchMemoryImpl 内 `all` 列表顺序，天然对齐。
+mixin AgentMemoryPatchMixin on AgentScenario {
+  /// 记忆缓存：getMemories 预填，patchMemory 成功后重建，buildSystemPrompt 复用。
+  List<String> _cachedMemories = const [];
+
+  /// 当前缓存（供 buildSystemPrompt 直接读取，零 IO）
+  List<String> get cachedMemories => _cachedMemories;
+
+  /// 从 DB 加载当前场景全部记忆并写入缓存
+  Future<List<String>> loadMemories(AgentMemoryRepository repo) async {
+    _cachedMemories = await repo.getAllByScenario(id);
+    return _cachedMemories;
+  }
+
+  /// 编号定位 + 去重的 patch 实现
+  ///
+  /// [repo] 由子类注入；[index] 为 1-based 编号，null/≤0 视为新增；
+  /// [newText] 为空时表示删除（此时 index 必填）。
+  Future<MemoryPatchResult> patchMemoryImpl(
+    AgentMemoryRepository repo,
+    int? index,
+    String newText,
+  ) async {
+    final all = await repo.getAllWithId(id);
+    final allContents = all.map((r) => r['content'] as String).toList();
+
+    // —— 新增（index 省略/≤0）——
+    final isNew = index == null || index <= 0;
+    if (isNew) {
+      if (newText.isEmpty) {
+        return MemoryPatchResult.error(
+          '新增记忆时 newText 不能为空',
+          allContents,
+        );
+      }
+      // 去重：内容已存在则幂等跳过（不算错误，避免 AI 误判重试）
+      if (allContents.contains(newText)) {
+        return MemoryPatchResult.ok('记忆已存在，跳过新增');
+      }
+      await repo.addMemory(id, newText);
+      await loadMemories(repo); // 重建缓存，保证编号正确
+      return MemoryPatchResult.ok('新记忆已添加（编号 ${_cachedMemories.length}）');
+    }
+
+    // —— index 定位校验 ——
+    final idx = index - 1; // 转 0-based
+    if (idx < 0 || idx >= all.length) {
+      return MemoryPatchResult.error(
+        '编号 $index 超出范围（当前共 ${all.length} 条记忆，有效范围 1~${all.length}）',
+        allContents,
+      );
+    }
+    final row = all[idx];
+    final rowId = row['id'] as int;
+
+    // —— 删除（newText 为空）——
+    if (newText.isEmpty) {
+      await repo.deleteMemory(rowId);
+      await loadMemories(repo);
+      return MemoryPatchResult.ok('第 $index 条记忆已删除');
+    }
+
+    // —— 替换 ——
+    // 去重：若 newText 与其它已有记忆（非自身）相同，拒绝以避免重复
+    final conflict = allContents
+        .asMap()
+        .entries
+        .any((e) => e.key != idx && e.value == newText);
+    if (conflict) {
+      return MemoryPatchResult.error(
+        '新内容与其它已有记忆重复',
+        allContents,
+      );
+    }
+    await repo.updateMemory(rowId, newText);
+    await loadMemories(repo);
+    return MemoryPatchResult.ok('第 $index 条记忆已更新');
+  }
+}
+
 /// patch_memory 工具的执行结果
 class MemoryPatchResult {
   final bool success;
@@ -166,39 +257,41 @@ class MemoryPatchResult {
 /// 说明：这是 Agent 进化的核心机制。
 /// - 遇到坑、用户帮你解决的、研究好几轮才解决的记忆，用 patch_memory 记录下来
 /// - 遇到和记忆不符的，先 patch_memory 修改记忆
-/// - patch_memory(oldText="...", newText="...")：
-///   - oldText 为空 → 新增
-///   - newText 为空 → 删除
-///   - 两者都非空 → 替换
-///   - 找不到 oldText → 报错并返回所有记忆
+/// - patch_memory(index=N, newText="...")：用编号定位（不依赖全文匹配）
+///   - index 省略/0 + newText 非空 → 新增（内容已存在则跳过）
+///   - index 给定 + newText 为空 → 删除第 index 条
+///   - index 给定 + newText 非空 → 替换第 index 条
+///   - index 越界 → 报错并返回所有记忆的编号列表
 const Map<String, dynamic> patchMemoryToolDefinition = {
   'type': 'function',
   'function': {
     'name': 'patch_memory',
     'description':
         '修改/添加/删除当前场景的经验记忆。\n'
-        '记忆会持久化到本地数据库，并在下次对话的 system prompt 中出现。\n'
+        '记忆会持久化到本地数据库，并在下次对话的 system prompt 中以编号列表出现。\n'
+        '记忆列表见 system prompt 末尾的「## 经验记忆」段，每条形如 `[1] 内容`。\n'
         '使用场景：\n'
         '- 遇到坑、用户帮你解决、或者研究了好几轮才解决的记忆 → 记录下来\n'
         '- 遇到和当前记忆不符的情况 → 修改记忆\n'
         '- 旧的记忆不再适用 → 删除\n'
-        '参数说明：\n'
-        '- oldText 为空字符串或省略 → 新增 newText\n'
-        '- newText 为空字符串或省略 → 删除 oldText\n'
-        '- 两者都非空 → 查找 oldText 并替换为 newText\n'
-        '- 若 oldText 在记忆中没有完全匹配 → 报错并返回所有现有记忆内容',
+        '参数说明（操作模式由 index / newText 组合决定）：\n'
+        '- index 省略或 0 + newText 非空 → 新增（若内容已存在则跳过）\n'
+        '- index 给定 + newText 为空或省略 → 删除第 index 条记忆\n'
+        '- index 给定 + newText 非空 → 替换第 index 条记忆\n'
+        '- index 越界 → 报错并返回当前所有记忆的编号列表（[N] 格式，供修正）',
     'parameters': {
       'type': 'object',
       'properties': {
-        'oldText': {
-          'type': 'string',
+        'index': {
+          'type': 'integer',
           'description':
-              '要被替换/删除的旧记忆内容（必须完全匹配）。为空表示新增。',
+              '要替换/删除的记忆编号（1-based，来自 system prompt「## 经验记忆」段的 [N] 标记）。'
+              '省略或传 0 表示新增。',
         },
         'newText': {
           'type': 'string',
           'description':
-              '新记忆内容。为空表示删除。',
+              '新记忆内容。为空或省略表示删除（此时 index 必填）。',
         },
       },
       'required': <String>[],

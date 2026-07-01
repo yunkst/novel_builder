@@ -39,7 +39,6 @@ import '../widgets/reader/reader_content_view.dart'; // ReaderContentView组件
 import '../widgets/reader/reader_error_view.dart'; // ReaderErrorView组件
 import '../utils/toast_utils.dart';
 import '../controllers/reader_content_controller.dart';
-import '../controllers/reader_interaction_controller.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 // Riverpod Providers
@@ -50,6 +49,8 @@ import '../core/providers/reader_edit_mode_provider.dart';
 import '../core/providers/reader_state_providers.dart'; // 新增：细粒度状态Provider
 import '../core/providers/reading_context_providers.dart';
 import '../widgets/hermes/hermes_floating_button.dart';
+import '../widgets/reader/version_history_sheet.dart';
+import '../models/chapter_version.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -84,9 +85,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   // ========== 新增：ReaderContentController ==========
   late ReaderContentController _contentController;
 
-  // ========== 新增：ReaderInteractionController ==========
-  late ReaderInteractionController _interactionController;
-
   // ========== 便捷访问器（向后兼容） ==========
   // ⚠️ 注意：这些 getter 使用 ref.read()，不会触发 UI 重建
   // 在 build() 方法中应该使用 ref.watch() 直接监听 Provider
@@ -94,12 +92,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   String get _errorMessage => _contentController.errorMessage;
 
   // ========== 计算属性 ==========
-  /// 段落列表（缓存分割结果，提升性能）
-  List<String> get _paragraphs => _contentController.content
-      .split('\n')
-      .where((p) => p.trim().isNotEmpty)
-      .toList();
-
   /// 当前章节索引（避免重复查找）
   int get _currentChapterIndex =>
       widget.chapters.indexWhere((c) => c.url == _currentChapter.url);
@@ -137,10 +129,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       novelRepository: ref.read(novelRepositoryProvider),
       headlessService: ref.read(headlessWebViewContentServiceProvider),
     );
-
-    // ========== 初始化 ReaderInteractionController ==========
-    // 新版本：不再需要onStateChanged回调，状态通过Riverpod Provider自动管理
-    _interactionController = ReaderInteractionController(ref: ref);
 
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
@@ -260,72 +248,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         stackTrace: stackTrace.toString(),
         category: LogCategory.cache,
         tags: ['preload', 'chapter'],
-      );
-    }
-  }
-
-  // 处理段落长按 - 显示操作菜单
-
-// ============ User Interaction Handlers ============
-  void _handleLongPress(int index) {
-    final interactionState = ref.read(interactionStateNotifierProvider);
-    if (!_interactionController
-        .shouldHandleLongPress(interactionState.isCloseupMode)) {
-      return;
-    }
-
-    final paragraphs = _paragraphs;
-
-    if (index >= 0 && index < paragraphs.length) {
-      final paragraph = paragraphs[index].trim();
-
-      // 显示选项菜单
-      showModalBottomSheet(
-        context: context,
-        builder: (BuildContext context) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '段落操作',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // 段落预览
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Theme.of(context).dividerColor),
-                  ),
-                  child: Text(
-                    paragraph.length > 100
-                        ? '${paragraph.substring(0, 100)}...'
-                        : paragraph,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
       );
     }
   }
@@ -524,6 +446,63 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       case 'refresh':
         _refreshChapter();
         break;
+      case 'version_history':
+        _showVersionHistory();
+        break;
+      case 'create_snapshot':
+        _createSnapshot();
+        break;
+    }
+  }
+
+  // 显示版本历史面板
+  void _showVersionHistory() {
+    VersionHistorySheet.show(
+      context,
+      chapterUrl: _currentChapter.url,
+      chapterTitle: _currentChapter.title,
+      onRestored: () {
+        // 还原后重新加载章节内容
+        _loadChapterContent(resetScrollPosition: false);
+      },
+    );
+  }
+
+  // 手动创建当前内容的快照
+  Future<void> _createSnapshot() async {
+    try {
+      final content = _contentController.content;
+      if (content.isEmpty) {
+        if (mounted) {
+          ToastUtils.showError('当前章节内容为空，无法创建快照', context: context);
+        }
+        return;
+      }
+
+      final versionRepo = ref.read(chapterVersionRepositoryProvider);
+      await versionRepo.saveVersion(ChapterVersion(
+        chapterUrl: _currentChapter.url,
+        content: content,
+        source: 'manual_snapshot',
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        contentLength: content.length,
+      ));
+
+      // 版本淘汰
+      await versionRepo.evictOldestVersions(_currentChapter.url, maxCount: 5);
+
+      if (mounted) {
+        ToastUtils.showSuccess('快照已创建', context: context);
+      }
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '创建快照失败',
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['chapter_version', 'snapshot', 'failed'],
+      );
     }
   }
 
@@ -557,16 +536,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   // ========== 辅助方法 ==========
-
-  // 切换特写模式
-  void _toggleCloseupMode() {
-    _interactionController.toggleCloseupMode();
-  }
-
-  // 处理段落点击
-  void _handleParagraphTap(int index) {
-    _interactionController.handleParagraphTap(index, _paragraphs);
-  }
 
   // 保存编辑后的章节内容
 
@@ -602,9 +571,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 使用 ref.watch 监听编辑模式状态
     final isEditMode = ref.watch(readerEditModeProvider);
 
-    // ⭐ 关键修复：监听交互状态变化（特写模式、段落选择），确保UI在状态变化时重建
-    final interactionState = ref.watch(interactionStateNotifierProvider);
-
     // ⭐ 关键修复：监听章节内容状态，确保内容加载后UI重建（修复空白页面问题）
     final contentState = ref.watch(chapterContentStateNotifierProvider);
 
@@ -631,16 +597,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           },
           onMenuAction: _handleMenuAction,
         ),
-        body: _buildBody(context, isEditMode, paragraphs, interactionState),
+        body: _buildBody(context, isEditMode, paragraphs),
         floatingActionButton: _contentController.content.isEmpty
             ? null
             : ReaderActionButtons(
-                isCloseupMode: interactionState.isCloseupMode,
-                hasSelectedParagraphs:
-                    interactionState.selectedParagraphIndices.isNotEmpty,
                 isAutoScrolling: isAutoScrolling, // Mixin getter
                 isAutoScrollPaused: isAutoScrollPaused, // Mixin getter
-                onToggleCloseupMode: _toggleCloseupMode,
                 onToggleAutoScroll: toggleAutoScroll, // Mixin method
               ),
       ),
@@ -652,7 +614,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BuildContext context,
     bool isEditMode,
     List<String> paragraphs,
-    InteractionState interactionState,
   ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -688,14 +649,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         // 主要内容区域
         ReaderContentView(
           paragraphs: paragraphs,
-          selectedParagraphIndices: interactionState.selectedParagraphIndices,
           fontSize: _fontSize ?? 18.0,
           textBrightness: _textBrightness ?? 1.0,
-          isCloseupMode: interactionState.isCloseupMode,
           isEditMode: isEditMode,
           isAutoScrolling: isAutoScrolling,
-          onParagraphTap: _handleParagraphTap,
-          onParagraphLongPress: _handleLongPress,
           onContentChanged: (index, newContent) {
             // 仅支持全文编辑模式（index=-1）
             assert(index == -1, '只支持全文编辑模式，段落编辑模式已废弃');

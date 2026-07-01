@@ -9,8 +9,12 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/services/llm_config_service.dart';
+import 'package:novel_app/services/ai/ai_service_factory.dart';
+import 'package:novel_app/services/preferences_service.dart';
 
 import '../../core/providers/database_providers.dart';
+import '../../core/providers/services/ai_service_providers.dart';
 import '../../models/character.dart';
 import '../../models/novel.dart';
 import '../../models/outline.dart';
@@ -26,6 +30,14 @@ class _IdResolveResult {
   final Map<String, dynamic>? errorJson;
   const _IdResolveResult.success(this.url) : errorJson = null;
   const _IdResolveResult.failure(this.errorJson) : url = null;
+}
+
+/// LLM 重写结果
+class _RewriteResult {
+  final String? content;
+  final Map<String, dynamic>? errorJson;
+  const _RewriteResult.success(this.content) : errorJson = null;
+  const _RewriteResult.failure(this.errorJson) : content = null;
 }
 
 class ToolExecutor {
@@ -62,6 +74,8 @@ class ToolExecutor {
         case 'search_in_chapters':
           return await _searchInChapters(args, scenarioContext);
         // ===== 章节写入 =====
+        case 'create_chapter':
+          return await _createChapter(args, scenarioContext);
         case 'update_chapter_content':
           return await _updateChapterContent(args, scenarioContext);
         // ===== 角色 =====
@@ -83,6 +97,8 @@ class ToolExecutor {
           return await _listPromptTags(args);
         case 'save_prompt_tag':
           return await _savePromptTag(args);
+        case 'delete_prompt_tag':
+          return await _deletePromptTag(args);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -380,6 +396,110 @@ class ToolExecutor {
 
   // ===== 章节写入 =====
 
+  Future<String> _createChapter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (position, posErr) = parser.requireInt('position');
+    if (posErr != null) return posErr;
+    final (instruction, instErr) = parser.requireString('instruction');
+    if (instErr != null) return instErr;
+    final (title, _) = parser.optionalString('title');
+    final (characterNames, charNamesErr) = parser.optionalStringList('characterNames');
+    if (charNamesErr != null) return charNamesErr;
+    final (tagNames, tagNamesErr) = parser.optionalStringList('tagNames');
+    if (tagNamesErr != null) return tagNamesErr;
+    final charNames = characterNames ?? const <String>[];
+    final tags = tagNames ?? const <String>[];
+
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final novelUrl = novelResolve.url!;
+
+    // 校验 position 范围：1 ≤ position ≤ 章节总数 + 1
+    final chapterRepo = ref.read(chapterRepositoryProvider);
+    final chapters = await chapterRepo.getCachedNovelChapters(novelUrl);
+    final totalCount = chapters.length;
+    if (position < 1 || position > totalCount + 1) {
+      LoggerService.instance.d(
+        '工具引导错误: create_chapter_position_out_of_range position=$position total=$totalCount',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'create_chapter', 'position_out_of_range'],
+      );
+      return jsonEncode({
+        'error': 'position_out_of_range',
+        'message': totalCount == 0
+            ? '当前小说没有任何章节，position 只能为 1。'
+            : '插入位置 $position 超出范围（当前共 $totalCount 章，有效范围 1~${totalCount + 1}）。'
+                '请先调用 list_chapters 查看有效位置。',
+        'suggested_tool': 'list_chapters',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+
+    // 确定章节标题
+    final chapterTitle = (title != null && title.trim().isNotEmpty)
+        ? title.trim()
+        : '第 $position 章';
+
+    // 调用 LLM 生成正文
+    final generateResult = await _generateChapter(
+      novelUrl: novelUrl,
+      chapterTitle: chapterTitle,
+      instruction: instruction,
+      characterNames: charNames,
+      tagNames: tags,
+    );
+    if (generateResult.errorJson != null) {
+      return jsonEncode(generateResult.errorJson);
+    }
+    final newContent = ContentSanitizer.sanitize(generateResult.content!);
+
+    // 插入章节：先腾出位置，再创建
+    final insertIndex = position - 1; // 0-based
+    try {
+      await chapterRepo.shiftChapterIndicesFrom(novelUrl, insertIndex);
+      await chapterRepo.createCustomChapter(
+        novelUrl,
+        chapterTitle,
+        newContent,
+        insertIndex,
+      );
+    } catch (e, stack) {
+      LoggerService.instance.e('创建章节入库失败: $e',
+          stackTrace: stack.toString(),
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_chapter', 'db_error']);
+      return jsonEncode({
+        'error': 'db_error',
+        'message': '章节内容已生成但入库失败：$e',
+      });
+    }
+
+    // 重新获取章节列表以拿到新章节的 URL
+    final updatedChapters = await chapterRepo.getCachedNovelChapters(novelUrl);
+    final newChapter = updatedChapters.firstWhere(
+      (c) => c.title == chapterTitle && c.chapterIndex == insertIndex,
+      orElse: () => updatedChapters[position - 1],
+    );
+
+    LoggerService.instance.i(
+        'AI 创建章节: position=$position, title="$chapterTitle", ${newContent.length} chars',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'create_chapter']);
+    return jsonEncode({
+      'success': true,
+      'message': '章节「$chapterTitle」已创建（${newContent.length} 字）。',
+      'chapterTitle': chapterTitle,
+      'position': position,
+      'novelUrl': novelUrl,
+      'chapterUrl': newChapter.url,
+      'charCount': newContent.length,
+    });
+  }
+
   Future<String> _updateChapterContent(
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
@@ -387,9 +507,15 @@ class ToolExecutor {
     final parser = ToolArgParser(args);
     final (position, posErr) = parser.requireInt('position');
     if (posErr != null) return posErr;
-    final (rawContent, contentErr) = parser.requireString('content');
-    if (contentErr != null) return contentErr;
-    final content = ContentSanitizer.sanitize(rawContent);
+    final (rewriteInstruction, instErr) =
+        parser.requireString('rewriteInstruction');
+    if (instErr != null) return instErr;
+    final (characterNames, charNamesErr) = parser.optionalStringList('characterNames');
+    if (charNamesErr != null) return charNamesErr;
+    final (tagNames, tagNamesErr) = parser.optionalStringList('tagNames');
+    if (tagNamesErr != null) return tagNamesErr;
+    final charNames = characterNames ?? const <String>[];
+    final tags = tagNames ?? const <String>[];
 
     final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
     if (resolveResult.errorJson != null) {
@@ -397,8 +523,38 @@ class ToolExecutor {
     }
     final chapterUrl = resolveResult.url!;
 
-    final repo = ref.read(chapterRepositoryProvider);
-    final affected = await repo.updateChapterContent(chapterUrl, content);
+    // 读取章节原文（重写基础）
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    final novelUrl = novelResolve.url!;
+    final chapterRepo = ref.read(chapterRepositoryProvider);
+    final chapters = await chapterRepo.getCachedNovelChapters(novelUrl);
+    final chapter =
+        chapters.firstWhere((c) => c.url == chapterUrl, orElse: () => chapters[position - 1]);
+    final originalContent = await chapterRepo.getCachedChapter(chapterUrl);
+    if (originalContent == null || originalContent.isEmpty) {
+      return jsonEncode({
+        'error': 'not_cached',
+        'message':
+            '位置 $position 的章节存在但内容尚未缓存，无法重写。请告知用户先加载/缓存该章节。',
+      });
+    }
+
+    // 组合提示词并调用 LLM 重写
+    final rewriteResult = await _rewriteChapter(
+      novelUrl: novelUrl,
+      chapterTitle: chapter.title,
+      originalContent: originalContent,
+      rewriteInstruction: rewriteInstruction,
+      characterNames: charNames,
+      tagNames: tags,
+    );
+    if (rewriteResult.errorJson != null) {
+      return jsonEncode(rewriteResult.errorJson);
+    }
+    final newContent = ContentSanitizer.sanitize(rewriteResult.content!);
+
+    // 保存到数据库
+    final affected = await chapterRepo.updateChapterContent(chapterUrl, newContent, source: 'ai_rewrite');
     if (affected == 0) {
       LoggerService.instance.d(
         '工具引导错误: chapter_not_found position=$position',
@@ -413,9 +569,218 @@ class ToolExecutor {
       });
     }
 
-    LoggerService.instance.i('更新章节内容: position=$position (${content.length} chars)',
+    LoggerService.instance.i(
+        'AI 重写章节: position=$position, ${originalContent.length}→${newContent.length} chars',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_chapter_content']);
-    return jsonEncode({'success': true, 'message': '章节内容已更新'});
+    // 返回元信息（不含正文，避免 LLM 上下文爆炸）
+    // __meta 不会被 agent_loop 截断，UI 据此渲染跳转入口
+    return jsonEncode({
+      'success': true,
+      'message': '章节「${chapter.title}」已重写（${newContent.length} 字）。',
+      'chapterTitle': chapter.title,
+      'position': position,
+      'novelUrl': novelUrl,
+      'chapterUrl': chapterUrl,
+      'charCount': newContent.length,
+    });
+  }
+
+  /// 读取 AI 作家设定（用户在 AI 配置页填写的作家人设 prompt），返回 trim 后的字符串
+  Future<String> _loadWriterPrompt() async {
+    final raw = await PreferencesService.instance.getString('ai_writer_prompt');
+    return raw.trim();
+  }
+
+  /// 拼装 LLM 上下文片段：人物卡 + 写作标签。
+  ///
+  /// 人物卡按名字在当前小说里查找（避免暴露/误传真实 ID）；
+  /// 写作标签按名匹配，每个标签随机抽一条 prompt。
+  Future<List<String>> _buildContextParts(
+    String novelUrl,
+    List<String> characterNames,
+    List<String> tagNames,
+  ) async {
+    final parts = <String>[];
+
+    // 人物卡
+    if (characterNames.isNotEmpty) {
+      final charRepo = ref.read(characterRepositoryProvider);
+      final allCharacters = await charRepo.getCharacters(novelUrl);
+      final wanted = allCharacters
+          .where((c) => characterNames.contains(c.name))
+          .toList();
+      if (wanted.isNotEmpty) {
+        parts.add(Character.formatForAI(wanted));
+      }
+    }
+
+    // 写作标签（每个标签随机抽一条 prompt）
+    if (tagNames.isNotEmpty) {
+      final tagRepo = ref.read(promptTagRepositoryProvider);
+      final allTags = await tagRepo.getAll();
+      final buffer = StringBuffer('【写作标签参考】\n');
+      for (final name in tagNames) {
+        final matched = allTags.where((t) => t.name == name).toList();
+        if (matched.isEmpty) continue;
+        matched.shuffle();
+        buffer.writeln('- $name：${matched.first.promptText}');
+      }
+      if (buffer.length > '【写作标签参考】\n'.length) {
+        parts.add(buffer.toString());
+      }
+    }
+
+    return parts;
+  }
+
+  /// 阻塞调用 LLM 生成正文。
+  ///
+  /// 由 [systemPrompt] 和 [userPrompt] 组成消息，使用写作场景的激活配置。
+  /// [failTag] 用于失败日志的 tag 归属。
+  Future<_RewriteResult> _callLlm({
+    required String systemPrompt,
+    required String userPrompt,
+    required String failTag,
+  }) async {
+    final configService = ref.read(llmConfigServiceProvider);
+    final activeConfig =
+        await configService.getActiveConfig(scenarioId: ScenarioIds.writing);
+    if (activeConfig == null) {
+      return _RewriteResult.failure({
+        'error': 'llm_not_configured',
+        'message': LlmConfigService.notConfiguredMessage,
+      });
+    }
+    final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
+    final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
+
+    try {
+      final response = await llm.chat(
+        messages: [
+          ChatMessage(role: 'system', content: systemPrompt),
+          ChatMessage(role: 'user', content: userPrompt),
+        ],
+        maxTokens: 8192,
+        temperature: 0.8,
+      );
+      final content = response.content.trim();
+      if (content.isEmpty) {
+        return _RewriteResult.failure({
+          'error': 'llm_empty_response',
+          'message': 'LLM 返回了空内容。请稍后重试或调整要求。',
+        });
+      }
+      return _RewriteResult.success(content);
+    } catch (e, stack) {
+      LoggerService.instance.e('LLM 调用失败: $e',
+          stackTrace: stack.toString(),
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', failTag, 'llm_error']);
+      return _RewriteResult.failure({
+        'error': 'llm_call_failed',
+        'message': '调用 LLM 失败：$e',
+      });
+    }
+  }
+
+  /// 调用 LLM 重写章节
+  ///
+  /// 组合「原文 + 修改要求 + 人物卡 + 标签 prompt」为提示词，
+  /// 阻塞调用 LLM，返回新正文或错误。
+  Future<_RewriteResult> _rewriteChapter({
+    required String novelUrl,
+    required String chapterTitle,
+    required String originalContent,
+    required String rewriteInstruction,
+    required List<String> characterNames,
+    required List<String> tagNames,
+  }) async {
+    final writerPrompt = await _loadWriterPrompt();
+    final contextParts =
+        await _buildContextParts(novelUrl, characterNames, tagNames);
+
+    final prompt = StringBuffer()
+      ..writeln('请根据以下信息重写章节正文。')
+      ..writeln()
+      ..writeln('## 章节标题')
+      ..writeln(chapterTitle)
+      ..writeln()
+      ..writeln('## 修改要求')
+      ..writeln(rewriteInstruction)
+      ..writeln();
+    if (writerPrompt.isNotEmpty) {
+      prompt.writeln('## AI 作家设定');
+      prompt.writeln(writerPrompt);
+      prompt.writeln();
+    }
+    if (contextParts.isNotEmpty) {
+      prompt.writeln(contextParts.join('\n'));
+      prompt.writeln();
+    }
+    prompt
+      ..writeln('## 原文')
+      ..writeln(originalContent)
+      ..writeln()
+      ..writeln('## 输出要求')
+      ..writeln('请直接输出重写后的完整章节正文，不要输出任何说明、标题或解释性文字。');
+
+    final systemPrompt = writerPrompt.isNotEmpty
+        ? '$writerPrompt\n\n你是专业的小说写作助手，只输出小说正文。'
+        : '你是专业的小说写作助手，只输出小说正文。';
+
+    return _callLlm(
+      systemPrompt: systemPrompt,
+      userPrompt: prompt.toString(),
+      failTag: 'update_chapter_content',
+    );
+  }
+
+  /// 调用 LLM 创作新章节
+  ///
+  /// 组合「创作要求 + 人物卡 + 标签 prompt」为提示词（无原文），
+  /// 阻塞调用 LLM，返回新正文或错误。
+  Future<_RewriteResult> _generateChapter({
+    required String novelUrl,
+    required String chapterTitle,
+    required String instruction,
+    required List<String> characterNames,
+    required List<String> tagNames,
+  }) async {
+    final writerPrompt = await _loadWriterPrompt();
+    final contextParts =
+        await _buildContextParts(novelUrl, characterNames, tagNames);
+
+    final prompt = StringBuffer()
+      ..writeln('请根据以下信息创作新的章节正文。')
+      ..writeln()
+      ..writeln('## 章节标题')
+      ..writeln(chapterTitle)
+      ..writeln()
+      ..writeln('## 创作要求')
+      ..writeln(instruction)
+      ..writeln();
+    if (writerPrompt.isNotEmpty) {
+      prompt.writeln('## AI 作家设定');
+      prompt.writeln(writerPrompt);
+      prompt.writeln();
+    }
+    if (contextParts.isNotEmpty) {
+      prompt.writeln(contextParts.join('\n'));
+      prompt.writeln();
+    }
+    prompt
+      ..writeln('## 输出要求')
+      ..writeln('请直接输出完整的章节正文，不要输出任何说明、标题或解释性文字。');
+
+    final systemPrompt = writerPrompt.isNotEmpty
+        ? '$writerPrompt\n\n你是专业的小说写作助手，只输出小说正文。'
+        : '你是专业的小说写作助手，只输出小说正文。';
+
+    return _callLlm(
+      systemPrompt: systemPrompt,
+      userPrompt: prompt.toString(),
+      failTag: 'create_chapter',
+    );
   }
 
   // ===== 角色 =====
@@ -433,7 +798,6 @@ class ToolExecutor {
     final repo = ref.read(characterRepositoryProvider);
     final characters = await repo.getCharacters(novelUrl);
     final list = characters.map((c) => {
-          'id': c.id,
           'name': c.name,
           'appearanceFeatures': c.appearanceFeatures,
           'gender': c.gender,
@@ -796,6 +1160,41 @@ class ToolExecutor {
       'success': true,
       'message': '标签 "$name" 已创建（分类：${category.name}）',
       'tagId': newId,
+    });
+  }
+
+  Future<String> _deletePromptTag(Map<String, dynamic> args) async {
+    final parser = ToolArgParser(args);
+    final (id, idErr) = parser.requireInt('id');
+    if (idErr != null) return idErr;
+
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+
+    // 确认标签存在
+    final existingTags = await tagRepo.getByIds([id]);
+    if (existingTags.isEmpty) {
+      LoggerService.instance.d(
+        '工具引导错误: tag_not_found id=$id',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'delete_prompt_tag', 'tag_not_found'],
+      );
+      return jsonEncode({
+        'error': 'tag_not_found',
+        'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+        'suggested_tool': 'list_prompt_tags',
+      });
+    }
+
+    final existing = existingTags.first;
+    await tagRepo.delete(id);
+
+    LoggerService.instance.i(
+        '删除提示标签: "${existing.name}" (id=$id)',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'delete_prompt_tag']);
+    return jsonEncode({
+      'success': true,
+      'message': '标签 "${existing.name}" 已删除',
     });
   }
 }

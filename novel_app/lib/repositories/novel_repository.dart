@@ -270,6 +270,38 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     );
   }
 
+  /// 根据 URL 查找小说（用于 Agent 重写结果跳转阅读器）
+  @override
+  Future<Novel?> getNovelByUrl(String novelUrl) async {
+    if (isWebPlatform) {
+      return null;
+    }
+
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bookshelf',
+      where: 'url = ?',
+      whereArgs: [novelUrl],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return Novel(
+      id: maps[0]['id'] as int?,
+      title: maps[0]['title'],
+      author: maps[0]['author'],
+      url: maps[0]['url'],
+      isInBookshelf: true,
+      coverUrl: maps[0]['coverUrl'] as String?,
+      description: maps[0]['description'] as String?,
+      backgroundSetting: maps[0]['backgroundSetting'] as String?,
+      lastReadChapterIndex: maps[0]['lastReadChapter'] as int?,
+    );
+  }
+
   /// 创建新小说（用于同步下载时创建不存在的书）
   @override
   Future<Novel> createNovel({

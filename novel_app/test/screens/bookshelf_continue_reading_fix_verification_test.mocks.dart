@@ -157,6 +157,15 @@ class MockINovelRepository extends _i1.Mock implements _i3.INovelRepository {
       ) as _i4.Future<_i2.Novel?>);
 
   @override
+  _i4.Future<_i2.Novel?> getNovelByUrl(String? novelUrl) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelByUrl,
+          [novelUrl],
+        ),
+        returnValue: _i4.Future<_i2.Novel?>.value(),
+      ) as _i4.Future<_i2.Novel?>);
+
+  @override
   _i4.Future<_i2.Novel> createNovel({
     required String? title,
     required String? author,

@@ -148,6 +148,7 @@ void main() {
           'prompt_tag_categories',
           'prompt_tags',
           'site_scripts',
+          'chapter_versions',
         ];
 
         for (final table in expectedTables) {
@@ -491,7 +492,7 @@ void main() {
 
     group('currentVersion', () {
       test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
-        expect(DatabaseMigrations.currentVersion, 29);
+        expect(DatabaseMigrations.currentVersion, 30);
       });
     });
 
@@ -523,6 +524,55 @@ void main() {
             await db.rawQuery("PRAGMA table_info(prompt_history)");
         final columnNames = columns.map((c) => c['name'] as String).toSet();
         expect(columnNames.contains('tag_group_ids'), isTrue);
+
+        await db.close();
+      });
+    });
+
+    group('v30 — 章节版本历史表', () {
+      test('应创建 chapter_versions 表', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 30);
+
+        final tables = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+        final tableNames = tables.map((t) => t['name'] as String).toSet();
+        expect(tableNames.contains('chapter_versions'), isTrue);
+
+        await db.close();
+      });
+
+      test('chapter_versions 表应包含正确字段', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 30);
+
+        final columns =
+            await db.rawQuery("PRAGMA table_info(chapter_versions)");
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+
+        expect(columnNames.contains('id'), isTrue);
+        expect(columnNames.contains('chapterUrl'), isTrue);
+        expect(columnNames.contains('content'), isTrue);
+        expect(columnNames.contains('source'), isTrue);
+        expect(columnNames.contains('createdAt'), isTrue);
+        expect(columnNames.contains('contentLength'), isTrue);
+
+        await db.close();
+      });
+
+      test('应创建索引', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 30);
+
+        final indexes = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_chapter_versions%'");
+        final indexNames = indexes.map((i) => i['name'] as String).toSet();
+
+        expect(indexNames.contains('idx_chapter_versions_chapter_url'), isTrue);
+        expect(indexNames.contains('idx_chapter_versions_created_at'), isTrue);
 
         await db.close();
       });

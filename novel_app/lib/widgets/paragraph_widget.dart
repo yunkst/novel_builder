@@ -6,11 +6,7 @@ class ParagraphWidget extends StatefulWidget {
   final int index;
   final double fontSize;
   final double textBrightness;
-  final bool isCloseupMode;
   final bool isEditMode;
-  final bool isSelected;
-  final ValueChanged<int>? onTap;
-  final ValueChanged<int>? onLongPress;
   final ValueChanged<String>? onContentChanged;
 
   const ParagraphWidget({
@@ -19,11 +15,7 @@ class ParagraphWidget extends StatefulWidget {
     required this.index,
     required this.fontSize,
     this.textBrightness = 1.0,
-    required this.isCloseupMode,
     required this.isEditMode,
-    required this.isSelected,
-    this.onTap,
-    this.onLongPress,
     this.onContentChanged,
   });
 
@@ -141,40 +133,18 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: widget.isCloseupMode && widget.onTap != null
-              ? () => widget.onTap!(widget.index)
-              : null,
-          onLongPress: widget.onLongPress != null
-              ? () => widget.onLongPress!(widget.index)
-              : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-            decoration: BoxDecoration(
-              color: widget.isSelected
-                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
-                  : null,
-              border: widget.isSelected
-                  ? Border.all(
-                      color: Theme.of(context).colorScheme.primary, width: 2)
-                  : widget.isCloseupMode
-                      ? Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.3),
-                          width: 1)
-                      : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              widget.paragraph.trim(),
-              style: TextStyle(
-                fontSize: widget.fontSize,
-                height: 1.8,
-                letterSpacing: 0.5,
-                color: effectiveColor,
-              ),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            widget.paragraph.trim(),
+            style: TextStyle(
+              fontSize: widget.fontSize,
+              height: 1.8,
+              letterSpacing: 0.5,
+              color: effectiveColor,
             ),
           ),
         ),

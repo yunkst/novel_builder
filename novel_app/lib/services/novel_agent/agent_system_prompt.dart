@@ -46,12 +46,12 @@ class AgentSystemPrompt {
     buffer.writeln('5. 修改操作完成后向用户汇报。');
     buffer.writeln();
 
-    // 注入经验记忆
+    // 注入经验记忆（编号 [N] 形式，供 patch_memory 工具用编号定位）
     if (memories.isNotEmpty) {
       buffer.writeln('## 经验记忆');
       buffer.writeln('以下是你在以往对话中记录的重要经验，请优先参考：');
-      for (final m in memories) {
-        buffer.writeln('- $m');
+      for (var i = 0; i < memories.length; i++) {
+        buffer.writeln('[${i + 1}] ${memories[i]}');
       }
       buffer.writeln();
     }

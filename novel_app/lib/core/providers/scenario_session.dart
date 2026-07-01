@@ -312,7 +312,7 @@ class ScenarioSession {
             result: e.result,
           ));
         }
-        if (e.success && e.name == 'select_novel') {
+        if (e.success && (e.name == 'select_novel' || e.name == 'create_novel')) {
           _handleSelectNovelFromResult(e.result);
         }
         _state = _state.copyWith(
@@ -364,7 +364,11 @@ class ScenarioSession {
     _notifyStateChanged();
   }
 
-  /// 解析 select_novel 工具返回的 JSON，自动同步 currentNovel
+  /// 解析 select_novel / create_novel 工具返回的 JSON，自动同步 currentNovel
+  ///
+  /// 两者返回结构一致（均含 success + novelId + title）：
+  /// - select_novel：切换到已有小说
+  /// - create_novel：创建新小说后自动切到该书
   void _handleSelectNovelFromResult(String? result) {
     if (result == null) return;
     try {

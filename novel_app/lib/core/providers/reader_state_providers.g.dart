@@ -28,26 +28,5 @@ final chapterContentStateNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$ChapterContentStateNotifier
     = AutoDisposeNotifier<ChapterContentState>;
-String _$interactionStateNotifierHash() =>
-    r'd763cb2ed140c2d1e16a623d7499d6068c9dfed7';
-
-/// InteractionStateNotifier
-///
-/// 管理用户交互状态
-///
-/// Copied from [InteractionStateNotifier].
-@ProviderFor(InteractionStateNotifier)
-final interactionStateNotifierProvider = AutoDisposeNotifierProvider<
-    InteractionStateNotifier, InteractionState>.internal(
-  InteractionStateNotifier.new,
-  name: r'interactionStateNotifierProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$interactionStateNotifierHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$InteractionStateNotifier = AutoDisposeNotifier<InteractionState>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

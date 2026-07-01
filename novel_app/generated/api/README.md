@@ -96,10 +96,6 @@ Class | Method | HTTP request | Description
 [*DefaultApi*](doc/DefaultApi.md) | [**uploadAppVersionApiAppVersionUploadPost**](doc/DefaultApi.md#uploadappversionapiappversionuploadpost) | **POST** /api/app-version/upload | Upload App Version
 [*HermesApi*](doc/HermesApi.md) | [**chatCompletionsHermesChatCompletionsPost**](doc/HermesApi.md#chatcompletionshermeschatcompletionspost) | **POST** /hermes/chat/completions | Chat Completions
 [*HermesApi*](doc/HermesApi.md) | [**hermesHealthCheckHermesHealthGet**](doc/HermesApi.md#hermeshealthcheckhermeshealthget) | **GET** /hermes/health | Hermes Health Check
-[*NovelSyncApi*](doc/NovelSyncApi.md) | [**deleteSyncedNovelApiNovelSyncDeleteDelete**](doc/NovelSyncApi.md#deletesyncednovelapinovelsyncdeletedelete) | **DELETE** /api/novel/sync/delete | Delete Synced Novel
-[*NovelSyncApi*](doc/NovelSyncApi.md) | [**downloadNovelApiNovelSyncDownloadPost**](doc/NovelSyncApi.md#downloadnovelapinovelsyncdownloadpost) | **POST** /api/novel/sync/download | Download Novel
-[*NovelSyncApi*](doc/NovelSyncApi.md) | [**listSyncedNovelsApiNovelSyncListGet**](doc/NovelSyncApi.md#listsyncednovelsapinovelsynclistget) | **GET** /api/novel/sync/list | List Synced Novels
-[*NovelSyncApi*](doc/NovelSyncApi.md) | [**uploadNovelApiNovelSyncUploadPost**](doc/NovelSyncApi.md#uploadnovelapinovelsyncuploadpost) | **POST** /api/novel/sync/upload | Upload Novel
 
 
 ## Documentation For Models
@@ -108,9 +104,6 @@ Class | Method | HTTP request | Description
  - [BackupUploadResponse](doc/BackupUploadResponse.md)
  - [Chapter](doc/Chapter.md)
  - [ChapterContent](doc/ChapterContent.md)
- - [ChapterSyncData](doc/ChapterSyncData.md)
- - [CharacterRelationSyncData](doc/CharacterRelationSyncData.md)
- - [CharacterSyncData](doc/CharacterSyncData.md)
  - [EnhancedSceneIllustrationRequest](doc/EnhancedSceneIllustrationRequest.md)
  - [HTTPValidationError](doc/HTTPValidationError.md)
  - [ImageToVideoRequest](doc/ImageToVideoRequest.md)
@@ -118,15 +111,7 @@ Class | Method | HTTP request | Description
  - [ImageWithModel](doc/ImageWithModel.md)
  - [ModelsResponse](doc/ModelsResponse.md)
  - [Novel](doc/Novel.md)
- - [NovelSyncData](doc/NovelSyncData.md)
- - [NovelSyncDeleteResponse](doc/NovelSyncDeleteResponse.md)
- - [NovelSyncDownloadRequest](doc/NovelSyncDownloadRequest.md)
- - [NovelSyncDownloadResponse](doc/NovelSyncDownloadResponse.md)
- - [NovelSyncListResponse](doc/NovelSyncListResponse.md)
- - [NovelSyncUploadRequest](doc/NovelSyncUploadRequest.md)
- - [NovelSyncUploadResponse](doc/NovelSyncUploadResponse.md)
  - [NovelWithChapters](doc/NovelWithChapters.md)
- - [OutlineSyncData](doc/OutlineSyncData.md)
  - [RoleCardGenerateRequest](doc/RoleCardGenerateRequest.md)
  - [RoleCardTaskStatusResponse](doc/RoleCardTaskStatusResponse.md)
  - [RoleGalleryResponse](doc/RoleGalleryResponse.md)

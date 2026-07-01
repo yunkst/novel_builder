@@ -50,11 +50,12 @@ final novelRepositoryProvider = AutoDisposeProvider<INovelRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NovelRepositoryRef = AutoDisposeProviderRef<INovelRepository>;
-String _$chapterRepositoryHash() => r'16896315729c603d33914948ef0266482431719c';
+String _$chapterRepositoryHash() => r'8c82f427c1be5f67323bf3e5b5e79a1bf3860b8d';
 
 /// ChapterRepository Provider
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
+/// 依赖 ChapterVersionRepository 实现自动版本保存
 ///
 /// Copied from [chapterRepository].
 @ProviderFor(chapterRepository)
@@ -72,6 +73,30 @@ final chapterRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterRepositoryRef = AutoDisposeProviderRef<IChapterRepository>;
+String _$chapterVersionRepositoryHash() =>
+    r'0f200a89492b11e16cebb073e68273bf82039277';
+
+/// ChapterVersionRepository Provider
+///
+/// 章节历史版本的持久化操作
+///
+/// Copied from [chapterVersionRepository].
+@ProviderFor(chapterVersionRepository)
+final chapterVersionRepositoryProvider =
+    AutoDisposeProvider<IChapterVersionRepository>.internal(
+  chapterVersionRepository,
+  name: r'chapterVersionRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$chapterVersionRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ChapterVersionRepositoryRef
+    = AutoDisposeProviderRef<IChapterVersionRepository>;
 String _$characterRepositoryHash() =>
     r'88d938991a24b892168a768899b6196a7546688f';
 
@@ -207,30 +232,5 @@ final bookshelfRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BookshelfRepositoryRef = AutoDisposeProviderRef<IBookshelfRepository>;
-String _$novelExportRepositoryHash() =>
-    r'17f2c8cc3d25252a90358f48ae6e468122ded34d';
-
-/// NovelExportRepository Provider
-///
-/// 用于小说数据的导出和导入操作
-/// 依赖其他Repository，不直接依赖数据库连接
-///
-/// Copied from [novelExportRepository].
-@ProviderFor(novelExportRepository)
-final novelExportRepositoryProvider =
-    AutoDisposeProvider<NovelExportRepository>.internal(
-  novelExportRepository,
-  name: r'novelExportRepositoryProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$novelExportRepositoryHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef NovelExportRepositoryRef
-    = AutoDisposeProviderRef<NovelExportRepository>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

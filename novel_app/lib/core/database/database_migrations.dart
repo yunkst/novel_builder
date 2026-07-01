@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 29;
+  static const int currentVersion = 30;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -605,6 +605,25 @@ class DatabaseMigrations {
         await _createIndexIfNotExists(
             db, 'idx_llm_configs_sort', 'llm_configs', 'sort_order');
         _log('迁移 v28 → v29: 创建 llm_configs 表');
+        break;
+
+      // ========== 版本 30：章节版本历史表 ==========
+      case 30:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS chapter_versions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chapterUrl TEXT NOT NULL,
+          content TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'edit',
+          createdAt INTEGER NOT NULL,
+          contentLength INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_chapter_versions_chapter_url', 'chapter_versions', 'chapterUrl');
+        await _createIndexIfNotExists(
+            db, 'idx_chapter_versions_created_at', 'chapter_versions', 'createdAt');
+        _log('迁移 v29 → v30: 创建 chapter_versions 表');
         break;
     }
   }

@@ -46,9 +46,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
-    # 小说同步配置
-    novel_sync_dir: str = "novel_sync"
-
     # Hermes AI Chat 服务配置
     hermes_api_url: str = Field(default="", alias="HERMES_API_URL")
     hermes_api_key: str = Field(default="", alias="HERMES_API_KEY")

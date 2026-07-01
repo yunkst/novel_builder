@@ -631,8 +631,9 @@ class MockIChapterRepository extends _i1.Mock
   @override
   _i7.Future<int> updateChapterContent(
     String? chapterUrl,
-    String? content,
-  ) =>
+    String? content, {
+    String? source = 'edit',
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #updateChapterContent,
@@ -640,6 +641,7 @@ class MockIChapterRepository extends _i1.Mock
             chapterUrl,
             content,
           ],
+          {#source: source},
         ),
         returnValue: _i7.Future<int>.value(0),
       ) as _i7.Future<int>);
@@ -1014,6 +1016,15 @@ class MockINovelRepository extends _i1.Mock implements _i14.INovelRepository {
         Invocation.method(
           #getNovelByTitle,
           [title],
+        ),
+        returnValue: _i7.Future<_i4.Novel?>.value(),
+      ) as _i7.Future<_i4.Novel?>);
+
+  @override
+  _i7.Future<_i4.Novel?> getNovelByUrl(String? novelUrl) => (super.noSuchMethod(
+        Invocation.method(
+          #getNovelByUrl,
+          [novelUrl],
         ),
         returnValue: _i7.Future<_i4.Novel?>.value(),
       ) as _i7.Future<_i4.Novel?>);

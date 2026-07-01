@@ -67,6 +67,12 @@ abstract class INovelRepository {
   /// 返回小说对象，如果不存在则返回null
   Future<Novel?> getNovelByTitle(String title);
 
+  /// 根据 URL 查找小说
+  ///
+  /// [novelUrl] 小说 URL（唯一标识）
+  /// 返回小说对象，如果不存在则返回null
+  Future<Novel?> getNovelByUrl(String novelUrl);
+
   /// 创建新小说（用于同步下载时创建不存在的书）
   ///
   /// 返回创建后的小说对象

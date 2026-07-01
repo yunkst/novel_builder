@@ -6,7 +6,6 @@ import '../paragraph_widget.dart';
 ///
 /// 职责：
 /// - 显示章节内容列表
-/// - 处理段落选择和交互
 /// - 支持触摸事件处理自动滚动
 /// - 处理滚动通知
 /// - 支持全文连续编辑模式
@@ -16,14 +15,10 @@ import '../paragraph_widget.dart';
 /// - AutoScrollMixin (自动滚动功能)
 class ReaderContentView extends StatefulWidget {
   final List<String> paragraphs;
-  final List<int> selectedParagraphIndices;
   final double fontSize;
   final double textBrightness;
-  final bool isCloseupMode;
   final bool isEditMode;
   final bool isAutoScrolling;
-  final ValueChanged<int> onParagraphTap;
-  final ValueChanged<int> onParagraphLongPress;
 
   /// 内容变化回调
   /// - [index] 段落索引（-1 表示全文编辑，>=0 表示段落编辑）
@@ -37,14 +32,10 @@ class ReaderContentView extends StatefulWidget {
   const ReaderContentView({
     super.key,
     required this.paragraphs,
-    required this.selectedParagraphIndices,
     required this.fontSize,
     this.textBrightness = 1.0,
-    required this.isCloseupMode,
     required this.isEditMode,
     required this.isAutoScrolling,
-    required this.onParagraphTap,
-    required this.onParagraphLongPress,
     required this.onContentChanged,
     required this.scrollController,
     required this.onPointerDown,
@@ -170,18 +161,13 @@ class _ReaderContentViewState extends State<ReaderContentView> {
             }
 
             final paragraph = widget.paragraphs[index];
-            final isSelected = widget.selectedParagraphIndices.contains(index);
 
             return ParagraphWidget(
               paragraph: paragraph,
               index: index,
               fontSize: widget.fontSize,
               textBrightness: widget.textBrightness,
-              isCloseupMode: widget.isCloseupMode,
               isEditMode: widget.isEditMode,
-              isSelected: isSelected,
-              onTap: (idx) => widget.onParagraphTap(idx),
-              onLongPress: (idx) => widget.onParagraphLongPress(idx),
               onContentChanged: (newContent) =>
                   widget.onContentChanged(index, newContent),
             );

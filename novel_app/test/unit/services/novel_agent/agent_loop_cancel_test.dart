@@ -121,7 +121,7 @@ class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario 
   Future<List<String>> getMemories() async => const [];
 
   @override
-  Future<MemoryPatchResult> patchMemory(String? oldText, String newText) async =>
+  Future<MemoryPatchResult> patchMemory(int? index, String newText) async =>
       MemoryPatchResult.error('not available', const []);
 
   @override
@@ -392,8 +392,8 @@ class _CancelAfterFirstToolScenario with AgentScenarioCleanupMixin
   Future<List<String>> getMemories() => inner.getMemories();
 
   @override
-  Future<MemoryPatchResult> patchMemory(String? oldText, String newText) =>
-      inner.patchMemory(oldText, newText);
+  Future<MemoryPatchResult> patchMemory(int? index, String newText) =>
+      inner.patchMemory(index, newText);
 
   @override
   Future<String?> onNoToolCalls(List<ChatMessage> messages) =>

@@ -1,0 +1,377 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/database_providers.dart';
+import '../../models/chapter_version.dart';
+import '../../utils/toast_utils.dart';
+
+/// 版本历史底部面板
+///
+/// 以 BottomSheet 形式展示当前章节的所有历史版本，
+/// 支持预览、还原和删除操作。
+class VersionHistorySheet extends ConsumerStatefulWidget {
+  final String chapterUrl;
+  final String chapterTitle;
+  final VoidCallback onRestored; // 还原后刷新阅读器的回调
+
+  const VersionHistorySheet({
+    super.key,
+    required this.chapterUrl,
+    required this.chapterTitle,
+    required this.onRestored,
+  });
+
+  /// 弹出 BottomSheet 的静态方法
+  static Future<void> show(
+    BuildContext context, {
+    required String chapterUrl,
+    required String chapterTitle,
+    required VoidCallback onRestored,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => VersionHistorySheet(
+        chapterUrl: chapterUrl,
+        chapterTitle: chapterTitle,
+        onRestored: onRestored,
+      ),
+    );
+  }
+
+  @override
+  ConsumerState<VersionHistorySheet> createState() =>
+      _VersionHistorySheetState();
+}
+
+class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
+  List<ChapterVersion> _versions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersions();
+  }
+
+  Future<void> _loadVersions() async {
+    try {
+      final repo = ref.read(chapterVersionRepositoryProvider);
+      final versions = await repo.getVersions(widget.chapterUrl);
+      if (!mounted) return;
+      setState(() {
+        _versions = versions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Container(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 拖拽把手
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // 标题行
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.history, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  '版本历史',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.chapterTitle,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_versions.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .secondaryContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${_versions.length}个版本',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // 版本列表
+          Flexible(
+            child: _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _versions.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _versions.length,
+                        itemBuilder: (context, index) {
+                          final version = _versions[index];
+                          return _buildVersionTile(version);
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.history_toggle_off, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 12),
+          Text(
+            '暂无历史版本',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '编辑或AI改写章节时，旧内容会自动保存为历史版本',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionTile(ChapterVersion version) {
+    return ListTile(
+      dense: true,
+      leading: Icon(version.sourceIcon, size: 20,
+          color: _sourceColor(version.source)),
+      title: Row(
+        children: [
+          Text(version.sourceLabel,
+              style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 8),
+          Text(version.formattedLength,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+        ],
+      ),
+      subtitle: Text(version.formattedTime,
+          style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 预览
+          IconButton(
+            icon: const Icon(Icons.visibility_outlined, size: 18),
+            tooltip: '预览',
+            onPressed: () => _previewVersion(version),
+          ),
+          // 还原
+          IconButton(
+            icon: const Icon(Icons.restore, size: 18),
+            tooltip: '还原',
+            onPressed: () => _restoreVersion(version),
+          ),
+          // 删除
+          IconButton(
+            icon: Icon(Icons.delete_outline, size: 18,
+                color: Theme.of(context).colorScheme.error),
+            tooltip: '删除',
+            onPressed: () => _deleteVersion(version),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color? _sourceColor(String source) {
+    switch (source) {
+      case 'edit':
+        return Colors.blue[400];
+      case 'ai_rewrite':
+        return Colors.purple[400];
+      case 'manual_snapshot':
+        return Colors.green[400];
+      case 'restore':
+        return Colors.orange[400];
+      default:
+        return Colors.grey[400];
+    }
+  }
+
+  /// 预览版本内容
+  void _previewVersion(ChapterVersion version) {
+    final previewText = version.content.length > 2000
+        ? '${version.content.substring(0, 2000)}\n\n... (共${version.contentLength}字)'
+        : version.content;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(version.sourceIcon, size: 20,
+                color: _sourceColor(version.source)),
+            const SizedBox(width: 8),
+            Text('${version.sourceLabel} · ${version.formattedTime}'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Text(previewText, style: const TextStyle(fontSize: 14, height: 1.6)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _restoreVersion(version);
+            },
+            child: const Text('还原此版本'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 还原到指定版本
+  Future<void> _restoreVersion(ChapterVersion version) async {
+    // 先关闭 BottomSheet
+    Navigator.of(context).pop();
+
+    // 二次确认
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.restore, color: Colors.orange),
+          SizedBox(width: 8),
+          Text('还原到历史版本'),
+        ]),
+        content: Text(
+          '将当前内容替换为「${version.sourceLabel}」'
+          '（${version.formattedTime}，${version.formattedLength}）的版本？\n\n'
+          '当前内容将自动保存为历史版本。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('还原'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      // updateChapterContent 会自动保存旧当前版本（source='restore'）
+      final chapterRepo = ref.read(chapterRepositoryProvider);
+      await chapterRepo.updateChapterContent(
+        widget.chapterUrl,
+        version.content,
+        source: 'restore',
+      );
+
+      if (mounted) {
+        ToastUtils.showSuccess('已还原到历史版本', context: context);
+      }
+
+      // 通知阅读器刷新
+      widget.onRestored();
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError('还原失败: $e', context: context);
+      }
+    }
+  }
+
+  /// 删除指定版本
+  Future<void> _deleteVersion(ChapterVersion version) async {
+    // 先关闭 BottomSheet
+    Navigator.of(context).pop();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除版本'),
+        content: Text(
+          '确定删除「${version.sourceLabel}」'
+          '（${version.formattedTime}）的版本？此操作不可撤销。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final versionRepo = ref.read(chapterVersionRepositoryProvider);
+      await versionRepo.deleteVersion(version.id!);
+
+      if (mounted) {
+        ToastUtils.showSuccess('版本已删除', context: context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showError('删除失败: $e', context: context);
+      }
+    }
+  }
+}

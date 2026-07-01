@@ -99,6 +99,26 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
             const PopupMenuItem(
+              value: 'version_history',
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 18),
+                  SizedBox(width: 12),
+                  Text('版本历史'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'create_snapshot',
+              child: Row(
+                children: [
+                  Icon(Icons.camera_alt_outlined, size: 18),
+                  SizedBox(width: 12),
+                  Text('创建快照'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'reader_settings',
               child: Row(
                 children: [

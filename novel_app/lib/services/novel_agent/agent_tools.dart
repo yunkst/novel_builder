@@ -3,7 +3,12 @@
 /// 上下文驱动设计：所有工具不再接受 novelId，而是作用于"当前小说"。
 /// - `list_novels` 用于发现书架上的小说
 /// - `select_novel` 用于切换当前小说
-/// - 章节操作使用 `position`（list_chapters 返回的连续 1-based 顺序号）
+/// - 章节定位使用 `position`（list_chapters 返回的连续 1-based 顺序号），
+///   读 / 写 / 创建章节均通过 position 定位，不暴露真实 chapterId
+/// - 角色定位使用 `name`（list_characters 返回的名字），不暴露真实 characterId
+/// - 章节写入（create_chapter / update_chapter_content）均为 LLM 生成流程：
+///   组合「修改/创作要求 + 人物卡 + 写作标签 + AI 作家设定」为提示词，调用 LLM
+///   产出正文后入库；只回传元信息，并在聊天窗口渲染跳转入口。
 library;
 
 class AgentTools {
@@ -20,6 +25,7 @@ class AgentTools {
     _listChapters,
     _searchInChapters,
     // ===== 章节写入 =====
+    _createChapter,
     _updateChapterContent,
     // ===== 角色 =====
     _listCharacters,
@@ -32,6 +38,7 @@ class AgentTools {
     // ===== 提示标签 =====
     _listPromptTags,
     _savePromptTag,
+    _deletePromptTag,
   ];
 
   /// 查找工具定义（带日志）
@@ -177,13 +184,66 @@ class AgentTools {
 
   // ===== 章节写入 =====
 
+  static const _createChapter = {
+    'type': 'function',
+    'function': {
+      'name': 'create_chapter',
+      'description':
+          '在指定位置创建新章节，由 AI 生成正文内容。\n'
+          '本工具会根据「创作要求」、「人物卡」和「写作标签」组合成提示词调用 LLM 生成正文，'
+          '然后插入到指定位置（原有章节自动后移）。\n'
+          'position 来自 list_chapters 返回的 position 字段（1-based）；'
+          '若 position = N+1（N 为当前章节数），则追加到末尾。\n'
+          '生成完成后，聊天窗口会出现可点击的跳转入口。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'position': {
+            'type': 'integer',
+            'description':
+                '新章节要插入的位置（1-based）。例如 position=3 表示插入为第 3 章，'
+                '原第 3 章及之后的章节自动后移。position = N+1 时追加到末尾。',
+          },
+          'instruction': {
+            'type': 'string',
+            'description':
+                '创作要求（自然语言描述）。说明希望新章节写什么内容，'
+                '例如「主角在酒馆遇到神秘老人，获得关键线索」「写一段紧张的追逐戏」。',
+          },
+          'title': {
+            'type': 'string',
+            'description': '章节标题。不传时默认使用「第 {position} 章」。',
+          },
+          'characterNames': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                '参与本章的角色名字列表（如 ["李明","张薇"]）。'
+                '这些人物的外貌、性格、背景设定将作为创作上下文。不传则不注入人物设定。',
+          },
+          'tagNames': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                '要应用的写作标签名称列表（如 ["赛博朋克","暗黑"]）。'
+                '系统会从每个标签随机抽取一条 prompt 文本拼入提示词。不传则不注入标签。',
+          },
+        },
+        'required': ['position', 'instruction'],
+      },
+    },
+  };
+
   static const _updateChapterContent = {
     'type': 'function',
     'function': {
       'name': 'update_chapter_content',
       'description':
-          '完全替换指定章节的正文内容。⚠️ 此操作会覆盖原有内容，请先调用 '
-          'read_chapter_content 确认当前内容。position 来自 list_chapters。',
+          'AI 重写指定章节的正文内容。\n'
+          '本工具不会直接覆盖——它会读取章节原文，结合「修改要求」、「人物卡」和「写作标签」'
+          '组合成提示词调用 LLM 重新生成正文，生成后自动保存并替换原内容。\n'
+          '⚠️ 会覆盖原有内容；建议先用 read_chapter_content 了解当前内容。\n'
+          'position 来自 list_chapters。生成完成后，聊天窗口会出现可点击的跳转入口。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -191,12 +251,28 @@ class AgentTools {
             'type': 'integer',
             'description': '章节在当前小说列表中的位置（1-based，从 list_chapters 获取）。',
           },
-          'content': {
+          'rewriteInstruction': {
             'type': 'string',
-            'description': '新的完整章节内容（将替换原有全文）',
+            'description':
+                '修改要求（自然语言描述）。说明希望如何改写本章，'
+                '例如「把结尾改成开放式结局，增加环境描写」「让对话更紧凑」。',
+          },
+          'characterNames': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                '参与本章的角色名字列表（如 ["李明","张薇"]）。'
+                '这些人物的外貌、性格、背景设定将作为重写上下文。不传则不注入人物设定。',
+          },
+          'tagNames': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                '要应用的写作标签名称列表（如 ["赛博朋克","暗黑"]）。'
+                '系统会从每个标签随机抽取一条 prompt 文本拼入提示词。不传则不注入标签。',
           },
         },
-        'required': ['position', 'content'],
+        'required': ['position', 'rewriteInstruction'],
       },
     },
   };
@@ -383,6 +459,28 @@ class AgentTools {
           },
         },
         'required': ['categoryName', 'name', 'promptText'],
+      },
+    },
+  };
+
+  static const _deletePromptTag = {
+    'type': 'function',
+    'function': {
+      'name': 'delete_prompt_tag',
+      'description':
+          '删除指定的提示标签。\n'
+          '使用场景：\n'
+          '- 用户想删除不再需要的写作技巧标签\n'
+          '- 用户想清理重复或错误的标签',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'id': {
+            'type': 'integer',
+            'description': '要删除的标签 ID（从 list_prompt_tags 获取）',
+          },
+        },
+        'required': ['id'],
       },
     },
   };

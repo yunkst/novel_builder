@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:novel_app/models/chapter.dart';
 import 'package:novel_app/core/interfaces/i_database_connection.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
+import 'package:novel_app/repositories/chapter_version_repository.dart';
 import '../../helpers/test_database_setup.dart';
 
 /// ChapterRepository 缓存修复验证测试
@@ -36,6 +37,7 @@ void main() {
     db = await TestDatabaseSetup.createInMemoryDatabase();
     repository = ChapterRepository(
       dbConnection: _TestDbConnection(db),
+      versionRepo: ChapterVersionRepository(dbConnection: _TestDbConnection(db)),
     );
   });
 

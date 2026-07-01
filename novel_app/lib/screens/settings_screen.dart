@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dify_settings_screen.dart';
+import 'prompt_tag_management_screen.dart';
+import 'agent_memory_management_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_report_settings_screen.dart';
 import 'log_viewer_screen.dart';
@@ -197,6 +199,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const DifySettingsScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.label_outline),
+            title: const Text('提示词标签管理'),
+            subtitle: const Text('管理 AI 写作的标签分类和 Prompt 文本'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PromptTagManagementScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+
+          // Agent 记忆管理
+          ListTile(
+            leading: const Icon(Icons.psychology_outlined),
+            title: const Text('Agent 记忆管理'),
+            subtitle: const Text('查看和管理 Agent 各场景的经验记忆'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AgentMemoryManagementScreen(),
                 ),
               );
             },

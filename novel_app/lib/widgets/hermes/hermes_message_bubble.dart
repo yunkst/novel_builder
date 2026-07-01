@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
+import 'chapter_rewrite_entry_card.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Hermes 聊天消息气泡
@@ -294,10 +295,27 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
           ),
           // 展开内容
           if (_expanded) _buildExpandedBody(context, call),
+          // update_chapter_content / create_chapter 成功时，渲染跳转阅读器入口
+          if ((call.name == 'update_chapter_content' || call.name == 'create_chapter') &&
+              call.status == AgentToolStatus.completed &&
+              _rewriteEntry != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: ChapterRewriteEntryCard(
+                data: _rewriteEntry!,
+                titleText: call.name == 'create_chapter'
+                    ? '查看新创建的章节'
+                    : '查看重写后的章节',
+              ),
+            ),
         ],
       ),
     );
   }
+
+  /// 解析工具结果中的重写成功信息（缓存，避免每次 build 重复解析）
+  ChapterRewriteEntryData? get _rewriteEntry =>
+      parseRewriteEntry(widget.call.result);
 
   Widget _buildExpandedBody(BuildContext context, AgentToolCall call) {
     return Container(

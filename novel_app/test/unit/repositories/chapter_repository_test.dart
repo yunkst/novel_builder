@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart';
+import 'package:novel_app/core/interfaces/repositories/i_chapter_version_repository.dart';
 import 'package:novel_app/core/interfaces/i_database_connection.dart';
+import 'package:novel_app/models/chapter_version.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
@@ -9,6 +11,29 @@ import 'package:mockito/mockito.dart';
 @GenerateMocks([IDatabaseConnection])
 import 'chapter_repository_test.mocks.dart';
 
+/// 测试用 no-op 版本仓库实现
+///
+/// 这些测试只验证接口实现/构造/静态方法，不真正写入版本数据，
+/// 因此版本仓库方法返回空值即可。
+class _FakeChapterVersionRepository implements IChapterVersionRepository {
+  @override
+  Future<int> saveVersion(ChapterVersion version) async => 0;
+  @override
+  Future<List<ChapterVersion>> getVersions(String chapterUrl) async => [];
+  @override
+  Future<int> getVersionCount(String chapterUrl) async => 0;
+  @override
+  Future<ChapterVersion?> getVersionById(int id) async => null;
+  @override
+  Future<int> deleteVersion(int id) async => 0;
+  @override
+  Future<int> deleteVersionsByChapter(String chapterUrl) async => 0;
+  @override
+  Future<int> deleteVersionsByNovel(String novelUrl) async => 0;
+  @override
+  Future<int> evictOldestVersions(String chapterUrl, {int maxCount = 5}) async => 0;
+}
+
 void main() {
   group('ChapterRepository迁移验证', () {
     late MockIDatabaseConnection mockDbConnection;
@@ -16,7 +41,10 @@ void main() {
 
     setUp(() {
       mockDbConnection = MockIDatabaseConnection();
-      chapterRepository = ChapterRepository(dbConnection: mockDbConnection);
+      chapterRepository = ChapterRepository(
+        dbConnection: mockDbConnection,
+        versionRepo: _FakeChapterVersionRepository(),
+      );
     });
 
     test('应该实现IChapterRepository接口', () {
@@ -25,7 +53,11 @@ void main() {
 
     test('构造函数应该接收IDatabaseConnection', () {
       expect(chapterRepository, isNotNull);
-      expect(() => ChapterRepository(dbConnection: mockDbConnection),
+      expect(
+          () => ChapterRepository(
+                dbConnection: mockDbConnection,
+                versionRepo: _FakeChapterVersionRepository(),
+              ),
           returnsNormally);
     });
 
@@ -59,7 +91,10 @@ void main() {
       // 验证ChapterRepository不再直接管理数据库初始化
       // 新架构通过构造函数注入IDatabaseConnection
       expect(
-        () => ChapterRepository(dbConnection: MockIDatabaseConnection()),
+        () => ChapterRepository(
+          dbConnection: MockIDatabaseConnection(),
+          versionRepo: _FakeChapterVersionRepository(),
+        ),
         returnsNormally,
       );
     });
@@ -68,6 +103,7 @@ void main() {
       // 新架构不再使用setSharedDatabase模式
       final repository = ChapterRepository(
         dbConnection: MockIDatabaseConnection(),
+        versionRepo: _FakeChapterVersionRepository(),
       );
       expect(repository, isNotNull);
     });

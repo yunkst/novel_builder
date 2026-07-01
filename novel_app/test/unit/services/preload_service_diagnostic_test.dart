@@ -7,6 +7,7 @@ import 'package:novel_app/services/headless_webview_content_service.dart';
 import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/services/preload_progress_update.dart';
 import 'package:novel_app/repositories/chapter_repository.dart';
+import 'package:novel_app/repositories/chapter_version_repository.dart';
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/models/chapter.dart';
 import 'package:novel_app/models/chapter_content_result.dart';
@@ -70,7 +71,7 @@ void main() {
   setUp(() async {
     db = await TestDatabaseSetup.createInMemoryDatabase();
     final connection = DatabaseConnection.forTesting(db);
-    chapterRepository = ChapterRepository(dbConnection: connection);
+    chapterRepository = ChapterRepository(dbConnection: connection, versionRepo: ChapterVersionRepository(dbConnection: connection));
     mockHeadlessService = MockHeadlessWebViewContentService();
 
     preloadService = PreloadService(
@@ -322,7 +323,7 @@ void main() {
 
       // 创建新实例（模拟 AutoDispose 重建）
       final conn = DatabaseConnection.forTesting(db);
-      final newRepo = ChapterRepository(dbConnection: conn);
+      final newRepo = ChapterRepository(dbConnection: conn, versionRepo: ChapterVersionRepository(dbConnection: conn));
       expect(await newRepo.isChapterCached(url), isTrue);
     });
   });

@@ -26,9 +26,7 @@ void main() {
                 paragraph: initialParagraph,
                 index: 0,
                 fontSize: 18.0,
-                isCloseupMode: false,
                 isEditMode: true,
-                isSelected: false,
                 onContentChanged: (newContent) {
                   onContentChangedCallCount++;
                   lastChangedContent = newContent;
@@ -49,9 +47,7 @@ void main() {
                 paragraph: updatedParagraph,
                 index: 0,
                 fontSize: 18.0,
-                isCloseupMode: false,
                 isEditMode: true,
-                isSelected: false,
                 onContentChanged: (newContent) {
                   onContentChangedCallCount++;
                   lastChangedContent = newContent;
@@ -88,9 +84,7 @@ void main() {
                 paragraph: initialParagraph,
                 index: 0,
                 fontSize: 18.0,
-                isCloseupMode: false,
                 isEditMode: true,
-                isSelected: false,
                 onContentChanged: (newContent) {
                   onContentChangedCallCount++;
                   lastChangedContent = newContent;
@@ -133,9 +127,7 @@ void main() {
                 paragraph: '版本1',
                 index: 0,
                 fontSize: 18.0,
-                isCloseupMode: false,
                 isEditMode: true,
-                isSelected: false,
                 onContentChanged: (_) => onContentChangedCallCount++,
               ),
             ),
@@ -153,9 +145,7 @@ void main() {
                   paragraph: '版本$i',
                   index: 0,
                   fontSize: 18.0,
-                  isCloseupMode: false,
                   isEditMode: true,
-                  isSelected: false,
                   onContentChanged: (_) => onContentChangedCallCount++,
                 ),
               ),
@@ -191,9 +181,7 @@ void main() {
                     paragraph: currentParagraph,
                     index: 0,
                     fontSize: 18.0,
-                    isCloseupMode: false,
                     isEditMode: true,
-                    isSelected: false,
                     onContentChanged: (newContent) {
                       // 模拟父组件监听变化并更新
                       if (newContent != currentParagraph) {
@@ -225,9 +213,7 @@ void main() {
                     paragraph: currentParagraph,
                     index: 0,
                     fontSize: 18.0,
-                    isCloseupMode: false,
                     isEditMode: true,
-                    isSelected: false,
                     onContentChanged: (newContent) {
                       if (newContent != currentParagraph) {
                         currentParagraph = newContent;
@@ -269,9 +255,7 @@ void main() {
               paragraph: paragraph,
               index: 0,
               fontSize: 18.0,
-              isCloseupMode: false,
               isEditMode: true,
-              isSelected: false,
               onContentChanged: (_) => onContentChangedCallCount++,
             ),
           ),
@@ -288,9 +272,7 @@ void main() {
               paragraph: paragraph, // 相同内容
               index: 0,
               fontSize: 18.0,
-              isCloseupMode: false,
               isEditMode: true,
-              isSelected: false,
               onContentChanged: (_) => onContentChangedCallCount++,
             ),
           ),
@@ -319,9 +301,7 @@ void main() {
               paragraph: '',
               index: 0,
               fontSize: 18.0,
-              isCloseupMode: false,
               isEditMode: true,
-              isSelected: false,
               onContentChanged: (_) => onContentChangedCallCount++,
             ),
           ),
@@ -338,9 +318,7 @@ void main() {
               paragraph: '新内容',
               index: 0,
               fontSize: 18.0,
-              isCloseupMode: false,
               isEditMode: true,
-              isSelected: false,
               onContentChanged: (_) => onContentChangedCallCount++,
             ),
           ),

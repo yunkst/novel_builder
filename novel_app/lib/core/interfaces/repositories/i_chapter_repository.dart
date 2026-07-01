@@ -43,10 +43,14 @@ abstract class IChapterRepository {
 
   /// 更新章节内容
   ///
+  /// 在覆盖之前自动将旧内容保存为历史版本（最多保留5个版本）。
+  ///
   /// [chapterUrl] 章节的URL
   /// [content] 新的章节内容
+  /// [source] 版本来源：'edit'（用户编辑）| 'ai_rewrite'（AI改写）| 'restore'（还原操作）
   /// 返回受影响的行数
-  Future<int> updateChapterContent(String chapterUrl, String content);
+  Future<int> updateChapterContent(String chapterUrl, String content,
+      {String source = 'edit'});
 
   /// 删除章节缓存
   ///

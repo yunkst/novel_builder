@@ -16,7 +16,8 @@ import '../agent_tools.dart';
 import '../agent_system_prompt.dart';
 import '../tool_executor.dart';
 
-class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
+class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
+    implements AgentScenario {
   final Ref _ref;
   late final ToolExecutor _executor = ToolExecutor(_ref);
 
@@ -47,7 +48,7 @@ class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
             '然后用 select_novel 选定目标。';
     return AgentSystemPrompt.build(
       readingContext: context.readingContext ?? const ReadingContext(),
-      memories: _cachedMemories,
+      memories: cachedMemories,
     ) + novelInfo;
   }
 
@@ -100,9 +101,9 @@ class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
 
   /// 执行 patch_memory 工具，序列化 MemoryPatchResult
   Future<String> _executePatchMemory(Map<String, dynamic> args) async {
-    final oldText = args['oldText'] as String? ?? args['old_text'] as String?;
-    final newText = args['newText'] as String? ?? args['new_text'] as String? ?? '';
-    final result = await patchMemory(oldText, newText);
+    final index = args['index'] as int?;
+    final newText = args['newText'] as String? ?? '';
+    final result = await patchMemory(index, newText);
     if (result.success) {
       LoggerService.instance.i(
         'patchMemory 成功: ${result.message}',
@@ -116,22 +117,24 @@ class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
       category: LogCategory.ai,
       tags: ['agent', 'writing', 'patch_memory', 'failed'],
     );
+    // 失败：返回 [N] 格式的编号列表，与 system prompt 展示一致，供 AI 用正确编号重试
     return jsonEncode({
-      'error': 'memory_not_found',
+      'error': 'memory_index_invalid',
       'message': result.message,
-      'allMemories': result.allMemories,
+      'allMemories': result.allMemories
+          .asMap()
+          .entries
+          .map((e) => '[${e.key + 1}] ${e.value}')
+          .toList(),
     });
   }
 
-  /// 记忆缓存（每次构建 prompt 时复用，避免重复 IO）
-  List<String> _cachedMemories = const [];
-
+  /// 记忆缓存（由 AgentMemoryPatchMixin 提供，本类复用 mixin 的实现）
   @override
   Future<List<String>> getMemories() async {
     try {
       final repo = _ref.read(agentMemoryRepositoryProvider);
-      _cachedMemories = await repo.getAllByScenario(id);
-      return _cachedMemories;
+      return await loadMemories(repo);
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '加载写作记忆失败: $e',
@@ -144,62 +147,8 @@ class WritingScenario with AgentScenarioCleanupMixin implements AgentScenario {
   }
 
   @override
-  Future<MemoryPatchResult> patchMemory(
-    String? oldText,
-    String newText,
-  ) async {
+  Future<MemoryPatchResult> patchMemory(int? index, String newText) async {
     final repo = _ref.read(agentMemoryRepositoryProvider);
-    final all = await repo.getAllWithId(id);
-    final allContents = all.map((r) => r['content'] as String).toList();
-
-    // Case 1: 记忆为空 → 直接插入
-    if (allContents.isEmpty) {
-      await repo.addMemory(id, newText);
-      _cachedMemories = [..._cachedMemories, newText];
-      return MemoryPatchResult.ok('记忆已添加（首次插入）');
-    }
-
-    // Case 2: oldText 为空 → 新增
-    if (oldText == null || oldText.isEmpty) {
-      await repo.addMemory(id, newText);
-      _cachedMemories = [..._cachedMemories, newText];
-      return MemoryPatchResult.ok('新记忆已添加');
-    }
-
-    // Case 3: newText 为空 → 删除
-    if (newText.isEmpty) {
-      final hit = all.firstWhere(
-        (r) => r['content'] == oldText,
-        orElse: () => <String, dynamic>{},
-      );
-      if (hit.isEmpty) {
-        return MemoryPatchResult.error(
-          '未找到要删除的记忆',
-          allContents,
-        );
-      }
-      await repo.deleteMemory(hit['id'] as int);
-      _cachedMemories = List<String>.from(_cachedMemories)..remove(oldText);
-      return MemoryPatchResult.ok('记忆已删除');
-    }
-
-    // Case 4: 替换
-    final hit = all.firstWhere(
-      (r) => r['content'] == oldText,
-      orElse: () => <String, dynamic>{},
-    );
-    if (hit.isEmpty) {
-      return MemoryPatchResult.error(
-        '未找到匹配的记忆内容。现有记忆：',
-        allContents,
-      );
-    }
-    await repo.updateMemory(hit['id'] as int, newText);
-    final idx = _cachedMemories.indexOf(oldText);
-    if (idx >= 0) {
-      _cachedMemories = List<String>.from(_cachedMemories)
-        ..[idx] = newText;
-    }
-    return MemoryPatchResult.ok('记忆已更新');
+    return patchMemoryImpl(repo, index, newText);
   }
 }

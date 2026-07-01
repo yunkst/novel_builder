@@ -37,10 +37,10 @@ void main() {
       expect(name, 'patch_memory');
     });
 
-    test('工具定义参数包含 oldText 和 newText', () {
+    test('工具定义参数包含 index 和 newText', () {
       final params = patchMemoryToolDefinition['function']['parameters'];
       final props = params['properties'] as Map<String, dynamic>;
-      expect(props.containsKey('oldText'), isTrue);
+      expect(props.containsKey('index'), isTrue);
       expect(props.containsKey('newText'), isTrue);
     });
 
@@ -125,110 +125,112 @@ void main() {
     });
   });
 
-  group('AgentMemoryRepository patchMemory 逻辑', () {
+  group('AgentMemoryPatchMixin 编号定位 + 去重', () {
     late Database db;
     late AgentMemoryRepository repo;
-    // 模拟场景 patchMemory 逻辑（不依赖 Ref）
     final scenarioId = 'writing';
+    late _TestScenario scenario;
 
     setUp(() async {
       db = await TestDatabaseSetup.createInMemoryDatabase();
       final connection = DatabaseConnection.forTesting(db);
       repo = AgentMemoryRepository(dbConnection: connection);
+      scenario = _TestScenario(scenarioId, repo);
     });
 
     tearDown(() async {
       await db.close();
     });
 
-    Future<MemoryPatchResult> patchMemory(String? oldText, String newText) async {
-      final all = await repo.getAllWithId(scenarioId);
-      final allContents = all.map((r) => r['content'] as String).toList();
-
-      if (allContents.isEmpty) {
-        await repo.addMemory(scenarioId, newText);
-        return MemoryPatchResult.ok('已添加（首次插入）');
-      }
-      if (oldText == null || oldText.isEmpty) {
-        await repo.addMemory(scenarioId, newText);
-        return MemoryPatchResult.ok('新记忆已添加');
-      }
-      if (newText.isEmpty) {
-        final hit = all.firstWhere(
-          (r) => r['content'] == oldText,
-          orElse: () => <String, dynamic>{},
-        );
-        if (hit.isEmpty) {
-          return MemoryPatchResult.error('未找到要删除的记忆', allContents);
-        }
-        await repo.deleteMemory(hit['id'] as int);
-        return MemoryPatchResult.ok('记忆已删除');
-      }
-      final hit = all.firstWhere(
-        (r) => r['content'] == oldText,
-        orElse: () => <String, dynamic>{},
-      );
-      if (hit.isEmpty) {
-        return MemoryPatchResult.error(
-          '未找到匹配的记忆内容。现有记忆：',
-          allContents,
-        );
-      }
-      await repo.updateMemory(hit['id'] as int, newText);
-      return MemoryPatchResult.ok('记忆已更新');
-    }
-
-    test('记忆为空时直接插入', () async {
-      final result = await patchMemory(null, '第一条记忆');
+    test('记忆为空时新增', () async {
+      final result = await scenario.patchMemory(null, '第一条记忆');
       expect(result.success, isTrue);
-      expect(result.message, contains('首次插入'));
+      expect(result.message, contains('已添加'));
       final memories = await repo.getAllByScenario(scenarioId);
       expect(memories, ['第一条记忆']);
     });
 
-    test('oldText 为空时新增', () async {
-      await patchMemory(null, '记忆1');
-      final result = await patchMemory('', '记忆2');
+    test('index 省略时新增（编号 0 等价于省略）', () async {
+      await scenario.patchMemory(null, '记忆1');
+      final result = await scenario.patchMemory(0, '记忆2');
       expect(result.success, isTrue);
-      expect(result.message, contains('新记忆已添加'));
+      expect(result.message, contains('已添加'));
       final memories = await repo.getAllByScenario(scenarioId);
       expect(memories, ['记忆1', '记忆2']);
     });
 
-    test('oldText 匹配时替换', () async {
-      await patchMemory(null, '旧记忆');
-      final result = await patchMemory('旧记忆', '新记忆');
+    test('index 定位替换第 N 条', () async {
+      await scenario.patchMemory(null, '旧记忆');
+      final result = await scenario.patchMemory(1, '新记忆');
       expect(result.success, isTrue);
       expect(result.message, contains('已更新'));
       final memories = await repo.getAllByScenario(scenarioId);
       expect(memories, ['新记忆']);
     });
 
-    test('oldText 不匹配时报错并返回所有记忆', () async {
-      await patchMemory(null, '记忆A');
-      await patchMemory('', '记忆B');
-      final result = await patchMemory('不存在的记忆', '新记忆');
+    test('index 越界时报错并返回所有记忆', () async {
+      await scenario.patchMemory(null, '记忆A');
+      await scenario.patchMemory(null, '记忆B');
+      final result = await scenario.patchMemory(99, '新记忆');
       expect(result.success, isFalse);
-      expect(result.message, contains('未找到匹配'));
+      expect(result.message, contains('超出范围'));
       expect(result.allMemories, ['记忆A', '记忆B']);
     });
 
-    test('newText 为空时删除', () async {
-      await patchMemory(null, '待删除');
-      await patchMemory('', '保留');
-      final result = await patchMemory('待删除', '');
+    test('newText 为空时按 index 删除', () async {
+      await scenario.patchMemory(null, '待删除');
+      await scenario.patchMemory(null, '保留');
+      final result = await scenario.patchMemory(1, '');
       expect(result.success, isTrue);
       expect(result.message, contains('已删除'));
       final memories = await repo.getAllByScenario(scenarioId);
       expect(memories, ['保留']);
     });
 
-    test('删除不存在的记忆报错', () async {
-      await patchMemory(null, '记忆A');
-      final result = await patchMemory('不存在', '');
+    test('删除越界 index 报错', () async {
+      await scenario.patchMemory(null, '记忆A');
+      final result = await scenario.patchMemory(99, '');
       expect(result.success, isFalse);
-      expect(result.message, contains('未找到要删除'));
+      expect(result.message, contains('超出范围'));
       expect(result.allMemories, ['记忆A']);
+    });
+
+    test('新增去重：内容已存在则跳过', () async {
+      await scenario.patchMemory(null, '记忆A');
+      final result = await scenario.patchMemory(null, '记忆A');
+      expect(result.success, isTrue);
+      expect(result.message, contains('已存在'));
+      final memories = await repo.getAllByScenario(scenarioId);
+      expect(memories, ['记忆A']); // 未增长
+    });
+
+    test('替换去重：与其它记忆重复则拒绝', () async {
+      await scenario.patchMemory(null, '记忆A');
+      await scenario.patchMemory(null, '记忆B');
+      final result = await scenario.patchMemory(1, '记忆B');
+      expect(result.success, isFalse);
+      expect(result.message, contains('重复'));
+      final memories = await repo.getAllByScenario(scenarioId);
+      expect(memories, ['记忆A', '记忆B']); // 未变
+    });
+
+    test('新增时 newText 为空报错', () async {
+      final result = await scenario.patchMemory(null, '');
+      expect(result.success, isFalse);
+      expect(result.message, contains('不能为空'));
+    });
+
+    test('替换成功后缓存同步更新', () async {
+      await scenario.patchMemory(null, '旧记忆');
+      await scenario.patchMemory(1, '新记忆');
+      expect(scenario.cachedMemories, ['新记忆']);
+    });
+
+    test('删除成功后缓存同步更新', () async {
+      await scenario.patchMemory(null, '记忆1');
+      await scenario.patchMemory(null, '记忆2');
+      await scenario.patchMemory(1, '');
+      expect(scenario.cachedMemories, ['记忆2']);
     });
   });
 
@@ -258,8 +260,8 @@ void main() {
       if (memories.isNotEmpty) {
         buf.writeln('## 经验记忆');
         buf.writeln('以下是以往对话中的经验记录，请优先参考：');
-        for (final m in memories) {
-          buf.writeln('- $m');
+        for (var i = 0; i < memories.length; i++) {
+          buf.writeln('[${i + 1}] ${memories[i]}');
         }
       }
       return buf.toString();
@@ -360,8 +362,43 @@ void main() {
       // 记忆位于末尾
       expect(prompt, contains('背景设定修改时需包含完整内容'));
       expect(prompt, contains('大纲保存使用 Markdown 格式'));
-      // 记忆段在末尾
-      expect(prompt, endsWith('- 大纲保存使用 Markdown 格式\n'));
+      // 记忆段在末尾（编号格式）
+      expect(prompt, endsWith('[2] 大纲保存使用 Markdown 格式\n'));
     });
   });
+}
+
+/// 最小化测试场景：仅用于测试 [AgentMemoryPatchMixin] 的编号定位 + 去重逻辑。
+///
+/// 不依赖 Riverpod Ref，直接注入 [AgentMemoryRepository]。
+/// 通过 `with AgentScenarioCleanupMixin, AgentMemoryPatchMixin` 获得真实实现。
+class _TestScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
+    implements AgentScenario {
+  @override
+  final String id;
+  final AgentMemoryRepository _repo;
+
+  _TestScenario(this.id, this._repo);
+
+  @override
+  String get displayName => 'test';
+
+  @override
+  List<Map<String, dynamic>> get tools => const [];
+
+  @override
+  String buildSystemPrompt(AgentScenarioContext context) => '';
+
+  @override
+  Future<String> executeTool(String name, Map<String, dynamic> args) async => '';
+
+  @override
+  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
+
+  @override
+  Future<List<String>> getMemories() => loadMemories(_repo);
+
+  @override
+  Future<MemoryPatchResult> patchMemory(int? index, String newText) =>
+      patchMemoryImpl(_repo, index, newText);
 }
