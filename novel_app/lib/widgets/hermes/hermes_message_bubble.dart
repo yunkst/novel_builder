@@ -14,11 +14,17 @@ class HermesMessageBubble extends StatelessWidget {
   final List<HermesSegment>? streamingSegments;
   final bool showTimestamp;
 
+  /// 回滚回调（仅 user 消息使用）：点击按钮后回滚至此消息,
+  /// 由 [HermesChatDialog] 实现确认弹框 + 输入框回填。
+  /// 传 null 表示不渲染回滚按钮。
+  final VoidCallback? onRollback;
+
   const HermesMessageBubble({
     super.key,
     required this.message,
     this.streamingSegments,
     this.showTimestamp = true,
+    this.onRollback,
   });
 
   @override
@@ -66,11 +72,21 @@ class HermesMessageBubble extends StatelessWidget {
           ),
           if (showTimestamp) ...[
             const SizedBox(height: 2),
-            Text(
-              _formatTime(message.timestamp),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                  ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+              children: [
+                Text(
+                  _formatTime(message.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                ),
+                if (isUser && onRollback != null) ...[
+                  const SizedBox(width: 6),
+                  _buildRollbackButton(context),
+                ],
+              ],
             ),
           ],
         ],
@@ -84,6 +100,27 @@ class HermesMessageBubble extends StatelessWidget {
       return context.appColors.hermesAccent;
     }
     return Theme.of(context).colorScheme.surfaceContainerHighest;
+  }
+
+  /// 回滚按钮（小图标 + tooltip）,仅 user 消息 + onRollback != null 时渲染
+  Widget _buildRollbackButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.4);
+    return Tooltip(
+      message: '回滚至此',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTap: onRollback,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Icon(
+            Icons.undo,
+            size: 14,
+            color: muted,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildContent(BuildContext context) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/hermes_chat_state.dart';
 import 'package:novel_app/core/providers/agent_scenario_provider.dart';
+import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
@@ -10,6 +11,9 @@ import 'package:novel_app/models/hermes_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
+import 'package:novel_app/screens/llm_config_management_screen.dart';
+import 'package:novel_app/services/llm_config_service.dart';
+import 'package:novel_app/widgets/hermes/chat_history_sheet.dart';
 import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
 import 'package:novel_app/widgets/hermes/hermes_novel_picker_dialog.dart';
 import 'package:novel_app/widgets/hermes/hermes_scenario_config_dialog.dart';
@@ -28,13 +32,25 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
   bool _isFullscreen = false;
+  // 输入框是否有内容(驱动发送按钮 enabled/disabled 视觉)
+  bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
+    _hasText = _inputController.text.trim().isNotEmpty;
+    _inputController.addListener(_onInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
+  }
+
+  /// 输入框内容变化时,仅在"有内容 ↔ 无内容"边界触发重建
+  void _onInputChanged() {
+    final hasText = _inputController.text.trim().isNotEmpty;
+    if (_hasText != hasText) {
+      setState(() => _hasText = hasText);
+    }
   }
 
   void _scrollToBottom() {
@@ -45,6 +61,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
 
   @override
   void dispose() {
+    _inputController.removeListener(_onInputChanged);
     _inputController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -84,7 +101,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               if (chatState.scenarioId == ScenarioIds.writing)
                 _buildCurrentNovelBar(chatState),
               Expanded(child: _buildMessageList(chatState)),
-              if (chatState.error != null) _buildErrorBar(chatState.error!),
+              if (chatState.error != null && !chatState.isLoading)
+                _buildErrorBar(chatState.error!, session),
               _buildContextTag(),
               _buildInputBar(chatState, session),
             ],
@@ -139,6 +157,22 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // 会话历史按钮（运行中禁用，提示等待）
+              IconButton(
+                icon: Icon(Icons.history,
+                    color: appColors.hermesOnBrandMuted, size: 20),
+                tooltip: '会话历史',
+                onPressed: chatState.isLoading
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('当前对话进行中，请等待完成后再切换'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    : () => _showHistorySheet(),
+              ),
               // 场景切换按钮
               PopupMenuButton<String>(
                 icon: Icon(
@@ -154,6 +188,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                   if (info != null) {
                     // 切换场景：设置当前 scenario + 懒创建目标 session
                     ref.read(currentAgentScenarioProvider.notifier).state = info.id;
+                    // 新 scenario 还没选会话，重置 sessionId 让 ScenarioSession 自取最近
+                    ref.read(currentChatSessionIdProvider.notifier).state = null;
                     ref.read(scenarioSessionsProvider.notifier).get(info.id);
                   }
                 },
@@ -232,7 +268,12 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         }
 
         final message = chatState.messages[index];
-        return HermesMessageBubble(message: message);
+        // 仅 user 消息提供回滚入口；agent 运行中禁用(防止与并发状态冲突)
+        final canRollback = message.role == HermesRole.user && !chatState.isLoading;
+        return HermesMessageBubble(
+          message: message,
+          onRollback: canRollback ? () => _handleRollback(index) : null,
+        );
       },
     );
   }
@@ -372,10 +413,14 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     );
   }
 
-  Widget _buildErrorBar(String error) {
+  Widget _buildErrorBar(String error, ScenarioSession? session) {
     final appColors = context.appColors;
+    // 命中"LLM 未配置"关键字 → 显示"去设置"按钮；否则显示"重试"按钮
+    final isNotConfigured =
+        error.contains(LlmConfigService.notConfiguredMessage);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       color: appColors.error.withValues(alpha: 0.1),
       child: Row(
         children: [
@@ -389,6 +434,42 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
+          if (isNotConfigured)
+            TextButton.icon(
+              onPressed: session == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const LlmConfigManagementScreen(),
+                        ),
+                      ),
+              icon: const Icon(Icons.settings, size: 14),
+              label: const Text('去设置', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: appColors.error,
+              ),
+            )
+          else
+            TextButton.icon(
+              onPressed: session == null
+                  ? null
+                  : () => session.retryLastRound(),
+              icon: const Icon(Icons.refresh, size: 14),
+              label: const Text('重试', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: appColors.error,
+              ),
+            ),
         ],
       ),
     );
@@ -508,6 +589,22 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     }
   }
 
+  /// 弹出会话历史底部抽屉（当前 scenario 下的会话列表）
+  ///
+  /// 运行中拦截已由按钮 onPressed 处理，这里只负责拉起 sheet。
+  Future<void> _showHistorySheet() async {
+    final scenarioId = ref.read(currentAgentScenarioProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => ChatHistorySheet(scenarioId: scenarioId),
+    );
+  }
+
   /// 弹出场景级 LLM 配置对话框
   ///
   /// 让用户为当前场景单独配置 LLM 后端（覆盖全局默认）。
@@ -528,7 +625,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         ScenarioQuickPrompts.forScenario(chatState.scenarioId);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
@@ -543,54 +640,100 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           // 快速输入提示词（仅在场景配置了提示词且非加载时显示）
           if (quickPrompts.isNotEmpty && !chatState.isLoading)
             _buildQuickPrompts(quickPrompts, theme, appColors),
-          TextField(
-            controller: _inputController,
-            focusNode: _focusNode,
-            enabled: !chatState.isLoading,
-            maxLines: 5,
-            minLines: 1,
-            decoration: InputDecoration(
-              hintText: chatState.isLoading ? '等待回复...' : '输入消息...（Enter 换行，点击发送）',
-              hintStyle: TextStyle(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-              ),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            textInputAction: TextInputAction.newline,
-          ),
-          const SizedBox(height: 8),
+          // 微信式输入区：输入框与发送/停止按钮同行
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (chatState.isLoading)
-                FilledButton.icon(
-                  onPressed: () => session?.cancel(),
-                  icon: const Icon(Icons.stop, size: 18),
-                  label: const Text('停止'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: appColors.error,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              Expanded(
+                child: TextField(
+                  controller: _inputController,
+                  focusNode: _focusNode,
+                  enabled: !chatState.isLoading,
+                  maxLines: 5,
+                  minLines: 1,
+                  decoration: InputDecoration(
+                    hintText:
+                        chatState.isLoading ? '等待回复...' : '输入消息...',
+                    hintStyle: TextStyle(
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
-                )
-              else
-                FilledButton.icon(
-                  onPressed: () => _sendMessage(session),
-                  icon: const Icon(Icons.send, size: 18),
-                  label: const Text('发送'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: appColors.hermesAccent,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
+                  textInputAction: TextInputAction.newline,
                 ),
+              ),
+              const SizedBox(width: 8),
+              _buildSendStopButton(chatState, session, theme, appColors),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// 发送/停止按钮（圆形 40x40，微信风格）
+  ///
+  /// 状态优先级：isLoading（停止）> _hasText（可发送）> 空内容（禁用）。
+  Widget _buildSendStopButton(
+    HermesChatState chatState,
+    ScenarioSession? session,
+    ThemeData theme,
+    AppColors appColors,
+  ) {
+    if (chatState.isLoading) {
+      return _circleIconButton(
+        icon: Icons.stop_rounded,
+        bg: appColors.error,
+        fg: appColors.hermesOnBrand,
+        onPressed: () => session?.cancel(),
+        tooltip: '停止',
+      );
+    }
+    if (_hasText) {
+      return _circleIconButton(
+        icon: Icons.send_rounded,
+        bg: appColors.hermesAccent,
+        fg: appColors.hermesOnBrand,
+        onPressed: () => _sendMessage(session),
+        tooltip: '发送',
+      );
+    }
+    return _circleIconButton(
+      icon: Icons.send_rounded,
+      bg: theme.colorScheme.outline.withValues(alpha: 0.3),
+      fg: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+      onPressed: null,
+      tooltip: '发送',
+    );
+  }
+
+  /// 圆形图标按钮（无文字，固定 40x40）
+  Widget _circleIconButton({
+    required IconData icon,
+    required Color bg,
+    required Color fg,
+    required VoidCallback? onPressed,
+    required String tooltip,
+  }) {
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: IconButton(
+        icon: Icon(icon, size: 20, color: fg),
+        onPressed: onPressed,
+        tooltip: tooltip,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
       ),
     );
   }
@@ -641,5 +784,62 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     session?.sendMessage(text);
 
     _focusNode.requestFocus();
+  }
+
+  /// 回滚到指定 user 消息 — 弹确认框,通过后删除该消息及之后所有记录,
+  /// 并把该消息文本回填到输入框(等待用户编辑后重新发送)。
+  ///
+  /// 索引 [messageIndex] 对应点击时刻的 messages 位置;弹框期间列表可能已变化,
+  /// 故内部用 ref.read 重新读取最新长度计算"将删除的条数"。
+  Future<void> _handleRollback(int messageIndex) async {
+    final chatState = ref.read(currentChatStateProvider);
+    if (chatState.isLoading) return;
+
+    final messages = chatState.messages;
+    if (messageIndex < 0 || messageIndex >= messages.length) return;
+    final target = messages[messageIndex];
+    if (target.role != HermesRole.user) return;
+
+    final willRemove = messages.length - messageIndex;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('回滚对话'),
+        content: Text(
+          '将删除此消息之后的 $willRemove 条记录(含此消息),\n'
+          '并把此消息内容放回输入框,是否继续?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认回滚'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    final session = ref.read(currentSessionProvider);
+    session?.rollbackToMessage(
+      messageIndex,
+      contentCallback: (text) {
+        if (!mounted) return;
+        _inputController.text = text;
+        _inputController.selection = TextSelection.collapsed(
+          offset: text.length,
+        );
+        // 手动触发一次输入监听,确保 _hasText / 发送按钮状态刷新
+        final hasText = _inputController.text.trim().isNotEmpty;
+        if (_hasText != hasText) {
+          setState(() => _hasText = hasText);
+        }
+        _focusNode.requestFocus();
+      },
+    );
   }
 }

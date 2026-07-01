@@ -9,6 +9,9 @@
 /// - 按 scenarioId 懒创建 ScenarioSession
 /// - LRU 淘汰（最多 8 个 session，空闲的优先淘汰）
 /// - Riverpod state 同步（`Map<scenarioId, HermesChatState>`）
+///
+/// 多 session 持久化后，ScenarioSession 本身多一个 sessionId 字段（可空）；
+/// 切换 session 时清空 in-memory messages，让 ScenarioSession 主动从 DB 加载。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import 'agent_scenario_provider.dart';
+import 'chat_session_providers.dart';
 import 'hermes_chat_state.dart';
 import 'scenario_session.dart';
 
@@ -35,7 +39,10 @@ class ScenarioSessionsNotifier
 
   ScenarioSessionsNotifier(this._ref) : super({});
 
-  /// 获取指定场景的 session（懒创建）
+  /// 获取指定场景的 session（懒创建）。
+  ///
+  /// 第一次调用时，如果当前已经有选中的 sessionId（来自 currentChatSessionIdProvider），
+  /// 用它；否则传 null，让 ScenarioSession 自身从 DB 选最近一个。
   ScenarioSession get(String scenarioId) {
     // 更新访问顺序
     _accessOrder.remove(scenarioId);
@@ -52,7 +59,12 @@ class ScenarioSessionsNotifier
       tags: ['sessions', 'create', scenarioId],
     );
 
-    final session = ScenarioSession(scenarioId: scenarioId, ref: _ref);
+    final initialSessionId = _ref.read(currentChatSessionIdProvider);
+    final session = ScenarioSession(
+      scenarioId: scenarioId,
+      initialSessionId: initialSessionId,
+      ref: _ref,
+    );
     session.setOnStateChanged(() => _syncState(scenarioId));
     _sessions[scenarioId] = session;
 
@@ -62,7 +74,36 @@ class ScenarioSessionsNotifier
     // 初始同步
     _syncState(scenarioId);
 
+    // 冷启动自动 hydrate：如果已经选了 sessionId（或 DB 里有该 scenario 的历史），
+    // 主动加载 messages，让 UI 一打开就能看到上次的对话。
+    // fire-and-forget：失败只记日志，messages 留空也不影响 agent 后续运行。
+    if (initialSessionId != null) {
+      // 已知 sessionId → 直接 hydrate
+      session.hydrateIfNeeded();
+    } else {
+      // 未知 sessionId → 让 ScenarioSession 内部先选最近再 hydrate
+      session.hydrateFromRecentIfNeeded();
+    }
+
     return session;
+  }
+
+  /// 切换会话 id（来自 UI「打开历史 → 点了一条」）。
+  ///
+  /// - 如果新 sessionId == 当前 ScenarioSession.sessionId：noop
+  /// - 否则：把 in-memory messages 清空，让 ScenarioSession 内部重新从 DB hydrate
+  ///
+  /// 不杀 agent（用户切到别的会话时通常当前 agent 已 done；如果在跑则上层拦截）。
+  void switchSession(String scenarioId, int? newSessionId) {
+    final session = _sessions[scenarioId];
+    if (session == null) {
+      // ScenarioSession 还没被创建，让下次 get() 用新 sessionId 初始化
+      return;
+    }
+    session.adoptSession(newSessionId);
+    _syncState(scenarioId);
+    // 触发重新 hydrate（内部 await，状态变化会通过 _onStateChanged 同步）
+    session.hydrateIfNeeded();
   }
 
   /// 获取当前场景的 session（如果已创建）
@@ -173,8 +214,14 @@ final scenarioSessionsProvider =
 ///
 /// UI 层不直接感知 ScenarioSession 的存在，
 /// 只通过这个 Provider 读取当前场景的 HermesChatState。
+///
+/// 同时 watch `currentAgentScenarioProvider`（场景）和 `currentChatSessionIdProvider`
+/// （会话 id）：sessionId 在 ScenarioSession 内部异步解析（冷启动选最近 / 首条消息新建）
+/// 时会被写回，此时 sessions state 尚未携带新 messages，watch sessionId 可让 UI 立即
+/// 反映「已选中某 session」并等待 hydrate 推送的二次重建。
 final currentChatStateProvider = Provider<HermesChatState>((ref) {
   final scenarioId = ref.watch(currentAgentScenarioProvider);
+  ref.watch(currentChatSessionIdProvider);
   final sessions = ref.watch(scenarioSessionsProvider);
   return sessions[scenarioId] ??
       HermesChatState(
@@ -190,6 +237,9 @@ final currentChatStateProvider = Provider<HermesChatState>((ref) {
 /// 当前场景的 session — 用于发送消息等操作
 ///
 /// 懒创建：首次访问时自动创建对应场景的 ScenarioSession。
+///
+/// 会话 id 切换由调用方负责：UI 写入 `currentChatSessionIdProvider` 后再调用
+/// `scenarioSessionsProvider.notifier.switchSession(...)` 触发 in-memory reload。
 final currentSessionProvider = Provider<ScenarioSession?>((ref) {
   final scenarioId = ref.watch(currentAgentScenarioProvider);
   final notifier = ref.read(scenarioSessionsProvider.notifier);

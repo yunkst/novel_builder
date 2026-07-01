@@ -492,7 +492,7 @@ void main() {
 
     group('currentVersion', () {
       test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
-        expect(DatabaseMigrations.currentVersion, 30);
+        expect(DatabaseMigrations.currentVersion, 31);
       });
     });
 
@@ -574,6 +574,96 @@ void main() {
         expect(indexNames.contains('idx_chapter_versions_chapter_url'), isTrue);
         expect(indexNames.contains('idx_chapter_versions_created_at'), isTrue);
 
+        await db.close();
+      });
+    });
+
+    group('v31 — AI 对话会话历史', () {
+      test('应创建 chat_sessions 和 chat_messages 两张表', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+
+        final tables = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table'");
+        final tableNames = tables.map((t) => t['name'] as String).toSet();
+
+        expect(tableNames.contains('chat_sessions'), isTrue);
+        expect(tableNames.contains('chat_messages'), isTrue);
+
+        await db.close();
+      });
+
+      test('chat_sessions 应包含完整字段', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+
+        final columns = await db.rawQuery('PRAGMA table_info(chat_sessions)');
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+
+        expect(columnNames.contains('id'), isTrue);
+        expect(columnNames.contains('scenarioId'), isTrue);
+        expect(columnNames.contains('title'), isTrue);
+        expect(columnNames.contains('createdAt'), isTrue);
+        expect(columnNames.contains('updatedAt'), isTrue);
+        expect(columnNames.contains('currentNovelId'), isTrue);
+        expect(columnNames.contains('currentNovelTitle'), isTrue);
+
+        await db.close();
+      });
+
+      test('chat_messages 应包含完整字段 + FK 到 chat_sessions', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+
+        final columns = await db.rawQuery('PRAGMA table_info(chat_messages)');
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+        expect(columnNames.contains('id'), isTrue);
+        expect(columnNames.contains('sessionId'), isTrue);
+        expect(columnNames.contains('role'), isTrue);
+        expect(columnNames.contains('content'), isTrue);
+        expect(columnNames.contains('segmentsJson'), isTrue);
+        expect(columnNames.contains('timestamp'), isTrue);
+        expect(columnNames.contains('orderIndex'), isTrue);
+
+        // FK 应指向 chat_sessions.id 且启用 CASCADE
+        final fks = await db.rawQuery('PRAGMA foreign_key_list(chat_messages)');
+        expect(fks, isNotEmpty);
+        final fk = fks.first;
+        expect(fk['table'], 'chat_sessions');
+        expect(fk['from'], 'sessionId');
+        expect((fk['on_delete']?.toString() ?? '').toLowerCase().contains('cascade'), isTrue);
+
+        await db.close();
+      });
+
+      test('应创建会话列表和消息顺序索引', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+
+        final indexes = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_chat_%'");
+        final indexNames = indexes.map((i) => i['name'] as String).toSet();
+        expect(indexNames.contains('idx_chat_sessions_scenario_updated'), isTrue);
+        expect(indexNames.contains('idx_chat_messages_session'), isTrue);
+        expect(
+            indexNames.contains('idx_chat_sessions_scenario_updated_desc'),
+            isTrue);
+        expect(indexNames.contains('idx_chat_messages_session_order'), isTrue);
+
+        await db.close();
+      });
+
+      test('PRAGMA foreign_keys 已被打开迁移自身开启', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+        final r = await db.rawQuery('PRAGMA foreign_keys');
+        // PRAGMA foreign_keys 返回 0/1 列
+        expect(r.first.values.first, 1);
         await db.close();
       });
     });

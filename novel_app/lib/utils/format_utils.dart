@@ -77,4 +77,19 @@ class FormatUtils {
     return '$year-$month-$day $hour:$minute:$second';
   }
 
+  /// 紧凑日期时间格式（"YYYY/MM/DD HH:mm"），用于列表/卡片标题等空间受限场景
+  ///
+  /// 与 [formatDateTime] 区别：用 `/` 分隔日期、不带秒。
+  ///
+  /// 示例：
+  /// ```dart
+  /// FormatUtils.formatDateTimeShort(DateTime(2024, 1, 15, 14, 30));
+  /// // "2024/01/15 14:30"
+  /// ```
+  static String formatDateTimeShort(DateTime dateTime) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${dateTime.year}/${two(dateTime.month)}/${two(dateTime.day)} '
+        '${two(dateTime.hour)}:${two(dateTime.minute)}';
+  }
+
 }

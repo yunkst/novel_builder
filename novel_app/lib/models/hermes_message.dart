@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import '../services/logger_service.dart';
 import '../services/novel_agent/agent_event.dart';
 
 /// Hermes 聊天消息角色
@@ -84,7 +87,128 @@ class HermesMessage {
         segments: segments,
       );
 
+  /// segments → JSON 字符串（持久化到 chat_messages.segmentsJson）
+  ///
+  /// 每条 segment 输出 `{type:'text', content}` 或
+  /// `{type:'tool', id, name, arguments, status, result?}`。
+  /// 任何异常不会抛出，返回空数组，保证 DB 写入不阻塞主流程。
+  static String segmentsToJson(List<HermesSegment> segments) {
+    try {
+      final list = segments.map((s) {
+        if (s is TextSegment) {
+          return {'type': 'text', 'content': s.content};
+        }
+        if (s is ToolCallSegment) {
+          final c = s.call;
+          return {
+            'type': 'tool',
+            'id': c.id,
+            'name': c.name,
+            'arguments': c.arguments,
+            'status': c.status.name,
+            if (c.result != null) 'result': c.result,
+          };
+        }
+        // 未知子类降级为 text（防御未来扩展）
+        return {'type': 'text', 'content': ''};
+      }).toList();
+      return jsonEncode(list);
+    } catch (e) {
+      LoggerService.instance.w(
+        'segmentsToJson 失败: $e',
+        category: LogCategory.ai,
+        tags: ['hermes_message', 'serialize_failed'],
+      );
+      return '[]';
+    }
+  }
+
+  /// JSON 字符串 → segments（坏数据降级为空 list，不抛异常）
+  static List<HermesSegment> segmentsFromJson(String json) {
+    if (json.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is! List) return const [];
+      final result = <HermesSegment>[];
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final type = item['type']?.toString();
+        if (type == 'text') {
+          result.add(TextSegment(item['content']?.toString() ?? ''));
+        } else if (type == 'tool') {
+          final argumentsRaw = item['arguments'];
+          final arguments = argumentsRaw is Map
+              ? Map<String, dynamic>.from(argumentsRaw)
+              : <String, dynamic>{};
+          final statusStr = item['status']?.toString() ?? 'running';
+          final status = AgentToolStatus.values.firstWhere(
+            (s) => s.name == statusStr,
+            orElse: () => AgentToolStatus.running,
+          );
+          result.add(ToolCallSegment(AgentToolCall(
+            id: item['id']?.toString() ?? '',
+            name: item['name']?.toString() ?? '',
+            arguments: arguments,
+            status: status,
+            result: item['result']?.toString(),
+          )));
+        }
+        // 未知 type 跳过
+      }
+      return result;
+    } catch (e) {
+      LoggerService.instance.w(
+        'segmentsFromJson 失败: $e rawLen=${json.length}',
+        category: LogCategory.ai,
+        tags: ['hermes_message', 'deserialize_failed'],
+      );
+      return const [];
+    }
+  }
+
+  /// 序列化为完整快照（含 segments 多态细节，用于持久化）
+  Map<String, dynamic> toJson() {
+    return {
+      'role': role.name,
+      'content': content,
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'segmentsJson': segmentsToJson(segments),
+    };
+  }
+
+  /// 从完整快照反序列化（坏数据降级为仅文本 user 消息）
+  factory HermesMessage.fromJson(Map<String, dynamic> map) {
+    final roleStr = map['role']?.toString() ?? 'user';
+    final HermesRole role;
+    switch (roleStr) {
+      case 'system':
+        role = HermesRole.system;
+        break;
+      case 'assistant':
+        role = HermesRole.assistant;
+        break;
+      default:
+        role = HermesRole.user;
+    }
+    final tsMs = map['timestamp'];
+    final ts = tsMs is int
+        ? DateTime.fromMillisecondsSinceEpoch(tsMs)
+        : DateTime.now();
+    final rawSegments = map['segmentsJson']?.toString() ?? '[]';
+    final segs = segmentsFromJson(rawSegments);
+    if (segs.isEmpty) {
+      return HermesMessage(
+        role: role,
+        segments: [TextSegment(map['content']?.toString() ?? '')],
+        timestamp: ts,
+      );
+    }
+    return HermesMessage(role: role, segments: segs, timestamp: ts);
+  }
+
   /// 序列化为 LLM 历史格式（只保留 role + content，不含 segments 细节）
+  ///
+  /// 保留供历史/外部 LLM 历史回放使用，不被持久化路径调用。
   Map<String, String> toMap() {
     return {
       'role': role.name,

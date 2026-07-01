@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 30;
+  static const int currentVersion = 31;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -625,6 +625,48 @@ class DatabaseMigrations {
             db, 'idx_chapter_versions_created_at', 'chapter_versions', 'createdAt');
         _log('迁移 v29 → v30: 创建 chapter_versions 表');
         break;
+
+      // ========== 版本 31：AI 对话会话历史 ==========
+      // chat_sessions + chat_messages 两表 + 外键 CASCADE。
+      // SQLite 默认关闭 foreign_keys，迁移自开启以让 FK CASCADE 在所有入口生效
+      // （生产连接由 DatabaseConnection._initDatabase 末尾开启；测试走本迁移）。
+      case 31:
+        await db.execute('PRAGMA foreign_keys = ON');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scenarioId TEXT NOT NULL,
+          title TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL,
+          currentNovelId INTEGER,
+          currentNovelTitle TEXT
+        )
+      ''');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sessionId INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          segmentsJson TEXT NOT NULL DEFAULT '[]',
+          timestamp INTEGER NOT NULL,
+          orderIndex INTEGER NOT NULL,
+          FOREIGN KEY (sessionId) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_chat_sessions_scenario_updated', 'chat_sessions', 'scenarioId');
+        // sessions 按 (scenarioId, updatedAt DESC) 列出，建复合索引
+        await _createIndexIfNotExists(
+            db, 'idx_chat_sessions_scenario_updated_desc', 'chat_sessions', 'scenarioId, updatedAt DESC');
+        await _createIndexIfNotExists(
+            db, 'idx_chat_messages_session', 'chat_messages', 'sessionId');
+        // messages 按 (sessionId, orderIndex ASC) 取出，建复合索引
+        await _createIndexIfNotExists(
+            db, 'idx_chat_messages_session_order', 'chat_messages', 'sessionId, orderIndex ASC');
+        _log('迁移 v30 → v31: 创建 chat_sessions + chat_messages 表（含外键 CASCADE）');
+        break;
     }
   }
 
@@ -662,18 +704,23 @@ class DatabaseMigrations {
   }
 
   /// 安全创建索引（如果不存在）
+  ///
+  /// [columnExpr] 是索引的列表达式，直接拼入 `ON table(...)`：
+  /// - 单列：`'scenarioId'`（向后兼容旧调用）
+  /// - 复合列：`'scenarioId, updatedAt DESC'`（不带外层括号，模板会加）
   static Future<void> _createIndexIfNotExists(
-      Database db, String indexName, String table, String column) async {
+      Database db, String indexName, String table, String columnExpr) async {
     try {
       final indexes = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE '$indexName'");
+          "SELECT name FROM sqlite_master WHERE type='index' AND name = ?",
+          [indexName]);
       if (indexes.isEmpty) {
         await db.execute(
-            'CREATE INDEX $indexName ON $table($column)');
+            'CREATE INDEX IF NOT EXISTS $indexName ON $table($columnExpr)');
       }
     } catch (e, stackTrace) {
       LoggerService.instance.w(
-        '创建索引失败: $indexName on $table.$column - $e',
+        '创建索引失败: $indexName on $table.$columnExpr - $e',
         stackTrace: stackTrace.toString(),
         category: LogCategory.database,
         tags: ['migration', 'create_index', 'failed'],

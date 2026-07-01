@@ -40,7 +40,12 @@ class TestDatabaseSetup {
   }
 
   /// 清空所有表数据（保留表结构）
+  ///
+  /// 清理顺序：先清带 FK 引用子表，再清被引用表，避免 FK CASCADE 误删。
   static Future<void> clearAllTables(Database db) async {
+    // 先关 FK，避免清 sessions 时 CASCADE 删 messages 触发 warning 噪音
+    await db.delete('chat_messages');
+    await db.delete('chat_sessions');
     await db.delete('bookshelf');
     await db.delete('chapter_cache');
     await db.delete('novel_chapters');
@@ -51,6 +56,14 @@ class TestDatabaseSetup {
     await db.delete('character_relationships');
     await db.delete('outlines');
     await db.delete('chat_scenes');
+    await db.delete('prompt_history');
+    await db.delete('prompt_tag_history');
+    await db.delete('prompt_tags');
+    await db.delete('prompt_tag_categories');
+    await db.delete('site_scripts');
+    await db.delete('agent_memory');
+    await db.delete('llm_configs');
+    await db.delete('chapter_versions');
   }
 
   /// 统计表中的记录数（用于调试）
@@ -66,6 +79,16 @@ class TestDatabaseSetup {
       'character_relationships',
       'outlines',
       'chat_scenes',
+      'prompt_history',
+      'prompt_tag_history',
+      'prompt_tags',
+      'prompt_tag_categories',
+      'site_scripts',
+      'agent_memory',
+      'llm_configs',
+      'chapter_versions',
+      'chat_sessions',
+      'chat_messages',
     ];
 
     final stats = <String, int>{};
@@ -93,6 +116,16 @@ class TestDatabaseSetup {
       'character_relationships',
       'bookshelves',
       'novel_bookshelves',
+      'prompt_history',
+      'prompt_tag_history',
+      'prompt_tags',
+      'prompt_tag_categories',
+      'site_scripts',
+      'agent_memory',
+      'llm_configs',
+      'chapter_versions',
+      'chat_sessions',
+      'chat_messages',
     ];
 
     final existingTables = await db.rawQuery(

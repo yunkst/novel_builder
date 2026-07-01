@@ -13,6 +13,7 @@ import '../../repositories/llm_config_repository.dart';
 import '../../repositories/prompt_tag_repository.dart';
 import '../../repositories/site_script_repository.dart';
 import '../../repositories/agent_memory_repository.dart';
+import '../../repositories/chat_session_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
 import '../interfaces/repositories/i_chapter_repository.dart';
@@ -138,4 +139,12 @@ final agentMemoryRepositoryProvider = Provider<AgentMemoryRepository>((ref) {
 final llmConfigRepositoryProvider = Provider<LlmConfigRepository>((ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return LlmConfigRepository(dbConnection: dbConnection);
+});
+
+/// ChatSessionRepository Provider
+///
+/// AI 对话会话历史的持久化操作
+final chatSessionRepositoryProvider = Provider<ChatSessionRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return ChatSessionRepository(dbConnection: dbConnection);
 });

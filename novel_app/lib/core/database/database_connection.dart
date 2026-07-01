@@ -81,12 +81,17 @@ class DatabaseConnection implements IDatabaseConnection {
       final databasePath = await getDatabasesPath();
       final path = join(databasePath, 'novel_reader.db');
 
-      return await openDatabase(
+      final db = await openDatabase(
         path,
         version: DatabaseMigrations.currentVersion,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
+      // SQLite 默认关闭 foreign_keys，PRAGMA 是 per-connection 的；
+      // sqflite 没有 onConfigure hook，统一在连接初始化末尾开一次，
+      // 让 chat_messages → chat_sessions 的 ON DELETE CASCADE 生效。
+      await db.execute('PRAGMA foreign_keys = ON');
+      return db;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '数据库初始化失败: $e',

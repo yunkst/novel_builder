@@ -18,7 +18,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/providers/agent_scenario_provider.dart';
-import 'package:novel_app/core/providers/current_novel_provider.dart';
 import 'package:novel_app/core/providers/hermes_providers.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
@@ -37,7 +36,16 @@ class MockNovelAgentService implements NovelAgentService {
   final Map<String, bool> _runningByScenario = {};
   int sendMessageCallCount = 0;
   final List<String> sendMessageScenarioIds = [];
+  final List<String> sendMessageUserInputs = [];
   final Duration? delay;
+
+  /// 失败注入：剩余多少轮调用需要模拟失败（emit AgentErrorEvent 而非正常流程）。
+  /// 每次失败调用会自减。供 retryLastRound 测试使用。
+  int failNextRounds = 0;
+
+  /// 失败前是否先 emit 一段 TextDelta（模拟流式半成品）。
+  /// 为 true 时失败轮会先发一个 TextDelta 再发 AgentErrorEvent。
+  bool emitPartialBeforeFail = false;
 
   MockNovelAgentService({this.delay});
 
@@ -70,14 +78,31 @@ class MockNovelAgentService implements NovelAgentService {
 
     sendMessageCallCount++;
     sendMessageScenarioIds.add(scenarioId);
+    sendMessageUserInputs.add(userInput);
     _runningByScenario[scenarioId] = true;
 
     final completer = Completer<void>();
     _completers[scenarioId] = completer;
 
+    final shouldFail = failNextRounds > 0;
+    if (shouldFail) {
+      failNextRounds--;
+    }
+
     try {
       // 等一帧让 ScenarioSession 的 listen 先注册上
       await Future<void>.delayed(Duration.zero);
+
+      if (shouldFail) {
+        // 失败路径：可选地先发一段半成品，再 emit AgentErrorEvent
+        if (emitPartialBeforeFail) {
+          _controller.add(TextDeltaEvent('[$scenarioId] 半成品回复...'));
+          await Future<void>.delayed(Duration.zero);
+        }
+        _controller.add(AgentErrorEvent('模拟 LLM 调用失败'));
+        await Future<void>.delayed(Duration.zero);
+        return;
+      }
 
       // 发一个文本增量模拟流式输出
       _controller.add(TextDeltaEvent('[$scenarioId] 回复: $userInput'));
@@ -471,6 +496,112 @@ void main() {
 
       session.dispose();
       expect(session.lifecycle, SessionLifecycle.disposed);
+    });
+  });
+
+  // ===========================================================================
+  // 9. retryLastRound — LLM 失败后重试
+  // ===========================================================================
+
+  group('retryLastRound', () {
+    test('失败首轮重试 → 用同一 user content 重新调用 Agent，error 清空', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 第一次：模拟失败
+      mockService.failNextRounds = 1;
+      await session.sendMessage('你好');
+
+      expect(session.state.error, isNotNull, reason: '首轮失败应设置 error');
+      expect(session.state.messages.length, 1);
+      expect(session.state.messages.last.role, HermesRole.user);
+      expect(session.state.messages.last.content, '你好');
+      expect(mockService.sendMessageCallCount, 1);
+
+      // 重试（mock 此时已恢复正常）
+      await session.retryLastRound();
+
+      expect(mockService.sendMessageCallCount, 2, reason: '重试应再调一次 sendMessage');
+      expect(mockService.sendMessageUserInputs.last, '你好',
+          reason: '重试应使用原 user content');
+      expect(session.state.error, isNull, reason: '重试后 error 应清空');
+      expect(session.state.messages.length, 2,
+          reason: '重试成功后应有 user + assistant');
+      expect(session.state.messages.first.role, HermesRole.user);
+      expect(session.state.messages.first.content, '你好',
+          reason: '不应重复添加 user 消息');
+      expect(session.state.messages.last.role, HermesRole.assistant);
+    });
+
+    test('半成品 assistant 在末尾时重试 → 删半成品，重发最后一条 user', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 第一轮正常：messages = [user1, assistant1]
+      await session.sendMessage('第一条');
+      expect(session.state.messages.length, 2);
+
+      // 第二轮失败且带半成品：messages = [user1, assistant1, user2, assistant_half]
+      mockService.failNextRounds = 1;
+      mockService.emitPartialBeforeFail = true;
+      await session.sendMessage('第二条');
+      expect(session.state.error, isNotNull);
+      expect(session.state.messages.length, 4,
+          reason: '半成品 assistant 应已入列');
+      expect(session.state.messages[2].role, HermesRole.user);
+      expect(session.state.messages[2].content, '第二条');
+      expect(session.state.messages.last.role, HermesRole.assistant,
+          reason: '末尾应是半成品 assistant');
+
+      // 重试：应删掉半成品 assistant，保留 user2，重发 user2.content
+      await session.retryLastRound();
+
+      expect(mockService.sendMessageUserInputs.last, '第二条',
+          reason: '重试应使用最后一条 user 的 content');
+      expect(session.state.messages.length, 4,
+          reason: '截断后 [user1, assistant1, user2] = 3 条，重试成功再 +1 assistant = 4');
+      expect(session.state.messages[2].role, HermesRole.user);
+      expect(session.state.messages[2].content, '第二条');
+      expect(session.state.messages.last.role, HermesRole.assistant,
+          reason: '重试成功后末尾应是新的 assistant');
+      expect(session.state.error, isNull);
+    });
+
+    test('运行中调 retryLastRound → 拒绝并设置 error 提示', () async {
+      // 用独立的慢 mock 容器，让 sendMessage 不立即完成
+      final slowMock = MockNovelAgentService(delay: const Duration(milliseconds: 100));
+      final slowContainer = ProviderContainer(overrides: [
+        novelAgentServiceProvider.overrideWith((ref) => slowMock),
+      ]);
+      addTearDown(slowContainer.dispose);
+
+      final slowSessions = slowContainer.read(scenarioSessionsProvider.notifier);
+      final slowSession = slowSessions.get(ScenarioIds.writing);
+
+      // 启动慢发送但不等它完成
+      final sendFuture = slowSession.sendMessage('慢消息');
+
+      // 等一帧让 _isRunning 被置为 true
+      await Future<void>.delayed(Duration.zero);
+      expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
+
+      // 此时调 retryLastRound 应被拒绝
+      await slowSession.retryLastRound();
+      expect(slowSession.state.error, 'Agent 正在运行，无法重试');
+
+      await sendFuture;
+    });
+
+    test('messages 中无 user 消息时 → 拒绝并设置 error 提示', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 全新 session，messages 为空，直接调 retryLastRound
+      await session.retryLastRound();
+
+      expect(session.state.error, '没有可重试的用户消息');
+      expect(mockService.sendMessageCallCount, 0,
+          reason: '无 user 消息时不应调用 Agent');
     });
   });
 }
