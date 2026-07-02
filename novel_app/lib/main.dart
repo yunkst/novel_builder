@@ -14,6 +14,7 @@ import 'core/theme/app_colors.dart';
 import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
+import 'services/llm_logger/llm_logger.dart';
 import 'services/log_reporter_service.dart';
 import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/agent_chat/agent_floating_button.dart';
@@ -28,6 +29,14 @@ void main() async {
     'LoggerService 初始化完成',
     category: LogCategory.general,
     tags: ['startup', 'logger'],
+  );
+
+  // 初始化 LLM 调用日志服务（拦截器在 llm_provider.dart 中调用，失败不阻塞）
+  await LlmLogger.instance.initialize();
+  LoggerService.instance.i(
+    'LlmLogger 初始化完成',
+    category: LogCategory.general,
+    tags: ['startup', 'llm-logger'],
   );
 
   // 初始化日志上报服务（在 LoggerService 之后）

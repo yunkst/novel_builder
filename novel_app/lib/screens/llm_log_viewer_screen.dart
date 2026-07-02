@@ -147,7 +147,8 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
           // 统计信息条
           Container(
             width: double.infinity,
-            color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+            color:
+                theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               '共 ${_records.length} 条 · 占用 ${FormatUtils.formatFileSize(_totalSize)}'
@@ -179,9 +180,8 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
   Widget _buildRecordCard(LlmCallRecord record) {
     final theme = Theme.of(context);
     final isSuccess = record.isSuccess;
-    final statusColor = isSuccess
-        ? theme.colorScheme.tertiary
-        : theme.colorScheme.error;
+    final statusColor =
+        isSuccess ? theme.colorScheme.tertiary : theme.colorScheme.error;
     final statusIcon = isSuccess ? Icons.check_circle : Icons.error;
 
     return Card(
@@ -206,7 +206,8 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
             if (record.isStreaming)
               Container(
                 margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(4),

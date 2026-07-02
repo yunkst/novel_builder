@@ -207,7 +207,8 @@ class _LlmLogDetailScreenState extends ConsumerState<LlmLogDetailScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+            color:
+                theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(6),
           ),
           constraints: const BoxConstraints(maxHeight: 360),

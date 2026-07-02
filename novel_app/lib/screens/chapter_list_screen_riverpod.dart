@@ -15,6 +15,8 @@ import '../utils/toast_utils.dart';
 import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
 import 'background_setting_screen.dart';
+import 'character_list_screen.dart';
+import 'outline_screen.dart';
 import 'insert_chapter_screen.dart';
 import '../core/providers/reading_context_providers.dart';
 
@@ -250,6 +252,26 @@ class _ChapterListScreenRiverpodState
               ),
             );
             break;
+          case 'characters':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CharacterListScreen(
+                  novel: widget.novel,
+                ),
+              ),
+            );
+            break;
+          case 'outline':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OutlineScreen(
+                  novel: widget.novel,
+                ),
+              ),
+            );
+            break;
         }
       },
       itemBuilder: (context) {
@@ -294,6 +316,26 @@ class _ChapterListScreenRiverpodState
                 Icon(Icons.info_outline),
                 SizedBox(width: 8),
                 Text('背景设定'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'characters',
+            child: Row(
+              children: [
+                Icon(Icons.people_outline),
+                SizedBox(width: 8),
+                Text('人物卡'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'outline',
+            child: Row(
+              children: [
+                Icon(Icons.description_outlined),
+                SizedBox(width: 8),
+                Text('大纲'),
               ],
             ),
           ),

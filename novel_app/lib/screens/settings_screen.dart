@@ -7,6 +7,7 @@ import 'agent_memory_management_screen.dart';
 import 'backend_settings_screen.dart';
 import 'log_report_settings_screen.dart';
 import 'log_viewer_screen.dart';
+import 'llm_log_viewer_screen.dart';
 import 'preload_queue_debug_screen.dart';
 import '../services/app_update_service.dart';
 import '../services/logger_service.dart';
@@ -290,6 +291,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LogViewerScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+
+          // LLM 调用日志入口
+          ListTile(
+            leading: const Icon(Icons.smart_toy_outlined),
+            title: const Text('LLM 调用日志'),
+            subtitle: const Text('查看前端 LLM 请求/响应记录'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LlmLogViewerScreen(),
                 ),
               );
             },
