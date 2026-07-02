@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 图标设计中间产物（候选图、生成脚本、旧图标备份），不入仓库
+/assets/icon_candidates/

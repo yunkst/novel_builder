@@ -16,7 +16,7 @@
 
     <application
         android:usesCleartextTraffic="true"
-        android:label="novel_app"
+        android:label="随心阅读"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -217,30 +217,50 @@ class ScenarioSession {
     }
   }
 
-  /// 冷启动用：sessionId 未知时选最近 session 再 hydrate。
-  Future<void> hydrateFromRecentIfNeeded() => _resolveSessionId(autoCreate: false);
-
-  Future<void> _resolveSessionId({required bool autoCreate}) async {
+  /// 冷启动用：sessionId 未知时选最近 session 再 hydrate，找不到则保持空白等用户发消息。
+  ///
+  /// 注意：此路径只服务"刚进入 scenario 时展示上次聊到哪"的冷启动场景。
+  /// 发消息路径走 [_ensureSessionId]，不复用最近 session，避免把新对话悄悄并入旧会话。
+  Future<void> hydrateFromRecentIfNeeded() async {
     if (_sessionId != null) {
       await hydrateIfNeeded();
       return;
     }
-    if (!autoCreate && _agentMessages.isNotEmpty) return;
+    if (_agentMessages.isNotEmpty) return;
     try {
       final repo = _ref.read(chatSessionRepositoryProvider);
       final list = await repo.listSessionsByScenario(scenarioId, limit: 1);
-      if (list.isNotEmpty) {
-        _sessionId = list.first.id;
-        _ref.read(currentChatSessionIdProvider.notifier).state = _sessionId;
-        LoggerService.instance.i(
-          'ScenarioSession [$scenarioId] 复用最近 session id=$_sessionId',
-          category: LogCategory.ai,
-          tags: ['session', 'reuse', scenarioId],
-        );
-        await hydrateIfNeeded();
-        return;
-      }
-      if (!autoCreate) return;
+      if (list.isEmpty) return;
+      _sessionId = list.first.id;
+      _ref.read(currentChatSessionIdProvider.notifier).state = _sessionId;
+      LoggerService.instance.i(
+        'ScenarioSession [$scenarioId] 复用最近 session id=$_sessionId',
+        category: LogCategory.ai,
+        tags: ['session', 'reuse', scenarioId],
+      );
+      await hydrateIfNeeded();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ScenarioSession [$scenarioId] hydrateFromRecentIfNeeded 失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['session', 'hydrate_recent', 'failed', scenarioId],
+      );
+    }
+  }
+
+  /// 发消息用：已有 sessionId 则沿用，否则强制新建——绝不隐式复用"最近一个 session"。
+  ///
+  /// 设计原因：若发消息时复用 updatedAt 最近的 session，会把用户预期中的"新对话"
+  /// 悄悄追加进上一段可能完全无关的旧会话（甚至跨小说上下文错位），违背用户直觉。
+  /// 想继续旧对话请走历史列表显式切换。
+  Future<void> _ensureSessionId() async {
+    if (_sessionId != null) {
+      await hydrateIfNeeded();
+      return;
+    }
+    try {
+      final repo = _ref.read(chatSessionRepositoryProvider);
       final id = await repo.createSession(ChatSession(
         scenarioId: scenarioId,
         title: '',
@@ -250,21 +270,19 @@ class ScenarioSession {
       _sessionId = id;
       _ref.read(currentChatSessionIdProvider.notifier).state = id;
       LoggerService.instance.i(
-        'ScenarioSession [$scenarioId] 新建 session id=$id',
+        'ScenarioSession [$scenarioId] 发消息新建 session id=$id',
         category: LogCategory.ai,
-        tags: ['session', 'create', scenarioId],
+        tags: ['session', 'create', 'send', scenarioId],
       );
     } catch (e, st) {
       LoggerService.instance.e(
-        'ScenarioSession [$scenarioId] _resolveSessionId 失败: $e',
+        'ScenarioSession [$scenarioId] _ensureSessionId 失败: $e',
         stackTrace: st.toString(),
         category: LogCategory.ai,
-        tags: ['session', 'resolve_id', 'failed', scenarioId],
+        tags: ['session', 'ensure_id', 'failed', scenarioId],
       );
     }
   }
-
-  Future<void> _ensureSessionId() => _resolveSessionId(autoCreate: true);
 
   AgentChatState get state => _state;
   bool get isRunning => _isRunning;
