@@ -10,7 +10,6 @@ doc/ChapterContent.md
 doc/DefaultApi.md
 doc/EnhancedSceneIllustrationRequest.md
 doc/HTTPValidationError.md
-doc/HermesApi.md
 doc/ImageToVideoRequest.md
 doc/ImageToVideoResponse.md
 doc/ImageWithModel.md
@@ -37,7 +36,6 @@ lib/novel_api.dart
 lib/src/api.dart
 lib/src/api/backup_api.dart
 lib/src/api/default_api.dart
-lib/src/api/hermes_api.dart
 lib/src/api_util.dart
 lib/src/auth/api_key_auth.dart
 lib/src/auth/auth.dart
@@ -83,7 +81,6 @@ test/chapter_content_test.dart
 test/chapter_test.dart
 test/default_api_test.dart
 test/enhanced_scene_illustration_request_test.dart
-test/hermes_api_test.dart
 test/http_validation_error_test.dart
 test/image_to_video_request_test.dart
 test/image_to_video_response_test.dart

@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/app_version.dart';
 import '../utils/device_arch.dart';
+import 'app_update_check_exception.dart';
+import 'app_update_result.dart';
 import 'github_release_service.dart';
 import 'logger_service.dart';
 import 'preferences_service.dart';
@@ -36,10 +38,16 @@ class AppUpdateService {
     return await PackageInfo.fromPlatform();
   }
 
-  /// 检查是否有新版本
+  /// 检查是否有新版本（详细结果，区分「无新版本」与「请求失败」）
   ///
-  /// 返回 null 表示没有新版本（或 API 错误/无可用 release）
-  Future<AppVersion?> checkForUpdate({bool forceCheck = false}) async {
+  /// - [AppUpdateAvailable]：远端存在可用 release（含至少一个匹配架构的 APK）
+  /// - [AppUpdateUpToDate]：请求成功，但远端无可用 release（404 / draft / prerelease / 无 APK）
+  /// - [AppUpdateCheckFailed]：请求失败（限流 / 网络错误 / 解析异常），用户应重试
+  ///
+  /// 与 [checkForUpdate] 的区别：后者把所有失败都归为 null（误报「无新版本」），
+  /// 本方法把失败单独返回，调用方可据此提示用户「检查失败，请重试」。
+  Future<AppUpdateResult> checkForUpdateDetailed(
+      {bool forceCheck = false}) async {
     try {
       // 频率控制
       if (!await _githubService.shouldCheck(forceCheck: forceCheck)) {
@@ -48,19 +56,16 @@ class AppUpdateService {
           category: LogCategory.general,
           tags: ['update'],
         );
-        return null;
+        return const AppUpdateUpToDate();
       }
 
       // 记录检查时间
       await _githubService.recordCheckTime();
 
-      // 获取当前版本
-      final currentInfo = await getCurrentVersion();
-
-      // 从 GitHub 获取最新 release
+      // 先从 GitHub 获取最新 release（限流/网络错误在此步抛 AppUpdateCheckException）
       final release = await _githubService.fetchLatestRelease();
       if (release == null) {
-        return null;
+        return const AppUpdateUpToDate();
       }
 
       // 检测设备 CPU 架构，按架构选择最合适的 APK
@@ -80,7 +85,7 @@ class AppUpdateService {
           category: LogCategory.general,
           tags: ['update', 'arch', 'noapk'],
         );
-        return null;
+        return const AppUpdateUpToDate();
       }
 
       // 构造 AppVersion（downloadUrl 使用 GitHub 直链）
@@ -92,6 +97,9 @@ class AppUpdateService {
         createdAt: release.publishedAt,
       );
 
+      // 获取当前版本（延后到确认有可用 release 之后，避免无 release 时也依赖平台）
+      final currentInfo = await getCurrentVersion();
+
       // 比较版本号
       final hasNew =
           hasNewVersion(currentInfo.version, appVersion.version);
@@ -102,19 +110,41 @@ class AppUpdateService {
         tags: ['update', 'debug'],
       );
 
+      // 有新版本或强制检查时都返回 Available（调用方自行按 hasNew 决定是否提示）
       if (forceCheck || hasNew) {
-        return appVersion;
+        return AppUpdateAvailable(appVersion);
       }
 
-      return null;
+      return const AppUpdateUpToDate();
+    } on AppUpdateCheckException catch (e) {
+      // 限流 / 网络错误 / 服务器错误 → 区分为 CheckFailed，不再误报「无新版本」
+      LoggerService.instance.w(
+        '检查更新失败（可恢复）: ${e.cause} - ${e.message}',
+        category: LogCategory.general,
+        tags: ['update', 'check', 'failed', e.cause],
+      );
+      return AppUpdateCheckFailed(e.message);
     } catch (e) {
       LoggerService.instance.e(
         '检查更新失败: $e',
         category: LogCategory.general,
         tags: ['update', 'check', 'error'],
       );
-      return null;
+      return AppUpdateCheckFailed('检查更新失败，请稍后重试');
     }
+  }
+
+  /// 检查是否有新版本（向后兼容入口）
+  ///
+  /// 返回 null 表示没有新版本（或 API 错误/无可用 release）。
+  /// 内部委托给 [checkForUpdateDetailed]：Available → 返回 AppVersion；
+  /// UpToDate / CheckFailed → 返回 null（保持旧契约不破坏调用方）。
+  Future<AppVersion?> checkForUpdate({bool forceCheck = false}) async {
+    final result = await checkForUpdateDetailed(forceCheck: forceCheck);
+    if (result is AppUpdateAvailable) {
+      return result.version;
+    }
+    return null;
   }
 
   /// 比较版本号

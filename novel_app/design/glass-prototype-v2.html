@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novel Builder · 极简玻璃设计</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ───── 极简玻璃色板 ───── */
+  :root{
+    --bg:#0E1116;             /* 石墨底 */
+    --bg-2:#161A21;           /* 卡片层 */
+    --glass:rgba(255,255,255,0.06);   /* 玻璃面板 */
+    --glass-stroke:rgba(255,255,255,0.08);
+    --text:#E8ECF1;
+    --text-2:#9BA3AF;
+    --text-3:#5C6370;
+    --accent:#64D2FF;         /* 冷蓝主点缀 */
+    --accent-soft:rgba(100,210,255,0.18);
+    --accent-glow:rgba(100,210,255,0.35);
+    --warn:#FF9F0A;           /* 原创 tag 等次要强调 */
+
+    /* 阅读器专属(古典暖色,与外壳反差) */
+    --r-bg:#1A1714;
+    --r-text:#D6CDBE;
+    --r-accent:#C9A86A;
+    --r-line:rgba(201,168,106,0.18);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Sora','Noto Sans SC',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+
+  /* ───── 背景氛围: 极远处柔光斑 + 极淡网格 ───── */
+  .ambient{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .ambient::before{ /* 远处蓝紫光斑 */
+    content:"";position:absolute;inset:-20%;
+    background:
+      radial-gradient(40% 30% at 18% 22%, rgba(100,210,255,0.10), transparent 60%),
+      radial-gradient(35% 28% at 85% 78%, rgba(180,140,255,0.07), transparent 60%),
+      radial-gradient(50% 40% at 50% 100%, rgba(100,210,255,0.05), transparent 60%);
+  }
+  .ambient::after{ /* 极淡网格 */
+    content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+    background-size:80px 80px;
+    mask-image:radial-gradient(ellipse at center, #000 30%, transparent 80%);
+  }
+
+  /* ───── 舞台 ───── */
+  .stage{
+    position:relative;z-index:2;
+    height:100vh;display:flex;align-items:center;justify-content:center;gap:48px;
+    padding:24px;overflow-x:auto;
+  }
+
+  /* ───── 手机外壳 ───── */
+  .phone{
+    width:390px;height:844px;flex-shrink:0;
+    background:var(--bg);
+    border:1px solid var(--glass-stroke);
+    border-radius:42px;
+    box-shadow:0 30px 80px rgba(0,0,0,0.5), 0 0 0 6px rgba(0,0,0,0.4);
+    overflow:hidden;position:relative;
+  }
+  .caption{
+    position:absolute;bottom:-44px;left:50%;transform:translateX(-50%);
+    font-family:'Sora';font-size:11px;letter-spacing:.15em;
+    color:var(--text-3);text-transform:uppercase;white-space:nowrap;
+  }
+  .caption b{color:var(--accent)}
+
+  /* ───── 通用顶部状态条 ───── */
+  .status-bar{
+    height:30px;display:flex;align-items:center;justify-content:space-between;
+    padding:6px 24px 0;font-size:12px;color:var(--text-2);font-weight:500;
+  }
+
+  /* ═══════════ 书架屏(真实功能对齐) ═══════════ */
+  /* AppBar: 标题"我的书架" + 无 actions(对应代码 appBar: AppBar(title:Text('我的书架'))) */
+  .appbar{
+    padding:6px 20px 14px;
+  }
+  .appbar h1{
+    font-family:'Sora';font-weight:700;font-size:24px;letter-spacing:-0.01em;
+    color:var(--text);
+  }
+  .appbar .sub{
+    font-size:11px;color:var(--text-3);letter-spacing:.05em;margin-top:2px;
+  }
+
+  /* BookshelfSelector 区域(对应代码 BookshelfSelector widget,水平切换书架分类) */
+  .shelf-selector{
+    display:flex;gap:8px;padding:0 20px 14px;overflow-x:auto;
+  }
+  .shelf-selector::-webkit-scrollbar{display:none}
+  .chip{
+    flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:500;
+    background:var(--glass);color:var(--text-2);
+    border:1px solid var(--glass-stroke);
+    transition:all .2s;
+  }
+  .chip.active{
+    background:var(--accent-soft);color:var(--accent);
+    border-color:rgba(100,210,255,0.3);
+  }
+
+  /* 列表容器 */
+  .list{padding:4px 16px 100px;height:calc(100% - 30px - 70px - 60px - 70px);overflow-y:auto}
+  .list::-webkit-scrollbar{width:0}
+
+  /* 小说卡片(对应 Card + ListTile,字段:封面/标题/作者/原创tag/缓存进度/继续阅读按钮/菜单) */
+  .novel-card{
+    display:flex;gap:14px;padding:16px;
+    background:var(--glass);border:1px solid var(--glass-stroke);
+    border-radius:18px;margin-bottom:10px;
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+  }
+  .cover{
+    width:64px;height:86px;flex-shrink:0;border-radius:8px;
+    background:linear-gradient(160deg, #1f2530, #14181f);
+    border:1px solid var(--glass-stroke);
+    display:flex;align-items:flex-end;justify-content:flex-start;
+    padding:8px;font-size:9px;color:rgba(255,255,255,0.4);
+    letter-spacing:.05em;font-family:'Sora';
+  }
+  .meta{flex:1;min-width:0;display:flex;flex-direction:column}
+  .meta .title{
+    font-family:'Noto Sans SC';font-weight:700;font-size:15px;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .meta .author{font-size:12px;color:var(--text-3);margin-top:2px}
+  .tag-row{margin-top:8px;display:flex;align-items:center;gap:6px}
+  .tag{
+    font-size:10px;padding:2px 7px;border-radius:4px;
+    background:rgba(255,159,10,0.12);color:var(--warn);
+    border:1px solid rgba(255,159,10,0.2);font-weight:500;
+  }
+  .progress-row{margin-top:10px;display:flex;align-items:center;gap:8px}
+  .bar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden}
+  .bar i{display:block;height:100%;
+    background:linear-gradient(90deg,var(--accent),rgba(100,210,255,0.6));
+    box-shadow:0 0 6px var(--accent-glow)}
+  .cache{font-size:10px;color:var(--text-3);font-family:'Sora';white-space:nowrap}
+  .actions{margin-top:10px;display:flex;align-items:center;justify-content:space-between}
+  .btn-resume{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:12px;font-weight:500;color:var(--accent);
+    padding:6px 12px;border-radius:10px;
+    background:var(--accent-soft);
+  }
+  .btn-resume .arrow{
+    width:14px;height:14px;border-radius:50%;
+    background:var(--accent);color:var(--bg);
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:700;
+  }
+  .more{
+    width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--text-3);background:rgba(255,255,255,0.04);
+    font-size:16px;letter-spacing:1px;
+  }
+
+  /* 未读项(无 lastReadChapterIndex,没有"继续阅读"按钮) */
+  .novel-card .actions.empty{justify-content:flex-end}
+
+  /* 底部导航 3 栏: 书架 / 浏览器 / 设置 */
+  .nav{
+    position:absolute;bottom:0;left:0;right:0;height:70px;
+    display:flex;
+    background:rgba(14,17,22,0.7);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border-top:1px solid var(--glass-stroke);
+    padding-bottom:14px;
+  }
+  .nav i{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    font-style:normal;color:var(--text-3);
+    font-size:11px;letter-spacing:.04em;
+  }
+  .nav i .ic{font-size:18px;line-height:1;font-weight:300}
+  .nav i.on{color:var(--accent)}
+  .nav i.on .ic{filter:drop-shadow(0 0 6px var(--accent-glow))}
+
+  /* ═══════════ 阅读器屏 ═══════════ */
+  .reader{height:100%;background:var(--r-bg);display:flex;flex-direction:column}
+
+  /* AppBar: 章节标题 + 编辑模式徽章 + 编辑按钮 + 更多菜单(刷新/版本历史/创建快照/...) */
+  .r-appbar{
+    padding:6px 8px 12px;
+    display:flex;align-items:center;gap:4px;
+    border-bottom:1px solid var(--r-line);
+    background:rgba(0,0,0,0.15);
+  }
+  .r-icon{
+    width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    color:var(--r-accent);font-size:18px;border-radius:10px;
+  }
+  .r-title{
+    flex:1;font-family:'Noto Serif SC';font-weight:600;font-size:15px;
+    color:var(--r-accent);letter-spacing:.04em;padding:0 4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .r-badge{
+    font-size:10px;padding:3px 8px;border-radius:8px;
+    background:rgba(201,168,106,0.15);color:var(--r-accent);
+    border:1px solid rgba(201,168,106,0.3);font-weight:500;
+  }
+  .r-more{
+    width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    color:var(--r-accent);font-size:18px;border-radius:10px;letter-spacing:1px;
+  }
+
+  .r-body{
+    flex:1;overflow-y:auto;padding:28px 26px;
+    font-family:'Noto Serif SC',serif;font-size:16px;line-height:1.85;
+    color:var(--r-text);text-align:justify;
+  }
+  .r-body::-webkit-scrollbar{width:0}
+  .r-body h1{
+    font-size:19px;font-weight:700;color:var(--r-accent);
+    text-align:center;margin-bottom:24px;letter-spacing:.06em;
+  }
+  .r-body p{text-indent:2em;margin-bottom:1.1em}
+
+  /* 底部: 上一章 / 进度 / 下一章 */
+  .r-bottom{
+    border-top:1px solid var(--r-line);background:rgba(0,0,0,0.25);
+    padding:10px 16px 14px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .r-pill{
+    display:flex;align-items:center;gap:6px;
+    font-size:12px;color:var(--r-accent);font-family:'Sora';
+    padding:8px 14px;border-radius:10px;
+    background:rgba(201,168,106,0.08);
+    border:1px solid rgba(201,168,106,0.15);
+  }
+  .r-pill.disabled{opacity:.35}
+  .r-progress{
+    font-family:'Sora';font-size:13px;color:var(--r-accent);
+    font-weight:500;letter-spacing:.05em;
+  }
+  .r-progress span{color:rgba(214,205,190,0.4);margin:0 4px}
+
+  /* ───── 右侧色板注释 ───── */
+  .legend{
+    position:fixed;right:32px;top:32px;z-index:10;
+    background:var(--glass);backdrop-filter:blur(20px);
+    border:1px solid var(--glass-stroke);border-radius:14px;
+    padding:16px;width:220px;
+    font-family:'Sora';font-size:11px;color:var(--text-2);
+  }
+  .legend h3{font-size:11px;letter-spacing:.15em;color:var(--text-3);
+    text-transform:uppercase;margin-bottom:10px;font-weight:500}
+  .swatch{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .swatch i{width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,0.1)}
+  .swatch code{font-family:'Sora';font-size:10px;color:var(--text)}
+
+  /* ───── 底部说明 ───── */
+  .notes{
+    position:fixed;left:32px;bottom:24px;z-index:10;max-width:240px;
+    font-family:'Sora';font-size:11px;line-height:1.7;color:var(--text-3);
+    letter-spacing:.02em;
+  }
+  .notes b{color:var(--text);font-weight:500}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+
+<!-- 色板 -->
+<div class="legend">
+  <h3>极简玻璃 · 色板</h3>
+  <div class="swatch"><i style="background:#0E1116"></i><code>#0E1116</code> <span style="color:var(--text-3)">底</span></div>
+  <div class="swatch"><i style="background:#161A21"></i><code>#161A21</code> <span style="color:var(--text-3)">卡层</span></div>
+  <div class="swatch"><i style="background:rgba(255,255,255,0.06)"></i><code>W 6%</code> <span style="color:var(--text-3)">玻璃</span></div>
+  <div class="swatch"><i style="background:#64D2FF"></i><code>#64D2FF</code> <span style="color:var(--accent)">主点缀</span></div>
+  <div class="swatch"><i style="background:#FF9F0A"></i><code>#FF9F0A</code> <span style="color:var(--text-3)">次强调</span></div>
+  <div class="swatch"><i style="background:#E8ECF1"></i><code>#E8ECF1</code> <span style="color:var(--text-3)">正文</span></div>
+  <div class="swatch"><i style="background:#9BA3AF"></i><code>#9BA3AF</code> <span style="color:var(--text-3)">次文</span></div>
+  <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--glass-stroke);color:var(--text-3)">
+    阅读器:#1A1714 + #C9A86A
+  </div>
+</div>
+
+<div class="notes">
+  <b style="display:block;margin-bottom:6px;letter-spacing:.08em">字体</b>
+  标题/数据 · Sora 500/700<br>
+  列表正文 · Noto Sans SC 500<br>
+  阅读正文 · Noto Serif SC 600<br>
+  <span style="color:var(--text-3)">行高 1.85 · 段首缩进 2em</span>
+</div>
+
+<div class="stage">
+
+  <!-- ═════════ 书架屏 ═════════ -->
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>5G ··· 100%</span>
+    </div>
+
+    <!-- AppBar: 标题"我的书架" -->
+    <div class="appbar">
+      <h1>我的书架</h1>
+      <div class="sub">14 本 · 3 个自定义分类</div>
+    </div>
+
+    <!-- BookshelfSelector: 水平书架分类切换 -->
+    <div class="shelf-selector">
+      <div class="chip active">全部小说</div>
+      <div class="chip">最近阅读</div>
+      <div class="chip">玄幻</div>
+      <div class="chip">科幻</div>
+      <div class="chip">收藏</div>
+    </div>
+
+    <!-- 小说列表 -->
+    <div class="list">
+
+      <!-- 卡片 1: 已阅读 + 有原创标记 + 缓存 60% -->
+      <div class="novel-card">
+        <div class="cover">CN</div>
+        <div class="meta">
+          <div class="title">在银河边缘醒来</div>
+          <div class="author">作者 · 林夜</div>
+          <div class="tag-row">
+            <div class="tag">原创</div>
+          </div>
+          <div class="progress-row">
+            <div class="bar"><i style="width:60%"></i></div>
+            <div class="cache">182 / 304</div>
+          </div>
+          <div class="actions">
+            <div class="btn-resume">
+              <span class="arrow">▶</span>
+              继续阅读 · 第 142 章
+            </div>
+            <div class="more">⋮</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡片 2: 已阅读 + 无原创标记 + 缓存 100% -->
+      <div class="novel-card">
+        <div class="cover">AI</div>
+        <div class="meta">
+          <div class="title">机械纪元</div>
+          <div class="author">作者 · 王小凡</div>
+          <div class="progress-row">
+            <div class="bar"><i style="width:100%"></i></div>
+            <div class="cache">全部已缓存</div>
+          </div>
+          <div class="actions">
+            <div class="btn-resume">
+              <span class="arrow">▶</span>
+              继续阅读 · 第 88 章
+            </div>
+            <div class="more">⋮</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡片 3: 未读(无继续阅读按钮,只有更多) -->
+      <div class="novel-card">
+        <div class="cover">PS</div>
+        <div class="meta">
+          <div class="title">深空牧云录</div>
+          <div class="author">作者 · 苏砚</div>
+          <div class="tag-row">
+            <div class="tag">原创</div>
+          </div>
+          <div class="progress-row">
+            <div class="bar"><i style="width:0%"></i></div>
+            <div class="cache">未缓存</div>
+          </div>
+          <div class="actions empty">
+            <div class="more">⋮</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 底部导航 3 栏 -->
+    <div class="nav">
+      <i class="on"><span class="ic">▤</span>书架</i>
+      <i><span class="ic">◎</span>浏览器</i>
+      <i><span class="ic">⚙</span>设置</i>
+    </div>
+
+    <div class="caption">书架屏 · <b>SHELF</b></div>
+  </div>
+
+  <!-- ═════════ 阅读器屏 ═════════ -->
+  <div class="phone" style="background:var(--r-bg)">
+    <div class="reader">
+
+      <!-- ReaderAppBar: 章节标题 + 编辑模式徽章 + 编辑按钮 + 更多菜单 -->
+      <div class="r-appbar">
+        <div class="r-icon">‹</div>
+        <div class="r-title">第 142 章 · 银河边缘的回声</div>
+        <div class="r-icon" style="font-size:15px">✎</div>
+        <div class="r-more">⋮</div>
+      </div>
+
+      <!-- 正文区: 古典暖黑 + 衬线 + 段首缩进 -->
+      <div class="r-body">
+        <h1>银河边缘的回声</h1>
+        <p>舱内的灯光第三次熄灭时,林溪终于意识到这并非系统故障。她摘下头盔,任由失重感漫过耳后——那是一种近乎温柔的牵引,像是有什么东西正从星海深处缓缓伸出一只手。</p>
+        <p>"你听见了吗。"通讯频道里只剩静电的底噪,可她确实听见了。不是声音,是某种更古老的振动,沿着脊柱上行,在颅腔里轻轻叩响。</p>
+        <p>城市的轮廓越来越清晰。它没有投下阴影,也没有反射任何星光,仿佛它本身就是光源本身。林溪屏住呼吸,伸手按上了舷窗的玻璃——冰凉的触感里,混着一丝几乎察觉不到的温度。</p>
+        <p>"你在那里。"她轻声说,不确定自己是在对城市说话,还是对自己。</p>
+      </div>
+
+      <!-- ReaderBottomBar: 上一章 / 进度 / 下一章 -->
+      <div class="r-bottom">
+        <div class="r-pill">◀ 上一章</div>
+        <div class="r-progress">142<span>/</span>304</div>
+        <div class="r-pill">下一章 ▶</div>
+      </div>
+    </div>
+    <div class="caption">阅读器屏 · <b>READER</b></div>
+  </div>
+
+</div>
+</body>
+</html>

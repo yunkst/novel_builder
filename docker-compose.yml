@@ -26,9 +26,6 @@ services:
       - DIFY_API_TOKEN=${DIFY_API_TOKEN}
       # ComfyUI服务配置
       - COMFYUI_API_URL=http://host.docker.internal:8188
-      # Hermes AI Chat 配置
-      - HERMES_API_URL=${HERMES_API_URL:-http://host.docker.internal:8642}
-      - HERMES_API_KEY=${HERMES_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

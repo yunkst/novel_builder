@@ -3,8 +3,8 @@ import 'dart:convert';
 import '../services/logger_service.dart';
 import '../services/novel_agent/agent_event.dart';
 
-/// Hermes 聊天消息角色
-enum HermesRole {
+/// Agent 聊天消息角色
+enum AgentChatRole {
   system,
   user,
   assistant,
@@ -14,29 +14,29 @@ enum HermesRole {
 ///
 /// assistant 消息由交替的 TextSegment 和 ToolCallSegment 组成，
 /// 精确反映 Agent 的"思考 → 行动 → 思考"流程。
-sealed class HermesSegment {
-  const HermesSegment();
+sealed class AgentChatSegment {
+  const AgentChatSegment();
 }
 
 /// 文本片段（LLM 输出内容）
-class TextSegment extends HermesSegment {
+class TextSegment extends AgentChatSegment {
   final String content;
   const TextSegment(this.content);
 }
 
 /// 工具调用片段
-class ToolCallSegment extends HermesSegment {
+class ToolCallSegment extends AgentChatSegment {
   final AgentToolCall call;
   const ToolCallSegment(this.call);
 }
 
-/// Hermes 聊天消息
-class HermesMessage {
-  final HermesRole role;
-  final List<HermesSegment> segments;
+/// Agent 聊天消息
+class AgentChatMessage {
+  final AgentChatRole role;
+  final List<AgentChatSegment> segments;
   final DateTime timestamp;
 
-  HermesMessage({
+  AgentChatMessage({
     required this.role,
     this.segments = const [],
     DateTime? timestamp,
@@ -55,35 +55,35 @@ class HermesMessage {
       .toList();
 
   /// 创建系统消息
-  factory HermesMessage.system(String content) => HermesMessage(
-        role: HermesRole.system,
+  factory AgentChatMessage.system(String content) => AgentChatMessage(
+        role: AgentChatRole.system,
         segments: [TextSegment(content)],
       );
 
   /// 创建用户消息
-  factory HermesMessage.user(String content) => HermesMessage(
-        role: HermesRole.user,
+  factory AgentChatMessage.user(String content) => AgentChatMessage(
+        role: AgentChatRole.user,
         segments: [TextSegment(content)],
       );
 
   /// 创建助手消息（兼容旧格式：文本 + 工具调用列表）
   ///
   /// 生成结构为 [TextSegment(content), ToolCallSegment×N]
-  factory HermesMessage.assistant(String content, {List<AgentToolCall> toolCalls = const []}) {
-    final segs = <HermesSegment>[
+  factory AgentChatMessage.assistant(String content, {List<AgentToolCall> toolCalls = const []}) {
+    final segs = <AgentChatSegment>[
       if (content.isNotEmpty) TextSegment(content),
       for (final call in toolCalls) ToolCallSegment(call),
     ];
-    return HermesMessage(
-      role: HermesRole.assistant,
+    return AgentChatMessage(
+      role: AgentChatRole.assistant,
       segments: segs,
     );
   }
 
   /// 创建助手消息（直接使用 segments 列表，保留交替时序）
-  factory HermesMessage.assistantFromSegments(List<HermesSegment> segments) =>
-      HermesMessage(
-        role: HermesRole.assistant,
+  factory AgentChatMessage.assistantFromSegments(List<AgentChatSegment> segments) =>
+      AgentChatMessage(
+        role: AgentChatRole.assistant,
         segments: segments,
       );
 
@@ -92,7 +92,7 @@ class HermesMessage {
   /// 每条 segment 输出 `{type:'text', content}` 或
   /// `{type:'tool', id, name, arguments, status, result?}`。
   /// 任何异常不会抛出，返回空数组，保证 DB 写入不阻塞主流程。
-  static String segmentsToJson(List<HermesSegment> segments) {
+  static String segmentsToJson(List<AgentChatSegment> segments) {
     try {
       final list = segments.map((s) {
         if (s is TextSegment) {
@@ -117,19 +117,19 @@ class HermesMessage {
       LoggerService.instance.w(
         'segmentsToJson 失败: $e',
         category: LogCategory.ai,
-        tags: ['hermes_message', 'serialize_failed'],
+        tags: ['agent_chat', 'serialize_failed'],
       );
       return '[]';
     }
   }
 
   /// JSON 字符串 → segments（坏数据降级为空 list，不抛异常）
-  static List<HermesSegment> segmentsFromJson(String json) {
+  static List<AgentChatSegment> segmentsFromJson(String json) {
     if (json.isEmpty) return const [];
     try {
       final decoded = jsonDecode(json);
       if (decoded is! List) return const [];
-      final result = <HermesSegment>[];
+      final result = <AgentChatSegment>[];
       for (final item in decoded) {
         if (item is! Map) continue;
         final type = item['type']?.toString();
@@ -160,7 +160,7 @@ class HermesMessage {
       LoggerService.instance.w(
         'segmentsFromJson 失败: $e rawLen=${json.length}',
         category: LogCategory.ai,
-        tags: ['hermes_message', 'deserialize_failed'],
+        tags: ['agent_chat', 'deserialize_failed'],
       );
       return const [];
     }
@@ -177,18 +177,18 @@ class HermesMessage {
   }
 
   /// 从完整快照反序列化（坏数据降级为仅文本 user 消息）
-  factory HermesMessage.fromJson(Map<String, dynamic> map) {
+  factory AgentChatMessage.fromJson(Map<String, dynamic> map) {
     final roleStr = map['role']?.toString() ?? 'user';
-    final HermesRole role;
+    final AgentChatRole role;
     switch (roleStr) {
       case 'system':
-        role = HermesRole.system;
+        role = AgentChatRole.system;
         break;
       case 'assistant':
-        role = HermesRole.assistant;
+        role = AgentChatRole.assistant;
         break;
       default:
-        role = HermesRole.user;
+        role = AgentChatRole.user;
     }
     final tsMs = map['timestamp'];
     final ts = tsMs is int
@@ -197,13 +197,13 @@ class HermesMessage {
     final rawSegments = map['segmentsJson']?.toString() ?? '[]';
     final segs = segmentsFromJson(rawSegments);
     if (segs.isEmpty) {
-      return HermesMessage(
+      return AgentChatMessage(
         role: role,
         segments: [TextSegment(map['content']?.toString() ?? '')],
         timestamp: ts,
       );
     }
-    return HermesMessage(role: role, segments: segs, timestamp: ts);
+    return AgentChatMessage(role: role, segments: segs, timestamp: ts);
   }
 
   /// 序列化为 LLM 历史格式（只保留 role + content，不含 segments 细节）
@@ -216,31 +216,31 @@ class HermesMessage {
     };
   }
 
-  factory HermesMessage.fromMap(Map<String, dynamic> map) {
+  factory AgentChatMessage.fromMap(Map<String, dynamic> map) {
     final roleStr = map['role']?.toString() ?? 'user';
-    HermesRole role;
+    AgentChatRole role;
     switch (roleStr) {
       case 'system':
-        role = HermesRole.system;
+        role = AgentChatRole.system;
         break;
       case 'assistant':
-        role = HermesRole.assistant;
+        role = AgentChatRole.assistant;
         break;
       default:
-        role = HermesRole.user;
+        role = AgentChatRole.user;
     }
-    return HermesMessage(
+    return AgentChatMessage(
       role: role,
       segments: [TextSegment(map['content']?.toString() ?? '')],
     );
   }
 
-  HermesMessage copyWith({
-    HermesRole? role,
-    List<HermesSegment>? segments,
+  AgentChatMessage copyWith({
+    AgentChatRole? role,
+    List<AgentChatSegment>? segments,
     DateTime? timestamp,
   }) {
-    return HermesMessage(
+    return AgentChatMessage(
       role: role ?? this.role,
       segments: segments ?? this.segments,
       timestamp: timestamp ?? this.timestamp,
@@ -252,6 +252,6 @@ class HermesMessage {
     final contentPreview = content.length > 50
         ? '${content.substring(0, 50)}...'
         : content;
-    return 'HermesMessage(role: $role, content: $contentPreview, segments: ${segments.length})';
+    return 'AgentChatMessage(role: $role, content: $contentPreview, segments: ${segments.length})';
   }
 }

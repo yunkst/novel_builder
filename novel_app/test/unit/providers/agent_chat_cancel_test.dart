@@ -1,20 +1,20 @@
-/// HermesChatNotifier.cancelRequest() 取消功能单元测试
+/// AgentChatNotifier.cancelRequest() 取消功能单元测试
 ///
-/// 验证 [HermesChatNotifier.cancelRequest] 的核心行为：
+/// 验证 [AgentChatNotifier.cancelRequest] 的核心行为：
 /// - 取消后状态正确转入 idle（isLoading=false, streamingSegments 清空）
 /// - 取消后 partial 内容保留到 messages
 /// - 取消后可立即重发新消息（不被"Agent 正在运行中"拒绝）
 ///
 /// 运行:
 ///   cd novel_app
-///   flutter test test/unit/providers/hermes_chat_cancel_test.dart
+///   flutter test test/unit/providers/agent_chat_cancel_test.dart
 library;
 
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:novel_app/core/providers/hermes_providers.dart';
+import 'package:novel_app/core/providers/agent_chat_providers.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/services/novel_agent/novel_agent_service.dart';
@@ -54,7 +54,6 @@ class MockNovelAgentService implements NovelAgentService {
     required List<dynamic> history,
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
-    List<int>? messageOwners,
   }) async {
     sendMessageCallCount++;
     lastUserInput = userInput;
@@ -134,12 +133,12 @@ void main() {
 
   group('cancelRequest 基本行为', () {
     test('cancelRequest 触发后 isLoading 变为 false', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // 模拟已经有 streaming segment 类似取消中场景
       // 直接调 cancelRequest
       notifier.cancelRequest();
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
 
       expect(state.isLoading, isFalse);
       expect(state.streamingSegments, isEmpty);
@@ -147,24 +146,24 @@ void main() {
     });
 
     test('cancelRequest 后 streamingSegments 清空', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       notifier.cancelRequest();
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.streamingSegments, isEmpty);
     });
 
     test('cancelRequest 应该重置 session 状态', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       notifier.cancelRequest();
       // cancelRequest 现在调用 session.cancel()，会重置 session 状态
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.isLoading, isFalse);
     });
   });
 
   group('cancelRequest 后可重发消息', () {
     test('cancelRequest 后 reset isLoading → sendMessage 应被允许', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       notifier.cancelRequest();
       // cancelRequest 把 isLoading 设为 false，此时不应被"正在运行"挡住
@@ -183,10 +182,10 @@ void main() {
 
   group('部分内容保留', () {
     test('取消后之前已生成的消息保留在对话历史中', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       notifier.cancelRequest();
       // cancelRequest 在没有 _pendingSegments 时不应添加空消息
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.messages, isEmpty,
           reason: '没有 pendingSegments 时 cancel 不应生成空消息');
     });
@@ -194,19 +193,19 @@ void main() {
 
   group('sceneSwitch 也取消 Agent', () {
     test('切换场景应调用 agentService.cancel()', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
       // switchScenario 内部调了 _agentSub?.cancel()，但没有调 agentService.cancel()
       // 这是设计意图——switchScenario 只是清空对话上下文，不需要取消底层 Agent
       // 但如果底层在跑（_isRunning=true），cancel 才会有意义
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.scenarioId, ScenarioIds.webviewExtract);
     });
   });
 
   group('场景切换历史保留', () {
     test('切换场景后，原场景历史清空但目标场景恢复缓存历史', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // 在 writing 场景发送一条消息（模拟 assistant 回复）
       await notifier.sendMessage('写作场景消息1');
@@ -216,75 +215,75 @@ void main() {
 
       // 先验证初始场景
       expect(
-        container.read(hermesChatProvider).scenarioId,
+        container.read(agentChatProvider).scenarioId,
         ScenarioIds.writing,
       );
     });
 
     test('切到新场景后 messages 为空，切回原场景恢复历史', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // Step 1: 在 writing 场景发送一条消息
       await notifier.sendMessage('你好');
-      final writingMessages = container.read(hermesChatProvider).messages;
+      final writingMessages = container.read(agentChatProvider).messages;
       expect(writingMessages.length, greaterThan(0),
           reason: 'writing 场景应有一条 user + 一条 assistant 消息');
 
       // Step 2: 切换到 webview_extract 场景
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
-      var state = container.read(hermesChatProvider);
+      var state = container.read(agentChatProvider);
       expect(state.scenarioId, ScenarioIds.webviewExtract);
       expect(state.messages, isEmpty,
           reason: '首次进入 webview_extract 场景，历史应为空');
 
       // Step 3: 在 webview_extract 场景发送一条消息
       await notifier.sendMessage('提取网页');
-      final extractMessages = container.read(hermesChatProvider).messages;
+      final extractMessages = container.read(agentChatProvider).messages;
       expect(extractMessages.length, greaterThan(0),
           reason: 'webview_extract 场景应有一条 user + 一条 assistant 消息');
 
       // Step 4: 切回 writing 场景，验证历史恢复
       notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
-      state = container.read(hermesChatProvider);
+      state = container.read(agentChatProvider);
       expect(state.scenarioId, ScenarioIds.writing);
       expect(state.messages.length, writingMessages.length,
           reason: '切回 writing 场景应恢复之前的对话历史');
 
       // Step 5: 再次切到 webview_extract，验证该场景历史也保留
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
-      state = container.read(hermesChatProvider);
+      state = container.read(agentChatProvider);
       expect(state.scenarioId, ScenarioIds.webviewExtract);
       expect(state.messages.length, extractMessages.length,
           reason: '切回 webview_extract 场景应恢复之前的对话历史');
     });
 
     test('同一场景重复切换不触发清空', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // 同场景切换应该直接 return，不改变任何状态
       notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.scenarioId, ScenarioIds.writing);
       expect(state.messages, isEmpty);
     });
 
     test('clearConversation 只清空当前场景，不影响其他场景缓存', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // 在 writing 场景发送消息
       await notifier.sendMessage('写作消息');
-      final writingMessages = container.read(hermesChatProvider).messages;
+      final writingMessages = container.read(agentChatProvider).messages;
       expect(writingMessages.isNotEmpty, isTrue);
 
       // 切到 webview_extract 并发送消息
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
       await notifier.sendMessage('提取消息');
-      final extractMessages = container.read(hermesChatProvider).messages;
+      final extractMessages = container.read(agentChatProvider).messages;
       expect(extractMessages.isNotEmpty, isTrue);
 
       // 在 webview_extract 场景执行 clearConversation
       notifier.clearConversation();
-      var state = container.read(hermesChatProvider);
+      var state = container.read(agentChatProvider);
       expect(state.messages, isEmpty,
           reason: 'clearConversation 后当前场景历史应为空');
       expect(state.scenarioId, ScenarioIds.webviewExtract,
@@ -292,38 +291,38 @@ void main() {
 
       // 切回 writing，验证历史仍在
       notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
-      state = container.read(hermesChatProvider);
+      state = container.read(agentChatProvider);
       expect(state.messages.length, writingMessages.length,
           reason: 'clearConversation 只清空了 webview_extract，writing 场景历史应保留');
 
       // 切回 webview_extract，验证已被清空
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
-      state = container.read(hermesChatProvider);
+      state = container.read(agentChatProvider);
       expect(state.messages, isEmpty,
           reason: '被 clearConversation 清空的场景再次进入也应为空');
     });
 
     test('多次切换场景，各自历史独立保留', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       // writing 场景
       await notifier.sendMessage('A');
-      final writingMsgs = container.read(hermesChatProvider).messages;
+      final writingMsgs = container.read(agentChatProvider).messages;
 
       // 切到 webview_extract
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
       await notifier.sendMessage('B');
-      final extractMsgs = container.read(hermesChatProvider).messages;
+      final extractMsgs = container.read(agentChatProvider).messages;
 
       // 切回 writing
       notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
       await notifier.sendMessage('C');
-      final writingMsgs2 = container.read(hermesChatProvider).messages;
+      final writingMsgs2 = container.read(agentChatProvider).messages;
 
       // 切回 webview_extract
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
       await notifier.sendMessage('D');
-      final extractMsgs2 = container.read(hermesChatProvider).messages;
+      final extractMsgs2 = container.read(agentChatProvider).messages;
 
       // 验证 writing 场景累积了 A + C 两轮
       expect(writingMsgs2.length, greaterThan(writingMsgs.length),
@@ -335,11 +334,11 @@ void main() {
 
       // 两个场景的历史应互不影响
       notifier.switchScenario(ScenarioIds.writing, '小说写作助手');
-      final finalWriting = container.read(hermesChatProvider).messages;
+      final finalWriting = container.read(agentChatProvider).messages;
       expect(finalWriting.length, writingMsgs2.length);
 
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
-      final finalExtract = container.read(hermesChatProvider).messages;
+      final finalExtract = container.read(agentChatProvider).messages;
       expect(finalExtract.length, extractMsgs2.length);
     });
   });

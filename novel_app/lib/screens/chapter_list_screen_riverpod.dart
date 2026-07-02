@@ -4,7 +4,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/providers/chapter_list_providers.dart';
 import '../core/theme/app_colors.dart';
-import '../widgets/hermes/hermes_floating_button.dart';
+import '../widgets/agent_chat/agent_floating_button.dart';
 import '../core/providers/service_providers.dart';
 import '../widgets/chapter_list/chapter_list_header.dart';
 import '../widgets/chapter_list/chapter_list_item.dart';
@@ -113,7 +113,7 @@ class _ChapterListScreenRiverpodState
       });
     }
 
-    return HermesFloatingShell(
+    return AgentFloatingShell(
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.novel.title),

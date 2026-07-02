@@ -20,7 +20,7 @@ class AiCapabilitiesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final aiColor = context.appColors.hermesAccent;
+    final aiColor = context.appColors.agentAccent;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -97,7 +97,7 @@ class AiCapabilitiesSection extends StatelessWidget {
           _buildCapabilityRow(
             context,
             icon: Icons.chat,
-            label: '角色对话（Hermes Agent）',
+            label: '角色对话（AI Agent）',
             detail: '和书中角色直接对话，支持多角色群聊',
             isLast: true,
           ),

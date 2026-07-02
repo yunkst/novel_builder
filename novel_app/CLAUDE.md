@@ -5,7 +5,7 @@
 ## 变更记录 (Changelog)
 
 - **2026-06-29**: DatabaseService 门面彻底删除，所有调用改为直接使用 Repository Provider；删除 PaginationController、repository_providers.dart（合并入 database_providers.dart）等死代码；清理 Dify 残留引用
-- **2026-06-11**: 更新文档，移除 Dify 引用，DSL Engine + Hermes Agent 成为 AI 主力
+- **2026-06-11**: 更新文档，移除 Dify 引用，DSL Engine + AI Agent 成为 AI 主力
 - **2026-06-09**: 移除 Dify 云端依赖（v1.7.4），仅保留本地 DSL Engine
 - **2026-06-05**: DSL Engine 客户端 Dify 工作流复刻（v1.7.0）
 - **2026-05-10**: Riverpod 状态管理迁移完成（v1.5.0）
@@ -121,7 +121,7 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `llm_config_service.dart` - LLM配置服务
   - `api_service_wrapper.dart` - API服务包装器
   - `dsl_engine/` - DSL Engine 本地工作流引擎
-  - `novel_agent/` - Hermes Agent 智能对话
+  - `novel_agent/` - AI Agent 智能对话
   - `llm_logger/` - LLM调用日志
 
 **UI层**:
@@ -256,8 +256,8 @@ final apiService = ref.watch(apiServiceProvider);
 - 角色聊天对话
 - 大纲生成辅助
 
-#### Hermes Agent（LLM 直连对话）
-**文件**: `lib/services/novel_agent/`、`lib/core/providers/hermes_providers.dart`
+#### AI Agent（LLM 直连对话）
+**文件**: `lib/services/novel_agent/`、`lib/core/providers/agent_chat_providers.dart`
 
 **功能**:
 - 角色对话（单角色 / 多角色）
@@ -456,10 +456,10 @@ class ChapterOutlineDraft {
 
 LLM 配置模型（API URL、Key、模型名称等）。
 
-#### HermesMessage
-**文件**: `lib/models/hermes_message.dart`
+#### AgentChatMessage
+**文件**: `lib/models/agent_chat_message.dart`
 
-Hermes Agent 对话消息模型。
+AI Agent 对话消息模型。
 
 ### 其他模型
 
@@ -694,7 +694,7 @@ class NovelListScreen extends ConsumerWidget {
 
 ### 5. 角色管理
 
-**Widget**: `lib/widgets/hermes/` - Hermes 对话组件（支持角色对话场景）
+**Widget**: `lib/widgets/agent_chat/` - Agent 对话组件（支持角色对话场景）
 
 **Repository**: `character_repository.dart`, `character_relation_repository.dart`
 
@@ -702,7 +702,7 @@ class NovelListScreen extends ConsumerWidget {
 - 角色信息管理
 - 角色头像（AI生成/自定义）
 - 角色关系可视化（力导向图）
-- 多角色对话（通过 Hermes Agent）
+- 多角色对话（通过 AI Agent）
 
 ### 6. 大纲管理
 
@@ -726,7 +726,7 @@ class NovelListScreen extends ConsumerWidget {
 
 **功能**:
 - API地址配置
-- LLM API URL / Key / 模型配置（DSL Engine + Hermes Agent）
+- LLM API URL / Key / 模型配置（DSL Engine + AI Agent）
 - 阅读设置（字体、字号、行间距）
 - 主题设置
 
@@ -780,7 +780,7 @@ class NovelListScreen extends ConsumerWidget {
 **核心组件** (`lib/services/dsl_engine/`):
 - `llm_provider.dart` - OpenAI 兼容的 LLM 调用（含 ChatMessage 模型）
 
-**说明**: DSL Engine 已大幅精简，仅保留 LLM 调用核心；结构化工作流能力迁移至 Hermes Agent（`lib/services/novel_agent/`）。
+**说明**: DSL Engine 已大幅精简，仅保留 LLM 调用核心；结构化工作流能力迁移至 AI Agent（`lib/services/novel_agent/`）。
 
 **用途**:
 - 创意写作（段落重写、全文重写）
@@ -792,11 +792,11 @@ class NovelListScreen extends ConsumerWidget {
 - LLM API Key
 - 默认模型（可选）
 
-### Hermes Agent（LLM 直连对话）
+### AI Agent（LLM 直连对话）
 
 **核心组件**:
-- `lib/core/providers/hermes_providers.dart` - Riverpod Provider
-- `lib/widgets/hermes/` - 对话 UI 组件
+- `lib/core/providers/agent_chat_providers.dart` - Riverpod Provider
+- `lib/widgets/agent_chat/` - 对话 UI 组件
 - `lib/services/novel_agent/` - Agent 执行引擎（agent_loop、agent_scenario 等）
 
 **用途**:
@@ -805,7 +805,7 @@ class NovelListScreen extends ConsumerWidget {
 - 流式输出支持
 
 **兼容层**:
-- `HermesChatNotifier` 保留为兼容层（仍被测试使用），`hermes_chat_dialog.dart` 的写入路径已改为直接使用 ScenarioSession
+- `AgentChatNotifier` 保留为兼容层（仍被测试使用），`agent_chat_dialog.dart` 的写入路径已改为直接使用 ScenarioSession
 
 ### AI相关Widget
 
@@ -1345,7 +1345,7 @@ flutter analyze lib/generated/api/
 - ✅ Controller层解耦
 - ✅ 依赖注入通过Providers
 - ✅ DatabaseService门面删除，全部改为 Repository Provider
-- ✅ Dify云端链路完全删除，DSL Engine + Hermes Agent 成为主力
+- ✅ Dify云端链路完全删除，DSL Engine + AI Agent 成为主力
 
 ### 未来计划
 - 添加更多集成测试

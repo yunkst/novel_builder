@@ -67,7 +67,7 @@ class _LogReportSettingsScreenState
             secondary: Icon(
               reporter.enabled ? Icons.cloud_upload : Icons.cloud_off,
               color: reporter.enabled
-                  ? appColors.hermesAccent
+                  ? appColors.agentAccent
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),

@@ -16,7 +16,7 @@ import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/log_reporter_service.dart';
 import 'services/novel_agent/agent_scenario.dart';
-import 'widgets/hermes/hermes_floating_button.dart';
+import 'widgets/agent_chat/agent_floating_button.dart';
 
 void main() async {
   // 确保 Flutter 初始化完成
@@ -256,7 +256,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     // 更新 Tab 索引（单一真相源：homeTabIndexNotifierProvider）
     ref.read(homeTabIndexNotifierProvider.notifier).switchTo(index);
 
-    // 根据当前 Tab 切换 Hermes Agent 场景：
+    // 根据当前 Tab 切换 AI Agent 场景：
     // 浏览器 Tab 用网页提取场景，其余 Tab 用写作场景。
     ref.read(currentAgentScenarioProvider.notifier).state =
         index == _browserTabIndex
@@ -336,7 +336,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     final selectedIndex = ref.watch(homeTabIndexNotifierProvider);
 
     // 响应外部/导航触发的 Tab 切换，执行副作用：
-    // 切换 Hermes Agent 场景
+    // 切换 AI Agent 场景
     ref.listen<int>(homeTabIndexNotifierProvider, (previous, next) {
       if (previous == null || previous == next) return;
       ref.read(currentAgentScenarioProvider.notifier).state =
@@ -349,7 +349,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     // 浏览器 Tab 此前每次切换都会销毁重建 WebView，导致浏览页面/历史丢失。
     // IndexedStack 会保留各 Tab 的 element 与 State，切换 Tab 不再销毁 WebView。
     return Scaffold(
-      body: HermesFloatingShell(
+      body: AgentFloatingShell(
         child: IndexedStack(
           index: selectedIndex,
           children: [

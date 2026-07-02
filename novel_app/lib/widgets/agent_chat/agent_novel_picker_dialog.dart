@@ -6,17 +6,17 @@ import 'package:novel_app/models/novel.dart';
 /// 小说选择对话框
 ///
 /// 列出书架中的所有小说供用户选择。
-/// 调用方：HermesChatDialog 的"切换"按钮。
-class HermesNovelPickerDialog extends ConsumerStatefulWidget {
-  const HermesNovelPickerDialog({super.key});
+/// 调用方：AgentChatDialog 的"切换"按钮。
+class AgentNovelPickerDialog extends ConsumerStatefulWidget {
+  const AgentNovelPickerDialog({super.key});
 
   @override
-  ConsumerState<HermesNovelPickerDialog> createState() =>
-      _HermesNovelPickerDialogState();
+  ConsumerState<AgentNovelPickerDialog> createState() =>
+      _AgentNovelPickerDialogState();
 }
 
-class _HermesNovelPickerDialogState
-    extends ConsumerState<HermesNovelPickerDialog> {
+class _AgentNovelPickerDialogState
+    extends ConsumerState<AgentNovelPickerDialog> {
   late Future<List<Novel>> _novelsFuture;
 
   @override

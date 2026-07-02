@@ -5,7 +5,7 @@
 ## 变更记录 (Changelog)
 
 - **2025-11-13**: 模块文档初始化，详细描述API架构和爬虫系统
-- **2026-06-11**: 更新为 Scrapling 爬虫引擎，扩展至 9 个站点，添加 Hermes/ComfyUI 客户端
+- **2026-06-11**: 更新为 Scrapling 爬虫引擎，扩展至 9 个站点，添加 ComfyUI 客户端
 
 ## 模块职责
 
@@ -167,7 +167,6 @@ class SourceSite(BaseModel):
 
 ### AI 服务客户端
 - **DifyClient** (`dify_client.py`): Dify 工作流 API 客户端
-- **HermesClient** (`hermes_client.py`): OpenAI 兼容的 LLM 直连客户端
 - **ComfyUI 相关**: `comfyui_client.py`, `comfyui_client_v2.py`, `comfyui_client_title_based.py`, `comfyui_video_client.py`
 - **角色卡服务**: `role_card_service.py`, `role_card_async_service.py`
 - **场景插图**: `scene_illustration_service.py`

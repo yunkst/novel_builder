@@ -1,7 +1,7 @@
 /// 当前 Agent 场景 Provider
 ///
-/// 根据用户当前所在的 UI 页面自动切换 Hermes Agent 的场景。
-/// 各页面通过此 Provider 设置当前场景，HermesChatNotifier 读取此值。
+/// 根据用户当前所在的 UI 页面自动切换 AI Agent 的场景。
+/// 各页面通过此 Provider 设置当前场景，AgentChatNotifier 读取此值。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

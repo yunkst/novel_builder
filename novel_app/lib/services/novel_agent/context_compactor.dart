@@ -1,12 +1,15 @@
-/// 上下文压缩服务（P0 最小可用版）
+/// 上下文压缩服务（v32 统一历史模型）
 ///
-/// 参考 opencode 的混合策略实现：
-/// - 触发条件：消息总字符数 ≥ 阈值（默认 500K 字符，≈ 125K tokens，适配 128K 上下文窗口）
-/// - 压缩策略：保留 system + 最近 N 条消息，丢弃早期消息
-/// - 工具调用安全：保留尾部完整消息（含 tool_calls/toolCallId 关联）
-/// - 可关闭：通过 [CompactorConfig.enabled] 控制
-/// - UI 对齐：通过 [CompactorConfig.messageOwners] 把 LLM messages 索引映射回 HermesMessage 索引，
-///   压缩后通过 CompactionResult.droppedHermesRange 通知 UI 同步裁剪，避免 LLM 已"失忆"但 UI 仍展示历史造成的认知错位
+/// 触发条件：消息总字符数 ≥ 阈值（默认 500K 字符，≈ 125K tokens，适配 128K 上下文窗口）
+/// 压缩策略：保留 system + 最近 N 条消息，丢弃早期消息
+/// 工具调用安全：
+///   1) 切点配对保护——不切断 assistant(toolCalls) 与其 tool 结果
+///   2) 尾部完整消息（含 tool_calls/toolCallId 关联）
+/// 可关闭：通过 [CompactorConfig.enabled] 控制
+///
+/// v32 变更：DB 也存 agent 消息，压缩时返回 [CompactionResult.droppedAgentFromIndex]，
+/// ScenarioSession 据此同步裁剪内存 + 删 DB（deleteMessagesBefore）。
+/// 不再需要 messageOwners / droppedHermesRange 的 UI 反推逻辑。
 ///
 /// P1 计划：用 LLM 生成结构化摘要替代简单截断
 library;
@@ -82,12 +85,11 @@ class CompactionResult {
   /// 丢弃的消息条数
   final int droppedMessageCount;
 
-  /// 被丢弃的 HermesMessage 连续索引区间 [start, end)
+  /// agent 内部 messages 中被丢弃的起始索引 [0, droppedAgentFromIndex)
   ///
-  /// 当调用方传入 [ContextCompactor.compact] 的 [messageOwners] 时,
-  /// 会反推哪些 HermesMessage 被整体丢弃,填入此字段。
-  /// 为 null 表示无 UI 对齐信息(未传 messageOwners)。
-  final ({int start, int end})? droppedHermesRange;
+  /// = 压缩前的 splitIndex。ScenarioSession 据此：
+  /// 内存 removeRange(0, droppedAgentFromIndex) + DB deleteMessagesBefore(sid, droppedAgentFromIndex)。
+  final int droppedAgentFromIndex;
 
   const CompactionResult({
     required this.messages,
@@ -96,7 +98,7 @@ class CompactionResult {
     required this.compactedChars,
     required this.keptMessageCount,
     required this.droppedMessageCount,
-    this.droppedHermesRange,
+    required this.droppedAgentFromIndex,
   });
 
   /// 压缩率（0-1，越大压缩越多）
@@ -106,8 +108,7 @@ class CompactionResult {
 
 /// 上下文压缩器
 ///
-/// P0 策略：保留 system + 尾部消息，丢弃早期消息。
-/// 确保 tool_calls 与 tool 响应的关联性不丢失。
+/// 保留 system + 尾部消息，丢弃早期消息。保证 tool_calls 与 tool 响应的配对完整。
 class ContextCompactor {
   final CompactorConfig _config;
 
@@ -127,20 +128,15 @@ class ContextCompactor {
   ///
   /// [messages] 当前消息列表（含 system prompt）
   /// [systemPrompt] 系统提示词（始终保留）
-  /// [messageOwners] 可选对齐信息：长度 = [messages] 的长度 + 2
-  ///   （前两位是 compact() 内部插入的 system prompt + 压缩提示），
-  ///   值为对应 HermesMessage 在 UI 列表中的索引，-1 表示无对应（system 消息）。
-  ///   传入后会在 [CompactionResult.droppedHermesRange] 反推被丢弃的 HermesMessage 区间。
   ///
-  /// 返回 [CompactionResult]，包含重组后的消息列表
+  /// 返回 [CompactionResult]，包含重组后的消息列表 + 被丢弃的起始索引。
   CompactionResult compact({
     required List<ChatMessage> messages,
     required String systemPrompt,
-    List<int>? messageOwners,
   }) {
     final originalChars = _estimateTotalChars(messages);
 
-    // 1. 边界选择：从后向前累加，找到保留的起始位置
+    // 1. 边界选择：从后向前累加，找到保留的起始位置（含配对保护）
     final splitIndex = _selectSplitIndex(messages);
 
     // 2. 构建压缩后的消息列表
@@ -152,7 +148,7 @@ class ContextCompactor {
         role: 'system',
         content: _buildCompactionNote(splitIndex, messages.length),
       ),
-      // 保留尾部消息（保证 tool_call_id 关联性）
+      // 保留尾部消息（splitIndex 已保证 tool_call/tool 配对完整）
       ...messages.sublist(splitIndex),
     ];
 
@@ -160,18 +156,11 @@ class ContextCompactor {
     final droppedCount = splitIndex;
     final keptCount = messages.length - splitIndex;
 
-    // 3. 反推被丢弃的 HermesMessage 区间（仅当传入 owners 时）
-    final droppedHermesRange = _computeDroppedHermesRange(
-      messageOwners: messageOwners,
-      originalMessageCount: messages.length,
-      splitIndex: splitIndex,
-    );
-
     LoggerService.instance.i(
       '上下文压缩完成: $originalChars→$compactedChars 字 '
       '(释放 ${originalChars - compactedChars} 字, '
-      '保留 $keptCount 条, 丢弃 $droppedCount 条'
-      '${droppedHermesRange != null ? ", UI 裁剪 Hermes[${droppedHermesRange.start},${droppedHermesRange.end})" : ""})',
+      '保留 $keptCount 条, 丢弃 $droppedCount 条, '
+      'droppedAgentFromIndex=$splitIndex)',
       category: LogCategory.ai,
       tags: ['agent', 'compaction', 'complete'],
     );
@@ -183,47 +172,17 @@ class ContextCompactor {
       compactedChars: compactedChars,
       keptMessageCount: keptCount,
       droppedMessageCount: droppedCount,
-      droppedHermesRange: droppedHermesRange,
+      droppedAgentFromIndex: splitIndex,
     );
   }
 
-  /// 反推被丢弃的 HermesMessage 连续索引区间
-  ///
-  /// [messageOwners] 长度 = messages 长度（不含 compact 内部插入的 2 条 system），
-  ///   元素为对应 HermesMessage 索引，-1 表示 system 消息不映射到 UI。
-  /// [originalMessageCount] 压缩前 messages 列表总长度。
-  /// [splitIndex] 压缩保留的起始索引（[splitIndex..] 被保留，[0..splitIndex) 被丢弃）。
-  ///
-  /// 返回 null 当 messageOwners 为 null 或被丢弃的 Hermes 索引为空集合或离散无法表达为区间。
-  ({int start, int end})? _computeDroppedHermesRange({
-    required List<int>? messageOwners,
-    required int originalMessageCount,
-    required int splitIndex,
-  }) {
-    if (messageOwners == null || splitIndex == 0) return null;
-    if (messageOwners.length != originalMessageCount) return null;
-
-    // 收集被丢弃消息对应的 HermesMessage 索引（去重 + 排序 + 过滤 -1）
-    final droppedHermesIndices = <int>{};
-    for (int i = 0; i < splitIndex; i++) {
-      final owner = messageOwners[i];
-      if (owner >= 0) droppedHermesIndices.add(owner);
-    }
-
-    if (droppedHermesIndices.isEmpty) return null;
-
-    final sorted = droppedHermesIndices.toList()..sort();
-
-    // 必须能用单个连续区间 [start, end) 表达
-    if (sorted.length != sorted.last - sorted.first + 1) return null;
-
-    return (start: sorted.first, end: sorted.last + 1);
-  }
-
-  /// 从后向前选择保留边界
+  /// 从后向前选择保留边界（含 tool_call/tool 配对保护）
   ///
   /// 从最后一条消息开始向前累加字符数，直到超过 [preserveTailChars]。
-  /// 返回保留起始索引（含），即 messages[spliIndex..] 会被保留。
+  /// 若候选切点会切断 assistant(toolCalls) → tool(result) 的配对，
+  /// 回退到 assistant 之前，避免保留孤立的 tool 消息导致 API 400。
+  ///
+  /// 返回保留起始索引（含），即 messages[splitIndex..] 会被保留。
   int _selectSplitIndex(List<ChatMessage> messages) {
     int accumulatedChars = 0;
     for (int i = messages.length - 1; i >= 0; i--) {
@@ -235,12 +194,36 @@ class ContextCompactor {
       accumulatedChars += charCount;
 
       if (accumulatedChars > _config.preserveTailChars) {
-        // 当前消息导致超出保留预算，从下一条开始保留
-        return i + 1;
+        // 候选切点：保留 [i+1, end)
+        return _protectToolPairing(messages, i + 1);
       }
     }
     // 所有消息都在预算内，无需压缩
     return 0;
+  }
+
+  /// 配对保护：若切点落在 assistant(toolCalls) 与其 tool 结果之间，回退。
+  ///
+  /// [splitIndex] 原始候选切点（messages[splitIndex] 是保留段的第一条）。
+  /// 若 messages[splitIndex-1] 是 assistant 且带 toolCalls，
+  /// 且 messages[splitIndex] 是 tool（其 toolCallId 属于前一个 assistant），
+  /// 则把切点回退到 splitIndex-1（把 assistant 也纳入保留段，配对完整）。
+  /// 递归向前检查，直到切点安全或顶到 system。
+  int _protectToolPairing(List<ChatMessage> messages, int splitIndex) {
+    int split = splitIndex;
+    while (split > 1 && split < messages.length) {
+      final prev = messages[split - 1];
+      final curr = messages[split];
+      if (prev.role == 'assistant' &&
+          (prev.toolCalls?.isNotEmpty ?? false) &&
+          curr.role == 'tool' &&
+          (prev.toolCalls?.any((t) => t.id == curr.toolCallId) ?? false)) {
+        split = split - 1;
+        continue;
+      }
+      break;
+    }
+    return split;
   }
 
   /// 构建压缩提示消息

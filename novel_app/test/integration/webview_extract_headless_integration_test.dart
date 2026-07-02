@@ -12,7 +12,7 @@
 ///   flutter test test/integration/webview_extract_headless_integration_test.dart
 ///
 /// 注意：本测试是 mock-based 集成测试（不需要真实 WebView 或 LLM API）。
-/// 如需真实 LLM 端到端测试，参考 hermes_agent_streaming_test.dart。
+/// 如需真实 LLM 端到端测试，参考 agent_streaming_test.dart。
 library;
 
 import 'dart:async';
@@ -36,7 +36,7 @@ void main() {
         useHeadlessWebView: true,
       );
 
-      // 模拟 HermesChatNotifier._buildScenarioContext 的判断
+      // 模拟 AgentChatNotifier._buildScenarioContext 的判断
       final scenarioId = ScenarioIds.webviewExtract;
       final useHeadless = scenarioId == ScenarioIds.webviewExtract;
       expect(useHeadless, isTrue);
@@ -162,9 +162,9 @@ void main() {
     });
   });
 
-  group('HermesChatProvider 改造后的预期行为', () {
+  group('AgentChatProvider 改造后的预期行为', () {
     test('AgentScenarioContext 构造兼容 Headless 标志', () {
-      // 模拟 HermesChatNotifier._buildScenarioContext 逻辑
+      // 模拟 AgentChatNotifier._buildScenarioContext 逻辑
       const scenarioId = ScenarioIds.webviewExtract;
       const currentUrl = 'https://www.example.com/book/';
 

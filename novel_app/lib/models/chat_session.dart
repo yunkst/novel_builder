@@ -1,7 +1,7 @@
 /// AI 对话会话（chat_sessions 表）
 ///
 /// 一个会话对应一个 scenarioId 下的一轮连续对话，可被浏览 / 切换 / 重命名 / 删除。
-/// 注意：旧 Hermes 聊天窗口没有 session 概念，本表对应的旧数据不需要迁移（用户决策）。
+/// 注意：旧 Agent 聊天窗口没有 session 概念，本表对应的旧数据不需要迁移（用户决策）。
 library;
 
 import '../utils/format_utils.dart';

@@ -48,7 +48,7 @@ import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
 import '../core/providers/reader_state_providers.dart'; // 新增：细粒度状态Provider
 import '../core/providers/reading_context_providers.dart';
-import '../widgets/hermes/hermes_floating_button.dart';
+import '../widgets/agent_chat/agent_floating_button.dart';
 import '../widgets/reader/version_history_sheet.dart';
 import '../models/chapter_version.dart';
 
@@ -133,7 +133,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 初始化自动滚动控制器
     initAutoScroll(scrollController: _scrollController);
 
-    // 设置 Hermes 阅读上下文（小说 + 章节）
+    // 设置 Agent 阅读上下文（小说 + 章节）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(readingContextProvider.notifier).state = ReadingContext(
@@ -173,7 +173,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   @override
   void deactivate() {
-    // 清除 Hermes 阅读上下文（必须在 deactivate 中执行，此时 ref 仍有效）
+    // 清除 Agent 阅读上下文（必须在 deactivate 中执行，此时 ref 仍有效）
     ref.read(readingContextProvider.notifier).state = const ReadingContext();
     super.deactivate();
   }
@@ -319,7 +319,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         setState(() {
           _currentChapter = targetChapter;
         });
-        // 更新 Hermes 阅读上下文中的章节信息
+        // 更新 Agent 阅读上下文中的章节信息
         ref.read(readingContextProvider.notifier).state = ReadingContext(
           novelTitle: widget.novel.title,
           chapterTitle: targetChapter.title,
@@ -581,7 +581,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final paragraphs =
         content.split('\n').where((p) => p.trim().isNotEmpty).toList();
 
-    return HermesFloatingShell(
+    return AgentFloatingShell(
       child: Scaffold(
         // 直接返回 Scaffold，不使用 ChangeNotifierProvider 包装
         appBar: ReaderAppBar(

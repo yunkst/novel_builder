@@ -57,29 +57,19 @@ class AgentLoop {
   /// [cancellationToken] 取消令牌；触发取消后，当前这轮 LLM 输出完成，
   ///   但循环不再执行后续工具、不再进入下一轮（不中断底层 LLM HTTP）。
   /// [messageOwners] 可选对齐信息：长度 = [initialMessages] 的长度，
-  ///   元素为对应 HermesMessage 在 UI 列表中的索引，-1 表示 system 消息不映射。
-  ///   压缩时透传给 [ContextCompactor.compact]，用于反推被丢弃的 HermesMessage 区间，
+  ///   元素为对应 AgentMessage 在 UI 列表中的索引，-1 表示 system 消息不映射。
+  ///   压缩时透传给 [ContextCompactor.compact]，用于反推被丢弃的 AgentMessage 区间，
   ///   通过 [CompactionEvent.droppedHermesRange] 通知 UI 同步裁剪。
   Future<void> run({
     required List<ChatMessage> initialMessages,
     required String systemPrompt,
     required void Function(AgentEvent event) emit,
     CancellationToken? cancellationToken,
-    List<int>? messageOwners,
   }) async {
     final messages = <ChatMessage>[
       ChatMessage(role: 'system', content: systemPrompt),
       ...initialMessages,
     ];
-
-    // owners 同步构建：[0] = -1 (system prompt), 其后 = initialMessages 对应的 owner
-    // 循环过程中新增的 assistant/tool 消息不映射到 UI，owner = -1
-    final owners = List<int>.filled(messages.length, -1);
-    if (messageOwners != null) {
-      for (int i = 0; i < messageOwners.length && i + 1 < owners.length; i++) {
-        owners[i + 1] = messageOwners[i];
-      }
-    }
 
     LoggerService.instance.i('Agent 循环开始 (scenario=${_scenario.id})',
         category: LogCategory.ai, tags: ['agent', 'loop_start', _scenario.id]);
@@ -102,9 +92,8 @@ class AgentLoop {
         // 0. 上下文压缩检查（每轮 LLM 调用前）
         //    防止 messages 无限增长导致超出 LLM 上下文窗口
         if (_compactor.needsCompaction(messages)) {
-          final preCompactionMsgCount = messages.length;
           LoggerService.instance.w(
-            '触发上下文压缩: 消息总量 $preCompactionMsgCount '
+            '触发上下文压缩: 消息总量 ${messages.length} '
             '条，超过阈值 (${_config.compaction.maxContextChars} 字符)',
             category: LogCategory.ai,
             tags: ['agent', 'compaction', 'triggered', _scenario.id],
@@ -112,35 +101,16 @@ class AgentLoop {
           final result = _compactor.compact(
             messages: messages,
             systemPrompt: systemPrompt,
-            messageOwners: owners,
           );
-          // 同步重置 owners：清空后重新填入 compact 后的新 messages 对应的 owners
-          // compact 后的 messages 结构：[system prompt, 压缩提示, ...尾部 messages]
-          // 前两条 owner 必为 -1
-          final compactedOwners = <int>[-1, -1];
-          // result.messages 的前 2 条是 compact 内部插入的 system,
-          // 第 3 条起对应原 messages[splitIndex..]，splitIndex = preCompactionMsgCount - droppedCount
-          final splitIndex = preCompactionMsgCount - result.droppedMessageCount;
-          for (int i = 2; i < result.messages.length; i++) {
-            final originalMsgIndex = (i - 2) + splitIndex;
-            if (originalMsgIndex < owners.length) {
-              compactedOwners.add(owners[originalMsgIndex]);
-            } else {
-              compactedOwners.add(-1);
-            }
-          }
           messages
             ..clear()
             ..addAll(result.messages);
-          owners
-            ..clear()
-            ..addAll(compactedOwners);
           emit(CompactionEvent(
             removedChars: result.removedChars,
             originalChars: result.originalChars,
             keptMessageCount: result.keptMessageCount,
             droppedMessageCount: result.droppedMessageCount,
-            droppedHermesRange: result.droppedHermesRange,
+            droppedAgentFromIndex: result.droppedAgentFromIndex,
           ));
         }
 
@@ -301,6 +271,9 @@ class AgentLoop {
           // 截断过长结果：错误响应优先保留 error/message/suggestion 字段；
           // __meta（run_id 等关键元数据）始终保留到末尾，永不被截断。
           var resultStr = jsonEncode(result);
+          // fullResultStr = 截断前的完整原始结果（含 __meta），供 DB 持久化。
+          // hydrate 续聊时 LLM 看到完整工具结果，避免截断版信息丢失。
+          final fullResultStr = resultStr;
 
           // 剥离 __meta：体积小但承载 run_id 等句柄，必须送达 LLM
           final meta = result.remove('__meta');
@@ -356,10 +329,11 @@ class AgentLoop {
             call.name,
             call.id,
             resultStr,
+            fullResult: fullResultStr,
             success: toolSuccess,
           ));
           LoggerService.instance.i(
-              '工具完成: ${call.name} (success=$toolSuccess, resultLen=${resultStr.length}, scenario=${_scenario.id})',
+              '工具完成: ${call.name} (success=$toolSuccess, resultLen=${resultStr.length}, fullLen=${fullResultStr.length}, scenario=${_scenario.id})',
               category: LogCategory.ai,
               tags: ['agent', 'tool', call.name, toolSuccess ? 'success' : 'error', _scenario.id]);
         }

@@ -1,11 +1,11 @@
-/// Hermes Chat 状态和 Provider
+/// Agent Chat 状态和 Provider
 ///
 /// 重构为多 Session 架构：
 /// - ScenarioSession（scenario_session.dart）— 每个场景的独立运行时
 /// - ScenarioSessionsNotifier（scenario_sessions_provider.dart）— 会话管理器
-/// - hermesChatProvider — 兼容层，委托给当前场景的 ScenarioSession
+/// - agentChatProvider — 兼容层，委托给当前场景的 ScenarioSession
 ///
-/// 对应 Hermes Agent 的三层隔离模型：
+/// 对应 AI Agent 的三层隔离模型：
 /// 1. 按 session_key 的 Agent 实例缓存 → ScenarioSession 按 scenarioId
 /// 2. 独立事件流 → 每个 ScenarioSession 有独立的 _pendingSegments
 /// 3. 会话状态机 → SessionLifecycle (fresh → active → idle → disposed)
@@ -17,23 +17,23 @@ import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import 'agent_scenario_provider.dart';
 import 'current_novel_provider.dart';
-import 'hermes_chat_state.dart';
+import 'agent_chat_state.dart';
 import 'scenario_session.dart';
 import 'scenario_sessions_provider.dart';
 
-// HermesChatState 已移到 hermes_chat_state.dart
+// AgentChatState 已移到 agent_chat_state.dart
 
-/// Hermes Chat Notifier — 兼容层
+/// Agent Chat Notifier — 兼容层
 ///
 /// 委托给 ScenarioSessionsNotifier，保持对外 API 不变。
 /// 新代码应直接使用 currentChatStateProvider / currentSessionProvider。
-class HermesChatNotifier extends StateNotifier<HermesChatState> {
+class AgentChatNotifier extends StateNotifier<AgentChatState> {
   final Ref _ref;
 
   /// 是否正在从 UI 手动切换（避免和自动切换冲突）
   bool _isSwitchingFromUI = false;
 
-  HermesChatNotifier(this._ref) : super(const HermesChatState()) {
+  AgentChatNotifier(this._ref) : super(const AgentChatState()) {
     // 监听场景自动切换
     _ref.listen<String>(
       currentAgentScenarioProvider,
@@ -45,7 +45,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     );
 
     // 监听 sessions 状态变化，同步当前场景的 state
-    _ref.listen<Map<String, HermesChatState>>(
+    _ref.listen<Map<String, AgentChatState>>(
       scenarioSessionsProvider,
       (prev, next) {
         final scenarioId = _ref.read(currentAgentScenarioProvider);
@@ -77,7 +77,7 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     final scenarioId = _ref.read(currentAgentScenarioProvider);
     final sessions = _ref.read(scenarioSessionsProvider);
     state = sessions[scenarioId] ??
-        HermesChatState(
+        AgentChatState(
           scenarioId: scenarioId,
           scenarioDisplayName: AgentScenarioFactory.availableScenarios
                   .where((s) => s.id == scenarioId)
@@ -104,9 +104,9 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
     if (state.scenarioId == scenarioId) return;
 
     LoggerService.instance.i(
-      'Hermes 场景切换: ${state.scenarioId} → $scenarioId',
+      'Agent 场景切换: ${state.scenarioId} → $scenarioId',
       category: LogCategory.ai,
-      tags: ['provider', 'hermes', 'scenario-switch', scenarioId],
+      tags: ['provider', 'agent_chat', 'scenario-switch', scenarioId],
     );
 
     // 同步 currentAgentScenarioProvider（手动切换时）
@@ -151,14 +151,14 @@ class HermesChatNotifier extends StateNotifier<HermesChatState> {
   }
 }
 
-/// Hermes Chat Provider — 兼容层
+/// Agent Chat Provider — 兼容层
 ///
 /// StateNotifierProvider 在 Riverpod 2.x 中默认不 autoDispose，
 /// 因此用户离开页面后对话历史和 Agent 任务状态会一直保持。
 /// 用户切换到 APP 其他页面后返回，仍能看到之前的任务执行情况。
 ///
 /// 新代码应优先使用 currentChatStateProvider / currentSessionProvider。
-final hermesChatProvider =
-    StateNotifierProvider<HermesChatNotifier, HermesChatState>((ref) {
-  return HermesChatNotifier(ref);
+final agentChatProvider =
+    StateNotifierProvider<AgentChatNotifier, AgentChatState>((ref) {
+  return AgentChatNotifier(ref);
 });

@@ -15,6 +15,11 @@ export '../dsl_engine/llm_provider.dart' show ChatMessage;
 
 /// Agent 场景上下文（动态参数，由调用方提供）
 class AgentScenarioContext {
+  /// 当前对话场景 ID（如 `ScenarioIds.writing`）。
+  ///
+  /// 工具内部调 LLM 时据此选择对应场景的供应商配置；为 null 时回退到 writing。
+  final String? scenarioId;
+
   /// 小说/章节阅读上下文
   final ReadingContext? readingContext;
 
@@ -41,6 +46,7 @@ class AgentScenarioContext {
   final String? currentNovelTitle;
 
   const AgentScenarioContext({
+    this.scenarioId,
     this.readingContext,
     this.webviewController,
     this.currentUrl,

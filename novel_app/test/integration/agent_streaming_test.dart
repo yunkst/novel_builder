@@ -1,4 +1,4 @@
-/// Hermes Agent 流式输出 + tool_calls 真实 API 集成测试
+/// AI Agent 流式输出 + tool_calls 真实 API 集成测试
 ///
 /// 使用真实 DeepSeek API 验证：
 ///   1. chatStreamWithTools() 流式文本输出（多个 chunk）
@@ -8,7 +8,7 @@
 ///
 /// 运行:
 ///   cd novel_app
-///   flutter test test/integration/hermes_agent_streaming_test.dart
+///   flutter test test/integration/agent_streaming_test.dart
 library;
 
 import 'dart:convert';

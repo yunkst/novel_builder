@@ -18,10 +18,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/providers/agent_scenario_provider.dart';
-import 'package:novel_app/core/providers/hermes_providers.dart';
+import 'package:novel_app/core/providers/agent_chat_providers.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
-import 'package:novel_app/models/hermes_message.dart';
+import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/services/novel_agent/novel_agent_service.dart';
@@ -68,7 +68,6 @@ class MockNovelAgentService implements NovelAgentService {
     required List<dynamic> history,
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
-    List<int>? messageOwners,
   }) async {
     // 同场景串行
     if (_runningByScenario[scenarioId] == true) {
@@ -198,8 +197,8 @@ void main() {
       // 流式完成后应包含 user + assistant 消息
       expect(session.state.messages.length, 2,
           reason: '应有 1 条 user + 1 条 assistant 消息');
-      expect(session.state.messages.first.role, HermesRole.user);
-      expect(session.state.messages.last.role, HermesRole.assistant);
+      expect(session.state.messages.first.role, AgentChatRole.user);
+      expect(session.state.messages.last.role, AgentChatRole.assistant);
       expect(session.isRunning, isFalse);
       expect(session.lifecycle, SessionLifecycle.idle);
     });
@@ -373,45 +372,45 @@ void main() {
   });
 
   // ===========================================================================
-  // 5. 兼容层 HermesChatNotifier 仍可用
+  // 5. 兼容层 AgentChatNotifier 仍可用
   // ===========================================================================
 
-  group('兼容层 HermesChatNotifier', () {
+  group('兼容层 AgentChatNotifier', () {
     test('sendMessage 通过兼容层正常工作', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       await notifier.sendMessage('兼容层测试');
 
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.messages.length, 2);
     });
 
     test('switchScenario 通过兼容层切换场景', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       await notifier.sendMessage('写作消息');
-      final writingState = container.read(hermesChatProvider);
+      final writingState = container.read(agentChatProvider);
       expect(writingState.scenarioId, ScenarioIds.writing);
 
       notifier.switchScenario(ScenarioIds.webviewExtract, '网页提取');
-      final extractState = container.read(hermesChatProvider);
+      final extractState = container.read(agentChatProvider);
       expect(extractState.scenarioId, ScenarioIds.webviewExtract);
     });
 
     test('clearConversation 通过兼容层清空', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       await notifier.sendMessage('测试');
-      expect(container.read(hermesChatProvider).messages.isNotEmpty, isTrue);
+      expect(container.read(agentChatProvider).messages.isNotEmpty, isTrue);
 
       notifier.clearConversation();
-      expect(container.read(hermesChatProvider).messages, isEmpty);
+      expect(container.read(agentChatProvider).messages, isEmpty);
     });
 
     test('cancelRequest 通过兼容层取消', () {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
 
       notifier.cancelRequest();
-      final state = container.read(hermesChatProvider);
+      final state = container.read(agentChatProvider);
       expect(state.isLoading, isFalse);
     });
   });
@@ -427,14 +426,14 @@ void main() {
       expect(state.scenarioId, ScenarioIds.writing);
 
       // 发消息
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       await notifier.sendMessage('测试');
       final updatedState = container.read(currentChatStateProvider);
       expect(updatedState.messages.length, 2);
     });
 
     test('切换场景后返回新场景的状态', () async {
-      final notifier = container.read(hermesChatProvider.notifier);
+      final notifier = container.read(agentChatProvider.notifier);
       await notifier.sendMessage('写作消息');
 
       // 切换场景
@@ -461,7 +460,7 @@ void main() {
 
       // 验证消息结构
       final lastMsg = session.state.messages.last;
-      expect(lastMsg.role, HermesRole.assistant);
+      expect(lastMsg.role, AgentChatRole.assistant);
     });
   });
 
@@ -514,7 +513,7 @@ void main() {
 
       expect(session.state.error, isNotNull, reason: '首轮失败应设置 error');
       expect(session.state.messages.length, 1);
-      expect(session.state.messages.last.role, HermesRole.user);
+      expect(session.state.messages.last.role, AgentChatRole.user);
       expect(session.state.messages.last.content, '你好');
       expect(mockService.sendMessageCallCount, 1);
 
@@ -527,10 +526,10 @@ void main() {
       expect(session.state.error, isNull, reason: '重试后 error 应清空');
       expect(session.state.messages.length, 2,
           reason: '重试成功后应有 user + assistant');
-      expect(session.state.messages.first.role, HermesRole.user);
+      expect(session.state.messages.first.role, AgentChatRole.user);
       expect(session.state.messages.first.content, '你好',
           reason: '不应重复添加 user 消息');
-      expect(session.state.messages.last.role, HermesRole.assistant);
+      expect(session.state.messages.last.role, AgentChatRole.assistant);
     });
 
     test('半成品 assistant 在末尾时重试 → 删半成品，重发最后一条 user', () async {
@@ -548,9 +547,9 @@ void main() {
       expect(session.state.error, isNotNull);
       expect(session.state.messages.length, 4,
           reason: '半成品 assistant 应已入列');
-      expect(session.state.messages[2].role, HermesRole.user);
+      expect(session.state.messages[2].role, AgentChatRole.user);
       expect(session.state.messages[2].content, '第二条');
-      expect(session.state.messages.last.role, HermesRole.assistant,
+      expect(session.state.messages.last.role, AgentChatRole.assistant,
           reason: '末尾应是半成品 assistant');
 
       // 重试：应删掉半成品 assistant，保留 user2，重发 user2.content
@@ -560,9 +559,9 @@ void main() {
           reason: '重试应使用最后一条 user 的 content');
       expect(session.state.messages.length, 4,
           reason: '截断后 [user1, assistant1, user2] = 3 条，重试成功再 +1 assistant = 4');
-      expect(session.state.messages[2].role, HermesRole.user);
+      expect(session.state.messages[2].role, AgentChatRole.user);
       expect(session.state.messages[2].content, '第二条');
-      expect(session.state.messages.last.role, HermesRole.assistant,
+      expect(session.state.messages.last.role, AgentChatRole.assistant,
           reason: '重试成功后末尾应是新的 assistant');
       expect(session.state.error, isNull);
     });

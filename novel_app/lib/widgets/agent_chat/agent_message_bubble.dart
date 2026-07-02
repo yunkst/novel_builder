@@ -2,24 +2,24 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:novel_app/models/hermes_message.dart';
+import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Hermes 聊天消息气泡
-class HermesMessageBubble extends StatelessWidget {
-  final HermesMessage message;
+/// Agent 聊天消息气泡
+class AgentMessageBubble extends StatelessWidget {
+  final AgentChatMessage message;
   /// 流式 segments（当前回合进行中时非空，历史消息为 null）
-  final List<HermesSegment>? streamingSegments;
+  final List<AgentChatSegment>? streamingSegments;
   final bool showTimestamp;
 
   /// 回滚回调（仅 user 消息使用）：点击按钮后回滚至此消息,
-  /// 由 [HermesChatDialog] 实现确认弹框 + 输入框回填。
+  /// 由 [AgentChatDialog] 实现确认弹框 + 输入框回填。
   /// 传 null 表示不渲染回滚按钮。
   final VoidCallback? onRollback;
 
-  const HermesMessageBubble({
+  const AgentMessageBubble({
     super.key,
     required this.message,
     this.streamingSegments,
@@ -29,7 +29,7 @@ class HermesMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isUser = message.role == HermesRole.user;
+    final isUser = message.role == AgentChatRole.user;
 
     // 流式气泡用 streamingSegments，历史气泡用 message.segments
     final effectiveSegments = streamingSegments ?? message.segments;
@@ -95,9 +95,9 @@ class HermesMessageBubble extends StatelessWidget {
   }
 
   Color _getBubbleColor(BuildContext context) {
-    final isUser = message.role == HermesRole.user;
+    final isUser = message.role == AgentChatRole.user;
     if (isUser) {
-      return context.appColors.hermesAccent;
+      return context.appColors.agentAccent;
     }
     return Theme.of(context).colorScheme.surfaceContainerHighest;
   }
@@ -128,7 +128,7 @@ class HermesMessageBubble extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-            color: context.appColors.hermesOnBrand,
+            color: context.appColors.agentOnBrand,
             height: 1.4,
           ),
     );
@@ -137,7 +137,7 @@ class HermesMessageBubble extends StatelessWidget {
   /// 按 segments 顺序交替渲染文本片段和工具调用卡片
   Widget _buildAssistantContent(
     BuildContext context,
-    List<HermesSegment> segments,
+    List<AgentChatSegment> segments,
     bool isStreaming,
   ) {
     if (segments.isEmpty) return const SizedBox.shrink();

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_app/widgets/hermes/hermes_chat_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/agent_chat_dialog.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Hermes 全局悬浮按钮
+/// Agent 全局悬浮按钮
 ///
 /// 使用 Stack + Positioned 实现可拖动悬浮按钮，
 /// 点击展开聊天对话框。
-class HermesFloatingButton extends ConsumerStatefulWidget {
-  const HermesFloatingButton({super.key});
+class AgentFloatingButton extends ConsumerStatefulWidget {
+  const AgentFloatingButton({super.key});
 
   @override
-  ConsumerState<HermesFloatingButton> createState() => _HermesFloatingButtonState();
+  ConsumerState<AgentFloatingButton> createState() => _AgentFloatingButtonState();
 }
 
-class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
+class _AgentFloatingButtonState extends ConsumerState<AgentFloatingButton> {
   double _x = 16.0;
   double _y = 100.0;
   bool _isDragging = false;
@@ -74,8 +74,8 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    appColors.hermesBrandStart,
-                    appColors.hermesBrandEnd,
+                    appColors.agentBrandStart,
+                    appColors.agentBrandEnd,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -83,7 +83,7 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: appColors.hermesBrandStart.withValues(alpha: 0.3),
+                    color: appColors.agentBrandStart.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -93,7 +93,7 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
                 color: Colors.transparent,
                 child: Icon(
                   Icons.auto_awesome,
-                  color: appColors.hermesOnBrand,
+                  color: appColors.agentOnBrand,
                   size: 24,
                 ),
               ),
@@ -107,18 +107,18 @@ class _HermesFloatingButtonState extends ConsumerState<HermesFloatingButton> {
   void _showChatDialog() {
     showDialog(
       context: context,
-      builder: (context) => const HermesChatDialog(),
+      builder: (context) => const AgentChatDialog(),
     );
   }
 }
 
-/// Hermes 悬浮外壳
+/// Agent 悬浮外壳
 ///
 /// 包裹在应用外层，在所有页面之上渲染悬浮按钮。
-class HermesFloatingShell extends StatelessWidget {
+class AgentFloatingShell extends StatelessWidget {
   final Widget child;
 
-  const HermesFloatingShell({
+  const AgentFloatingShell({
     super.key,
     required this.child,
   });
@@ -128,7 +128,7 @@ class HermesFloatingShell extends StatelessWidget {
     return Stack(
       children: [
         child,
-        const HermesFloatingButton(),
+        const AgentFloatingButton(),
       ],
     );
   }

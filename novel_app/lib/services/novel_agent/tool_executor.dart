@@ -49,7 +49,7 @@ class ToolExecutor {
   ///
   /// [scenarioContext] 写作场景专用，包含当前小说 ID。
   /// 对于 `select_novel` 工具，返回的结果会包含 success 标记，
-  /// 上游（HermesChatNotifier）需自行维护状态。
+  /// 上游（AgentChatNotifier）需自行维护状态。
   Future<String> execute(
     String toolName,
     Map<String, dynamic> args, {
@@ -452,6 +452,7 @@ class ToolExecutor {
       instruction: instruction,
       characterNames: charNames,
       tagNames: tags,
+      scenarioId: ctx?.scenarioId ?? ScenarioIds.writing,
     );
     if (generateResult.errorJson != null) {
       return jsonEncode(generateResult.errorJson);
@@ -547,6 +548,7 @@ class ToolExecutor {
       rewriteInstruction: rewriteInstruction,
       characterNames: charNames,
       tagNames: tags,
+      scenarioId: ctx?.scenarioId ?? ScenarioIds.writing,
     );
     if (rewriteResult.errorJson != null) {
       return jsonEncode(rewriteResult.errorJson);
@@ -641,10 +643,11 @@ class ToolExecutor {
     required String systemPrompt,
     required String userPrompt,
     required String failTag,
+    String scenarioId = ScenarioIds.writing,
   }) async {
     final configService = ref.read(llmConfigServiceProvider);
     final activeConfig =
-        await configService.getActiveConfig(scenarioId: ScenarioIds.writing);
+        await configService.getActiveConfig(scenarioId: scenarioId);
     if (activeConfig == null) {
       return _RewriteResult.failure({
         'error': 'llm_not_configured',
@@ -694,6 +697,7 @@ class ToolExecutor {
     required String rewriteInstruction,
     required List<String> characterNames,
     required List<String> tagNames,
+    String scenarioId = ScenarioIds.writing,
   }) async {
     final writerPrompt = await _loadWriterPrompt();
     final contextParts =
@@ -732,6 +736,7 @@ class ToolExecutor {
       systemPrompt: systemPrompt,
       userPrompt: prompt.toString(),
       failTag: 'update_chapter_content',
+      scenarioId: scenarioId,
     );
   }
 
@@ -745,6 +750,7 @@ class ToolExecutor {
     required String instruction,
     required List<String> characterNames,
     required List<String> tagNames,
+    String scenarioId = ScenarioIds.writing,
   }) async {
     final writerPrompt = await _loadWriterPrompt();
     final contextParts =
@@ -780,6 +786,7 @@ class ToolExecutor {
       systemPrompt: systemPrompt,
       userPrompt: prompt.toString(),
       failTag: 'create_chapter',
+      scenarioId: scenarioId,
     );
   }
 
@@ -799,11 +806,16 @@ class ToolExecutor {
     final characters = await repo.getCharacters(novelUrl);
     final list = characters.map((c) => {
           'name': c.name,
-          'appearanceFeatures': c.appearanceFeatures,
           'gender': c.gender,
           'age': c.age,
           'occupation': c.occupation,
           'personality': c.personality,
+          'appearanceFeatures': c.appearanceFeatures,
+          'bodyType': c.bodyType,
+          'clothingStyle': c.clothingStyle,
+          'backgroundStory': c.backgroundStory,
+          'aliases': c.aliases,
+          'avatarUrl': c.cachedImageUrl,
         }).toList();
 
     final novelContext = _buildCurrentNovelContext(ctx);
@@ -846,10 +858,45 @@ class ToolExecutor {
       });
     }
 
+    final (gender, genderErr) = parser.nullableString('gender');
+    if (genderErr != null) return genderErr;
+    final (age, ageErr) = parser.optionalInt('age');
+    if (ageErr != null) return ageErr;
+    final (occupation, occupationErr) = parser.nullableString('occupation');
+    if (occupationErr != null) return occupationErr;
+    final (personality, personalityErr) =
+        parser.nullableString('personality');
+    if (personalityErr != null) return personalityErr;
+    final (appearanceFeatures, appearanceErr) =
+        parser.nullableString('appearanceFeatures');
+    if (appearanceErr != null) return appearanceErr;
+    // description 作为外貌特征的兜底（兼容旧用法，与 _createCharacter 对齐）
     final (description, _) = parser.nullableString('description');
-    final (avatarUrl, _) = parser.nullableString('avatarUrl');
+    final resolvedAppearance =
+        appearanceFeatures ?? description ?? existing.appearanceFeatures;
+    final (bodyType, bodyErr) = parser.nullableString('bodyType');
+    if (bodyErr != null) return bodyErr;
+    final (clothingStyle, clothingErr) =
+        parser.nullableString('clothingStyle');
+    if (clothingErr != null) return clothingErr;
+    final (backgroundStory, bgErr) =
+        parser.nullableString('backgroundStory');
+    if (bgErr != null) return bgErr;
+    final (aliases, aliasesErr) = parser.optionalStringList('aliases');
+    if (aliasesErr != null) return aliasesErr;
+    final (avatarUrl, avatarErr) = parser.nullableString('avatarUrl');
+    if (avatarErr != null) return avatarErr;
+
     final updated = existing.copyWith(
-      appearanceFeatures: description ?? existing.appearanceFeatures,
+      gender: gender ?? existing.gender,
+      age: age ?? existing.age,
+      occupation: occupation ?? existing.occupation,
+      personality: personality ?? existing.personality,
+      appearanceFeatures: resolvedAppearance,
+      bodyType: bodyType ?? existing.bodyType,
+      clothingStyle: clothingStyle ?? existing.clothingStyle,
+      backgroundStory: backgroundStory ?? existing.backgroundStory,
+      aliases: aliases ?? existing.aliases,
       cachedImageUrl: avatarUrl ?? existing.cachedImageUrl,
     );
     await repo.updateCharacter(updated);
@@ -887,11 +934,47 @@ class ToolExecutor {
       });
     }
 
-    final (charDesc, _) = parser.nullableString('description');
+    final (gender, genderErr) = parser.nullableString('gender');
+    if (genderErr != null) return genderErr;
+    final (age, ageErr) = parser.optionalInt('age');
+    if (ageErr != null) return ageErr;
+    final (occupation, occupationErr) = parser.nullableString('occupation');
+    if (occupationErr != null) return occupationErr;
+    final (personality, personalityErr) =
+        parser.nullableString('personality');
+    if (personalityErr != null) return personalityErr;
+    final (appearanceFeatures, appearanceErr) =
+        parser.nullableString('appearanceFeatures');
+    if (appearanceErr != null) return appearanceErr;
+    final (bodyType, bodyErr) = parser.nullableString('bodyType');
+    if (bodyErr != null) return bodyErr;
+    final (clothingStyle, clothingErr) =
+        parser.nullableString('clothingStyle');
+    if (clothingErr != null) return clothingErr;
+    final (backgroundStory, bgErr) =
+        parser.nullableString('backgroundStory');
+    if (bgErr != null) return bgErr;
+    final (aliases, aliasesErr) = parser.optionalStringList('aliases');
+    if (aliasesErr != null) return aliasesErr;
+    // description 作为外貌特征的兜底（兼容旧用法）
+    final (description, _) = parser.nullableString('description');
+
+    // 结构化字段未传 appearanceFeatures 时，回退到 description
+    final resolvedAppearance =
+        appearanceFeatures ?? description ?? '';
+
     final character = Character(
       novelUrl: novelUrl,
       name: name,
-      appearanceFeatures: charDesc ?? '',
+      gender: gender,
+      age: age,
+      occupation: occupation,
+      personality: personality,
+      appearanceFeatures: resolvedAppearance,
+      bodyType: bodyType,
+      clothingStyle: clothingStyle,
+      backgroundStory: backgroundStory,
+      aliases: aliases,
     );
     final id = await repo.createCharacter(character);
 

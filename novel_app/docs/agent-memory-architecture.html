@@ -255,11 +255,11 @@
              ARROWS — drawn BEFORE boxes so they render behind
              ============================================================ -->
 
-        <!-- Flow 1: 用户点击反思按钮 → HermesChatNotifier.triggerReview() -->
+        <!-- Flow 1: 用户点击反思按钮 → AgentChatNotifier.triggerReview() -->
         <line x1="310" y1="140" x2="310" y2="278" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
         <text x="320" y="215" fill="#22d3ee" font-size="8">triggerReview()</text>
 
-        <!-- Flow 2: HermesChatNotifier → AgentMemoryService.extractMemories() -->
+        <!-- Flow 2: AgentChatNotifier → AgentMemoryService.extractMemories() -->
         <line x1="410" y1="330" x2="410" y2="428" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
         <text x="420" y="385" fill="#34d399" font-size="8">extractMemories()</text>
 
@@ -323,10 +323,10 @@
         <text x="410" y="93" fill="white" font-size="12" font-weight="600" text-anchor="middle">📚 记忆库管理</text>
         <text x="410" y="113" fill="#94a3b8" font-size="9" text-anchor="middle">MemoryManagementScreen</text>
 
-        <!-- HermesChatDialog -->
+        <!-- AgentChatDialog -->
         <rect x="560" y="70" width="240" height="130" rx="6" fill="#0f172a"/>
         <rect x="560" y="70" width="240" height="130" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="680" y="95" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatDialog</text>
+        <text x="680" y="95" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentChatDialog</text>
         <text x="680" y="115" fill="#94a3b8" font-size="9" text-anchor="middle">对话界面 + 场景切换器</text>
         <text x="680" y="133" fill="#94a3b8" font-size="8" text-anchor="middle">• 消息气泡列表</text>
         <text x="680" y="148" fill="#94a3b8" font-size="8" text-anchor="middle">• 流式输出展示</text>
@@ -337,17 +337,17 @@
              STATE LAYER (y=230 to y=360)
              ============================================================ -->
 
-        <!-- HermesChatNotifier -->
+        <!-- AgentChatNotifier -->
         <rect x="40" y="280" width="280" height="70" rx="6" fill="#0f172a"/>
         <rect x="40" y="280" width="280" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="180" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatNotifier</text>
+        <text x="180" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentChatNotifier</text>
         <text x="180" y="325" fill="#94a3b8" font-size="9" text-anchor="middle">triggerReview() / confirmReview()</text>
-        <text x="180" y="340" fill="#94a3b8" font-size="8" text-anchor="middle">StateNotifier&lt;HermesChatState&gt;</text>
+        <text x="180" y="340" fill="#94a3b8" font-size="8" text-anchor="middle">StateNotifier&lt;AgentChatState&gt;</text>
 
-        <!-- HermesChatState 扩展字段 -->
+        <!-- AgentChatState 扩展字段 -->
         <rect x="360" y="280" width="260" height="70" rx="6" fill="#0f172a"/>
         <rect x="360" y="280" width="260" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="490" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">HermesChatState (扩展)</text>
+        <text x="490" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">AgentChatState (扩展)</text>
         <text x="490" y="322" fill="#94a3b8" font-size="8" text-anchor="middle">+ lastReviewedAtIndex: int?</text>
         <text x="490" y="337" fill="#94a3b8" font-size="8" text-anchor="middle">+ reviewUi: ReviewUiState</text>
 
@@ -468,7 +468,7 @@
         <!-- Flow step descriptions -->
         <text x="30" y="748" fill="#64748b" font-size="8">
           <tspan fill="#22d3ee" font-weight="600">①</tspan> 用户点击"反思"按钮
-          <tspan dx="20" fill="#22d3ee" font-weight="600">②</tspan> HermesChatNotifier 收集未反思消息
+          <tspan dx="20" fill="#22d3ee" font-weight="600">②</tspan> AgentChatNotifier 收集未反思消息
           <tspan dx="20" fill="#34d399" font-weight="600">③</tspan> AgentMemoryService 调用 LLM 提取记忆
           <tspan dx="20" fill="#fbbf24" font-weight="600">④</tspan> LLM 返回结构化记忆 JSON
           <tspan dx="20" fill="#22d3ee" font-weight="600">⑤</tspan> 用户审核模态（勾选/取消）

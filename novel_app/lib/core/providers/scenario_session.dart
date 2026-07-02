@@ -1,20 +1,18 @@
 /// 场景会话 — 每个 scenarioId 对应一个独立运行时
 ///
-/// 参考 Hermes Agent 的三层隔离模型：
-/// 1. AIAgent 实例隔离（每个 session_key 独立的 AIAgent）
-/// 2. 独立事件流（每个会话有自己的 StreamConsumer）
-/// 3. 会话状态机（fresh → active → idle → expired → finalized）
+/// v32 统一历史模型：
+/// - 内部以 agent 视角的 `List<ChatMessage>`（_agentMessages）为真理源，
+///   含完整 ReAct 链（system/user/assistant/tool）。
+/// - DB 直接存 agent ChatMessage（chat_messages 表 v32），hydrate 时 1:1 还原。
+/// - UI 通过 _projectUiMessages 把 agent messages 投影为 AgentChatMessage（含 segments）。
+/// - 落库时机：user 消息即时落库；assistant 回合（含 tool 调用/结果）在
+///   AgentDoneEvent/cancel 时从 _pendingSegments 重建并批量落库。
+/// - 压缩 / retry / rollback 同步删 DB（deleteMessagesBefore），保证内存与 DB 一致。
 ///
-/// 在 Flutter 单线程环境中，不需要 ContextVar（Dart 没有进程全局变量问题）
-/// 和线程局部中断（已有 CancellationToken），但核心思想 1:1 映射：
+/// 隔离设计（保留）：
 /// - 每个 scenarioId → 独立的 ScenarioSession
 /// - 每个 ScenarioSession 有自己的 _pendingSegments、_agentSub、CancellationToken
 /// - 切场景不杀 Agent，只是 UI 切到另一个 session 的视图
-///
-/// 多 session 持久化：
-/// - 一个 ScenarioSession 内含一个 sessionId（会话 id），可被 UI 切换
-/// - 切换 sessionId 时清空 in-memory messages，重新从 DB hydrate
-/// - _persistUserMessage / _persistAssistantTurn 在合适时机把消息落库
 library;
 
 import 'dart:async';
@@ -23,7 +21,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/hermes_message.dart';
+import '../../models/agent_chat_message.dart';
 import '../../models/chat_session.dart';
 import '../../models/chat_message_record.dart';
 import '../../services/logger_service.dart';
@@ -36,58 +34,43 @@ import '../../utils/cancellation_token.dart';
 import 'chat_session_providers.dart';
 import 'current_novel_provider.dart';
 import 'database_providers.dart';
-import 'hermes_chat_state.dart';
+import 'agent_chat_state.dart';
 import 'reading_context_providers.dart';
 import 'webview_providers.dart';
 
 /// 场景会话生命周期状态
-///
-/// 对应 Hermes 的 SessionEntry 状态机（简化版）：
-/// fresh → active → idle → disposed
 enum SessionLifecycle {
-  /// 刚创建，尚未使用
   fresh,
-
-  /// 正在运行（Agent 活跃）
   active,
-
-  /// Agent 完成，等待下次使用
   idle,
-
-  /// 已销毁（LRU 淘汰或手动关闭）
   disposed,
 }
 
 /// 场景会话 — 每个场景的独立运行时
-///
-/// 核心设计：
-/// - 切场景不杀 Agent，只是 UI 切到另一个 session 的视图
-/// - 每个 session 有独立的 _pendingSegments / _agentSub / CancellationToken
-/// - 切回 A 场景时，能看到 A 上次对话的结果（即使 Agent 还在跑）
 class ScenarioSession {
   final String scenarioId;
   final Ref _ref;
 
   /// 当前会话 id（可空：用户从未建过 session / 还没从 DB 选中）
   int? _sessionId;
-
   int? get sessionId => _sessionId;
 
-  // ===== 对应 Hermes 的 "AIAgent 实例状态" =====
+  // ===== agent 视角历史（v32 真理源）=====
+  /// 完整 ReAct 链：system(运行时注入不存)/user/assistant/tool。
+  /// hydrate 时从 DB 1:1 还原；运行时由 agent 事件流增量更新。
+  final List<ChatMessage> _agentMessages = [];
+
+  // ===== 运行时状态 =====
   bool _isRunning = false;
   CancellationToken? _currentToken;
-
-  // ===== 对应 Hermes 的 "per-session pending segments" =====
-  final List<HermesSegment> _pendingSegments = [];
-
-  // ===== 对应 Hermes 的 "独立事件订阅" =====
+  final List<AgentChatSegment> _pendingSegments = [];
   StreamSubscription<AgentEvent>? _agentSub;
 
   // ===== 会话状态 =====
-  late HermesChatState _state;
+  late AgentChatState _state;
   SessionLifecycle _lifecycle = SessionLifecycle.fresh;
 
-  // ===== 当前小说（按 Session 隔离） =====
+  // ===== 当前小说（按 Session 隔离）=====
   CurrentNovel? _currentNovel;
 
   // ===== 状态变更通知回调 =====
@@ -102,15 +85,73 @@ class ScenarioSession {
     final info = AgentScenarioFactory.availableScenarios
         .where((s) => s.id == scenarioId)
         .firstOrNull;
-    _state = HermesChatState(
+    _state = AgentChatState(
       scenarioId: scenarioId,
       scenarioDisplayName: info?.displayName ?? scenarioId,
     );
   }
 
-  /// 由 ScenarioSessionsNotifier 在 UI 切换 sessionId 时调用。
+  /// UI 视图消息：从 _agentMessages 投影出 user/assistant（含 segments）。
+  List<AgentChatMessage> get _uiMessages => _projectUiMessages(_agentMessages);
+
+  /// 投影：agent ChatMessage 列表 → UI AgentChatMessage 列表
   ///
-  /// 仅在确实改变时清空 messages 并标记需要重新 hydrate；否则 noop。
+  /// 规则：
+  /// - system：跳过（含压缩提示，不展示）
+  /// - user：直接转 AgentChatMessage.user
+  /// - assistant：收集紧跟其后、toolCallId 匹配的 tool 消息作为 ToolCallSegment
+  /// - tool：已被前一个 assistant 吸收，跳过
+  static List<AgentChatMessage> _projectUiMessages(List<ChatMessage> agentMsgs) {
+    final ui = <AgentChatMessage>[];
+    for (var i = 0; i < agentMsgs.length; i++) {
+      final m = agentMsgs[i];
+      switch (m.role) {
+        case 'system':
+          continue;
+        case 'user':
+          ui.add(AgentChatMessage.user(m.content ?? ''));
+          break;
+        case 'assistant':
+          final segments = <AgentChatSegment>[];
+          if (m.content != null && m.content!.isNotEmpty) {
+            segments.add(TextSegment(m.content!));
+          }
+          for (final tc in m.toolCalls ?? const <ToolCall>[]) {
+            final toolMsg = _findToolResult(agentMsgs, i, tc.id);
+            segments.add(ToolCallSegment(AgentToolCall(
+              id: tc.id,
+              name: tc.name,
+              arguments: tc.arguments,
+              status: toolMsg != null
+                  ? AgentToolStatus.completed
+                  : AgentToolStatus.running,
+              result: toolMsg?.content,
+            )));
+          }
+          ui.add(AgentChatMessage.assistantFromSegments(segments));
+          break;
+        case 'tool':
+          // 已被 assistant 吸收
+          break;
+        default:
+          break;
+      }
+    }
+    return ui;
+  }
+
+  /// 从 fromIndex+1 开始找 role='tool' 且 toolCallId 匹配的消息
+  static ChatMessage? _findToolResult(
+      List<ChatMessage> msgs, int fromIndex, String toolCallId) {
+    for (var i = fromIndex + 1; i < msgs.length; i++) {
+      final m = msgs[i];
+      if (m.role == 'tool' && m.toolCallId == toolCallId) return m;
+      if (m.role == 'assistant' || m.role == 'user') break;
+    }
+    return null;
+  }
+
+  /// 由 ScenarioSessionsNotifier 在 UI 切换 sessionId 时调用。仅在确实改变时清空并重新 hydrate。
   void adoptSession(int? newSessionId) {
     if (_sessionId == newSessionId) return;
     LoggerService.instance.i(
@@ -120,7 +161,7 @@ class ScenarioSession {
     );
     _sessionId = newSessionId;
     _pendingSegments.clear();
-    // 清空 messages（保留 currentNovel 等场景上下文）
+    _agentMessages.clear();
     _state = _state.copyWith(
       messages: const [],
       isLoading: false,
@@ -133,17 +174,11 @@ class ScenarioSession {
     _notifyStateChanged();
   }
 
-  /// 如果 _sessionId 不为空且 _state.messages 为空，主动从 DB 加载。
-  ///
-  /// 调用方负责在 adoptSession 后或冷启动时调用一次。
-  /// 内部捕获异常：DB 读失败时留下空 messages，不影响 agent 后续运行。
+  /// 如果 _sessionId 不为空且 _agentMessages 为空，主动从 DB 加载。
   Future<void> hydrateIfNeeded() async {
     final sid = _sessionId;
     if (sid == null) return;
-    if (_state.messages.isNotEmpty) {
-      // 已经有内容（in-memory），跳过 hydrate
-      return;
-    }
+    if (_agentMessages.isNotEmpty) return;
     try {
       final repo = _ref.read(chatSessionRepositoryProvider);
       final session = await repo.getSession(sid);
@@ -156,23 +191,18 @@ class ScenarioSession {
         return;
       }
       final records = await repo.listMessages(sid);
-      final messages = <HermesMessage>[];
+      _agentMessages.clear();
       for (final r in records) {
-        // 跳过坏数据：segs 和 content 都空的记录直接丢弃
-        if (r.segments.isEmpty && r.content.isEmpty) continue;
-        messages.add(r.toHermesMessage());
+        _agentMessages.add(r.toAgentMessage());
       }
-      // 注意：currentNovel 不从 DB 恢复（DB 只存了 id/title，没 url）。
-      // 让用户下次调 select_novel 工具时由 _buildScenarioContext 走默认 null 路径，
-      // 避免构造出不完整的 CurrentNovel。
       _state = _state.copyWith(
-        messages: messages,
+        messages: _uiMessages,
         clearCurrentNovel: true,
         scenarioDisplayName: _state.scenarioDisplayName,
       );
       _currentNovel = null;
       LoggerService.instance.i(
-        'ScenarioSession [$scenarioId] hydrate sessionId=$sid → ${messages.length} 条消息',
+        'ScenarioSession [$scenarioId] hydrate sessionId=$sid → ${_agentMessages.length} 条 agent 消息',
         category: LogCategory.ai,
         tags: ['session', 'hydrate', 'success', scenarioId],
       );
@@ -187,23 +217,15 @@ class ScenarioSession {
     }
   }
 
-  /// 冷启动用：sessionId 未知时，主动从 DB 选该 scenario 最近的 session，
-  /// 写入 _sessionId + currentChatSessionIdProvider，再 hydrate。
-  ///
-  /// DB 无任何 session 时不创建（等到用户发第一条消息时由 [sendMessage]
-  /// 内部的 [sendMessage] 走 `_resolveSessionId(autoCreate: true)` 流程再建）。
+  /// 冷启动用：sessionId 未知时选最近 session 再 hydrate。
   Future<void> hydrateFromRecentIfNeeded() => _resolveSessionId(autoCreate: false);
 
-  /// 确保 _sessionId 非空：复用最近一个；DB 无则视 [autoCreate] 决定是否新建。
-  /// 完成后统一触发 hydrate（in-memory messages 仍空时从 DB 拉取）。
-  ///
-  /// 失败时只记日志不抛错（agent 仍能跑）。
   Future<void> _resolveSessionId({required bool autoCreate}) async {
     if (_sessionId != null) {
       await hydrateIfNeeded();
       return;
     }
-    if (!autoCreate && _state.messages.isNotEmpty) return;
+    if (!autoCreate && _agentMessages.isNotEmpty) return;
     try {
       final repo = _ref.read(chatSessionRepositoryProvider);
       final list = await repo.listSessionsByScenario(scenarioId, limit: 1);
@@ -218,10 +240,10 @@ class ScenarioSession {
         await hydrateIfNeeded();
         return;
       }
-      if (!autoCreate) return; // 冷启动分支：等用户首条消息再建
+      if (!autoCreate) return;
       final id = await repo.createSession(ChatSession(
         scenarioId: scenarioId,
-        title: '', // displayTitle getter 会回退成「新对话 时间」
+        title: '',
         currentNovelId: _currentNovel?.id,
         currentNovelTitle: _currentNovel?.title,
       ));
@@ -242,36 +264,18 @@ class ScenarioSession {
     }
   }
 
-  /// 旧名 _ensureSessionId 的入口，等价于 [sendMessage] 内的「确保有 sessionId」
   Future<void> _ensureSessionId() => _resolveSessionId(autoCreate: true);
 
-  /// 落库 user message（sendMessage 每回合只调一次，无需去重）
-
-  /// 当前状态（只读视图，给 UI watch）
-  HermesChatState get state => _state;
-
-  /// 是否正在运行 Agent
+  AgentChatState get state => _state;
   bool get isRunning => _isRunning;
-
-  /// 会话生命周期
   SessionLifecycle get lifecycle => _lifecycle;
-
-  /// 当前小说（本 session 独享）
   CurrentNovel? get currentNovel => _currentNovel;
 
-  /// 设置状态变更通知回调
   void setOnStateChanged(VoidCallback? callback) {
     _onStateChanged = callback;
   }
 
   /// 发送消息 — Agent 在本 session 内独立运行
-  ///
-  /// 同 session 内串行（上一个还在跑时拒绝新请求），但不同 session 之间并行。
-  ///
-  /// 多 session 持久化：
-  /// 1) 如果当前还没 sessionId，主动从 DB 选最近一个或新建一条；
-  /// 2) 新建 / 复用 session 后，user message 落库。
-  /// 3) 不存在则：先 hydrate（如果已有 session 但 messages 空）再发。
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
@@ -285,7 +289,6 @@ class ScenarioSession {
       return;
     }
 
-    // 多 session：确保有 sessionId；否则新建
     await _ensureSessionId();
 
     LoggerService.instance.i(
@@ -294,30 +297,20 @@ class ScenarioSession {
       tags: ['session', 'send', scenarioId],
     );
 
-    final userMessage = HermesMessage.user(content.trim());
+    // user 消息即时进 _agentMessages + 落库
+    final userMsg = ChatMessage(role: 'user', content: content.trim());
+    _agentMessages.add(userMsg);
     _state = _state.copyWith(
-      messages: [..._state.messages, userMessage],
+      messages: _uiMessages,
       isLoading: true,
     );
     _notifyStateChanged();
+    await _persistAgentMessage(userMsg);
 
-    // 落库 user message（异步，失败不阻塞主流程）
-    unawaited(_persistUserMessage(userMessage));
-
-    // 启动 Agent 一轮（_beginAgentRun 负责状态切换 + 调 _runAgent + 异常兜底）
     await _beginAgentRun(content.trim());
   }
 
-  /// 启动一轮 Agent 回合的公共逻辑（sendMessage / retryLastRound 共用）。
-  ///
-  /// 负责：lifecycle/isRunning/token/清 pending + 进 loading + 清 error +
-  /// 调 [_runAgent] + 异常兜底。
-  ///
-  /// **不负责** add user 消息与落库（由调用方 [sendMessage] / [retryLastRound]
-  /// 自行决定是否新增 user 消息、是否落库）。
-  ///
-  /// [userInput] 是本轮要发给 LLM 的用户输入文本（NovelAgentService 会把它
-  /// append 成 history 末尾的 user 消息）。
+  /// 启动一轮 Agent 回合
   Future<void> _beginAgentRun(String userInput) async {
     _lifecycle = SessionLifecycle.active;
     _isRunning = true;
@@ -327,7 +320,6 @@ class ScenarioSession {
     _state = _state.copyWith(
       isLoading: true,
       streamingSegments: const [],
-      // copyWith 的 error 参数无 ?? 兜底，不传即清空（见 hermes_chat_state.dart）
       error: null,
     );
     _notifyStateChanged();
@@ -347,16 +339,8 @@ class ScenarioSession {
 
   /// 重试上次失败的 Agent 回合。
   ///
-  /// 找到 messages 里**最后一条 user 消息**，删除它**之后**的所有消息
-  /// （保留该 user 本身——区别于 [rollbackToMessage] 删 user 及之后全部），
-  /// 然后用该 user 的 content 重新触发 Agent。
-  ///
-  /// 典型失败场景与重试后状态：
-  /// - 末尾是 user（首轮 LLM 就挂 / 未配置）→ 无后置消息，直接重发该 user
-  /// - 末尾是 assistant 半成品（多轮后挂）→ 删半成品 assistant，重发末尾 user
-  ///
-  /// 仅改内存 messages，不碰 DB（与 [rollbackToMessage] 一致）。
-  /// user 消息在首次 [sendMessage] 时已落库，重试不重复落库。
+  /// 找到 _agentMessages 里最后一条 user，删除其后所有消息（含 tool/assistant），
+  /// 同步删 DB，然后用该 user 的 content 重新触发 Agent。
   Future<void> retryLastRound() async {
     if (_isRunning) {
       LoggerService.instance.w(
@@ -368,18 +352,16 @@ class ScenarioSession {
       return;
     }
 
-    final messages = _state.messages;
-    // 从后往前找最后一条 user 消息
     int lastUserIndex = -1;
-    for (int i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role == HermesRole.user) {
+    for (int i = _agentMessages.length - 1; i >= 0; i--) {
+      if (_agentMessages[i].role == 'user') {
         lastUserIndex = i;
         break;
       }
     }
     if (lastUserIndex < 0) {
       LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 拒绝重试：messages 中无 user 消息',
+        'ScenarioSession [$scenarioId] 拒绝重试：无 user 消息',
         category: LogCategory.ai,
         tags: ['session', 'retry', 'no_user', scenarioId],
       );
@@ -387,30 +369,32 @@ class ScenarioSession {
       return;
     }
 
-    final userContent = messages[lastUserIndex].content;
-    // 截断：保留 [0, lastUserIndex+1)，即保留 user 本身、删掉其后所有
-    final retained = messages.sublist(0, lastUserIndex + 1);
+    final userContent = _agentMessages[lastUserIndex].content ?? '';
+    final cutFrom = lastUserIndex + 1;
+    final removedCount = _agentMessages.length - cutFrom;
+    _agentMessages.removeRange(cutFrom, _agentMessages.length);
 
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 重试：截断至 lastUserIndex=$lastUserIndex, '
-      '删掉其后 ${messages.length - retained.length} 条',
+      '删掉其后 $removedCount 条',
       category: LogCategory.ai,
       tags: ['session', 'retry', scenarioId],
     );
 
     _state = _state.copyWith(
-      messages: retained,
+      messages: _uiMessages,
       streamingSegments: const [],
       error: null,
     );
     _notifyStateChanged();
 
+    // 同步删 DB：删掉 cutFrom 之后的所有消息
+    await _deleteAgentMessagesFromDb(cutFrom);
+
     await _beginAgentRun(userContent);
   }
 
   /// 取消本 session 的 Agent（不影响其他 session）
-  ///
-  /// 对应 Hermes 的线程局部中断：只中断目标线程，不误杀其他会话。
   void cancel() {
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 请求已取消',
@@ -418,41 +402,24 @@ class ScenarioSession {
       tags: ['session', 'cancel', scenarioId],
     );
 
-    // 触发底层 Agent 循环取消
     if (_currentToken != null) {
       _currentToken!.cancel(reason: '用户主动取消');
       _currentToken = null;
     }
-
-    // 取消事件订阅
     _agentSub?.cancel();
     _agentSub = null;
 
-    // 保留已生成的 partial segments
-    HermesMessage? partial;
+    // 把 partial segments 落库为 assistant turn
     if (_pendingSegments.isNotEmpty) {
-      final segmentsSnapshot = List<HermesSegment>.unmodifiable(_pendingSegments);
-      partial = HermesMessage.assistantFromSegments(segmentsSnapshot);
-      _state = _state.copyWith(
-        messages: [..._state.messages, partial],
-        isLoading: false,
-        streamingSegments: const [],
-      );
+      _finalizeAgentResponse(partial: true);
     } else {
       _state = _state.copyWith(
         isLoading: false,
         streamingSegments: const [],
       );
-    }
-
-    _pendingSegments.clear();
-    _isRunning = false;
-    _lifecycle = SessionLifecycle.idle;
-    _notifyStateChanged();
-
-    // partial 落库（标 status='partial' 由 toolcall 状态保留）
-    if (partial != null) {
-      unawaited(_persistAssistantTurn(partial, partial: true));
+      _isRunning = false;
+      _lifecycle = SessionLifecycle.idle;
+      _notifyStateChanged();
     }
   }
 
@@ -463,16 +430,12 @@ class ScenarioSession {
       _currentNovel = novel;
       _state = _state.copyWith(currentNovel: novel);
       _notifyStateChanged();
-      // 同步到 chat_sessions.currentNovelId / currentNovelTitle
       unawaited(_persistCurrentNovel());
     }
     return novel;
   }
 
   /// 清空对话（保留场景和小说上下文）
-  ///
-  /// 持久化路径：删除 chat_messages 全部行（chat_sessions 保留，
-  /// 之后可继续往这个 session 写新消息）。
   void clearConversation() {
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 清空对话 sessionId=$_sessionId',
@@ -480,28 +443,22 @@ class ScenarioSession {
       tags: ['session', 'clear', scenarioId],
     );
     _pendingSegments.clear();
+    _agentMessages.clear();
 
-    // 清空时保留 scenarioId / displayName / currentNovel
-    _state = HermesChatState(
+    _state = AgentChatState(
       scenarioId: scenarioId,
       scenarioDisplayName: _state.scenarioDisplayName,
       currentNovel: _currentNovel,
     );
     _notifyStateChanged();
 
-    // 同步删除 messages 行
     unawaited(_clearMessagesFromDb());
   }
 
   /// 回滚到指定 user 消息 — 删除该消息及之后的所有记录,
-  /// 并通过 [contentCallback] 把该消息文本回传给 UI(由 UI 填入输入框)。
+  /// 并通过 [contentCallback] 把该消息文本回传给 UI。
   ///
-  /// 约束:
-  /// - Agent 运行中(`_isRunning == true`)不允许回滚,通过 error 通知 UI,返回 false。
-  /// - [index] 必须指向 user 消息;越界或非 user 消息返回 false。
-  /// - 保留 `scenarioId` / `displayName` / `currentNovel`(与 [clearConversation] 一致)。
-  ///
-  /// 返回 true 表示回滚成功。
+  /// [index] 指向 UI messages（AgentChatMessage）中的 user 消息。
   bool rollbackToMessage(
     int index, {
     required void Function(String content) contentCallback,
@@ -515,46 +472,61 @@ class ScenarioSession {
       _notifyStateError('Agent 正在运行，无法回滚');
       return false;
     }
-    if (index < 0 || index >= _state.messages.length) {
+    final uiMsgs = _uiMessages;
+    if (index < 0 || index >= uiMsgs.length) {
       LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 回滚索引越界: index=$index, len=${_state.messages.length}',
+        'ScenarioSession [$scenarioId] 回滚索引越界: index=$index, len=${uiMsgs.length}',
         category: LogCategory.ai,
         tags: ['session', 'rollback', 'out_of_bounds', scenarioId],
       );
       return false;
     }
-    final target = _state.messages[index];
-    if (target.role != HermesRole.user) {
+    final target = uiMsgs[index];
+    if (target.role != AgentChatRole.user) {
       LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 回滚目标非 user 消息: role=${target.role}',
+        'ScenarioSession [$scenarioId] 回滚目标非 user 消息',
         category: LogCategory.ai,
         tags: ['session', 'rollback', 'not_user', scenarioId],
       );
       return false;
     }
 
-    final removedCount = _state.messages.length - index;
+    // UI index → agent index：投影后第 index 条 user 对应的 agent 位置
+    int agentIdx = -1;
+    int uiCount = 0;
+    for (int i = 0; i < _agentMessages.length; i++) {
+      if (_agentMessages[i].role == 'user') {
+        if (uiCount == index) {
+          agentIdx = i;
+          break;
+        }
+        uiCount++;
+      }
+    }
+    if (agentIdx < 0) return false;
+
+    final userContent = _agentMessages[agentIdx].content ?? '';
     LoggerService.instance.i(
-      'ScenarioSession [$scenarioId] 回滚至 index=$index, 删除之后 $removedCount 条消息',
+      'ScenarioSession [$scenarioId] 回滚至 agentIdx=$agentIdx, '
+      '删除之后 ${_agentMessages.length - agentIdx} 条 agent 消息',
       category: LogCategory.ai,
       tags: ['session', 'rollback', scenarioId],
     );
 
-    final userContent = target.content;
-    final retained = _state.messages.sublist(0, index);
+    _agentMessages.removeRange(agentIdx, _agentMessages.length);
     _state = _state.copyWith(
-      messages: retained,
+      messages: _uiMessages,
       isLoading: false,
       streamingSegments: const [],
       error: null,
     );
     _notifyStateChanged();
 
+    unawaited(_deleteAgentMessagesFromDb(agentIdx));
     contentCallback(userContent);
     return true;
   }
 
-  /// 销毁 session（对应 Hermes 的 session finalized）
   void dispose() {
     _agentSub?.cancel();
     _agentSub = null;
@@ -564,20 +536,18 @@ class ScenarioSession {
 
   // ===== 内部实现 =====
 
-  /// 运行 Agent — 订阅全局 AgentService 的事件流，只更新本 session 的状态
+  /// 运行 Agent — 订阅全局 AgentService 的事件流
   Future<void> _runAgent(String userInput) async {
     final agentService = _ref.read(novelAgentServiceProvider);
-
-    // 取消之前的订阅（同一 session 内串行，前一个应该已经结束）
     await _agentSub?.cancel();
-
-    // 订阅事件流：按事件时序构建本 session 的 segments 列表
     _agentSub = agentService.events.listen(_handleAgentEvent);
 
-    // 构造历史消息 + 压缩对齐 owner（单次遍历）
-    final (history, owners) = _buildHistoryAndOwners();
+    // history = _agentMessages（去掉末尾的 user，由 service append）
+    final history = List<ChatMessage>.from(_agentMessages);
+    if (history.isNotEmpty && history.last.role == 'user') {
+      history.removeLast();
+    }
 
-    // 构造场景上下文
     final scenarioContext = _buildScenarioContext();
 
     await agentService.sendMessage(
@@ -585,14 +555,10 @@ class ScenarioSession {
       history: history,
       scenarioId: scenarioId,
       scenarioContext: scenarioContext,
-      messageOwners: owners,
     );
   }
 
   /// 处理 Agent 事件 — 只更新本 session 的 _pendingSegments
-  ///
-  /// 关键隔离设计：每个 session 有独立的 _pendingSegments，
-  /// 不会与其他 session 的流式数据混在一起。
   void _handleAgentEvent(AgentEvent event) {
     switch (event) {
       case TextDeltaEvent e:
@@ -605,7 +571,7 @@ class ScenarioSession {
           _pendingSegments.add(TextSegment(e.text));
         }
         _state = _state.copyWith(
-          streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
+          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case ToolCallStartEvent e:
@@ -617,7 +583,7 @@ class ScenarioSession {
         );
         _pendingSegments.add(ToolCallSegment(call));
         _state = _state.copyWith(
-          streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
+          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case ToolCallEndEvent e:
@@ -629,14 +595,15 @@ class ScenarioSession {
           _pendingSegments[idx] = ToolCallSegment(old.copyWith(
             status:
                 e.success ? AgentToolStatus.completed : AgentToolStatus.error,
-            result: e.result,
+            // 落库用 fullResult（完整原始），UI 展示也用 fullResult（信息更全）
+            result: e.fullResult ?? e.result,
           ));
         }
         if (e.success && (e.name == 'select_novel' || e.name == 'create_novel')) {
           _handleSelectNovelFromResult(e.result);
         }
         _state = _state.copyWith(
-          streamingSegments: List<HermesSegment>.unmodifiable(_pendingSegments),
+          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case CompactionEvent e:
@@ -651,8 +618,13 @@ class ScenarioSession {
     _notifyStateChanged();
   }
 
-  /// 完成 Agent 响应 — 将 _pendingSegments 合入 messages
-  void _finalizeAgentResponse({String? error}) {
+  /// 完成 Agent 响应 — 把 _pendingSegments 重建为 agent messages 并落库
+  ///
+  /// 重建规则（一个回合可能含多段 assistant/tool 交替）：
+  /// - TextSegment 累积为当前 assistant 的 content
+  /// - ToolCallSegment 触发 flush 当前 assistant（含已累积 toolCalls）+ 追加 tool 消息
+  /// - [partial]=true（用户取消）时，running 状态的 tool_call 不追加 tool 消息
+  void _finalizeAgentResponse({String? error, bool partial = false}) {
     if (error != null) {
       LoggerService.instance.e(
         'ScenarioSession [$scenarioId] Agent 错误: $error',
@@ -661,16 +633,50 @@ class ScenarioSession {
       );
     }
 
-    final segmentsSnapshot = List<HermesSegment>.unmodifiable(_pendingSegments);
-    final assistantMessage = segmentsSnapshot.isNotEmpty
-        ? HermesMessage.assistantFromSegments(segmentsSnapshot)
-        : null;
-    final newMessages = assistantMessage != null
-        ? [..._state.messages, assistantMessage]
-        : _state.messages;
+    final newMessages = <ChatMessage>[];
+    var pendingText = StringBuffer();
+    var pendingToolCalls = <ToolCall>[];
+
+    void flushAssistant() {
+      final hasText = pendingText.isNotEmpty;
+      final hasCalls = pendingToolCalls.isNotEmpty;
+      if (!hasText && !hasCalls) return;
+      newMessages.add(ChatMessage(
+        role: 'assistant',
+        content: hasText ? pendingText.toString() : null,
+        toolCalls: hasCalls ? List<ToolCall>.from(pendingToolCalls) : null,
+      ));
+      pendingText = StringBuffer();
+      pendingToolCalls = [];
+    }
+
+    for (final seg in _pendingSegments) {
+      if (seg is TextSegment) {
+        pendingText.write(seg.content);
+      } else if (seg is ToolCallSegment) {
+        final call = seg.call;
+        pendingToolCalls.add(ToolCall(
+          id: call.id,
+          name: call.name,
+          arguments: call.arguments,
+        ));
+        flushAssistant();
+        if (call.status == AgentToolStatus.completed ||
+            call.status == AgentToolStatus.error) {
+          newMessages.add(ChatMessage(
+            role: 'tool',
+            content: call.result ?? '',
+            toolCallId: call.id,
+          ));
+        }
+      }
+    }
+    flushAssistant();
+
+    _agentMessages.addAll(newMessages);
 
     _state = _state.copyWith(
-      messages: newMessages,
+      messages: _uiMessages,
       isLoading: false,
       streamingSegments: const [],
       error: error,
@@ -683,17 +689,12 @@ class ScenarioSession {
     _lifecycle = SessionLifecycle.idle;
     _notifyStateChanged();
 
-    // 落库 assistant turn
-    if (assistantMessage != null) {
-      unawaited(_persistAssistantTurn(assistantMessage));
+    if (newMessages.isNotEmpty) {
+      unawaited(_persistAgentMessages(newMessages, partial: partial));
     }
   }
 
   /// 解析 select_novel / create_novel 工具返回的 JSON，自动同步 currentNovel
-  ///
-  /// 两者返回结构一致（均含 success + novelId + title）：
-  /// - select_novel：切换到已有小说
-  /// - create_novel：创建新小说后自动切到该书
   void _handleSelectNovelFromResult(String? result) {
     if (result == null) return;
     try {
@@ -711,107 +712,97 @@ class ScenarioSession {
     }
   }
 
-  /// 处理上下文压缩事件 — 同步裁剪本 session 的 messages
+  /// 处理上下文压缩事件 — 同步裁剪内存 + 删 DB
   void _handleCompaction(CompactionEvent e) {
-    if (e.droppedHermesRange != null) {
-      final range = e.droppedHermesRange!;
-      final currentMsgs = List<HermesMessage>.from(_state.messages);
-      if (range.start < currentMsgs.length && range.end <= currentMsgs.length) {
-        currentMsgs.removeRange(range.start, range.end);
-        LoggerService.instance.i(
-          'ScenarioSession [$scenarioId] UI 裁剪: 移除 messages[${range.start},${range.end}), '
-          '剩余 ${currentMsgs.length} 条',
-          category: LogCategory.ai,
-          tags: ['session', 'compaction', 'ui-trim', scenarioId],
-        );
-        _state = _state.copyWith(messages: currentMsgs);
-      } else {
-        LoggerService.instance.w(
-          'ScenarioSession [$scenarioId] UI 裁剪越界: range=[${range.start},${range.end}), '
-          'messages.length=${currentMsgs.length}, 跳过裁剪',
-          category: LogCategory.ai,
-          tags: ['session', 'compaction', 'out-of-bounds', scenarioId],
-        );
-      }
-    } else {
+    final cut = e.droppedAgentFromIndex;
+    if (cut <= 0) {
       LoggerService.instance.i(
-        'ScenarioSession [$scenarioId] 收到压缩事件(无 UI 对齐): ${e.description}',
+        'ScenarioSession [$scenarioId] 收到压缩事件(无裁剪): ${e.description}',
         category: LogCategory.ai,
         tags: ['session', 'compaction', scenarioId],
       );
+      return;
     }
+    final removed = cut.clamp(0, _agentMessages.length);
+    _agentMessages.removeRange(0, removed);
+    _state = _state.copyWith(messages: _uiMessages);
+    LoggerService.instance.i(
+      'ScenarioSession [$scenarioId] 压缩裁剪: 移除前 $removed 条 agent 消息, '
+      '剩余 ${_agentMessages.length} 条',
+      category: LogCategory.ai,
+      tags: ['session', 'compaction', 'trim', scenarioId],
+    );
+    unawaited(_deleteAgentMessagesBeforeDb(cut));
   }
 
-  /// 通知 UI 状态变更
   void _notifyStateChanged() {
     _onStateChanged?.call();
   }
 
-  /// 通知 UI 错误（不中断运行）
   void _notifyStateError(String error) {
     _state = _state.copyWith(error: error);
     _notifyStateChanged();
   }
 
-  // ===== 构造辅助方法 =====
+  // ===== 持久化 =====
 
-  /// 落库 user message（sendMessage 每回合只调一次，无需去重）
-  Future<void> _persistUserMessage(HermesMessage message) async {
+  /// 落库单条 agent 消息（user 消息即时落库用）
+  Future<void> _persistAgentMessage(ChatMessage m) async {
     final sid = _sessionId ?? _ref.read(currentChatSessionIdProvider);
     if (sid == null) return;
     try {
       final repo = _ref.read(chatSessionRepositoryProvider);
-      await repo.appendMessage(ChatMessageRecord.fromHermesMessage(
+      final idx = _agentMessages.indexOf(m);
+      await repo.appendMessage(ChatMessageRecord.fromAgentMessage(
         sid,
-        0, // orderIndex 由 repo 内部用 MAX+1 覆盖
-        message,
+        idx >= 0 ? idx : _agentMessages.length - 1,
+        m,
       ));
-      // 让 UI 历史抽屉的列表刷新（updatedAt 排序会变）
       _ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
     } catch (e, st) {
       LoggerService.instance.e(
-        'ScenarioSession [$scenarioId] 落库 user message 失败: $e',
+        'ScenarioSession [$scenarioId] 落库 agent 消息失败: $e',
         stackTrace: st.toString(),
         category: LogCategory.ai,
-        tags: ['session', 'persist_user', 'failed', scenarioId],
+        tags: ['session', 'persist_msg', 'failed', scenarioId],
       );
     }
   }
 
-  /// 落库 assistant turn（含工具调用详情）。
+  /// 批量落库多条 agent 消息（回合结束 finalize 用）
   ///
-  /// [partial] = true 表示用户中途取消，segments 中可能含 status=running 的
-  /// tool_call —— 按决策仍写入，列表渲染时可显示「已中断」标记。
-  Future<void> _persistAssistantTurn(
-    HermesMessage message, {
-    bool partial = false,
-  }) async {
+  /// agentMsgIndex 基于 _agentMessages 的最终位置计算（消息已 addAll 进去）。
+  Future<void> _persistAgentMessages(List<ChatMessage> msgs,
+      {bool partial = false}) async {
     final sid = _sessionId ?? _ref.read(currentChatSessionIdProvider);
     if (sid == null) return;
     try {
       final repo = _ref.read(chatSessionRepositoryProvider);
-      await repo.appendMessage(ChatMessageRecord.fromHermesMessage(
-        sid,
-        0,
-        message,
-      ));
+      final startIdx = _agentMessages.length - msgs.length;
+      for (var i = 0; i < msgs.length; i++) {
+        await repo.appendMessage(ChatMessageRecord.fromAgentMessage(
+          sid,
+          startIdx + i,
+          msgs[i],
+        ));
+      }
       _ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
       LoggerService.instance.d(
-        'ScenarioSession [$scenarioId] 落库 assistant turn partial=$partial sessionId=$sid',
+        'ScenarioSession [$scenarioId] 落库 ${msgs.length} 条 agent 消息 '
+        'partial=$partial sessionId=$sid startIdx=$startIdx',
         category: LogCategory.ai,
-        tags: ['session', 'persist_assistant', partial ? 'partial' : 'ok', scenarioId],
+        tags: ['session', 'persist_turn', partial ? 'partial' : 'ok', scenarioId],
       );
     } catch (e, st) {
       LoggerService.instance.e(
-        'ScenarioSession [$scenarioId] 落库 assistant turn 失败: $e',
+        'ScenarioSession [$scenarioId] 批量落库失败: $e',
         stackTrace: st.toString(),
         category: LogCategory.ai,
-        tags: ['session', 'persist_assistant', 'failed', scenarioId],
+        tags: ['session', 'persist_turn', 'failed', scenarioId],
       );
     }
   }
 
-  /// 同步 currentNovel 到 chat_sessions（selectNovel 后调用）
   Future<void> _persistCurrentNovel() async {
     final sid = _sessionId;
     if (sid == null) return;
@@ -831,7 +822,67 @@ class ScenarioSession {
     }
   }
 
-  /// 清库当前 session 全部 messages（clearConversation 时调用）
+  /// 删 DB 中 agentMsgIndex >= [fromIndex] 的消息（retry/rollback 用）
+  ///
+  /// 当前 repo 只有 deleteMessagesBefore（删 < beforeIndex）和 clearMessages，
+  /// 这里用 clearMessages + 重写保留段实现"删尾部"。
+  Future<void> _deleteAgentMessagesFromDb(int fromIndex) async {
+    final sid = _sessionId;
+    if (sid == null) return;
+    try {
+      final repo = _ref.read(chatSessionRepositoryProvider);
+      final retained = List<ChatMessage>.from(_agentMessages);
+      await repo.clearMessages(sid);
+      for (var i = 0; i < retained.length; i++) {
+        await repo.appendMessage(
+            ChatMessageRecord.fromAgentMessage(sid, i, retained[i]));
+      }
+      _ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
+      LoggerService.instance.i(
+        'ScenarioSession [$scenarioId] DB 重写: 保留 ${retained.length} 条 (fromIndex=$fromIndex)',
+        category: LogCategory.ai,
+        tags: ['session', 'db_rewrite', scenarioId],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ScenarioSession [$scenarioId] DB 重写失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['session', 'db_rewrite', 'failed', scenarioId],
+      );
+    }
+  }
+
+  /// 删 DB 中 agentMsgIndex < [beforeIndex] 的消息（压缩用）
+  Future<void> _deleteAgentMessagesBeforeDb(int beforeIndex) async {
+    final sid = _sessionId;
+    if (sid == null) return;
+    try {
+      final repo = _ref.read(chatSessionRepositoryProvider);
+      await repo.deleteMessagesBefore(sid, beforeIndex);
+      // 压缩后 agentMsgIndex 有空洞，重写保留段让索引紧凑
+      final retained = List<ChatMessage>.from(_agentMessages);
+      await repo.clearMessages(sid);
+      for (var i = 0; i < retained.length; i++) {
+        await repo.appendMessage(
+            ChatMessageRecord.fromAgentMessage(sid, i, retained[i]));
+      }
+      _ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
+      LoggerService.instance.i(
+        'ScenarioSession [$scenarioId] 压缩后 DB 重写: 保留 ${retained.length} 条',
+        category: LogCategory.ai,
+        tags: ['session', 'compaction_db', scenarioId],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ScenarioSession [$scenarioId] 压缩 DB 清理失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['session', 'compaction_db', 'failed', scenarioId],
+      );
+    }
+  }
+
   Future<void> _clearMessagesFromDb() async {
     final sid = _sessionId;
     if (sid == null) return;
@@ -864,50 +915,5 @@ class ScenarioSession {
       currentNovelId: _currentNovel?.id,
       currentNovelTitle: _currentNovel?.title,
     );
-  }
-
-  /// 构造 LLM 历史消息 + 压缩对齐 owner（单次遍历，避免两份「末尾是 user 则 removeLast」逻辑漂移）
-  (List<ChatMessage>, List<int>) _buildHistoryAndOwners() {
-    final history = <ChatMessage>[];
-    final owners = <int>[];
-    final messages = _state.messages;
-    for (var i = 0; i < messages.length; i++) {
-      final m = messages[i];
-      if (m.role == HermesRole.assistant) {
-        final toolCalls = m.toolCalls;
-        final withResults =
-            toolCalls.where((c) => c.result != null).toList();
-        if (toolCalls.isNotEmpty) {
-          history.add(ChatMessage(
-            role: 'assistant',
-            content: m.content.isEmpty ? null : m.content,
-            toolCalls: toolCalls
-                .map((c) => ToolCall(
-                    id: c.id, name: c.name, arguments: c.arguments))
-                .toList(),
-          ));
-          for (final c in withResults) {
-            history.add(ChatMessage(
-                role: 'tool', content: c.result, toolCallId: c.id));
-          }
-          owners.add(i);
-          for (final _ in withResults) {
-            owners.add(i);
-          }
-        } else {
-          history.add(ChatMessage(role: m.role.name, content: m.content));
-          owners.add(i);
-        }
-      } else {
-        history.add(ChatMessage(role: m.role.name, content: m.content));
-        owners.add(i);
-      }
-    }
-    // 末尾是 user 消息会被 NovelAgentService 自行 append，这里不重复带
-    if (messages.isNotEmpty && messages.last.role == HermesRole.user) {
-      history.removeLast();
-      owners.removeLast();
-    }
-    return (history, owners);
   }
 }

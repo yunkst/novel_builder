@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_app/core/providers/hermes_chat_state.dart';
+import 'package:novel_app/core/providers/agent_chat_state.dart';
 import 'package:novel_app/core/providers/agent_scenario_provider.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
-import 'package:novel_app/models/hermes_message.dart';
+import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/screens/llm_config_management_screen.dart';
 import 'package:novel_app/services/llm_config_service.dart';
-import 'package:novel_app/widgets/hermes/chat_history_sheet.dart';
-import 'package:novel_app/widgets/hermes/hermes_message_bubble.dart';
-import 'package:novel_app/widgets/hermes/hermes_novel_picker_dialog.dart';
-import 'package:novel_app/widgets/hermes/hermes_scenario_config_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/chat_history_sheet.dart';
+import 'package:novel_app/widgets/agent_chat/agent_message_bubble.dart';
+import 'package:novel_app/widgets/agent_chat/agent_novel_picker_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/agent_scenario_config_dialog.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Hermes 聊天对话框
-class HermesChatDialog extends ConsumerStatefulWidget {
-  const HermesChatDialog({super.key});
+/// Agent 聊天对话框
+class AgentChatDialog extends ConsumerStatefulWidget {
+  const AgentChatDialog({super.key});
 
   @override
-  ConsumerState<HermesChatDialog> createState() => _HermesChatDialogState();
+  ConsumerState<AgentChatDialog> createState() => _AgentChatDialogState();
 }
 
-class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
+class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
@@ -119,11 +119,11 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [appColors.hermesBrandStart, appColors.hermesBrandEnd],
+          colors: [appColors.agentBrandStart, appColors.agentBrandEnd],
         ),
         boxShadow: [
           BoxShadow(
-            color: appColors.hermesBrandStart.withValues(alpha: 0.2),
+            color: appColors.agentBrandStart.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -136,13 +136,13 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
           // 第一排:场景名称(独立一行)
           Row(
             children: [
-              Icon(Icons.auto_awesome, color: appColors.hermesOnBrand, size: 22),
+              Icon(Icons.auto_awesome, color: appColors.agentOnBrand, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   chatState.scenarioDisplayName,
                   style: TextStyle(
-                    color: appColors.hermesOnBrand,
+                    color: appColors.agentOnBrand,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -160,7 +160,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               // 会话历史按钮（运行中禁用，提示等待）
               IconButton(
                 icon: Icon(Icons.history,
-                    color: appColors.hermesOnBrandMuted, size: 20),
+                    color: appColors.agentOnBrandMuted, size: 20),
                 tooltip: '会话历史',
                 onPressed: chatState.isLoading
                     ? () {
@@ -177,7 +177,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               PopupMenuButton<String>(
                 icon: Icon(
                   Icons.swap_horiz,
-                  color: appColors.hermesOnBrandMuted,
+                  color: appColors.agentOnBrandMuted,
                   size: 20,
                 ),
                 tooltip: '切换场景',
@@ -214,14 +214,14 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               // 场景配置按钮
               IconButton(
                 icon: Icon(Icons.tune,
-                    color: appColors.hermesOnBrandMuted, size: 20),
+                    color: appColors.agentOnBrandMuted, size: 20),
                 tooltip: '场景配置',
                 onPressed: () => _showScenarioConfigDialog(chatState),
               ),
               IconButton(
                 icon: Icon(
                   _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                  color: appColors.hermesOnBrandMuted,
+                  color: appColors.agentOnBrandMuted,
                   size: 20,
                 ),
                 onPressed: () => setState(() => _isFullscreen = !_isFullscreen),
@@ -229,7 +229,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               ),
               IconButton(
                 icon: Icon(Icons.delete_outline,
-                    color: appColors.hermesOnBrandMuted, size: 20),
+                    color: appColors.agentOnBrandMuted, size: 20),
                 onPressed: () {
                   session?.clearConversation();
                 },
@@ -237,7 +237,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               ),
               IconButton(
                 icon: Icon(Icons.close,
-                    color: appColors.hermesOnBrandMuted, size: 20),
+                    color: appColors.agentOnBrandMuted, size: 20),
                 onPressed: () => Navigator.pop(context),
                 tooltip: '关闭',
               ),
@@ -248,7 +248,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     );
   }
 
-  Widget _buildMessageList(HermesChatState chatState) {
+  Widget _buildMessageList(AgentChatState chatState) {
     if (chatState.messages.isEmpty && !chatState.isLoading) {
       return _buildEmptyState();
     }
@@ -260,8 +260,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       itemBuilder: (context, index) {
         // 流式响应时，在最后一条 assistant 消息显示 streaming segments
         if (index == chatState.messages.length && chatState.isLoading) {
-          return HermesMessageBubble(
-            message: HermesMessage(role: HermesRole.assistant),
+          return AgentMessageBubble(
+            message: AgentChatMessage(role: AgentChatRole.assistant),
             streamingSegments: chatState.streamingSegments,
             showTimestamp: false,
           );
@@ -269,8 +269,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
 
         final message = chatState.messages[index];
         // 仅 user 消息提供回滚入口；agent 运行中禁用(防止与并发状态冲突)
-        final canRollback = message.role == HermesRole.user && !chatState.isLoading;
-        return HermesMessageBubble(
+        final canRollback = message.role == AgentChatRole.user && !chatState.isLoading;
+        return AgentMessageBubble(
           message: message,
           onRollback: canRollback ? () => _handleRollback(index) : null,
         );
@@ -294,7 +294,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     int saveScriptOk = 0;
     bool hasCacheHit = false;
 
-    void scan(List<HermesSegment> segs) {
+    void scan(List<AgentChatSegment> segs) {
       for (final s in segs) {
         if (s is! ToolCallSegment) {
           continue;
@@ -330,7 +330,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: appColors.hermesAccent.withValues(alpha: 0.06),
+        color: appColors.agentAccent.withValues(alpha: 0.06),
         border: Border(
           bottom: BorderSide(
             color: theme.colorScheme.outline.withValues(alpha: 0.1),
@@ -342,9 +342,9 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         children: [
           Row(
             children: [
-              Icon(Icons.link, size: 14, color: appColors.hermesAccent),
+              Icon(Icons.link, size: 14, color: appColors.agentAccent),
               const SizedBox(width: 4),
-              Text('当前页面', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: appColors.hermesAccent)),
+              Text('当前页面', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: appColors.agentAccent)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(currentUrl, style: const TextStyle(fontFamily: 'monospace', fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -508,7 +508,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   ///
   /// 当 AI 调用 `select_novel` 或 `create_novel` 工具后，UI 会自动更新展示。
   /// 用户也可点击"切换"按钮手动选择。
-  Widget _buildCurrentNovelBar(HermesChatState chatState) {
+  Widget _buildCurrentNovelBar(AgentChatState chatState) {
     final appColors = context.appColors;
     final currentNovel = chatState.currentNovel;
     final theme = Theme.of(context);
@@ -517,7 +517,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: appColors.hermesAccent.withValues(alpha: 0.06),
+        color: appColors.agentAccent.withValues(alpha: 0.06),
         border: Border(
           bottom: BorderSide(
             color: theme.colorScheme.outline.withValues(alpha: 0.1),
@@ -526,7 +526,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.menu_book, size: 16, color: appColors.hermesAccent),
+          Icon(Icons.menu_book, size: 16, color: appColors.agentAccent),
           const SizedBox(width: 6),
           Expanded(
             child: currentNovel == null
@@ -553,7 +553,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
                         text: currentNovel.title,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: appColors.hermesAccent,
+                          color: appColors.agentAccent,
                         ),
                       ),
                     ]),
@@ -569,7 +569,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               minimumSize: const Size(0, 28),
-              foregroundColor: appColors.hermesAccent,
+              foregroundColor: appColors.agentAccent,
             ),
           ),
         ],
@@ -578,10 +578,10 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   }
 
   /// 弹出小说选择对话框
-  Future<void> _showNovelPickerDialog(HermesChatState chatState) async {
+  Future<void> _showNovelPickerDialog(AgentChatState chatState) async {
     final picked = await showDialog<int>(
       context: context,
-      builder: (_) => const HermesNovelPickerDialog(),
+      builder: (_) => const AgentNovelPickerDialog(),
     );
     if (picked != null) {
       final session = ref.read(currentSessionProvider);
@@ -609,16 +609,16 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   ///
   /// 让用户为当前场景单独配置 LLM 后端（覆盖全局默认）。
   /// 配置写入 SharedPreferences，下次 sendMessage 自动生效。
-  Future<void> _showScenarioConfigDialog(HermesChatState chatState) async {
+  Future<void> _showScenarioConfigDialog(AgentChatState chatState) async {
     await showDialog<bool>(
       context: context,
-      builder: (_) => HermesScenarioConfigDialog(
+      builder: (_) => AgentScenarioConfigDialog(
         scenarioId: chatState.scenarioId,
       ),
     );
   }
 
-  Widget _buildInputBar(HermesChatState chatState, ScenarioSession? session) {
+  Widget _buildInputBar(AgentChatState chatState, ScenarioSession? session) {
     final theme = Theme.of(context);
     final appColors = context.appColors;
     final quickPrompts =
@@ -684,7 +684,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
   ///
   /// 状态优先级：isLoading（停止）> _hasText（可发送）> 空内容（禁用）。
   Widget _buildSendStopButton(
-    HermesChatState chatState,
+    AgentChatState chatState,
     ScenarioSession? session,
     ThemeData theme,
     AppColors appColors,
@@ -693,7 +693,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
       return _circleIconButton(
         icon: Icons.stop_rounded,
         bg: appColors.error,
-        fg: appColors.hermesOnBrand,
+        fg: appColors.agentOnBrand,
         onPressed: () => session?.cancel(),
         tooltip: '停止',
       );
@@ -701,8 +701,8 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     if (_hasText) {
       return _circleIconButton(
         icon: Icons.send_rounded,
-        bg: appColors.hermesAccent,
-        fg: appColors.hermesOnBrand,
+        bg: appColors.agentAccent,
+        fg: appColors.agentOnBrand,
         onPressed: () => _sendMessage(session),
         tooltip: '发送',
       );
@@ -752,11 +752,11 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
         children: prompts.map((p) {
           return ActionChip(
             avatar: Icon(Icons.auto_awesome, size: 14,
-                color: appColors.hermesAccent),
+                color: appColors.agentAccent),
             label: Text(p.label, style: const TextStyle(fontSize: 12)),
-            backgroundColor: appColors.hermesAccent.withValues(alpha: 0.08),
+            backgroundColor: appColors.agentAccent.withValues(alpha: 0.08),
             side: BorderSide(
-              color: appColors.hermesAccent.withValues(alpha: 0.2),
+              color: appColors.agentAccent.withValues(alpha: 0.2),
             ),
             onPressed: () => _insertPrompt(p.text),
           );
@@ -798,7 +798,7 @@ class _HermesChatDialogState extends ConsumerState<HermesChatDialog> {
     final messages = chatState.messages;
     if (messageIndex < 0 || messageIndex >= messages.length) return;
     final target = messages[messageIndex];
-    if (target.role != HermesRole.user) return;
+    if (target.role != AgentChatRole.user) return;
 
     final willRemove = messages.length - messageIndex;
     final confirmed = await showDialog<bool>(

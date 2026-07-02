@@ -44,19 +44,32 @@ abstract class IChatSessionRepository {
 
   // ===== 消息 =====
 
-  /// 追加一条消息到 session。
+  /// 追加一条 agent 消息到 session。
   ///
-  /// 用 `db.transaction` 把"计算 orderIndex（MAX+1）+ 写入消息 + 刷新 session.updatedAt"
-  /// 包成原子单元。失败时整体回滚。
-  /// 返回新插入的 message 行 id。
+  /// [record.agentMsgIndex] 由调用方传入。
+  /// 用 `db.transaction` 把"写入消息 + 刷新 session.updatedAt"包成原子单元。
+  /// 失败时整体回滚。返回新插入的 message 行 id。
   Future<int> appendMessage(ChatMessageRecord record);
 
-  /// 获取会话的全部消息（按 orderIndex ASC 排序）
-  Future<List<ChatMessageRecord>> listMessages(int sessionId);
+  /// 获取会话的消息（按 agentMsgIndex ASC 排序）
+  ///
+  /// [limit] / [offset] 支持分页，避免长会话冷启动一次性全量加载。
+  /// 不传 limit 表示全量。
+  Future<List<ChatMessageRecord>> listMessages(
+    int sessionId, {
+    int? limit,
+    int offset = 0,
+  });
 
   /// 获取会话的消息总数
   Future<int> getMessageCount(int sessionId);
 
   /// 清空会话的全部消息（保留 session 行，updatedAt 由 transaction 内统一刷新）
   Future<int> clearMessages(int sessionId);
+
+  /// 删除会话中 agentMsgIndex < [beforeIndex] 的所有消息。
+  ///
+  /// 用于上下文压缩 / retry / rollback 时同步删 DB，保证内存与 DB 一致。
+  /// 同步刷新 session.updatedAt。返回删除行数。
+  Future<int> deleteMessagesBefore(int sessionId, int beforeIndex);
 }

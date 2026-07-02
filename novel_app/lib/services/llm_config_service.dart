@@ -1,7 +1,7 @@
 /// LLM 配置服务
 ///
 /// 统一管理 LLM 配置序列的读取、切换和迁移。
-/// 所有 AI 调用路径（Hermes Agent）都通过此服务获取 LLM 配置。
+/// 所有 AI 调用路径（AI Agent）都通过此服务获取 LLM 配置。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,16 +15,18 @@ import '../services/logger_service.dart';
 class LlmConfigService {
   final Ref _ref;
 
-  static const String _activeProfileKey = 'active_llm_profile_id';
+  static const String _activeProfileKey = 'active_llm_profile_id'; // 仅迁移用，不再作为运行时 fallback
   static const String _migratedKey = 'llm_configs_migrated';
   static const String _scenarioPrefix = 'active_llm_profile_';
+  static const String _globalActiveMigratedV2Key = 'llm_global_active_migrated_v2';
 
   /// 统一未配置错误消息（AgentErrorEvent / Exception 共用）
   static const String notConfiguredMessage =
       '请先在设置中配置 LLM（添加至少一个配置）';
 
-  /// 迁移完成的内存标记，避免热路径重复读 SharedPreferences
+  /// 全局激活 → 默认 迁移的内存标记，避免热路径重复读 SharedPreferences
   bool _migrationChecked = false;
+  bool _globalActiveMigratedV2 = false;
 
   LlmConfigService(this._ref);
 
@@ -36,7 +38,9 @@ class LlmConfigService {
     return repo.getAll();
   }
 
-  /// 获取当前激活的全局配置（优先场景配置 → 默认配置 → 第一条）
+  /// 获取当前激活的配置（场景级 → 默认 → 第一条）
+  ///
+  /// 全局激活层已删除：场景级覆盖最高，兜底用 DB 中标记为默认的配置。
   Future<app.LlmConfig?> getActiveConfig({String? scenarioId}) async {
     final repo = _ref.read(llmConfigRepositoryProvider);
     final prefs = await SharedPreferences.getInstance();
@@ -51,18 +55,11 @@ class LlmConfigService {
       }
     }
 
-    // 2. 全局激活配置
-    final activeId = prefs.getInt(_activeProfileKey);
-    if (activeId != null) {
-      final config = await repo.getById(activeId);
-      if (config != null) return config;
-    }
-
-    // 3. 默认配置
+    // 2. 默认配置
     final defaultConfig = await repo.getDefault();
     if (defaultConfig != null) return defaultConfig;
 
-    // 4. 第一条配置
+    // 3. 第一条配置
     final all = await repo.getAll();
     return all.isNotEmpty ? all.first : null;
   }
@@ -76,13 +73,9 @@ class LlmConfigService {
 
   // ── 设置激活 ──
 
-  /// 设置全局激活配置
-  Future<void> setActiveConfig(int configId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_activeProfileKey, configId);
-    LoggerService.instance.i('全局激活 LLM 配置: id=$configId',
-        category: LogCategory.ai, tags: ['llm_config', 'set_active']);
-  }
+  /// 全局激活机制已删除：默认配置由 setDefault() 管理，场景覆盖由
+  /// setActiveConfigForScenario() 管理。旧用户数据通过
+  /// [ensureGlobalActiveMigrated] 一次性迁移到默认配置。
 
   /// 设置场景级激活配置（configId 为 null 时清除场景覆盖）
   Future<void> setActiveConfigForScenario(
@@ -227,5 +220,37 @@ class LlmConfigService {
     _migrationChecked = true;
     LoggerService.instance.i('旧配置迁移完成',
         category: LogCategory.ai, tags: ['llm_config', 'migration', 'done']);
+  }
+
+  /// 将旧「全局激活」（prefs `active_llm_profile_id`）一次性迁移为「默认配置」。
+  ///
+  /// 删除全局激活层后，老用户原先通过 setActiveConfig 选中的供应商若不迁移，
+  /// 升级后会跳变到 DB 默认。本方法把全局激活指向的配置设为默认，保证用户感知不变。
+  /// 幂等：用内存标记 + prefs 标记双保险，只跑一次。配置已被删除则跳过。
+  Future<void> ensureGlobalActiveMigrated() async {
+    if (_globalActiveMigratedV2) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_globalActiveMigratedV2Key) == true) {
+      _globalActiveMigratedV2 = true;
+      return;
+    }
+
+    final repo = _ref.read(llmConfigRepositoryProvider);
+    final legacyActiveId = prefs.getInt(_activeProfileKey);
+    if (legacyActiveId != null) {
+      final config = await repo.getById(legacyActiveId);
+      if (config != null) {
+        await repo.setDefault(legacyActiveId);
+        LoggerService.instance.i(
+            '全局激活 → 默认 迁移: id=$legacyActiveId',
+            category: LogCategory.ai,
+            tags: ['llm_config', 'migration', 'global_active_v2']);
+      }
+      await prefs.remove(_activeProfileKey);
+    }
+
+    await prefs.setBool(_globalActiveMigratedV2Key, true);
+    _globalActiveMigratedV2 = true;
   }
 }

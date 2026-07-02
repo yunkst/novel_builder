@@ -1,4 +1,4 @@
-/// Hermes 场景配置对话框
+/// Agent 场景配置对话框
 ///
 /// 用户可选择一个已有的 LLM 配置作为当前场景的 LLM 后端，
 /// 也可清空选择以使用全局默认配置。
@@ -11,21 +11,21 @@ import '../../core/providers/services/ai_service_providers.dart';
 import '../../models/llm_config.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 
-class HermesScenarioConfigDialog extends ConsumerStatefulWidget {
+class AgentScenarioConfigDialog extends ConsumerStatefulWidget {
   final String scenarioId;
 
-  const HermesScenarioConfigDialog({
+  const AgentScenarioConfigDialog({
     super.key,
     required this.scenarioId,
   });
 
   @override
-  ConsumerState<HermesScenarioConfigDialog> createState() =>
-      _HermesScenarioConfigDialogState();
+  ConsumerState<AgentScenarioConfigDialog> createState() =>
+      _AgentScenarioConfigDialogState();
 }
 
-class _HermesScenarioConfigDialogState
-    extends ConsumerState<HermesScenarioConfigDialog> {
+class _AgentScenarioConfigDialogState
+    extends ConsumerState<AgentScenarioConfigDialog> {
   List<LlmConfig> _configs = [];
   int? _selectedConfigId;
   bool _isLoading = true;

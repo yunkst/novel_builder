@@ -70,7 +70,6 @@ from .services.role_card_service import role_card_service
 from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
 from .api.routes.backup import router as backup_router
-from .api.routes.hermes import router as hermes_router
 from .api.routes.logs import router as logs_router
 
 logger = logging.getLogger(__name__)
@@ -104,7 +103,6 @@ app.add_middleware(
 
 # 注册API路由
 app.include_router(backup_router)
-app.include_router(hermes_router)
 app.include_router(logs_router)
 
 

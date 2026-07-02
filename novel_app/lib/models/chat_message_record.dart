@@ -1,61 +1,86 @@
-/// AI 对话消息记录（chat_messages 表）
+/// AI 对话消息记录（chat_messages 表）—— v32 统一历史模型
 ///
-/// 一条 chat_message 对应 HermesMessage 在某 session 中的快照，
-/// segments（含工具调用详情）以 JSON 字符串形式存入 segmentsJson 列。
-/// 反序列化时通过 [HermesMessage.segmentsFromJson] 还原。
+/// 一条 chat_message 直接对应 agent 内部的一条 [ChatMessage]（ReAct 链中的一个节点），
+/// 含完整 role（system/user/assistant/tool）、toolCalls、toolCallId、agentMsgIndex。
+///
+/// 设计变更（v31→v32）：
+/// - 不再从 UI 视角（AgentChatMessage/segments）重建 agent history，
+///   DB 直接存 agent 视角的完整消息，hydrate 时 1:1 还原。
+/// - 解决：跨会话续聊工具结果丢失、压缩后无法重建、owner 对齐漂移。
+///
+/// UI 渲染由 [ScenarioSession._projectUiMessages] 把 agent messages 投影为
+/// [AgentChatMessage]（含 TextSegment / ToolCallSegment），UI 层无需感知本模型。
 library;
 
-import 'hermes_message.dart';
+import 'dart:convert';
+
+import '../services/dsl_engine/llm_provider.dart';
 
 class ChatMessageRecord {
   final int? id;
   final int sessionId;
-  final String role;
-  final String content;
-  final String segmentsJson;
+  final String role; // 'system' | 'user' | 'assistant' | 'tool'
+  final String content; // role='assistant' 且只有 toolCalls 时为 ''
+  final String? toolCallsJson; // assistant 的 toolCalls 序列化（OpenAI tool_calls 格式）
+  final String? toolCallId; // tool 消息关联的 tool_call ID
   final DateTime timestamp;
-  final int orderIndex;
+  final int agentMsgIndex; // agent 内部 messages 列表中的索引（还原顺序用）
 
   ChatMessageRecord({
     this.id,
     required this.sessionId,
     required this.role,
     required this.content,
-    required this.segmentsJson,
+    this.toolCallsJson,
+    this.toolCallId,
     DateTime? timestamp,
-    required this.orderIndex,
+    required this.agentMsgIndex,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  /// 还原 segments 列表（坏数据时降级为单 TextSegment，不抛异常）
-  List<HermesSegment> get segments => HermesMessage.segmentsFromJson(segmentsJson);
-
-  /// 还原为 HermesMessage（坏数据时由 [HermesMessage.fromJson] 降级为单 TextSegment）
+  /// 从 agent ChatMessage 构造（落库主路径）
   ///
-  /// 与 [HermesMessage.fromJson] 共享同一套 role 解析 + segments 降级逻辑，
-  /// 是 hydrate 路径的单一真理来源。
-  HermesMessage toHermesMessage() => HermesMessage.fromJson({
-        'role': role,
-        'content': content,
-        'segmentsJson': segmentsJson,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      });
-
-  /// 从一条 HermesMessage 构造 DB 行（segments 全量序列化）
-  ///
-  /// [orderIndex] 由 Repository 内部事务覆盖（MAX+1），调用方可传 0。
-  /// 如需携带已知的 id（更新场景），用 `.copyWith(id: id)`。
-  factory ChatMessageRecord.fromHermesMessage(
+  /// [agentMsgIndex] 该消息在 agent 内部 messages 列表中的索引。
+  factory ChatMessageRecord.fromAgentMessage(
     int sessionId,
-    int orderIndex,
-    HermesMessage message,
+    int agentMsgIndex,
+    ChatMessage m,
   ) {
     return ChatMessageRecord(
       sessionId: sessionId,
-      role: message.role.name,
-      content: message.content,
-      segmentsJson: HermesMessage.segmentsToJson(message.segments),
-      timestamp: message.timestamp,
-      orderIndex: orderIndex,
+      role: m.role,
+      content: m.content ?? '',
+      toolCallsJson: m.toolCalls != null && m.toolCalls!.isNotEmpty
+          ? jsonEncode(m.toolCalls!.map((tc) => tc.toJson()).toList())
+          : null,
+      toolCallId: m.toolCallId,
+      timestamp: DateTime.now(),
+      agentMsgIndex: agentMsgIndex,
+    );
+  }
+
+  /// 还原为 agent ChatMessage（hydrate 主路径）
+  ///
+  /// 反序列化失败时 toolCalls 降级为 null（不抛异常），保证 hydrate 不阻塞。
+  ChatMessage toAgentMessage() {
+    List<ToolCall>? toolCalls;
+    if (toolCallsJson != null && toolCallsJson!.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(toolCallsJson!);
+        if (decoded is List) {
+          toolCalls = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((j) => ToolCall.fromJson(j))
+              .toList();
+        }
+      } catch (_) {
+        // toolCalls 解析失败降级为 null
+      }
+    }
+    return ChatMessage(
+      role: role,
+      content: content.isEmpty && toolCalls != null ? null : content,
+      toolCalls: toolCalls,
+      toolCallId: toolCallId,
     );
   }
 
@@ -65,9 +90,10 @@ class ChatMessageRecord {
       'sessionId': sessionId,
       'role': role,
       'content': content,
-      'segmentsJson': segmentsJson,
+      if (toolCallsJson != null) 'toolCallsJson': toolCallsJson,
+      if (toolCallId != null) 'toolCallId': toolCallId,
       'timestamp': timestamp.millisecondsSinceEpoch,
-      'orderIndex': orderIndex,
+      'agentMsgIndex': agentMsgIndex,
     };
   }
 
@@ -76,38 +102,19 @@ class ChatMessageRecord {
     return ChatMessageRecord(
       id: map['id'] as int?,
       sessionId: (map['sessionId'] as num).toInt(),
-      role: map['role'] as String? ?? 'user',
-      content: map['content'] as String? ?? '',
-      segmentsJson: map['segmentsJson'] as String? ?? '[]',
+      role: (map['role'] as String?) ?? 'user',
+      content: (map['content'] as String?) ?? '',
+      toolCallsJson: map['toolCallsJson'] as String?,
+      toolCallId: map['toolCallId'] as String?,
       timestamp: ts is int
           ? DateTime.fromMillisecondsSinceEpoch(ts)
           : DateTime.now(),
-      orderIndex: (map['orderIndex'] as num).toInt(),
-    );
-  }
-
-  ChatMessageRecord copyWith({
-    int? id,
-    int? sessionId,
-    String? role,
-    String? content,
-    String? segmentsJson,
-    DateTime? timestamp,
-    int? orderIndex,
-  }) {
-    return ChatMessageRecord(
-      id: id ?? this.id,
-      sessionId: sessionId ?? this.sessionId,
-      role: role ?? this.role,
-      content: content ?? this.content,
-      segmentsJson: segmentsJson ?? this.segmentsJson,
-      timestamp: timestamp ?? this.timestamp,
-      orderIndex: orderIndex ?? this.orderIndex,
+      agentMsgIndex: (map['agentMsgIndex'] as num).toInt(),
     );
   }
 
   @override
   String toString() =>
       'ChatMessageRecord(id: $id, sessionId: $sessionId, role: $role, '
-      'orderIndex: $orderIndex, contentLen: ${content.length})';
+      'agentMsgIndex: $agentMsgIndex, contentLen: ${content.length})';
 }

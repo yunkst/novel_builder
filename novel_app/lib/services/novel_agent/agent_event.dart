@@ -67,12 +67,14 @@ class ToolCallStartEvent extends AgentEvent {
 class ToolCallEndEvent extends AgentEvent {
   final String name;
   final String toolCallId;
-  final String result;
+  final String result; // 截断版（给 LLM 看，受 toolResultMaxChars 限制）
+  final String? fullResult; // 未截断原始结果（给 DB 持久化，hydrate 续聊时 LLM 看到完整结果）
   final bool success;
   const ToolCallEndEvent(
     this.name,
     this.toolCallId,
     this.result, {
+    this.fullResult,
     this.success = true,
   });
 }
@@ -90,7 +92,7 @@ class AgentErrorEvent extends AgentEvent {
 
 /// 上下文压缩事件
 ///
-/// 在 Agent 循环自动压缩消息列表时触发，UI 可用于同步裁剪历史消息。
+/// 在 Agent 循环自动压缩消息列表时触发。ScenarioSession 据此同步裁剪内存 + 删 DB。
 class CompactionEvent extends AgentEvent {
   /// 释放的字符数
   final int removedChars;
@@ -104,19 +106,20 @@ class CompactionEvent extends AgentEvent {
   /// 丢弃的消息条数
   final int droppedMessageCount;
 
-  /// 被丢弃的 HermesMessage 连续索引区间 [start, end)
+  /// agent 内部 messages 中被丢弃的起始索引 [0, droppedAgentFromIndex)
   ///
-  /// 当 [messageOwners] 透传时,压缩器会反推哪些 HermesMessage 被丢弃,
-  /// 填入此字段供 UI 端一次 `removeRange(start, end)` 完成裁剪。
-  /// 为 null 表示无 UI 对齐信息(未传 messageOwners),UI 不应裁剪。
-  final ({int start, int end})? droppedHermesRange;
+  /// v32 起 DB 也存 agent 消息，ScenarioSession 收到本事件后：
+  /// 1. 内存 _agentMessages.removeRange(0, droppedAgentFromIndex)
+  /// 2. DB deleteMessagesBefore(sessionId, droppedAgentFromIndex)
+  /// 内存与 DB 同步裁剪，跨会话不再"复活"已压缩内容。
+  final int droppedAgentFromIndex;
 
   const CompactionEvent({
     required this.removedChars,
     required this.originalChars,
     required this.keptMessageCount,
     required this.droppedMessageCount,
-    this.droppedHermesRange,
+    required this.droppedAgentFromIndex,
   });
 
   /// 压缩率（0-1）

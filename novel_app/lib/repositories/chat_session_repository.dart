@@ -8,13 +8,16 @@ import 'base_repository.dart';
 ///
 /// 表常量说明：
 /// - chat_sessions: id PK（自增）+ scenarioId + 标题/时间/currentNovel
-/// - chat_messages: id PK（自增）+ sessionId FK（CASCADE 删除）+ 角色/内容/segmentsJson/timestamp/orderIndex
+/// - chat_messages(v32): id PK（自增）+ sessionId FK（CASCADE 删除）+
+///   role/content/toolCallsJson/toolCallId/timestamp/agentMsgIndex
 ///
-/// appendMessage 用 db.transaction 把 3 步合成原子操作：
-/// 1) MAX(orderIndex)+1 计算下一个序号
-/// 2) INSERT chat_messages
-/// 3) UPDATE chat_sessions SET updatedAt = now
+/// appendMessage 用 db.transaction 把 2 步合成原子操作：
+/// 1) INSERT chat_messages（agentMsgIndex 由调用方传入）
+/// 2) UPDATE chat_sessions SET updatedAt = now
 /// 任何一步异常都会回滚，DB 状态保持一致。
+///
+/// v32 变更：messages 改存完整 agent ChatMessage（含 tool/system 角色、toolCalls、
+/// toolCallId、agentMsgIndex）。不再从 UI 视角重建，hydrate 时 1:1 还原。
 class ChatSessionRepository extends BaseRepository
     implements IChatSessionRepository {
   static const String _tableSessions = 'chat_sessions';
@@ -206,21 +209,12 @@ class ChatSessionRepository extends BaseRepository
   Future<int> appendMessage(ChatMessageRecord record) async {
     try {
       final db = await database;
-      // 用 transaction 把 orderIndex 计算 + 插入消息 + 更新 session 时间戳合并
+      // 用 transaction 把 插入消息 + 更新 session 时间戳合并
       return await db.transaction((txn) async {
-        // 1) 计算下一个 orderIndex：MAX + 1；空表时取 0
-        final maxResult = await txn.rawQuery(
-          'SELECT COALESCE(MAX(orderIndex), -1) AS maxIdx FROM $_tableMessages WHERE sessionId = ?',
-          [record.sessionId],
-        );
-        final maxIdx = (maxResult.first['maxIdx'] as int?) ?? -1;
-        final nextIdx = maxIdx + 1;
-
-        // 2) 插入消息（强制覆盖 orderIndex，避免调用方传错导致冲突）
-        final insertable = record.copyWith(orderIndex: nextIdx).toMap();
+        final insertable = record.toMap();
         final messageId = await txn.insert(_tableMessages, insertable);
 
-        // 3) 刷新 session.updatedAt，让列表排序稳定
+        // 刷新 session.updatedAt，让列表排序稳定
         final now = DateTime.now().millisecondsSinceEpoch;
         await txn.update(
           _tableSessions,
@@ -230,7 +224,7 @@ class ChatSessionRepository extends BaseRepository
         );
 
         LoggerService.instance.d(
-          '追加消息: sessionId=${record.sessionId} role=${record.role} orderIdx=$nextIdx messageId=$messageId',
+          '追加消息: sessionId=${record.sessionId} role=${record.role} agentIdx=${record.agentMsgIndex} messageId=$messageId',
           category: LogCategory.database,
           tags: ['chat_message', 'append', 'success'],
         );
@@ -248,14 +242,20 @@ class ChatSessionRepository extends BaseRepository
   }
 
   @override
-  Future<List<ChatMessageRecord>> listMessages(int sessionId) async {
+  Future<List<ChatMessageRecord>> listMessages(
+    int sessionId, {
+    int? limit,
+    int offset = 0,
+  }) async {
     try {
       final db = await database;
       final maps = await db.query(
         _tableMessages,
         where: 'sessionId = ?',
         whereArgs: [sessionId],
-        orderBy: 'orderIndex ASC',
+        orderBy: 'agentMsgIndex ASC',
+        limit: limit,
+        offset: offset,
       );
       return maps.map((m) => ChatMessageRecord.fromMap(m)).toList();
     } catch (e, stackTrace) {
@@ -284,6 +284,40 @@ class ChatSessionRepository extends BaseRepository
         stackTrace: stackTrace.toString(),
         category: LogCategory.database,
         tags: ['chat_message', 'count', 'failed'],
+      );
+      rethrow;
+    }
+  }
+
+  @override
+  Future<int> deleteMessagesBefore(int sessionId, int beforeIndex) async {
+    try {
+      final db = await database;
+      return await db.transaction((txn) async {
+        final deleted = await txn.delete(
+          _tableMessages,
+          where: 'sessionId = ? AND agentMsgIndex < ?',
+          whereArgs: [sessionId, beforeIndex],
+        );
+        await txn.update(
+          _tableSessions,
+          {'updatedAt': DateTime.now().millisecondsSinceEpoch},
+          where: 'id = ?',
+          whereArgs: [sessionId],
+        );
+        LoggerService.instance.d(
+          '删除消息: sessionId=$sessionId beforeIdx=$beforeIndex 删除 $deleted 行',
+          category: LogCategory.database,
+          tags: ['chat_message', 'delete_before', 'success'],
+        );
+        return deleted;
+      });
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除消息失败: sessionId=$sessionId beforeIndex=$beforeIndex - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chat_message', 'delete_before', 'failed'],
       );
       rethrow;
     }

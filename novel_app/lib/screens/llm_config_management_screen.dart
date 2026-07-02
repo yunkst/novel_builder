@@ -1,7 +1,7 @@
 /// LLM 配置管理页
 ///
 /// 用户可增删改查多个 LLM 配置，设置默认配置，拖拽排序。
-/// Hermes Agent 和章节生成时可选择不同配置。
+/// AI Agent 和章节生成时可选择不同配置。
 library;
 
 import 'package:flutter/material.dart';
@@ -193,7 +193,6 @@ class _LlmConfigManagementScreenState
   Future<void> _setDefault(int id) async {
     final service = ref.read(llmConfigServiceProvider);
     await service.setDefault(id);
-    await service.setActiveConfig(id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已设为默认配置')),

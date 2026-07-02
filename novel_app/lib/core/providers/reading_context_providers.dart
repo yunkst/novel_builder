@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 当前阅读上下文
 ///
-/// 记录用户在哪个小说/章节页面，用于 Hermes AI 聊天时注入上下文。
+/// 记录用户在哪个小说/章节页面，用于 AI 聊天时注入上下文。
 class ReadingContext {
   /// 当前小说名称
   final String? novelTitle;
@@ -46,7 +46,7 @@ class ReadingContext {
 
 /// 全局阅读上下文 Provider
 ///
-/// 用于在 Hermes 聊天时注入当前小说/章节信息。
+/// 用于在 Agent 聊天时注入当前小说/章节信息。
 final readingContextProvider = StateProvider<ReadingContext>((ref) {
   return const ReadingContext();
 });

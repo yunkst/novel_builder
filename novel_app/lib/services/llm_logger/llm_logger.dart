@@ -31,13 +31,14 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart'
+    show ChangeNotifier, ValueNotifier, debugPrint;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'llm_call_record.dart';
 
-class LlmLogger {
+class LlmLogger extends ChangeNotifier {
   static LlmLogger? _instance;
   static LlmLogger get instance {
     _instance ??= LlmLogger._internal();
@@ -49,7 +50,13 @@ class LlmLogger {
   /// 重置单例（仅测试用）
   static void resetForTesting() {
     _instance = null;
+    changeNotifier.value = 0;
   }
+
+  /// 静态 ValueNotifier：UI 可用 `LlmLogger.changeNotifier.addListener(...)`
+  /// 监听日志变化，`.value` 为变化计数（每次 log/clear 递增）。
+  /// 与 [instance]（也是 ChangeNotifier）并行通知，互不影响。
+  static final ValueNotifier<int> changeNotifier = ValueNotifier<int>(0);
 
   // ==================== 常量 ====================
 
@@ -215,6 +222,8 @@ class LlmLogger {
     }
 
     _changeCount++;
+    changeNotifier.value = _changeCount;
+    notifyListeners();
   }
 
   /// 记录请求失败
@@ -235,6 +244,8 @@ class LlmLogger {
     }
 
     _changeCount++;
+    changeNotifier.value = _changeCount;
+    notifyListeners();
   }
 
   // ==================== 查询接口 ====================
@@ -269,6 +280,8 @@ class LlmLogger {
     _recentCache.clear();
     _writeQueue.clear();
     _changeCount++;
+    changeNotifier.value = _changeCount;
+    notifyListeners();
 
     if (_logDir == null) return;
     try {

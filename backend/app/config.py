@@ -46,11 +46,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
-    # Hermes AI Chat 服务配置
-    hermes_api_url: str = Field(default="", alias="HERMES_API_URL")
-    hermes_api_key: str = Field(default="", alias="HERMES_API_KEY")
-    hermes_timeout: int = 300  # 5分钟超时
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 生成默认的secret_key（如果未设置）

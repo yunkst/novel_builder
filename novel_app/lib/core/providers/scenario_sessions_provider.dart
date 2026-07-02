@@ -1,6 +1,6 @@
 /// 场景会话管理器 — 按 scenarioId 管理 ScenarioSession 实例
 ///
-/// 对应 Hermes GatewayRunner 的 _agent_cache 机制：
+/// 对应 Agent Gateway 的 _agent_cache 机制：
 /// - 按 session_key (scenarioId) 懒创建 AIAgent 实例
 /// - LRU 淘汰空闲实例（_AGENT_CACHE_MAX_SIZE = 128）
 /// - _AGENT_CACHE_IDLE_TTL_SECS = 3600（空闲 1 小时驱逐）
@@ -8,7 +8,7 @@
 /// 在 Flutter 中简化为：
 /// - 按 scenarioId 懒创建 ScenarioSession
 /// - LRU 淘汰（最多 8 个 session，空闲的优先淘汰）
-/// - Riverpod state 同步（`Map<scenarioId, HermesChatState>`）
+/// - Riverpod state 同步（`Map<scenarioId, AgentChatState>`）
 ///
 /// 多 session 持久化后，ScenarioSession 本身多一个 sessionId 字段（可空）；
 /// 切换 session 时清空 in-memory messages，让 ScenarioSession 主动从 DB 加载。
@@ -20,7 +20,7 @@ import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import 'agent_scenario_provider.dart';
 import 'chat_session_providers.dart';
-import 'hermes_chat_state.dart';
+import 'agent_chat_state.dart';
 import 'scenario_session.dart';
 
 /// 最大并发 session 数
@@ -28,7 +28,7 @@ const _maxSessions = 8;
 
 /// 场景会话管理器
 class ScenarioSessionsNotifier
-    extends StateNotifier<Map<String, HermesChatState>> {
+    extends StateNotifier<Map<String, AgentChatState>> {
   final Ref _ref;
 
   /// scenarioId → ScenarioSession 实例
@@ -128,7 +128,7 @@ class ScenarioSessionsNotifier
     if (session != null) {
       session.dispose();
       _accessOrder.remove(scenarioId);
-      state = <String, HermesChatState>{...state}..remove(scenarioId);
+      state = <String, AgentChatState>{...state}..remove(scenarioId);
       LoggerService.instance.i(
         'ScenarioSessions 销毁 session: $scenarioId',
         category: LogCategory.ai,
@@ -154,7 +154,7 @@ class ScenarioSessionsNotifier
   void _syncState(String scenarioId) {
     final session = _sessions[scenarioId];
     if (session == null) return;
-    state = <String, HermesChatState>{...state, scenarioId: session.state};
+    state = <String, AgentChatState>{...state, scenarioId: session.state};
   }
 
   /// LRU 淘汰 — 超过 _maxSessions 时淘汰最早的不在运行的 session
@@ -189,7 +189,7 @@ class ScenarioSessionsNotifier
       final session = _sessions.remove(evictKey);
       session?.dispose();
       _accessOrder.remove(evictKey);
-      state = <String, HermesChatState>{...state}..remove(evictKey);
+      state = <String, AgentChatState>{...state}..remove(evictKey);
     }
   }
 }
@@ -199,7 +199,7 @@ class ScenarioSessionsNotifier
 /// 全局单例，管理所有场景的 ScenarioSession 实例。
 /// StateNotifierProvider 在 Riverpod 2.x 中默认不 autoDispose。
 final scenarioSessionsProvider =
-    StateNotifierProvider<ScenarioSessionsNotifier, Map<String, HermesChatState>>(
+    StateNotifierProvider<ScenarioSessionsNotifier, Map<String, AgentChatState>>(
   (ref) {
     LoggerService.instance.i(
       'ScenarioSessionsNotifier 初始化',
@@ -213,18 +213,18 @@ final scenarioSessionsProvider =
 /// 当前场景的聊天状态 — UI 只 watch 这个
 ///
 /// UI 层不直接感知 ScenarioSession 的存在，
-/// 只通过这个 Provider 读取当前场景的 HermesChatState。
+/// 只通过这个 Provider 读取当前场景的 AgentChatState。
 ///
 /// 同时 watch `currentAgentScenarioProvider`（场景）和 `currentChatSessionIdProvider`
 /// （会话 id）：sessionId 在 ScenarioSession 内部异步解析（冷启动选最近 / 首条消息新建）
 /// 时会被写回，此时 sessions state 尚未携带新 messages，watch sessionId 可让 UI 立即
 /// 反映「已选中某 session」并等待 hydrate 推送的二次重建。
-final currentChatStateProvider = Provider<HermesChatState>((ref) {
+final currentChatStateProvider = Provider<AgentChatState>((ref) {
   final scenarioId = ref.watch(currentAgentScenarioProvider);
   ref.watch(currentChatSessionIdProvider);
   final sessions = ref.watch(scenarioSessionsProvider);
   return sessions[scenarioId] ??
-      HermesChatState(
+      AgentChatState(
         scenarioId: scenarioId,
         scenarioDisplayName: AgentScenarioFactory.availableScenarios
                 .where((s) => s.id == scenarioId)

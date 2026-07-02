@@ -14,7 +14,7 @@ Novel Builder 采用 monorepo 架构，包含两个主要模块：
         │                       │
         │                       ├── Scrapling 爬虫 (9 站点)
         │                       ├── ComfyUI (图片/视频生成)
-        │                       └── Hermes (LLM 对话)
+        │                       └── Agent (LLM 对话)
         │
         └── SQLite 本地缓存
 ```
@@ -148,7 +148,7 @@ novel_app/
 │   ├── services/               # 业务服务
 │   │   ├── dsl_engine/         # DSL Engine 核心
 │   │   ├── dify/               # Dify Facade
-│   │   ├── hermes/             # Hermes Agent
+│   │   ├── novel_agent/        # Agent Chat 引擎
 │   │   └── api_service_*.dart  # API 客户端
 │   ├── screens/                # 页面组件
 │   ├── widgets/                # 可复用组件
@@ -181,7 +181,6 @@ backend/
 │   ├── api/
 │   │   └── routes/             # 路由模块
 │   │       ├── backup.py       # 备份 API
-│   │       ├── hermes.py       # Hermes 代理
 │   │       ├── novel_sync.py   # 小说同步
 │   │       └── logs.py         # 日志查询
 │   ├── deps/                   # FastAPI 依赖
@@ -194,7 +193,6 @@ backend/
 │       ├── *_crawler.py        # 9 个站点爬虫
 │       ├── cache_*.py          # 缓存系统
 │       ├── dify_client.py      # Dify 客户端
-│       ├── hermes_client.py    # Hermes 客户端
 │       ├── comfyui_*.py        # ComfyUI 客户端
 │       └── *.py                # 其他服务
 ├── alembic/                    # 数据库迁移
@@ -328,19 +326,6 @@ async def get_chapter_content(self, chapter_url: str) -> dict:
 
 ### AI 服务集成
 
-#### Hermes 客户端（OpenAI 兼容）
-
-```python
-from app.services.hermes_client import HermesClient
-
-client = HermesClient(base_url="http://localhost:11434", api_key="sk-xxx")
-response = await client.chat_completions(
-    model="deepseek-chat",
-    messages=[{"role": "user", "content": "Hello"}],
-    stream=True
-)
-```
-
 #### ComfyUI 客户端
 
 ```python
@@ -420,23 +405,6 @@ workflow:
         to: extract
       - from: extract
         to: end
-```
-
-### Hermes Agent
-
-直接 LLM 对话，支持流式输出：
-
-```dart
-final client = HermesClient(
-  baseUrl: 'http://localhost:11434',
-  apiKey: '',
-);
-
-await client.chatStream(
-  model: 'qwen2.5',
-  messages: conversationHistory,
-  onDelta: (delta) => appendToUI(delta),
-);
 ```
 
 ---
@@ -692,8 +660,6 @@ git push origin master --tags
 | `NOVEL_API_TOKEN` | ✅ | API 认证 Token |
 | `NOVEL_ENABLED_SITES` | ✅ | 启用的爬虫站点列表 |
 | `DATABASE_URL` | ✅ | PostgreSQL 连接字符串 |
-| `HERMES_API_URL` | ⚠️ | LLM 服务地址（AI 功能必需） |
-| `HERMES_API_KEY` | ❌ | LLM API Key |
 | `COMFYUI_API_URL` | ⚠️ | ComfyUI 服务（插图功能必需） |
 | `SECRET_KEY` | ✅ | JWT 密钥 |
 | `DEBUG` | ❌ | 调试模式 |

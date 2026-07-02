@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 31;
+  static const int currentVersion = 32;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -666,6 +666,38 @@ class DatabaseMigrations {
         await _createIndexIfNotExists(
             db, 'idx_chat_messages_session_order', 'chat_messages', 'sessionId, orderIndex ASC');
         _log('迁移 v30 → v31: 创建 chat_sessions + chat_messages 表（含外键 CASCADE）');
+        break;
+
+      // ========== 版本 32：chat_messages 改存完整 agent message ==========
+      // 破坏性迁移：旧数据（segmentsJson / orderIndex）直接丢弃，不做兼容。
+      // 设计变更：DB 直接存 agent 内部 ChatMessage（含 role:'tool' / role:'system' 压缩提示 /
+      //   toolCalls / toolCallId / agentMsgIndex），hydrate 时 1:1 还原，不再从 UI 视角重建。
+      // 解决：跨会话续聊工具结果丢失、压缩后无法重建、_buildHistoryAndOwners 对齐漂移。
+      case 32:
+        await db.execute('PRAGMA foreign_keys = ON');
+        // 旧表结构不兼容（缺 toolCallsJson/toolCallId/agentMsgIndex，多 segmentsJson/orderIndex），
+        // 直接 DROP + CREATE 重建。旧会话消息全部清空，chat_sessions 行保留。
+        await db.execute('DROP TABLE IF EXISTS chat_messages');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sessionId INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          toolCallsJson TEXT,
+          toolCallId TEXT,
+          timestamp INTEGER NOT NULL,
+          agentMsgIndex INTEGER NOT NULL,
+          FOREIGN KEY (sessionId) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )
+      ''');
+        // 按 (sessionId, agentMsgIndex ASC) 还原 agent 内部消息顺序。
+        // 复用 v31 的索引名 idx_chat_messages_session_order（指向新列 agentMsgIndex），
+        // 这样幂等重跑 v1→v32 时，v31 的 _createIndexIfNotExists 查到同名索引已存在而跳过，
+        // 不会因表已无 orderIndex 列而报错。
+        await _createIndexIfNotExists(
+            db, 'idx_chat_messages_session_order', 'chat_messages', 'sessionId, agentMsgIndex ASC');
+        _log('迁移 v31 → v32: 重建 chat_messages 表（存完整 agent message，旧消息清空）');
         break;
     }
   }

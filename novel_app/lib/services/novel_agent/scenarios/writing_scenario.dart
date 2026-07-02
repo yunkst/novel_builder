@@ -83,6 +83,7 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
       final parsed = jsonDecode(result) as Map<String, dynamic>;
       if (parsed['success'] == true && parsed['novelId'] != null) {
         _currentContext = AgentScenarioContext(
+          scenarioId: ScenarioIds.writing,
           readingContext: _currentContext?.readingContext,
           currentUrl: _currentContext?.currentUrl,
           currentNovelId: parsed['novelId'] as int,

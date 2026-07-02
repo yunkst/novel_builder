@@ -180,7 +180,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         updatedAt: now,
       ));
       await configService.setDefault(id);
-      await configService.setActiveConfig(id);
 
       // 兼容旧 key（引导页写 dsl_engine_* 以兼容未迁移的旧逻辑）
       final prefs = ref.read(preferencesServiceProvider);
@@ -274,7 +273,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // 4 - 阅读增强亮点
                   _buildInfoPage(
                     icon: Icons.auto_awesome,
-                    iconColor: context.appColors.hermesAccent,
+                    iconColor: context.appColors.agentAccent,
                     title: 'AI 让阅读更有趣',
                     description: '配置好 AI 引擎后，阅读时即可调用这些能力，'
                         '为文字补充画面感，或改写不满意的段落。',
@@ -490,7 +489,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   /// 构建 AI 引擎配置页（关键步骤）
   Widget _buildAiConfigPage(BuildContext context) {
     final theme = Theme.of(context);
-    final aiColor = context.appColors.hermesAccent;
+    final aiColor = context.appColors.agentAccent;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),

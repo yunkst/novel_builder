@@ -29,7 +29,7 @@ class NovelAgentService {
 
   /// 按场景跟踪运行状态（替代全局 _isRunning 互斥锁）
   ///
-  /// 对应 Hermes 的同会话串行化：同一个 session_key 同时只有一个 AIAgent 在跑。
+  /// 对应 Agent 的同会话串行化：同一个 session_key 同时只有一个 AIAgent 在跑。
   /// 但不同 session_key 之间完全并行。
   final Map<String, bool> _runningByScenario = {};
 
@@ -50,7 +50,7 @@ class NovelAgentService {
   /// 取消指定场景的 Agent 回合
   ///
   /// 只取消目标场景，不影响其他场景的运行。
-  /// 对应 Hermes 的线程局部中断：只中断目标线程，不误杀其他会话。
+  /// 对应 Agent 的线程局部中断：只中断目标线程，不误杀其他会话。
   void cancelFor(String scenarioId) {
     final token = _tokensByScenario[scenarioId];
     if (token != null) {
@@ -76,19 +76,14 @@ class NovelAgentService {
   /// 发送消息给 Agent
   ///
   /// [userInput] 用户输入
-  /// [history] 之前的对话历史（用于上下文）
+  /// [history] 之前的对话历史（agent 视角的完整 messages，含 tool/system，不含本轮 user）
   /// [scenarioId] 场景标识（'writing' | 'webview_extract' | ...）
   /// [scenarioContext] 场景上下文参数
-  /// [messageOwners] 可选对齐信息：长度 = [history] 的长度，
-  ///   元素为 history 中每条消息对应的 HermesMessage 在 UI 列表中的索引。
-  ///   透传给 AgentLoop 用于压缩时反推被丢弃的 HermesMessage 区间，
-  ///   通知 UI 同步裁剪。
   Future<void> sendMessage({
     required String userInput,
     required List<ChatMessage> history,
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
-    List<int>? messageOwners,
   }) async {
     // 同场景串行：拒绝并发请求，但不同场景可以并行
     if (_runningByScenario[scenarioId] == true) {
@@ -109,6 +104,7 @@ class NovelAgentService {
       // 构造 LLM Provider（从 LlmConfigService 获取激活配置，支持场景级覆盖）
       final configService = ref.read(llmConfigServiceProvider);
       await configService.ensureMigratedFromLegacy();
+      await configService.ensureGlobalActiveMigrated();
       final activeConfig =
           await configService.getActiveConfig(scenarioId: scenarioId);
       if (activeConfig == null) {
@@ -145,7 +141,6 @@ class NovelAgentService {
           systemPrompt: systemPrompt,
           emit: (event) => _controller.add(event),
           cancellationToken: token,
-          messageOwners: messageOwners,
         );
 
         final cancelledTag = token.isCancelled ? ' (cancelled)' : '';

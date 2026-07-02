@@ -492,7 +492,7 @@ void main() {
 
     group('currentVersion', () {
       test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
-        expect(DatabaseMigrations.currentVersion, 31);
+        expect(DatabaseMigrations.currentVersion, 32);
       });
     });
 
@@ -664,6 +664,77 @@ void main() {
         final r = await db.rawQuery('PRAGMA foreign_keys');
         // PRAGMA foreign_keys 返回 0/1 列
         expect(r.first.values.first, 1);
+        await db.close();
+      });
+    });
+
+    group('v32 — chat_messages 统一历史模型', () {
+      test('升级到 v32 后 chat_messages 含新列且无 segmentsJson/orderIndex', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 32);
+
+        final columns = await db.rawQuery('PRAGMA table_info(chat_messages)');
+        final columnNames = columns.map((c) => c['name'] as String).toSet();
+        expect(columnNames.contains('id'), isTrue);
+        expect(columnNames.contains('sessionId'), isTrue);
+        expect(columnNames.contains('role'), isTrue);
+        expect(columnNames.contains('content'), isTrue);
+        expect(columnNames.contains('toolCallsJson'), isTrue);
+        expect(columnNames.contains('toolCallId'), isTrue);
+        expect(columnNames.contains('agentMsgIndex'), isTrue);
+        // 旧列已被 DROP 重建移除
+        expect(columnNames.contains('segmentsJson'), isFalse);
+        expect(columnNames.contains('orderIndex'), isFalse);
+
+        // FK 仍指向 chat_sessions 且 CASCADE
+        final fks = await db.rawQuery('PRAGMA foreign_key_list(chat_messages)');
+        expect(fks, isNotEmpty);
+        final fk = fks.first;
+        expect(fk['table'], 'chat_sessions');
+        expect(
+            (fk['on_delete']?.toString() ?? '').toLowerCase().contains('cascade'),
+            isTrue);
+
+        await db.close();
+      });
+
+      test('v31 → v32 迁移丢弃旧消息行（破坏性迁移）', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 31);
+        // 在 v31 表里塞一条旧格式数据
+        await db.insert('chat_sessions', {
+          'scenarioId': 'writing',
+          'title': '旧会话',
+          'createdAt': DateTime.now().millisecondsSinceEpoch,
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
+        await db.insert('chat_messages', {
+          'sessionId': 1,
+          'role': 'user',
+          'content': '旧消息',
+          'segmentsJson': '[]',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'orderIndex': 0,
+        });
+        // 升级到 v32：DROP + CREATE
+        await DatabaseMigrations.upgrade(db, 31, 32);
+        final cnt = await db.rawQuery(
+            'SELECT COUNT(*) AS c FROM chat_messages WHERE sessionId = 1');
+        expect((cnt.first['c'] as int?) ?? 0, 0);
+        await db.close();
+      });
+
+      test('幂等：v1→v32 反复执行不报错', () async {
+        final db = await createEmptyDb();
+        await DatabaseMigrations.createV1Tables(db);
+        await DatabaseMigrations.upgrade(db, 1, 32);
+        // 再跑一次全量，v31 建基于 orderIndex 的索引已被 v32 同名索引覆盖，不应报错
+        await DatabaseMigrations.upgrade(db, 1, 32);
+        final cnt = await db.rawQuery(
+            "SELECT COUNT(*) AS c FROM sqlite_master WHERE type='index' AND name='idx_chat_messages_session_order'");
+        expect((cnt.first['c'] as int?) ?? 0, 1);
         await db.close();
       });
     });

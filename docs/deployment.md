@@ -75,9 +75,6 @@ NOVEL_API_TOKEN=your_secure_api_token_here
 # 启用的爬虫站点
 NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543
 
-# AI 功能配置（可选）
-HERMES_API_URL=http://your-llm-server:11434
-HERMES_API_KEY=your_api_key
 COMFYUI_API_URL=http://your-comfyui-server:8188
 ```
 
@@ -333,9 +330,6 @@ CORS_ORIGINS=["https://your-domain.com"]
 REDIS_URL=redis://redis:6379/0
 CACHE_TTL=3600
 
-# AI 功能配置（可选）
-HERMES_API_URL=http://your-llm-server:11434
-HERMES_API_KEY=your_api_key
 COMFYUI_API_URL=http://your-comfyui-server:8188
 
 # 代理配置（可选）

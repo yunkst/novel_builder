@@ -6,7 +6,7 @@
 /// 使用方式：
 /// ```dart
 /// final colors = context.appColors; // BuildContext 扩展
-/// Container(color: colors.hermesAccent);
+/// Container(color: colors.agentAccent);
 /// ```
 library;
 
@@ -15,21 +15,21 @@ import 'package:flutter/material.dart';
 /// 应用自定义颜色主题扩展
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
-  // ─── Hermes 品牌色 ────────────────────────────────────────────
-  /// Hermes 渐变起始色（紫蓝 Indigo-500）
-  final Color hermesBrandStart;
+  // ─── Agent 品牌色 ────────────────────────────────────────────
+  /// Agent 渐变起始色（紫蓝 Indigo-500）
+  final Color agentBrandStart;
 
-  /// Hermes 渐变结束色（紫色 Violet-500）
-  final Color hermesBrandEnd;
+  /// Agent 渐变结束色（紫色 Violet-500）
+  final Color agentBrandEnd;
 
-  /// Hermes 用户气泡/发送按钮主色
-  final Color hermesAccent;
+  /// Agent 用户气泡/发送按钮主色
+  final Color agentAccent;
 
-  /// Hermes 头部主文字/图标色
-  final Color hermesOnBrand;
+  /// Agent 头部主文字/图标色
+  final Color agentOnBrand;
 
-  /// Hermes 头部次要图标色
-  final Color hermesOnBrandMuted;
+  /// Agent 头部次要图标色
+  final Color agentOnBrandMuted;
 
   // ─── 语义色（Toast/状态）─────────────────────────────────────
   final Color success;
@@ -153,11 +153,11 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color errorAccent;
 
   const AppColors({
-    required this.hermesBrandStart,
-    required this.hermesBrandEnd,
-    required this.hermesAccent,
-    required this.hermesOnBrand,
-    required this.hermesOnBrandMuted,
+    required this.agentBrandStart,
+    required this.agentBrandEnd,
+    required this.agentAccent,
+    required this.agentOnBrand,
+    required this.agentOnBrandMuted,
     required this.success,
     required this.error,
     required this.warning,
@@ -212,11 +212,11 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 聊天/角色气泡使用浅色填充 + 深色文字，确保浅色背景下可读。
   /// 语义色使用中度饱和度（Material 700/800）以在白色背景上保持对比度。
   static const AppColors light = AppColors(
-    hermesBrandStart: Color(0xFF6366F1),
-    hermesBrandEnd: Color(0xFF8B5CF6),
-    hermesAccent: Color(0xFF6366F1),
-    hermesOnBrand: Colors.white,
-    hermesOnBrandMuted: Colors.white70,
+    agentBrandStart: Color(0xFF6366F1),
+    agentBrandEnd: Color(0xFF8B5CF6),
+    agentAccent: Color(0xFF6366F1),
+    agentOnBrand: Colors.white,
+    agentOnBrandMuted: Colors.white70,
     success: Color(0xFF2E7D32),
     error: Color(0xFFC62828),
     warning: Color(0xFFEF6C00),
@@ -272,11 +272,11 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 沿用项目原 `0xFF...` 深色值与 Material 默认 `Colors.X`，
   /// 保留原观感。
   static const AppColors dark = AppColors(
-    hermesBrandStart: Color(0xFF6366F1),
-    hermesBrandEnd: Color(0xFF8B5CF6),
-    hermesAccent: Color(0xFF6366F1),
-    hermesOnBrand: Colors.white,
-    hermesOnBrandMuted: Colors.white70,
+    agentBrandStart: Color(0xFF6366F1),
+    agentBrandEnd: Color(0xFF8B5CF6),
+    agentAccent: Color(0xFF6366F1),
+    agentOnBrand: Colors.white,
+    agentOnBrandMuted: Colors.white70,
     success: Colors.green,
     error: Colors.red,
     warning: Colors.orange,
@@ -330,11 +330,11 @@ class AppColors extends ThemeExtension<AppColors> {
 
   @override
   AppColors copyWith({
-    Color? hermesBrandStart,
-    Color? hermesBrandEnd,
-    Color? hermesAccent,
-    Color? hermesOnBrand,
-    Color? hermesOnBrandMuted,
+    Color? agentBrandStart,
+    Color? agentBrandEnd,
+    Color? agentAccent,
+    Color? agentOnBrand,
+    Color? agentOnBrandMuted,
     Color? success,
     Color? error,
     Color? warning,
@@ -384,11 +384,11 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? errorAccent,
   }) {
     return AppColors(
-      hermesBrandStart: hermesBrandStart ?? this.hermesBrandStart,
-      hermesBrandEnd: hermesBrandEnd ?? this.hermesBrandEnd,
-      hermesAccent: hermesAccent ?? this.hermesAccent,
-      hermesOnBrand: hermesOnBrand ?? this.hermesOnBrand,
-      hermesOnBrandMuted: hermesOnBrandMuted ?? this.hermesOnBrandMuted,
+      agentBrandStart: agentBrandStart ?? this.agentBrandStart,
+      agentBrandEnd: agentBrandEnd ?? this.agentBrandEnd,
+      agentAccent: agentAccent ?? this.agentAccent,
+      agentOnBrand: agentOnBrand ?? this.agentOnBrand,
+      agentOnBrandMuted: agentOnBrandMuted ?? this.agentOnBrandMuted,
       success: success ?? this.success,
       error: error ?? this.error,
       warning: warning ?? this.warning,
@@ -444,13 +444,13 @@ class AppColors extends ThemeExtension<AppColors> {
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
     if (other is! AppColors) return this;
     return AppColors(
-      hermesBrandStart:
-          Color.lerp(hermesBrandStart, other.hermesBrandStart, t)!,
-      hermesBrandEnd: Color.lerp(hermesBrandEnd, other.hermesBrandEnd, t)!,
-      hermesAccent: Color.lerp(hermesAccent, other.hermesAccent, t)!,
-      hermesOnBrand: Color.lerp(hermesOnBrand, other.hermesOnBrand, t)!,
-      hermesOnBrandMuted:
-          Color.lerp(hermesOnBrandMuted, other.hermesOnBrandMuted, t)!,
+      agentBrandStart:
+          Color.lerp(agentBrandStart, other.agentBrandStart, t)!,
+      agentBrandEnd: Color.lerp(agentBrandEnd, other.agentBrandEnd, t)!,
+      agentAccent: Color.lerp(agentAccent, other.agentAccent, t)!,
+      agentOnBrand: Color.lerp(agentOnBrand, other.agentOnBrand, t)!,
+      agentOnBrandMuted:
+          Color.lerp(agentOnBrandMuted, other.agentOnBrandMuted, t)!,
       success: Color.lerp(success, other.success, t)!,
       error: Color.lerp(error, other.error, t)!,
       warning: Color.lerp(warning, other.warning, t)!,

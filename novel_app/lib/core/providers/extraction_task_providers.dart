@@ -6,9 +6,9 @@
 /// ## 设计目的
 ///
 /// 旧架构中，提取任务状态只存在于 Agent 事件流里（`NovelAgentService.events`），
-/// 只有 HermesChatDialog 订阅。
+/// 只有 AgentChatDialog 订阅。
 /// 改造后，提取任务使用 Headless WebView 后台执行，
-/// 用户可能在 HermesChatDialog 关闭、页面切换时也想看到任务状态。
+/// 用户可能在 AgentChatDialog 关闭、页面切换时也想看到任务状态。
 ///
 /// ## 数据流
 ///

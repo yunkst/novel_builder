@@ -1,6 +1,6 @@
 /// 章节重写结果跳转入口卡片
 ///
-/// 在 Hermes 聊天窗口中，当 `update_chapter_content` 工具成功完成（AI 重写章节）
+/// 在 Agent 聊天窗口中，当 `update_chapter_content` 工具成功完成（AI 重写章节）
 /// 时渲染此卡片。用户点击后，从数据库加载小说和章节列表，跳转到阅读器查看改后正文。
 library;
 
@@ -114,7 +114,7 @@ class _ChapterRewriteEntryCardState
         '打开重写章节失败: $e',
         stackTrace: stack.toString(),
         category: LogCategory.ai,
-        tags: ['hermes', 'rewrite_entry', 'open_failed'],
+        tags: ['agent_chat', 'rewrite_entry', 'open_failed'],
       );
       if (mounted) {
         ToastUtils.showError('打开失败: $e');
