@@ -123,7 +123,6 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('LLM 调用日志'),
-        backgroundColor: theme.colorScheme.inversePrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.content_copy),

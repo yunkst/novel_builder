@@ -65,7 +65,6 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI 配置'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

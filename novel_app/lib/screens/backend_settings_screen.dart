@@ -101,7 +101,6 @@ class _BackendSettingsScreenState extends ConsumerState<BackendSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('后端服务配置'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

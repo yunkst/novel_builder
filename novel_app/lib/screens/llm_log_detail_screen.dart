@@ -60,7 +60,6 @@ class _LlmLogDetailScreenState extends ConsumerState<LlmLogDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('调用详情'),
-        backgroundColor: theme.colorScheme.inversePrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.copy),

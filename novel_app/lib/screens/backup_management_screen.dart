@@ -208,7 +208,6 @@ class _BackupManagementScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('备份管理'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: RefreshIndicator(
         onRefresh: _loadBackupList,
