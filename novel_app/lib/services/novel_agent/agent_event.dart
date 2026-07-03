@@ -10,6 +10,9 @@ class AgentToolCall {
   final Map<String, dynamic> arguments;
   final AgentToolStatus status;
   final String? result;
+  // running 期间已生成的字符数（流式进度），落库前应清为 null。
+  // 仅 create_chapter / update_chapter_content 这类内部走 LLM 流式的工具会写入。
+  final int? progressChars;
 
   const AgentToolCall({
     required this.id,
@@ -17,11 +20,16 @@ class AgentToolCall {
     required this.arguments,
     this.status = AgentToolStatus.running,
     this.result,
+    this.progressChars,
   });
 
   AgentToolCall copyWith({
     AgentToolStatus? status,
     String? result,
+    int? progressChars,
+    // copyWith 的 null 语义二义性：progressChars: null 既可能表示"不变"也可能表示"清空"。
+    // 这里默认 null = 不变（被 ?? this.progressChars 覆盖）；需要清空时传 clearProgress: true。
+    bool clearProgress = false,
   }) {
     return AgentToolCall(
       id: id,
@@ -29,6 +37,8 @@ class AgentToolCall {
       arguments: arguments,
       status: status ?? this.status,
       result: result ?? this.result,
+      progressChars:
+          clearProgress ? null : (progressChars ?? this.progressChars),
     );
   }
 }
@@ -77,6 +87,17 @@ class ToolCallEndEvent extends AgentEvent {
     this.fullResult,
     this.success = true,
   });
+}
+
+/// 工具调用进度（流式生成中）
+///
+/// 由内部走 LLM 流式的工具（如 create_chapter / update_chapter_content）在生成正文时
+/// 逐 chunk 上报已生成字符数。AgentLoop 节流后 emit，UI 据此在工具卡片 running 态
+/// 显示「已生成 N 字」。完成后由 ToolCallEndEvent 把卡片切到 completed。
+class ToolProgressEvent extends AgentEvent {
+  final String toolCallId;
+  final int generatedChars;
+  const ToolProgressEvent(this.toolCallId, this.generatedChars);
 }
 
 /// Agent 循环结束

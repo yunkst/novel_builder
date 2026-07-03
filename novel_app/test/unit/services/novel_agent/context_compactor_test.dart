@@ -222,7 +222,6 @@ void main() {
       expect(updated.enabled, isFalse);
       expect(updated.maxContextChars, 1000);
       expect(updated.preserveTailChars, original.preserveTailChars);
-      expect(updated.toolOutputMaxChars, original.toolOutputMaxChars);
     });
 
     test('disabled 常量正确禁用', () {

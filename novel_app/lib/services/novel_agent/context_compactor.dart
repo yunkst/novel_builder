@@ -11,6 +11,10 @@
 /// ScenarioSession 据此同步裁剪内存 + 删 DB（deleteMessagesBefore）。
 /// 不再需要 messageOwners / droppedHermesRange 的 UI 反推逻辑。
 ///
+/// 工具结果截断不在本组件负责：实时工具结果在 agent_loop.dart 已被
+/// [ToolResultFormatter] 截到 50000 字符，压缩阶段不再二次截断；超长的历史
+/// tool 结果会随整条消息丢弃。
+///
 /// P1 计划：用 LLM 生成结构化摘要替代简单截断
 library;
 
@@ -35,16 +39,10 @@ class CompactorConfig {
   /// 默认 100000 字符 ≈ 25K tokens（占总阈值的 20%，保证近期对话 + 工具结果不被丢）
   final int preserveTailChars;
 
-  /// 工具输出截断长度（压缩时单个 tool 结果的最大字符数）
-  ///
-  /// 默认 2000 字符，与 opencode 一致
-  final int toolOutputMaxChars;
-
   const CompactorConfig({
     this.enabled = true,
     this.maxContextChars = 500000,
     this.preserveTailChars = 100000,
-    this.toolOutputMaxChars = 2000,
   });
 
   /// 禁用压缩
@@ -54,13 +52,11 @@ class CompactorConfig {
     bool? enabled,
     int? maxContextChars,
     int? preserveTailChars,
-    int? toolOutputMaxChars,
   }) {
     return CompactorConfig(
       enabled: enabled ?? this.enabled,
       maxContextChars: maxContextChars ?? this.maxContextChars,
       preserveTailChars: preserveTailChars ?? this.preserveTailChars,
-      toolOutputMaxChars: toolOutputMaxChars ?? this.toolOutputMaxChars,
     );
   }
 }

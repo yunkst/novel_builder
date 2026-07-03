@@ -13,10 +13,16 @@ import '../dsl_engine/llm_provider.dart';
 import 'agent_event.dart';
 import 'agent_scenario.dart';
 import 'context_compactor.dart';
+import 'tool_result_formatter.dart';
 
 /// Agent 循环配置
 class AgentLoopConfig {
   final int maxRounds;
+
+  /// 给 LLM 的工具结果最大字符数（截断阈值）
+  ///
+  /// 默认 50000 字符 ≈ 12.5K tokens，覆盖单章正文（通常 3000-8000 字）。
+  /// 实际截断逻辑委托给 [ToolResultFormatter]。LLM 始终拿到合法 JSON。
   final int toolResultMaxChars;
 
   /// 上下文压缩配置（默认启用）
@@ -24,7 +30,7 @@ class AgentLoopConfig {
 
   const AgentLoopConfig({
     this.maxRounds = 50,
-    this.toolResultMaxChars = 2000,
+    this.toolResultMaxChars = 50000,
     this.compaction = const CompactorConfig(),
   });
 }
@@ -38,6 +44,7 @@ class AgentLoop {
   final AgentScenario _scenario;
   final AgentLoopConfig _config;
   final ContextCompactor _compactor;
+  late final ToolResultFormatter _toolResultFormatter;
 
   AgentLoop({
     required LlmProvider llm,
@@ -47,7 +54,10 @@ class AgentLoop {
         _scenario = scenario,
         _config = config ?? const AgentLoopConfig(),
         _compactor = ContextCompactor(
-            config: (config ?? const AgentLoopConfig()).compaction);
+            config: (config ?? const AgentLoopConfig()).compaction) {
+    _toolResultFormatter =
+        ToolResultFormatter(maxChars: _config.toolResultMaxChars);
+  }
 
   /// 运行 Agent 循环
   ///
@@ -253,10 +263,34 @@ class AgentLoop {
               category: LogCategory.ai, tags: ['agent', 'tool', call.name, _scenario.id]);
           emit(ToolCallStartEvent(call.name, call.arguments, call.id));
 
-          Map<String, dynamic> result;
+          // 流式进度节流：仅 create_chapter / update_chapter_content 这类
+          // 内部走 LLM 流式的工具会触发 onProgress 回调。
+          // - 首个非空 chunk 必发，避免短章节全程无进度
+          // - 之后每累计 100 字发一次（一章 ~3000 字约 30 次，UI 刷新可控）
+          // - 流结束不强制最后一次 emit：紧随其后的 ToolCallEndEvent 会切到 completed
+          const progressThreshold = 100;
+          var lastEmittedChars = 0;
+          var firstProgressEmitted = false;
 
-          // 执行工具（委托给场景）
-          final rawResult = await _scenario.executeTool(call.name, call.arguments);
+          // 执行工具（委托给场景），流式进度按 100 字节流上报
+          final rawResult = await _scenario.executeTool(
+            call.name,
+            call.arguments,
+            onProgress: (n) {
+              if (!firstProgressEmitted) {
+                firstProgressEmitted = true;
+                lastEmittedChars = n;
+                emit(ToolProgressEvent(call.id, n));
+              } else if (n - lastEmittedChars >= progressThreshold) {
+                lastEmittedChars = n;
+                emit(ToolProgressEvent(call.id, n));
+              }
+            },
+          );
+
+          // 工具结果格式化：截断逻辑委托给 ToolResultFormatter。
+          // llm = 合法 JSON（可能截断），给 LLM；full = 完整版，给 DB。
+          Map<String, dynamic> result;
           try {
             result = jsonDecode(rawResult) as Map<String, dynamic>;
           } catch (_) {
@@ -268,54 +302,17 @@ class AgentLoop {
             result = {'raw': rawResult};
           }
 
-          // 截断过长结果：错误响应优先保留 error/message/suggestion 字段；
-          // __meta（run_id 等关键元数据）始终保留到末尾，永不被截断。
-          var resultStr = jsonEncode(result);
-          // fullResultStr = 截断前的完整原始结果（含 __meta），供 DB 持久化。
-          // hydrate 续聊时 LLM 看到完整工具结果，避免截断版信息丢失。
-          final fullResultStr = resultStr;
+          final formatted =
+              _toolResultFormatter.format(result);
+          final resultStr = formatted.llm;
+          final fullResultStr = formatted.full;
 
-          // 剥离 __meta：体积小但承载 run_id 等句柄，必须送达 LLM
-          final meta = result.remove('__meta');
-
-          if (resultStr.length > _config.toolResultMaxChars) {
+          if (resultStr.length < fullResultStr.length) {
             LoggerService.instance.d(
-              '工具结果截断: ${call.name} originalLen=${resultStr.length} → ${_config.toolResultMaxChars}',
+              '工具结果截断: ${call.name} originalLen=${fullResultStr.length} → ${resultStr.length}',
               category: LogCategory.ai,
               tags: ['agent', 'tool', call.name, 'truncated'],
             );
-            if (result.containsKey('error')) {
-              // 错误结果：优先保留错误信息，截断其余数据
-              final errorInfo = <String, dynamic>{
-                'error': result['error'],
-              };
-              if (result['message'] != null) {
-                errorInfo['message'] = result['message'];
-              }
-              if (result['suggestion'] != null) {
-                errorInfo['suggestion'] = result['suggestion'];
-              }
-              final errorStr = jsonEncode(errorInfo);
-              final remaining =
-                  _config.toolResultMaxChars - errorStr.length - 30;
-              if (remaining > 200) {
-                final truncated = <String, dynamic>{
-                  ...errorInfo,
-                  'partial_data': resultStr.substring(0, remaining),
-                };
-                resultStr = jsonEncode(truncated);
-              } else {
-                resultStr = errorStr;
-              }
-            } else {
-              resultStr =
-                  '${resultStr.substring(0, _config.toolResultMaxChars)}... [truncated]';
-            }
-          }
-
-          // __meta 拼到末尾：永远不被截断预算影响，保证 run_id 可见
-          if (meta != null) {
-            resultStr = '$resultStr\n\n__meta=${jsonEncode(meta)}';
           }
 
           messages.add(ChatMessage(

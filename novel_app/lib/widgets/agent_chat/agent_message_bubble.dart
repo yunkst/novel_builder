@@ -309,9 +309,7 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      call.status == AgentToolStatus.running
-                          ? '${call.name}...'
-                          : call.name,
+                      _runningLabel(call),
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontFamily: 'monospace',
                         color: statusColor,
@@ -353,6 +351,17 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
   /// 解析工具结果中的重写成功信息（缓存，避免每次 build 重复解析）
   ChapterRewriteEntryData? get _rewriteEntry =>
       parseRewriteEntry(widget.call.result);
+
+  /// running 态标题文案：内部走 LLM 流式的工具显示「已生成 N 字」进度，
+  /// 其他工具维持原 `工具名...` 转圈语义。
+  String _runningLabel(AgentToolCall call) {
+    if (call.status != AgentToolStatus.running) return call.name;
+    final progress = call.progressChars;
+    if (progress != null && progress > 0) {
+      return '${call.name} · 已生成 $progress 字...';
+    }
+    return '${call.name}...';
+  }
 
   Widget _buildExpandedBody(BuildContext context, AgentToolCall call) {
     return Container(

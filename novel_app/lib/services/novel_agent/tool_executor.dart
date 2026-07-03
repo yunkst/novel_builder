@@ -54,6 +54,7 @@ class ToolExecutor {
     String toolName,
     Map<String, dynamic> args, {
     AgentScenarioContext? scenarioContext,
+    void Function(int generatedChars)? onProgress,
   }) async {
     LoggerService.instance.d('执行工具: $toolName (args=${args.keys.toList()})',
         category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'exec']);
@@ -75,9 +76,11 @@ class ToolExecutor {
           return await _searchInChapters(args, scenarioContext);
         // ===== 章节写入 =====
         case 'create_chapter':
-          return await _createChapter(args, scenarioContext);
+          return await _createChapter(args, scenarioContext,
+              onProgress: onProgress);
         case 'update_chapter_content':
-          return await _updateChapterContent(args, scenarioContext);
+          return await _updateChapterContent(args, scenarioContext,
+              onProgress: onProgress);
         // ===== 角色 =====
         case 'list_characters':
           return await _listCharacters(args, scenarioContext);
@@ -95,6 +98,8 @@ class ToolExecutor {
         // ===== 提示标签 =====
         case 'list_prompt_tags':
           return await _listPromptTags(args);
+        case 'get_prompt_tag':
+          return await _getPromptTag(args);
         case 'save_prompt_tag':
           return await _savePromptTag(args);
         case 'delete_prompt_tag':
@@ -398,8 +403,9 @@ class ToolExecutor {
 
   Future<String> _createChapter(
     Map<String, dynamic> args,
-    AgentScenarioContext? ctx,
-  ) async {
+    AgentScenarioContext? ctx, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     final parser = ToolArgParser(args);
     final (position, posErr) = parser.requireInt('position');
     if (posErr != null) return posErr;
@@ -453,6 +459,7 @@ class ToolExecutor {
       characterNames: charNames,
       tagNames: tags,
       scenarioId: ctx?.scenarioId ?? ScenarioIds.writing,
+      onProgress: onProgress,
     );
     if (generateResult.errorJson != null) {
       return jsonEncode(generateResult.errorJson);
@@ -503,8 +510,9 @@ class ToolExecutor {
 
   Future<String> _updateChapterContent(
     Map<String, dynamic> args,
-    AgentScenarioContext? ctx,
-  ) async {
+    AgentScenarioContext? ctx, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     final parser = ToolArgParser(args);
     final (position, posErr) = parser.requireInt('position');
     if (posErr != null) return posErr;
@@ -549,6 +557,7 @@ class ToolExecutor {
       characterNames: charNames,
       tagNames: tags,
       scenarioId: ctx?.scenarioId ?? ScenarioIds.writing,
+      onProgress: onProgress,
     );
     if (rewriteResult.errorJson != null) {
       return jsonEncode(rewriteResult.errorJson);
@@ -635,15 +644,18 @@ class ToolExecutor {
     return parts;
   }
 
-  /// 阻塞调用 LLM 生成正文。
+  /// 流式调用 LLM 生成正文。
   ///
   /// 由 [systemPrompt] 和 [userPrompt] 组成消息，使用写作场景的激活配置。
+  /// 走 [LlmProvider.chatStream] 逐 chunk 累积正文；每收到非空 chunk 时通过
+  /// [onProgress] 回调上报已生成字符数（供 UI 流式进度展示）。
   /// [failTag] 用于失败日志的 tag 归属。
   Future<_RewriteResult> _callLlm({
     required String systemPrompt,
     required String userPrompt,
     required String failTag,
     String scenarioId = ScenarioIds.writing,
+    void Function(int generatedChars)? onProgress,
   }) async {
     final configService = ref.read(llmConfigServiceProvider);
     final activeConfig =
@@ -658,15 +670,23 @@ class ToolExecutor {
     final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
 
     try {
-      final response = await llm.chat(
+      final buffer = StringBuffer();
+      await for (final chunk in llm.chatStream(
         messages: [
           ChatMessage(role: 'system', content: systemPrompt),
           ChatMessage(role: 'user', content: userPrompt),
         ],
         maxTokens: 8192,
         temperature: 0.8,
-      );
-      final content = response.content.trim();
+      )) {
+        if (chunk.isNotEmpty) {
+          buffer.write(chunk);
+          if (onProgress != null) {
+            onProgress(buffer.length);
+          }
+        }
+      }
+      final content = buffer.toString().trim();
       if (content.isEmpty) {
         return _RewriteResult.failure({
           'error': 'llm_empty_response',
@@ -689,7 +709,7 @@ class ToolExecutor {
   /// 调用 LLM 重写章节
   ///
   /// 组合「原文 + 修改要求 + 人物卡 + 标签 prompt」为提示词，
-  /// 阻塞调用 LLM，返回新正文或错误。
+  /// 流式调用 LLM，返回新正文或错误。
   Future<_RewriteResult> _rewriteChapter({
     required String novelUrl,
     required String chapterTitle,
@@ -698,6 +718,7 @@ class ToolExecutor {
     required List<String> characterNames,
     required List<String> tagNames,
     String scenarioId = ScenarioIds.writing,
+    void Function(int generatedChars)? onProgress,
   }) async {
     final writerPrompt = await _loadWriterPrompt();
     final contextParts =
@@ -712,18 +733,15 @@ class ToolExecutor {
       ..writeln('## 修改要求')
       ..writeln(rewriteInstruction)
       ..writeln();
-    if (writerPrompt.isNotEmpty) {
-      prompt.writeln('## AI 作家设定');
-      prompt.writeln(writerPrompt);
-      prompt.writeln();
-    }
     if (contextParts.isNotEmpty) {
       prompt.writeln(contextParts.join('\n'));
       prompt.writeln();
     }
     prompt
       ..writeln('## 原文')
+      ..writeln('<<<原文开始>>>')
       ..writeln(originalContent)
+      ..writeln('<<<原文结束>>>')
       ..writeln()
       ..writeln('## 输出要求')
       ..writeln('请直接输出重写后的完整章节正文，不要输出任何说明、标题或解释性文字。');
@@ -737,13 +755,14 @@ class ToolExecutor {
       userPrompt: prompt.toString(),
       failTag: 'update_chapter_content',
       scenarioId: scenarioId,
+      onProgress: onProgress,
     );
   }
 
   /// 调用 LLM 创作新章节
   ///
   /// 组合「创作要求 + 人物卡 + 标签 prompt」为提示词（无原文），
-  /// 阻塞调用 LLM，返回新正文或错误。
+  /// 流式调用 LLM，返回新正文或错误。
   Future<_RewriteResult> _generateChapter({
     required String novelUrl,
     required String chapterTitle,
@@ -751,6 +770,7 @@ class ToolExecutor {
     required List<String> characterNames,
     required List<String> tagNames,
     String scenarioId = ScenarioIds.writing,
+    void Function(int generatedChars)? onProgress,
   }) async {
     final writerPrompt = await _loadWriterPrompt();
     final contextParts =
@@ -765,11 +785,6 @@ class ToolExecutor {
       ..writeln('## 创作要求')
       ..writeln(instruction)
       ..writeln();
-    if (writerPrompt.isNotEmpty) {
-      prompt.writeln('## AI 作家设定');
-      prompt.writeln(writerPrompt);
-      prompt.writeln();
-    }
     if (contextParts.isNotEmpty) {
       prompt.writeln(contextParts.join('\n'));
       prompt.writeln();
@@ -787,6 +802,7 @@ class ToolExecutor {
       userPrompt: prompt.toString(),
       failTag: 'create_chapter',
       scenarioId: scenarioId,
+      onProgress: onProgress,
     );
   }
 
@@ -1127,9 +1143,6 @@ class ToolExecutor {
                   'id': t.id,
                   'name': t.name,
                   'reason': t.reason,
-                  'promptText': t.promptText.length > 150
-                      ? '${t.promptText.substring(0, 150)}...'
-                      : t.promptText,
                 })
             .toList(),
         'tagCount': tags.length,
@@ -1147,6 +1160,109 @@ class ToolExecutor {
       'totalTags': totalTags,
     });
   }
+
+  Future<String> _getPromptTag(Map<String, dynamic> args) async {
+    final parser = ToolArgParser(args);
+    final (id, idErr) = parser.optionalInt('id');
+    if (idErr != null) return idErr;
+    final (name, _) = parser.optionalString('name');
+
+    if (id == null && (name == null || name.isEmpty)) {
+      LoggerService.instance.d(
+        '工具引导错误: missing_arg (id 和 name 均未提供)',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'get_prompt_tag', 'missing_arg'],
+      );
+      return jsonEncode({
+        'error': 'missing_arg',
+        'message': '需要提供 id 或 name 来查看标签详情',
+      });
+    }
+
+    final tagRepo = ref.read(promptTagRepositoryProvider);
+    final categoryRepo = ref.read(promptTagCategoryRepositoryProvider);
+    final categories = await categoryRepo.getAll();
+    final categoryNameById = <int, String>{};
+    for (final c in categories) {
+      if (c.id != null) categoryNameById[c.id!] = c.name;
+    }
+
+    // id 精确查询
+    if (id != null) {
+      final tags = await tagRepo.getByIds([id]);
+      if (tags.isEmpty) {
+        LoggerService.instance.d(
+          '工具引导错误: tag_not_found id=$id',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'get_prompt_tag', 'tag_not_found'],
+        );
+        return jsonEncode({
+          'error': 'tag_not_found',
+          'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+          'suggested_tool': 'list_prompt_tags',
+        });
+      }
+      final t = tags.first;
+      LoggerService.instance.i('查看提示标签详情: "${t.name}" (id=$id)',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'get_prompt_tag']);
+      return jsonEncode({
+        'success': true,
+        'tag': _tagDetail(t, categoryNameById[t.categoryId]),
+      });
+    }
+
+    // name 大小写无关精确匹配
+    final all = await tagRepo.getAll();
+    final matched = all
+        .where((t) => t.name.toLowerCase() == name!.toLowerCase())
+        .toList();
+    if (matched.isEmpty) {
+      final fuzzy = await tagRepo.search(name!);
+      final suggestedNames = fuzzy.map((t) => t.name).toSet().toList();
+      LoggerService.instance.d(
+        '工具引导错误: tag_not_found name=$name',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'get_prompt_tag', 'tag_not_found'],
+      );
+      return jsonEncode({
+        'error': 'tag_not_found',
+        'message': '没有名为 "$name" 的标签。',
+        if (suggestedNames.isNotEmpty) 'suggested_names': suggestedNames,
+        'suggested_tool': 'list_prompt_tags',
+      });
+    }
+    if (matched.length == 1) {
+      final t = matched.first;
+      LoggerService.instance.i('查看提示标签详情: "${t.name}" (by name)',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'get_prompt_tag']);
+      return jsonEncode({
+        'success': true,
+        'tag': _tagDetail(t, categoryNameById[t.categoryId]),
+      });
+    }
+    LoggerService.instance.i(
+        '查看提示标签: name="$name" 命中 ${matched.length} 个',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'get_prompt_tag']);
+    return jsonEncode({
+      'success': true,
+      'message': '找到 ${matched.length} 个名为 "$name" 的标签，请用 id 精确查看',
+      'tags': matched
+          .map((t) => _tagDetail(t, categoryNameById[t.categoryId]))
+          .toList(),
+    });
+  }
+
+  /// 构造标签详情（含完整 promptText）
+  Map<String, dynamic> _tagDetail(PromptTag t, String? categoryName) => {
+        'id': t.id,
+        'name': t.name,
+        'categoryName': categoryName,
+        'reason': t.reason,
+        'promptText': t.promptText,
+      };
 
   Future<String> _savePromptTag(Map<String, dynamic> args) async {
     final parser = ToolArgParser(args);

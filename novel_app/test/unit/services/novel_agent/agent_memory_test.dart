@@ -390,7 +390,11 @@ class _TestScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
   String buildSystemPrompt(AgentScenarioContext context) => '';
 
   @override
-  Future<String> executeTool(String name, Map<String, dynamic> args) async => '';
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  }) async => '';
 
   @override
   Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;

@@ -236,9 +236,15 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   }
 
   @override
-  Future<String> executeTool(String name, Map<String, dynamic> args) async {
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     // 任意工具调用都视为 agent 在"行动"，标记供 onNoToolCalls 状态机判断
     _hadToolCallSinceLastCheck = true;
+    // onProgress 在本场景不使用：webview_extract 的工具均为 WebView/DB 操作，
+    // 没有内部走 LLM 流式的工具。参数仅为对齐 AgentScenario 接口签名。
 
     LoggerService.instance.d(
       'WebViewExtractScenario 执行工具: $name',

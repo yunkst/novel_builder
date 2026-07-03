@@ -128,7 +128,11 @@ class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario 
   Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
 
   @override
-  Future<String> executeTool(String name, Map<String, dynamic> args) async {
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     if (toolDelay != null) {
       await Future<void>.delayed(toolDelay!);
     }
@@ -403,7 +407,11 @@ class _CancelAfterFirstToolScenario with AgentScenarioCleanupMixin
   Future<void> cleanup() => inner.cleanup();
 
   @override
-  Future<String> executeTool(String name, Map<String, dynamic> args) async {
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     final result = await inner.executeTool(name, args);
     if (!_firstDone) {
       _firstDone = true;

@@ -37,6 +37,7 @@ class AgentTools {
     _getOutline,
     // ===== 提示标签 =====
     _listPromptTags,
+    _getPromptTag,
     _savePromptTag,
     _deletePromptTag,
   ];
@@ -404,7 +405,9 @@ class AgentTools {
       'name': 'list_prompt_tags',
       'description':
           '获取写作提示标签列表，支持按分类名筛选或获取全部。'
-          '标签按分类分组返回，每个标签包含名称、使用场景和提示词摘要。\n'
+          '标签按分类分组返回，每个标签仅包含 id、名称和使用场景'
+          '（不含提示词正文，以节省上下文）。\n'
+          '查看某个标签的完整提示词请用 get_prompt_tag。\n'
           '使用场景：\n'
           '- 用户想查看或了解可用的写作技巧标签\n'
           '- 需要为写作选择合适的标签风格\n'
@@ -415,6 +418,34 @@ class AgentTools {
           'categoryName': {
             'type': 'string',
             'description': '分类名称筛选（如"风格"、"场景"、"人物"、"情节"）。不填则返回全部分类及其标签。',
+          },
+        },
+        'required': <String>[],
+      },
+    },
+  };
+
+  static const _getPromptTag = {
+    'type': 'function',
+    'function': {
+      'name': 'get_prompt_tag',
+      'description':
+          '查看指定标签的完整提示词（promptText）。\n'
+          '- 传入 id 精确查看单个标签\n'
+          '- 传入 name 按名称查看（大小写无关精确匹配；同名存在多个时一并返回）\n'
+          '使用场景：\n'
+          '- 已通过 list_prompt_tags 拿到标签 id 或名称，想查看完整提示词\n'
+          '- 引用或修改标签前确认其提示词内容',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'id': {
+            'type': 'integer',
+            'description': '标签 ID（从 list_prompt_tags 获取）',
+          },
+          'name': {
+            'type': 'string',
+            'description': '标签名称（大小写无关精确匹配）',
           },
         },
         'required': <String>[],

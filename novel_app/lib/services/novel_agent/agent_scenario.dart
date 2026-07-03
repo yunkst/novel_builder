@@ -74,7 +74,14 @@ abstract class AgentScenario {
   String buildSystemPrompt(AgentScenarioContext context);
 
   /// 执行工具调用
-  Future<String> executeTool(String name, Map<String, dynamic> args);
+  ///
+  /// [onProgress] 可选进度回调，供内部走 LLM 流式的工具（如 create_chapter /
+  /// update_chapter_content）上报已生成字符数。不传或工具无流式生成时忽略。
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  });
 
   /// 当本轮 LLM 响应无 tool_calls（即将结束循环）时的注入钩子
   ///

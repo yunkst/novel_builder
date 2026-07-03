@@ -53,7 +53,11 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
   }
 
   @override
-  Future<String> executeTool(String name, Map<String, dynamic> args) async {
+  Future<String> executeTool(
+    String name,
+    Map<String, dynamic> args, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
     LoggerService.instance.d(
       'WritingScenario 执行工具: $name',
       category: LogCategory.ai,
@@ -70,7 +74,13 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
       _syncCurrentContext(result);
       return result;
     }
-    return await _executor.execute(name, args, scenarioContext: _currentContext);
+    // 其余工具（含 create_chapter / update_chapter_content 的流式进度）透传 onProgress
+    return await _executor.execute(
+      name,
+      args,
+      scenarioContext: _currentContext,
+      onProgress: onProgress,
+    );
   }
 
   /// 写作场景无需"无 tool_call 注入"，直接结束

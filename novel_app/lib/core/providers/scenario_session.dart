@@ -606,7 +606,7 @@ class ScenarioSession {
 
       case ToolCallEndEvent e:
         final idx = _pendingSegments.indexWhere(
-          (s) => s is ToolCallSegment && s.call.id == e.toolCallId,
+            (s) => s is ToolCallSegment && s.call.id == e.toolCallId,
         );
         if (idx >= 0) {
           final old = (_pendingSegments[idx] as ToolCallSegment).call;
@@ -615,6 +615,8 @@ class ScenarioSession {
                 e.success ? AgentToolStatus.completed : AgentToolStatus.error,
             // 落库用 fullResult（完整原始），UI 展示也用 fullResult（信息更全）
             result: e.fullResult ?? e.result,
+            // 工具结束：清空 running 期间的瞬时进度，避免 completed 后残留旧字数
+            clearProgress: true,
           ));
         }
         if (e.success && (e.name == 'select_novel' || e.name == 'create_novel')) {
@@ -623,6 +625,23 @@ class ScenarioSession {
         _state = _state.copyWith(
           streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
+
+      case ToolProgressEvent e:
+        // 流式生成中：更新对应 running 态工具卡片的已生成字符数
+        final idx = _pendingSegments.indexWhere(
+            (s) => s is ToolCallSegment && s.call.id == e.toolCallId);
+        if (idx >= 0) {
+          final old = (_pendingSegments[idx] as ToolCallSegment).call;
+          // 防乱序：进度事件可能晚于 end 到达，仅更新仍处于 running 态的卡片
+          if (old.status == AgentToolStatus.running) {
+            _pendingSegments[idx] =
+                ToolCallSegment(old.copyWith(progressChars: e.generatedChars));
+            _state = _state.copyWith(
+              streamingSegments:
+                  List<AgentChatSegment>.unmodifiable(_pendingSegments),
+            );
+          }
+        }
 
       case CompactionEvent e:
         _handleCompaction(e);
