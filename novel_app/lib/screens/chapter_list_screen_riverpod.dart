@@ -4,6 +4,7 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/providers/chapter_list_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../widgets/agent_chat/agent_floating_button.dart';
 import '../core/providers/service_providers.dart';
 import '../widgets/chapter_list/chapter_list_header.dart';
@@ -12,6 +13,7 @@ import '../widgets/chapter_list/reorderable_chapter_item.dart';
 import '../widgets/chapter_list/empty_chapters_view.dart';
 import '../constants/chapter_constants.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/common/library_app_bar.dart';
 import 'reader_screen.dart';
 import 'chapter_search_screen.dart';
 import 'background_setting_screen.dart';
@@ -117,9 +119,8 @@ class _ChapterListScreenRiverpodState
 
     return AgentFloatingShell(
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.novel.title),
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        appBar: LibraryAppBar(
+          title: widget.novel.title,
           actions: [
             _buildReorderButton(state, notifier),
             _buildSearchButton(),
@@ -408,54 +409,117 @@ class _ChapterListScreenRiverpodState
 
   /// 构建分页控制栏
   Widget _buildPaginationControl(ChapterListState state, ChapterList notifier) {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
+    final colors = context.appColors;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final isFirstPage = state.currentPage <= 1;
+    final isLastPage = state.currentPage >= state.totalPages;
+
+    // 次级按钮（首页 / 末页）：小图标 + 浅色
+    Widget buildSecondaryButton({
+      required IconData icon,
+      required VoidCallback? onPressed,
+      required String tooltip,
+    }) {
+      return IconButton(
+        icon: Icon(icon, size: 20),
+        onPressed: onPressed,
+        tooltip: tooltip,
+        constraints: const BoxConstraints(minHeight: 36, minWidth: 36),
+        padding: EdgeInsets.zero,
+        color: colorScheme.onSurfaceVariant,
+        disabledColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+      );
+    }
+
+    // 主按钮（上一页 / 下一页）：圆形琥珀色背景
+    Widget buildPrimaryButton({
+      required IconData icon,
+      required VoidCallback? onPressed,
+      required String tooltip,
+    }) {
+      final enabled = onPressed != null;
+      return Tooltip(
+        message: tooltip,
+        child: Material(
+          color: enabled
+              ? colors.agentAccent
+              : colors.agentAccent.withValues(alpha: 0.3),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: SizedBox(
+              height: 36,
+              width: 36,
+              child: Icon(
+                icon,
+                size: 22,
+                color: colors.agentOnBrand,
+              ),
+            ),
+          ),
         ),
+      );
+    }
+
+    return Card(
+      elevation: 1,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 首页按钮
-          IconButton(
-            icon: const Icon(Icons.first_page),
-            onPressed:
-                state.currentPage > 1 ? () => notifier.goToPage(1) : null,
-            tooltip: '首页',
-          ),
-          // 上一页按钮
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: state.currentPage > 1
-                ? () => notifier.goToPage(state.currentPage - 1)
-                : null,
-            tooltip: '上一页',
-          ),
-          // 页码显示
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text('第 ${state.currentPage} / ${state.totalPages} 页'),
-          ),
-          // 下一页按钮
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            onPressed: state.currentPage < state.totalPages
-                ? () => notifier.goToPage(state.currentPage + 1)
-                : null,
-            tooltip: '下一页',
-          ),
-          // 末页按钮
-          IconButton(
-            icon: const Icon(Icons.last_page),
-            onPressed: state.currentPage < state.totalPages
-                ? () => notifier.goToPage(state.totalPages)
-                : null,
-            tooltip: '末页',
-          ),
-        ],
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 首页按钮
+            buildSecondaryButton(
+              icon: Icons.first_page,
+              onPressed:
+                  isFirstPage ? null : () => notifier.goToPage(1),
+              tooltip: '首页',
+            ),
+            const SizedBox(width: 4),
+            // 上一页按钮（主按钮）
+            buildPrimaryButton(
+              icon: Icons.chevron_left,
+              onPressed: isFirstPage
+                  ? null
+                  : () => notifier.goToPage(state.currentPage - 1),
+              tooltip: '上一页',
+            ),
+            // 页码显示
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                '第 ${state.currentPage} / ${state.totalPages} 页',
+                style: AppTypography.metaItalic.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // 下一页按钮（主按钮）
+            buildPrimaryButton(
+              icon: Icons.chevron_right,
+              onPressed: isLastPage
+                  ? null
+                  : () => notifier.goToPage(state.currentPage + 1),
+              tooltip: '下一页',
+            ),
+            const SizedBox(width: 4),
+            // 末页按钮
+            buildSecondaryButton(
+              icon: Icons.last_page,
+              onPressed: isLastPage
+                  ? null
+                  : () => notifier.goToPage(state.totalPages),
+              tooltip: '末页',
+            ),
+          ],
+        ),
       ),
     );
   }

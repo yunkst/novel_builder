@@ -184,7 +184,6 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜索章节内容'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           if (searchState.hasSearched)
             IconButton(

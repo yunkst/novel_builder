@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/webview_add_novel_providers.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../services/logger_service.dart';
@@ -55,6 +56,9 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       heroTag: 'add_novel_fab',
       onPressed: _isExtracting ? null : () => _handleAddNovel(context),
       tooltip: '添加小说',
+      backgroundColor: context.appColors.agentAccent,
+      foregroundColor: context.appColors.agentOnBrand,
+      elevation: 4,
       child: _isExtracting
           ? const SizedBox(
               width: 20,

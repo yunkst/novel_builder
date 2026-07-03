@@ -390,7 +390,6 @@ class _BackgroundSettingScreenState
                 ),
               ],
             ),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             actions: [
               // 保存按钮
               IconButton(

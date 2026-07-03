@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_colors.dart';
+
 class ReaderActionButtons extends StatelessWidget {
   final bool isAutoScrolling;
   final bool isAutoScrollPaused;
@@ -22,7 +24,10 @@ class ReaderActionButtons extends StatelessWidget {
             ? (isAutoScrollPaused ? '恢复自动滚动' : '暂停自动滚动')
             : '开始自动滚动',
         heroTag: 'auto_scroll',
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.appColors.agentAccent,
+        foregroundColor: context.appColors.agentOnBrand,
+        elevation: 4,
+        shape: const CircleBorder(),
         child: Icon(isAutoScrolling
             ? (isAutoScrollPaused ? Icons.play_arrow : Icons.pause)
             : Icons.play_arrow),

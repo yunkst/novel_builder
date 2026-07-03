@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
+import 'package:novel_app/core/theme/app_colors.dart';
 import 'package:novel_app/models/chat_session.dart';
 import 'package:novel_app/utils/format_utils.dart';
 
@@ -148,7 +149,7 @@ class ChatHistoryListItem extends ConsumerWidget {
             child: const Text('取消'),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: context.appColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('删除'),
           ),

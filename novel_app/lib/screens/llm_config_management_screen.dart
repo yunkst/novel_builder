@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/services/ai_service_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/llm_config.dart';
 import '../../services/logger_service.dart';
 
@@ -97,7 +98,7 @@ class _LlmConfigManagementScreenState
         leading: IconButton(
           icon: Icon(
             config.isDefault ? Icons.star : Icons.star_border,
-            color: config.isDefault ? Colors.amber : null,
+            color: config.isDefault ? context.appColors.warning : null,
           ),
           tooltip: config.isDefault ? '默认配置' : '设为默认',
           onPressed: config.isDefault ? null : () => _setDefault(config.id!),

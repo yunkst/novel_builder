@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/models/novel.dart';
 
+import '../empty_states/empty_state_view.dart';
+
 /// 小说选择对话框
 ///
 /// 列出书架中的所有小说供用户选择。
@@ -81,11 +83,11 @@ class _AgentNovelPickerDialogState
                   }
                   final novels = snapshot.data ?? const [];
                   if (novels.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('书架为空，请先添加小说'),
-                      ),
+                    return const EmptyStateView(
+                      icon: Icons.library_books_outlined,
+                      title: '书架为空',
+                      subtitle: '请先在浏览器中添加小说到书架',
+                      padding: EdgeInsets.symmetric(horizontal: 16),
                     );
                   }
                   return ListView.separated(

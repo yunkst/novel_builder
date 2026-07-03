@@ -8,6 +8,9 @@ import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
 import '../widgets/empty_states/empty_bookshelf.dart';
+import '../widgets/novel/novel_cover.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
@@ -303,21 +306,142 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     }
   }
 
-  /// 显示上传所有小说对话框
+  /// 显示小说操作菜单（编辑/移动/复制/移除）
+  void _showNovelMenu(Novel novel) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        final colors = sheetCtx.appColors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '《${novel.title}》',
+                    style: AppTypography.novelTitle.copyWith(
+                      fontSize: 16,
+                      color: colors.chatPrimaryText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.edit_outlined, color: colors.info),
+                title: const Text('编辑书名'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _editNovelTitle(novel);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.drive_file_move_outline, color: colors.warning),
+                title: const Text('移动到书架'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _showBookshelfSelectionDialog(novel, 'move');
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.copy_all_outlined, color: colors.success),
+                title: const Text('复制到书架'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _showBookshelfSelectionDialog(novel, 'copy');
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: colors.error),
+                title: const Text('从书架移除'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _removeFromBookshelf(novel);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentBookshelfId = ref.watch(currentBookshelfIdProvider);
     final bookshelfAsync = ref.watch(bookshelfNovelsProvider);
     final cacheStats = ref.watch(bookshelfCacheStatsProvider).valueOrNull;
+    final colors = context.appColors;
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('我的书架'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        toolbarHeight: 72,
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            // 品牌标记 · 卷轴
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.agentAccent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '卷',
+                style: AppTypography.chapterTitle.copyWith(
+                  fontSize: 20,
+                  color: colors.agentOnBrand,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '我的书架',
+                    style: AppTypography.shelfTitle.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Midnight Library',
+                    style: AppTypography.metaItalic.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索',
+            onPressed: () {
+              // 搜索入口暂沿用浏览器；后续可接入书架内搜索
+              ToastUtils.showInfo('在浏览器中搜索并加入书架', context: context);
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         children: [
-          // 书架选择器
+          // 书架选择器（沿用现有组件，已自带样式）
           BookshelfSelector(
             currentBookshelfId: currentBookshelfId,
             onBookshelfChanged: _onBookshelfChanged,
@@ -333,7 +457,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: Theme.of(context).colorScheme.error,
+                      color: colors.error,
                     ),
                     const SizedBox(height: 16),
                     Text('加载失败: $error'),
@@ -345,194 +469,435 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                   return const EmptyBookshelfView();
                 }
 
+                final totalCached = cacheStats?.values.fold<int>(
+                      0,
+                      (s, v) => s + v.cached,
+                    ) ??
+                    0;
+                final totalChapters = cacheStats?.values.fold<int>(
+                      0,
+                      (s, v) => s + v.total,
+                    ) ??
+                    0;
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(bookshelfNovelsProvider);
                     ref.invalidate(bookshelfCacheStatsProvider);
                   },
-                  child: ListView.builder(
-                    itemCount: bookshelf.length,
-                    itemBuilder: (context, index) {
-                      final novel = bookshelf[index];
-                      final stats = cacheStats?[novel.url];
-                      final cached = stats?.cached ?? 0;
-                      final total = stats?.total ?? 0;
-                      final double percent = stats?.percent ?? 0.0;
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: _ShelfMetaBar(
+                          count: bookshelf.length,
+                          cached: totalCached,
+                          total: totalChapters,
                         ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  novel.title,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                            ],
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.58,
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '作者: ${novel.author}',
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                  if (novel.url.startsWith('custom://')) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .tertiary
-                                            .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .tertiary
-                                                .withValues(alpha: 0.3)),
-                                      ),
-                                      child: Text(
-                                        '原创',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall!
-                                            .copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .tertiary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final novel = bookshelf[index];
+                              final stats = cacheStats?[novel.url];
+                              final total = stats?.total ?? 0;
+                              final cached = stats?.cached ?? 0;
+                              return _NovelCard(
+                                novel: novel,
+                                totalChapters: total,
+                                cachedChapters: cached,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ChapterListScreenRiverpod(
+                                        novel: novel,
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              if (total > 0) ...[
-                                LinearProgressIndicator(value: percent),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '已缓存章节: $cached / $total',
-                                  style: const TextStyle(fontSize: 12),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ],
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // 继续阅读按钮（仅在有阅读记录时显示）
-                              if (novel.lastReadChapterIndex != null &&
-                                  novel.lastReadChapterIndex! > 0)
-                                IconButton(
-                                  icon: const Icon(Icons.menu_book),
-                                  tooltip: '继续阅读',
-                                  onPressed: () => _continueReading(novel),
-                                ),
-                              // 原有的菜单按钮
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _editNovelTitle(novel);
-                                      break;
-                                    case 'move':
-                                      _showBookshelfSelectionDialog(novel, 'move');
-                                      break;
-                                    case 'copy':
-                                      _showBookshelfSelectionDialog(novel, 'copy');
-                                      break;
-                                    case 'delete':
-                                      _removeFromBookshelf(novel);
-                                      break;
-                                  }
+                                  );
                                 },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.edit),
-                                        SizedBox(width: 8),
-                                        Text('编辑书名'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'move',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.drive_file_move_outline,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text('移动到书架'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'copy',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.copy),
-                                        SizedBox(width: 8),
-                                        Text('复制到书架'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete),
-                                        SizedBox(width: 8),
-                                        Text('从书架移除'),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                onContinue: () => _continueReading(novel),
+                                onMenu: () => _showNovelMenu(novel),
+                              );
+                            },
+                            childCount: bookshelf.length,
                           ),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ChapterListScreenRiverpod(novel: novel),
-                              ),
-                            ).then((_) {
-                              // 书架列表会通过Riverpod自动刷新，无需手动刷新
-                            });
-                          },
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 );
               },
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          ToastUtils.showInfo('在浏览器中搜索并加入书架', context: context);
+        },
+        backgroundColor: colors.agentAccent,
+        foregroundColor: colors.agentOnBrand,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+/// 书架元信息条 · 馆藏数 / 缓存进度
+class _ShelfMetaBar extends StatelessWidget {
+  const _ShelfMetaBar({
+    required this.count,
+    required this.cached,
+    required this.total,
+  });
+
+  final int count;
+  final int cached;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+      child: Row(
+        children: [
+          _MetaChip(
+            icon: Icons.menu_book_outlined,
+            label: '馆藏',
+            value: '$count',
+            color: colors.agentAccent,
+          ),
+          const SizedBox(width: 14),
+          _MetaChip(
+            icon: Icons.cloud_download_outlined,
+            label: '已缓存',
+            value: total > 0 ? '$cached / $total' : '—',
+            color: colors.success,
+          ),
+          const Spacer(),
+          Text(
+            '长按封面管理',
+            style: AppTypography.metaItalic.copyWith(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 小说卡片 · 封面网格单元
+class _NovelCard extends StatelessWidget {
+  const _NovelCard({
+    required this.novel,
+    required this.totalChapters,
+    required this.cachedChapters,
+    required this.onTap,
+    required this.onContinue,
+    required this.onMenu,
+  });
+
+  final Novel novel;
+  final int totalChapters;
+  final int cachedChapters;
+  final VoidCallback onTap;
+  final VoidCallback onContinue;
+  final VoidCallback onMenu;
+
+  bool get _hasReadingRecord =>
+      novel.lastReadChapterIndex != null && novel.lastReadChapterIndex! > 0;
+
+  double get _readPercent {
+    if (!_hasReadingRecord || totalChapters <= 0) return 0.0;
+    final v = novel.lastReadChapterIndex! / totalChapters;
+    if (v < 0) return 0.0;
+    if (v > 1) return 1.0;
+    return v;
+  }
+
+  double get _cachePercent {
+    if (totalChapters <= 0) return 0.0;
+    final v = cachedChapters / totalChapters;
+    if (v < 0) return 0.0;
+    if (v > 1) return 1.0;
+    return v;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final theme = Theme.of(context);
+    final isOriginal = novel.url.startsWith('custom://');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onMenu,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 封面 · 外层 InkWell 已处理 onLongPress，此处不重复绑定
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: NovelCover(
+                        novel: novel,
+                        isReading: _hasReadingRecord,
+                        isOriginal: isOriginal,
+                      ),
+                    ),
+                    // 右上 · 更多操作（封面内浮层固定黑白：封面恒为深色渐变，不随主题变）
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: onMenu,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.more_horiz,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 标题
+              Text(
+                novel.title,
+                style: AppTypography.novelTitle.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              // 作者
+              Text(
+                novel.author,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              // 双进度：阅读 + 缓存
+              if (totalChapters > 0)
+                _DualProgress(
+                  readPercent: _readPercent,
+                  cachePercent: _cachePercent,
+                )
+              else
+                Text(
+                  '未获取章节',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.chatHintText,
+                    fontSize: 11,
+                  ),
+                ),
+              // 继续阅读按钮
+              if (_hasReadingRecord) ...[
+                const SizedBox(height: 8),
+                _ContinueButton(onPressed: onContinue),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 双进度条 · 阅读进度（琥珀）+ 缓存进度（苔绿）
+class _DualProgress extends StatelessWidget {
+  const _DualProgress({
+    required this.readPercent,
+    required this.cachePercent,
+  });
+
+  final double readPercent;
+  final double cachePercent;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final theme = Theme.of(context);
+    final trackColor = theme.colorScheme.onSurface.withValues(alpha: 0.08);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 阅读进度
+        Row(
+          children: [
+            Text(
+              '读',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
+                color: colors.agentAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: readPercent,
+                  minHeight: 3,
+                  backgroundColor: trackColor,
+                  valueColor: AlwaysStoppedAnimation(colors.agentAccent),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${(readPercent * 100).round()}%',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        // 缓存进度
+        Row(
+          children: [
+            Text(
+              '缓',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
+                color: colors.success,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: cachePercent,
+                  minHeight: 3,
+                  backgroundColor: trackColor,
+                  valueColor: AlwaysStoppedAnimation(colors.success),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${(cachePercent * 100).round()}%',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 继续阅读按钮
+class _ContinueButton extends StatelessWidget {
+  const _ContinueButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return SizedBox(
+      height: 28,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(Icons.menu_book, size: 14, color: colors.agentAccent),
+        label: Text(
+          '继续阅读',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: colors.agentAccent,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          minimumSize: Size.zero,
+          side: BorderSide(color: colors.agentAccent.withValues(alpha: 0.5)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
       ),
     );
   }

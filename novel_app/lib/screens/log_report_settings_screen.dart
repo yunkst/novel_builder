@@ -48,7 +48,6 @@ class _LogReportSettingsScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('日志上报'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ListView(
         children: [

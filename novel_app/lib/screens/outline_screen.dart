@@ -227,7 +227,6 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
                 ),
               ],
             ),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             actions: [
               IconButton(
                 icon: _isSaving

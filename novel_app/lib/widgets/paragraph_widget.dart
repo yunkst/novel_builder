@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_typography.dart';
 import '../utils/media_markup_parser.dart';
 
 class ParagraphWidget extends StatefulWidget {
@@ -114,10 +115,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
         ),
-        style: TextStyle(
+        style: AppTypography.bodyProse.copyWith(
           fontSize: widget.fontSize,
-          height: 1.8,
-          letterSpacing: 0.5,
           color: Theme.of(context).textTheme.bodyLarge?.color,
         ),
         maxLines: null,
@@ -140,10 +139,8 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
           ),
           child: Text(
             widget.paragraph.trim(),
-            style: TextStyle(
+            style: AppTypography.bodyProse.copyWith(
               fontSize: widget.fontSize,
-              height: 1.8,
-              letterSpacing: 0.5,
               color: effectiveColor,
             ),
           ),

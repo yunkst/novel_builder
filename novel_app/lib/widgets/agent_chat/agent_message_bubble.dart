@@ -99,7 +99,7 @@ class AgentMessageBubble extends StatelessWidget {
     if (isUser) {
       return context.appColors.agentAccent;
     }
-    return Theme.of(context).colorScheme.surfaceContainerHighest;
+    return context.appColors.chatRoleBubble;
   }
 
   /// 回滚按钮（小图标 + tooltip）,仅 user 消息 + onRollback != null 时渲染

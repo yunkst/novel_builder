@@ -5,6 +5,7 @@ import '../../core/providers/onboarding_providers.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/providers/ui_providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/llm_config.dart';
 import '../../services/logger_service.dart';
 import '../../utils/toast_utils.dart';
@@ -351,8 +352,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Center(
             child: Text(
               title,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: AppTypography.onboardingTitle.copyWith(
+                color: colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -443,8 +444,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Center(
             child: Text(
               '后端服务',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: AppTypography.onboardingTitle.copyWith(
+                color: colorScheme.onSurface,
               ),
             ),
           ),
@@ -532,8 +533,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Center(
             child: Text(
               '配置 AI 引擎',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: AppTypography.onboardingTitle.copyWith(
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),

@@ -9,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../services/logger_service.dart';
 import '../../services/preferences_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_typography.dart';
 
 part 'theme_provider.g.dart';
 
@@ -28,7 +29,8 @@ class ThemeState {
 
   const ThemeState({
     required this.themeMode,
-    this.seedColor = Colors.blue,
+    // 书馆美学种子色：琥珀（暗夜书馆 / 晨读书馆 共用基调）
+    this.seedColor = const Color(0xFFB8843A),
   });
 
   /// 获取Flutter的ThemeMode（用于MaterialApp）
@@ -43,7 +45,7 @@ class ThemeState {
     }
   }
 
-  /// 生成亮色主题数据
+  /// 生成亮色主题数据 · 晨读书馆
   ThemeData getLightTheme() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
@@ -51,11 +53,14 @@ class ThemeState {
         brightness: Brightness.light,
       ),
       useMaterial3: true,
+      // 全局默认字体：无衬线 + 中文 fallback 链（项目无自定义字体文件）
+      fontFamily: AppTypography.sans,
+      fontFamilyFallback: AppTypography.sansFallback,
       extensions: const <ThemeExtension<dynamic>>[AppColors.light],
     );
   }
 
-  /// 生成暗色主题数据
+  /// 生成暗色主题数据 · 暗夜书馆
   ThemeData getDarkTheme() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
@@ -63,6 +68,8 @@ class ThemeState {
         brightness: Brightness.dark,
       ),
       useMaterial3: true,
+      fontFamily: AppTypography.sans,
+      fontFamilyFallback: AppTypography.sansFallback,
       extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
     );
   }

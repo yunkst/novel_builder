@@ -11,6 +11,7 @@ import 'core/providers/onboarding_providers.dart';
 import 'core/providers/ui_providers.dart';
 import 'core/providers/agent_scenario_provider.dart';
 import 'core/theme/app_colors.dart';
+import 'core/theme/app_typography.dart';
 import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
@@ -110,10 +111,13 @@ class NovelReaderApp extends ConsumerWidget {
   ThemeData _buildFallbackThemeData() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.blue,
+        // 书馆美学种子色，与 ThemeState 默认一致，避免启动闪蓝
+        seedColor: const Color(0xFFB8843A),
         brightness: Brightness.dark,
       ),
       useMaterial3: true,
+      fontFamily: AppTypography.sans,
+      fontFamilyFallback: AppTypography.sansFallback,
       extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
     );
   }
