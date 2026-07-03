@@ -659,8 +659,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                           theme.colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
                     filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
+                    fillColor: appColors.chatInputBackground,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(

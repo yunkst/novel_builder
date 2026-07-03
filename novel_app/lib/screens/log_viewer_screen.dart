@@ -7,6 +7,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/log_level_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
+import '../widgets/common/library_app_bar.dart';
 
 /// 日志查看页面
 ///
@@ -191,9 +192,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('应用日志'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      appBar: LibraryAppBar(
+        title: '应用日志',
         actions: [
           // 搜索按钮
           IconButton(

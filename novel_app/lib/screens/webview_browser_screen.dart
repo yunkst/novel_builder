@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/providers/webview_providers.dart';
+import '../core/theme/app_colors.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
@@ -123,6 +124,11 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                   LinearProgressIndicator(
                     value: progress > 0 ? progress : null,
                     minHeight: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      context.appColors.agentAccent,
+                    ),
+                    backgroundColor:
+                        context.appColors.agentAccent.withValues(alpha: 0.15),
                   ),
                 // WebView 主体
                 Expanded(

@@ -5,6 +5,7 @@ import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/models/chat_session.dart';
 
+import '../empty_states/empty_state_view.dart';
 import 'chat_history_list_item.dart';
 
 /// 会话历史底部抽屉
@@ -117,21 +118,10 @@ class ChatHistorySheet extends ConsumerWidget {
   }
 
   Widget _buildEmpty(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.history_toggle_off,
-              size: 48, color: theme.colorScheme.outline),
-          const SizedBox(height: 12),
-          Text('还没有会话', style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 4),
-          Text('点击右上角「+」新建一个开始对话',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.outline)),
-        ],
-      ),
+    return const EmptyStateView(
+      icon: Icons.chat_bubble_outline,
+      title: '还没有会话',
+      subtitle: '开始你的第一次对话吧',
     );
   }
 

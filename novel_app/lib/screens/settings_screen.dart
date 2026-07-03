@@ -8,6 +8,7 @@ import 'backend_settings_screen.dart';
 import 'log_report_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'llm_log_viewer_screen.dart';
+import '../widgets/common/library_app_bar.dart';
 import 'preload_queue_debug_screen.dart';
 import '../services/app_update_service.dart';
 import '../services/logger_service.dart';
@@ -16,6 +17,8 @@ import '../utils/toast_utils.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/providers/service_providers.dart';
 import '../core/database/database_connection.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import 'backup_management_screen.dart';
 
@@ -121,251 +124,271 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     // 监听主题提供者
     final themeAsync = ref.watch(themeNotifierProvider);
+    final appColors = context.appColors;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
+      appBar: LibraryAppBar(title: '设置'),
       body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // 版本信息
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('关于应用'),
-            subtitle: Text(
-              _packageInfo != null
-                  ? '版本 ${_packageInfo!.version} (${_packageInfo!.buildNumber})'
-                  : '加载中...',
-            ),
-          ),
-          const Divider(),
-
-          // 检查更新
-          ListTile(
-            leading: _isCheckingUpdate
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.system_update_alt),
-            title: const Text('检查更新'),
-            subtitle: const Text('查看是否有新版本可用'),
-            trailing:
-                _isCheckingUpdate ? null : const Icon(Icons.arrow_forward_ios),
-            onTap: _isCheckingUpdate ? null : _checkForUpdate,
-          ),
-          const Divider(),
-
-          ListTile(
-            leading: const Icon(Icons.settings_ethernet),
-            title: const Text('后端服务配置'),
-            subtitle: const Text('设置后端 HOST 与 TOKEN'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BackendSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('新手引导'),
-            subtitle: const Text('重新查看首次启动引导'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const OnboardingScreen(isReviewMode: true),
-                  fullscreenDialog: true,
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.smart_toy),
-            title: const Text('AI 配置'),
-            subtitle: const Text('配置全局默认 LLM 和 AI 设定'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DifySettingsScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.label_outline),
-            title: const Text('提示词标签管理'),
-            subtitle: const Text('管理 AI 写作的标签分类和 Prompt 文本'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PromptTagManagementScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // Agent 记忆管理
-          ListTile(
-            leading: const Icon(Icons.psychology_outlined),
-            title: const Text('Agent 记忆管理'),
-            subtitle: const Text('查看和管理 Agent 各场景的经验记忆'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const AgentMemoryManagementScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 主题模式设置
-          themeAsync.when(
-            data: (themeState) {
-              return ListTile(
-                leading: const Icon(Icons.palette_outlined),
-                title: const Text('主题模式'),
-                subtitle: Text(_getThemeModeText(themeState.themeMode)),
+          // ── AI 组 ─────────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.auto_awesome_outlined,
+            title: 'AI',
+            accentColor: appColors.agentAccent,
+            subtitle: '智能助手 · 模型配置 · 主题偏好',
+            children: [
+              ListTile(
+                leading: Icon(Icons.smart_toy, color: appColors.agentAccent),
+                title: const Text('AI 配置'),
+                subtitle: const Text('配置全局默认 LLM 和 AI 设定'),
                 trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => _showThemeModeDialog(themeState),
-              );
-            },
-            loading: () => const ListTile(
-              leading: Icon(Icons.palette_outlined),
-              title: Text('主题模式'),
-              subtitle: Text('加载中...'),
-            ),
-            error: (_, __) => const ListTile(
-              leading: Icon(Icons.palette_outlined),
-              title: Text('主题模式'),
-              subtitle: Text('加载失败'),
-            ),
-          ),
-          const Divider(),
-
-          // 日志上报设置
-          ListTile(
-            leading: const Icon(Icons.cloud_upload_outlined),
-            title: const Text('日志上报'),
-            subtitle: const Text('配置远程日志上报行为'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LogReportSettingsScreen(),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DifySettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.label_outline, color: appColors.agentAccent),
+                title: const Text('提示词标签管理'),
+                subtitle: const Text('管理 AI 写作的标签分类和 Prompt 文本'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PromptTagManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.psychology_outlined, color: appColors.agentAccent),
+                title: const Text('Agent 记忆管理'),
+                subtitle: const Text('查看和管理 Agent 各场景的经验记忆'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const AgentMemoryManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              themeAsync.when(
+                data: (themeState) {
+                  return ListTile(
+                    leading:
+                        Icon(Icons.palette_outlined, color: appColors.agentAccent),
+                    title: const Text('主题模式'),
+                    subtitle: Text(_getThemeModeText(themeState.themeMode)),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () => _showThemeModeDialog(themeState),
+                  );
+                },
+                loading: () => ListTile(
+                  leading:
+                      Icon(Icons.palette_outlined, color: appColors.agentAccent),
+                  title: const Text('主题模式'),
+                  subtitle: const Text('加载中...'),
                 ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 应用日志入口
-          ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('应用日志'),
-            subtitle: const Text('查看、复制或清空应用日志'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LogViewerScreen(),
+                error: (_, __) => ListTile(
+                  leading:
+                      Icon(Icons.palette_outlined, color: appColors.agentAccent),
+                  title: const Text('主题模式'),
+                  subtitle: const Text('加载失败'),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-          const Divider(),
 
-          // LLM 调用日志入口
-          ListTile(
-            leading: const Icon(Icons.smart_toy_outlined),
-            title: const Text('LLM 调用日志'),
-            subtitle: const Text('查看前端 LLM 请求/响应记录'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LlmLogViewerScreen(),
+          // ── 数据组 ────────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.storage_outlined,
+            title: '数据',
+            accentColor: appColors.success,
+            subtitle: '后端配置 · 备份 · 日志',
+            children: [
+              ListTile(
+                leading: Icon(Icons.settings_ethernet, color: appColors.success),
+                title: const Text('后端服务配置'),
+                subtitle: const Text('设置后端 HOST 与 TOKEN'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BackendSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.backup_rounded, color: appColors.success),
+                title: const Text('数据备份'),
+                subtitle: Text(_lastBackupTime != null
+                    ? '上次备份: $_lastBackupTime'
+                    : '将数据库备份到服务器'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BackupManagementScreen(),
+                    ),
+                  ).then((_) => _loadLastBackupTime());
+                },
+              ),
+              ListTile(
+                leading: _isRepairing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.build_outlined, color: appColors.success),
+                title: const Text('修复数据库'),
+                subtitle: const Text('补全缺失的表和列（不影响现有数据）'),
+                trailing:
+                    _isRepairing ? null : const Icon(Icons.arrow_forward_ios),
+                onTap: _isRepairing ? null : _handleRepairDatabase,
+              ),
+              ListTile(
+                leading: Icon(Icons.bug_report_outlined, color: appColors.success),
+                title: const Text('应用日志'),
+                subtitle: const Text('查看、复制或清空应用日志'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LogViewerScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.smart_toy_outlined, color: appColors.success),
+                title: const Text('LLM 调用日志'),
+                subtitle: const Text('查看前端 LLM 请求/响应记录'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LlmLogViewerScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          // ── 诊断组 ────────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.health_and_safety_outlined,
+            title: '诊断',
+            accentColor: appColors.warning,
+            subtitle: '队列监控 · 上报配置',
+            children: [
+              ListTile(
+                leading: Icon(Icons.downloading, color: appColors.warning),
+                title: const Text('预加载队列'),
+                subtitle: const Text('查看和管理预加载任务'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PreloadQueueDebugScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.cloud_upload_outlined, color: appColors.warning),
+                title: const Text('日志上报'),
+                subtitle: const Text('配置远程日志上报行为'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LogReportSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          // ── 新手组 ────────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.menu_book_outlined,
+            title: '新手',
+            accentColor: appColors.info,
+            subtitle: '快速入门',
+            children: [
+              ListTile(
+                leading: Icon(Icons.help_outline, color: appColors.info),
+                title: const Text('新手引导'),
+                subtitle: const Text('重新查看首次启动引导'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const OnboardingScreen(isReviewMode: true),
+                      fullscreenDialog: true,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          // ── 关于组 ────────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.info_outline,
+            title: '关于',
+            accentColor: appColors.neutral,
+            subtitle: '应用信息 · 版本更新',
+            children: [
+              ListTile(
+                leading: Icon(Icons.info_outline, color: appColors.neutral),
+                title: const Text('关于应用'),
+                subtitle: Text(
+                  _packageInfo != null
+                      ? '版本 ${_packageInfo!.version} (${_packageInfo!.buildNumber})'
+                      : '加载中...',
                 ),
-              );
-            },
+              ),
+              ListTile(
+                leading: _isCheckingUpdate
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.system_update_alt, color: appColors.neutral),
+                title: const Text('检查更新'),
+                subtitle: const Text('查看是否有新版本可用'),
+                trailing:
+                    _isCheckingUpdate ? null : const Icon(Icons.arrow_forward_ios),
+                onTap: _isCheckingUpdate ? null : _checkForUpdate,
+              ),
+            ],
           ),
-          const Divider(),
-
-          // 预加载队列入口
-          ListTile(
-            leading: const Icon(Icons.downloading),
-            title: const Text('预加载队列'),
-            subtitle: const Text('查看和管理预加载任务'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PreloadQueueDebugScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 数据备份入口
-          ListTile(
-            leading: const Icon(Icons.backup_rounded),
-            title: const Text('数据备份'),
-            subtitle: Text(_lastBackupTime != null
-                ? '上次备份: $_lastBackupTime'
-                : '将数据库备份到服务器'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BackupManagementScreen(),
-                ),
-              ).then((_) => _loadLastBackupTime());
-            },
-          ),
-          const Divider(),
-
-          // 修复数据库入口
-          ListTile(
-            leading: _isRepairing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.build_outlined),
-            title: const Text('修复数据库'),
-            subtitle: const Text('补全缺失的表和列（不影响现有数据）'),
-            trailing:
-                _isRepairing ? null : const Icon(Icons.arrow_forward_ios),
-            onTap: _isRepairing ? null : _handleRepairDatabase,
-          ),
-          const Divider(),
         ],
       ),
     );
@@ -481,5 +504,107 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ToastUtils.showError('数据库修复失败: $e');
       }
     }
+  }
+}
+
+/// 设置页分组卡片（书馆美学风格）
+///
+/// 顶部 section header（图标 + 衬线大字 + 可选副标题），
+/// 下方承载一组业务 ListTile，圆角 12，elevation 0。
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.icon,
+    required this.title,
+    required this.accentColor,
+    required this.children,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final Color accentColor;
+  final List<Widget> children;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // ListTile 之间用细线分隔（淡化的 outlineVariant）
+    final List<Widget> body = [];
+    for (var i = 0; i < children.length; i++) {
+      body.add(children[i]);
+      if (i != children.length - 1) {
+        body.add(Divider(
+          height: 0,
+          thickness: 0.4,
+          indent: 16,
+          endIndent: 16,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ));
+      }
+    }
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.6,
+        ),
+      ),
+      color: colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.08),
+              border: Border(
+                bottom: BorderSide(
+                  color: accentColor.withValues(alpha: 0.25),
+                  width: 0.6,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: accentColor),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: AppTypography.shelfTitle.copyWith(
+                    fontSize: 14,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant,
+                        letterSpacing: 0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          ...body,
+        ],
+      ),
+    );
   }
 }

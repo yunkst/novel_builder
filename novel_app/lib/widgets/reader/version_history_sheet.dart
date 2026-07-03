@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/database_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/chapter_version.dart';
 import '../../utils/toast_utils.dart';
 
@@ -71,6 +72,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       constraints: BoxConstraints(maxHeight: screenHeight * 0.6),
       child: Column(
@@ -82,7 +84,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[400],
+              color: colorScheme.outlineVariant,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -101,7 +103,9 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
                 Expanded(
                   child: Text(
                     widget.chapterTitle,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -110,9 +114,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .secondaryContainer
+                      color: colorScheme.secondaryContainer
                           .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -120,7 +122,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
                       '${_versions.length}个版本',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        color: colorScheme.onSecondaryContainer,
                       ),
                     ),
                   ),
@@ -153,21 +155,27 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.history_toggle_off, size: 48, color: Colors.grey[400]),
+          Icon(Icons.history_toggle_off,
+              size: 48, color: colorScheme.outlineVariant),
           const SizedBox(height: 12),
           Text(
             '暂无历史版本',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 14, color: colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 4),
           Text(
             '编辑或AI改写章节时，旧内容会自动保存为历史版本',
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant
+                    .withValues(alpha: 0.7)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -176,6 +184,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
   }
 
   Widget _buildVersionTile(ChapterVersion version) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
       dense: true,
       leading: Icon(version.sourceIcon, size: 20,
@@ -186,11 +195,17 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
               style: const TextStyle(fontSize: 14)),
           const SizedBox(width: 8),
           Text(version.formattedLength,
-              style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant
+                      .withValues(alpha: 0.7))),
         ],
       ),
       subtitle: Text(version.formattedTime,
-          style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant
+                  .withValues(alpha: 0.7))),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -209,7 +224,7 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
           // 删除
           IconButton(
             icon: Icon(Icons.delete_outline, size: 18,
-                color: Theme.of(context).colorScheme.error),
+                color: colorScheme.error),
             tooltip: '删除',
             onPressed: () => _deleteVersion(version),
           ),
@@ -219,17 +234,18 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
   }
 
   Color? _sourceColor(String source) {
+    final appColors = context.appColors;
     switch (source) {
       case 'edit':
-        return Colors.blue[400];
+        return appColors.info;
       case 'ai_rewrite':
-        return Colors.purple[400];
+        return appColors.agentAccent;
       case 'manual_snapshot':
-        return Colors.green[400];
+        return appColors.success;
       case 'restore':
-        return Colors.orange[400];
+        return appColors.warning;
       default:
-        return Colors.grey[400];
+        return Theme.of(context).colorScheme.outlineVariant;
     }
   }
 
@@ -283,10 +299,10 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.restore, color: Colors.orange),
-          SizedBox(width: 8),
-          Text('还原到历史版本'),
+        title: Row(children: [
+          Icon(Icons.restore, color: ctx.appColors.warning),
+          const SizedBox(width: 8),
+          const Text('还原到历史版本'),
         ]),
         content: Text(
           '将当前内容替换为「${version.sourceLabel}」'
