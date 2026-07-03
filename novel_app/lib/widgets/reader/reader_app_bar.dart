@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 
@@ -40,7 +41,7 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
           Expanded(
             child: Text(
               currentChapter.title,
-              style: const TextStyle(fontSize: 18),
+              style: AppTypography.chapterTitle.copyWith(fontSize: 18),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
             ),
@@ -60,6 +61,8 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                   const SizedBox(width: 4),
                   Text(
                     '编辑模式',
+                    // 徽章文字保持小号无衬线以提升对比可读性
+                    // （背景为 colorScheme.secondary，白字保证对比度）
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],
