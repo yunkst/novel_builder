@@ -303,118 +303,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     }
   }
 
-  // 显示创建空小说对话框
-  Future<void> _showCreateNovelDialog() async {
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: false, // 禁用空白区域点击关闭
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.create),
-            SizedBox(width: 8),
-            Text('创建新小说'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('创建一本属于你自己的小说，可以自由添加章节'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(
-                labelText: '小说标题',
-                hintText: '请输入小说标题',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: '简介 (可选)',
-                hintText: '请输入小说简介',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              minLines: 1,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final title = titleController.text.trim();
-
-              if (title.isEmpty) {
-                ToastUtils.showError('请填写小说标题', context: context);
-                return;
-              }
-
-              final Map<String, String> resultData = {
-                'title': title,
-                'author': '原创',
-                'description': descriptionController.text.trim(),
-              };
-
-              // 使用微任务确保 Navigator 调用时机正确
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted) {
-                  Navigator.pop(context, resultData);
-                }
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
-            child: const Text('创建'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      try {
-        final novelRepository = ref.read(novelRepositoryProvider);
-        final novel = Novel(
-          title: result['title']!,
-          author: result['author']!,
-          url: 'custom://custom_novel_${DateTime.now().millisecondsSinceEpoch}',
-          coverUrl: null,
-          description: result['description'],
-          backgroundSetting: null,
-        );
-        await novelRepository.addToBookshelf(novel);
-        if (mounted) {
-          ToastUtils.showSuccess('小说创建成功！', context: context);
-        }
-        // 刷新书架列表
-        ref.invalidate(bookshelfNovelsProvider);
-      } catch (e, stackTrace) {
-        LoggerService.instance.e(
-          '创建自定义小说失败: $e',
-          stackTrace: stackTrace.toString(),
-          category: LogCategory.database,
-          tags: ['novel', 'create', 'failed'],
-        );
-        if (mounted) {
-          ToastUtils.showError('创建失败: $e', context: context);
-        }
-      }
-    }
-  }
-
   /// 显示上传所有小说对话框
 
   @override
@@ -454,9 +342,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
               ),
               data: (bookshelf) {
                 if (bookshelf.isEmpty) {
-                  return EmptyBookshelfView(
-                    onCreateNovel: _showCreateNovelDialog,
-                  );
+                  return const EmptyBookshelfView();
                 }
 
                 return RefreshIndicator(
@@ -648,13 +534,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'bookshelf_fab',
-        onPressed: _showCreateNovelDialog,
-        tooltip: '创建新小说',
-        child: const Icon(Icons.add),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startDocked,
     );
   }
 }
