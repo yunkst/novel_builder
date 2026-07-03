@@ -207,94 +207,34 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.errorAccent,
   });
 
-  /// 亮色主题配色
+  /// 亮色主题配色 · 晨读书馆
   ///
-  /// 聊天/角色气泡使用浅色填充 + 深色文字，确保浅色背景下可读。
-  /// 语义色使用中度饱和度（Material 700/800）以在白色背景上保持对比度。
+  /// 暖白纸底 + 墨色字 + 琥珀强调，护眼且有书卷气。
+  /// 业务色（关系图/性别/Agent 品牌）与暗色保持一致，不随主题变化。
   static const AppColors light = AppColors(
     agentBrandStart: Color(0xFF6366F1),
     agentBrandEnd: Color(0xFF8B5CF6),
     agentAccent: Color(0xFF6366F1),
     agentOnBrand: Colors.white,
     agentOnBrandMuted: Colors.white70,
-    success: Color(0xFF2E7D32),
-    error: Color(0xFFC62828),
-    warning: Color(0xFFEF6C00),
-    info: Color(0xFF1976D2),
-    neutral: Color(0xFF616161),
+    success: Color(0xFF5E7A3C),
+    error: Color(0xFFB23A2E),
+    warning: Color(0xFFB8732A),
+    info: Color(0xFF3A6A9E),
+    neutral: Color(0xFF6B5D48),
     onSemantic: Colors.white,
-    errorContainer: Color(0xFFF9DEDC),
-    onErrorContainer: Color(0xFF410E0B),
-    successContainer: Color(0xFFD7EFD9),
-    onSuccessContainer: Color(0xFF002106),
-    warningContainer: Color(0xFFFFE2B7),
-    onWarningContainer: Color(0xFF2A1700),
-    infoContainer: Color(0xFFD7E3F4),
-    onInfoContainer: Color(0xFF001D36),
-    galleryOverlay: Color(0xB3FFFFFF),
+    // 容器色 · 米白纸感
+    errorContainer: Color(0xFFF3DAD5),
+    onErrorContainer: Color(0xFF5C1A12),
+    successContainer: Color(0xFFE0E8CF),
+    onSuccessContainer: Color(0xFF2A3A14),
+    warningContainer: Color(0xFFF3E2C5),
+    onWarningContainer: Color(0xFF4A2E08),
+    infoContainer: Color(0xFFD8E2EE),
+    onInfoContainer: Color(0xFF0E2840),
+    galleryOverlay: Color(0xB3F3EADA),
     galleryOnDark: Color(0xFFFFFFFF),
-    // 关系图调色板（沿用原硬编码值，保持视觉一致）
-    graphCenterStart: Color(0xFFFFA726),         // orange.shade400
-    graphCenterEnd: Color(0xFFEF6C00),           // orange.shade600
-    graphCenterGlow: Color(0x80EF6C00),          // orange.shade600 @ 50%
-    graphCenterBorder: Color(0xFFFFCC80),         // orange.shade100
-    graphCenterOnDark: Color(0xFFFBE9E7),         // orange.shade50
-    graphGenderMale: Color(0xFF1976D2),           // Colors.blue
-    graphGenderFemale: Color(0xFFE91E63),         // Colors.pink
-    graphGenderUnknown: Color(0xFF9C27B0),        // Colors.purple
-    graphRelationIntimate: Color(0xFFE53935),     // red.shade600
-    graphRelationFamily: Color(0xFF00897B),      // teal.shade600
-    graphRelationLover: Color(0xFFEC407A),       // pink.shade500
-    graphRelationFriend: Color(0xFF1E88E5),       // blue.shade600
-    graphRelationHostile: Color(0xFFD32F2F),      // red.shade600
-    graphRelationHostileDeep: Color(0xFFB71C1C),  // red.shade800
-    graphRelationRival: Color(0xFFEF6C00),        // orange.shade600
-    graphRelationColleague: Color(0xFFFFA000),    // amber.shade700
-    graphRelationMaster: Color(0xFF3949AB),       // indigo.shade600
-    graphRelationAlly: Color(0xFF43A047),         // green.shade600
-    graphRelationDefault: Color(0xFF757575),      // grey.shade600
-    chatInputBackground: Color(0xFFF5F5F5),
-    chatPrimaryText: Color(0xFF1A1A1A),
-    chatSecondaryText: Color(0xFF555555),
-    chatHintText: Color(0xFF888888),
-    chatRoleBubble: Color(0xFFD7E3F4),
-    chatUserBubble: Color(0xFFD7EFD9),
-    chatUserBubbleBorder: Color(0xFFA5C9A8),
-    chatDivider: Color(0xFFE0E0E0),
-    chatButtonPrimary: Color(0xFF2196F3),
-    chatButtonDisabled: Color(0xFFBDBDBD),
-    avatarShadow: Color(0x4D000000),
-    errorAccent: Color(0xFFB00020),
-  );
-
-  /// 暗色主题配色
-  ///
-  /// 沿用项目原 `0xFF...` 深色值与 Material 默认 `Colors.X`，
-  /// 保留原观感。
-  static const AppColors dark = AppColors(
-    agentBrandStart: Color(0xFF6366F1),
-    agentBrandEnd: Color(0xFF8B5CF6),
-    agentAccent: Color(0xFF6366F1),
-    agentOnBrand: Colors.white,
-    agentOnBrandMuted: Colors.white70,
-    success: Colors.green,
-    error: Colors.red,
-    warning: Colors.orange,
-    info: Colors.blue,
-    neutral: Color(0xFF616161),
-    onSemantic: Colors.white,
-    // 暗色容器色（深色低饱和度）
-    errorContainer: Color(0xFF601410),
-    onErrorContainer: Color(0xFFF9DEDC),
-    successContainer: Color(0xFF1B5E20),
-    onSuccessContainer: Color(0xFFD7EFD9),
-    warningContainer: Color(0xFF8C5A00),
-    onWarningContainer: Color(0xFFFFE2B7),
-    infoContainer: Color(0xFF0D47A1),
-    onInfoContainer: Color(0xFFD7E3F4),
-    galleryOverlay: Color(0xB3FFFFFF),
-    galleryOnDark: Color(0xFFFFFFFF),
-    // 关系图调色板（暗色实例与亮色保持一致，关系图强调色不随主题变化）
+    // 关系图调色板（业务色，与暗色一致）
     graphCenterStart: Color(0xFFFFA726),
     graphCenterEnd: Color(0xFFEF6C00),
     graphCenterGlow: Color(0x80EF6C00),
@@ -314,18 +254,80 @@ class AppColors extends ThemeExtension<AppColors> {
     graphRelationMaster: Color(0xFF3949AB),
     graphRelationAlly: Color(0xFF43A047),
     graphRelationDefault: Color(0xFF757575),
-    chatInputBackground: Color(0xFF1E1E1E),
-    chatPrimaryText: Color(0xFFE3E3E3),
-    chatSecondaryText: Color(0xFFB0B0B0),
-    chatHintText: Color(0xFF8E8E8E),
-    chatRoleBubble: Color(0xFF1E3A5F),
-    chatUserBubble: Color(0xFF1F3D2F),
-    chatUserBubbleBorder: Color(0xFF3A6B4A),
-    chatDivider: Color(0xFF3C3C3C),
-    chatButtonPrimary: Color(0xFF2196F3),
-    chatButtonDisabled: Color(0xFF3C3C3C),
+    // 聊天 · 暖纸色系
+    chatInputBackground: Color(0xFFEBE3D2),
+    chatPrimaryText: Color(0xFF2A2018),
+    chatSecondaryText: Color(0xFF6B5D48),
+    chatHintText: Color(0xFF9C8A6E),
+    chatRoleBubble: Color(0xFFDCE6F0),
+    chatUserBubble: Color(0xFFE0E8CF),
+    chatUserBubbleBorder: Color(0xFFB8C8A0),
+    chatDivider: Color(0xFFDCCFB3),
+    chatButtonPrimary: Color(0xFFB8843A),
+    chatButtonDisabled: Color(0xFFC9BC9E),
+    avatarShadow: Color(0x2A000000),
+    errorAccent: Color(0xFFB23A2E),
+  );
+
+  /// 暗色主题配色 · 暗夜书馆
+  ///
+  /// 深炭黑底 + 羊皮纸字 + 琥珀暖光，沉浸夜读。
+  static const AppColors dark = AppColors(
+    agentBrandStart: Color(0xFF6366F1),
+    agentBrandEnd: Color(0xFF8B5CF6),
+    agentAccent: Color(0xFF6366F1),
+    agentOnBrand: Colors.white,
+    agentOnBrandMuted: Colors.white70,
+    success: Color(0xFF7A9A55),
+    error: Color(0xFFD9685A),
+    warning: Color(0xFFE0A050),
+    info: Color(0xFF6E9FD6),
+    neutral: Color(0xFF8A7C66),
+    onSemantic: Color(0xFF1A1610),
+    // 容器色 · 深炭低饱和
+    errorContainer: Color(0xFF4A1A14),
+    onErrorContainer: Color(0xFFF3DAD5),
+    successContainer: Color(0xFF2A3A14),
+    onSuccessContainer: Color(0xFFE0E8CF),
+    warningContainer: Color(0xFF4A2E08),
+    onWarningContainer: Color(0xFFF3E2C5),
+    infoContainer: Color(0xFF142A42),
+    onInfoContainer: Color(0xFFD8E2EE),
+    galleryOverlay: Color(0xB3FFFFFF),
+    galleryOnDark: Color(0xFFFFFFFF),
+    // 关系图调色板（业务色，与亮色一致）
+    graphCenterStart: Color(0xFFFFA726),
+    graphCenterEnd: Color(0xFFEF6C00),
+    graphCenterGlow: Color(0x80EF6C00),
+    graphCenterBorder: Color(0xFFFFCC80),
+    graphCenterOnDark: Color(0xFFFBE9E7),
+    graphGenderMale: Color(0xFF1976D2),
+    graphGenderFemale: Color(0xFFE91E63),
+    graphGenderUnknown: Color(0xFF9C27B0),
+    graphRelationIntimate: Color(0xFFE53935),
+    graphRelationFamily: Color(0xFF00897B),
+    graphRelationLover: Color(0xFFEC407A),
+    graphRelationFriend: Color(0xFF1E88E5),
+    graphRelationHostile: Color(0xFFD32F2F),
+    graphRelationHostileDeep: Color(0xFFB71C1C),
+    graphRelationRival: Color(0xFFEF6C00),
+    graphRelationColleague: Color(0xFFFFA000),
+    graphRelationMaster: Color(0xFF3949AB),
+    graphRelationAlly: Color(0xFF43A047),
+    graphRelationDefault: Color(0xFF757575),
+    // 聊天 · 深炭羊皮纸系
+    chatInputBackground: Color(0xFF241F16),
+    chatPrimaryText: Color(0xFFE8DCC4),
+    chatSecondaryText: Color(0xFFB5A482),
+    chatHintText: Color(0xFF7A6B52),
+    chatRoleBubble: Color(0xFF1F2E44),
+    chatUserBubble: Color(0xFF2A3A1E),
+    chatUserBubbleBorder: Color(0xFF4A5C3A),
+    chatDivider: Color(0xFF3A3128),
+    chatButtonPrimary: Color(0xFFD9A05B),
+    chatButtonDisabled: Color(0xFF3A3128),
     avatarShadow: Color(0x4D000000),
-    errorAccent: Color(0xFFB00020),
+    errorAccent: Color(0xFFD9685A),
   );
 
   @override
