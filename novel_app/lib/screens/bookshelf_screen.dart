@@ -386,24 +386,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         titleSpacing: 20,
         title: Row(
           children: [
-            // 品牌标记 · 卷轴
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colors.agentAccent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '卷',
-                style: AppTypography.chapterTitle.copyWith(
-                  fontSize: 20,
-                  color: colors.agentOnBrand,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,14 +522,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ToastUtils.showInfo('在浏览器中搜索并加入书架', context: context);
-        },
-        backgroundColor: colors.agentAccent,
-        foregroundColor: colors.agentOnBrand,
-        child: const Icon(Icons.add),
       ),
     );
   }

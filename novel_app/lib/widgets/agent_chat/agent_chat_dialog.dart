@@ -34,12 +34,15 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   bool _isFullscreen = false;
   // 输入框是否有内容(驱动发送按钮 enabled/disabled 视觉)
   bool _hasText = false;
+  // 消息列表是否贴底:驱动"回到底部"按钮显隐 + 新消息自动跟随策略
+  bool _isAtBottom = true;
 
   @override
   void initState() {
     super.initState();
     _hasText = _inputController.text.trim().isNotEmpty;
     _inputController.addListener(_onInputChanged);
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
@@ -53,6 +56,16 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     }
   }
 
+  /// 滚动监听:判断是否贴底,驱动"回到底部"按钮显隐
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final atBottom = (position.maxScrollExtent - position.pixels) <= 80;
+    if (_isAtBottom != atBottom) {
+      setState(() => _isAtBottom = atBottom);
+    }
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -63,6 +76,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   void dispose() {
     _inputController.removeListener(_onInputChanged);
     _inputController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -76,11 +90,14 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     ref.listen(currentChatStateProvider, (prev, next) {
       final prevCount = prev?.messages.length ?? 0;
       final nextCount = next.messages.length;
-      if (nextCount > prevCount || (next.isLoading && next.streamingSegments.isNotEmpty)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-      }
+      final hasNew = nextCount > prevCount ||
+          (next.isLoading && next.streamingSegments.isNotEmpty);
+      if (!hasNew) return;
+      // 仅在用户已贴底时自动跟随,避免打断用户浏览历史
+      if (!_isAtBottom) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
     });
 
     return Dialog(
@@ -253,28 +270,68 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
       return _buildEmptyState();
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      itemCount: chatState.messages.length + (chatState.isLoading ? 1 : 0),
-      itemBuilder: (context, index) {
-        // 流式响应时，在最后一条 assistant 消息显示 streaming segments
-        if (index == chatState.messages.length && chatState.isLoading) {
-          return AgentMessageBubble(
-            message: AgentChatMessage(role: AgentChatRole.assistant),
-            streamingSegments: chatState.streamingSegments,
-            showTimestamp: false,
-          );
-        }
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          itemCount: chatState.messages.length + (chatState.isLoading ? 1 : 0),
+          itemBuilder: (context, index) {
+            // 流式响应时，在最后一条 assistant 消息显示 streaming segments
+            if (index == chatState.messages.length && chatState.isLoading) {
+              return AgentMessageBubble(
+                message: AgentChatMessage(role: AgentChatRole.assistant),
+                streamingSegments: chatState.streamingSegments,
+                showTimestamp: false,
+              );
+            }
 
-        final message = chatState.messages[index];
-        // 仅 user 消息提供回滚入口；agent 运行中禁用(防止与并发状态冲突)
-        final canRollback = message.role == AgentChatRole.user && !chatState.isLoading;
-        return AgentMessageBubble(
-          message: message,
-          onRollback: canRollback ? () => _handleRollback(index) : null,
-        );
-      },
+            final message = chatState.messages[index];
+            // 仅 user 消息提供回滚入口；agent 运行中禁用(防止与并发状态冲突)
+            final canRollback = message.role == AgentChatRole.user && !chatState.isLoading;
+            return AgentMessageBubble(
+              message: message,
+              onRollback: canRollback ? () => _handleRollback(index) : null,
+            );
+          },
+        ),
+        // 回到底部浮动按钮:仅当用户向上浏览离开底部时淡入
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: IgnorePointer(
+            ignoring: _isAtBottom,
+            child: AnimatedOpacity(
+              opacity: _isAtBottom ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              child: _buildJumpToBottomButton(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// "回到底部"浮动按钮
+  Widget _buildJumpToBottomButton() {
+    final appColors = context.appColors;
+    return Material(
+      color: appColors.agentAccent,
+      elevation: 4,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _scrollToBottom,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(
+            Icons.keyboard_arrow_down,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      ),
     );
   }
 

@@ -509,17 +509,19 @@ class ScenarioSession {
       return false;
     }
 
-    // UI index → agent index：投影后第 index 条 user 对应的 agent 位置
+    // UI index → agent index：在 _agentMessages 中找到对应 uiMsgs[index] 的位置。
+    // _uiMessages 包含 user 和 assistant（system/tool 被跳过/吸收），
+    // 所以需要在 agent 列表中按投影顺序匹配，而不是只匹配 user。
     int agentIdx = -1;
     int uiCount = 0;
     for (int i = 0; i < _agentMessages.length; i++) {
-      if (_agentMessages[i].role == 'user') {
-        if (uiCount == index) {
-          agentIdx = i;
-          break;
-        }
-        uiCount++;
+      final role = _agentMessages[i].role;
+      if (role == 'system' || role == 'tool') continue;
+      if (uiCount == index) {
+        agentIdx = i;
+        break;
       }
+      uiCount++;
     }
     if (agentIdx < 0) return false;
 

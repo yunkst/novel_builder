@@ -603,4 +603,129 @@ void main() {
           reason: '无 user 消息时不应调用 Agent');
     });
   });
+
+  // ===========================================================================
+  // 10. rollbackToMessage — 回滚到指定 user 消息
+  // ===========================================================================
+
+  group('rollbackToMessage', () {
+    test('回滚到第一条 user 消息 → 删除该消息及之后所有消息，content 回传', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 构造两轮对话：[user1, assistant1, user2, assistant2]
+      await session.sendMessage('第一条');
+      await session.sendMessage('第二条');
+      expect(session.state.messages.length, 4);
+
+      String? callbackContent;
+      final result = session.rollbackToMessage(
+        0,
+        contentCallback: (c) => callbackContent = c,
+      );
+
+      expect(result, isTrue, reason: '回滚到第一条 user 应成功');
+      expect(callbackContent, '第一条', reason: 'callback 应回传该 user 的 content');
+      expect(session.state.messages, isEmpty,
+          reason: '回滚到第一条 user 后应删除所有消息（含目标 user）');
+    });
+
+    test('回滚到最后一条 user 消息 → 删掉最后一轮回复，保留前面轮次', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 构造两轮对话：[user1, assistant1, user2, assistant2]
+      await session.sendMessage('第一条');
+      await session.sendMessage('第二条');
+      expect(session.state.messages.length, 4);
+
+      // UI index 2 = user2
+      String? callbackContent;
+      final result = session.rollbackToMessage(
+        2,
+        contentCallback: (c) => callbackContent = c,
+      );
+
+      expect(result, isTrue);
+      expect(callbackContent, '第二条');
+      // 回滚后应保留 [user1, assistant1]，user2 及 assistant2 被删除
+      expect(session.state.messages.length, 2,
+          reason: '应保留第一轮的 user + assistant');
+      expect(session.state.messages[0].role, AgentChatRole.user);
+      expect(session.state.messages[0].content, '第一条');
+      expect(session.state.messages[1].role, AgentChatRole.assistant);
+    });
+
+    test('运行中调 rollbackToMessage → 拒绝并返回 false', () async {
+      final slowMock = MockNovelAgentService(delay: const Duration(milliseconds: 100));
+      final slowContainer = ProviderContainer(overrides: [
+        novelAgentServiceProvider.overrideWith((ref) => slowMock),
+      ]);
+      addTearDown(slowContainer.dispose);
+
+      final slowSessions = slowContainer.read(scenarioSessionsProvider.notifier);
+      final slowSession = slowSessions.get(ScenarioIds.writing);
+
+      // 先发一条消息建立历史
+      await slowSession.sendMessage('前置消息');
+
+      // 启动慢发送但不等它完成
+      final sendFuture = slowSession.sendMessage('慢消息');
+      await Future<void>.delayed(Duration.zero);
+      expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
+
+      final result = slowSession.rollbackToMessage(
+        0,
+        contentCallback: (_) {},
+      );
+
+      expect(result, isFalse, reason: '运行中应拒绝回滚');
+      expect(slowSession.state.error, 'Agent 正在运行，无法回滚');
+
+      await sendFuture;
+    });
+
+    test('索引越界 → 返回 false', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      await session.sendMessage('测试');
+      expect(session.state.messages.length, 2);
+
+      // 负索引
+      expect(
+        session.rollbackToMessage(-1, contentCallback: (_) {}),
+        isFalse,
+        reason: '负索引应返回 false',
+      );
+
+      // 超出长度
+      expect(
+        session.rollbackToMessage(99, contentCallback: (_) {}),
+        isFalse,
+        reason: '超出长度的索引应返回 false',
+      );
+
+      // 消息不应被修改
+      expect(session.state.messages.length, 2, reason: '越界回滚不应影响消息');
+    });
+
+    test('目标非 user 消息（指向 assistant）→ 返回 false', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      await session.sendMessage('测试');
+      // messages = [user, assistant]，index 1 是 assistant
+      expect(session.state.messages.length, 2);
+      expect(session.state.messages[1].role, AgentChatRole.assistant);
+
+      final result = session.rollbackToMessage(
+        1,
+        contentCallback: (_) {},
+      );
+
+      expect(result, isFalse, reason: '指向 assistant 的索引应拒绝回滚');
+      expect(session.state.messages.length, 2, reason: '非 user 目标不应影响消息');
+    });
+  });
 }
