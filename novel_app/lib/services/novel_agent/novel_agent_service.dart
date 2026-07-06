@@ -21,6 +21,7 @@ import 'agent_event.dart';
 import 'agent_loop.dart';
 import 'agent_scenario.dart';
 import 'agent_scenario_factory.dart';
+import 'agent_system_prompt.dart';
 
 class NovelAgentService {
   final Ref ref;
@@ -128,13 +129,23 @@ class NovelAgentService {
         // 加载场景经验记忆（在 buildSystemPrompt 前调用，让场景有缓存）
         await scenario.getMemories();
 
-        // 构造 system prompt（由场景生成）
+        // 构造 system prompt（由场景生成；用户上下文/当前工作小说由下面 user message 注入）
         final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
+
+        // 构造本轮 user message：把"用户正在阅读 / 当前工作小说"作为临时上下文
+        // 注入到用户输入头部。history 保持原文（落库的也是原文）。
+        final contextPrefix = AgentSystemPrompt.buildUserContextPrefix(
+          readingContext: scenarioContext.readingContext,
+          currentNovelTitle: scenarioContext.currentNovelTitle,
+        );
+        final userContent = contextPrefix.isEmpty
+            ? userInput
+            : '$contextPrefix$userInput';
 
         // 构造初始消息
         final initialMessages = [
           ...history,
-          ChatMessage(role: 'user', content: userInput),
+          ChatMessage(role: 'user', content: userContent),
         ];
 
         // 运行循环

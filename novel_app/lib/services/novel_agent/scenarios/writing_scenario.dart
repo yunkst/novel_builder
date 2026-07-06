@@ -8,7 +8,6 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
-import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 import '../agent_scenario.dart';
@@ -41,15 +40,11 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
   @override
   String buildSystemPrompt(AgentScenarioContext context) {
     _currentContext = context;
-    final novelInfo = context.currentNovelTitle != null
-        ? '\n\n## 当前小说\n${context.currentNovelTitle}\n'
-            '所有不传 novelId 的工具将作用于该小说。'
-        : '\n\n## 当前小说\n未选择。请先调用 list_novels 查看书架，'
-            '然后用 select_novel 选定目标。';
+    // 用户阅读上下文、当前工作小说 改由 NovelAgentService 在 user message 头部注入，
+    // 本方法只负责相对静态的"身份 + 工作原则 + 经验记忆"。
     return AgentSystemPrompt.build(
-      readingContext: context.readingContext ?? const ReadingContext(),
       memories: cachedMemories,
-    ) + novelInfo;
+    );
   }
 
   @override
