@@ -12,7 +12,6 @@ import 'core/providers/ui_providers.dart';
 import 'core/providers/agent_scenario_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_typography.dart';
-import 'utils/video_cache_manager.dart';
 import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/llm_logger/llm_logger.dart';
@@ -297,8 +296,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // 应用退出时清理所有视频控制器
-    VideoCacheManager.disposeAll();
     LoggerService.instance.i(
       'HomePage: 移除生命周期监听器并清理资源',
       category: LogCategory.ui,
@@ -319,8 +316,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
     switch (state) {
       case AppLifecycleState.paused:
-        // 应用进入后台时，暂停所有视频播放
-        VideoCacheManager.pauseAllExcept(null);
         // 立即上报缓冲日志，避免丢失
         LogReporterService.instance.flush();
         break;
@@ -328,16 +323,10 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         // 应用恢复前台时，不自动恢复播放，让可见性检测器处理
         break;
       case AppLifecycleState.inactive:
-        // 应用不活跃时，暂停所有视频播放
-        VideoCacheManager.pauseAllExcept(null);
         break;
       case AppLifecycleState.detached:
-        // 应用分离时，清理所有视频控制器
-        VideoCacheManager.disposeAll();
         break;
       case AppLifecycleState.hidden:
-        // 应用隐藏时，暂停所有视频播放
-        VideoCacheManager.pauseAllExcept(null);
         break;
     }
   }

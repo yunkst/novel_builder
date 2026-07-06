@@ -53,4 +53,4 @@ export 'services/database_service_providers.dart'
         chapterSearchServiceProvider;
 
 // 缓存服务
-export 'services/cache_service_providers.dart';
+// 原 cache_service_providers.dart 已删除（ImageCacheManager 为孤儿组件）

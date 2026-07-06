@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 32;
+  static const int currentVersion = 33;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -698,6 +698,35 @@ class DatabaseMigrations {
         await _createIndexIfNotExists(
             db, 'idx_chat_messages_session_order', 'chat_messages', 'sessionId, agentMsgIndex ASC');
         _log('迁移 v31 → v32: 重建 chat_messages 表（存完整 agent message，旧消息清空）');
+        break;
+
+      // ========== 版本 33：ComfyUI 模型下载/上传任务表 ==========
+      case 33:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS model_download_tasks (
+          id TEXT PRIMARY KEY,
+          url TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          targetSubdir TEXT NOT NULL,
+          totalSize INTEGER NOT NULL DEFAULT 0,
+          downloadedBytes INTEGER NOT NULL DEFAULT 0,
+          uploadedChunkIndicesJson TEXT NOT NULL DEFAULT '[]',
+          chunkSize INTEGER NOT NULL DEFAULT 0,
+          totalChunks INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'downloading',
+          localPath TEXT NOT NULL,
+          backendUploadId TEXT,
+          sourcePage TEXT,
+          errorMessage TEXT,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_model_tasks_status', 'model_download_tasks', 'status');
+        await _createIndexIfNotExists(
+            db, 'idx_model_tasks_created', 'model_download_tasks', 'createdAt DESC');
+        _log('迁移 v32 → v33: 新建 model_download_tasks 表');
         break;
     }
   }

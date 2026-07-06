@@ -25,11 +25,11 @@ t2i:
     height: 1280
 i2v:
   - title: "视频生成"
-    path: "./comfyui_json/img2video/smooth_i2v.json"
-    description: "图片转视频工作流"
+    path: "./comfyui_json/img2video/i2v.json"
+    description: "图片转视频工作流 (WanVideo)"
 
 # 全局配置
 settings:
-  default_t2i_model: "动漫风"
+  default_t2i_model: "动漫风17.5"
   api_timeout: 300
   max_concurrent_tasks: 5

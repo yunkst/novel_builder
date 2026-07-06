@@ -15,6 +15,7 @@ import 'package:novel_app/services/preferences_service.dart';
 
 import '../../core/providers/database_providers.dart';
 import '../../core/providers/services/ai_service_providers.dart';
+import '../../core/providers/services/network_service_providers.dart';
 import '../../models/character.dart';
 import '../../models/novel.dart';
 import '../../models/outline.dart';
@@ -104,6 +105,11 @@ class ToolExecutor {
           return await _savePromptTag(args);
         case 'delete_prompt_tag':
           return await _deletePromptTag(args);
+        // ===== 文生图（ComfyUI）=====
+        case 'list_text2img_models':
+          return await _listText2ImgModels(args);
+        case 'create_images':
+          return await _createImages(args, scenarioContext);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -1421,5 +1427,96 @@ class ToolExecutor {
       'success': true,
       'message': '标签 "${existing.name}" 已删除',
     });
+  }
+
+  // ===== 文生图（ComfyUI）=====
+
+  /// 列出可用文生图工作流（GET /api/models 的 text2img 节）。
+  ///
+  /// 返回精简字段 [{name, description, isDefault}]，name 作为 create_images
+  /// 的 modelName 参数。后端/ComfyUI 不可用时返回 error，引导告知用户。
+  Future<String> _listText2ImgModels(Map<String, dynamic> args) async {
+    final api = ref.read(apiServiceWrapperProvider);
+    try {
+      final models = await api.getText2ImgModels();
+      LoggerService.instance.i('列出文生图模型: ${models.length} 个',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'list_text2img_models']);
+      return jsonEncode({
+        'models': models,
+        'count': models.length,
+        if (models.isEmpty)
+          'message': '后端未配置任何文生图工作流（workflows.yaml 的 t2i 节为空）。',
+      });
+    } catch (e) {
+      LoggerService.instance.e('列出文生图模型失败: $e',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'list_text2img_models', 'error']);
+      return jsonEncode({
+        'error': 'backend_unavailable',
+        'message': '无法获取文生图模型列表：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
+      });
+    }
+  }
+
+  /// 提交文生图任务（POST /api/text2img/generate × count）。
+  ///
+  /// 并发提交 N 个独立任务，每个任务返回独立 task_id。组装 images 数组
+  /// （含前端生成的 imageId）返回；UI 据此渲染画廊并轮询取图。
+  /// imageId 格式 `img_{ts}_{idx}`，作为本地缓存文件名。
+  Future<String> _createImages(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (prompt, promptErr) = parser.requireString('prompt');
+    if (promptErr != null) return promptErr;
+    final (countRaw, countErr) = parser.optionalInt('count');
+    if (countErr != null) return countErr;
+    final (modelName, modelNameErr) = parser.nullableString('modelName');
+    if (modelNameErr != null) return modelNameErr;
+
+    final count = (countRaw ?? 1).clamp(1, 4);
+
+    final api = ref.read(apiServiceWrapperProvider);
+    final ts = DateTime.now().millisecondsSinceEpoch;
+
+    try {
+      // 并发提交 N 个独立任务
+      final submissions = await Future.wait(
+        List.generate(count, (i) => i).map((i) async {
+          final taskId = await api.submitText2ImgTask(
+            prompt: prompt,
+            modelName: modelName,
+          );
+          return {
+            'imageId': 'img_${ts}_$i',
+            'taskId': taskId,
+            'prompt': prompt,
+            if (modelName != null) 'modelName': modelName,
+          };
+        }),
+      );
+
+      LoggerService.instance.i(
+          '提交文生图任务: count=$count, modelName=${modelName ?? "(默认)"}',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_images']);
+
+      return jsonEncode({
+        'success': true,
+        'message': '已提交 $count 张图片生成任务，画廊将自动刷新直到出图。',
+        'images': submissions,
+        'count': submissions.length,
+      });
+    } catch (e) {
+      LoggerService.instance.e('提交文生图任务失败: $e',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_images', 'error']);
+      return jsonEncode({
+        'error': 'backend_unavailable',
+        'message': '提交文生图任务失败：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
+      });
+    }
   }
 }

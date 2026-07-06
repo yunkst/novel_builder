@@ -40,7 +40,17 @@ class AgentTools {
     _getPromptTag,
     _savePromptTag,
     _deletePromptTag,
+    // ===== 文生图（ComfyUI；仅 ComfyUI healthy 时由 WritingScenario 注入）=====
+    _listText2ImgModels,
+    _createImages,
   ];
+
+  /// 依赖 ComfyUI 的图片工具名集合。
+  /// WritingScenario.tools 在 ComfyUI 不健康时据此过滤，避免 LLM 调用后失败。
+  static const Set<String> imageTools = <String>{
+    'list_text2img_models',
+    'create_images',
+  };
 
   /// 查找工具定义（带日志）
   ///
@@ -580,6 +590,63 @@ class AgentTools {
           },
         },
         'required': ['id'],
+      },
+    },
+  };
+
+  // ===== 文生图（ComfyUI）=====
+
+  static const _listText2ImgModels = {
+    'type': 'function',
+    'function': {
+      'name': 'list_text2img_models',
+      'description':
+          '获取可用的文生图工作流列表（动漫风/写实等不同画风）。'
+          '返回每个工作流的 name（作为 create_images 的 modelName 参数）、'
+          '描述和是否默认。使用场景：用户想生成图片、为角色配图、画场景插图时，'
+          '先调用本工具了解可选画风。',
+      'parameters': {
+        'type': 'object',
+        'properties': <String, dynamic>{},
+        'required': <String>[],
+      },
+    },
+  };
+
+  static const _createImages = {
+    'type': 'function',
+    'function': {
+      'name': 'create_images',
+      'description':
+          '根据提示词生成图片（异步任务，后端 ComfyUI 执行）。\n'
+          '本工具会立即提交任务并返回，图片生成需要数十秒。'
+          '聊天窗口会出现图片画廊，自动轮询直到出图完成。\n'
+          '使用场景：\n'
+          '- 用户想看某角色/场景的视觉化呈现\n'
+          '- 为章节配插图\n'
+          '- 探索人物外貌的具象化\n'
+          'modelName 来自 list_text2img_models 的 name 字段；不传则用默认画风。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'prompt': {
+            'type': 'string',
+            'description':
+                '图片生成提示词（自然语言描述画面，建议含主体、服饰、场景、光影等）。'
+                '英文标签效果通常更好，可中英混合。',
+          },
+          'count': {
+            'type': 'integer',
+            'description': '生成张数（1-4，默认 1）。多张图会以画廊形式展示，可左右切换。',
+          },
+          'modelName': {
+            'type': 'string',
+            'description':
+                '工作流名称（来自 list_text2img_models 的 name，如"动漫风17.5""写实1"）。'
+                '不传则使用后端默认工作流。',
+          },
+        },
+        'required': ['prompt'],
       },
     },
   };

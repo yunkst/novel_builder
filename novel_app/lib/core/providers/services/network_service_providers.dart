@@ -131,7 +131,7 @@ ApiServiceWrapper apiServiceWrapper(Ref ref) {
   // 通过依赖注入创建 ApiServiceWrapper 实例
   // 注入 Dio 实例，统一管理 HTTP 客户端
   final dio = ref.watch(dioProvider);
-  final apiService = ApiServiceWrapper(null, dio);
+  final apiService = ApiServiceWrapper(dio);
 
   // 自动初始化（异步，不阻塞返回）
   // 使用 onAddListener 的方式确保初始化只执行一次

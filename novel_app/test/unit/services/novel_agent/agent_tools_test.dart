@@ -16,8 +16,8 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 18 个工具', () {
-      expect(AgentTools.allTools.length, 18, reason: '所有工具数应为 18（list/select/create novel + read/list/search chapter + create/update chapter + list/update/create character + background/outline + prompt tags）');
+    test('应该有 20 个工具', () {
+      expect(AgentTools.allTools.length, 20, reason: '所有工具数应为 20（list/select/create novel + read/list/search chapter + create/update chapter + list/update/create character + background/outline + prompt tags + text2img 图片工具）');
     });
 
     test('每个工具都有 type=function', () {

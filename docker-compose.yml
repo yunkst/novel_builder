@@ -12,6 +12,8 @@ services:
       - ./backend:/app
       # 小说同步目录映射
       - D:/myspace/nov:/app/novel_sync
+      # ComfyUI 模型目录挂载
+      - D:/Comfyui/ComfyUI_windows_portable/ComfyUI/models:/app/models
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
@@ -26,6 +28,8 @@ services:
       - DIFY_API_TOKEN=${DIFY_API_TOKEN}
       # ComfyUI服务配置
       - COMFYUI_API_URL=http://host.docker.internal:8188
+      # ComfyUI 模型目录（与 volumes 挂载点一致）
+      - COMFYUI_MODELS_DIR=/app/models
     depends_on:
       postgres:
         condition: service_healthy

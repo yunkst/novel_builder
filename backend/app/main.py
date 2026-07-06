@@ -37,24 +37,11 @@ from .logging_config import setup_logging
 from .schemas import (
     Chapter,
     ChapterContent,
-    EnhancedSceneIllustrationRequest,
-    ImageToVideoRequest,
-    ImageToVideoResponse,
     ModelsResponse,
     Novel,
     NovelWithChapters,
-    RoleCardGenerateRequest,
-    RoleCardTaskStatusResponse,
-    RoleGalleryResponse,
-    RoleImageDeleteRequest,
-    RoleRegenerateRequest,
-    SceneIllustrationResponse,
-    SceneGalleryResponse,
-    SceneImageDeleteRequest,
-    SceneRegenerateRequest,
-    SceneRegenerateResponse,
     SourceSite,
-    VideoStatusResponse,
+    Text2ImgGenerateRequest,
     WorkflowInfo,
 )
 from .services.crawler_factory import (
@@ -63,22 +50,17 @@ from .services.crawler_factory import (
     get_enabled_crawlers,
     get_source_sites_info,
 )
-from .services.dify_client import create_dify_client
 from .services.image_to_video_service import create_image_to_video_service
-from .services.role_card_async_service import role_card_async_service
-from .services.role_card_service import role_card_service
-from .services.scene_illustration_service import create_scene_illustration_service
 from .services.search_service import SearchService
+from .services.text2img_service import create_text2img_service
 from .api.routes.backup import router as backup_router
 from .api.routes.logs import router as logs_router
+from .api.routes.models import router as models_router
 
 logger = logging.getLogger(__name__)
 
-# 创建场面绘制服务实例
-dify_client = create_dify_client()
-scene_illustration_service = create_scene_illustration_service(dify_client)
-
-# 创建图生视频服务实例
+# 创建文生图和图生视频服务实例
+text2img_service = create_text2img_service()
 image_to_video_service = create_image_to_video_service()
 
 app = FastAPI(
@@ -104,6 +86,7 @@ app.add_middleware(
 # 注册API路由
 app.include_router(backup_router)
 app.include_router(logs_router)
+app.include_router(models_router)
 
 
 # 应用启动事件
@@ -340,60 +323,72 @@ async def chapter_content(
     }
 
 
+# ================= 文生图 API =================
+
+
+@app.post("/api/text2img/generate", dependencies=[Depends(verify_token)])
+async def text2img_generate(
+    request: Text2ImgGenerateRequest, db: Session = Depends(get_db)
+):
+    """
+    提交文生图任务
+
+    - **prompt**: 图片生成提示词
+    - **model_name**: 模型名称（可选，不填则使用默认模型）
+
+    返回 task_id，可通过 GET /api/text2img/image/{task_id} 获取图片
+    """
+    try:
+        task_id = await text2img_service.generate(
+            request.prompt, request.model_name, db
+        )
+        return {"task_id": task_id}
+    except Exception as e:
+        raise handle_service_exception(e, logger, "提交文生图任务")
+
+
 @app.get(
-    "/text2img/image/{filename}",
+    "/api/text2img/image/{task_id}",
     response_class=Response,
     responses={
         200: {
             "content": {
                 "image/png": {"schema": {"type": "string", "format": "binary"}}
             },
-            "description": "成功返回图片二进制数据 (PNG格式)",
+            "description": "成功返回图片二进制数据",
         },
-        404: {"description": "图片文件不存在"},
+        202: {"description": "图片仍在生成中"},
+        404: {"description": "任务不存在或生成失败"},
     },
+    dependencies=[Depends(verify_token)],
 )
-async def get_image_proxy(filename: str):
+async def text2img_get_image(task_id: str, db: Session = Depends(get_db)):
     """
-    图片代理接口 - 从ComfyUI获取图片并转发给用户
+    根据 task_id 获取文生图结果
 
-    返回图片二进制数据 (PNG格式)
-
-    - **filename**: 图片文件名
-    - **返回**: 图片二进制数据 (Content-Type: image/png)
+    - **task_id**: 提交时返回的任务ID
+    - 未完成返回 202 {"status": "pending"}
+    - 完成返回 200 image/png 二进制
+    - 失败或不存在返回 404
     """
-    import re
-
-    import requests
-
     try:
-        # 安全验证：防止路径遍历攻击
-        # 只允许字母、数字、下划线、连字符、点和扩展名分隔符
-        if not re.match(r"^[a-zA-Z0-9_\-\.]+\.(png|jpg|jpeg|gif|webp)$", filename):
-            raise HTTPException(status_code=400, detail="无效的文件名格式")
-
-        # 额外检查：防止路径遍历
-        if ".." in filename or "/" in filename or "\\" in filename:
-            raise HTTPException(status_code=400, detail="文件名包含非法字符")
-
-        # 直接从ComfyUI获取图片
-        comfyui_url = settings.comfyui_api_url
-        image_url = f"{comfyui_url}/view?filename={filename}"
-
-        response = requests.get(image_url, timeout=None)
-        if response.status_code == 200:
+        data, status_code = await text2img_service.get_image(task_id, db)
+        if status_code == 200:
             return Response(
-                content=response.content,
+                content=data,
                 media_type="image/png",
                 headers={
-                    "Cache-Control": f"public, max-age={CACHE_ONE_DAY}",  # 缓存1天
+                    "Cache-Control": f"public, max-age={CACHE_ONE_DAY}",
                     "X-Content-Type-Options": "nosniff",
                 },
             )
-        else:
-            raise HTTPException(status_code=404, detail="图片不存在")
-    except requests.RequestException:
-        raise HTTPException(status_code=503, detail="无法连接到ComfyUI服务")
+        if status_code == 202:
+            return JSONResponse(status_code=202, content={"status": "pending"})
+        raise HTTPException(status_code=404, detail="图片不存在或生成失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取文生图结果")
 
 
 @app.get("/text2img/health", dependencies=[Depends(verify_token)])
@@ -425,111 +420,80 @@ async def text2img_health_check():
         }
 
 
-# ================= 人物卡图片生成 API =================
+# ================= 图生视频 API =================
 
 
-@app.post("/api/role-card/generate", dependencies=[Depends(verify_token)])
-async def generate_role_card_images(
-    request: RoleCardGenerateRequest, db: Session = Depends(get_db)
+@app.post("/api/image-to-video/generate", dependencies=[Depends(verify_token)])
+async def image_to_video_generate(
+    prompt: str = Form(..., description="视频生成提示词"),
+    model_name: str | None = Form(None, description="模型名称（可选）"),
+    image: UploadFile = File(..., description="输入图片"),
+    db: Session = Depends(get_db),
 ):
     """
-    异步生成人物卡图片
+    提交图生视频任务
 
-    - **role_id**: 人物卡ID
-    - **roles**: 人物卡设定信息
-    - **model**: 使用的模型名称（可选）
+    - **prompt**: 视频生成提示词
+    - **model_name**: 模型名称（可选，不填则使用默认模型）
+    - **image**: 输入图片文件
 
-    返回任务ID，可通过 /api/role-card/status/{task_id} 查询进度
-
-    注意：用户要求已固定为"生成人物卡"，无需手动输入
+    返回 task_id，可通过 GET /api/image-to-video/video/{task_id} 获取视频
     """
     try:
-        return await role_card_async_service.create_task(request, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "创建人物卡生成任务")
-
-
-@app.get(
-    "/api/role-card/status/{task_id}",
-    response_model=RoleCardTaskStatusResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def get_role_card_task_status(
-    task_id: int, db: Session = Depends(get_db)
-):
-    """
-    查询人物卡生成任务状态
-
-    - **task_id**: 任务ID
-    """
-    try:
-        result = await role_card_async_service.get_task_status(task_id, db)
-        if not result:
-            raise HTTPException(status_code=404, detail="任务不存在")
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "查询任务状态")
-
-
-@app.get(
-    "/api/role-card/gallery/{role_id}",
-    response_model=RoleGalleryResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def get_role_card_gallery(
-    role_id: str, db: Session = Depends(get_db)
-):
-    """
-    查看角色图集
-
-    - **role_id**: 人物卡ID
-    """
-    try:
-        return await role_card_service.get_role_gallery(role_id, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "获取角色图集")
-
-
-@app.delete("/api/role-card/image", dependencies=[Depends(verify_token)])
-async def delete_role_card_image(
-    request: RoleImageDeleteRequest, db: Session = Depends(get_db)
-):
-    """
-    从角色图集中删除图片
-
-    - **role_id**: 人物卡ID
-    - **img_url**: 要删除的图片URL
-    """
-    try:
-        success = await role_card_service.delete_role_image(request, db)
-        if not success:
-            raise HTTPException(status_code=404, detail="图片不存在")
-        return {"message": "图片删除成功"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "删除角色图片")
-
-
-@app.post("/api/role-card/regenerate", dependencies=[Depends(verify_token)])
-async def regenerate_similar_images(
-    request: RoleRegenerateRequest, db: Session = Depends(get_db)
-):
-    """
-    重新生成相似图片
-
-    - **img_url**: 参考图片URL
-    - **count**: 生成图片数量
-    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
-    """
-    try:
-        return await role_card_service.regenerate_similar_images(
-            request, db, model=request.model
+        image_bytes = await image.read()
+        task_id = await image_to_video_service.generate(
+            prompt, model_name, image_bytes, image.filename or "input_image.png", db
         )
+        return {"task_id": task_id}
     except Exception as e:
-        raise handle_service_exception(e, logger, "重新生成相似图片")
+        raise handle_service_exception(e, logger, "提交图生视频任务")
+
+
+@app.get(
+    "/api/image-to-video/video/{task_id}",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {
+                "video/mp4": {"schema": {"type": "string", "format": "binary"}}
+            },
+            "description": "成功返回视频二进制数据",
+        },
+        202: {"description": "视频仍在生成中"},
+        404: {"description": "任务不存在或生成失败"},
+    },
+    dependencies=[Depends(verify_token)],
+)
+async def image_to_video_get_video(task_id: str, db: Session = Depends(get_db)):
+    """
+    根据 task_id 获取图生视频结果
+
+    - **task_id**: 提交时返回的任务ID
+    - 未完成返回 202 {"status": "pending"}
+    - 完成返回 200 video/mp4 二进制
+    - 失败或不存在返回 404
+    """
+    try:
+        data, status_code = await image_to_video_service.get_video(task_id, db)
+        if status_code == 200:
+            return Response(
+                content=data,
+                media_type="video/mp4",
+                headers={
+                    "Cache-Control": f"public, max-age={CACHE_ONE_HOUR}",
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+        if status_code == 202:
+            return JSONResponse(status_code=202, content={"status": "pending"})
+        raise HTTPException(status_code=404, detail="视频不存在或生成失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise handle_service_exception(e, logger, "获取图生视频结果")
+
+
+# ================= 模型管理 API =================
 
 
 @app.get("/api/models", dependencies=[Depends(verify_token)])
@@ -571,234 +535,6 @@ async def get_models() -> ModelsResponse:
         raise handle_service_exception(e, logger, "获取模型列表")
 
 
-@app.get("/api/role-card/health", dependencies=[Depends(verify_token)])
-async def role_card_health_check():
-    """检查人物卡服务健康状态"""
-    try:
-        health_status = await role_card_service.health_check()
-        overall_healthy = all(health_status.values())
-
-        return {
-            "status": "healthy" if overall_healthy else "unhealthy",
-            "services": health_status,
-        }
-    except Exception as e:
-        logger.error(f"人物卡健康检查失败: {e}")
-        return {"status": "error", "message": str(e), "services": {}}
-
-
-# ================= 场面绘制 API =================
-
-
-@app.post(
-    "/api/scene-illustration/generate",
-    response_model=SceneIllustrationResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def generate_scene_images(
-    request: EnhancedSceneIllustrationRequest, db: Session = Depends(get_db)
-):
-    """
-    生成场面绘制图片
-
-    - **chapters_content**: 章节内容
-    - **task_id**: 任务标识符
-    - **roles**: 角色信息
-    - **num**: 生成图片数量
-    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型）
-
-    返回任务ID，可通过后续接口查询和获取图片
-    """
-    try:
-        return await scene_illustration_service.generate_scene_images(request, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "创建场面绘制任务")
-
-
-@app.get(
-    "/api/scene-illustration/gallery/{task_id}",
-    response_model=SceneGalleryResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def get_scene_gallery(
-    task_id: str, db: Session = Depends(get_db)
-):
-    """
-    查看场面绘制图片列表
-
-    - **task_id**: 场面绘制任务ID
-    """
-    try:
-        return await scene_illustration_service.get_scene_gallery(task_id, db)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "获取场面图集")
-
-
-@app.delete("/api/scene-illustration/image", dependencies=[Depends(verify_token)])
-async def delete_scene_image(
-    request: SceneImageDeleteRequest, db: Session = Depends(get_db)
-):
-    """
-    从场面绘制结果中删除图片
-
-    - **task_id**: 场面绘制任务ID
-    - **filename**: 要删除的图片文件名
-    """
-    try:
-        success = await scene_illustration_service.delete_scene_image(request, db)
-        if not success:
-            raise HTTPException(status_code=404, detail="图片不存在")
-        return {"message": "图片删除成功"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "删除场面图片")
-
-
-@app.post(
-    "/api/scene-illustration/regenerate",
-    response_model=SceneRegenerateResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def regenerate_scene_images(
-    request: SceneRegenerateRequest, db: Session = Depends(get_db)
-):
-    """
-    基于现有任务重新生成场面图片
-
-    - **task_id**: 原始任务ID
-    - **count**: 生成图片数量
-    - **model_name**: 指定使用的模型名称（可选，不填则使用默认模型，向后兼容model参数）
-    """
-    try:
-        return await scene_illustration_service.regenerate_scene_images(request, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "重新生成场面图片")
-
-
-# ================= 图生视频 API =================
-
-
-@app.post(
-    "/api/image-to-video/generate",
-    response_model=ImageToVideoResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def generate_video_from_image(
-    request: ImageToVideoRequest, db: Session = Depends(get_db)
-):
-    """
-    生成图生视频
-
-    创建一个图生视频任务，将指定的图片转换为动态视频。
-
-    **请求参数:**
-    - **img_name**: 要处理的图片文件名称
-    - **user_input**: 用户对视频生成的要求描述
-    - **model_name**: 图生视频模型名称（可选，不填则使用默认模型）
-
-    **返回值:**
-    - **task_id**: 视频生成任务的唯一标识符，用于后续状态查询
-    - **img_name**: 处理的图片名称
-    - **status**: 任务初始状态（通常为 "pending"）
-    - **message**: 任务创建的状态消息
-
-    **使用示例:**
-    ```json
-    {
-        "task_id": 123,
-        "img_name": "example.jpg",
-        "status": "pending",
-        "message": "图生视频任务创建成功"
-    }
-    ```
-
-    **后续操作:**
-    使用返回的 task_id 轮询 `/api/image-to-video/has-video/{img_name}` 查询视频是否生成完成
-    """
-    try:
-        return await image_to_video_service.create_video_generation_task(request, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "创建图生视频任务")
-
-
-@app.get(
-    "/api/image-to-video/has-video/{img_name}",
-    response_model=VideoStatusResponse,
-    dependencies=[Depends(verify_token)],
-)
-async def check_video_status(
-    img_name: str, db: Session = Depends(get_db)
-):
-    """
-    检查图片是否有已生成的视频
-
-    根据图片名称快速查询是否已有对应的视频文件存在。
-
-    **路径参数:**
-    - **img_name**: 要查询的图片文件名称
-
-    **返回值:**
-    - **img_name**: 图片名称
-    - **has_video**: 是否有对应的视频文件（true/false）
-    - **video_url**: 视频文件URL（如果有）
-    - **created_at**: 视频创建时间（如果有）
-
-    **使用场景:**
-    - 在显示图片时快速判断是否显示视频播放按钮
-    - 避免重复创建已有视频的任务
-    """
-    try:
-        return await image_to_video_service.get_video_status(img_name, db)
-    except Exception as e:
-        raise handle_service_exception(e, logger, "检查视频状态")
-
-
-@app.get(
-    "/api/image-to-video/video/{img_name}",
-    response_class=Response,
-    responses={
-        200: {
-            "content": {
-                "video/mp4": {"schema": {"type": "string", "format": "binary"}}
-            },
-            "description": "成功返回视频二进制数据 (MP4格式)",
-        },
-        404: {"description": "视频文件不存在"},
-    },
-)
-async def get_video_file(
-    img_name: str, db: Session = Depends(get_db)
-):
-    """
-    获取视频文件
-
-    返回视频二进制数据 (MP4格式)
-
-    - **img_name**: 图片名称
-    - **返回**: 视频二进制数据 (Content-Type: video/mp4)
-    """
-    try:
-        video_data = await image_to_video_service.get_video_file(img_name, db)
-        if not video_data:
-            raise HTTPException(status_code=404, detail="视频文件不存在")
-
-        return Response(
-            content=video_data,
-            media_type="video/mp4",
-            headers={
-                "Cache-Control": f"public, max-age={CACHE_ONE_HOUR}",
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_service_exception(e, logger, "获取视频文件")
-
-
 # ================= 缓存管理 API =================
 
 
@@ -827,10 +563,8 @@ def index():
             "实时内容抓取",
             "后台缓存任务",
             "WebSocket进度推送",
-            "角色卡AI图片生成",
-            "ComfyUI图片生成",
-            "图生视频功能",
-            "Dify工作流集成",
+            "ComfyUI文生图",
+            "ComfyUI图生视频",
             "APP版本管理和升级",
         ],
         "endpoints": [
@@ -838,11 +572,12 @@ def index():
             "GET /search?keyword=xxx&sites=alice_sw,shukuge - 搜索小说（可指定站点）",
             "GET /chapters?url=xxx - 获取章节列表",
             "GET /chapter-content?url=xxx&force_refresh=true - 获取章节内容",
-            "GET /text2img/image/{filename} - 获取生成的图片",
-            "GET /text2img/health - 文生图服务健康检查",
-            "POST /api/image-to-video/generate - 图生视频生成",
-            "GET /api/image-to-video/has-video/{img_name} - 检查图片是否有视频",
-            "GET /api/image-to-video/video/{img_name} - 获取视频文件",
+            "POST /api/text2img/generate - 提交文生图任务",
+            "GET /api/text2img/image/{task_id} - 获取文生图结果",
+            "GET /text2img/health - ComfyUI服务健康检查",
+            "POST /api/image-to-video/generate - 提交图生视频任务",
+            "GET /api/image-to-video/video/{task_id} - 获取图生视频结果",
+            "GET /api/models - 获取可用模型列表",
             "POST /api/app-version/upload - 上传APP新版本",
             "GET /api/app-version/latest - 查询最新版本",
             "GET /api/app-version/download/{version} - 下载APK文件",

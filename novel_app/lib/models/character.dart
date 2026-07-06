@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:novel_api/novel_api.dart';
 
 class Character {
   final int? id;
@@ -158,36 +157,4 @@ ${i + 1}. ${char.name}
     return rolesInfo;
   }
 
-  /// 转换为API客户端的RoleInfo列表
-  ///
-  /// 将Character对象列表转换为RoleInfo对象列表，用于API调用。
-  /// 此方法主要用于场景插图生成和角色卡生成功能。
-  ///
-  /// [characters] 要转换的Character对象列表
-  ///
-  /// 返回包含所有角色信息的RoleInfo列表
-  ///
-  /// 注意：
-  /// - 如果Character.id为null，将使用0作为默认值
-  /// - 所有可选字段将原样传递，null值会被保留
-  /// - 建议在调用前确保Character对象的数据完整性
-  static List<RoleInfo> toRoleInfoList(List<Character> characters) {
-    if (characters.isEmpty) return [];
-
-    return characters.map((char) {
-      return RoleInfo((b) => b
-        ..id = char.id ?? 0 // 使用0作为默认值，实际应该确保id不为空
-        ..name = char.name
-        ..gender = char.gender
-        ..age = char.age
-        ..occupation = char.occupation
-        ..personality = char.personality
-        ..appearanceFeatures = char.appearanceFeatures
-        ..bodyType = char.bodyType
-        ..clothingStyle = char.clothingStyle
-        ..backgroundStory = char.backgroundStory
-        ..facePrompts = char.facePrompts
-        ..bodyPrompts = char.bodyPrompts);
-    }).toList();
   }
-}

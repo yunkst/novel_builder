@@ -1,10 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/site_script.dart';
 import '../../services/logger_service.dart';
 import '../../services/bookmark_service.dart';
+import '../../widgets/model_save_location_dialog.dart';
 import 'database_providers.dart';
+import 'model_download_providers.dart';
+import 'services/network_service_providers.dart';
 
 /// 当前显示的 URL（地址栏订阅）
 final webviewCurrentUrlProvider = StateProvider<String>(
@@ -69,6 +73,81 @@ class WebViewControllerNotifier
       category: LogCategory.network,
       tags: ['webview', 'resource-error'],
     );
+  }
+
+  /// 处理 WebView 内点击下载链接
+  ///
+  /// 弹出选目录对话框，候选为 backend /app/models 下的一级子目录。
+  /// 用户确认后创建任务并开始下载。
+  Future<void> handleDownloadStart({
+    required String url,
+    required BuildContext context,
+    required WidgetRef ref,
+    String? sourcePage,
+  }) async {
+    LoggerService.instance.i(
+      'WebView 触发下载: $url',
+      category: LogCategory.network,
+      tags: ['webview', 'download', 'start'],
+    );
+
+    final apiService = ref.read(apiServiceWrapperProvider);
+
+    // 从 URL 解析文件名
+    String filename = 'download';
+    try {
+      final uri = Uri.parse(url);
+      final seg = uri.pathSegments;
+      if (seg.isNotEmpty && seg.last.isNotEmpty) {
+        filename = Uri.decodeComponent(seg.last);
+      }
+    } catch (_) {}
+
+    // 取候选目录
+    List<Map<String, dynamic>> dirs = [];
+    try {
+      dirs = await apiService.listModelDirs();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('获取模型目录失败: $e')),
+        );
+      }
+      return;
+    }
+    if (dirs.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('/app/models 下没有可用的子目录')),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    final result = await showDialog<ModelSaveLocationResult?>(
+      context: context,
+      builder: (ctx) => ModelSaveLocationDialog(
+        url: url,
+        filename: filename,
+        dirs: dirs,
+      ),
+    );
+
+    if (result == null) return;
+
+    await ref.read(modelDownloadProvider.notifier).createTask(
+          url: url,
+          filename: result.filename,
+          targetSubdir: result.subdir,
+          sourcePage: sourcePage,
+        );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已加入下载，点击「模型下载管理」查看')),
+      );
+    }
   }
 
   /// 加载指定 URL（自动规范化）

@@ -14,6 +14,7 @@ import '../../repositories/prompt_tag_repository.dart';
 import '../../repositories/site_script_repository.dart';
 import '../../repositories/agent_memory_repository.dart';
 import '../../repositories/chat_session_repository.dart';
+import '../../repositories/model_download_repository.dart';
 import '../database/database_connection.dart';
 import '../interfaces/repositories/i_novel_repository.dart';
 import '../interfaces/repositories/i_chapter_repository.dart';
@@ -147,4 +148,13 @@ final llmConfigRepositoryProvider = Provider<LlmConfigRepository>((ref) {
 final chatSessionRepositoryProvider = Provider<ChatSessionRepository>((ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return ChatSessionRepository(dbConnection: dbConnection);
+});
+
+/// ModelDownloadRepository Provider
+///
+/// ComfyUI 模型下载/上传任务的持久化操作
+final modelDownloadRepositoryProvider =
+    Provider<ModelDownloadRepository>((ref) {
+  final dbConnection = ref.watch(databaseConnectionProvider);
+  return ModelDownloadRepository(dbConnection: dbConnection);
 });

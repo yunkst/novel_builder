@@ -37,6 +37,8 @@ class Settings(BaseSettings):
 
     # ComfyUI服务配置
     comfyui_api_url: str = "http://host.docker.internal:8188"
+    # ComfyUI 模型目录（容器内路径），用于模型文件上传落地
+    comfyui_models_dir: str = Field(default="/app/models", alias="COMFYUI_MODELS_DIR")
 
     # 图生视频相关配置
     video_generation_timeout: int = 600  # 10分钟

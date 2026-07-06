@@ -136,6 +136,8 @@ class SourceSite(BaseModel):
 ### SQLAlchemy模型 (`app/models.py`)
 - **ChapterCache**: 章节内容缓存表
 - **CacheTask**: 缓存任务管理表
+- **Text2ImgTask**: 文生图任务表 (prompt_id 唯一标识)
+- **ImageToVideoTask**: 图生视频任务表 (prompt_id 唯一标识)
 
 ## 爬虫系统架构
 
@@ -166,11 +168,9 @@ class SourceSite(BaseModel):
 - **缓存装饰器** (`cache_decorator.py`): 声明式缓存逻辑
 
 ### AI 服务客户端
-- **DifyClient** (`dify_client.py`): Dify 工作流 API 客户端
-- **ComfyUI 相关**: `comfyui_client.py`, `comfyui_client_v2.py`, `comfyui_client_title_based.py`, `comfyui_video_client.py`
-- **角色卡服务**: `role_card_service.py`, `role_card_async_service.py`
-- **场景插图**: `scene_illustration_service.py`
-- **图生视频**: `image_to_video_service.py`
+- **ComfyUI 客户端** (`comfyui_client.py`): 统一的文生图/图生视频 ComfyUI 交互客户端
+- **文生图服务** (`text2img_service.py`): 提交文生图任务 + 按 task_id 取图
+- **图生视频服务** (`image_to_video_service.py`): 提交图生视频任务 + 按 task_id 取视频
 
 ### APP版本管理
 - **服务**: `app_version_service.py`
@@ -204,6 +204,16 @@ class BaseCrawler:
    - 任务状态管理
    - 进度跟踪
    - 错误处理
+
+3. **text2img_task**: 文生图任务
+   - prompt_id (ComfyUI prompt_id, 唯一索引, 对外即 task_id)
+   - prompt, model_name, status, filename
+   - 提交即落库, 完成后回填 filename
+
+4. **image_to_video_task**: 图生视频任务
+   - prompt_id (ComfyUI prompt_id, 唯一索引, 对外即 task_id)
+   - prompt, model_name, image_filename, video_filename
+   - 提交即落库, 完成后回填 video_filename
 
 ### 数据库服务
 - **初始化**: `app/database.py`

@@ -217,8 +217,8 @@ docker-compose logs -f
 - **chapter_cache**: 章节内容缓存
 - **novel_chapters**: 章节列表元数据
 - **cache_tasks**: 缓存任务管理
-- **characters / character_relationships**: 角色及关系
-- **scene_illustrations**: 场景插图
+- **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id）
+- **image_to_video_task**: 图生视频任务（ComfyUI prompt_id 为 task_id）
 - **outlines**: 提纲数据
 - **chat_scenes**: 对话场景
 
@@ -241,6 +241,11 @@ docker-compose logs -f
 - `POST /api/cache/create`: 创建缓存任务
 - `GET /api/cache/status/{task_id}`: 查询缓存状态
 - `GET /api/source-sites`: 获取支持的站点列表
+- `POST /api/text2img/generate`: 提交文生图任务，返回 task_id
+- `GET /api/text2img/image/{task_id}`: 按 task_id 取文生图结果（202 pending / 200 png / 404 失败）
+- `POST /api/image-to-video/generate`: 上传图片+提示词，提交图生视频任务，返回 task_id
+- `GET /api/image-to-video/video/{task_id}`: 按 task_id 取视频结果（202 pending / 200 mp4 / 404 失败）
+- `GET /api/models`: 获取可用文生图/图生视频模型列表
 - `POST /api/app-version/upload`: 上传APP版本
 - `GET /api/app-version/download/{version}`: 下载APP版本
 

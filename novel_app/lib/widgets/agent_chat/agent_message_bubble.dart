@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
+import 'image_gallery_card.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Agent 聊天消息气泡
@@ -36,19 +37,13 @@ class AgentMessageBubble extends StatelessWidget {
     final isStreaming = streamingSegments != null;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: isUser ? 48 : 8,
-        right: isUser ? 8 : 48,
-        top: 4,
-        bottom: 4,
-      ),
+      // 气泡占满对话框内容区宽度，仅留对称小边距，避免横向空间浪费。
+      // user / assistant 的区分由背景色（_getBubbleColor）和时间戳 Row 对齐承担。
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Column(
         crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: _getBubbleColor(context),
@@ -343,6 +338,14 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
                     : '查看重写后的章节',
               ),
             ),
+          // create_images 成功时，渲染图片画廊
+          if (call.name == 'create_images' &&
+              call.status == AgentToolStatus.completed &&
+              _imageGallery != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: ImageGalleryCard(data: _imageGallery!),
+            ),
         ],
       ),
     );
@@ -351,6 +354,10 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
   /// 解析工具结果中的重写成功信息（缓存，避免每次 build 重复解析）
   ChapterRewriteEntryData? get _rewriteEntry =>
       parseRewriteEntry(widget.call.result);
+
+  /// 解析工具结果中的图片画廊数据（缓存）
+  ImageGalleryData? get _imageGallery =>
+      parseImageGallery(widget.call.result);
 
   /// running 态标题文案：内部走 LLM 流式的工具显示「已生成 N 字」进度，
   /// 其他工具维持原 `工具名...` 转圈语义。

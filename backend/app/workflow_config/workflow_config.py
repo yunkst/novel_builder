@@ -68,7 +68,9 @@ class WorkflowConfigManager:
                 config_path = Path("/app/workflows.yaml")
             else:
                 # 在本地开发环境
-                current_dir = Path(__file__).parent.parent
+                # __file__ = backend/app/workflow_config/workflow_config.py
+                # parents[2] = backend/
+                current_dir = Path(__file__).parents[2]
                 config_path = current_dir / "workflows.yaml"
 
         self.config_path = Path(config_path)
@@ -254,7 +256,8 @@ class WorkflowConfigManager:
             backend_dir = Path("/app")
         else:
             # 在本地开发环境，使用相对路径
-            backend_dir = Path(__file__).parent.parent
+            # __file__ = backend/app/workflow_config/workflow_config.py, parents[2] = backend/
+            backend_dir = Path(__file__).parents[2]
 
         full_path = backend_dir / workflow_path
         return str(full_path.resolve())
