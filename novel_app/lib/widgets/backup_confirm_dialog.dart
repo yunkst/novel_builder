@@ -1,13 +1,27 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
+/// 备份确认结果
+///
+/// [confirmed] 用户是否点击"开始备份"
+/// [excludeToken] 用户是否勾选"不包含 API Token"
+class BackupConfirmResult {
+  final bool confirmed;
+  final bool excludeToken;
+
+  const BackupConfirmResult({
+    required this.confirmed,
+    required this.excludeToken,
+  });
+}
+
 /// 备份确认对话框
 ///
-/// 显示备份操作的确认信息，包括数据库名称、文件大小等
-class BackupConfirmDialog extends StatelessWidget {
+/// 显示备份操作的确认信息，包括备份包大小、是否排除 API Token 等
+class BackupConfirmDialog extends StatefulWidget {
   final String fileName;
   final String fileSize;
-  final VoidCallback onConfirm;
+  final void Function(bool excludeToken) onConfirm;
   final VoidCallback? onCancel;
 
   const BackupConfirmDialog({
@@ -20,23 +34,34 @@ class BackupConfirmDialog extends StatelessWidget {
 
   /// 显示对话框
   ///
-  /// 返回用户是否确认备份
-  static Future<bool> show({
+  /// 返回 [BackupConfirmResult]；若用户取消则 confirmed=false
+  static Future<BackupConfirmResult> show({
     required BuildContext context,
     required String fileName,
     required String fileSize,
   }) async {
-    final result = await showDialog<bool>(
+    final result = await showDialog<BackupConfirmResult>(
       context: context,
       builder: (context) => BackupConfirmDialog(
         fileName: fileName,
         fileSize: fileSize,
-        onConfirm: () => Navigator.of(context).pop(true),
-        onCancel: () => Navigator.of(context).pop(false),
+        onConfirm: (excludeToken) => Navigator.of(context).pop(
+          BackupConfirmResult(confirmed: true, excludeToken: excludeToken),
+        ),
+        onCancel: () => Navigator.of(context).pop(
+          const BackupConfirmResult(confirmed: false, excludeToken: false),
+        ),
       ),
     );
-    return result ?? false;
+    return result ?? const BackupConfirmResult(confirmed: false, excludeToken: false);
   }
+
+  @override
+  State<BackupConfirmDialog> createState() => _BackupConfirmDialogState();
+}
+
+class _BackupConfirmDialogState extends State<BackupConfirmDialog> {
+  bool _excludeToken = false;
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +77,36 @@ class BackupConfirmDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('即将上传数据库备份到服务器，请确认：'),
+          const Text('即将上传备份包到服务器，请确认：'),
           const SizedBox(height: 16),
-          _buildInfoRow(context, '文件名', fileName),
+          _buildInfoRow(context, '文件名', widget.fileName),
           const SizedBox(height: 8),
-          _buildInfoRow(context, '文件大小', fileSize),
-          const SizedBox(height: 16),
+          _buildInfoRow(context, '文件大小', widget.fileSize),
+          const SizedBox(height: 12),
+          // Token 排除勾选框
+          InkWell(
+            onTap: () => setState(() => _excludeToken = !_excludeToken),
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _excludeToken,
+                    onChanged: (v) =>
+                        setState(() => _excludeToken = v ?? false),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      '不包含 API Token（迁移到新设备后需手动重新配置）',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -68,11 +117,13 @@ class BackupConfirmDialog extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, size: 20, color: context.appColors.onInfoContainer),
+                Icon(Icons.info_outline,
+                    size: 20, color: context.appColors.onInfoContainer),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '备份文件将保存在服务器，不会被删除。您可以随时恢复数据。',
+                    '备份包内含数据库与阅读器设置、书签、LLM 配置等偏好设置。'
+                    '备份文件将保存在服务器，不会被删除，您可以随时恢复数据。',
                     style: TextStyle(
                       fontSize: 12,
                       color: context.appColors.onInfoContainer,
@@ -86,11 +137,11 @@ class BackupConfirmDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          onPressed: onCancel,
+          onPressed: widget.onCancel,
           child: const Text('取消'),
         ),
         ElevatedButton(
-          onPressed: onConfirm,
+          onPressed: () => widget.onConfirm(_excludeToken),
           child: const Text('开始备份'),
         ),
       ],

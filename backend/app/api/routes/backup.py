@@ -89,9 +89,9 @@ async def upload_backup(
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
 
-    if not file.filename.lower().endswith(".db"):
+    if not file.filename.lower().endswith((".db", ".zip")):
         raise HTTPException(
-            status_code=400, detail="仅支持.db格式的数据库备份文件"
+            status_code=400, detail="仅支持.db或.zip格式的备份文件"
         )
 
     # 2. 生成存储路径（按日期分目录）
@@ -114,8 +114,14 @@ async def upload_backup(
     # 如果文件已存在，追加时间戳
     if file_path.exists():
         timestamp = datetime.now().strftime("%H%M%S")
-        name_without_ext = original_filename[:-3]  # 去掉.db
-        stored_filename = f"{name_without_ext}_{timestamp}.db"
+        # 按真实扩展名拆分（支持 .db 和 .zip）
+        if original_filename.lower().endswith(".zip"):
+            name_without_ext = original_filename[:-4]  # 去掉.zip
+            new_ext = ".zip"
+        else:
+            name_without_ext = original_filename[:-3]  # 去掉.db
+            new_ext = ".db"
+        stored_filename = f"{name_without_ext}_{timestamp}{new_ext}"
         file_path = date_dir / stored_filename
 
     # 4. 流式写入文件（避免大文件占用过多内存）
@@ -165,9 +171,11 @@ async def list_backups(
 
     backups: list[BackupInfo] = []
 
-    # 遍历 BACKUP_DIR 下所有 .db 文件
-    for db_file in BACKUP_DIR.rglob("*.db"):
+    # 遍历 BACKUP_DIR 下所有 .db 或 .zip 备份文件
+    for db_file in BACKUP_DIR.rglob("*"):
         if not db_file.is_file():
+            continue
+        if not db_file.name.lower().endswith((".db", ".zip")):
             continue
 
         try:

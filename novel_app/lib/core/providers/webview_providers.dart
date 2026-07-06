@@ -133,6 +133,12 @@ final bookmarkListProvider =
   (ref) => BookmarkListNotifier(),
 );
 
+/// 收藏分组列表 Provider
+final bookmarkGroupListProvider = StateNotifierProvider<BookmarkGroupListNotifier,
+    AsyncValue<List<BookmarkGroup>>>(
+  (ref) => BookmarkGroupListNotifier(ref),
+);
+
 /// 收藏夹状态管理
 class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
   BookmarkListNotifier() : super(const AsyncValue.loading()) {
@@ -157,8 +163,15 @@ class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
     }
   }
 
+  /// 同步刷新（供分组管理等外部调用）
+  void refresh() => _loadBookmarks();
+
   /// 添加收藏
-  Future<void> addBookmark({required String title, required String url}) async {
+  Future<void> addBookmark({
+    required String title,
+    required String url,
+    String? groupId,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final service = BookmarkService(prefs);
@@ -166,6 +179,7 @@ class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
         url: url,
+        groupId: groupId,
         createdAt: DateTime.now(),
       );
       await service.addBookmark(bookmark);
@@ -175,7 +189,7 @@ class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
       state = AsyncValue.data(updated);
 
       LoggerService.instance.i(
-        '添加收藏: $title ($url)',
+        '添加收藏: $title ($url, groupId=$groupId)',
         category: LogCategory.database,
         tags: ['bookmark', 'add'],
       );
@@ -215,9 +229,158 @@ class BookmarkListNotifier extends StateNotifier<AsyncValue<List<Bookmark>>> {
     }
   }
 
+  /// 重命名收藏
+  Future<void> renameBookmark(String id, String title) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      await service.renameBookmark(id, title);
+      state = AsyncValue.data(service.loadBookmarks());
+      LoggerService.instance.i(
+        '重命名收藏: id=$id -> $title',
+        category: LogCategory.database,
+        tags: ['bookmark', 'rename'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '重命名收藏失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'rename', 'error'],
+      );
+    }
+  }
+
+  /// 移动收藏到分组（groupId 为 null = 未分组）
+  Future<void> moveBookmark(String id, String? groupId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      await service.moveBookmark(id, groupId);
+      state = AsyncValue.data(service.loadBookmarks());
+      LoggerService.instance.i(
+        '移动收藏: id=$id -> groupId=$groupId',
+        category: LogCategory.database,
+        tags: ['bookmark', 'move'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '移动收藏失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'move', 'error'],
+      );
+    }
+  }
+
   /// 检查 URL 是否已收藏
   bool isBookmarked(String url) {
     return state.value?.any((b) => b.url == url) ?? false;
+  }
+}
+
+/// 收藏分组状态管理
+///
+/// 与 `BookmarkListNotifier` 互调刷新：删除分组后必须刷收藏列表
+/// （收藏的 `groupId` 会变更）。
+class BookmarkGroupListNotifier
+    extends StateNotifier<AsyncValue<List<BookmarkGroup>>> {
+  final Ref _ref;
+
+  BookmarkGroupListNotifier(this._ref)
+      : super(const AsyncValue.loading()) {
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      state = AsyncValue.data(service.loadGroups());
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '加载收藏分组失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'init', 'error'],
+      );
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  /// 同步刷新（供添加/删除收藏等可能影响分组关联的入口调用）
+  void refresh() => _loadGroups();
+
+  /// 新建分组（同名校验在 service 内自动去重）
+  /// 返回新建的分组（含服务端纠正后的名称）
+  Future<BookmarkGroup?> addGroup(String name) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      final group = await service.addGroup(name);
+      state = AsyncValue.data(service.loadGroups());
+      LoggerService.instance.i(
+        '新建收藏分组: ${group.name}',
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'add'],
+      );
+      return group;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '新建收藏分组失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'add', 'error'],
+      );
+      return null;
+    }
+  }
+
+  /// 重命名分组
+  Future<void> renameGroup(String id, String name) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      await service.renameGroup(id, name);
+      state = AsyncValue.data(service.loadGroups());
+      LoggerService.instance.i(
+        '重命名收藏分组: id=$id -> $name',
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'rename'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '重命名收藏分组失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'rename', 'error'],
+      );
+    }
+  }
+
+  /// 删除分组（自动将分组内收藏归入「未分组」）
+  /// 删除完成后同时刷新收藏列表
+  Future<void> deleteGroup(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final service = BookmarkService(prefs);
+      await service.deleteGroup(id);
+      state = AsyncValue.data(service.loadGroups());
+      // 关键：删除分组后，组内收藏的 groupId 已置 null，需刷新
+      _ref.read(bookmarkListProvider.notifier).refresh();
+      LoggerService.instance.i(
+        '删除收藏分组: id=$id',
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'delete'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '删除收藏分组失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['bookmark', 'group', 'delete', 'error'],
+      );
+    }
   }
 }
 

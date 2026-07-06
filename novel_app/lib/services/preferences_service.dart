@@ -161,6 +161,19 @@ class PreferencesService {
     }
   }
 
+  /// 获取底层 SharedPreferences 实例
+  ///
+  /// 仅供需要直接访问全部键/原始值的场景使用（如备份服务）。
+  /// 普通业务请使用上面的 typed get/set 方法。
+  Future<SharedPreferences> getInstance() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('PreferencesService.getInstance 失败: $e');
+      rethrow;
+    }
+  }
+
   /// 检查键是否存在
   Future<bool> containsKey(String key) async {
     try {

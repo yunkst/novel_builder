@@ -71,21 +71,21 @@ class _BackupManagementScreenState
       final backupService = ref.read(backupServiceProvider);
       final apiService = ref.read(apiServiceWrapperProvider);
 
-      // 获取数据库文件
+      // 获取数据库文件（用于估算备份包大小）
       final dbFile = await backupService.getDatabaseFile();
       final fileSize = await dbFile.length();
       final fileName = dbFile.path.split('/').last;
       final fileSizeText = FormatUtils.formatFileSize(fileSize);
 
-      // 显示确认对话框
+      // 显示确认对话框（含 Token 排除选项）
       if (!mounted) return;
-      final confirmed = await BackupConfirmDialog.show(
+      final confirmResult = await BackupConfirmDialog.show(
         context: context,
         fileName: fileName,
         fileSize: fileSizeText,
       );
 
-      if (!confirmed) return;
+      if (!confirmResult.confirmed) return;
 
       // 显示进度对话框并执行上传
       if (!mounted) return;
@@ -93,7 +93,7 @@ class _BackupManagementScreenState
         context: context,
         uploadTask: () => backupService.uploadBackup(
           apiWrapper: apiService,
-          dbFile: dbFile,
+          excludeToken: confirmResult.excludeToken,
         ),
       );
 
@@ -102,7 +102,7 @@ class _BackupManagementScreenState
       await _loadBackupList();
       if (mounted) {
         setState(() {});
-        ToastUtils.show('备份成功');
+        ToastUtils.show(confirmResult.excludeToken ? '备份成功（不含 API Token）' : '备份成功');
       }
     } catch (e) {
       if (mounted) {
