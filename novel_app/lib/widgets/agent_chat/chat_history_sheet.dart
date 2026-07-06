@@ -131,9 +131,9 @@ class ChatHistorySheet extends ConsumerWidget {
       scenarioId: scenarioId,
       title: '',
     ));
-    // 切换到新 session
+    // 切换到新 session（运行中时由 ScenarioSession.adoptSession 内部 cancel 老 agent 兜底）
     ref.read(currentChatSessionIdProvider.notifier).state = id;
-    ref.read(scenarioSessionsProvider.notifier).switchSession(scenarioId, id);
+    await ref.read(scenarioSessionsProvider.notifier).switchSession(scenarioId, id);
     ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
     if (context.mounted) {
       Navigator.of(context).pop();

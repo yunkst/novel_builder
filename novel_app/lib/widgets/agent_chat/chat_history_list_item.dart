@@ -92,15 +92,18 @@ class ChatHistoryListItem extends ConsumerWidget {
           const PopupMenuItem(value: 'delete', child: Text('删除')),
         ],
       ),
-      enabled: !isRunning,
-      onTap: () {
+      // isRunning 仅用于"进行中"徽章展示（下方 if 子句）；切会话不再禁用——
+      // ScenarioSession.adoptSession 内部 cancel 老 agent 兜底避免数据污染。
+      onTap: () async {
         // 切换当前 session
         ref.read(currentChatSessionIdProvider.notifier).state = session.id;
-        // 通知 ScenarioSession 重新 hydrate
-        ref
+        // 通知 ScenarioSession 重新 hydrate（内部 cancel + reload）
+        await ref
             .read(scenarioSessionsProvider.notifier)
             .switchSession(scenarioId, session.id);
-        Navigator.of(context).pop();
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
     );
   }

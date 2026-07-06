@@ -5,9 +5,11 @@
 /// - 每个工具的 name、description、parameters 结构合法
 /// - required 参数列表正确
 /// - findTool 查找功能
+/// - schema 声明与 tool_executor.dart 执行端实际读取的字段双向对齐
 library;
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/novel_agent/agent_tools.dart';
@@ -133,24 +135,46 @@ void main() {
       verifyToolSchema('list_characters');
     });
 
-    test('update_character — 需要 name, description/avatarUrl 可选', () {
+    test('update_character — 需要 name，其余结构化字段可选', () {
       verifyToolSchema('update_character',
           required: ['name'],
-          optional: ['description', 'avatarUrl']);
+          optional: [
+            'gender',
+            'age',
+            'occupation',
+            'personality',
+            'appearanceFeatures',
+            'bodyType',
+            'clothingStyle',
+            'backgroundStory',
+            'aliases',
+            'avatarUrl',
+          ]);
     });
 
-    test('create_character — 需要 name, description 可选', () {
+    test('create_character — 需要 name，其余结构化字段可选', () {
       verifyToolSchema('create_character',
-          required: ['name'], optional: ['description']);
+          required: ['name'],
+          optional: [
+            'gender',
+            'age',
+            'occupation',
+            'personality',
+            'appearanceFeatures',
+            'bodyType',
+            'clothingStyle',
+            'backgroundStory',
+            'aliases',
+          ]);
     });
 
     test('update_background_setting — 需要 setting', () {
       verifyToolSchema('update_background_setting', required: ['setting']);
     });
 
-    test('update_outline — 需要 title + content', () {
+    test('update_outline — 仅需 content（标题用当前小说书名兜底）', () {
       verifyToolSchema('update_outline',
-          required: ['title', 'content']);
+          required: ['content']);
     });
 
     test('get_outline — 无参数（从上下文读取当前小说）', () {
@@ -229,6 +253,120 @@ void main() {
           as Map<String, dynamic>;
       expect(props.containsKey('author'), false,
           reason: 'create_novel 不应暴露 author 字段，固定为"原创"');
+    });
+  });
+
+  group('AgentTools — schema vs 执行端字段双向对齐', () {
+    /// 工具名 → tool_executor.dart 中对应的私有方法名。
+    /// 该映射与 tool_executor.dart 的 execute() switch 同步；
+    /// 若方法被重命名，下面 _resolveExecutorMethodBodies 会找不到对应方法体。
+    const toolMethodMap = <String, String>{
+      'list_novels': '_listNovels',
+      'select_novel': '_selectNovel',
+      'create_novel': '_createNovel',
+      'read_chapter_content': '_readChapterContent',
+      'list_chapters': '_listChapters',
+      'search_in_chapters': '_searchInChapters',
+      'create_chapter': '_createChapter',
+      'update_chapter_content': '_updateChapterContent',
+      'list_characters': '_listCharacters',
+      'update_character': '_updateCharacter',
+      'create_character': '_createCharacter',
+      'update_background_setting': '_updateBackgroundSetting',
+      'update_outline': '_updateOutline',
+      'get_outline': '_getOutline',
+      'list_prompt_tags': '_listPromptTags',
+      'get_prompt_tag': '_getPromptTag',
+      'save_prompt_tag': '_savePromptTag',
+      'delete_prompt_tag': '_deletePromptTag',
+    };
+
+    /// 执行端接受、但 schema **有意不声明** 的字段。
+    /// 白名单必须小且每项有理由；新增条目请补充注释。
+    const intentionallyUndeclared = <String, Set<String>>{
+      // description 是 appearanceFeatures 的旧用法别名，
+      // 执行端做兜底（appearanceFeatures ?? description ?? ...）。
+      // schema 不暴露，避免引导模型在 description 与 appearanceFeatures 间二选一。
+      'create_character': {'description'},
+      'update_character': {'description'},
+    };
+
+    /// 读取 tool_executor.dart 源码并按方法签名切片。
+    /// 返回 {_MethodName: methodBody}，键保留前导下划线，与 toolMethodMap 对齐。
+    Map<String, String> _resolveExecutorMethodBodies(String source) {
+      // 用方法签名作为切片锚点：Future<String> _methodName( ... )
+      // group(1) 含前导下划线，匹配 toolMethodMap 的 value 形态。
+      final sigPattern = RegExp(r'Future<String>\s+(_\w+)\s*\(');
+      final sigs = sigPattern.allMatches(source).toList();
+
+      final bodies = <String, String>{};
+      for (var i = 0; i < sigs.length; i++) {
+        final name = sigs[i].group(1)!;
+        final start = sigs[i].end;
+        // 切片到下一个方法签名（或文件末尾），不处理嵌套大括号
+        // —— 字段提取正则只看 parser.xxx('...')，跨方法切片不影响结果。
+        final end = i + 1 < sigs.length ? sigs[i + 1].start : source.length;
+        bodies[name] = source.substring(start, end);
+      }
+      return bodies;
+    }
+
+    /// 从方法体中提取所有 parser.xxx('field') 的字段名集合。
+    Set<String> _parsedFields(String body) {
+      final re = RegExp(r"parser\.\w+\(\s*'([^']+)'");
+      return re.allMatches(body).map((m) => m.group(1)!).toSet();
+    }
+
+    test('每个执行端读取的字段都在 schema 中声明（防 A 类 bug）', () {
+      final executorPath = 'lib/services/novel_agent/tool_executor.dart';
+      final src = File(executorPath).readAsStringSync();
+      final bodies = _resolveExecutorMethodBodies(src);
+
+      for (final entry in toolMethodMap.entries) {
+        final toolName = entry.key;
+        final methodName = entry.value;
+        final body = bodies[methodName];
+        expect(body, isNotNull,
+            reason: '执行端找不到方法 $methodName（工具 $toolName）—— '
+                '若方法被重命名，请同步更新 toolMethodMap');
+
+        var fields = _parsedFields(body!);
+        fields = fields.difference(intentionallyUndeclared[toolName] ?? const {});
+
+        final schemaProps = (AgentTools.findTool(toolName)!
+                ['function']['parameters']['properties']
+            as Map<String, dynamic>).keys.toSet();
+
+        final missing = fields.difference(schemaProps);
+        expect(missing, isEmpty,
+            reason: '$toolName：执行端读取了字段 $missing，但 schema 未声明。'
+                '若该字段是有意保留的兜底/兼容字段，请加到 intentionallyUndeclared 并附注释');
+      }
+    });
+
+    test('每个 schema 声明的字段都被执行端读取（防 B 类 bug）', () {
+      final executorPath = 'lib/services/novel_agent/tool_executor.dart';
+      final src = File(executorPath).readAsStringSync();
+      final bodies = _resolveExecutorMethodBodies(src);
+
+      for (final entry in toolMethodMap.entries) {
+        final toolName = entry.key;
+        final methodName = entry.value;
+        final body = bodies[methodName];
+        expect(body, isNotNull,
+            reason: '执行端找不到方法 $methodName（工具 $toolName）');
+
+        final fields = _parsedFields(body!);
+
+        final schemaProps = (AgentTools.findTool(toolName)!
+                ['function']['parameters']['properties']
+            as Map<String, dynamic>).keys.toSet();
+
+        final unused = schemaProps.difference(fields);
+        expect(unused, isEmpty,
+            reason: '$toolName：schema 声明了字段 $unused，但执行端未读取。'
+                '要么删除 schema 字段，要么补上 parser.xxx(\'$unused\')');
+      }
     });
   });
 

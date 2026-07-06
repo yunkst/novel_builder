@@ -297,21 +297,56 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_character',
-      'description': '更新当前小说中已有角色的信息。只更新传入的字段，未传入的字段保持不变。',
+      'description':
+          '更新当前小说中已有角色的信息。只更新传入的字段，未传入的字段保持不变。'
+          'name 来自 list_characters 返回的角色名。',
       'parameters': {
         'type': 'object',
         'properties': {
           'name': {
             'type': 'string',
-            'description': '要更新的角色名称',
+            'description': '要更新的角色名称（来自 list_characters）',
           },
-          'description': {
+          'gender': {
             'type': 'string',
-            'description': '新的角色描述',
+            'description': '性别（如 "男" / "女" / "未知"）',
+          },
+          'age': {
+            'type': 'integer',
+            'description': '年龄',
+          },
+          'occupation': {
+            'type': 'string',
+            'description': '职业',
+          },
+          'personality': {
+            'type': 'string',
+            'description': '性格特点',
+          },
+          'appearanceFeatures': {
+            'type': 'string',
+            'description': '外貌特征',
+          },
+          'bodyType': {
+            'type': 'string',
+            'description': '身材体型',
+          },
+          'clothingStyle': {
+            'type': 'string',
+            'description': '穿衣风格',
+          },
+          'backgroundStory': {
+            'type': 'string',
+            'description': '背景经历',
+          },
+          'aliases': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': '别名列表（如 ["小李", "云哥"]）',
           },
           'avatarUrl': {
             'type': 'string',
-            'description': '新的头像URL',
+            'description': '新的头像 URL',
           },
         },
         'required': ['name'],
@@ -323,7 +358,9 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'create_character',
-      'description': '在当前小说中创建一个新角色。',
+      'description':
+          '在当前小说中创建一个新角色。name 必填，建议同时填齐外貌、性格、背景等结构化字段，'
+          '以便后续写作时作为上下文注入。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -331,9 +368,42 @@ class AgentTools {
             'type': 'string',
             'description': '角色名称',
           },
-          'description': {
+          'gender': {
             'type': 'string',
-            'description': '角色描述（外貌、性格、背景等）',
+            'description': '性别（如 "男" / "女" / "未知"）',
+          },
+          'age': {
+            'type': 'integer',
+            'description': '年龄',
+          },
+          'occupation': {
+            'type': 'string',
+            'description': '职业',
+          },
+          'personality': {
+            'type': 'string',
+            'description': '性格特点',
+          },
+          'appearanceFeatures': {
+            'type': 'string',
+            'description': '外貌特征',
+          },
+          'bodyType': {
+            'type': 'string',
+            'description': '身材体型',
+          },
+          'clothingStyle': {
+            'type': 'string',
+            'description': '穿衣风格',
+          },
+          'backgroundStory': {
+            'type': 'string',
+            'description': '背景经历',
+          },
+          'aliases': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': '别名列表（如 ["小李", "云哥"]）',
           },
         },
         'required': ['name'],
@@ -366,20 +436,18 @@ class AgentTools {
     'type': 'function',
     'function': {
       'name': 'update_outline',
-      'description': '创建或更新当前小说的大纲。',
+      'description':
+          '创建或更新当前小说的大纲。大纲不需要标题，直接传入内容即可，'
+          '内部会使用当前小说书名作为大纲标题。',
       'parameters': {
         'type': 'object',
         'properties': {
-          'title': {
-            'type': 'string',
-            'description': '大纲标题',
-          },
           'content': {
             'type': 'string',
             'description': '大纲内容（Markdown格式）',
           },
         },
-        'required': ['title', 'content'],
+        'required': ['content'],
       },
     },
   };

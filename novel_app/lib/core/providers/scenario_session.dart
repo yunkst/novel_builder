@@ -152,8 +152,25 @@ class ScenarioSession {
   }
 
   /// 由 ScenarioSessionsNotifier 在 UI 切换 sessionId 时调用。仅在确实改变时清空并重新 hydrate。
-  void adoptSession(int? newSessionId) {
+  ///
+  /// 同 scenario 切不同 sessionId 时必须中断老 agent——避免流式 segment
+  /// 落进新 sessionId 的内存/DB 造成数据污染。cancel 时 _sessionId 仍是老的，
+  /// partial 正确落库到老会话历史。
+  /// 跨 scenario 切场景不杀 Agent（by design，UI 切的是另一个 ScenarioSession 实例）。
+  Future<void> adoptSession(int? newSessionId) async {
     if (_sessionId == newSessionId) return;
+
+    // 运行中切会话：先 cancel 老 agent，避免数据污染
+    if (_isRunning) {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] adoptSession 时中断老 agent, '
+        'oldSessionId=$_sessionId → newSessionId=$newSessionId',
+        category: LogCategory.ai,
+        tags: ['session', 'adopt', 'interrupt', scenarioId],
+      );
+      await cancel();
+    }
+
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 切换 sessionId $_sessionId → $newSessionId',
       category: LogCategory.ai,
@@ -297,15 +314,8 @@ class ScenarioSession {
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    if (_isRunning) {
-      LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 拒绝请求（已在运行中）',
-        category: LogCategory.ai,
-        tags: ['session', 'busy', scenarioId],
-      );
-      _notifyStateError('当前场景正在运行中，请稍后再试');
-      return;
-    }
+    // 运行中再发：先中断当前回合（落库 partial），再发送新消息。
+    await _interruptIfRunning();
 
     await _ensureSessionId();
 
@@ -359,16 +369,10 @@ class ScenarioSession {
   ///
   /// 找到 _agentMessages 里最后一条 user，删除其后所有消息（含 tool/assistant），
   /// 同步删 DB，然后用该 user 的 content 重新触发 Agent。
+  /// 运行中重试 = cancel 当前回合（落库 partial） → 截断 → 重新触发。
   Future<void> retryLastRound() async {
-    if (_isRunning) {
-      LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 拒绝重试（Agent 运行中）',
-        category: LogCategory.ai,
-        tags: ['session', 'retry', 'busy', scenarioId],
-      );
-      _notifyStateError('Agent 正在运行，无法重试');
-      return;
-    }
+    // 运行中：先 cancel 落 partial，再截断到 last user（partial 在末尾会被一并砍掉）
+    await _interruptIfRunning();
 
     int lastUserIndex = -1;
     for (int i = _agentMessages.length - 1; i >= 0; i--) {
@@ -413,7 +417,10 @@ class ScenarioSession {
   }
 
   /// 取消本 session 的 Agent（不影响其他 session）
-  void cancel() {
+  ///
+  /// 返回 Future 以便写操作 `await cancel()` 形成 interrupt-then-act 语义；
+  /// 内部仍为同步逻辑（落库走 unawaited fire-and-forget），不引入真实异步等待。
+  Future<void> cancel() async {
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 请求已取消',
       category: LogCategory.ai,
@@ -421,7 +428,7 @@ class ScenarioSession {
     );
 
     if (_currentToken != null) {
-      _currentToken!.cancel(reason: '用户主动取消');
+      _currentToken!.cancel(reason: '用户主动取消 / 写操作中断');
       _currentToken = null;
     }
     _agentSub?.cancel();
@@ -441,6 +448,21 @@ class ScenarioSession {
     }
   }
 
+  /// 统一中断守卫 — 所有写操作的第一道（也是唯一一道）运行中处理。
+  ///
+  /// 设计契约（interrupt-then-act）：运行中触发任何写操作 = 先 cancel 落库当前
+  /// partial，再执行新操作。UI 层不再做业务拦截，只保留纯视觉反馈。
+  /// 切场景（跨 scenarioId）不走此路径，保持 by design 的"不杀 Agent"。
+  Future<void> _interruptIfRunning() async {
+    if (!_isRunning) return;
+    LoggerService.instance.i(
+      'ScenarioSession [$scenarioId] 写操作触发中断运行中的 agent',
+      category: LogCategory.ai,
+      tags: ['session', 'interrupt', scenarioId],
+    );
+    await cancel();
+  }
+
   /// 切换当前小说（本 session 独享）
   Future<CurrentNovel?> selectNovel(int novelId) async {
     final novel = await selectCurrentNovel(_ref, novelId);
@@ -454,9 +476,15 @@ class ScenarioSession {
   }
 
   /// 清空对话（保留场景和小说上下文）
-  void clearConversation() {
+  ///
+  /// 运行中清空：先清空内存（包括 _pendingSegments）→ 再 cancel。
+  /// 此时 cancel 走 else 分支不落库残缺 partial，与"清空"语义一致。
+  /// 不走 _interruptIfRunning()，因为该方法的语义是"先 cancel 落 partial"，
+  /// 与本方法的"先清空，不留残缺"相反。
+  Future<void> clearConversation() async {
+    final wasRunning = _isRunning;
     LoggerService.instance.i(
-      'ScenarioSession [$scenarioId] 清空对话 sessionId=$_sessionId',
+      'ScenarioSession [$scenarioId] 清空对话 sessionId=$_sessionId (wasRunning=$wasRunning)',
       category: LogCategory.ai,
       tags: ['session', 'clear', scenarioId],
     );
@@ -470,6 +498,12 @@ class ScenarioSession {
     );
     _notifyStateChanged();
 
+    // 后台 cancel：因 _pendingSegments 已空，cancel 走 else 分支仅做状态重置，
+    // 不会落库残缺 partial。放在 _clearMessagesFromDb 之前保证最终 DB 状态 = 清空。
+    if (wasRunning) {
+      await cancel();
+    }
+
     unawaited(_clearMessagesFromDb());
   }
 
@@ -477,19 +511,18 @@ class ScenarioSession {
   /// 并通过 [contentCallback] 把该消息文本回传给 UI。
   ///
   /// [index] 指向 UI messages（AgentChatMessage）中的 user 消息。
-  bool rollbackToMessage(
+  ///
+  /// 运行中回滚 = cancel 当前回合（落库 partial 到 _agentMessages 末尾）→ 然后
+  /// 按 index 切。partial 会和被回滚的消息一起被 `removeRange` 砍掉，行为干净。
+  /// 返回 Future[bool] 是为了与新签名 await 链一致；运行中不再返回 false，
+  /// 业务校验失败（越界/非 user）仍返回 false。
+  Future<bool> rollbackToMessage(
     int index, {
     required void Function(String content) contentCallback,
-  }) {
-    if (_isRunning) {
-      LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 拒绝回滚（Agent 运行中）',
-        category: LogCategory.ai,
-        tags: ['session', 'rollback', 'busy', scenarioId],
-      );
-      _notifyStateError('Agent 正在运行，无法回滚');
-      return false;
-    }
+  }) async {
+    // 运行中：先 cancel 落 partial（partial 在末尾会被下方 removeRange 一并砍掉）
+    await _interruptIfRunning();
+
     final uiMsgs = _uiMessages;
     if (index < 0 || index >= uiMsgs.length) {
       LoggerService.instance.w(

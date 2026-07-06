@@ -85,14 +85,16 @@ class NovelAgentService {
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
   }) async {
-    // 同场景串行：拒绝并发请求，但不同场景可以并行
+    // 同场景串行兜底：正常路径下 ScenarioSession 在 sendMessage 前会先 cancel
+    // 当前回合（interrupt-then-act），不会并发调用。到达这里说明上层（ScenarioSession）
+    // 有 bug——未在写操作前 cancel。发出 error 事件便于上层感知，避免静默吞并。
     if (_runningByScenario[scenarioId] == true) {
-      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
       LoggerService.instance.w(
-        'Agent 拒绝请求（场景 $scenarioId 已在运行中）',
+        'Agent 拒绝请求（场景 $scenarioId 已在运行中，应由 ScenarioSession.cancel() 兜底）',
         category: LogCategory.ai,
         tags: ['agent', 'service', 'busy', scenarioId],
       );
+      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
       return;
     }
 

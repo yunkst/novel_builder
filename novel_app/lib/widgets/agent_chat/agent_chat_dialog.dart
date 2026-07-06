@@ -174,21 +174,12 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // 会话历史按钮（运行中禁用，提示等待）
+              // 会话历史按钮（运行中也允许点，切会话由 ScenarioSession.adoptSession 内部 cancel 兜底）
               IconButton(
                 icon: Icon(Icons.history,
                     color: appColors.agentOnBrandMuted, size: 20),
                 tooltip: '会话历史',
-                onPressed: chatState.isLoading
-                    ? () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('当前对话进行中，请等待完成后再切换'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    : () => _showHistorySheet(),
+                onPressed: () => _showHistorySheet(),
               ),
               // 场景切换按钮
               PopupMenuButton<String>(
@@ -287,8 +278,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             }
 
             final message = chatState.messages[index];
-            // 仅 user 消息提供回滚入口；agent 运行中禁用(防止与并发状态冲突)
-            final canRollback = message.role == AgentChatRole.user && !chatState.isLoading;
+            // 仅 user 消息提供回滚入口；运行中点击由 ScenarioSession.rollbackToMessage 内部 cancel 兜底
+            final canRollback = message.role == AgentChatRole.user;
             return AgentMessageBubble(
               message: message,
               onRollback: canRollback ? () => _handleRollback(index) : null,
@@ -849,7 +840,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   /// 故内部用 ref.read 重新读取最新长度计算"将删除的条数"。
   Future<void> _handleRollback(int messageIndex) async {
     final chatState = ref.read(currentChatStateProvider);
-    if (chatState.isLoading) return;
 
     final messages = chatState.messages;
     if (messageIndex < 0 || messageIndex >= messages.length) return;
@@ -881,7 +871,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     if (!mounted) return;
 
     final session = ref.read(currentSessionProvider);
-    session?.rollbackToMessage(
+    await session?.rollbackToMessage(
       messageIndex,
       contentCallback: (text) {
         if (!mounted) return;

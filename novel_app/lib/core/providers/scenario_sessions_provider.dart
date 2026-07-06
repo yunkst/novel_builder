@@ -93,14 +93,15 @@ class ScenarioSessionsNotifier
   /// - 如果新 sessionId == 当前 ScenarioSession.sessionId：noop
   /// - 否则：把 in-memory messages 清空，让 ScenarioSession 内部重新从 DB hydrate
   ///
-  /// 不杀 agent（用户切到别的会话时通常当前 agent 已 done；如果在跑则上层拦截）。
-  void switchSession(String scenarioId, int? newSessionId) {
+  /// 不杀 agent（跨 scenario 切场景不杀；同 scenario 切 sessionId 由 ScenarioSession
+  /// 内部 cancel 兜底，避免数据污染）。
+  Future<void> switchSession(String scenarioId, int? newSessionId) async {
     final session = _sessions[scenarioId];
     if (session == null) {
       // ScenarioSession 还没被创建，让下次 get() 用新 sessionId 初始化
       return;
     }
-    session.adoptSession(newSessionId);
+    await session.adoptSession(newSessionId);
     _syncState(scenarioId);
     // 触发重新 hydrate（内部 await，状态变化会通过 _onStateChanged 同步）
     session.hydrateIfNeeded();

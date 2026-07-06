@@ -552,6 +552,62 @@ void main() {
       final json = jsonDecode(result) as Map<String, dynamic>;
       expect(json['count'], 0);
     });
+
+    test('无当前小说 → no_current_novel + suggested_tool=list_novels', () async {
+      final result = await executor.execute(
+        'search_in_chapters',
+        {'keyword': '剑客'},
+        scenarioContext: _noNovelContext,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['error'], 'no_current_novel');
+      expect(json['suggested_tool'], 'list_novels');
+    });
+
+    test('多小说隔离：搜当前小说时不返回其他小说的命中', () async {
+      // 小说 A：含关键词"剑客"
+      final novelIdA = await insertNovel(title: '小说A', url: 'urlA');
+      await insertChapter(
+        novelUrl: 'urlA',
+        chapterUrl: 'https://a/ch1',
+        content: '剑客走在路上',
+      );
+      // 小说 B：同样含关键词"剑客"（隔离测试的前提）
+      await insertNovel(title: '小说B', url: 'urlB');
+      await insertChapter(
+        novelUrl: 'urlB',
+        chapterUrl: 'https://b/ch1',
+        content: '剑客登场',
+      );
+
+      // ctx 指向 A，应只命中 A 的 1 个章节
+      final ctx = _writingContext(novelIdA, '小说A');
+      final result = await executor.execute(
+        'search_in_chapters',
+        {'keyword': '剑客'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['count'], 1);
+      final results = json['results'] as List;
+      expect(results.length, 1);
+      expect((json['novel'] as Map)['title'], '小说A');
+      expect(results.first['matchedText'].toString(), contains('剑客'));
+    });
+
+    test('keyword 缺失 → missing_required_param', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'search_in_chapters',
+        <String, dynamic>{}, // 故意不传 keyword
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['error'], 'missing_required_param');
+      expect(json['param'], 'keyword');
+    });
   });
 
   // ========================================================================
@@ -765,13 +821,13 @@ void main() {
   // update_outline
   // ========================================================================
   group('update_outline', () {
-    test('保存大纲后可读取', () async {
+    test('保存大纲后可读取（标题用当前小说书名兜底）', () async {
       final novelId = await insertNovel();
       final ctx = _ctx(novelId);
 
       final result = await executor.execute(
         'update_outline',
-        {'title': '全书大纲', 'content': '第一幕\n第二幕'},
+        {'content': '第一幕\n第二幕'},
         scenarioContext: ctx,
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
@@ -782,7 +838,8 @@ void main() {
         defaultNovelUrl,
       );
       expect(outline, isNotNull);
-      expect(outline!.title, '全书大纲');
+      // 工具不再要求 title，内部用 ctx.currentNovelTitle 兜底（默认 '测试小说'）
+      expect(outline!.title, '测试小说');
       expect(outline.content, '第一幕\n第二幕');
     });
   });

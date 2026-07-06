@@ -451,6 +451,16 @@ class ToolExecutor {
         ? title.trim()
         : '第 $position 章';
 
+    // 取前一章正文作为衔接上下文（position=1 无前一章；前一章未缓存则跳过）
+    String? previousChapterContext;
+    if (position >= 2) {
+      final prevChapter = chapters[position - 2]; // 前一章（列表 0-based）
+      final prevContent = await chapterRepo.getCachedChapter(prevChapter.url);
+      if (prevContent != null && prevContent.trim().isNotEmpty) {
+        previousChapterContext = '《${prevChapter.title}》\n\n$prevContent';
+      }
+    }
+
     // 调用 LLM 生成正文
     final generateResult = await _generateChapter(
       novelUrl: novelUrl,
@@ -458,6 +468,7 @@ class ToolExecutor {
       instruction: instruction,
       characterNames: charNames,
       tagNames: tags,
+      previousChapterContext: previousChapterContext,
       scenarioId: ctx?.scenarioId ?? ScenarioIds.writing,
       onProgress: onProgress,
     );
@@ -761,7 +772,7 @@ class ToolExecutor {
 
   /// 调用 LLM 创作新章节
   ///
-  /// 组合「创作要求 + 人物卡 + 标签 prompt」为提示词（无原文），
+  /// 组合「前一章正文（可选）+ 创作要求 + 人物卡 + 标签 prompt」为提示词（无原文），
   /// 流式调用 LLM，返回新正文或错误。
   Future<_RewriteResult> _generateChapter({
     required String novelUrl,
@@ -769,6 +780,7 @@ class ToolExecutor {
     required String instruction,
     required List<String> characterNames,
     required List<String> tagNames,
+    String? previousChapterContext,
     String scenarioId = ScenarioIds.writing,
     void Function(int generatedChars)? onProgress,
   }) async {
@@ -781,7 +793,19 @@ class ToolExecutor {
       ..writeln()
       ..writeln('## 章节标题')
       ..writeln(chapterTitle)
-      ..writeln()
+      ..writeln();
+    // 前一章正文：用成对硬边界符号包裹，明确为只读参考，避免与创作要求/产出混淆
+    if (previousChapterContext != null && previousChapterContext.isNotEmpty) {
+      prompt
+        ..writeln('## 前一章内容（仅供衔接参考：保持人物、情节、场景连贯，'
+            '勿与上文矛盾，不要重复上文情节，不要直接续写接龙）')
+        ..writeln()
+        ..writeln('━━━━━━━━━ 上一章正文开始 ━━━━━━━━━')
+        ..writeln(previousChapterContext)
+        ..writeln('━━━━━━━━━ 上一章正文结束 ━━━━━━━━━')
+        ..writeln();
+    }
+    prompt
       ..writeln('## 创作要求')
       ..writeln(instruction)
       ..writeln();
@@ -1040,8 +1064,6 @@ class ToolExecutor {
     AgentScenarioContext? ctx,
   ) async {
     final parser = ToolArgParser(args);
-    final (title, titleErr) = parser.requireString('title');
-    if (titleErr != null) return titleErr;
     final (content, contentErr) = parser.requireString('content');
     if (contentErr != null) return contentErr;
 
@@ -1050,6 +1072,10 @@ class ToolExecutor {
       return jsonEncode(novelResolve.errorJson);
     }
     final novelUrl = novelResolve.url!;
+
+    // 大纲不再要求标题：用当前小说书名兜底（与大纲编辑页未填标题时的行为一致），
+    // 书名缺失时回退为空串（outlines.title 为 NOT NULL，空串合法）。
+    final title = (ctx?.currentNovelTitle ?? '').trim();
 
     final repo = ref.read(outlineRepositoryProvider);
     final outline = Outline(
@@ -1060,7 +1086,7 @@ class ToolExecutor {
       updatedAt: DateTime.now(),
     );
     await repo.saveOutline(outline);
-    LoggerService.instance.i('保存大纲: "$title"',
+    LoggerService.instance.i('保存大纲: novelUrl=$novelUrl',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_outline']);
     return jsonEncode({'success': true, 'message': '大纲已保存'});
   }

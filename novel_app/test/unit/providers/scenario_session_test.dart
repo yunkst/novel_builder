@@ -39,6 +39,10 @@ class MockNovelAgentService implements NovelAgentService {
   final List<String> sendMessageUserInputs = [];
   final Duration? delay;
 
+  /// cancelFor 被调用的次数（按 scenarioId 累计）。
+  /// 供「运行中写操作先 cancel 再执行」的新机制断言使用。
+  int cancelForCallCount = 0;
+
   /// 失败注入：剩余多少轮调用需要模拟失败（emit AgentErrorEvent 而非正常流程）。
   /// 每次失败调用会自减。供 retryLastRound 测试使用。
   int failNextRounds = 0;
@@ -123,6 +127,7 @@ class MockNovelAgentService implements NovelAgentService {
 
   @override
   void cancelFor(String scenarioId) {
+    cancelForCallCount++;
     final completer = _completers[scenarioId];
     if (completer != null && !completer.isCompleted) {
       completer.complete();
@@ -499,6 +504,50 @@ void main() {
   });
 
   // ===========================================================================
+  // 8.5 cancel — partial 落库为 assistant turn
+  // ===========================================================================
+
+  group('cancel partial 落库', () {
+    test('运行中有 _pendingSegments 时调 cancel → 落库为 partial assistant，状态重置',
+        () async {
+      final slowMock =
+          MockNovelAgentService(delay: const Duration(milliseconds: 100));
+      final slowContainer = ProviderContainer(overrides: [
+        novelAgentServiceProvider.overrideWith((ref) => slowMock),
+      ]);
+      addTearDown(slowContainer.dispose);
+
+      final slowSessions =
+          slowContainer.read(scenarioSessionsProvider.notifier);
+      final slowSession = slowSessions.get(ScenarioIds.writing);
+
+      // 启动慢发送：mock 会先 emit TextDelta，再 delay 100ms
+      final sendFuture = slowSession.sendMessage('测试');
+
+      // 等 _isRunning=true 并让 TextDelta 被 listener 处理进 _pendingSegments。
+      // 100ms 给微任务链足够的时间窗口（_persistAgentMessage + listen + add TextDelta）。
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(slowSession.isRunning, isTrue, reason: '前置：应正在运行');
+
+      // cancel —— 应把 _pendingSegments 落库为 partial assistant turn
+      slowSession.cancel();
+
+      expect(slowSession.isRunning, isFalse, reason: 'cancel 后应停止运行');
+      expect(slowSession.state.isLoading, isFalse);
+      expect(slowSession.state.streamingSegments, isEmpty);
+      // user 消息 + 落库的 partial assistant = 2 条
+      expect(slowSession.state.messages.length, 2,
+          reason: '应有 user + 落库的 partial assistant');
+      expect(slowSession.state.messages.first.role, AgentChatRole.user);
+      expect(slowSession.state.messages.last.role, AgentChatRole.assistant);
+      expect(slowSession.state.messages.last.content,
+          contains('回复'), reason: 'partial assistant content 应保留流式文本');
+
+      await sendFuture;
+    });
+  });
+
+  // ===========================================================================
   // 9. retryLastRound — LLM 失败后重试
   // ===========================================================================
 
@@ -566,7 +615,8 @@ void main() {
       expect(session.state.error, isNull);
     });
 
-    test('运行中调 retryLastRound → 拒绝并设置 error 提示', () async {
+    test('运行中调 retryLastRound → 不再拒绝（interrupt-then-act，契约回归）',
+        () async {
       // 用独立的慢 mock 容器，让 sendMessage 不立即完成
       final slowMock = MockNovelAgentService(delay: const Duration(milliseconds: 100));
       final slowContainer = ProviderContainer(overrides: [
@@ -577,17 +627,24 @@ void main() {
       final slowSessions = slowContainer.read(scenarioSessionsProvider.notifier);
       final slowSession = slowSessions.get(ScenarioIds.writing);
 
-      // 启动慢发送但不等它完成
+      // 启动慢发送
       final sendFuture = slowSession.sendMessage('慢消息');
 
-      // 等一帧让 _isRunning 被置为 true
-      await Future<void>.delayed(Duration.zero);
+      // 等 _isRunning=true
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
 
-      // 此时调 retryLastRound 应被拒绝
+      // 运行中调 retry：interrupt-then-act = cancel 落库 partial → 截断 → 重发
       await slowSession.retryLastRound();
-      expect(slowSession.state.error, 'Agent 正在运行，无法重试');
 
+      // 新契约：旧的拒绝文案 "Agent 正在运行，无法重试" 不再产生
+      expect(slowSession.state.error, isNot('Agent 正在运行，无法重试'),
+          reason: '运行中 retry 不应再被拒绝（旧文案已废弃）');
+      // 最终达到一致状态（不论 retry 在 mock 环境下能否并发成功）
+      expect(slowSession.isRunning, isFalse,
+          reason: 'retry 完成后应回到 idle 态');
+
+      // 清理仍在飞的 sendFuture
       await sendFuture;
     });
 
@@ -619,7 +676,7 @@ void main() {
       expect(session.state.messages.length, 4);
 
       String? callbackContent;
-      final result = session.rollbackToMessage(
+      final result = await session.rollbackToMessage(
         0,
         contentCallback: (c) => callbackContent = c,
       );
@@ -641,7 +698,7 @@ void main() {
 
       // UI index 2 = user2
       String? callbackContent;
-      final result = session.rollbackToMessage(
+      final result = await session.rollbackToMessage(
         2,
         contentCallback: (c) => callbackContent = c,
       );
@@ -656,7 +713,8 @@ void main() {
       expect(session.state.messages[1].role, AgentChatRole.assistant);
     });
 
-    test('运行中调 rollbackToMessage → 拒绝并返回 false', () async {
+    test('运行中调 rollbackToMessage → 不再拒绝（interrupt-then-act，契约回归）',
+        () async {
       final slowMock = MockNovelAgentService(delay: const Duration(milliseconds: 100));
       final slowContainer = ProviderContainer(overrides: [
         novelAgentServiceProvider.overrideWith((ref) => slowMock),
@@ -669,18 +727,21 @@ void main() {
       // 先发一条消息建立历史
       await slowSession.sendMessage('前置消息');
 
-      // 启动慢发送但不等它完成
+      // 启动慢发送
       final sendFuture = slowSession.sendMessage('慢消息');
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
 
-      final result = slowSession.rollbackToMessage(
+      final result = await slowSession.rollbackToMessage(
         0,
         contentCallback: (_) {},
       );
 
-      expect(result, isFalse, reason: '运行中应拒绝回滚');
-      expect(slowSession.state.error, 'Agent 正在运行，无法回滚');
+      // 新契约：旧的拒绝文案 "Agent 正在运行，无法回滚" 不再产生
+      expect(slowSession.state.error, isNot('Agent 正在运行，无法回滚'),
+          reason: '运行中 rollback 不应再被拒绝（旧文案已废弃）');
+      // 最终回到一致状态
+      expect(slowSession.isRunning, isFalse);
 
       await sendFuture;
     });
@@ -694,14 +755,14 @@ void main() {
 
       // 负索引
       expect(
-        session.rollbackToMessage(-1, contentCallback: (_) {}),
+        await session.rollbackToMessage(-1, contentCallback: (_) {}),
         isFalse,
         reason: '负索引应返回 false',
       );
 
       // 超出长度
       expect(
-        session.rollbackToMessage(99, contentCallback: (_) {}),
+        await session.rollbackToMessage(99, contentCallback: (_) {}),
         isFalse,
         reason: '超出长度的索引应返回 false',
       );
@@ -719,7 +780,7 @@ void main() {
       expect(session.state.messages.length, 2);
       expect(session.state.messages[1].role, AgentChatRole.assistant);
 
-      final result = session.rollbackToMessage(
+      final result = await session.rollbackToMessage(
         1,
         contentCallback: (_) {},
       );
