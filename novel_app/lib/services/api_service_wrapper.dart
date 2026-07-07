@@ -790,4 +790,98 @@ class ApiServiceWrapper {
       return (null, 0);
     }
   }
+
+  /// 提交一个图生视频任务（POST /api/image-to-video/generate，multipart）。
+  ///
+  /// [prompt] 视频生成提示词；[imageBytes] 输入图片字节；[imageFilename] 图片
+  /// 文件名（backend 用作 ComfyUI 加载名）；[modelName] 工作流标题（可选）。
+  /// 返回后端 task_id。
+  Future<String> submitImageToVideoTask({
+    required String prompt,
+    required Uint8List imageBytes,
+    required String imageFilename,
+    String? modelName,
+  }) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('API Token未配置');
+      }
+      final formData = FormData.fromMap({
+        'prompt': prompt,
+        if (modelName != null && modelName.isNotEmpty) 'model_name': modelName,
+        'image': MultipartFile.fromBytes(imageBytes, filename: imageFilename),
+      });
+      final response = await _dio.post(
+        '/api/image-to-video/generate',
+        data: formData,
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+          contentType: 'multipart/form-data',
+        ),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final taskId = (response.data as Map<String, dynamic>)['task_id'];
+        if (taskId is String && taskId.isNotEmpty) return taskId;
+        throw Exception('后端未返回有效的 task_id');
+      }
+      throw Exception('提交图生视频任务失败：${response.statusCode}');
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '提交图生视频任务失败: prompt=${prompt.length}字符',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'image_to_video', 'generate', 'failed'],
+      );
+      throw _handleError(e);
+    }
+  }
+
+  /// 按 task_id 拉取图生视频结果（GET /api/image-to-video/video/{task_id}）。
+  ///
+  /// 不抛异常，返回 (bytes?, statusCode)：
+  /// - 200 → (bytes, 200)，bytes 为 mp4 二进制
+  /// - 202 → (null, 202)，视频仍在生成
+  /// - 404 → (null, 404)，任务不存在/失败
+  /// - 其他/网络错误 → (null, code)
+  ///
+  /// 上层靠 statusCode 决策 loading / loaded / 刷新，与文生图取图同构。
+  Future<(Uint8List?, int)> fetchImageToVideoVideo(String taskId) async {
+    _ensureInitialized();
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) {
+        return (null, 401);
+      }
+      final response = await _dio.get(
+        '/api/image-to-video/video/$taskId',
+        options: Options(
+          headers: {'X-API-TOKEN': token},
+          responseType: ResponseType.bytes,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 300,
+        ),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        return ((response.data as Uint8List?) ?? Uint8List(0), 200);
+      }
+      return (null, response.statusCode ?? 0);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode ?? 0;
+      LoggerService.instance.d(
+        '拉取图生视频失败: taskId=$taskId code=$code - ${e.message}',
+        category: LogCategory.network,
+        tags: ['image_to_video', 'video', 'fetch', 'failed'],
+      );
+      return (null, code);
+    } catch (e) {
+      LoggerService.instance.e(
+        '拉取图生视频异常: taskId=$taskId',
+        category: LogCategory.network,
+        tags: ['image_to_video', 'video', 'fetch', 'error'],
+      );
+      return (null, 0);
+    }
+  }
 }

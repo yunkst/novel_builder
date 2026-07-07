@@ -15,6 +15,7 @@ class Character {
   final String? facePrompts; // 面部提示词
   final String? bodyPrompts; // 身材提示词
   final String? cachedImageUrl; // 缓存的图集第一张图片路径
+  final String? avatarMediaId; // 头像媒体资源ID（图像/视频），经 MediaView 渲染
   final List<String>? aliases; // 别名列表，上限10个
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -34,6 +35,7 @@ class Character {
     this.facePrompts, // 面部提示词
     this.bodyPrompts, // 身材提示词
     this.cachedImageUrl, // 缓存的图集第一张图片路径
+    this.avatarMediaId, // 头像媒体资源ID
     this.aliases, // 别名列表
     DateTime? createdAt,
     this.updatedAt,
@@ -55,6 +57,7 @@ class Character {
       'facePrompts': facePrompts,
       'bodyPrompts': bodyPrompts,
       'cachedImageUrl': cachedImageUrl,
+      'avatarMediaId': avatarMediaId,
       'aliases': aliases?.isEmpty ?? true ? null : jsonEncode(aliases),
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt?.millisecondsSinceEpoch,
@@ -87,6 +90,7 @@ class Character {
       facePrompts: map['facePrompts'] as String?,
       bodyPrompts: map['bodyPrompts'] as String?,
       cachedImageUrl: map['cachedImageUrl'] as String?,
+      avatarMediaId: map['avatarMediaId'] as String?,
       aliases: parseAliases(map['aliases'] as String?),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
       updatedAt: map['updatedAt'] != null
@@ -110,6 +114,7 @@ class Character {
     String? facePrompts,
     String? bodyPrompts,
     String? cachedImageUrl,
+    String? avatarMediaId,
     List<String>? aliases,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -129,6 +134,7 @@ class Character {
       facePrompts: facePrompts ?? this.facePrompts,
       bodyPrompts: bodyPrompts ?? this.bodyPrompts,
       cachedImageUrl: cachedImageUrl ?? this.cachedImageUrl,
+      avatarMediaId: avatarMediaId ?? this.avatarMediaId,
       aliases: aliases ?? this.aliases,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),

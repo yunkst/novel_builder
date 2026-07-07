@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,7 +9,9 @@ import '../models/novel.dart';
 import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/character/avatar_media.dart';
 import '../widgets/common/confirm_dialog.dart';
+import '../widgets/media/media_view.dart';
 import 'character_edit_screen.dart';
 
 /// 人物卡详情页
@@ -90,43 +90,25 @@ class _CharacterDetailScreenState
   // ─── 头部 ───────────────────────────────────────────────────
 
   Widget _buildHero(AppColors colors) {
-    final img = _character.cachedImageUrl;
+    final mediaId = _character.avatarMediaId;
     final genderColor = _genderColor(colors);
+    final hasMedia = mediaId != null && mediaId.isNotEmpty;
     return Center(
-      child: GestureDetector(
-        onTap: img == null ? null : () => _showFullScreenImage(img),
-        child: Container(
-          width: 180,
-          height: 240,
-          decoration: BoxDecoration(
-            color: genderColor.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: genderColor.withValues(alpha: 0.5), width: 2),
-          ),
-          child: img == null
-              ? Center(
-                  child: Text(
-                    _character.name.isNotEmpty
-                        ? _character.name.characters.first
-                        : '?',
-                    style: TextStyle(
-                      fontSize: 72,
-                      fontWeight: FontWeight.bold,
-                      color: genderColor,
-                    ),
-                  ),
-                )
-              : ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.file(
-                    File(img),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Icon(Icons.broken_image_outlined,
-                          size: 56, color: genderColor),
-                    ),
-                  ),
-                ),
+      child: Container(
+        width: 180,
+        height: 240,
+        decoration: BoxDecoration(
+          color: genderColor.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: genderColor.withValues(alpha: 0.5), width: 2),
+        ),
+        child: AvatarMedia(
+          mediaId: mediaId,
+          name: _character.name,
+          genderColor: genderColor,
+          borderRadius: 14,
+          fontSize: 72,
+          onTap: hasMedia ? () => _showFullScreenAvatar(mediaId) : null,
         ),
       ),
     );
@@ -358,11 +340,11 @@ class _CharacterDetailScreenState
     }
   }
 
-  void _showFullScreenImage(String path) {
+  void _showFullScreenAvatar(String mediaId) {
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
-        pageBuilder: (_, __, ___) => _FullScreenImage(path: path),
+        pageBuilder: (_, __, ___) => _FullScreenAvatar(mediaId: mediaId),
       ),
     );
   }
@@ -439,10 +421,10 @@ class _AppearanceRow {
   const _AppearanceRow(this.label, this.value);
 }
 
-/// 全屏查看头像图片（点击空白关闭）
-class _FullScreenImage extends StatelessWidget {
-  final String path;
-  const _FullScreenImage({required this.path});
+/// 全屏查看头像媒体（图片缩放 / 视频循环播放，点击关闭）
+class _FullScreenAvatar extends StatelessWidget {
+  final String mediaId;
+  const _FullScreenAvatar({required this.mediaId});
 
   @override
   Widget build(BuildContext context) {
@@ -451,9 +433,7 @@ class _FullScreenImage extends StatelessWidget {
       body: GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Center(
-          child: InteractiveViewer(
-            child: Image.file(File(path)),
-          ),
+          child: MediaView(mediaId: mediaId, fullscreen: true),
         ),
       ),
     );

@@ -21,6 +21,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import 'backup_management_screen.dart';
+import 'media_cache_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -324,6 +325,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const LogReportSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library_outlined,
+                    color: appColors.warning),
+                title: const Text('媒体缓存'),
+                subtitle: const Text('管理 AI 生成图/视频与上传图片缓存'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MediaCacheScreen(),
                     ),
                   );
                 },

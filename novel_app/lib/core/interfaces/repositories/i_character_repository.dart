@@ -133,4 +133,11 @@ abstract class ICharacterRepository {
   /// [characterId] 角色ID
   /// 返回是否有头像缓存
   Future<bool> hasCharacterAvatar(int characterId);
+
+  /// 更新角色头像的媒体资源ID
+  ///
+  /// [characterId] 角色ID
+  /// [mediaId] 媒体资源ID（图像或视频），传 null 清空头像
+  /// 返回受影响的行数
+  Future<int> updateCharacterAvatarMediaId(int characterId, String? mediaId);
 }

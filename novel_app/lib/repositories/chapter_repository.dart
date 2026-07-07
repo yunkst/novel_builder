@@ -227,58 +227,9 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     );
 
     if (maps.isNotEmpty) {
-      final content = maps.first['content'] as String;
-
-      // 直接清理无效媒体标记（避免循环依赖）
-      final cleanedContent = await _cleanInvalidMarkups(content);
-      return cleanedContent;
+      return maps.first['content'] as String;
     }
     return null;
-  }
-
-  /// 清理章节内容中的无效媒体标记
-  ///
-  /// [content] 原始章节内容
-  /// 返回清理后的内容
-  Future<String> _cleanInvalidMarkups(String content) async {
-    // 匹配所有媒体标记：插图、视频
-    final pattern = RegExp(r'!\[(.*?)\]\{(.*?)\}');
-    final matches = pattern.allMatches(content);
-
-    if (matches.isEmpty) {
-      return content;
-    }
-
-    String cleanedContent = content;
-    final db = await database;
-
-    for (final match in matches.toList().reversed) {
-      final mediaId = match.group(2)?.trim() ?? '';
-      final fullMatch = match.group(0)!;
-
-      // 检查是否为插图标记
-      if (fullMatch.startsWith('![')) {
-        // 查询插图是否存在
-        final result = await db.query(
-          'scene_illustrations',
-          where: 'id = ?',
-          whereArgs: [mediaId],
-          limit: 1,
-        );
-
-        if (result.isEmpty) {
-          // 插图不存在，移除标记
-          cleanedContent = cleanedContent.replaceFirst(fullMatch, '');
-          LoggerService.instance.w(
-            '移除无效插图标记: $mediaId',
-            category: LogCategory.cache,
-            tags: ['invalid_markup', 'illustration'],
-          );
-        }
-      }
-    }
-
-    return cleanedContent;
   }
 
   /// 获取小说的所有缓存章节

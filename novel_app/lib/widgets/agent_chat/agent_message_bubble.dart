@@ -5,7 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
-import 'image_gallery_card.dart';
+import 'media_gallery_card.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Agent 聊天消息气泡
@@ -338,13 +338,14 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
                     : '查看重写后的章节',
               ),
             ),
-          // create_images 成功时，渲染图片画廊
-          if (call.name == 'create_images' &&
+          // create_images / create_image_to_video 成功时，渲染媒体画廊
+          if ((call.name == 'create_images' ||
+                  call.name == 'create_image_to_video') &&
               call.status == AgentToolStatus.completed &&
-              _imageGallery != null)
+              _mediaGallery != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: ImageGalleryCard(data: _imageGallery!),
+              child: MediaGalleryCard(data: _mediaGallery!),
             ),
         ],
       ),
@@ -355,9 +356,9 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
   ChapterRewriteEntryData? get _rewriteEntry =>
       parseRewriteEntry(widget.call.result);
 
-  /// 解析工具结果中的图片画廊数据（缓存）
-  ImageGalleryData? get _imageGallery =>
-      parseImageGallery(widget.call.result);
+  /// 解析工具结果中的媒体画廊数据（图片或视频，缓存）
+  MediaGalleryData? get _mediaGallery =>
+      parseMediaGallery(widget.call.result);
 
   /// running 态标题文案：内部走 LLM 流式的工具显示「已生成 N 字」进度，
   /// 其他工具维持原 `工具名...` 转圈语义。

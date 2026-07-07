@@ -24,6 +24,9 @@ import '../../models/prompt_tag_category.dart';
 import '../../utils/content_sanitizer.dart';
 import '../dsl_engine/llm_provider.dart' show kArgsParseErrorKey,
     kArgsParseErrorDetailKey, kArgsRawPreviewKey;
+import '../media/media_proxy.dart';
+import '../media/media_store.dart';
+import '../media/media_types.dart';
 import 'agent_scenario.dart';
 import 'outline_replacer.dart';
 import 'tool_arg_parser.dart';
@@ -153,6 +156,8 @@ class ToolExecutor {
           return await _listText2ImgModels(args);
         case 'create_images':
           return await _createImages(args, scenarioContext);
+        case 'create_image_to_video':
+          return await _createImageToVideo(args, scenarioContext);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -999,7 +1004,7 @@ class ToolExecutor {
           'clothingStyle': c.clothingStyle,
           'backgroundStory': c.backgroundStory,
           'aliases': c.aliases,
-          'avatarUrl': c.cachedImageUrl,
+          'avatarMediaId': c.avatarMediaId,
         }).toList();
 
     final novelContext = _buildCurrentNovelContext(ctx);
@@ -1068,7 +1073,7 @@ class ToolExecutor {
     if (bgErr != null) return bgErr;
     final (aliases, aliasesErr) = parser.optionalStringList('aliases');
     if (aliasesErr != null) return aliasesErr;
-    final (avatarUrl, avatarErr) = parser.nullableString('avatarUrl');
+    final (avatarMediaId, avatarErr) = parser.nullableString('avatarMediaId');
     if (avatarErr != null) return avatarErr;
 
     final updated = existing.copyWith(
@@ -1081,7 +1086,7 @@ class ToolExecutor {
       clothingStyle: clothingStyle ?? existing.clothingStyle,
       backgroundStory: backgroundStory ?? existing.backgroundStory,
       aliases: aliases ?? existing.aliases,
-      cachedImageUrl: avatarUrl ?? existing.cachedImageUrl,
+      avatarMediaId: avatarMediaId ?? existing.avatarMediaId,
     );
     await repo.updateCharacter(updated);
 
@@ -1710,10 +1715,10 @@ class ToolExecutor {
     final count = (countRaw ?? 1).clamp(1, 4);
 
     final api = ref.read(apiServiceWrapperProvider);
-    final ts = DateTime.now().millisecondsSinceEpoch;
+    final mediaProxy = ref.read(mediaProxyProvider);
 
     try {
-      // 并发提交 N 个独立任务
+      // 并发提交 N 个独立任务；每个 task_id 即统一 mediaId
       final submissions = await Future.wait(
         List.generate(count, (i) => i).map((i) async {
           final taskId = await api.submitText2ImgTask(
@@ -1721,9 +1726,16 @@ class ToolExecutor {
             modelName: modelName,
             negativePrompt: negativePrompt,
           );
+          // 注册媒体元数据，UI 据 mediaId 回源 GET /api/text2img/image/{mediaId}
+          await mediaProxy.register(
+            mediaId: taskId,
+            kind: MediaKind.image,
+            source: MediaSource.text2img,
+            prompt: prompt,
+            modelName: modelName,
+          );
           return {
-            'imageId': 'img_${ts}_$i',
-            'taskId': taskId,
+            'mediaId': taskId,
             'prompt': prompt,
             if (modelName != null) 'modelName': modelName,
             if (negativePrompt != null) 'negativePrompt': negativePrompt,
@@ -1750,6 +1762,98 @@ class ToolExecutor {
       return jsonEncode({
         'error': 'backend_unavailable',
         'message': '提交文生图任务失败：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
+      });
+    }
+  }
+
+  /// 提交图生视频任务（POST /api/image-to-video/generate × count）。
+  ///
+  /// 输入图来自 sourceMediaId（文生图结果或用户上传）。先经 MediaProxy 解析把
+  /// 输入图落到本地字节（文生图可能尚未回源下载），再 multipart 上传到后端。
+  /// 每个任务返回独立 task_id（即视频 mediaId），注册 source=imageToVideo，
+  /// UI 据此回源 GET /api/image-to-video/video/{mediaId}。
+  Future<String> _createImageToVideo(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (prompt, promptErr) = parser.requireString('prompt');
+    if (promptErr != null) return promptErr;
+    final (sourceMediaId, sourceErr) = parser.requireString('sourceMediaId');
+    if (sourceErr != null) return sourceErr;
+    final (countRaw, countErr) = parser.optionalInt('count');
+    if (countErr != null) return countErr;
+    final (modelName, modelNameErr) = parser.nullableString('modelName');
+    if (modelNameErr != null) return modelNameErr;
+
+    final count = (countRaw ?? 1).clamp(1, 2);
+
+    final api = ref.read(apiServiceWrapperProvider);
+    final mediaProxy = ref.read(mediaProxyProvider);
+
+    // 1. 先把输入图解析到本地（文生图结果可能尚未回源下载）
+    final sourceResult = await mediaProxy.resolve(sourceMediaId);
+    if (!sourceResult.isLoaded) {
+      return jsonEncode({
+        'error': 'source_image_not_ready',
+        'message': '输入图片尚未就绪（状态：${sourceResult.status.name}，'
+            'code：${sourceResult.code}）。请稍后重试，或先确认该图片已生成完成。',
+      });
+    }
+    final imageBytes =
+        await MediaStore.instance.getBytes(sourceMediaId, MediaKind.image);
+    if (imageBytes == null || imageBytes.isEmpty) {
+      return jsonEncode({
+        'error': 'source_image_missing',
+        'message': '输入图片本地字节缺失，无法上传。',
+      });
+    }
+
+    try {
+      // 2. 并发提交 N 个图生视频任务
+      final submissions = await Future.wait(
+        List.generate(count, (i) => i).map((i) async {
+          final taskId = await api.submitImageToVideoTask(
+            prompt: prompt,
+            imageBytes: imageBytes,
+            imageFilename: '$sourceMediaId.png',
+            modelName: modelName,
+          );
+          await mediaProxy.register(
+            mediaId: taskId,
+            kind: MediaKind.video,
+            source: MediaSource.imageToVideo,
+            prompt: prompt,
+            modelName: modelName,
+          );
+          return {
+            'mediaId': taskId,
+            'sourceMediaId': sourceMediaId,
+            'prompt': prompt,
+            if (modelName != null) 'modelName': modelName,
+          };
+        }),
+      );
+
+      LoggerService.instance.i(
+          '提交图生视频任务: count=$count, source=$sourceMediaId, '
+          'modelName=${modelName ?? "(默认)"}',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_image_to_video']);
+
+      return jsonEncode({
+        'success': true,
+        'message': '已提交 $count 个视频生成任务，画廊将自动刷新直到出视频。',
+        'videos': submissions,
+        'count': submissions.length,
+      });
+    } catch (e) {
+      LoggerService.instance.e('提交图生视频任务失败: $e',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'create_image_to_video', 'error']);
+      return jsonEncode({
+        'error': 'backend_unavailable',
+        'message': '提交图生视频任务失败：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
       });
     }
   }

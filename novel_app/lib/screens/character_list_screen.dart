@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +5,7 @@ import '../core/providers/character_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
+import '../widgets/character/avatar_media.dart';
 import '../widgets/character/empty_characters_view.dart';
 import 'character_detail_screen.dart';
 import 'character_edit_screen.dart';
@@ -245,27 +244,13 @@ class _CharacterCard extends StatelessWidget {
             Expanded(
               child: Container(
                 color: genderColor.withValues(alpha: 0.18),
-                child: character.cachedImageUrl == null
-                    ? Center(
-                        child: Text(
-                          character.name.isNotEmpty
-                              ? character.name.characters.first
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: genderColor,
-                          ),
-                        ),
-                      )
-                    : Image.file(
-                        File(character.cachedImageUrl!),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Icon(Icons.broken_image_outlined,
-                              size: 40, color: genderColor),
-                        ),
-                      ),
+                child: AvatarMedia(
+                  mediaId: character.avatarMediaId,
+                  name: character.name,
+                  genderColor: genderColor,
+                  borderRadius: 14,
+                  fontSize: 48,
+                ),
               ),
             ),
             // 信息区

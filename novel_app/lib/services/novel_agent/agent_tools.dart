@@ -45,16 +45,18 @@ class AgentTools {
     _getPromptTag,
     _savePromptTag,
     _deletePromptTag,
-    // ===== 文生图（ComfyUI；仅 ComfyUI healthy 时由 WritingScenario 注入）=====
+    // ===== 文生图/图生视频（ComfyUI；仅 ComfyUI healthy 时由 WritingScenario 注入）=====
     _listText2ImgModels,
     _createImages,
+    _createImageToVideo,
   ];
 
-  /// 依赖 ComfyUI 的图片工具名集合。
+  /// 依赖 ComfyUI 的媒体工具名集合（文生图 + 图生视频）。
   /// WritingScenario.tools 在 ComfyUI 不健康时据此过滤，避免 LLM 调用后失败。
-  static const Set<String> imageTools = <String>{
+  static const Set<String> mediaTools = <String>{
     'list_text2img_models',
     'create_images',
+    'create_image_to_video',
   };
 
   /// 查找工具定义（带日志）
@@ -404,9 +406,9 @@ class AgentTools {
             'items': {'type': 'string'},
             'description': '别名列表（如 ["小李", "云哥"]）',
           },
-          'avatarUrl': {
+          'avatarMediaId': {
             'type': 'string',
-            'description': '新的头像 URL',
+            'description': '头像媒体资源ID（图像或视频），由 create_images / create_image_to_video 返回的 mediaId',
           },
         },
         'required': ['name'],
@@ -751,6 +753,49 @@ class AgentTools {
           },
         },
         'required': ['prompt'],
+      },
+    },
+  };
+
+  static const _createImageToVideo = {
+    'type': 'function',
+    'function': {
+      'name': 'create_image_to_video',
+      'description':
+          '根据一张图片 + 提示词生成短视频（异步任务，后端 ComfyUI 执行）。\n'
+          '本工具会立即提交任务并返回，视频生成耗时较长。'
+          '聊天窗口会出现视频，自动轮询直到生成完成。\n'
+          '使用场景：\n'
+          '- 让 create_images 生成的静态图片"动起来"\n'
+          '- 为某个画面制作动态效果\n'
+          'sourceMediaId 是输入图片的 mediaId（来自 create_images 返回的 mediaId，'
+          '或用户上传图片的 mediaId）。返回的 videos 数组里每个视频的 mediaId '
+          '即后端 task_id，UI 据此渲染并轮询取视频。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'prompt': {
+            'type': 'string',
+            'description':
+                '视频生成提示词（描述希望图片如何运动/变化，例如'
+                '"镜头缓慢推进，头发随风飘动，水面泛起涟漪"）。',
+          },
+          'sourceMediaId': {
+            'type': 'string',
+            'description':
+                '输入图片的 mediaId。来自 create_images 返回结果中的 mediaId，'
+                '或用户上传图片的 mediaId。',
+          },
+          'count': {
+            'type': 'integer',
+            'description': '生成视频个数（1-2，默认 1）。每个视频独立提交任务。',
+          },
+          'modelName': {
+            'type': 'string',
+            'description': '图生视频工作流名称（可选，不传则使用后端默认工作流）。',
+          },
+        },
+        'required': ['prompt', 'sourceMediaId'],
       },
     },
   };

@@ -16,11 +16,11 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 22 个工具（新增 rewrite_chapter）', () {
-      expect(AgentTools.allTools.length, 22, reason: '所有工具数应为 22（含 2026-07 新增的 rewrite_chapter：'
+    test('应该有 23 个工具（新增 create_image_to_video）', () {
+      expect(AgentTools.allTools.length, 23, reason: '所有工具数应为 23（含 2026-07 新增的 create_image_to_video：'
           'list/select/create novel + read/list/search chapter + create/update/rewrite chapter + '
           'list/update/create character + background/update_outline/write_outline/get_outline + '
-          'prompt tags + text2img 图片工具）');
+          'prompt tags + text2img 图片工具 + 图生视频工具）');
     });
 
     test('每个工具都有 type=function', () {
@@ -165,7 +165,7 @@ void main() {
             'clothingStyle',
             'backgroundStory',
             'aliases',
-            'avatarUrl',
+            'avatarMediaId',
           ]);
     });
 

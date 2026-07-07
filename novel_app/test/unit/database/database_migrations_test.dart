@@ -138,7 +138,7 @@ void main() {
           'chapter_cache',
           'novel_chapters',
           'characters',
-          'scene_illustrations',
+          'media_items',
           'outlines',
           'chat_scenes',
           'character_relationships',
@@ -155,6 +155,10 @@ void main() {
           expect(tableNames.contains(table), isTrue,
               reason: '表 $table 应该存在');
         }
+
+        // v34 删除了 scene_illustrations 死表
+        expect(tableNames.contains('scene_illustrations'), isFalse,
+            reason: 'scene_illustrations 在 v34 已被删除');
 
         await db.close();
       });
@@ -492,7 +496,7 @@ void main() {
 
     group('currentVersion', () {
       test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
-        expect(DatabaseMigrations.currentVersion, 33);
+        expect(DatabaseMigrations.currentVersion, 34);
       });
     });
 

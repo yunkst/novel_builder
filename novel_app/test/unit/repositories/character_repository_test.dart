@@ -82,6 +82,13 @@ void main() {
       expect(characterRepository.updateCharacter is Function, isTrue);
     });
 
+    test('应该有updateCharacterAvatarMediaId方法', () {
+      expect(
+        characterRepository.updateCharacterAvatarMediaId,
+        isA<Function>(),
+      );
+    });
+
     test('应该有deleteCharacter方法', () {
       // 验证方法签名存在
       expect(characterRepository.deleteCharacter is Function, isTrue);

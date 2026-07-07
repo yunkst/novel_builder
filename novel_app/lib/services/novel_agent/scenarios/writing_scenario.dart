@@ -43,7 +43,7 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
         : AgentTools.allTools
             .where((t) =>
                 !(t['function'] is Map &&
-                    AgentTools.imageTools
+                    AgentTools.mediaTools
                         .contains(t['function']['name'] as String)))
             .toList();
     return [...base, patchMemoryToolDefinition];

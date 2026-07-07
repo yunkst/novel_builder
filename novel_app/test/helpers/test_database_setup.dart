@@ -50,7 +50,7 @@ class TestDatabaseSetup {
     await db.delete('chapter_cache');
     await db.delete('novel_chapters');
     await db.delete('characters');
-    await db.delete('scene_illustrations');
+    await db.delete('media_items');
     await db.delete('bookshelves');
     await db.delete('novel_bookshelves');
     await db.delete('character_relationships');
@@ -73,7 +73,7 @@ class TestDatabaseSetup {
       'chapter_cache',
       'novel_chapters',
       'characters',
-      'scene_illustrations',
+      'media_items',
       'bookshelves',
       'novel_bookshelves',
       'character_relationships',
@@ -110,7 +110,7 @@ class TestDatabaseSetup {
       'chapter_cache',
       'novel_chapters',
       'characters',
-      'scene_illustrations',
+      'media_items',
       'outlines',
       'chat_scenes',
       'character_relationships',

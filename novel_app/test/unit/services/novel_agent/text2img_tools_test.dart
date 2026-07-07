@@ -20,10 +20,14 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common/sqflite.dart';
 
+import 'package:novel_app/core/database/database_connection.dart';
+import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/services/network_service_providers.dart';
 import 'package:novel_app/services/api_service_wrapper.dart';
 import 'package:novel_app/services/novel_agent/tool_executor.dart';
+import '../../../helpers/test_database_setup.dart' as test_db;
 
 // ──────────────────────────────────────────────────────────────────────
 // Fake ApiServiceWrapper
@@ -89,17 +93,24 @@ void main() {
   late _FakeApiServiceWrapper fakeApi;
   late ProviderContainer container;
   late ToolExecutor executor;
+  late Database db;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    db = await test_db.TestDatabaseSetup.createInMemoryDatabase();
+    final dbConnection = DatabaseConnection.forTesting(db);
     fakeApi = _FakeApiServiceWrapper();
     container = ProviderContainer(overrides: [
       apiServiceWrapperProvider.overrideWithValue(fakeApi),
+      databaseConnectionProvider.overrideWithValue(dbConnection),
     ]);
     executor = container.read(_toolExecutorProvider);
   });
 
-  tearDown(() => container.dispose());
+  tearDown(() async {
+    container.dispose();
+    await db.close();
+  });
 
   Map<String, dynamic> decode(String raw) =>
       jsonDecode(raw) as Map<String, dynamic>;
@@ -158,14 +169,9 @@ void main() {
       final images = (json['images'] as List).cast<Map<String, dynamic>>();
       expect(images.length, 1);
       expect(images.first['prompt'], '1girl, anime style');
-      expect(images.first['taskId'], isA<String>());
-      expect(images.first['imageId'], isA<String>());
-      // imageId 格式 img_{timestamp}_{index}
-      expect(
-        RegExp(r'^img_\d+_0$').hasMatch(images.first['imageId'] as String),
-        true,
-        reason: 'imageId 应为 img_{ts}_0 格式',
-      );
+      // mediaId 即后端 task_id（统一句柄，不再有独立 imageId）
+      expect(images.first['mediaId'], isA<String>());
+      expect(images.first['mediaId'], 'fake-task-0');
     });
 
     test('多图（count=3）每张 taskId 独立、imageId 后缀递增', () async {
@@ -179,13 +185,9 @@ void main() {
       expect(json['count'], 3);
       final images = (json['images'] as List).cast<Map<String, dynamic>>();
       expect(images.length, 3);
-      expect(images.map((i) => i['taskId']).toList(), ['task-0', 'task-1', 'task-2']);
-      expect(images.map((i) => i['imageId']).toList(),
-          matchesImgIds(['img_*_0', 'img_*_1', 'img_*_2']));
-      // 所有 imageId 共享同一时间戳前缀
-      final prefixes =
-          images.map((i) => (i['imageId'] as String).split('_')[1]).toSet();
-      expect(prefixes.length, 1, reason: '同一批任务应共享时间戳前缀');
+      // mediaId = 各任务独立 task_id
+      expect(images.map((i) => i['mediaId']).toList(),
+          ['task-0', 'task-1', 'task-2']);
     });
 
     test('modelName 透传到 images 元素', () async {

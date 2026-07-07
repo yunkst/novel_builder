@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 33;
+  static const int currentVersion = 34;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -727,6 +727,37 @@ class DatabaseMigrations {
         await _createIndexIfNotExists(
             db, 'idx_model_tasks_created', 'model_download_tasks', 'createdAt DESC');
         _log('迁移 v32 → v33: 新建 model_download_tasks 表');
+        break;
+
+      // ========== 版本 34：统一媒体代理器 ==========
+      // 新建 media_items 表（统一管理 AI 生成图/视频 + 用户上传的本地映射）：
+      //   - mediaId：统一句柄。AI 生成 = backend task_id；用户上传 = app 本地生成 id。
+      //   - kind：'image' | 'video'。source：'text2img' | 'image_to_video' | 'local_upload'。
+      //   - localOnly=1 表示用户上传、不可回源、不可被"清空可回源缓存"批量删除。
+      // characters 加 avatarMediaId 列（角色头像迁移到 mediaId 体系）；旧 cachedImageUrl
+      // 保留兼容，展示层优先读 avatarMediaId、为空时回退 cachedImageUrl，不在迁移中搬文件。
+      // 删除废弃的 scene_illustrations 死表（service/repository/widget 早已删除）。
+      case 34:
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS media_items (
+          mediaId TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          source TEXT NOT NULL,
+          prompt TEXT,
+          modelName TEXT,
+          createdAt INTEGER NOT NULL,
+          lastAccessedAt INTEGER NOT NULL,
+          localBytes INTEGER NOT NULL DEFAULT 0,
+          localOnly INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+        await _createIndexIfNotExists(
+            db, 'idx_media_items_kind', 'media_items', 'kind');
+        await _createIndexIfNotExists(
+            db, 'idx_media_items_last_access', 'media_items', 'lastAccessedAt');
+        await _addColumnIfNotExists(db, 'characters', 'avatarMediaId', 'TEXT');
+        await db.execute('DROP TABLE IF EXISTS scene_illustrations');
+        _log('迁移 v33 → v34: 新建 media_items 表，characters 加 avatarMediaId 列，删除 scene_illustrations 死表');
         break;
     }
   }

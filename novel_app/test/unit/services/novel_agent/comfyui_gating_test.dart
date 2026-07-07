@@ -1,9 +1,9 @@
 /// ComfyUI 健康门控单元测试
 ///
 /// 覆盖三件事：
-/// 1. AgentTools.imageTools 集合内容
+/// 1. AgentTools.mediaTools 集合内容
 /// 2. comfyuiHealthyProvider：healthy / unhealthy / 抛异常 三路径
-/// 3. WritingScenario.tools 据健康状态过滤两个图片工具
+/// 3. WritingScenario.tools 据健康状态过滤三个媒体工具（文生图 + 图生视频）
 ///
 /// 运行：
 ///   cd novel_app
@@ -73,17 +73,18 @@ void main() {
   // =========================================================================
   // AgentTools.imageTools 常量
   // =========================================================================
-  group('AgentTools.imageTools 常量', () {
-    test('包含两个图片工具名', () {
-      expect(AgentTools.imageTools, contains('list_text2img_models'));
-      expect(AgentTools.imageTools, contains('create_images'));
-      expect(AgentTools.imageTools.length, 2);
+  group('AgentTools.mediaTools 常量', () {
+    test('包含三个媒体工具名（文生图 + 图生视频）', () {
+      expect(AgentTools.mediaTools, contains('list_text2img_models'));
+      expect(AgentTools.mediaTools, contains('create_images'));
+      expect(AgentTools.mediaTools, contains('create_image_to_video'));
+      expect(AgentTools.mediaTools.length, 3);
     });
 
-    test('这两个工具确实在 allTools 中注册', () {
+    test('这三个工具确实在 allTools 中注册', () {
       final allNames = _toolNames(AgentTools.allTools);
-      expect(allNames.containsAll(AgentTools.imageTools), true,
-          reason: 'imageTools 集合必须是 allTools 的子集');
+      expect(allNames.containsAll(AgentTools.mediaTools), true,
+          reason: 'mediaTools 集合必须是 allTools 的子集');
     });
   });
 
@@ -148,7 +149,7 @@ void main() {
   // WritingScenario.tools 健康过滤
   // =========================================================================
   group('WritingScenario.tools 健康过滤', () {
-    test('healthy=true 时含两个图片工具', () async {
+    test('healthy=true 时含三个媒体工具', () async {
       final container = ProviderContainer(overrides: [
         comfyuiHealthyProvider.overrideWith((ref) async => true),
       ]);
@@ -160,6 +161,7 @@ void main() {
 
       expect(names.contains('list_text2img_models'), true);
       expect(names.contains('create_images'), true);
+      expect(names.contains('create_image_to_video'), true);
       // patch_memory 是 writing 场景专属，应始终存在
       expect(names.contains('patch_memory'), true);
       // 基础工具也未丢失
@@ -167,7 +169,7 @@ void main() {
       expect(names.contains('create_chapter'), true);
     });
 
-    test('healthy=false 时过滤掉两个图片工具', () async {
+    test('healthy=false 时过滤掉三个媒体工具', () async {
       final container = ProviderContainer(overrides: [
         comfyuiHealthyProvider.overrideWith((ref) async => false),
       ]);
@@ -181,13 +183,15 @@ void main() {
           reason: 'ComfyUI 不健康时不应注入 list_text2img_models');
       expect(names.contains('create_images'), false,
           reason: 'ComfyUI 不健康时不应注入 create_images');
+      expect(names.contains('create_image_to_video'), false,
+          reason: 'ComfyUI 不健康时不应注入 create_image_to_video');
       // 基础工具不受影响
       expect(names.contains('list_novels'), true);
       expect(names.contains('create_chapter'), true);
       expect(names.contains('patch_memory'), true);
     });
 
-    test('healthy=false 时 tools 数量 = allTools - 图片工具数 + patch_memory', () async {
+    test('healthy=false 时 tools 数量 = allTools - 媒体工具数 + patch_memory', () async {
       final container = ProviderContainer(overrides: [
         comfyuiHealthyProvider.overrideWith((ref) async => false),
       ]);
@@ -197,9 +201,9 @@ void main() {
       final scenario = container.read(_writingScenarioProvider);
 
       final expectedLen =
-          AgentTools.allTools.length - AgentTools.imageTools.length + 1;
+          AgentTools.allTools.length - AgentTools.mediaTools.length + 1;
       expect(scenario.tools.length, expectedLen,
-          reason: '基础工具去掉图片工具，再加 patch_memory');
+          reason: '基础工具去掉媒体工具，再加 patch_memory');
     });
 
     test('healthy=true 时 tools 数量 = allTools + patch_memory', () async {

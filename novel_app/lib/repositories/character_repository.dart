@@ -515,4 +515,30 @@ class CharacterRepository extends BaseRepository
     final cachedUrl = await getCharacterCachedImage(characterId);
     return cachedUrl != null && cachedUrl.isNotEmpty;
   }
+
+  /// 更新角色头像的媒体资源ID（图像/视频）
+  ///
+  /// [characterId] 角色ID
+  /// [mediaId] 媒体资源ID，传 null 清空头像
+  /// 返回受影响的行数
+  @override
+  Future<int> updateCharacterAvatarMediaId(
+      int characterId, String? mediaId) async {
+    final db = await database;
+    final affected = await db.update(
+      'characters',
+      {
+        'avatarMediaId': mediaId,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [characterId],
+    );
+    LoggerService.instance.d(
+      '更新角色头像媒体: id=$characterId mediaId=$mediaId (affected=$affected)',
+      category: LogCategory.character,
+      tags: ['character', 'avatar', 'update'],
+    );
+    return affected;
+  }
 }

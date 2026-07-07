@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_typography.dart';
-import '../utils/media_markup_parser.dart';
 
 class ParagraphWidget extends StatefulWidget {
   final String paragraph;
@@ -56,38 +55,7 @@ class _ParagraphWidgetState extends State<ParagraphWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 检查是否为插图标记 — 仅在编辑模式下展示原始标记文本
-    if (MediaMarkupParser.isMediaMarkup(widget.paragraph)) {
-      return _buildMediaMarkupWidget();
-    }
-
     return _buildTextWidget();
-  }
-
-  /// 插图标记展示（编辑模式下展示原始标记，阅读模式下隐藏）
-  Widget _buildMediaMarkupWidget() {
-    if (widget.isEditMode) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-          ),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          widget.paragraph,
-          style: TextStyle(
-            fontSize: widget.fontSize * 0.9,
-            fontFamily: 'monospace',
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-      );
-    }
-    // 阅读模式下不渲染插图标记
-    return const SizedBox.shrink();
   }
 
   Widget _buildTextWidget() {

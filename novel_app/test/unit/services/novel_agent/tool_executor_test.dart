@@ -835,6 +835,27 @@ void main() {
       final json = jsonDecode(result) as Map<String, dynamic>;
       expect(json['count'], 0);
     });
+
+    test('返回 avatarMediaId 且不含旧 avatarUrl', () async {
+      final novelId = await insertNovel();
+      await characterRepo.createCharacter(Character(
+        novelUrl: defaultNovelUrl,
+        name: '李云',
+        avatarMediaId: 'local_abc_001',
+      ));
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'list_characters',
+        {},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      final c = (json['characters'] as List)[0] as Map<String, dynamic>;
+
+      expect(c['avatarMediaId'], 'local_abc_001');
+      expect(c.containsKey('avatarUrl'), isFalse);
+    });
   });
 
   // ========================================================================
@@ -875,6 +896,26 @@ void main() {
 
       expect(json['error'], 'character_not_found');
       expect(json['suggested_tool'], 'list_characters');
+    });
+
+    test('更新 avatarMediaId 写入并可读回', () async {
+      final novelId = await insertNovel();
+      await insertCharacter(name: '李云');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_character',
+        {'name': '李云', 'avatarMediaId': 'local_123_456'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['success'], true);
+
+      final updated = await characterRepo.findCharacterByName(
+        defaultNovelUrl,
+        '李云',
+      );
+      expect(updated!.avatarMediaId, 'local_123_456');
     });
   });
 
