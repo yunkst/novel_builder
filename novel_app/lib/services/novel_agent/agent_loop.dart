@@ -4,10 +4,13 @@
 /// 重构: 依赖 AgentScenario 抽象，支持多场景切换
 library;
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show HandshakeException, SocketException;
 
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
+import 'package:novel_app/utils/retry_helper.dart' show RetryableHttpException;
 
 import '../dsl_engine/llm_provider.dart';
 import 'agent_event.dart';
@@ -28,10 +31,26 @@ class AgentLoopConfig {
   /// 上下文压缩配置（默认启用）
   final CompactorConfig compaction;
 
+  /// 单轮 LLM 流式调用总耗时上限
+  ///
+  /// 流式响应无事件到达此上限即触发 [TimeoutException]，
+  /// 由 [_isTransientNetworkError] 判定为瞬态错误，触发 round 重试。
+  /// 默认 5min，覆盖单章正文生成（3000-8000 字约 30s-2min）。
+  final Duration llmStreamTimeout;
+
+  /// 单轮内网络错误最大重试次数
+  ///
+  /// 仅当异常是瞬态网络错误（[_isTransientNetworkError] 返回 true）时触发；
+  /// JSON 解析失败、空响应等逻辑错误不重试，立即终止。
+  /// 重试计数与外层 round 独立：成功后 [roundRetryCount] 重置。
+  final int networkRetryPerRound;
+
   const AgentLoopConfig({
     this.maxRounds = 50,
     this.toolResultMaxChars = 50000,
     this.compaction = const CompactorConfig(),
+    this.llmStreamTimeout = const Duration(minutes: 5),
+    this.networkRetryPerRound = 2,
   });
 }
 
@@ -84,7 +103,9 @@ class AgentLoop {
     LoggerService.instance.i('Agent 循环开始 (scenario=${_scenario.id})',
         category: LogCategory.ai, tags: ['agent', 'loop_start', _scenario.id]);
 
-    for (int round = 0; round < _config.maxRounds; round++) {
+    int round = 0;
+    int roundRetryCount = 0;
+    while (round < _config.maxRounds) {
       // 检查点 A：进入新一轮前（例如上一轮工具执行后被取消）
       if (cancellationToken?.isCancelled == true) {
         LoggerService.instance.i(
@@ -133,11 +154,25 @@ class AgentLoop {
         String? streamFinishReason;
         int contentChunkCount = 0;
 
-        await for (final chunk in _llm.chatStreamWithTools(
+        // ★ 流式超时：超过 [llmStreamTimeout] 无事件到达 → TimeoutException
+        // → 由 catch 块判定为瞬态网络错误，触发 round 重试
+        final streamTimeout = _config.llmStreamTimeout;
+        final streamSource = _llm.chatStreamWithTools(
           messages: messages,
           tools: _scenario.tools,
           toolChoice: 'auto',
-        )) {
+        ).timeout(
+          streamTimeout,
+          onTimeout: (EventSink<LlmStreamChunk> sink) {
+            sink.addError(TimeoutException(
+              'LLM 流式响应超过 ${streamTimeout.inMinutes} 分钟无事件',
+              streamTimeout,
+            ));
+            sink.close();
+          },
+        );
+
+        await for (final chunk in streamSource) {
           // 实时 emit 文本增量 → UI 流式展示
           if (chunk.isContent) {
             contentChunkCount++;
@@ -231,6 +266,9 @@ class AgentLoop {
               category: LogCategory.ai,
               tags: ['agent', 'loop', 'injection', _scenario.id],
             );
+            // 本轮已成功完成（无 tool_calls 注入场景提示）→ 先递增，再 continue
+            roundRetryCount = 0;
+            round++;
             continue; // 不结束，继续下一轮
           }
 
@@ -334,8 +372,42 @@ class AgentLoop {
               category: LogCategory.ai,
               tags: ['agent', 'tool', call.name, toolSuccess ? 'success' : 'error', _scenario.id]);
         }
+
+        // 本轮成功执行（含工具调用）→ 进入下一轮，重置重试计数
+        roundRetryCount = 0;
+        round++;
       } catch (e, stack) {
-        LoggerService.instance.e('Agent 循环异常 (round $round, scenario=${_scenario.id}): $e',
+        // 瞬态网络错误（SocketException / TimeoutException / 5xx 等）
+        // → round 级整体重试，保留 messages 上下文，避免多轮 ReAct 白跑
+        if (_isTransientNetworkError(e) &&
+            roundRetryCount < _config.networkRetryPerRound) {
+          roundRetryCount++;
+          // 指数退避：1s → 2s → 4s（上限 4s）
+          final delay = Duration(
+            milliseconds: (1000 * (1 << (roundRetryCount - 1))).clamp(0, 4000),
+          );
+          LoggerService.instance.w(
+            'Agent 轮级网络重试 (round=$round, $roundRetryCount/${_config.networkRetryPerRound}, '
+            '${delay.inMilliseconds}ms, ${e.runtimeType}: $e)',
+            category: LogCategory.ai,
+            stackTrace: stack.toString(),
+            tags: ['agent', 'loop', 'round_retry', _scenario.id],
+          );
+          await Future<void>.delayed(delay);
+          // 退避期间收到取消 → 优雅结束，不再重试
+          if (cancellationToken?.isCancelled == true) {
+            LoggerService.instance.i(
+                'Agent 重试退避期间被取消 (round=$round, scenario=${_scenario.id})',
+                category: LogCategory.ai,
+                tags: ['agent', 'loop', 'round_retry', 'cancelled', _scenario.id]);
+            emit(const AgentDoneEvent());
+            return;
+          }
+          continue; // 重试本轮，不递增 round
+        }
+
+        LoggerService.instance.e(
+            'Agent 循环异常 (round $round, scenario=${_scenario.id}): $e',
             stackTrace: stack.toString(),
             category: LogCategory.ai,
             tags: ['agent', 'loop', 'error', _scenario.id]);
@@ -368,5 +440,22 @@ class AgentLoop {
     emit(const AgentDoneEvent());
     LoggerService.instance.i('Agent 循环完成（达到最大轮数, scenario=${_scenario.id}）',
         category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);
+  }
+
+  /// 判定异常是否是"瞬态网络错误"——值得 round 整体重试
+  ///
+  /// 决策：
+  /// - [SocketException] / [HandshakeException] → true（TCP/TLS 层断开）
+  /// - [TimeoutException] → true（来自 [chatStreamWithTools] 的 [Duration] 超时
+  ///   或 dart:io HttpClient 超时）
+  /// - [RetryableHttpException]（5xx）→ true
+  /// - [FormatException] / [StateError] / 4xx [NonRetryableHttpException] →
+  ///   false（逻辑错误，重复执行无意义）
+  bool _isTransientNetworkError(Object e) {
+    if (e is SocketException) return true;
+    if (e is HandshakeException) return true;
+    if (e is TimeoutException) return true;
+    if (e is RetryableHttpException) return true;
+    return false;
   }
 }

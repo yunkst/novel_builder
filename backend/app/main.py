@@ -335,12 +335,16 @@ async def text2img_generate(
 
     - **prompt**: 图片生成提示词
     - **model_name**: 模型名称（可选，不填则使用默认模型）
+    - **negative_prompt**: 负向提示词（可选，仅工作流含对应占位符时生效）
 
     返回 task_id，可通过 GET /api/text2img/image/{task_id} 获取图片
     """
     try:
         task_id = await text2img_service.generate(
-            request.prompt, request.model_name, db
+            request.prompt,
+            request.model_name,
+            db,
+            negative_prompt=request.negative_prompt,
         )
         return {"task_id": task_id}
     except Exception as e:
@@ -516,6 +520,7 @@ async def get_models() -> ModelsResponse:
                 width=workflow.width,
                 height=workflow.height,
                 is_default=(workflow.title == default_t2i_title),
+                prompt_skill=workflow.prompt_skill,
             )
             for workflow in t2i_response.workflows
         ]

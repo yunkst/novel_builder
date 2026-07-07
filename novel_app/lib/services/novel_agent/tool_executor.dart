@@ -22,7 +22,10 @@ import '../../models/outline.dart';
 import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
 import '../../utils/content_sanitizer.dart';
+import '../dsl_engine/llm_provider.dart' show kArgsParseErrorKey,
+    kArgsParseErrorDetailKey, kArgsRawPreviewKey;
 import 'agent_scenario.dart';
+import 'outline_replacer.dart';
 import 'tool_arg_parser.dart';
 
 /// ID/位置解析结果
@@ -46,6 +49,15 @@ class ToolExecutor {
 
   ToolExecutor(this.ref);
 
+  /// 本 Agent 循环内已通过 get_outline 读过的大纲 novelUrl 集合。
+  ///
+  /// update_outline 据此强制 read-before-write：未读过则报错，引导 AI 先调
+  /// get_outline。这与 opencode edit 工具的 FileTime 校验同源。
+  ///
+  /// 生命周期 = 一个 ToolExecutor 实例 ≈ 一次用户消息触发的整个 Agent 循环
+  ///（WritingScenario 每次 sendMessage 新建，其 _executor 随之重建）。
+  final Set<String> _readOutlineUrls = {};
+
   /// 分发工具调用
   ///
   /// [scenarioContext] 写作场景专用，包含当前小说 ID。
@@ -57,6 +69,32 @@ class ToolExecutor {
     AgentScenarioContext? scenarioContext,
     void Function(int generatedChars)? onProgress,
   }) async {
+    // ★ 短路：tool_call arguments JSON 解析失败
+    //
+    // 此分支由 [ToolCall.fromJson] / [StreamingResult.buildToolCalls] 在
+    // 流式拼接截断 / JSON 不闭合 / 解析成功但不是对象时填入。
+    // 不进入 switch 分发，直接返回引导错误，让 LLM 自助修复（通常是网络抖动
+    // 导致的流末尾截断）。这样 LLM 不会拿到空参数 {} 而误判调用成功，
+    // 避免用户输入意图丢失。
+    if (args.containsKey(kArgsParseErrorKey)) {
+      final detail = args[kArgsParseErrorDetailKey]?.toString() ?? '未知错误';
+      final preview = args[kArgsRawPreviewKey]?.toString() ?? '';
+      LoggerService.instance.w(
+        '工具参数解析失败短路: $toolName, detail=$detail',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', toolName, 'args_parse_error'],
+      );
+      return jsonEncode({
+        'error': 'args_parse_failed',
+        'message': '你为本工具提供的参数 JSON 格式不合法（流式输出被截断或 JSON 不闭合）。'
+            '请重新调用本工具，确保 arguments 是合法 JSON 对象。',
+        'parse_error_detail': detail,
+        'previous_args_preview': preview,
+        'suggested_action':
+            '重新调用 $toolName，使用完整、合法闭合的 JSON 对象作为 arguments。',
+      });
+    }
+
     LoggerService.instance.d('执行工具: $toolName (args=${args.keys.toList()})',
         category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'exec']);
     try {
@@ -82,6 +120,9 @@ class ToolExecutor {
         case 'update_chapter_content':
           return await _updateChapterContent(args, scenarioContext,
               onProgress: onProgress);
+        case 'rewrite_chapter':
+          return await _rewriteChapterContent(args, scenarioContext,
+              onProgress: onProgress);
         // ===== 角色 =====
         case 'list_characters':
           return await _listCharacters(args, scenarioContext);
@@ -94,6 +135,8 @@ class ToolExecutor {
           return await _updateBackgroundSetting(args, scenarioContext);
         case 'update_outline':
           return await _updateOutline(args, scenarioContext);
+        case 'write_outline':
+          return await _writeOutline(args, scenarioContext);
         case 'get_outline':
           return await _getOutline(args, scenarioContext);
         // ===== 提示标签 =====
@@ -533,6 +576,101 @@ class ToolExecutor {
     final parser = ToolArgParser(args);
     final (position, posErr) = parser.requireInt('position');
     if (posErr != null) return posErr;
+    final (oldString, oldErr) = parser.requireString('oldString');
+    if (oldErr != null) return oldErr;
+    final (newString, newErr) = parser.requireString('newString');
+    if (newErr != null) return newErr;
+    final (replaceAll, allErr) = parser.optionalBool('replaceAll');
+    if (allErr != null) return allErr;
+
+    if (oldString == newString) {
+      return jsonEncode({
+        'error': 'invalid_param',
+        'message': 'oldString 与 newString 不能相同',
+      });
+    }
+
+    final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
+    if (resolveResult.errorJson != null) {
+      return jsonEncode(resolveResult.errorJson);
+    }
+    final chapterUrl = resolveResult.url!;
+
+    final chapterRepo = ref.read(chapterRepositoryProvider);
+    final originalContent = await chapterRepo.getCachedChapter(chapterUrl);
+    if (originalContent == null || originalContent.isEmpty) {
+      return jsonEncode({
+        'error': 'not_cached',
+        'message': '位置 $position 的章节存在但内容尚未缓存，无法编辑。请告知用户先加载/缓存该章节。',
+      });
+    }
+
+    // 复用 outline_replacer 的 9 重容错匹配（纯函数，与 outline 无耦合，
+    // 同样适用于章节正文这种任意长文本的精确局部替换）。
+    String newContent;
+    try {
+      newContent = replaceOutlineSnippet(
+        content: originalContent,
+        oldString: oldString,
+        newString: newString,
+        replaceAll: replaceAll ?? false,
+      );
+    } on OutlineEditException catch (e) {
+      final errorCode =
+          e.reason == 'ambiguous' ? 'ambiguous_match' : 'not_found';
+      LoggerService.instance.d(
+        '编辑章节失败: $errorCode, position=$position',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_chapter_content', errorCode],
+      );
+      return jsonEncode({'error': errorCode, 'message': e.message});
+    }
+
+    final affected = await chapterRepo.updateChapterContent(
+      chapterUrl,
+      newContent,
+      source: 'ai_edit',
+    );
+    if (affected == 0) {
+      LoggerService.instance.d(
+        '工具引导错误: chapter_not_found position=$position',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_chapter_content', 'chapter_not_found'],
+      );
+      return jsonEncode({
+        'error': 'chapter_not_found',
+        'message': '章节位置 $position 的数据库记录不存在或内容表无对应行。',
+        'suggested_tool': 'list_chapters',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+
+    LoggerService.instance.i(
+        '编辑章节: position=$position, ${originalContent.length}→${newContent.length} chars',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'update_chapter_content']);
+    // 返回元信息（不含正文，避免 LLM 上下文爆炸）
+    return jsonEncode({
+      'success': true,
+      'message': '章节已更新（${newContent.length} 字）。',
+      'chapterUrl': chapterUrl,
+      'position': position,
+      'charCount': newContent.length,
+    });
+  }
+
+  /// AI 重写整章正文（原 update_chapter_content 的 LLM 全文重写逻辑）。
+  ///
+  /// 与 [updateChapterContent] 的字符串替换不同，本方法把整章原文 + 修改要求 +
+  /// 人物卡 + 写作标签拼成提示词，流式调用 LLM 重新生成整章正文后入库。
+  /// 适合大范围重写、风格转换、结构调整；想精确改某段用 update_chapter_content。
+  Future<String> _rewriteChapterContent(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx, {
+    void Function(int generatedChars)? onProgress,
+  }) async {
+    final parser = ToolArgParser(args);
+    final (position, posErr) = parser.requireInt('position');
+    if (posErr != null) return posErr;
     final (rewriteInstruction, instErr) =
         parser.requireString('rewriteInstruction');
     if (instErr != null) return instErr;
@@ -587,7 +725,7 @@ class ToolExecutor {
       LoggerService.instance.d(
         '工具引导错误: chapter_not_found position=$position',
         category: LogCategory.ai,
-        tags: ['agent', 'tool', 'update_chapter_content', 'chapter_not_found'],
+        tags: ['agent', 'tool', 'rewrite_chapter', 'chapter_not_found'],
       );
       return jsonEncode({
         'error': 'chapter_not_found',
@@ -599,7 +737,7 @@ class ToolExecutor {
 
     LoggerService.instance.i(
         'AI 重写章节: position=$position, ${originalContent.length}→${newContent.length} chars',
-        category: LogCategory.ai, tags: ['agent', 'tool', 'update_chapter_content']);
+        category: LogCategory.ai, tags: ['agent', 'tool', 'rewrite_chapter']);
     // 返回元信息（不含正文，避免 LLM 上下文爆炸）
     // __meta 不会被 agent_loop 截断，UI 据此渲染跳转入口
     return jsonEncode({
@@ -1070,6 +1208,88 @@ class ToolExecutor {
     AgentScenarioContext? ctx,
   ) async {
     final parser = ToolArgParser(args);
+    final (oldString, oldErr) = parser.requireString('oldString');
+    if (oldErr != null) return oldErr;
+    final (newString, newErr) = parser.requireString('newString');
+    if (newErr != null) return newErr;
+    final (replaceAll, allErr) = parser.optionalBool('replaceAll');
+    if (allErr != null) return allErr;
+
+    if (oldString == newString) {
+      return jsonEncode({
+        'error': 'invalid_param',
+        'message': 'oldString 与 newString 不能相同',
+      });
+    }
+
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final novelUrl = novelResolve.url!;
+
+    // read-before-write 校验：本循环内必须先 get_outline 读过大纲，
+    // 避免用 AI 脑海中的旧快照覆盖当前内容（与 opencode edit 的 FileTime 同源）。
+    if (!_readOutlineUrls.contains(novelUrl)) {
+      LoggerService.instance.d(
+        '工具引导错误: outline_not_read novelUrl=$novelUrl',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_outline', 'outline_not_read'],
+      );
+      return jsonEncode({
+        'error': 'outline_not_read',
+        'message': '编辑大纲前请先调用 get_outline 读取当前内容。',
+        'suggested_tool': 'get_outline',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+
+    final repo = ref.read(outlineRepositoryProvider);
+    final outline = await repo.getOutlineByNovelUrl(novelUrl);
+    if (outline == null) {
+      LoggerService.instance.w('大纲不存在，引导用 write_outline 创建',
+          category: LogCategory.ai,
+          tags: ['agent', 'tool', 'update_outline', 'not_found']);
+      return jsonEncode({
+        'error': 'not_found',
+        'message': '暂无大纲，请用 write_outline 创建。',
+        'suggested_tool': 'write_outline',
+      });
+    }
+
+    try {
+      final newContent = replaceOutlineSnippet(
+        content: outline.content,
+        oldString: oldString,
+        newString: newString,
+        replaceAll: replaceAll ?? false,
+      );
+      // edit 场景大纲必然已存在，用 updateOutlineContent 仅更新 content+updated_at，
+      // 不动 created_at，语义比 saveOutline 的 upsert 更准。
+      await repo.updateOutlineContent(novelUrl, outline.title, newContent);
+    } on OutlineEditException catch (e) {
+      final errorCode =
+          e.reason == 'ambiguous' ? 'ambiguous_match' : 'not_found';
+      LoggerService.instance.d(
+        '更新大纲失败: $errorCode, novelUrl=$novelUrl',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'update_outline', errorCode],
+      );
+      return jsonEncode({'error': errorCode, 'message': e.message});
+    }
+
+    // 大纲已被改写，重新标记已读，避免连续编辑被拦截
+    _readOutlineUrls.add(novelUrl);
+    LoggerService.instance.i('更新大纲: novelUrl=$novelUrl',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'update_outline']);
+    return jsonEncode({'success': true, 'message': '大纲已更新'});
+  }
+
+  Future<String> _writeOutline(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
     final (content, contentErr) = parser.requireString('content');
     if (contentErr != null) return contentErr;
 
@@ -1092,8 +1312,10 @@ class ToolExecutor {
       updatedAt: DateTime.now(),
     );
     await repo.saveOutline(outline);
-    LoggerService.instance.i('保存大纲: novelUrl=$novelUrl',
-        category: LogCategory.ai, tags: ['agent', 'tool', 'update_outline']);
+    // 整篇重写后同样标记已读，使后续 update_outline 可直接生效
+    _readOutlineUrls.add(novelUrl);
+    LoggerService.instance.i('写入大纲: novelUrl=$novelUrl',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'write_outline']);
     return jsonEncode({'success': true, 'message': '大纲已保存'});
   }
 
@@ -1115,6 +1337,9 @@ class ToolExecutor {
           tags: ['agent', 'tool', 'get_outline', 'not_found']);
       return jsonEncode({'error': 'not_found', 'message': '暂无大纲'});
     }
+
+    // 读成功后标记「已读」，供 update_outline 的 read-before-write 校验
+    _readOutlineUrls.add(novelUrl);
 
     final novelContext = _buildCurrentNovelContext(ctx);
     LoggerService.instance.i('获取大纲成功',
@@ -1433,8 +1658,10 @@ class ToolExecutor {
 
   /// 列出可用文生图工作流（GET /api/models 的 text2img 节）。
   ///
-  /// 返回精简字段 [{name, description, isDefault}]，name 作为 create_images
-  /// 的 modelName 参数。后端/ComfyUI 不可用时返回 error，引导告知用户。
+  /// 返回精简字段 [{name, description, isDefault, promptSkill}]，name 作为
+  /// create_images 的 modelName 参数；promptSkill 是该工作流的提示词写作技巧
+  /// （含正向/负向 prompt 的具体写法建议），可为 null。
+  /// 后端/ComfyUI 不可用时返回 error，引导告知用户。
   Future<String> _listText2ImgModels(Map<String, dynamic> args) async {
     final api = ref.read(apiServiceWrapperProvider);
     try {
@@ -1464,6 +1691,8 @@ class ToolExecutor {
   /// 并发提交 N 个独立任务，每个任务返回独立 task_id。组装 images 数组
   /// （含前端生成的 imageId）返回；UI 据此渲染画廊并轮询取图。
   /// imageId 格式 `img_{ts}_{idx}`，作为本地缓存文件名。
+  /// [negativePrompt] 可选；仅工作流含「负向提示词在这里替换」占位符时生效，
+  /// 否则后端静默忽略。
   Future<String> _createImages(
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
@@ -1475,6 +1704,8 @@ class ToolExecutor {
     if (countErr != null) return countErr;
     final (modelName, modelNameErr) = parser.nullableString('modelName');
     if (modelNameErr != null) return modelNameErr;
+    final (negativePrompt, negPromptErr) = parser.nullableString('negativePrompt');
+    if (negPromptErr != null) return negPromptErr;
 
     final count = (countRaw ?? 1).clamp(1, 4);
 
@@ -1488,18 +1719,21 @@ class ToolExecutor {
           final taskId = await api.submitText2ImgTask(
             prompt: prompt,
             modelName: modelName,
+            negativePrompt: negativePrompt,
           );
           return {
             'imageId': 'img_${ts}_$i',
             'taskId': taskId,
             'prompt': prompt,
             if (modelName != null) 'modelName': modelName,
+            if (negativePrompt != null) 'negativePrompt': negativePrompt,
           };
         }),
       );
 
       LoggerService.instance.i(
-          '提交文生图任务: count=$count, modelName=${modelName ?? "(默认)"}',
+          '提交文生图任务: count=$count, modelName=${modelName ?? "(默认)"}, '
+          'hasNegativePrompt=${negativePrompt != null}',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'create_images']);
 

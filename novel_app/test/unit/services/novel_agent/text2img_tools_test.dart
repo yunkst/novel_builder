@@ -56,6 +56,7 @@ class _FakeApiServiceWrapper extends ApiServiceWrapper {
   Future<String> submitText2ImgTask({
     required String prompt,
     String? modelName,
+    String? negativePrompt,
   }) async {
     if (submitError != null) throw submitError!;
     // 计数器无条件递增，保证并发提交时每张图拿到不同 index

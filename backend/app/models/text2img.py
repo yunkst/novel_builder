@@ -21,6 +21,9 @@ class Text2ImgTask(Base):
         String(255), unique=True, nullable=False, index=True, comment="ComfyUI prompt_id, 对外即 task_id"
     )
     prompt = Column(Text, nullable=False, comment="用户提供的提示词")
+    negative_prompt = Column(
+        Text, nullable=True, comment="用户提供的负向提示词（可选；工作流不支持时静默忽略）"
+    )
     model_name = Column(String(100), nullable=False, comment="使用的模型名称")
     status = Column(
         String(20), nullable=False, default="pending", comment="任务状态: pending/completed/failed"

@@ -84,11 +84,15 @@ class ComfyUIClient:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
-    async def generate_image(self, prompt: str) -> str | None:
+    async def generate_image(
+        self, prompt: str, negative_prompt: str | None = None
+    ) -> str | None:
         """生成图片.
 
         Args:
             prompt: 图片生成提示词
+            negative_prompt: 负向提示词(可选);仅当工作流 JSON 含
+                「负向提示词在这里替换」占位符时生效,找不到则静默忽略
 
         Returns:
             任务ID，如果生成失败则返回None
@@ -99,7 +103,7 @@ class ComfyUIClient:
 
         try:
             # 准备工作流数据（返回JSON字符串）
-            workflow_json_str = self._prepare_workflow(prompt)
+            workflow_json_str = self._prepare_workflow(prompt, negative_prompt)
 
             # 调用ComfyUI API
             response = requests.post(
@@ -392,11 +396,27 @@ class ComfyUIClient:
             logger.error(f"ComfyUI视频生成失败: {e}")
             return None
 
-    def _prepare_workflow(self, prompt: str, image_base64: str | None = None) -> str:
+    def _prepare_workflow(
+        self,
+        prompt: str,
+        negative_prompt: str | None = None,
+        image_base64: str | None = None,
+    ) -> str:
         """准备ComfyUI工作流数据 - 使用固定字符串替换模式.
+
+        通过递归遍历工作流 JSON,按「占位符字符串」原值匹配后替换:
+        - "提示词在这里替换"        → 正向提示词 prompt
+        - "负向提示词在这里替换"    → 负向提示词 negative_prompt
+          (negative_prompt 为空时,占位符原样保留,工作流可保留其默认值)
+        - "在这替换随机数"          → 1~999999 随机 seed
+        - "图片base64在这里替换"    → image_base64 (仅图生视频)
+
+        找不到对应占位符的工作流不会受影响(如某些工作流用
+        ConditioningZeroOut 模拟负向,不含该字面量)。
 
         Args:
             prompt: 图片生成提示词
+            negative_prompt: 负向提示词（可选）
             image_base64: 图片的base64编码（仅图生视频使用）
 
         Returns:
@@ -412,6 +432,11 @@ class ComfyUIClient:
         if image_base64 and not image_base64.strip():
             raise ValueError("图片base64数据不能为空字符串")
 
+        # 负向提示词白名单 trim(空串视为不提供,保留工作流占位符/默认值)
+        negative_prompt_trimmed = (
+            negative_prompt.strip() if negative_prompt else None
+        )
+
         # 创建工作流副本并修改（避免修改原始workflow_json）
         workflow_json_copy = json.loads(json.dumps(self.workflow_json))
 
@@ -422,9 +447,19 @@ class ComfyUIClient:
                 for key, value in workflow_dict.items():
                     if isinstance(value, str) and value == "提示词在这里替换":
                         workflow_dict[key] = prompt
+                    elif (
+                        isinstance(value, str)
+                        and value == "负向提示词在这里替换"
+                        and negative_prompt_trimmed
+                    ):
+                        workflow_dict[key] = negative_prompt_trimmed
                     elif isinstance(value, str) and value == "在这替换随机数":
                         workflow_dict[key] = random.randint(1, 999999)
-                    elif isinstance(value, str) and value == "图片base64在这里替换" and image_base64:
+                    elif (
+                        isinstance(value, str)
+                        and value == "图片base64在这里替换"
+                        and image_base64
+                    ):
                         workflow_dict[key] = image_base64
                     elif isinstance(value, (dict, list)):
                         replace_prompt_in_workflow(value)
@@ -434,11 +469,15 @@ class ComfyUIClient:
 
         replace_prompt_in_workflow(workflow_json_copy)
 
-        # 序�列化为JSON字符串
+        # 序列化为JSON字符串
         workflow_content = json.dumps(workflow_json_copy, ensure_ascii=False)
 
         if image_base64:
             logger.info("已注入图片base64数据到工作流")
+        if negative_prompt_trimmed:
+            logger.info(
+                f"已注入负向提示词(长度: {len(negative_prompt_trimmed)})"
+            )
 
         logger.info(f"工作流准备完成，提示词长度: {len(prompt)}")
         return workflow_content

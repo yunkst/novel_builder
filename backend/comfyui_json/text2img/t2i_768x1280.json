@@ -72,7 +72,7 @@
   },
   "5": {
     "inputs": {
-      "text": "(bad hands,mutated hands and fingers:1.2),lowres,(bad),bad feet,text,error,fewer,extra,missing,worst quality,jpeg artifacts,low quality,watermark,unfinished,displeasing,oldest,early,signature,artistic error,username,scan,[abstract],english text,shiny hair,3d,realistic,",
+      "text": "负向提示词在这里替换",
       "clip": [
         "1",
         1

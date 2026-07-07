@@ -163,10 +163,12 @@ def run_preflight(project_root: Path) -> bool:
     print("  ✅ flutter analyze 通过")
 
     # 1.2 flutter test
-    print("\n  [1.2/3] flutter test --no-pub test/unit/ test/bug/ test/verification/")
+    # -j 1 串行执行：backup_service_test 等通过全局共享 novel_reader.db 文件
+    # 操作的测试在并发下会互相干扰（PathNotFoundException），与 CI 保持一致。
+    print("\n  [1.2/3] flutter test --no-pub -j 1 test/unit/ test/bug/ test/verification/")
     print("  " + "-" * 40)
     rc, stdout, stderr = run_command(
-        ["flutter", "test", "--no-pub", "test/unit/", "test/bug/", "test/verification/"],
+        ["flutter", "test", "--no-pub", "-j", "1", "test/unit/", "test/bug/", "test/verification/"],
         flutter_dir,
     )
 

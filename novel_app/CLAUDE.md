@@ -803,6 +803,11 @@ class NovelListScreen extends ConsumerWidget {
 - 角色对话（单角色 / 多角色）
 - 沉浸式聊天
 - 流式输出支持
+- AI 续写/重写章节（`create_chapter` / `update_chapter_content` 工具，组合"修改要求 + 人物卡 + 写作标签 + AI 作家设定"调 LLM）
+- AI 文生图（`list_text2img_models` + `create_images` 工具，调后端 ComfyUI 出图）
+  - `create_images` 参数: `prompt`(必填) / `negativePrompt`(可选) / `count`(1-4) / `modelName`
+  - `list_text2img_models` 返回 `promptSkill` 字段供 LLM 撰写针对性提示词
+  - 仅在 ComfyUI 健康时由 `WritingScenario` 注入这两个工具
 
 **兼容层**:
 - `AgentChatNotifier` 保留为兼容层（仍被测试使用），`agent_chat_dialog.dart` 的写入路径已改为直接使用 ScenarioSession

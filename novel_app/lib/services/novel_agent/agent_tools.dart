@@ -6,9 +6,12 @@
 /// - 章节定位使用 `position`（list_chapters 返回的连续 1-based 顺序号），
 ///   读 / 写 / 创建章节均通过 position 定位，不暴露真实 chapterId
 /// - 角色定位使用 `name`（list_characters 返回的名字），不暴露真实 characterId
-/// - 章节写入（create_chapter / update_chapter_content）均为 LLM 生成流程：
-///   组合「修改/创作要求 + 人物卡 + 写作标签 + AI 作家设定」为提示词，调用 LLM
-///   产出正文后入库；只回传元信息，并在聊天窗口渲染跳转入口。
+/// - 章节写入分两类：
+///   - create_chapter / rewrite_chapter 走 LLM 生成流程：组合「修改/创作要求 +
+///     人物卡 + 写作标签 + AI 作家设定」为提示词，调用 LLM 产出整章正文后入库；
+///     只回传元信息，并在聊天窗口渲染跳转入口。
+///   - update_chapter_content 走精确字符串替换（oldString→newString，复用 9 重容错
+///     匹配器），不调 LLM；适合错别字、段落替换、对话润色等局部修改。
 library;
 
 class AgentTools {
@@ -27,6 +30,7 @@ class AgentTools {
     // ===== 章节写入 =====
     _createChapter,
     _updateChapterContent,
+    _rewriteChapter,
     // ===== 角色 =====
     _listCharacters,
     _updateCharacter,
@@ -34,6 +38,7 @@ class AgentTools {
     // ===== 设定 / 大纲 =====
     _updateBackgroundSetting,
     _updateOutline,
+    _writeOutline,
     _getOutline,
     // ===== 提示标签 =====
     _listPromptTags,
@@ -250,11 +255,56 @@ class AgentTools {
     'function': {
       'name': 'update_chapter_content',
       'description':
-          'AI 重写指定章节的正文内容。\n'
+          '对指定章节正文做精确字符串替换（局部修改，不调 LLM）。\n'
+          'position 来自 list_chapters。会读取章节原文，把 oldString 替换为 newString 后保存。\n'
+          '⚠️ 会覆盖原有内容；建议先用 read_chapter_content 了解当前内容，'
+          '从其返回值中逐字复制 oldString（含缩进）。\n'
+          '参数说明：\n'
+          '- oldString：要被替换的原文片段（必须与 read_chapter_content 返回的内容一致）。\n'
+          '- newString：替换后的内容（必须与 oldString 不同）。\n'
+          '- replaceAll：可选，默认 false。true 表示替换所有匹配；false 时若 oldString 在正文中出现多次会报 ambiguous_match。\n'
+          '失败情况：\n'
+          '- oldString 找不到 → not_found。请用 read_chapter_content 返回的原文逐字复制。\n'
+          '- oldString 多处且未设 replaceAll=true → ambiguous_match。请补更多上下文行让匹配唯一，或设 replaceAll=true。\n'
+          '- 章节未缓存 → not_cached。\n'
+          '大范围重写、风格转换、结构调整请改用 rewrite_chapter。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'position': {
+            'type': 'integer',
+            'description': '章节在当前小说列表中的位置（1-based，从 list_chapters 获取）。',
+          },
+          'oldString': {
+            'type': 'string',
+            'description': '要被替换的原文片段',
+          },
+          'newString': {
+            'type': 'string',
+            'description': '替换后的内容（必须与 oldString 不同）',
+          },
+          'replaceAll': {
+            'type': 'boolean',
+            'description': '是否替换所有匹配（默认 false）。',
+          },
+        },
+        'required': ['position', 'oldString', 'newString'],
+      },
+    },
+  };
+
+  static const _rewriteChapter = {
+    'type': 'function',
+    'function': {
+      'name': 'rewrite_chapter',
+      'description':
+          'AI 重写指定章节的整章正文。\n'
           '本工具不会直接覆盖——它会读取章节原文，结合「修改要求」、「人物卡」和「写作标签」'
-          '组合成提示词调用 LLM 重新生成正文，生成后自动保存并替换原内容。\n'
+          '组合成提示词调用 LLM 重新生成整章正文，生成后自动保存并替换原内容。\n'
           '⚠️ 会覆盖原有内容；建议先用 read_chapter_content 了解当前内容。\n'
-          'position 来自 list_chapters。生成完成后，聊天窗口会出现可点击的跳转入口。',
+          'position 来自 list_chapters。生成完成后，聊天窗口会出现可点击的跳转入口。\n'
+          '使用场景：大范围重写、风格转换、结构调整。\n'
+          '只想精确改某段（错别字、段落替换、对话润色）请用 update_chapter_content，更省 token 且不跑偏。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -447,8 +497,49 @@ class AgentTools {
     'function': {
       'name': 'update_outline',
       'description':
-          '创建或更新当前小说的大纲。大纲不需要标题，直接传入内容即可，'
-          '内部会使用当前小说书名作为大纲标题。',
+          '对当前小说的大纲做精确字符串替换（局部修改）。'
+          '调用前必须先用 get_outline 读取大纲，未读过会报 outline_not_read。\n'
+          '参数说明：\n'
+          '- oldString：要被替换的原文（必须与 get_outline 返回的 content 中的片段一致）。\n'
+          '- newString：替换后的内容（必须与 oldString 不同）。\n'
+          '- replaceAll：可选，默认 false。true 表示替换所有匹配；false 时若 oldString 在大纲中出现多次会报 ambiguous_match。\n'
+          '失败情况：\n'
+          '- oldString 找不到 → not_found。请用 get_outline 返回的原文，逐字复制（含缩进）。\n'
+          '- oldString 多处且未设 replaceAll=true → ambiguous_match。请补更多上下文行让匹配唯一，或设 replaceAll=true。\n'
+          '- 想整篇重写或新建大纲，请改用 write_outline。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'oldString': {
+            'type': 'string',
+            'description': '要被替换的原文片段',
+          },
+          'newString': {
+            'type': 'string',
+            'description': '替换后的内容（必须与 oldString 不同）',
+          },
+          'replaceAll': {
+            'type': 'boolean',
+            'description': '是否替换所有匹配（默认 false）。',
+          },
+        },
+        'required': ['oldString', 'newString'],
+      },
+    },
+  };
+
+  static const _writeOutline = {
+    'type': 'function',
+    'function': {
+      'name': 'write_outline',
+      'description':
+          '创建或整篇覆盖当前小说的大纲。会替换原有内容，请传入完整大纲。'
+          '大纲不需要标题，内部用当前小说书名兜底。\n'
+          '使用场景：\n'
+          '- 首次创建大纲\n'
+          '- 需要大范围重写（改动较多时比逐段 update_outline 更高效）\n'
+          '- 现有大纲结构需要推翻重做\n'
+          '只想改其中一小段请用 update_outline。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -603,8 +694,9 @@ class AgentTools {
       'description':
           '获取可用的文生图工作流列表（动漫风/写实等不同画风）。'
           '返回每个工作流的 name（作为 create_images 的 modelName 参数）、'
-          '描述和是否默认。使用场景：用户想生成图片、为角色配图、画场景插图时，'
-          '先调用本工具了解可选画风。',
+          '描述、是否默认，以及 promptSkill（提示词写作技巧，含正向/负向提示词'
+          '的具体写法建议）。使用 create_images 前建议先调用本工具拿到 promptSkill，'
+          '据此撰写正向 prompt 和负向 prompt 会显著提升出图质量。',
       'parameters': {
         'type': 'object',
         'properties': <String, dynamic>{},
@@ -625,7 +717,9 @@ class AgentTools {
           '- 用户想看某角色/场景的视觉化呈现\n'
           '- 为章节配插图\n'
           '- 探索人物外貌的具象化\n'
-          'modelName 来自 list_text2img_models 的 name 字段；不传则用默认画风。',
+          'modelName 来自 list_text2img_models 的 name 字段；不传则用默认画风。'
+          '建议先调用 list_text2img_models 拿到 promptSkill，'
+          '据此撰写 prompt 和 negativePrompt 会显著提升出图质量。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -633,7 +727,17 @@ class AgentTools {
             'type': 'string',
             'description':
                 '图片生成提示词（自然语言描述画面，建议含主体、服饰、场景、光影等）。'
-                '英文标签效果通常更好，可中英混合。',
+                '英文标签效果通常更好，可中英混合。'
+                '先调用 list_text2img_models 拿到 promptSkill 可获取针对性的写法建议。',
+          },
+          'negativePrompt': {
+            'type': 'string',
+            'description':
+                '负向提示词（可选，避免生成你不想要的元素，例如 '
+                '"worst quality, extra fingers, blurry, watermark"）。'
+                '仅在所选 modelName 的工作流支持负向提示词（工作流 JSON 含独立负向 '
+                'CLIPTextEncode 节点并置入「负向提示词在这里替换」占位符）时生效；'
+                '未支持的工作流会静默忽略此参数。',
           },
           'count': {
             'type': 'integer',

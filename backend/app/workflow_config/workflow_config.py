@@ -162,6 +162,7 @@ class WorkflowConfigManager:
                 path=workflow.path,
                 width=workflow.width,
                 height=workflow.height,
+                prompt_skill=workflow.prompt_skill,
             )
             for workflow in workflows
         ]

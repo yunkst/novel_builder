@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common/sqflite.dart';
 
 import 'package:novel_app/core/database/database_connection.dart';
-import 'package:novel_app/core/interfaces/i_database_connection.dart';
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_character_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart';
@@ -611,23 +610,161 @@ void main() {
   });
 
   // ========================================================================
-  // update_chapter_content
+  // update_chapter_content (edit 风格：字符串替换)
   // ========================================================================
   group('update_chapter_content', () {
-    test('通过 position 更新章节内容 — 未配置 LLM 时返回友好错误', () async {
+    test('oldString 唯一 → 成功，DB 内容已替换', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: 'foo bar baz');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': 'bar', 'newString': 'BAR'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
+      expect(chapters.first.content, 'foo BAR baz');
+    });
+
+    test('oldString 找不到 → not_found', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: '现成章节内容');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': '不存在的段落', 'newString': 'X'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'not_found');
+    });
+
+    test('oldString 多处且未 replaceAll → ambiguous_match', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: 'foo bar foo baz');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': 'foo', 'newString': 'X'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'ambiguous_match');
+    });
+
+    test('replaceAll=true → 全部替换', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: 'foo bar foo baz foo');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': 'foo', 'newString': 'X', 'replaceAll': true},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
+      expect(chapters.first.content, 'X bar X baz X');
+    });
+
+    test('oldString 与 newString 相同 → invalid_param', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: '内容');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': '内容', 'newString': '内容'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'invalid_param');
+    });
+
+    test('章节未缓存 → not_cached', () async {
+      final novelId = await insertNovel();
+      // 插入章节列表元数据但不缓存正文内容
+      await chapterRepo.cacheNovelChapters(defaultNovelUrl, [
+        Chapter(title: '空章', url: 'https://example.com/empty', chapterIndex: 0),
+      ]);
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 1, 'oldString': 'A', 'newString': 'B'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'not_cached');
+    });
+
+    test('行 trim 容错：AI 漏了行尾空格仍能命中', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: '第一段\n第二段\n第三段');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {
+          'position': 1,
+          'oldString': '第一段\n第二段',
+          'newString': '第一段(改)\n第二段',
+        },
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      final chapters = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
+      expect(chapters.first.content, '第一段(改)\n第二段\n第三段');
+    });
+
+    test('position 不存在 → chapter_position_out_of_range + suggested_tool', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_chapter_content',
+        {'position': 999, 'oldString': 'A', 'newString': 'B'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'chapter_position_out_of_range');
+      expect(json['suggested_tool'], 'list_chapters');
+    });
+  });
+
+  // ========================================================================
+  // rewrite_chapter (LLM 全文重写)
+  // ========================================================================
+  group('rewrite_chapter', () {
+    test('通过 position 重写章节 — 未配置 LLM 时返回友好错误', () async {
       final novelId = await insertNovel();
       await insertChapter(content: '旧内容');
       final ctx = _ctx(novelId);
 
       final result = await executor.execute(
-        'update_chapter_content',
+        'rewrite_chapter',
         {'position': 1, 'rewriteInstruction': '改写为悬疑风格'},
         scenarioContext: ctx,
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
 
       // 测试环境未配置 LLM，position 已正确解析到章节，
-      // LLM 调用链因无配置而失败（具体错误码取决于配置加载路径，统一断言非成功）
+      // LLM 调用链因无配置而失败（统一断言非成功）
       expect(json['success'], isNull);
       expect(json.containsKey('error'), isTrue);
 
@@ -641,7 +778,7 @@ void main() {
       final ctx = _ctx(novelId);
 
       final result = await executor.execute(
-        'update_chapter_content',
+        'rewrite_chapter',
         {'position': 999, 'rewriteInstruction': '新内容'},
         scenarioContext: ctx,
       );
@@ -818,15 +955,15 @@ void main() {
   });
 
   // ========================================================================
-  // update_outline
+  // write_outline
   // ========================================================================
-  group('update_outline', () {
-    test('保存大纲后可读取（标题用当前小说书名兜底）', () async {
+  group('write_outline', () {
+    test('整篇保存大纲后可读取（标题用当前小说书名兜底）', () async {
       final novelId = await insertNovel();
       final ctx = _ctx(novelId);
 
       final result = await executor.execute(
-        'update_outline',
+        'write_outline',
         {'content': '第一幕\n第二幕'},
         scenarioContext: ctx,
       );
@@ -838,9 +975,173 @@ void main() {
         defaultNovelUrl,
       );
       expect(outline, isNotNull);
-      // 工具不再要求 title，内部用 ctx.currentNovelTitle 兜底（默认 '测试小说'）
       expect(outline!.title, '测试小说');
       expect(outline.content, '第一幕\n第二幕');
+    });
+
+    test('write_outline 后标记已读，可直接 update_outline 局部编辑', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      // 1. write_outline 写整篇
+      await executor.execute(
+        'write_outline',
+        {'content': '行一\n行二\n行三'},
+        scenarioContext: ctx,
+      );
+
+      // 2. update_outline 应直接成功（已读标记已生效）
+      final r = jsonDecode(await executor.execute(
+        'update_outline',
+        {'oldString': '行二', 'newString': '行二(改)'},
+        scenarioContext: ctx,
+      )) as Map<String, dynamic>;
+      expect(r['success'], true);
+
+      final outline = await outlineRepo.getOutlineByNovelUrl(defaultNovelUrl);
+      expect(outline!.content, '行一\n行二(改)\n行三');
+    });
+  });
+
+  // ========================================================================
+  // update_outline (edit 风格)
+  // ========================================================================
+  group('update_outline', () {
+    test('未先 get_outline → outline_not_read（引导先读）', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: '原内容');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': '原内容', 'newString': '新内容'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'outline_not_read');
+      expect(json['suggested_tool'], 'get_outline');
+    });
+
+    test('先 get_outline 再 update_outline → 成功，DB 内容已替换', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: '原内容');
+      final ctx = _ctx(novelId);
+
+      // 先读,标记已读
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': '原内容', 'newString': '新内容'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+
+      final outline = await outlineRepo.getOutlineByNovelUrl(defaultNovelUrl);
+      expect(outline!.content, '新内容');
+    });
+
+    test('oldString 找不到 → not_found', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: '现成大纲');
+      final ctx = _ctx(novelId);
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': '不存在的段落', 'newString': 'X'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'not_found');
+      expect(json['message'], contains('not found'));
+    });
+
+    test('oldString 多处且未 replaceAll → ambiguous_match', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: 'foo bar foo baz');
+      final ctx = _ctx(novelId);
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': 'foo', 'newString': 'X'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'ambiguous_match');
+    });
+
+    test('replaceAll=true → 全部替换', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: 'foo bar foo baz foo');
+      final ctx = _ctx(novelId);
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': 'foo', 'newString': 'X', 'replaceAll': true},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+
+      final outline = await outlineRepo.getOutlineByNovelUrl(defaultNovelUrl);
+      expect(outline!.content, 'X bar X baz X');
+    });
+
+    test('oldString 与 newString 相同 → invalid_param', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: '内容');
+      final ctx = _ctx(novelId);
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': '内容', 'newString': '内容'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'invalid_param');
+    });
+
+    test('大纲不存在 → not_found，引导用 write_outline', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+      // 跳过 get_outline 直接 update_outline
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': 'A', 'newString': 'B'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'outline_not_read');
+    });
+
+    test('行 trim 容错：AI 漏了行尾空格仍能命中', () async {
+      final novelId = await insertNovel();
+      await insertOutline(content: '第一幕\n第二幕\n第三幕');
+      final ctx = _ctx(novelId);
+      await executor.execute('get_outline', {}, scenarioContext: ctx);
+
+      final result = await executor.execute(
+        'update_outline',
+        {'oldString': '第一幕\n第二幕', 'newString': '第一幕(改)\n第二幕'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      final outline = await outlineRepo.getOutlineByNovelUrl(defaultNovelUrl);
+      expect(outline!.content, '第一幕(改)\n第二幕\n第三幕');
     });
   });
 

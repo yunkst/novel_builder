@@ -33,7 +33,15 @@ class ApiServiceWrapper {
 
   Dio _dio;
 
+  /// 只读暴露内部 Dio 实例
+  ///
+  /// 供单元测试注入 [HttpClientAdapter] 拦截 HTTP 请求，也可用于调试。
+  Dio get dio => _dio;
+
   bool _initialized = false;
+
+  /// 是否已完成 [init]
+  bool get isInitialized => _initialized;
 
   /// 初始化 API 客户端
   ///
@@ -646,8 +654,9 @@ class ApiServiceWrapper {
 
   /// 获取可用文生图工作流列表（GET /api/models 的 text2img 节）。
   ///
-  /// 返回精简字段 [{name, description, isDefault}]，name 即工作流标题，
-  /// 作为 create_images 的 modelName 参数。
+  /// 返回精简字段 [{name, description, isDefault, promptSkill}]，name 即工作流标题，
+  /// 作为 create_images 的 modelName 参数；promptSkill 是该工作流的提示词写作技巧
+  /// （含正向/负向 prompt 的写法建议），为 null 表示后端未配置。
   Future<List<Map<String, dynamic>>> getText2ImgModels() async {
     _ensureInitialized();
     try {
@@ -664,12 +673,13 @@ class ApiServiceWrapper {
         final list = (data['text2img'] as List<dynamic>?)
                 ?.cast<Map<String, dynamic>>() ??
             [];
-        // 精简字段：title → name
+        // 精简字段：title → name，prompt_skill → promptSkill
         return list
             .map((m) => {
                   'name': m['title'],
                   'description': m['description'],
                   'isDefault': m['is_default'] == true,
+                  'promptSkill': m['prompt_skill'],
                 })
             .toList();
       }
@@ -688,10 +698,12 @@ class ApiServiceWrapper {
   /// 提交一个文生图任务（POST /api/text2img/generate）。
   ///
   /// [prompt] 图片生成提示词；[modelName] 工作流标题（来自 getText2ImgModels），
-  /// 不传则后端用默认工作流。返回后端 task_id。
+  /// 不传则后端用默认工作流；[negativePrompt] 负向提示词（可选，仅工作流含
+  /// 「负向提示词在这里替换」占位符时生效，否则静默忽略）。返回后端 task_id。
   Future<String> submitText2ImgTask({
     required String prompt,
     String? modelName,
+    String? negativePrompt,
   }) async {
     _ensureInitialized();
     try {
@@ -705,6 +717,8 @@ class ApiServiceWrapper {
           'prompt': prompt,
           if (modelName != null && modelName.isNotEmpty)
             'model_name': modelName,
+          if (negativePrompt != null && negativePrompt.isNotEmpty)
+            'negative_prompt': negativePrompt,
         },
         options: Options(
           headers: {'X-API-TOKEN': token},

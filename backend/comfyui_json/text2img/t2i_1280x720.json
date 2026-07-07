@@ -72,7 +72,7 @@
   },
   "5": {
     "inputs": {
-      "text": "worst quality,bad quality,simple_background,low quality,jpeg artifacts,mutated hands and fingers,old,oldest,signature,,bad hands,shiny_skin,",
+      "text": "负向提示词在这里替换",
       "clip": [
         "1",
         1

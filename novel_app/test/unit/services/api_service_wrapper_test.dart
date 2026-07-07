@@ -1,102 +1,44 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:novel_api/novel_api.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/api_service_wrapper.dart';
 
-// 生成 Mock 类
-@GenerateMocks([Dio, DefaultApi])
-import 'api_service_wrapper_test.mocks.dart';
-
+/// ApiServiceWrapper 构造与初始化单元测试
+///
+/// 验证当前设计：单 Dio 注入构造 + 只读 dio/isInitialized 暴露 + 非单例。
+///（早期版本曾支持 Dio + DefaultApi 双注入，已随 OpenAPI DefaultApi 弃用而移除。）
 void main() {
-  group('ApiServiceWrapper - 依赖注入重构验证', () {
-    late ApiServiceWrapper apiService;
-    late MockDio mockDio;
-    late MockDefaultApi mockApi;
+  group('ApiServiceWrapper - Dio 注入', () {
+    test('可通过构造函数注入 Dio 实例', () {
+      final dio = Dio(BaseOptions());
+      final api = ApiServiceWrapper(dio);
 
-    setUp(() {
-      mockDio = MockDio();
-      mockApi = MockDefaultApi();
+      expect(api.dio, same(dio));
     });
 
-    test('应该能够通过构造函数注入 Dio 实例', () {
-      // Arrange & Act
-      apiService = ApiServiceWrapper(null, mockDio);
+    test('不传参时创建默认 Dio 实例', () {
+      final api = ApiServiceWrapper();
 
-      // Assert
-      expect(apiService, isNotNull);
-      expect(apiService.dio, equals(mockDio));
+      expect(api.dio, isA<Dio>());
     });
 
-    test('应该能够通过构造函数注入 DefaultApi 实例', () {
-      // Arrange & Act
-      apiService = ApiServiceWrapper(mockApi, null);
+    test('isInitialized 初始为 false', () {
+      final api = ApiServiceWrapper();
 
-      // Assert - 只验证实例创建成功，不访问 defaultApi getter
-      // 因为 defaultApi getter 会检查初始化状态
-      expect(apiService, isNotNull);
-    });
-
-    test('应该能够同时注入 Dio 和 DefaultApi', () {
-      // Arrange & Act
-      apiService = ApiServiceWrapper(mockApi, mockDio);
-
-      // Assert - 只验证实例创建成功
-      expect(apiService, isNotNull);
-      expect(apiService.dio, equals(mockDio));
-    });
-
-    test('应该能够在不注入参数时创建默认实例', () {
-      // Arrange & Act
-      apiService = ApiServiceWrapper();
-
-      // Assert - 只验证实例创建成功和 dio getter
-      expect(apiService, isNotNull);
-      expect(apiService.dio, isA<Dio>());
-    });
-
-    test('未初始化时调用业务方法应该抛出异常', () async {
-      // Arrange
-      apiService = ApiServiceWrapper(mockApi, mockDio);
-
-      // Act & Assert
-      expect(
-        () => apiService.defaultApi,
-        throwsA(isA<Exception>().having(
-          (e) => e.toString(),
-          'message',
-          contains('未初始化'),
-        )),
-      );
-    });
-
-    test('isInitialized 应该反映初始化状态', () {
-      // Arrange
-      apiService = ApiServiceWrapper(mockApi, mockDio);
-
-      // Act & Assert
-      expect(apiService.isInitialized, isFalse);
+      expect(api.isInitialized, isFalse);
     });
   });
 
-  group('ApiServiceWrapper - 不再使用单例模式', () {
-    test('每个实例应该是独立的', () {
-      // Arrange & Act
-      final service1 = ApiServiceWrapper();
-      final service2 = ApiServiceWrapper();
+  group('ApiServiceWrapper - 非单例', () {
+    test('每个实例相互独立', () {
+      final a = ApiServiceWrapper();
+      final b = ApiServiceWrapper();
 
-      // Assert
-      expect(identical(service1, service2), isFalse);
-      expect(service1, isNot(equals(service2)));
+      expect(identical(a, b), isFalse);
     });
 
-    test('应该可以创建多个独立实例', () {
-      // Arrange & Act
+    test('可创建多个独立实例', () {
       final services = List.generate(5, (_) => ApiServiceWrapper());
 
-      // Assert
-      expect(services.length, equals(5));
       for (var i = 0; i < services.length; i++) {
         for (var j = i + 1; j < services.length; j++) {
           expect(identical(services[i], services[j]), isFalse);

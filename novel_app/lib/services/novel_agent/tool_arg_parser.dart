@@ -87,6 +87,20 @@ class ToolArgParser {
     return (null, _typeError(key, 'int', v.runtimeType));
   }
 
+  /// 提取可选 bool 参数
+  ///
+  /// - 缺失或 null → (null, null)
+  /// - bool → 直接返回
+  /// - 其他类型 → (null, error)
+  ///
+  /// 用于 update_outline 的 replaceAll 等可选布尔开关。
+  (bool?, String?) optionalBool(String key) {
+    if (!args.containsKey(key) || args[key] == null) return (null, null);
+    final v = args[key];
+    if (v is bool) return (v, null);
+    return (null, _typeError(key, 'boolean', v.runtimeType));
+  }
+
   /// 提取可选 String 参数
   ///
   /// - 缺失或 null → (null, null)

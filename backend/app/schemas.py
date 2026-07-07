@@ -64,6 +64,13 @@ class Text2ImgGenerateRequest(BaseModel):
     model_name: str | None = Field(
         None, max_length=100, description="模型名称(可选，默认使用默认模型)"
     )
+    negative_prompt: str | None = Field(
+        None,
+        max_length=5000,
+        description="负向提示词(可选，避免生成不想要的元素；仅当所选工作流"
+        "含独立负向 CLIPTextEncode 且已置入「负向提示词在这里替换」占位符时生效，"
+        "否则静默忽略)",
+    )
 
 
 # ============================================================================
@@ -80,6 +87,10 @@ class WorkflowInfo(BaseModel):
     width: int | None = Field(None, description="图片宽度（仅T2I）")
     height: int | None = Field(None, description="图片高度（仅T2I）")
     is_default: bool = Field(False, description="是否为默认模型")
+    prompt_skill: str | None = Field(
+        None,
+        description="提示词写作技巧(LLM 据此撰写正向/负向提示词；含具体写法建议)",
+    )
 
 
 class ModelsResponse(BaseModel):

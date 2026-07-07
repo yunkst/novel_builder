@@ -29,6 +29,7 @@ class WorkflowResponse(BaseModel):
     path: str
     width: int | None = None
     height: int | None = None
+    prompt_skill: str | None = None
 
     class Config:
         json_schema_extra = {

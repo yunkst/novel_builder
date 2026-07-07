@@ -69,8 +69,6 @@ void main() {
 
       // 公平压缩：每个字段都被裁到相近大小
       final decoded = jsonDecode(result2.llm) as Map<String, dynamic>;
-      final sizes =
-          (decoded['a'] as String).length + (decoded['b'] as String).length + (decoded['c'] as String).length;
       // 三个字段大小应该接近（差异在 30% 内）
       final aLen = (decoded['a'] as String).length;
       final bLen = (decoded['b'] as String).length;

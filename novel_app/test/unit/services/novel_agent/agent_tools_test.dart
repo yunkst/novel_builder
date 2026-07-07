@@ -16,8 +16,11 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 20 个工具', () {
-      expect(AgentTools.allTools.length, 20, reason: '所有工具数应为 20（list/select/create novel + read/list/search chapter + create/update chapter + list/update/create character + background/outline + prompt tags + text2img 图片工具）');
+    test('应该有 22 个工具（新增 rewrite_chapter）', () {
+      expect(AgentTools.allTools.length, 22, reason: '所有工具数应为 22（含 2026-07 新增的 rewrite_chapter：'
+          'list/select/create novel + read/list/search chapter + create/update/rewrite chapter + '
+          'list/update/create character + background/update_outline/write_outline/get_outline + '
+          'prompt tags + text2img 图片工具）');
     });
 
     test('每个工具都有 type=function', () {
@@ -126,8 +129,22 @@ void main() {
       verifyToolSchema('search_in_chapters', required: ['keyword']);
     });
 
-    test('update_chapter_content — 需要 position + rewriteInstruction', () {
+    test('update_chapter_content — 需要 position + oldString + newString（edit 风格）', () {
       verifyToolSchema('update_chapter_content',
+          required: ['position', 'oldString', 'newString']);
+    });
+
+    test('update_chapter_content — replaceAll 为可选 boolean', () {
+      final tool = AgentTools.findTool('update_chapter_content');
+      final props = tool!['function']['parameters']['properties']
+          as Map<String, dynamic>;
+      final replaceAll = props['replaceAll'] as Map<String, dynamic>?;
+      expect(replaceAll, isNotNull);
+      expect(replaceAll!['type'], 'boolean');
+    });
+
+    test('rewrite_chapter — 需要 position + rewriteInstruction（LLM 重写）', () {
+      verifyToolSchema('rewrite_chapter',
           required: ['position', 'rewriteInstruction']);
     });
 
@@ -172,9 +189,22 @@ void main() {
       verifyToolSchema('update_background_setting', required: ['setting']);
     });
 
-    test('update_outline — 仅需 content（标题用当前小说书名兜底）', () {
+    test('update_outline — 需要 oldString + newString（edit 风格）', () {
       verifyToolSchema('update_outline',
-          required: ['content']);
+          required: ['oldString', 'newString']);
+    });
+
+    test('update_outline — replaceAll 为可选 boolean', () {
+      final tool = AgentTools.findTool('update_outline');
+      final props = tool!['function']['parameters']['properties']
+          as Map<String, dynamic>;
+      final replaceAll = props['replaceAll'] as Map<String, dynamic>?;
+      expect(replaceAll, isNotNull);
+      expect(replaceAll!['type'], 'boolean');
+    });
+
+    test('write_outline — 需要 content（write 风格）', () {
+      verifyToolSchema('write_outline', required: ['content']);
     });
 
     test('get_outline — 无参数（从上下文读取当前小说）', () {
@@ -187,6 +217,7 @@ void main() {
       final tools = [
         'read_chapter_content',
         'update_chapter_content',
+        'rewrite_chapter',
       ];
       for (final name in tools) {
         final tool = AgentTools.findTool(name);
@@ -269,11 +300,13 @@ void main() {
       'search_in_chapters': '_searchInChapters',
       'create_chapter': '_createChapter',
       'update_chapter_content': '_updateChapterContent',
+      'rewrite_chapter': '_rewriteChapterContent',
       'list_characters': '_listCharacters',
       'update_character': '_updateCharacter',
       'create_character': '_createCharacter',
       'update_background_setting': '_updateBackgroundSetting',
       'update_outline': '_updateOutline',
+      'write_outline': '_writeOutline',
       'get_outline': '_getOutline',
       'list_prompt_tags': '_listPromptTags',
       'get_prompt_tag': '_getPromptTag',
@@ -388,9 +421,10 @@ void main() {
       expect(tool, isNull);
     });
 
-    test('所有 14 个工具都能被 findTool 找到', () {
+    test('所有工具都能被 findTool 找到', () {
       final names =
           AgentTools.allTools.map((t) => t['function']['name'] as String).toList();
+      expect(names, isNotEmpty);
       for (final name in names) {
         expect(AgentTools.findTool(name), isNotNull,
             reason: 'findTool("$name") 应该能找到');

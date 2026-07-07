@@ -30,7 +30,7 @@
   },
   "4": {
     "inputs": {
-      "text": "lowres, bad quality, worst quality,bad anatomy, sketch, jpeg artifacts, ugly, poorly drawn,blurry, transparent background, censored, (simple background:1.6), artist name, signature, watermark, saliva, sweat, cum on face, cum on mouth, wet, (5fingers:1.6), multiple views",
+      "text": "负向提示词在这里替换",
       "clip": [
         "2",
         0

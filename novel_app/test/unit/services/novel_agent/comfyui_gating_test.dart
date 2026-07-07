@@ -45,7 +45,11 @@ class _FakeApiServiceWrapper extends ApiServiceWrapper {
   @override
   Future<List<Map<String, dynamic>>> getText2ImgModels() async => [];
   @override
-  Future<String> submitText2ImgTask({required String prompt, String? modelName}) async =>
+  Future<String> submitText2ImgTask({
+    required String prompt,
+    String? modelName,
+    String? negativePrompt,
+  }) async =>
       '';
   @override
   Future<(Uint8List?, int)> fetchText2ImgImage(String taskId) async =>

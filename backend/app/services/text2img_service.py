@@ -23,13 +23,21 @@ logger = logging.getLogger(__name__)
 class Text2ImgService:
     """文生图服务类."""
 
-    async def generate(self, prompt: str, model_name: str | None, db: Session) -> str:
+    async def generate(
+        self,
+        prompt: str,
+        model_name: str | None,
+        db: Session,
+        negative_prompt: str | None = None,
+    ) -> str:
         """提交文生图任务,立即返回 task_id(即 ComfyUI prompt_id).
 
         Args:
             prompt: 图片生成提示词
             model_name: 模型名称(可选)
             db: 数据库会话
+            negative_prompt: 负向提示词(可选);工作流未置入对应占位符时由
+                ComfyUIClient 静默忽略,不影响生成
 
         Returns:
             task_id (ComfyUI prompt_id)
@@ -39,7 +47,7 @@ class Text2ImgService:
         """
         model = validate_and_get_model(model_name, "T2I")
         client = create_comfyui_client(model_title=model, workflow_type="t2i")
-        prompt_id = await client.generate_image(prompt)
+        prompt_id = await client.generate_image(prompt, negative_prompt)
 
         if not prompt_id:
             raise RuntimeError("ComfyUI 提交失败")
@@ -47,6 +55,7 @@ class Text2ImgService:
         task = Text2ImgTask(
             prompt_id=prompt_id,
             prompt=prompt,
+            negative_prompt=negative_prompt,
             model_name=model,
             status="pending",
         )

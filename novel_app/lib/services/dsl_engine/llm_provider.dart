@@ -19,6 +19,7 @@ import 'dart:math';
 import 'package:novel_app/services/llm_logger/llm_logger.dart';
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/utils/json_utils.dart';
+import 'package:novel_app/utils/retry_helper.dart';
 
 // -- 配置 --
 
@@ -56,6 +57,33 @@ class LlmConfig {
 
 // -- 工具调用模型 (Phase 1: Function Calling) --
 
+/// tool_calls arguments JSON 解析失败的标记 key
+///
+/// 解析失败时（流式拼接被截断 / JSON 不闭合 / 解析成功但不是对象），
+/// [ToolCall.arguments] 会被填入包含此 key 的标记字典。
+/// 上层 [ToolExecutor] 据此短路返回引导错误，避免 LLM 拿到空参 {} 而语义崩塌。
+const String kArgsParseErrorKey = '__parse_error';
+
+/// 解析失败的详细错误信息（来自 jsonDecode 的 FormatException 等）
+const String kArgsParseErrorDetailKey = '__parse_error_detail';
+
+/// 原始 JSON 字符串的预览（截断到 500 字符），供 LLM 自助修复时参考
+const String kArgsRawPreviewKey = '__raw_args_preview';
+
+/// 构造"解析失败"标记字典的私有辅助函数
+Map<String, dynamic> _markParseError({
+  required String detail,
+  required String raw,
+}) {
+  return {
+    kArgsParseErrorKey: true,
+    kArgsParseErrorDetailKey: detail,
+    kArgsRawPreviewKey: raw.length > 500
+        ? '${raw.substring(0, 500)}...(truncated)'
+        : raw,
+  };
+}
+
 /// LLM 返回的工具调用
 class ToolCall {
   final String id;
@@ -74,13 +102,37 @@ class ToolCall {
     final rawArgs = func['arguments'];
     if (rawArgs is String && rawArgs.isNotEmpty) {
       try {
-        args = jsonDecode(rawArgs) as Map<String, dynamic>;
-      } catch (_) {
-        // 参数解析失败，保持空
+        final decoded = jsonDecode(rawArgs);
+        if (decoded is Map<String, dynamic>) {
+          args = decoded;
+        } else {
+          // 合法 JSON 但不是对象（数组、字符串、数字）→ 标记错误
+          args = _markParseError(
+            detail: 'JSON 解析成功但不是对象: ${decoded.runtimeType}',
+            raw: rawArgs,
+          );
+        }
+      } catch (e) {
+        // 流式拼接截断 / JSON 不闭合等 → 标记错误并保留预览
+        LoggerService.instance.w(
+          'ToolCall arguments 解析失败: id=${json['id']}, name=${func['name']}, err=$e',
+          category: LogCategory.ai,
+          tags: ['dsl', 'llm', 'tool_call', 'parse_error'],
+        );
+        args = _markParseError(detail: e.toString(), raw: rawArgs);
       }
     } else if (rawArgs is Map<String, dynamic>) {
       args = rawArgs;
+    } else if (rawArgs != null &&
+        !(rawArgs is String && rawArgs.isEmpty)) {
+      // 数字、bool 等异常类型 → 标记
+      // 空字符串保持空 args（正常情况：某些工具无参）
+      args = _markParseError(
+        detail: 'arguments 字段类型异常: ${rawArgs.runtimeType}',
+        raw: rawArgs.toString(),
+      );
     }
+    // rawArgs == null / 空字符串 → 保持空 args（正常情况：某些工具无参）
     return ToolCall(
       id: (json['id'] as String?) ?? '',
       name: (func['name'] as String?) ?? '',
@@ -199,8 +251,24 @@ class StreamingResult {
       final argsStr = d.argumentsBuffer.toString();
       if (argsStr.isNotEmpty) {
         try {
-          args = jsonDecode(argsStr) as Map<String, dynamic>;
-        } catch (_) {}
+          final decoded = jsonDecode(argsStr);
+          if (decoded is Map<String, dynamic>) {
+            args = decoded;
+          } else {
+            args = _markParseError(
+              detail: 'JSON 解析成功但不是对象: ${decoded.runtimeType}',
+              raw: argsStr,
+            );
+          }
+        } catch (e) {
+          LoggerService.instance.w(
+            'Streaming tool_call arguments 解析失败: '
+            'name=${d.name}, id=${d.id}, argsLen=${argsStr.length}, err=$e',
+            category: LogCategory.ai,
+            tags: ['dsl', 'llm', 'tool_call', 'streaming_parse_error'],
+          );
+          args = _markParseError(detail: e.toString(), raw: argsStr);
+        }
       }
       return ToolCall(id: d.id ?? '', name: d.name ?? '', arguments: args);
     }).toList();
@@ -805,14 +873,46 @@ class _LineSplitter extends StreamTransformerBase<String, String> {
 // （从已删除的 real_llm_executor.dart 迁移至此，与 LlmHttpClient 接口同文件）
 // ---------------------------------------------------------------------------
 
+/// 流式握手阶段的结果（握手成功后供 [IoLlmHttpClient._wrapStreamWithLogging] 落盘）
+class _StreamHandshake {
+  final Stream<String> bodyStream;
+  final String logId;
+  final Stopwatch stopwatch;
+  final StringBuffer responseBuffer;
+  _StreamHandshake({
+    required this.bodyStream,
+    required this.logId,
+    required this.stopwatch,
+    required this.responseBuffer,
+  });
+}
+
 /// 基于 dart:io HttpClient 的 LlmHttpClient 实现
 class IoLlmHttpClient implements LlmHttpClient {
-  final io.HttpClient _client = io.HttpClient();
+  // connectionTimeout: TCP/TLS 建连超时；idleTimeout: 空闲连接超时
+  // 参照 lib/core/providers/services/network_service_providers.dart:82-84 项目惯例
+  final io.HttpClient _client = io.HttpClient()
+    ..connectionTimeout = const Duration(seconds: 15)
+    ..idleTimeout = const Duration(seconds: 60);
 
   IoLlmHttpClient();
 
   @override
   Future<String> postJson(
+      String url, Map<String, String> headers, String body) async {
+    return withRetry(
+      () => _postJsonOnce(url, headers, body),
+      config: const RetryConfig(maxAttempts: 3),
+      label: 'llm_post',
+    );
+  }
+
+  /// 单次 HTTP 调用（被 [postJson] 包装重试）
+  ///
+  /// 5xx → 抛 [RetryableHttpException]（withRetry 会重试）
+  /// 4xx → 抛 [NonRetryableHttpException]（withRetry 立即终止）
+  /// 2xx/3xx → 返回响应 body 字符串
+  Future<String> _postJsonOnce(
       String url, Map<String, String> headers, String body) async {
     // ★ LLM 日志拦截：记录请求
     final logId = _generateLogId();
@@ -832,32 +932,33 @@ class IoLlmHttpClient implements LlmHttpClient {
     final statusCode = response.statusCode;
     final responseBody = await response.transform(utf8.decoder).join();
 
-    // ★ LLM 日志拦截：记录响应
+    // ★ LLM 日志拦截：记录响应（重试失败也保留记录，便于诊断）
     stopwatch.stop();
-    if (statusCode >= 400) {
-      LlmLogger.instance.logResponse(
-        id: logId,
-        responseBody: responseBody,
-        durationMs: stopwatch.elapsedMilliseconds,
-        isSuccess: false,
-        errorMessage: 'HTTP $statusCode',
-      );
-    } else {
-      LlmLogger.instance.logResponse(
-        id: logId,
-        responseBody: responseBody,
-        durationMs: stopwatch.elapsedMilliseconds,
-        isSuccess: true,
-      );
-    }
+    final isSuccess = statusCode < 400;
+    LlmLogger.instance.logResponse(
+      id: logId,
+      responseBody: responseBody,
+      durationMs: stopwatch.elapsedMilliseconds,
+      isSuccess: isSuccess,
+      errorMessage: isSuccess ? null : 'HTTP $statusCode',
+    );
 
-    if (statusCode >= 400) {
+    if (statusCode >= 500) {
       LoggerService.instance.w(
-        'LLM HTTP 错误: $statusCode',
+        'LLM HTTP 5xx: $statusCode',
         category: LogCategory.ai,
         stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
-        tags: ['dsl', 'llm', 'http', 'post_json'],
+        tags: ['dsl', 'llm', 'http', 'post_json', 'retryable'],
       );
+      throw RetryableHttpException(statusCode, responseBody, url);
+    } else if (statusCode >= 400) {
+      LoggerService.instance.w(
+        'LLM HTTP 4xx: $statusCode',
+        category: LogCategory.ai,
+        stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
+        tags: ['dsl', 'llm', 'http', 'post_json', 'non_retryable'],
+      );
+      throw NonRetryableHttpException(statusCode, responseBody, url);
     }
     return responseBody;
   }
@@ -865,7 +966,30 @@ class IoLlmHttpClient implements LlmHttpClient {
   @override
   Stream<String> postJsonStream(
       String url, Map<String, String> headers, String body) async* {
-    // ★ LLM 日志拦截：记录流式请求
+    // 握手阶段（到拿到 statusCode 为止）走 withRetry；
+    // 5xx 重试、4xx 抛非可重试、网络层异常重试。
+    // 握手成功（2xx）后流中段断开不再重试（避免 UI 内容重复），
+    // 交给 agent_loop 的 round-level 重试处理。
+    final handshake = await withRetry(
+      () => _postJsonStreamHandshake(url, headers, body),
+      config: const RetryConfig(maxAttempts: 3),
+      label: 'llm_stream_establish',
+    );
+
+    yield* _wrapStreamWithLogging(
+      handshake.bodyStream,
+      handshake.logId,
+      handshake.stopwatch,
+      handshake.responseBuffer,
+    );
+  }
+
+  /// 流式握手阶段：到 statusCode 拿到为止
+  ///
+  /// 返回 [_StreamHandshake] 包含握手成功的 bodyStream 与日志上下文。
+  /// 5xx → 抛 [RetryableHttpException]；4xx → 抛 [NonRetryableHttpException]。
+  Future<_StreamHandshake> _postJsonStreamHandshake(
+      String url, Map<String, String> headers, String body) async {
     final logId = _generateLogId();
     final stopwatch = Stopwatch()..start();
     final responseBuffer = StringBuffer();
@@ -883,15 +1007,8 @@ class IoLlmHttpClient implements LlmHttpClient {
     final response = await request.close();
     final statusCode = response.statusCode;
     if (statusCode >= 400) {
-      // 错误响应通常很短，缓冲后一次性记录，避免流式碎片丢失诊断信息
+      // 错误响应通常很短，缓冲后一次性记录
       final errorBody = await response.transform(utf8.decoder).join();
-      LoggerService.instance.w(
-        'LLM HTTP 错误: $statusCode',
-        category: LogCategory.ai,
-        stackTrace: _buildHttpErrorContext(url, headers, body, errorBody),
-        tags: ['dsl', 'llm', 'http', 'post_json_stream'],
-      );
-      // ★ LLM 日志拦截：记录流式错误
       stopwatch.stop();
       LlmLogger.instance.logResponse(
         id: logId,
@@ -900,19 +1017,39 @@ class IoLlmHttpClient implements LlmHttpClient {
         isSuccess: false,
         errorMessage: 'HTTP $statusCode',
       );
-      yield errorBody;
-      return;
+      final ctx = _buildHttpErrorContext(url, headers, body, errorBody);
+      if (statusCode >= 500) {
+        LoggerService.instance.w(
+          'LLM HTTP 5xx (stream): $statusCode',
+          category: LogCategory.ai,
+          stackTrace: ctx,
+          tags: ['dsl', 'llm', 'http', 'stream_establish', 'retryable'],
+        );
+        throw RetryableHttpException(statusCode, errorBody, url);
+      } else {
+        LoggerService.instance.w(
+          'LLM HTTP 4xx (stream): $statusCode',
+          category: LogCategory.ai,
+          stackTrace: ctx,
+          tags: ['dsl', 'llm', 'http', 'stream_establish', 'non_retryable'],
+        );
+        throw NonRetryableHttpException(statusCode, errorBody, url);
+      }
     }
-    // ★ 流式拦截：收集所有 chunk，流结束后记录完整响应
-    yield* _wrapStreamWithLogging(
-      response.transform(utf8.decoder),
-      logId,
-      stopwatch,
-      responseBuffer,
+    return _StreamHandshake(
+      bodyStream: response.transform(utf8.decoder),
+      logId: logId,
+      stopwatch: stopwatch,
+      responseBuffer: responseBuffer,
     );
   }
 
   /// 将流式响应包装，在流结束后记录完整响应到 LlmLogger
+  ///
+  /// 注意：落盘的是 [buffer] 重构出的**结构化 JSON**（OpenAI 兼容格式），
+  /// 而非原始 SSE 文本——后者含大量 `data:` 帧前缀与 `[DONE]` 心跳，
+  /// 会污染日志、撑大 JSONL 文件并导致 UI 端 JSON 高亮失败。
+  /// [yield] 仍透传原始 chunk，流式渲染体验不受影响。
   Stream<String> _wrapStreamWithLogging(
     Stream<String> source,
     String logId,
@@ -924,11 +1061,11 @@ class IoLlmHttpClient implements LlmHttpClient {
         buffer.write(chunk);
         yield chunk;
       }
-      // 流正常结束，记录完整响应
+      // 流正常结束：将原始 SSE 文本重构为结构化 JSON 后记录。
       stopwatch.stop();
       LlmLogger.instance.logResponse(
         id: logId,
-        responseBody: buffer.toString(),
+        responseBody: _reconstructStreamedJson(buffer.toString()),
         durationMs: stopwatch.elapsedMilliseconds,
         isSuccess: true,
       );
@@ -942,6 +1079,83 @@ class IoLlmHttpClient implements LlmHttpClient {
       );
       rethrow;
     }
+  }
+
+  /// 将流式 SSE 原始文本重构为 OpenAI 兼容的非流式响应 JSON，
+  /// 供 LLM 日志记录使用，避免 `data:` 帧前缀与 `[DONE]` 心跳污染落盘内容。
+  ///
+  /// 复用 [SseParser.parseStreamingResult] 提取 content / reasoning_content /
+  /// tool_calls，并额外扫描顶层 `usage` 与 `choices[].finish_reason`
+  /// （二者在标准 OpenAI 流式中仅出现于末尾帧，取最后非空值）。
+  ///
+  /// 解析完全失败（无任何有效内容）时回退为 `{"_stream_raw": ...}` 保留原始文本，
+  /// 不丢失诊断信息。
+  static String _reconstructStreamedJson(String raw) {
+    final result = SseParser.parseStreamingResult(raw);
+
+    // 提取 usage / finish_reason（顶层与 choices 字段，parseStreamingResult 未收集）
+    Map<String, dynamic>? usage;
+    String? finishReason;
+    for (final line in raw.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      final payload = line.substring(5).trim();
+      if (payload.isEmpty || payload == '[DONE]') continue;
+      try {
+        final obj = jsonDecode(payload) as Map<String, dynamic>;
+        final u = obj['usage'] as Map<String, dynamic>?;
+        if (u != null) usage = u;
+        final choices = obj['choices'] as List?;
+        if (choices != null && choices.isNotEmpty) {
+          final fr = (choices.first as Map<String, dynamic>)['finish_reason'];
+          if (fr is String) finishReason = fr;
+        }
+      } catch (_) {
+        // 忽略单帧解析失败
+      }
+    }
+
+    final content = result.fullContent;
+    final reasoning = result.reasoningChunks.join();
+    final toolCalls = result.buildToolCalls();
+
+    // 解析无任何有效内容 → 回退原始文本，保留诊断信息
+    if (content.isEmpty &&
+        reasoning.isEmpty &&
+        toolCalls.isEmpty &&
+        usage == null &&
+        finishReason == null) {
+      return jsonEncode({
+        '_stream_raw': raw,
+        '_note': 'SSE 解析未提取到有效内容，保留原始流文本',
+      });
+    }
+
+    final message = <String, dynamic>{
+      'role': 'assistant',
+      if (content.isNotEmpty) 'content': content,
+    };
+    if (reasoning.isNotEmpty) {
+      message['reasoning_content'] = reasoning;
+    }
+    if (toolCalls.isNotEmpty) {
+      message['tool_calls'] = toolCalls.map((t) => t.toJson()).toList();
+    }
+
+    return jsonEncode({
+      'object': 'chat.completion',
+      'choices': [
+        {
+          'index': 0,
+          'finish_reason': finishReason ?? 'stop',
+          'message': message,
+        }
+      ],
+      if (usage != null) 'usage': usage,
+      '_stream_meta': {
+        'raw_size': raw.length,
+        'content_chunk_count': result.contentChunks.length,
+      },
+    });
   }
 
   /// 构造 HTTP 错误诊断上下文（写入 stackTrace 字段，便于后续定位 4xx/5xx 根因）
