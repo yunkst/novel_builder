@@ -14,7 +14,6 @@ import '../agent_scenario.dart';
 import '../agent_tools.dart';
 import '../agent_system_prompt.dart';
 import '../tool_executor.dart';
-import '../../../core/providers/comfyui_health_provider.dart';
 
 class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     implements AgentScenario {
@@ -33,21 +32,8 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
   String get displayName => '小说写作助手';
 
   @override
-  List<Map<String, dynamic>> get tools {
-    // ComfyUI 不健康时过滤掉图片工具，避免 LLM 调用后失败（详细说明见
-    // lib/core/providers/comfyui_health_provider.dart 的"探一次"语义）
-    final comfyuiHealthy =
-        _ref.read(comfyuiHealthyProvider).valueOrNull ?? false;
-    final base = comfyuiHealthy
-        ? AgentTools.allTools
-        : AgentTools.allTools
-            .where((t) =>
-                !(t['function'] is Map &&
-                    AgentTools.mediaTools
-                        .contains(t['function']['name'] as String)))
-            .toList();
-    return [...base, patchMemoryToolDefinition];
-  }
+  List<Map<String, dynamic>> get tools =>
+      [...AgentTools.allTools, patchMemoryToolDefinition];
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) {

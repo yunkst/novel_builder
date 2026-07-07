@@ -45,19 +45,11 @@ class AgentTools {
     _getPromptTag,
     _savePromptTag,
     _deletePromptTag,
-    // ===== 文生图/图生视频（ComfyUI；仅 ComfyUI healthy 时由 WritingScenario 注入）=====
+    // ===== 文生图/图生视频（ComfyUI）=====
     _listText2ImgModels,
     _createImages,
     _createImageToVideo,
   ];
-
-  /// 依赖 ComfyUI 的媒体工具名集合（文生图 + 图生视频）。
-  /// WritingScenario.tools 在 ComfyUI 不健康时据此过滤，避免 LLM 调用后失败。
-  static const Set<String> mediaTools = <String>{
-    'list_text2img_models',
-    'create_images',
-    'create_image_to_video',
-  };
 
   /// 查找工具定义（带日志）
   ///

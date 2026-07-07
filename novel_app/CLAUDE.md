@@ -807,7 +807,7 @@ class NovelListScreen extends ConsumerWidget {
 - AI 文生图（`list_text2img_models` + `create_images` 工具，调后端 ComfyUI 出图）
   - `create_images` 参数: `prompt`(必填) / `negativePrompt`(可选) / `count`(1-4) / `modelName`
   - `list_text2img_models` 返回 `promptSkill` 字段供 LLM 撰写针对性提示词
-  - 仅在 ComfyUI 健康时由 `WritingScenario` 注入这两个工具
+  - 这两个工具始终由 `WritingScenario` 注入 LLM；后端/ComfyUI 不可用时由 tool_executor 返回错误消息引导用户修复
 
 **兼容层**:
 - `AgentChatNotifier` 保留为兼容层（仍被测试使用），`agent_chat_dialog.dart` 的写入路径已改为直接使用 ScenarioSession

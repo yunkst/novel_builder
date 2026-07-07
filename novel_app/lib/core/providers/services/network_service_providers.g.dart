@@ -49,7 +49,7 @@ final dioProvider = Provider<Dio>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DioRef = ProviderRef<Dio>;
-String _$apiServiceWrapperHash() => r'ad6a9ac48976ae344df490909fe83b8b99b7e523';
+String _$apiServiceWrapperHash() => r'0135da35269bab301c905e5c16985c11de90b691';
 
 /// ApiServiceWrapper Provider
 ///

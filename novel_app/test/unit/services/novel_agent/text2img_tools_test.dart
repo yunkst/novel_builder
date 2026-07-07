@@ -74,9 +74,6 @@ class _FakeApiServiceWrapper extends ApiServiceWrapper {
   Future<(Uint8List?, int)> fetchText2ImgImage(String taskId) async {
     return fetchResult ?? (null, 202);
   }
-
-  @override
-  Future<(bool, String)> checkComfyuiHealth() async => (true, '');
 }
 
 // 用一个本地 Provider 让 ProviderContainer 暴露带 Ref 的 ToolExecutor

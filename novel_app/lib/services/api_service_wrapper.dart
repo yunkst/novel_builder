@@ -619,39 +619,6 @@ class ApiServiceWrapper {
 
   // ======================== 文生图（ComfyUI） ========================
 
-  /// 检查后端 ComfyUI 健康状态（GET /text2img/health）。
-  ///
-  /// 不抛异常：成功且 status=="healthy" 返回 (true, message)；
-  /// 任何失败/网络错误返回 (false, message)。供 comfyuiHealthy Provider
-  /// 决定是否向 Agent 注入图片工具。
-  Future<(bool, String)> checkComfyuiHealth() async {
-    _ensureInitialized();
-    try {
-      final token = await getToken();
-      if (token == null || token.isEmpty) {
-        return (false, 'API Token未配置');
-      }
-      final response = await _dio.get(
-        '/text2img/health',
-        options: Options(headers: {'X-API-TOKEN': token}),
-      );
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        final status = data['status'] as String? ?? 'unhealthy';
-        final message = data['message'] as String? ?? '';
-        return (status == 'healthy', message);
-      }
-      return (false, 'ComfyUI 健康检查返回 ${response.statusCode}');
-    } catch (e) {
-      LoggerService.instance.d(
-        'ComfyUI 健康检查失败: $e',
-        category: LogCategory.network,
-        tags: ['text2img', 'health', 'failed'],
-      );
-      return (false, '健康检查请求失败：$e');
-    }
-  }
-
   /// 获取可用文生图工作流列表（GET /api/models 的 text2img 节）。
   ///
   /// 返回精简字段 [{name, description, isDefault, promptSkill}]，name 即工作流标题，

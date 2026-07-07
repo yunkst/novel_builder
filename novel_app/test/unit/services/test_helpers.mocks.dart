@@ -4,13 +4,13 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i5;
-import 'dart:io' as _i8;
-import 'dart:typed_data' as _i6;
+import 'dart:io' as _i6;
+import 'dart:typed_data' as _i8;
 
-import 'package:dio/dio.dart' as _i3;
+import 'package:dio/dio.dart' as _i2;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i7;
-import 'package:novel_api/novel_api.dart' as _i2;
+import 'package:novel_api/novel_api.dart' as _i3;
 import 'package:novel_app/services/api_service_wrapper.dart' as _i4;
 
 // ignore_for_file: type=lint
@@ -27,8 +27,8 @@ import 'package:novel_app/services/api_service_wrapper.dart' as _i4;
 // ignore_for_file: camel_case_types
 // ignore_for_file: subtype_of_sealed_class
 
-class _FakeDefaultApi_0 extends _i1.SmartFake implements _i2.DefaultApi {
-  _FakeDefaultApi_0(
+class _FakeDio_0 extends _i1.SmartFake implements _i2.Dio {
+  _FakeDio_0(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -37,52 +37,9 @@ class _FakeDefaultApi_0 extends _i1.SmartFake implements _i2.DefaultApi {
         );
 }
 
-class _FakeDio_1 extends _i1.SmartFake implements _i3.Dio {
-  _FakeDio_1(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeImageToVideoResponse_2 extends _i1.SmartFake
-    implements _i2.ImageToVideoResponse {
-  _FakeImageToVideoResponse_2(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeVideoStatusResponse_3 extends _i1.SmartFake
-    implements _i2.VideoStatusResponse {
-  _FakeVideoStatusResponse_3(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeModelsResponse_4 extends _i1.SmartFake
-    implements _i2.ModelsResponse {
-  _FakeModelsResponse_4(
-    Object parent,
-    Invocation parentInvocation,
-  ) : super(
-          parent,
-          parentInvocation,
-        );
-}
-
-class _FakeBackupUploadResponse_5 extends _i1.SmartFake
-    implements _i2.BackupUploadResponse {
-  _FakeBackupUploadResponse_5(
+class _FakeBackupUploadResponse_1 extends _i1.SmartFake
+    implements _i3.BackupUploadResponse {
+  _FakeBackupUploadResponse_1(
     Object parent,
     Invocation parentInvocation,
   ) : super(
@@ -100,28 +57,19 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
   }
 
   @override
-  _i2.DefaultApi get defaultApi => (super.noSuchMethod(
-        Invocation.getter(#defaultApi),
-        returnValue: _FakeDefaultApi_0(
+  _i2.Dio get dio => (super.noSuchMethod(
+        Invocation.getter(#dio),
+        returnValue: _FakeDio_0(
           this,
-          Invocation.getter(#defaultApi),
+          Invocation.getter(#dio),
         ),
-      ) as _i2.DefaultApi);
+      ) as _i2.Dio);
 
   @override
   bool get isInitialized => (super.noSuchMethod(
         Invocation.getter(#isInitialized),
         returnValue: false,
       ) as bool);
-
-  @override
-  _i3.Dio get dio => (super.noSuchMethod(
-        Invocation.getter(#dio),
-        returnValue: _FakeDio_1(
-          this,
-          Invocation.getter(#dio),
-        ),
-      ) as _i3.Dio);
 
   @override
   _i5.Future<void> init() => (super.noSuchMethod(
@@ -132,15 +80,6 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),
       ) as _i5.Future<void>);
-
-  @override
-  Map<String, dynamic> getInitStatus() => (super.noSuchMethod(
-        Invocation.method(
-          #getInitStatus,
-          [],
-        ),
-        returnValue: <String, dynamic>{},
-      ) as Map<String, dynamic>);
 
   @override
   _i5.Future<String?> getHost() => (super.noSuchMethod(
@@ -188,272 +127,9 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
       );
 
   @override
-  _i5.Future<Map<String, dynamic>> generateRoleCardImages({
-    required String? roleId,
-    required Map<String, dynamic>? roles,
-    String? modelName,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #generateRoleCardImages,
-          [],
-          {
-            #roleId: roleId,
-            #roles: roles,
-            #modelName: modelName,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> getRoleGallery(String? roleId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getRoleGallery,
-          [roleId],
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<bool> deleteRoleImage({
-    required String? roleId,
-    required String? imageUrl,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #deleteRoleImage,
-          [],
-          {
-            #roleId: roleId,
-            #imageUrl: imageUrl,
-          },
-        ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> generateMoreImages({
-    required String? roleId,
-    required int? count,
-    String? referenceImageUrl,
-    String? modelName,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #generateMoreImages,
-          [],
-          {
-            #roleId: roleId,
-            #count: count,
-            #referenceImageUrl: referenceImageUrl,
-            #modelName: modelName,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> createSceneIllustration({
-    required String? chaptersContent,
-    required String? taskId,
-    required dynamic roles,
-    required int? num,
-    String? modelName,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #createSceneIllustration,
-          [],
-          {
-            #chaptersContent: chaptersContent,
-            #taskId: taskId,
-            #roles: roles,
-            #num: num,
-            #modelName: modelName,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> getSceneIllustrationGallery(
-          String? taskId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getSceneIllustrationGallery,
-          [taskId],
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> deleteSceneIllustrationImage({
-    required String? taskId,
-    required String? filename,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #deleteSceneIllustrationImage,
-          [],
-          {
-            #taskId: taskId,
-            #filename: filename,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> regenerateSceneIllustration({
-    required String? taskId,
-    required int? count,
-    String? model,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #regenerateSceneIllustration,
-          [],
-          {
-            #taskId: taskId,
-            #count: count,
-            #model: model,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<_i6.Uint8List> getImageProxy(String? filename) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getImageProxy,
-          [filename],
-        ),
-        returnValue: _i5.Future<_i6.Uint8List>.value(_i6.Uint8List(0)),
-      ) as _i5.Future<_i6.Uint8List>);
-
-  @override
-  _i5.Future<_i2.ImageToVideoResponse> generateVideoFromImage({
-    required String? imgName,
-    required String? userInput,
-    String? modelName,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #generateVideoFromImage,
-          [],
-          {
-            #imgName: imgName,
-            #userInput: userInput,
-            #modelName: modelName,
-          },
-        ),
-        returnValue: _i5.Future<_i2.ImageToVideoResponse>.value(
-            _FakeImageToVideoResponse_2(
-          this,
-          Invocation.method(
-            #generateVideoFromImage,
-            [],
-            {
-              #imgName: imgName,
-              #userInput: userInput,
-              #modelName: modelName,
-            },
-          ),
-        )),
-      ) as _i5.Future<_i2.ImageToVideoResponse>);
-
-  @override
-  _i5.Future<_i2.VideoStatusResponse> checkVideoStatus(String? imgName) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #checkVideoStatus,
-          [imgName],
-        ),
-        returnValue: _i5.Future<_i2.VideoStatusResponse>.value(
-            _FakeVideoStatusResponse_3(
-          this,
-          Invocation.method(
-            #checkVideoStatus,
-            [imgName],
-          ),
-        )),
-      ) as _i5.Future<_i2.VideoStatusResponse>);
-
-  @override
-  _i5.Future<String> getVideoFileUrl(String? imgName) => (super.noSuchMethod(
-        Invocation.method(
-          #getVideoFileUrl,
-          [imgName],
-        ),
-        returnValue: _i5.Future<String>.value(_i7.dummyValue<String>(
-          this,
-          Invocation.method(
-            #getVideoFileUrl,
-            [imgName],
-          ),
-        )),
-      ) as _i5.Future<String>);
-
-  @override
-  _i5.Future<Map<String, dynamic>> regenerateSceneIllustrationImages({
-    required String? taskId,
-    required int? count,
-    String? modelName,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #regenerateSceneIllustrationImages,
-          [],
-          {
-            #taskId: taskId,
-            #count: count,
-            #modelName: modelName,
-          },
-        ),
-        returnValue:
-            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i5.Future<Map<String, dynamic>>);
-
-  @override
-  _i5.Future<_i2.ModelsResponse> getModels() => (super.noSuchMethod(
-        Invocation.method(
-          #getModels,
-          [],
-        ),
-        returnValue: _i5.Future<_i2.ModelsResponse>.value(_FakeModelsResponse_4(
-          this,
-          Invocation.method(
-            #getModels,
-            [],
-          ),
-        )),
-      ) as _i5.Future<_i2.ModelsResponse>);
-
-  @override
-  _i5.Future<List<String>> getModelTitles({String? apiType}) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getModelTitles,
-          [],
-          {#apiType: apiType},
-        ),
-        returnValue: _i5.Future<List<String>>.value(<String>[]),
-      ) as _i5.Future<List<String>>);
-
-  @override
-  _i5.Future<_i2.BackupUploadResponse> uploadBackup({
-    required _i8.File? dbFile,
-    _i3.ProgressCallback? onProgress,
+  _i5.Future<_i3.BackupUploadResponse> uploadBackup({
+    required _i6.File? dbFile,
+    _i2.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -464,8 +140,8 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
             #onProgress: onProgress,
           },
         ),
-        returnValue: _i5.Future<_i2.BackupUploadResponse>.value(
-            _FakeBackupUploadResponse_5(
+        returnValue: _i5.Future<_i3.BackupUploadResponse>.value(
+            _FakeBackupUploadResponse_1(
           this,
           Invocation.method(
             #uploadBackup,
@@ -476,7 +152,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
             },
           ),
         )),
-      ) as _i5.Future<_i2.BackupUploadResponse>);
+      ) as _i5.Future<_i3.BackupUploadResponse>);
 
   @override
   _i5.Future<List<Map<String, dynamic>>> getBackupList() => (super.noSuchMethod(
@@ -492,7 +168,7 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
   _i5.Future<String> downloadBackup({
     required String? backupId,
     required String? savePath,
-    _i3.ProgressCallback? onProgress,
+    _i2.ProgressCallback? onProgress,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -529,4 +205,194 @@ class MockApiServiceWrapper extends _i1.Mock implements _i4.ApiServiceWrapper {
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),
       ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<List<Map<String, dynamic>>> listModelDirs() => (super.noSuchMethod(
+        Invocation.method(
+          #listModelDirs,
+          [],
+        ),
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i5.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>> initModelUpload({
+    required String? filename,
+    required String? targetSubdir,
+    required int? totalSize,
+    required int? chunkSize,
+    required int? totalChunks,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #initModelUpload,
+          [],
+          {
+            #filename: filename,
+            #targetSubdir: targetSubdir,
+            #totalSize: totalSize,
+            #chunkSize: chunkSize,
+            #totalChunks: totalChunks,
+          },
+        ),
+        returnValue:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>> uploadModelChunk({
+    required String? uploadId,
+    required int? index,
+    required List<int>? chunkBytes,
+    _i2.ProgressCallback? onProgress,
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #uploadModelChunk,
+          [],
+          {
+            #uploadId: uploadId,
+            #index: index,
+            #chunkBytes: chunkBytes,
+            #onProgress: onProgress,
+            #cancelToken: cancelToken,
+          },
+        ),
+        returnValue:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>> getModelUploadStatus(
+          {required String? uploadId}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getModelUploadStatus,
+          [],
+          {#uploadId: uploadId},
+        ),
+        returnValue:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>> completeModelUpload(
+          {required String? uploadId}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #completeModelUpload,
+          [],
+          {#uploadId: uploadId},
+        ),
+        returnValue:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
+
+  @override
+  _i5.Future<void> cancelModelUpload({required String? uploadId}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #cancelModelUpload,
+          [],
+          {#uploadId: uploadId},
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<List<Map<String, dynamic>>> getText2ImgModels() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getText2ImgModels,
+          [],
+        ),
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i5.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i5.Future<String> submitText2ImgTask({
+    required String? prompt,
+    String? modelName,
+    String? negativePrompt,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #submitText2ImgTask,
+          [],
+          {
+            #prompt: prompt,
+            #modelName: modelName,
+            #negativePrompt: negativePrompt,
+          },
+        ),
+        returnValue: _i5.Future<String>.value(_i7.dummyValue<String>(
+          this,
+          Invocation.method(
+            #submitText2ImgTask,
+            [],
+            {
+              #prompt: prompt,
+              #modelName: modelName,
+              #negativePrompt: negativePrompt,
+            },
+          ),
+        )),
+      ) as _i5.Future<String>);
+
+  @override
+  _i5.Future<(_i8.Uint8List?, int)> fetchText2ImgImage(String? taskId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchText2ImgImage,
+          [taskId],
+        ),
+        returnValue: _i5.Future<(_i8.Uint8List?, int)>.value((null, 0)),
+      ) as _i5.Future<(_i8.Uint8List?, int)>);
+
+  @override
+  _i5.Future<String> submitImageToVideoTask({
+    required String? prompt,
+    required _i8.Uint8List? imageBytes,
+    required String? imageFilename,
+    String? modelName,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #submitImageToVideoTask,
+          [],
+          {
+            #prompt: prompt,
+            #imageBytes: imageBytes,
+            #imageFilename: imageFilename,
+            #modelName: modelName,
+          },
+        ),
+        returnValue: _i5.Future<String>.value(_i7.dummyValue<String>(
+          this,
+          Invocation.method(
+            #submitImageToVideoTask,
+            [],
+            {
+              #prompt: prompt,
+              #imageBytes: imageBytes,
+              #imageFilename: imageFilename,
+              #modelName: modelName,
+            },
+          ),
+        )),
+      ) as _i5.Future<String>);
+
+  @override
+  _i5.Future<(_i8.Uint8List?, int)> fetchImageToVideoVideo(String? taskId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchImageToVideoVideo,
+          [taskId],
+        ),
+        returnValue: _i5.Future<(_i8.Uint8List?, int)>.value((null, 0)),
+      ) as _i5.Future<(_i8.Uint8List?, int)>);
 }
