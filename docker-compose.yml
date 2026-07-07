@@ -22,11 +22,7 @@ services:
       - HTTP_PROXY=http://host.docker.internal:7897
       - HTTPS_PROXY=http://host.docker.internal:7897
       - NO_PROXY=localhost,127.0.0.1,postgres,host.docker.internal
-      # 文生图功能配置
-      # 注意：ComfyUI工作流配置已迁移到 workflows.yaml 文件
-      - DIFY_API_URL=${DIFY_API_URL:-http://host.docker.internal/v1/workflows/run}
-      - DIFY_API_TOKEN=${DIFY_API_TOKEN}
-      # ComfyUI服务配置
+      # ComfyUI服务配置（文生图/图生视频后端）
       - COMFYUI_API_URL=http://host.docker.internal:8188
       # ComfyUI 模型目录（与 volumes 挂载点一致）
       - COMFYUI_MODELS_DIR=/app/models

@@ -3,7 +3,8 @@
 ## 变更记录 (Changelog)
 
 - **2025-11-13**: AI上下文初始化，重新设计架构文档，添加模块化结构
-- **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DS Engine + Scrapling + Riverpod
+- **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DSL Engine + Scrapling + Riverpod
+- **2026-07-07**: 校准爬虫站点（9→11）、DB 版本（v21→v33）、移除无依据端口；DSL Engine 统一命名
 
 ## 项目愿景
 
@@ -36,11 +37,12 @@ graph TD
     H --> R["版本管理API"];
 
     I --> S["AliceSW"];
-    I --> T["书库"];
-    I --> U["顶点小说"];
-    I --> V["我的书城"];
-    I --> W["微风小说"];
+    I --> T["点点（ddxsmf）"];
+    I --> U["书库（shukuge）"];
+    I --> V["我的书城（wodeshucheng）"];
+    I --> W["微风（wfxs）"];
     I --> X["笔趣阁543"];
+    I --> Y["...共11站点"];
 
     click B "./novel_app/CLAUDE.md" "查看 Flutter 移动应用模块"
     click C "./backend/CLAUDE.md" "查看 Python 后端模块"
@@ -73,22 +75,22 @@ graph TD
 | 模块路径 | 类型 | 主要功能 | 状态 |
 |---------|------|----------|------|
 | [novel_app](./novel_app/CLAUDE.md) | Flutter移动应用 | 小说阅读器，搜索，缓存，AI功能 | ✅ 活跃 |
-| [backend](./backend/CLAUDE.md) | FastAPI后端 | 多站点爬虫（9个），API服务，缓存管理 | ✅ 活跃 |
+| [backend](./backend/CLAUDE.md) | FastAPI后端 | 多站点爬虫（11个），API服务，缓存管理 | ✅ 活跃 |
 
 ## 核心功能
 
 ### 📱 移动应用功能
 - **书架管理**: 本地小说收藏与阅读进度跟踪
-- **智能搜索**: 跨9个小说站点的统一搜索
+- **智能搜索**: 跨11个小说站点的统一搜索
 - **离线阅读**: 章节内容本地缓存
-- **AI增强**: DS Engine 本地工作流 + Agent Chat 智能对话
-- **场景插图**: AI生成的场景插图功能（ComfyUI 后端）
+- **AI增强**: DSL Engine 本地工作流 + Agent Chat 智能对话
+- **场景插图**: AI生成的场景插图功能（ComfyUI 后端，支持负向提示词）
 - **角色卡管理**: 智能识别和提取章节角色信息
 - **人物关系图**: 可视化角色关系网络
 - **提纲管理**: 小说结构和章节规划
 
 ### 🌐 后端服务功能
-- **多站点爬虫**: 支持9个小说站点（7个活跃 + 2个禁用）
+- **多站点爬虫**: 支持11个小说站点（基于 Scrapling）
 - **智能缓存**: PostgreSQL数据库缓存 + 装饰器模式
 - **实时API**: RESTful API with OpenAPI文档
 - **任务管理**: 后台缓存任务与进度跟踪
@@ -125,17 +127,17 @@ docker-compose ps
 ```
 
 ### 端口映射
-- **移动应用**: 3154 (开发调试)
 - **后端API**: 3800 → 8000 (FastAPI)
 - **调试端口**: 6678 → 5678 (debugpy)
-- **数据库**: 5432 (PostgreSQL)
+- **数据库**: 5432 (PostgreSQL，仅容器内部，不对宿主机暴露)
+- **ComfyUI**: 8188 (宿主机本地，文生图后端)
 
 ### 开发环境配置
 
 创建 `.env` 文件：
 ```env
 NOVEL_API_TOKEN=your_api_token_here
-NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543
+NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,xspsw,wdscw,wodeshucheng,smxku,wfxs,shuhaoxs,biquge543,xqishen
 DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
 ```
 
@@ -213,17 +215,24 @@ docker-compose logs -f
 ## 数据库设计
 
 ### 主要表结构
-- **bookshelf**: 用户书架
+- **bookshelf**: 小说元数据（历史命名，含阅读进度）
 - **chapter_cache**: 章节内容缓存
 - **novel_chapters**: 章节列表元数据
+- **chapter_versions**: 章节历史版本（AI 编辑/重写留档）
 - **cache_tasks**: 缓存任务管理
-- **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id）
+- **characters / character_relationships**: 角色与关系图
+- **outlines**: 大纲数据
+- **chat_sessions / chat_scenes**: Agent 对话会话与场景
+- **prompt_tags / prompt_tag_categories**: 写作标签库
+- **agent_memories**: Agent 经验记忆
+- **llm_configs**: LLM 配置
+- **model_downloads**: 模型分片下载
+- **site_scripts**: 站点提取脚本
+- **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id，1.9.21 起含 negative_prompt）
 - **image_to_video_task**: 图生视频任务（ComfyUI prompt_id 为 task_id）
-- **outlines**: 提纲数据
-- **chat_scenes**: 对话场景
 
 ### 数据库版本
-- **前端SQLite**: v21 (novel_reader.db)
+- **前端SQLite**: v33 (novel_reader.db)
 - **后端PostgreSQL**: Alembic 管理
 - **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 
@@ -241,7 +250,7 @@ docker-compose logs -f
 - `POST /api/cache/create`: 创建缓存任务
 - `GET /api/cache/status/{task_id}`: 查询缓存状态
 - `GET /api/source-sites`: 获取支持的站点列表
-- `POST /api/text2img/generate`: 提交文生图任务，返回 task_id
+- `POST /api/text2img/generate`: 提交文生图任务（支持 negative_prompt 负向提示词），返回 task_id
 - `GET /api/text2img/image/{task_id}`: 按 task_id 取文生图结果（202 pending / 200 png / 404 失败）
 - `POST /api/image-to-video/generate`: 上传图片+提示词，提交图生视频任务，返回 task_id
 - `GET /api/image-to-video/video/{task_id}`: 按 task_id 取视频结果（202 pending / 200 mp4 / 404 失败）
