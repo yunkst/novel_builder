@@ -45,15 +45,19 @@ void main() {
 
     test('listSessionsByScenario 按 scenarioId 过滤 + 按 updatedAt DESC 排序',
         () async {
+      // 显式设 updatedAt（而非依赖 DateTime.now() 默认值）：
+      // 两次 createSession 间隔可能 <1ms，默认 updatedAt 相同会让 DESC 排序不稳定（flaky）。
       final idA = await repo.createSession(ChatSession(
         scenarioId: 'writing',
         title: 'A',
         createdAt: DateTime.fromMillisecondsSinceEpoch(1000),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1000),
       ));
       final idB = await repo.createSession(ChatSession(
         scenarioId: 'writing',
         title: 'B',
         createdAt: DateTime.fromMillisecondsSinceEpoch(2000),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(2000),
       ));
       await repo.createSession(ChatSession(
         scenarioId: 'webview_extract',
