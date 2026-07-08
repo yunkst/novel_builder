@@ -24,6 +24,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers/agent_launcher_providers.dart';
 import '../core/providers/webview_add_novel_providers.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/providers/database_providers.dart';
@@ -35,6 +36,7 @@ import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../utils/toast_utils.dart';
 import 'add_novel_preview_sheet.dart';
+import 'agent_chat/fab_launch_request_builder.dart';
 
 class WebViewAddNovelFab extends ConsumerStatefulWidget {
   const WebViewAddNovelFab({super.key});
@@ -74,31 +76,40 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
   // ===================================================================
 
   Future<void> _handleAddNovel(BuildContext context) async {
-    // 1. 获取脚本
-    final script = ref.read(webviewCurrentSiteScriptProvider).valueOrNull;
-    if (script == null) {
-      _toast('未找到该网站的提取脚本', isError: true);
+    // 1. 取当前 URL 与域名
+    final currentUrl = ref.read(webviewCurrentUrlProvider);
+    if (currentUrl.isEmpty) {
+      _toast('无法获取当前页面链接', isError: true);
+      return;
+    }
+    final domain = ref.read(webviewCurrentDomainProvider);
+    if (domain == null) {
+      _toast('当前页面不是 http(s) 页面', isError: true);
       return;
     }
 
-    // 2. 获取 WebView 控制器
+    // 2. 取脚本（可能为 null -> 无脚本降级）
+    final script = ref.read(webviewCurrentSiteScriptProvider).valueOrNull;
+
+    // 3. 取 WebView 控制器
     final controller = ref.read(webviewControllerProvider);
     if (controller == null) {
       _toast('浏览器未就绪', isError: true);
       return;
     }
 
-    // 3. 获取当前 URL
-    final currentUrl = ref.read(webviewCurrentUrlProvider);
-    if (currentUrl.isEmpty) {
-      _toast('无法获取当前页面链接', isError: true);
+    // 4. 无脚本分支 -> 降级 agent
+    if (script == null) {
+      await _launchAgent(context, currentUrl, domain, null,
+          FabFailureReason.noScript);
       return;
     }
 
-    // 4. 执行提取
     setState(() => _isExtracting = true);
 
     try {
+      // 5. 有脚本分支：校验 -> 执行 -> 解析（保留原 :150-269 逻辑）
+
       // 校验脚本（确保含 {{URL}} 占位符）
       final validationError =
           WebViewJsExecutor.validateScript(script.chapterListJs);
@@ -108,7 +119,10 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
           category: LogCategory.ai,
           tags: ['headless-webview', 'fab-add-novel', 'validation'],
         );
-        _toast('脚本校验失败：$validationError', isError: true);
+        // 校验失败 -> 降级修复
+        await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+            FabFailureReason.scriptError,
+            errorMessage: validationError);
         return;
       }
 
@@ -132,7 +146,9 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
           category: LogCategory.ai,
           tags: ['headless-webview', 'fab-add-novel', 'null_result'],
         );
-        _toast('提取失败：脚本返回空值', isError: true);
+        // 空结果 -> 降级修复
+        await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+            FabFailureReason.emptyResult);
         return;
       }
       if (jsResult.error != null) {
@@ -141,7 +157,10 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
           category: LogCategory.ai,
           tags: ['headless-webview', 'fab-add-novel', 'js-error'],
         );
-        _toast('提取失败：${jsResult.error}', isError: true);
+        // JS 错误 -> 降级修复
+        await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+            FabFailureReason.scriptError,
+            errorMessage: jsResult.error);
         return;
       }
 
@@ -158,7 +177,9 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
           category: LogCategory.ai,
           tags: ['headless-webview', 'fab-add-novel', 'empty_result'],
         );
-        _toast('未提取到章节，请检查是否在章节目录页', isError: true);
+        // 提取结果为空 -> 降级修复
+        await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+            FabFailureReason.emptyResult);
         return;
       }
 
@@ -179,11 +200,13 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
           category: LogCategory.ai,
           tags: ['headless-webview', 'fab-add-novel', 'parse_failed'],
         );
-        _toast('解析章节数据失败', isError: true);
+        // 章节解析失败 -> 降级修复（按 emptyResult 处理）
+        await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+            FabFailureReason.emptyResult);
         return;
       }
 
-      // 5. 检查是否已在书架
+      // 6. 检查是否已在书架
       final novelRepo = ref.read(novelRepositoryProvider);
       final alreadyInBookshelf = await novelRepo.isInBookshelf(currentUrl);
 
@@ -203,7 +226,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
         return;
       }
 
-      // 6. 显示预览弹窗
+      // 7. 显示预览弹窗
       if (!mounted) return;
       final previewResult = await showModalBottomSheet<Map<String, dynamic>>(
         // ignore: use_build_context_synchronously
@@ -224,7 +247,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
 
       final finalTitle = (previewResult['title'] as String?) ?? extractedTitle;
 
-      // 7. 写入数据库
+      // 8. 写入数据库
       await novelRepo.addToBookshelf(Novel(
         title: finalTitle,
         author: '',
@@ -240,7 +263,7 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       );
       _toast('已添加到书架');
 
-      // 8. 导航到章节列表
+      // 9. 导航到章节列表
       if (mounted) {
         // ignore: use_build_context_synchronously
         _navigateToChapterList(context, Novel(
@@ -255,17 +278,47 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
         category: LogCategory.ai,
         tags: ['headless-webview', 'fab-add-novel', 'timeout'],
       );
-      _toast('提取超时，请重试', isError: true);
+      // 超时 -> 降级修复
+      await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+          FabFailureReason.scriptError,
+          errorMessage: '提取超时(>60s)');
     } catch (e) {
       LoggerService.instance.e(
         'FAB添加小说: 提取异常 domain=${script.domain} error=$e',
         category: LogCategory.ai,
         tags: ['headless-webview', 'fab-add-novel', 'error'],
       );
-      _toast('提取失败：$e', isError: true);
+      // 异常 -> 降级修复
+      await _launchAgent(context, currentUrl, domain, script.chapterListJs,
+          FabFailureReason.scriptError,
+          errorMessage: e.toString());
     } finally {
       if (mounted) setState(() => _isExtracting = false);
     }
+  }
+
+  /// 降级触发 agent（无脚本/脚本失败/空结果）
+  ///
+  /// [oldScript] 仅在 has-script 失败分支提供（用于 agent 读取旧脚本修复）；
+  /// noScript 分支为 null。
+  /// [errorMessage] 仅 reason==scriptError 时提供（JS 错误信息）。
+  Future<void> _launchAgent(
+    BuildContext context,
+    String currentUrl,
+    String domain,
+    String? oldScript,
+    FabFailureReason reason, {
+    String? errorMessage,
+  }) async {
+    final launcher = ref.read(contextualAgentLauncherProvider);
+    final request = FabLaunchRequestBuilder.build(
+      currentUrl: currentUrl,
+      domain: domain,
+      oldScript: oldScript,
+      reason: reason,
+      errorMessage: errorMessage,
+    );
+    await launcher.launch(context, request);
   }
 
   // ===================================================================
