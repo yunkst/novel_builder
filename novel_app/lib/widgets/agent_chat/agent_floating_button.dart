@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_app/widgets/agent_chat/agent_chat_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/agent_chat_launcher_entry.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Agent 全局悬浮按钮
@@ -105,10 +105,7 @@ class _AgentFloatingButtonState extends ConsumerState<AgentFloatingButton> {
   }
 
   void _showChatDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const AgentChatDialog(),
-    );
+    AgentChatLauncherEntry.open(context);
   }
 }
 
