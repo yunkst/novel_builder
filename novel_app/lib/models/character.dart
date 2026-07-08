@@ -17,6 +17,7 @@ class Character {
   final String? cachedImageUrl; // 缓存的图集第一张图片路径
   final String? avatarMediaId; // 头像媒体资源ID（图像/视频），经 MediaView 渲染
   final List<String>? aliases; // 别名列表，上限10个
+  final int? firstAppearanceChapter; // 登场章节(0-based index),空=视为§0登场
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -37,6 +38,7 @@ class Character {
     this.cachedImageUrl, // 缓存的图集第一张图片路径
     this.avatarMediaId, // 头像媒体资源ID
     this.aliases, // 别名列表
+    this.firstAppearanceChapter, // 登场章节
     DateTime? createdAt,
     this.updatedAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -59,6 +61,7 @@ class Character {
       'cachedImageUrl': cachedImageUrl,
       'avatarMediaId': avatarMediaId,
       'aliases': aliases?.isEmpty ?? true ? null : jsonEncode(aliases),
+      'firstAppearanceChapter': firstAppearanceChapter,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt?.millisecondsSinceEpoch,
     };
@@ -92,6 +95,7 @@ class Character {
       cachedImageUrl: map['cachedImageUrl'] as String?,
       avatarMediaId: map['avatarMediaId'] as String?,
       aliases: parseAliases(map['aliases'] as String?),
+      firstAppearanceChapter: map['firstAppearanceChapter'] as int?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
       updatedAt: map['updatedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'])
@@ -116,6 +120,7 @@ class Character {
     String? cachedImageUrl,
     String? avatarMediaId,
     List<String>? aliases,
+    int? firstAppearanceChapter,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -136,6 +141,7 @@ class Character {
       cachedImageUrl: cachedImageUrl ?? this.cachedImageUrl,
       avatarMediaId: avatarMediaId ?? this.avatarMediaId,
       aliases: aliases ?? this.aliases,
+      firstAppearanceChapter: firstAppearanceChapter ?? this.firstAppearanceChapter,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
     );

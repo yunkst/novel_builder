@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 34;
+  static const int currentVersion = 35;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -758,6 +758,43 @@ class DatabaseMigrations {
         await _addColumnIfNotExists(db, 'characters', 'avatarMediaId', 'TEXT');
         await db.execute('DROP TABLE IF EXISTS scene_illustrations');
         _log('迁移 v33 → v34: 新建 media_items 表，characters 加 avatarMediaId 列，删除 scene_illustrations 死表');
+        break;
+
+      // ========== 版本 35：人物关系图重设计 ==========
+      // character_relationships 重建为区间模型(旧表从未被 UI 使用,空表):
+      //   - relation_type 存 RelationType 枚举名(替代旧自由文本 relationship_type)
+      //   - strength(1-5)/ start_chapter / end_chapter / novel_url
+      //   - UNIQUE(source, target, relation_type, start_chapter)
+      // characters 加 firstAppearanceChapter(登场章节,0-based,空=§0)。
+      case 35:
+        await db.execute('DROP TABLE IF EXISTS character_relationships');
+        await db.execute('''
+        CREATE TABLE character_relationships (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_character_id INTEGER NOT NULL,
+          target_character_id INTEGER NOT NULL,
+          relation_type TEXT NOT NULL,
+          strength INTEGER NOT NULL DEFAULT 3,
+          start_chapter INTEGER NOT NULL,
+          end_chapter INTEGER,
+          description TEXT,
+          novel_url TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER,
+          FOREIGN KEY (source_character_id) REFERENCES characters(id) ON DELETE CASCADE,
+          FOREIGN KEY (target_character_id) REFERENCES characters(id) ON DELETE CASCADE,
+          UNIQUE(source_character_id, target_character_id, relation_type, start_chapter)
+        )
+        ''');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_rel_source ON character_relationships(source_character_id)');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_rel_target ON character_relationships(target_character_id)');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_rel_novel_chapter ON character_relationships(novel_url, start_chapter, end_chapter)');
+        await _addColumnIfNotExists(
+            db, 'characters', 'firstAppearanceChapter', 'INTEGER');
+        _log('迁移 v34 → v35: 重建 character_relationships 为区间模型, characters 加 firstAppearanceChapter');
         break;
     }
   }

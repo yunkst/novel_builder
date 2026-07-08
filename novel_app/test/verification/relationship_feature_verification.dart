@@ -1,26 +1,21 @@
 /// 角色关系功能验证脚本
 ///
-/// 这是一个简单的验证脚本，用于确认角色关系功能的核心部分是否正常工作
+/// 这是一个简单的验证脚本,用于确认角色关系功能的核心部分是否正常工作。
+/// 适配 CharacterRelationship v2(区间模型:封闭枚举 + 强度 + 起止章节 + 章节时间轴)。
 ///
-/// 使用方法：
+/// 使用方法:
 /// 1. 确保应用正在运行或已构建
-/// 2. 在应用中手动测试以下场景：
-///    - 创建角色关系
-///    - 查看关系列表
-///    - 查看关系图
+/// 2. 在应用中手动测试以下场景:
+///    - 创建角色关系(选择预设关系类型)
+///    - 按章节时间轴查看关系图
 ///    - 编辑/删除关系
 ///
-/// 已完成的自动化测试：
-/// ✅ CharacterRelationship 模型单元测试 (43个测试用例)
-///    - 构造函数和默认值
-///    - 序列化/反序列化
-///    - copyWith方法
-///    - 相等性判断
-///    - 反向关系推断
-///    - 边界条件
+/// 已完成的自动化测试:
+/// ✅ RelationType 枚举单元测试 (8 个用例:数量/词条/对称性/方向/颜色)
+/// ✅ CharacterRelationship v2 模型单元测试 (区间模型序列化/默认值/copyWith)
 ///
-/// 待完成的测试：
-/// ⏳ UI Widget 测试 (需要复杂的Mock设置)
+/// 待完成的测试:
+/// ⏳ UI Widget 测试 (需要复杂的 Mock 设置)
 /// ⏳ 集成测试 (需要真实数据库环境)
 ///
 /// 建议：
@@ -34,27 +29,21 @@ library;
 final List<TestScenario> testScenarios = [
   // 模型层测试
   TestScenario(
-    name: '模型: 创建关系对象',
+    name: '模型: 关系类型枚举',
     status: TestStatus.passed,
-    description: 'CharacterRelationship构造函数正常工作',
+    description: 'RelationType 109 个封闭枚举值,正反双向词条、对称性、颜色正确',
+    testFile: 'test/unit/models/relation_type_test.dart',
+  ),
+  TestScenario(
+    name: '模型: 区间模型序列化',
+    status: TestStatus.passed,
+    description: 'v2 toMap/fromMap 正确转换 relation_type/strength/start_chapter/end_chapter',
     testFile: 'test/unit/models/character_relationship_test.dart',
   ),
   TestScenario(
-    name: '模型: 序列化/反序列化',
+    name: '模型: copyWith 方法',
     status: TestStatus.passed,
-    description: 'toMap/fromMap正确转换所有字段',
-    testFile: 'test/unit/models/character_relationship_test.dart',
-  ),
-  TestScenario(
-    name: '模型: copyWith方法',
-    status: TestStatus.passed,
-    description: '正确复制和更新对象',
-    testFile: 'test/unit/models/character_relationship_test.dart',
-  ),
-  TestScenario(
-    name: '模型: 反向关系推断',
-    status: TestStatus.passed,
-    description: 'getReverseTypeHint正确推断反向类型',
+    description: '正确复制和更新区间字段',
     testFile: 'test/unit/models/character_relationship_test.dart',
   ),
 

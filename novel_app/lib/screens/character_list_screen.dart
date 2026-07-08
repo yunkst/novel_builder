@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/character_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../widgets/character/avatar_media.dart';
 import '../widgets/character/empty_characters_view.dart';
 import 'character_detail_screen.dart';
 import 'character_edit_screen.dart';
+import 'relationship_graph_screen.dart';
 
 /// 人物卡列表页（2 列网格）
 ///
@@ -53,8 +55,23 @@ class _CharacterListScreenState extends ConsumerState<CharacterListScreen> {
                 ),
                 onChanged: (v) => setState(() => _searchQuery = v.trim()),
               )
-            : Text('${widget.novel.title} · 人物卡'),
+            : Text(
+                '${widget.novel.title} · 人物卡',
+                style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+              ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_tree_outlined),
+            tooltip: '人物关系图',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RelationshipGraphScreen(
+                  novelUrl: widget.novel.url,
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: Icon(_showSearch ? Icons.close : Icons.search),
             tooltip: '搜索',
@@ -84,8 +101,13 @@ class _CharacterListScreenState extends ConsumerState<CharacterListScreen> {
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
-                        child: Text('没有匹配的角色',
-                            style: Theme.of(context).textTheme.bodyLarge),
+                        child: Text(
+                          '没有匹配的角色',
+                          style: AppTypography.bodyProse.copyWith(
+                            fontSize: 15,
+                            color: context.appColors.inkSoft,
+                          ),
+                        ),
                       )
                     : _buildGrid(filtered),
               ),
@@ -168,8 +190,13 @@ class _CharacterListScreenState extends ConsumerState<CharacterListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('加载失败',
-              style: TextStyle(color: context.appColors.error)),
+          Text(
+            '加载失败',
+            style: AppTypography.bodyProse.copyWith(
+              fontSize: 15,
+              color: context.appColors.error,
+            ),
+          ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => ref
@@ -263,9 +290,10 @@ class _CharacterCard extends StatelessWidget {
                     character.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: AppTypography.novelTitle.copyWith(
+                      fontSize: 15,
+                      color: colors.ink,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -277,12 +305,9 @@ class _CharacterCard extends StatelessWidget {
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                        ),
+                    style: AppTypography.metaItalic.copyWith(
+                      color: colors.inkSoft,
+                    ),
                   ),
                 ],
               ),

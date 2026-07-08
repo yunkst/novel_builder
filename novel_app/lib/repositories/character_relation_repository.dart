@@ -1,28 +1,63 @@
 import 'package:sqflite/sqflite.dart';
+import '../models/character.dart';
 import '../models/character_relationship.dart';
+import '../models/relationship_graph_snapshot.dart';
 import '../services/logger_service.dart';
 import '../core/interfaces/repositories/i_character_relation_repository.dart';
 import 'base_repository.dart';
 
-/// 人物关系数据仓库
+/// 人物关系仓库 v2(区间模型)。
 ///
-/// 负责角色关系（CharacterRelationship）的数据库操作
-/// 包括关系的创建、查询、更新、删除以及关系图数据管理
+/// 关系采用区间模型(见 [CharacterRelationship] 的 startChapter/endChapter)。
+/// [getGraphSnapshot] 提供按章节过滤的图快照,支撑时间轴交互。
 class CharacterRelationRepository extends BaseRepository
     implements ICharacterRelationRepository {
-  /// 构造函数 - 接受数据库连接实例
   CharacterRelationRepository({required super.dbConnection});
 
-  // ========== 基础CRUD操作 ==========
+  // ========== 基础 CRUD ==========
 
-  /// 创建角色关系
-  ///
-  /// [relationship] 要创建的关系对象
-  /// 返回新插入记录的ID，如果关系已存在则抛出异常
   @override
   Future<int> createRelationship(CharacterRelationship relationship) async {
+    // 校验
+    if (relationship.startChapter < 0) {
+      throw ArgumentError.value(relationship.startChapter, 'startChapter',
+          'startChapter 不能小于 0');
+    }
+    if (relationship.endChapter != null &&
+        relationship.endChapter! < relationship.startChapter) {
+      throw ArgumentError.value(
+          relationship.endChapter, 'endChapter', 'endChapter 不能小于 startChapter');
+    }
+
     try {
       final db = await database;
+
+      // 对称类型:source/target 双向查重(避免 (A,B) 与 (B,A) 双份)
+      if (relationship.relationType.symmetric) {
+        final exists = await db.query(
+          'character_relationships',
+          where:
+              'relation_type = ? AND start_chapter = ? AND novel_url = ? AND ('
+              '(source_character_id = ? AND target_character_id = ?) OR '
+              '(source_character_id = ? AND target_character_id = ?))',
+          whereArgs: [
+            relationship.relationType.name,
+            relationship.startChapter,
+            relationship.novelUrl,
+            relationship.sourceCharacterId,
+            relationship.targetCharacterId,
+            relationship.targetCharacterId,
+            relationship.sourceCharacterId,
+          ],
+          limit: 1,
+        );
+        if (exists.isNotEmpty) {
+          throw StateError('对称关系已存在: ${relationship.relationType.name} '
+              'between ${relationship.sourceCharacterId} and '
+              '${relationship.targetCharacterId} at §${relationship.startChapter}');
+        }
+      }
+
       final id = await db.insert(
         'character_relationships',
         relationship.toMap(),
@@ -30,12 +65,13 @@ class CharacterRelationRepository extends BaseRepository
       );
 
       LoggerService.instance.i(
-        '创建关系成功: $id',
+        '创建关系成功: $id (${relationship.relationType.name})',
         category: LogCategory.character,
         tags: ['relationship', 'create', 'success'],
       );
-
       return id;
+    } on ArgumentError {
+      rethrow;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '创建关系失败: $e',
@@ -47,16 +83,11 @@ class CharacterRelationRepository extends BaseRepository
     }
   }
 
-  /// 更新角色关系
-  ///
-  /// [relationship] 要更新的关系对象（必须包含id）
-  /// 返回受影响的行数
   @override
   Future<int> updateRelationship(CharacterRelationship relationship) async {
     if (relationship.id == null) {
-      throw ArgumentError('关系ID不能为空');
+      throw ArgumentError('关系 ID 不能为空');
     }
-
     try {
       final db = await database;
       final count = await db.update(
@@ -65,13 +96,11 @@ class CharacterRelationRepository extends BaseRepository
         where: 'id = ?',
         whereArgs: [relationship.id],
       );
-
       LoggerService.instance.i(
         '更新关系成功: ${relationship.id}',
         category: LogCategory.character,
         tags: ['relationship', 'update', 'success'],
       );
-
       return count;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
@@ -84,10 +113,6 @@ class CharacterRelationRepository extends BaseRepository
     }
   }
 
-  /// 删除角色关系
-  ///
-  /// [relationshipId] 关系ID
-  /// 返回受影响的行数
   @override
   Future<int> deleteRelationship(int relationshipId) async {
     try {
@@ -97,13 +122,11 @@ class CharacterRelationRepository extends BaseRepository
         where: 'id = ?',
         whereArgs: [relationshipId],
       );
-
       LoggerService.instance.i(
         '删除关系成功: $relationshipId',
         category: LogCategory.character,
         tags: ['relationship', 'delete', 'success'],
       );
-
       return count;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
@@ -116,192 +139,48 @@ class CharacterRelationRepository extends BaseRepository
     }
   }
 
-  // ========== 关系查询方法 ==========
+  // ========== 图快照查询 ==========
 
-  /// 获取角色的所有关系（出度 + 入度）
-  ///
-  /// [characterId] 角色ID
-  /// 返回该角色相关的所有关系列表
   @override
-  Future<List<CharacterRelationship>> getRelationships(int characterId) async {
+  Future<RelationshipGraphSnapshot> getGraphSnapshot(
+      String novelUrl, int chapter) async {
     final db = await database;
 
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT * FROM character_relationships
-      WHERE source_character_id = ? OR target_character_id = ?
-      ORDER BY created_at DESC
-    ''', [characterId, characterId]);
+    // 已登场人物:firstAppearanceChapter 为空(视为§0)或 <= chapter
+    final charMaps = await db.query(
+      'characters',
+      where:
+          'novelUrl = ? AND (firstAppearanceChapter IS NULL OR firstAppearanceChapter <= ?)',
+      whereArgs: [novelUrl, chapter],
+      orderBy: 'createdAt ASC',
+    );
 
-    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
-  }
-
-  /// 获取角色的出度关系（Ta → 其他人）
-  ///
-  /// [characterId] 角色ID
-  /// 返回该角色发起的所有关系列表
-  @override
-  Future<List<CharacterRelationship>> getOutgoingRelationships(
-    int characterId,
-  ) async {
-    final db = await database;
-
-    final List<Map<String, dynamic>> maps = await db.query(
+    // 当前生效关系:start <= chapter AND (end 为空 OR end >= chapter)
+    final relMaps = await db.query(
       'character_relationships',
-      where: 'source_character_id = ?',
-      whereArgs: [characterId],
+      where:
+          'novel_url = ? AND start_chapter <= ? AND (end_chapter IS NULL OR end_chapter >= ?)',
+      whereArgs: [novelUrl, chapter, chapter],
       orderBy: 'created_at DESC',
     );
 
-    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
-  }
-
-  /// 获取角色的入度关系（其他人 → Ta）
-  ///
-  /// [characterId] 角色ID
-  /// 返回指向该角色的所有关系列表
-  @override
-  Future<List<CharacterRelationship>> getIncomingRelationships(
-    int characterId,
-  ) async {
-    final db = await database;
-
-    final List<Map<String, dynamic>> maps = await db.query(
-      'character_relationships',
-      where: 'target_character_id = ?',
-      whereArgs: [characterId],
-      orderBy: 'created_at DESC',
+    return RelationshipGraphSnapshot(
+      characters: charMaps.map(Character.fromMap).toList(),
+      relationships: relMaps.map(CharacterRelationship.fromMap).toList(),
+      chapter: chapter,
     );
-
-    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
   }
 
-  /// 根据源和目标角色ID获取关系
-  ///
-  /// [sourceId] 源角色ID
-  /// [targetId] 目标角色ID
-  /// 返回匹配的关系列表
-  @override
-  Future<List<CharacterRelationship>> getRelationshipsByCharacterIds(
-    int sourceId,
-    int targetId,
-  ) async {
-    final db = await database;
-
-    final List<Map<String, dynamic>> maps = await db.query(
-      'character_relationships',
-      where: 'source_character_id = ? AND target_character_id = ?',
-      whereArgs: [sourceId, targetId],
-    );
-
-    return maps.map((map) => CharacterRelationship.fromMap(map)).toList();
-  }
-
-  /// 获取小说的所有角色关系
-  ///
-  /// [novelUrl] 小说URL
-  /// 返回该小说的所有角色关系
   @override
   Future<List<CharacterRelationship>> getAllRelationships(
       String novelUrl) async {
-    if (isWebPlatform) {
-      return [];
-    }
-
     final db = await database;
-
-    // 获取小说的所有角色ID
-    final List<Map<String, dynamic>> characterMaps = await db.query(
-      'characters',
-      columns: ['id'],
-      where: 'novelUrl = ?',
-      whereArgs: [novelUrl],
-    );
-
-    if (characterMaps.isEmpty) {
-      return [];
-    }
-
-    final characterIds = characterMaps.map((m) => m['id'] as int).toList();
-
-    // 构建查询条件：source或target在角色ID列表中
-    final placeholders = List.filled(characterIds.length, '?').join(',');
-    final query = '''
-      SELECT * FROM character_relationships
-      WHERE source_character_id IN ($placeholders)
-         OR target_character_id IN ($placeholders)
-      ORDER BY created_at DESC
-    ''';
-
-    final args = [...characterIds, ...characterIds];
-    final List<Map<String, dynamic>> relationMaps =
-        await db.rawQuery(query, args);
-
-    return relationMaps
-        .map((map) => CharacterRelationship.fromMap(map))
-        .toList();
-  }
-
-  // ========== 关系统计和检查 ==========
-
-  /// 检查关系是否已存在
-  ///
-  /// [sourceId] 源角色ID
-  /// [targetId] 目标角色ID
-  /// [type] 关系类型
-  /// 返回关系是否存在
-  @override
-  Future<bool> relationshipExists(
-    int sourceId,
-    int targetId,
-    String type,
-  ) async {
-    final db = await database;
-
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       'character_relationships',
-      where:
-          'source_character_id = ? AND target_character_id = ? AND relationship_type = ?',
-      whereArgs: [sourceId, targetId, type],
-      limit: 1,
+      where: 'novel_url = ?',
+      whereArgs: [novelUrl],
+      orderBy: 'start_chapter ASC, created_at DESC',
     );
-
-    return maps.isNotEmpty;
-  }
-
-  /// 获取角色的关系数量
-  ///
-  /// [characterId] 角色ID
-  /// 返回该角色的关系总数（出度 + 入度）
-  @override
-  Future<int> getRelationshipCount(int characterId) async {
-    final db = await database;
-
-    final result = await db.rawQuery('''
-      SELECT COUNT(*) as count FROM character_relationships
-      WHERE source_character_id = ? OR target_character_id = ?
-    ''', [characterId, characterId]);
-
-    return Sqflite.firstIntValue(result) ?? 0;
-  }
-
-  /// 获取与某角色相关的所有角色（去重）
-  ///
-  /// [characterId] 角色ID
-  /// 返回相关角色的ID列表
-  @override
-  Future<List<int>> getRelatedCharacterIds(int characterId) async {
-    final db = await database;
-
-    final result = await db.rawQuery('''
-      SELECT DISTINCT
-        CASE
-          WHEN source_character_id = ? THEN target_character_id
-          ELSE source_character_id
-        END as related_id
-      FROM character_relationships
-      WHERE source_character_id = ? OR target_character_id = ?
-    ''', [characterId, characterId, characterId]);
-
-    return result.map((row) => row['related_id'] as int).toList();
+    return maps.map(CharacterRelationship.fromMap).toList();
   }
 }
