@@ -106,7 +106,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Novel API Settings
 NOVEL_API_TOKEN=your-novel-api-token-here
-NOVEL_ENABLED_SITES=alice_sw,shukuge
 
 # Development Settings
 DEBUG=false

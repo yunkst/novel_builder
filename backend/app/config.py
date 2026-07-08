@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     secret_key: str = ""
 
     # 开发环境配置
-    enabled_sites: str = Field(default="alice_sw,shukuge", alias="NOVEL_ENABLED_SITES")
     debug: bool = False
 
     # Database settings for caching functionality

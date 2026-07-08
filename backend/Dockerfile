@@ -11,10 +11,8 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Install system dependencies for building
-# Include libcurl4-openssl-dev for curl_cffi (Scrapling dependency)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libcurl4-openssl-dev \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,48 +36,13 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Install runtime system dependencies
-# Include libcurl4 for curl_cffi (Scrapling dependency) and Playwright browsers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
-    # curl_cffi runtime dependencies (Scrapling)
-    libcurl4 \
-    # Base dependencies
     ca-certificates \
     build-essential \
     pkg-config \
-    # Playwright browser dependencies (Scrapling Dynamic/Stealth sessions)
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libxss1 \
-    libgtk-3-0 \
-    # Additional libraries
-    libglib2.0-0 \
-    libdbus-1-3 \
-    libx11-6 \
-    libxcb1 \
-    libxext6 \
-    libxrender1 \
-    libxi6 \
-    libxcursor1 \
-    libxinerama1 \
-    libxtst6 \
-    libxt6 \
-    libpng16-16 \
-    libjpeg62-turbo \
-    libtiff6 \
-    # Font support
+    # Font support (ComfyUI 工作流/图片相关兜底)
     fonts-liberation \
     fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/* \
@@ -95,16 +58,6 @@ COPY ./app ./app
 # Copy alembic config
 COPY ./alembic.ini ./
 COPY ./alembic ./alembic
-
-# Install Playwright browsers (required by Scrapling Dynamic/Stealth sessions)
-# 使用国内镜像源加速下载
-RUN PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright python -m playwright install chromium
-RUN python -m playwright install-deps chromium
-
-# Create non-root user for security (optional for development)
-# RUN useradd --create-home --shell /bin/bash app \
-#     && chown -R app:app /app
-# USER app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

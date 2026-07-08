@@ -9,49 +9,6 @@ for request validation and response serialization.
 from pydantic import BaseModel, Field
 
 
-class Novel(BaseModel):
-    """Novel metadata schema."""
-
-    title: str
-    author: str
-    url: str
-
-
-class Chapter(BaseModel):
-    """Chapter metadata schema."""
-
-    title: str
-    url: str
-
-
-class NovelWithChapters(BaseModel):
-    """Novel with chapters response schema."""
-
-    novel: Novel
-    chapters: list[Chapter]
-
-
-class ChapterContent(BaseModel):
-    """Chapter content schema."""
-
-    title: str
-    content: str
-    from_cache: bool = False
-
-
-class SourceSite(BaseModel):
-    """Source site information schema."""
-
-    id: str  # 站点标识 (alice_sw, shukuge, xspsw)
-    name: str  # 站点名称
-    base_url: str  # 站点基础URL
-    description: str  # 站点描述
-    enabled: bool  # 是否启用
-    search_enabled: bool  # 是否支持搜索功能
-    search_reason: str | None = None  # 不支持搜索的原因
-    search_hint: str | None = None  # 搜索提示或替代方案
-
-
 # ============================================================================
 # 文生图功能相关API模式
 # ============================================================================

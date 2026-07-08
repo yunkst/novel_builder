@@ -1,19 +1,25 @@
 # Novel Builder Backend
 
-FastAPI backend service for novel crawling and management with multi-site support.
+FastAPI backend service for **novel AI image/video generation, backup, and model management**.
+
+> 注：搜索与多站点爬虫相关功能已废弃移除，章节内容由前端 headless WebView + 本地 JS 提取脚本获取。
+> 后端现在只提供 AI 文生图/图生视频（ComfyUI）、数据库备份、模型管理、客户端日志上报等能力。
 
 ## 🚀 Features
 
-- **Multi-site novel crawling** - Support for multiple novel websites
-- **Unified API interface** - Consistent response format regardless of source
-- **Token-based authentication** - Secure API access
-- **Real-time content fetching** - On-demand chapter content retrieval
-- **Modern Python project structure** - Using pyproject.toml for dependency management
+- **ComfyUI text-to-image** - 文生图任务提交与结果轮询
+- **ComfyUI image-to-video** - 图生视频任务提交与结果轮询
+- **Model management** - ComfyUI 工作流与可用模型列表
+- **Database backup** - 客户端备份文件上传、列表、下载
+- **Client log reporting** - 接收并持久化客户端日志
+- **Token-based authentication** - 统一 X-API-TOKEN 鉴权
+- **Modern Python project structure** - pyproject.toml + Alembic 迁移
 
 ## 📋 Prerequisites
 
 - Python 3.11+
 - Docker & Docker Compose (for containerized deployment)
+- PostgreSQL 15+ (生产) / SQLite (本地开发)
 - Git
 
 ## 🛠️ Development Setup
@@ -34,10 +40,7 @@ FastAPI backend service for novel crawling and management with multi-site suppor
 
 3. **Install dependencies**
    ```bash
-   # Install production dependencies
    pip install -e .
-
-   # Install development dependencies
    pip install -e ".[dev]"
    ```
 
@@ -59,138 +62,99 @@ FastAPI backend service for novel crawling and management with multi-site suppor
 
 ### Docker Development
 
-1. **Build and run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Run tests in Docker**
-   ```bash
-   docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
-   ```
+```bash
+docker-compose up --build
+# Tests
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+```
 
 ## 🧪 Testing
 
-### Run All Tests
 ```bash
-pytest
-```
-
-### Run Tests with Coverage
-```bash
+pytest                       # All tests
 pytest --cov=app --cov-report=html
-```
-
-### Run Specific Test File
-```bash
-pytest tests/test_main.py
-```
-
-### Run Tests by Marker
-```bash
-pytest -m unit        # Unit tests only
-pytest -m integration # Integration tests only
+pytest -m unit
+pytest -m integration
 ```
 
 ## 🔍 Code Quality
 
-### Static Analysis
 ```bash
-# Run all checks
-ruff check .          # Fast linting and formatting
-pylint app/           # Deep code quality check
-mypy app/             # Static type checking
-
-# Format code
-ruff format .         # Auto-format with ruff
-black .               # Alternative formatter
-isort .               # Sort imports
-```
-
-### Pre-commit Hooks
-The project uses pre-commit hooks to ensure code quality. They will run automatically before each commit.
-
-To run them manually:
-```bash
-pre-commit run --all-files
+ruff check .
+pylint app/
+mypy app/
+ruff format .
+black .
+isort .
 ```
 
 ## 📁 Project Structure
 
 ```
 backend/
-├── app/                    # Application code
-│   ├── api/               # API route handlers
-│   ├── core/              # Core application logic
-│   ├── models/            # Database models
-│   ├── schemas/           # Pydantic models
-│   ├── services/          # Business logic services
-│   ├── deps/              # Dependencies (auth, etc.)
-│   └── main.py           # FastAPI application entry point
-├── tests/                 # Test files
-│   ├── unit/             # Unit tests
-│   ├── integration/      # Integration tests
-│   └── conftest.py       # Test configuration
-├── pyproject.toml         # Project configuration and dependencies
-├── Dockerfile            # Production Docker image
-├── docker-compose.yml    # Development environment
-├── docker-compose.test.yml # Test environment
-├── .env.example          # Environment variables template
-├── .pre-commit-config.yaml # Pre-commit hooks configuration
-└── README.md             # This file
+├── app/
+│   ├── api/routes/        # FastAPI 路由（backup, logs, models）
+│   ├── models/            # SQLAlchemy 模型（text2img, client_log）
+│   ├── schemas.py         # Pydantic 模型
+│   ├── services/          # text2img / image_to_video / comfyui_client
+│   ├── workflow_config/   # ComfyUI 工作流加载与配置
+│   ├── deps/              # 鉴权依赖
+│   ├── config.py
+│   ├── database.py
+│   └── main.py
+├── tests/                 # conftest.py（fixtures + pytest 配置）
+├── alembic/               # 数据库迁移
+├── pyproject.toml
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.test.yml
+└── .env.example
 ```
 
 ## 🔧 Configuration
 
-### Environment Variables
+主要环境变量（详见 `.env.example`）：
 
-Key environment variables (see `.env.example`):
-
-- `NOVEL_API_TOKEN`: API authentication token (required)
-- `NOVEL_ENABLED_SITES`: Comma-separated list of enabled crawler sites
-- `SECRET_KEY`: JWT secret key for authentication
-- `DEBUG`: Enable debug mode
-
-### Adding New Crawlers
-
-1. Create a new crawler class in `app/services/crawlers/`
-2. Inherit from `BaseCrawler`
-3. Implement required methods (`search`, `get_chapters`, `get_chapter_content`)
-4. Register in `crawler_factory.py`
-5. Add to `NOVEL_ENABLED_SITES` environment variable
+- `NOVEL_API_TOKEN`: API 鉴权 token（必需）
+- `SECRET_KEY`: 应用密钥
+- `DATABASE_URL`: SQLAlchemy 连接串（默认 SQLite；生产 PostgreSQL）
+- `COMFYUI_API_URL`: ComfyUI 服务地址
+- `COMFYUI_MODELS_DIR`: ComfyUI 模型目录（容器内路径）
+- `DEBUG`: 调试模式开关
+- `CORS_ORIGINS`: 允许的 CORS 源
 
 ## 📚 API Documentation
 
-Once running, visit:
+启动后访问：
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **OpenAPI Schema**: http://localhost:8000/openapi.json
 
 ### Authentication
 
-All API endpoints require `X-API-TOKEN` header:
+所有受保护接口均需 `X-API-TOKEN` header：
 ```
 X-API-TOKEN: your-api-token-here
 ```
 
 ### Main Endpoints
 
-- `GET /health` - Health check
-- `GET /search` - Search novels across enabled sites
-- `GET /chapters` - Get chapter list for a novel
-- `GET /chapter-content` - Get specific chapter content
+- `GET /health` - 健康检查
+- `POST /api/text2img/generate` - 提交文生图任务
+- `GET /api/text2img/image/{task_id}` - 取文生图结果
+- `POST /api/image-to-video/generate` - 提交图生视频任务
+- `GET /api/image-to-video/video/{task_id}` - 取图生视频结果
+- `GET /api/models` - 可用工作流/模型列表
+- `POST /api/backup/upload` - 上传数据库备份
+- `GET /api/backup/list` - 列出已上传备份
+- `GET /api/backup/download/{backup_id}` - 下载备份
+- `POST /api/logs/upload` - 上报客户端日志
 
 ## 🚀 Deployment
 
-### Production Docker Build
 ```bash
 docker build -t novel-backend .
 docker run -p 8000:8000 --env-file .env novel-backend
-```
-
-### Using Docker Compose (Production)
-```bash
-docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ## 🤝 Contributing
@@ -203,28 +167,20 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Code Style
 
-This project follows:
-- **PEP 8** for Python code style
-- **Black** for code formatting (line length: 88)
-- **Ruff** for fast linting
-- **MyPy** for type checking
-- **PyLint** for deep code analysis
+- PEP 8
+- Black / Ruff (line length: 88)
+- MyPy (strict)
+- PyLint
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - see LICENSE file for details.
 
 ## 🔍 Troubleshooting
 
-### Common Issues
-
-1. **Import errors**: Make sure you're in the virtual environment
-2. **Permission denied**: Check Docker permissions or use `sudo`
-3. **Port already in use**: Change port in docker-compose.yml or stop conflicting services
-4. **Tests failing**: Check environment variables and dependencies
-
-### Getting Help
-
-- Check the [Issues](../../issues) page
-- Read the [Documentation](../../wiki)
-- Create a new issue with detailed information
+- **Import errors**: 确认已激活虚拟环境
+- **Permission denied**: 检查 Docker 权限
+- **Port already in use**: 修改 docker-compose.yml 端口
+- **Tests failing**: 检查环境变量与依赖
+- **ComfyUI 图片生成失败**: 确认 ComfyUI 服务运行正常，`COMFYUI_API_URL` 配置正确
+- **数据库迁移失败**: 确认 `DATABASE_URL` 指向可达的数据库

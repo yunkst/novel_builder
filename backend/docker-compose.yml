@@ -12,7 +12,6 @@ services:
       - DEBUG=true
       - LOG_LEVEL=DEBUG
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN:-your-api-token-here}
-      - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES:-alice_sw,shukuge}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
     volumes:
       # Mount source code for development

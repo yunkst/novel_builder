@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "novel-builder-backend"
 version = "0.1.0"
-description = "FastAPI backend for novel crawling and management"
+description = "FastAPI backend for novel AI image/video generation, backup, and model management"
 authors = [
     {name = "Novel Builder Team", email = "team@novelbuilder.com"}
 ]
@@ -24,22 +24,13 @@ classifiers = [
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    # HTTP client
     "requests>=2.31.0",
-    # Scrapling for web scraping
-    "scrapling[all]>=0.4.0",
-    "urllib3>=2.0.0",
     "pydantic>=2.4.0",
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.6",
-    # Database dependencies for caching functionality
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
     "alembic>=1.12.0",
-    # Traditional Chinese to Simplified Chinese conversion
-    "opencc>=1.1.2",
-    # App version management
-    "aiofiles>=23.0.0",
     "packaging>=23.0.0",
 ]
 
@@ -50,8 +41,6 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "httpx>=0.25.0",  # For testing FastAPI
-    "factory-boy>=3.3.0",  # Test factories
-    "faker>=20.0.0",  # Realistic test data
 
     # Linting and formatting
     "ruff>=0.1.0",
@@ -62,7 +51,6 @@ dev = [
     # Type checking
     "mypy>=1.6.0",
     "types-requests>=2.31.0",
-    "types-beautifulsoup4>=4.12.0",
 
     # Development tools
     "pre-commit>=3.4.0",
@@ -144,10 +132,7 @@ strict_equality = true
 # Module-specific settings
 [[tool.mypy.overrides]]
 module = [
-    "bs4.*",
-    "lxml.*",
     "requests.*",
-    "urllib3.*",
 ]
 ignore_missing_imports = true
 

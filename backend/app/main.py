@@ -16,12 +16,11 @@ from fastapi import (
     File,
     Form,
     HTTPException,
-    Query,
     Request,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -35,23 +34,11 @@ from .exceptions import (
 )
 from .logging_config import setup_logging
 from .schemas import (
-    Chapter,
-    ChapterContent,
     ModelsResponse,
-    Novel,
-    NovelWithChapters,
-    SourceSite,
     Text2ImgGenerateRequest,
     WorkflowInfo,
 )
-from .services.crawler_factory import (
-    SOURCE_SITES_METADATA,
-    get_crawler_for_url,
-    get_enabled_crawlers,
-    get_source_sites_info,
-)
 from .services.image_to_video_service import create_image_to_video_service
-from .services.search_service import SearchService
 from .services.text2img_service import create_text2img_service
 from .api.routes.backup import router as backup_router
 from .api.routes.logs import router as logs_router
@@ -99,7 +86,6 @@ async def startup_event() -> None:
     init_db()
 
     logger.info("Novel Builder Backend 启动完成")
-    logger.info(f"启用的爬虫站点: {settings.enabled_sites}")
 
     if settings.debug:
         logger.warning("调试模式已开启")
@@ -176,150 +162,6 @@ def security_check() -> dict[str, Any]:
             else None,
             "CORS设置为允许所有源" if "*" in (settings.cors_origins or "") else None,
         ],
-    }
-
-
-@app.get(
-    "/source-sites",
-    response_model=list[SourceSite],
-    dependencies=[Depends(verify_token)],
-)
-async def get_source_sites() -> list[dict[str, Any]]:
-    """获取所有源站列表"""
-    return get_source_sites_info()
-
-
-@app.get("/search", response_model=list[Novel], dependencies=[Depends(verify_token)])
-async def search(
-    keyword: str = Query(..., min_length=1, description="小说名称或作者"),
-    sites: str = Query(None, description="指定搜索站点，逗号分隔，如 alice_sw,shukuge"),
-) -> list[dict[str, Any]]:
-    """搜索小说，支持指定站点"""
-    # 获取所有启用的站点
-    all_crawlers = get_enabled_crawlers()
-
-    # 过滤出搜索功能启用的站点
-    searchable_crawlers = {
-        site_id: crawler
-        for site_id, crawler in all_crawlers.items()
-        if SOURCE_SITES_METADATA.get(site_id, {}).get("search_enabled", False)
-    }
-
-    if sites:
-        # 解析指定站点，只使用指定的爬虫
-        site_list = [s.strip() for s in sites.split(",")]
-        crawlers = {
-            site: crawler
-            for site, crawler in searchable_crawlers.items()
-            if site in site_list
-        }
-        if not crawlers:
-            raise HTTPException(status_code=400, detail="指定的站点无效或未启用搜索功能")
-    else:
-        # 使用所有搜索功能启用的站点
-        crawlers = searchable_crawlers
-
-    service = SearchService(list(crawlers.values()))
-    results = await service.search(keyword, crawlers)
-    return results
-
-
-@app.get(
-    "/chapters", response_model=list[Chapter], dependencies=[Depends(verify_token)]
-)
-async def chapters(
-    url: str = Query(..., description="小说详情页或阅读页URL"),
-    force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
-) -> list[dict[str, Any]]:
-    """
-    获取章节列表
-
-    - **url**: 小说详情页或阅读页URL
-    - **force_refresh**: 是否强制刷新（默认 False）
-      - False: 优先从缓存获取，缓存不存在时从源站抓取
-      - True: 强制从源站重新获取
-    """
-    # 获取爬虫并调用（缓存由装饰器自动处理）
-    crawler = get_crawler_for_url(url)
-    if not crawler:
-        raise HTTPException(status_code=400, detail="不支持该URL的站点")
-
-    # 调用爬虫方法，缓存装饰器会自动处理缓存逻辑
-    chapters = await crawler.get_chapter_list(url, force_refresh=force_refresh)
-    return chapters
-
-
-@app.get(
-    "/novel-by-url", response_model=NovelWithChapters, dependencies=[Depends(verify_token)]
-)
-async def novel_by_url(
-    url: str = Query(..., description="小说详情页URL"),
-) -> dict[str, Any]:
-    """
-    通过URL获取小说信息和章节列表
-
-    - **url**: 小说详情页URL
-
-    返回小说的完整信息，包括：
-    - novel: 小说基本信息（标题、作者、封面、简介）
-    - chapters: 章节列表（缓存由装饰器自动处理）
-    """
-    crawler = get_crawler_for_url(url)
-    if not crawler:
-        raise HTTPException(status_code=400, detail="不支持该URL的站点")
-
-    # 调用爬虫的 get_novel_info 方法（内部会调用 get_chapter_list，缓存由装饰器自动处理）
-    novel_info = await crawler.get_novel_info(url)
-    chapters = novel_info.get("chapters", [])
-
-    # 清理标题中的冗余信息
-    title = novel_info.get("title", "")
-    if " - " in title:
-        title = title.split(" - ")[0]
-
-    # 构建 Novel 对象
-    novel_data = {
-        "title": title,
-        "author": novel_info.get("author", "未知作者"),
-        "url": url,
-    }
-
-    # 返回结果
-    return {
-        "novel": novel_data,
-        "chapters": chapters,
-    }
-
-
-@app.get(
-    "/chapter-content",
-    response_model=ChapterContent,
-    dependencies=[Depends(verify_token)],
-)
-async def chapter_content(
-    url: str = Query(..., description="章节URL"),
-    force_refresh: bool = Query(False, description="强制刷新，从源站重新获取"),
-) -> dict[str, Any]:
-    """
-    获取章节内容
-
-    - **url**: 章节URL
-    - **force_refresh**: 是否强制刷新（默认 False）
-      - False: 优先从缓存获取，缓存不存在时从源站抓取
-      - True: 强制从源站重新获取（用于更新内容）
-    """
-    # 获取爬虫并调用（缓存由装饰器自动处理）
-    crawler = get_crawler_for_url(url)
-    if not crawler:
-        raise HTTPException(status_code=400, detail="不支持该URL的站点")
-
-    # 调用爬虫方法，缓存装饰器会自动处理缓存逻辑
-    content_data = await crawler.get_chapter_content(url, force_refresh=force_refresh)
-
-    return {
-        "title": content_data.get("title", "章节内容"),
-        "content": content_data.get("content", ""),
-        "from_cache": content_data.get("from_cache", False),
     }
 
 
@@ -559,39 +401,22 @@ def index():
         "token_required": True,
         "token_header": settings.token_header,
         "features": [
-            "多站点小说搜索",
-            "指定站点搜索功能",
-            "源站列表获取",
-            "章节列表获取",
-            "章节内容获取（支持缓存）",
-            "智能缓存机制",
-            "实时内容抓取",
-            "后台缓存任务",
-            "WebSocket进度推送",
             "ComfyUI文生图",
             "ComfyUI图生视频",
-            "APP版本管理和升级",
+            "数据库备份上传与下载",
+            "ComfyUI 模型文件分块上传",
+            "客户端日志上报",
         ],
         "endpoints": [
-            "GET /source-sites - 获取源站列表",
-            "GET /search?keyword=xxx&sites=alice_sw,shukuge - 搜索小说（可指定站点）",
-            "GET /chapters?url=xxx - 获取章节列表",
-            "GET /chapter-content?url=xxx&force_refresh=true - 获取章节内容",
             "POST /api/text2img/generate - 提交文生图任务",
             "GET /api/text2img/image/{task_id} - 获取文生图结果",
             "GET /text2img/health - ComfyUI服务健康检查",
             "POST /api/image-to-video/generate - 提交图生视频任务",
             "GET /api/image-to-video/video/{task_id} - 获取图生视频结果",
             "GET /api/models - 获取可用模型列表",
-            "POST /api/app-version/upload - 上传APP新版本",
-            "GET /api/app-version/latest - 查询最新版本",
-            "GET /api/app-version/download/{version} - 下载APK文件",
-        ],
-        "supported_sites": [
-            "alice_sw - 轻小说文库",
-            "shukuge - 书库",
-            "xspsw - 小说网",
-            "wdscw - 我的书城",
-            "wodeshucheng - 我的书城(wodeshucheng)",
+            "POST /api/backup/upload - 上传数据库备份",
+            "GET /api/backup/list - 列出已上传的备份",
+            "GET /api/backup/download/{backup_id} - 下载备份文件",
+            "POST /api/logs/upload - 上报客户端日志",
         ],
     }

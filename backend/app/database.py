@@ -62,8 +62,6 @@ def init_db():
     """初始化数据库（创建所有表）"""
     try:
         # 导入所有模型以确保它们被注册
-        from .models.cache import CacheTask, ChapterCache
-        from .models.chapter_list_cache import ChapterListCache
         from .models.client_log import ClientLog
 
         # 创建所有表

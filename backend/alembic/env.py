@@ -14,7 +14,6 @@ from app.config import settings
 from app.database import Base
 
 # 导入所有模型以确保autogenerate能检测到所有表
-from app.models.cache import CacheTask, ChapterCache
 from app.models.text2img import Text2ImgTask, ImageToVideoTask
 
 # this is the Alembic Config object, which provides

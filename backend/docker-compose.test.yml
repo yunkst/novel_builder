@@ -12,7 +12,6 @@ services:
       - DEBUG=true
       - LOG_LEVEL=DEBUG
       - NOVEL_API_TOKEN=test-token
-      - NOVEL_ENABLED_SITES=test_site
       - SECRET_KEY=test-secret-key
       - PYTEST_CURRENT_TEST=${PYTEST_CURRENT_TEST}
     volumes:
