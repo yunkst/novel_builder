@@ -199,68 +199,21 @@ void main() {
   // webviewHasAddNovelButtonProvider
   // ===================================================================
   group('webviewHasAddNovelButtonProvider', () {
-    test('无脚本 → false', () {
+    test('http(s) 页面 -> 显示 FAB（无论有无脚本）', () {
       container.read(webviewCurrentUrlProvider.notifier).state =
-          'https://no-script-site.com/book/123';
-      // 等待 FutureProvider 完成
-      final show = container.read(webviewHasAddNovelButtonProvider);
-      expect(show, isFalse);
+          'https://unknown-site.com/book/123';
+      // 即使无脚本也显示（降级到 agent 生成）
+      expect(container.read(webviewHasAddNovelButtonProvider), isTrue);
     });
 
-    test('有脚本但 chapterListJs 为空 → false', () async {
-      final db = container.read(databaseConnectionProvider).database;
-      await db.then((d) => d.insert('site_scripts', {
-            'id': 'test-script-3',
-            'domain': 'www.example.com',
-            'url_pattern': '',
-            'chapter_list_js': '', // 空！
-            'chapter_content_js': '...',
-            'sample_url': '',
-            'created_at': DateTime.now().millisecondsSinceEpoch,
-            'last_used_at': DateTime.now().millisecondsSinceEpoch,
-            'use_count': 0,
-            'verified': 0,
-          }));
-
-      container.read(webviewCurrentUrlProvider.notifier).state =
-          'https://www.example.com/book/123';
-      // 等待 FutureProvider 完成
-      await container.read(webviewCurrentSiteScriptProvider.future);
-      final show = container.read(webviewHasAddNovelButtonProvider);
-      expect(show, isFalse);
+    test('非 http(s) 页面 -> 不显示 FAB', () {
+      container.read(webviewCurrentUrlProvider.notifier).state = 'about:blank';
+      expect(container.read(webviewHasAddNovelButtonProvider), isFalse);
     });
 
-    test('有脚本且 chapterListJs 非空 → true', () async {
-      final db = container.read(databaseConnectionProvider).database;
-      await db.then((d) => d.insert('site_scripts', {
-            'id': 'test-script-4',
-            'domain': 'www.alicesw.com',
-            'url_pattern': '',
-            'chapter_list_js': '(async function(){ return JSON.stringify({title:"test",chapters:[]}); })()',
-            'chapter_content_js': '',
-            'sample_url': '',
-            'created_at': DateTime.now().millisecondsSinceEpoch,
-            'last_used_at': DateTime.now().millisecondsSinceEpoch,
-            'use_count': 0,
-            'verified': 0,
-          }));
-
-      container.read(webviewCurrentUrlProvider.notifier).state =
-          'https://www.alicesw.com/book/123';
-      // 等待 FutureProvider 完成
-      await container.read(webviewCurrentSiteScriptProvider.future);
-      final show = container.read(webviewHasAddNovelButtonProvider);
-      expect(show, isTrue);
-    });
-
-    test('loading 状态 → false（不闪烁）', () {
-      // 刚设置 URL，FutureProvider 还在加载中
-      container.read(webviewCurrentUrlProvider.notifier).state =
-          'https://www.alicesw.com/book/123';
-      // 不 await，直接读派生 Provider
-      final show = container.read(webviewHasAddNovelButtonProvider);
-      // loading 状态应返回 false
-      expect(show, isFalse);
+    test('空 URL -> 不显示 FAB', () {
+      container.read(webviewCurrentUrlProvider.notifier).state = '';
+      expect(container.read(webviewHasAddNovelButtonProvider), isFalse);
     });
   });
 }

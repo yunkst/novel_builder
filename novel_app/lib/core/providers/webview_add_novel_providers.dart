@@ -46,18 +46,10 @@ final webviewCurrentSiteScriptProvider =
   return repository.getByDomain(domain);
 });
 
-/// 是否应显示「添加小说」悬浮按钮
+/// 是否显示"添加到书架"FAB
 ///
-/// 派生 Provider：当前域名的 SiteScript 存在且 `chapterListJs` 非空。
-///
-/// - `AsyncValue.loading` → `false`（不显示，避免闪烁）
-/// - `AsyncValue.data(null)` → `false`
-/// - `AsyncValue.data(script)` → `script.hasChapterListJs`
-/// - `AsyncValue.error` → `false`
+/// 改为：当前页是 http(s) 页面即显示（无脚本时点击走 agent 降级生成）。
 final webviewHasAddNovelButtonProvider = Provider<bool>((ref) {
-  final scriptAsync = ref.watch(webviewCurrentSiteScriptProvider);
-  return scriptAsync.maybeWhen(
-    data: (script) => script != null && script.hasChapterListJs,
-    orElse: () => false,
-  );
+  final domain = ref.watch(webviewCurrentDomainProvider);
+  return domain != null;
 });
