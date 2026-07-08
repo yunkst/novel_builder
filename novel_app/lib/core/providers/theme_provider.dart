@@ -47,13 +47,18 @@ class ThemeState {
 
   /// 生成亮色主题数据 · 晨读书馆
   ThemeData getLightTheme() {
+    final base = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: Brightness.light,
+    );
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: seedColor,
-        brightness: Brightness.light,
+      colorScheme: base.copyWith(
+        surface: AppColors.light.paper,
+        onSurface: AppColors.light.ink,
       ),
+      scaffoldBackgroundColor: AppColors.light.paper,
       useMaterial3: true,
-      // 全局默认字体：无衬线 + 中文 fallback 链（项目无自定义字体文件）
+      // 全局默认字体：无衬线 + 中文 fallback 链（项目内嵌 NotoSansSC）
       fontFamily: AppTypography.sans,
       fontFamilyFallback: AppTypography.sansFallback,
       extensions: const <ThemeExtension<dynamic>>[AppColors.light],
@@ -62,11 +67,16 @@ class ThemeState {
 
   /// 生成暗色主题数据 · 暗夜书馆
   ThemeData getDarkTheme() {
+    final base = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: Brightness.dark,
+    );
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: seedColor,
-        brightness: Brightness.dark,
+      colorScheme: base.copyWith(
+        surface: AppColors.dark.paper,
+        onSurface: AppColors.dark.ink,
       ),
+      scaffoldBackgroundColor: AppColors.dark.paper,
       useMaterial3: true,
       fontFamily: AppTypography.sans,
       fontFamilyFallback: AppTypography.sansFallback,
@@ -124,11 +134,11 @@ class ThemeNotifier extends _$ThemeNotifier {
       if (themeModeString.isNotEmpty) {
         themeMode = AppThemeMode.values.firstWhere(
           (mode) => mode.toString() == themeModeString,
-          orElse: () => AppThemeMode.dark,
+          orElse: () => AppThemeMode.system,
         );
       } else {
-        // 默认暗色主题
-        themeMode = AppThemeMode.dark;
+        // 默认跟随系统：日间浅色「晨读书馆」纸感，夜间「暗夜书馆」
+        themeMode = AppThemeMode.system;
       }
 
       LoggerService.instance.i(
@@ -145,7 +155,7 @@ class ThemeNotifier extends _$ThemeNotifier {
         tags: ['provider', 'theme', 'load'],
       );
       // 发生错误时使用默认主题
-      return const ThemeState(themeMode: AppThemeMode.dark);
+      return const ThemeState(themeMode: AppThemeMode.system);
     }
   }
 

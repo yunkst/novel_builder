@@ -51,6 +51,8 @@ import '../core/providers/reading_context_providers.dart';
 import '../widgets/agent_chat/agent_floating_button.dart';
 import '../widgets/reader/version_history_sheet.dart';
 import '../models/chapter_version.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final Novel novel;
@@ -381,26 +383,35 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       context: context,
       barrierDismissible: false, // 禁用空白区域点击关闭
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.refresh),
             SizedBox(width: 8),
-            Text('刷新章节'),
+            Text(
+              '刷新章节',
+              style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('将从服务器重新获取最新内容并覆盖本地缓存。'),
+            Text(
+              '将从服务器重新获取最新内容并覆盖本地缓存。',
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 15,
+                height: 1.6,
+                color: context.appColors.ink,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('这可能会花费一些时间，请确认是否继续？',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6))),
+            Text(
+              '这可能会花费一些时间，请确认是否继续？',
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
+            ),
           ],
         ),
         actions: [

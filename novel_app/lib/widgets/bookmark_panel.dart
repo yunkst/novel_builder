@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/webview_providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../services/bookmark_service.dart';
 
 /// 收藏夹弹出面板
@@ -72,9 +74,8 @@ class _BookmarkPanelState extends ConsumerState<BookmarkPanel> {
                 const SizedBox(width: 8),
                 Text(
                   '收藏夹',
-                  style: TextStyle(
+                  style: AppTypography.novelTitle.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
                     color: colorScheme.onSurface,
                   ),
                 ),
@@ -312,9 +313,8 @@ class _GroupSectionTile extends StatelessWidget {
                     section.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: AppTypography.novelTitle.copyWith(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
                       color: colorScheme.onSurface,
                     ),
                   ),
@@ -542,15 +542,18 @@ class _BookmarkTile extends StatelessWidget {
           bookmark.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+          style: AppTypography.novelTitle.copyWith(
+            fontSize: 14,
+            color: colorScheme.onSurface,
+          ),
         ),
         subtitle: Text(
           bookmark.url,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: AppTypography.metaItalic.copyWith(
             fontSize: 11,
-            color: colorScheme.onSurface.withValues(alpha: 0.5),
+            color: context.appColors.inkSoft,
           ),
         ),
         trailing: IconButton(
@@ -728,9 +731,8 @@ class _BookmarkTile extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     '移动到分组',
-                    style: TextStyle(
+                    style: AppTypography.novelTitle.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
                       color: colorScheme.onSurface,
                     ),
                   ),
@@ -1020,9 +1022,8 @@ class _GroupManagementSheet extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Text(
                   '管理分组',
-                  style: TextStyle(
+                  style: AppTypography.novelTitle.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
                     color: colorScheme.onSurface,
                   ),
                 ),

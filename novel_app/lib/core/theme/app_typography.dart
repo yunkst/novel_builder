@@ -1,11 +1,10 @@
 /// 书馆美学 · 字体令牌
 ///
-/// 项目无自定义字体文件（assets/fonts/ 不存在），采用「系统字体 + fallback 链」方案：
-/// - 标题/书名/章名用衬线（书卷气），各平台回退到系统宋体/Noto Serif
-/// - UI 正文用无衬线，回退到系统黑体/Noto Sans
-///
-/// 如需精确的 Noto Serif SC / Noto Sans SC，可后续将 .ttf 放入 assets/fonts/，
-/// 在 pubspec.yaml 注册字体族后，把下方 [serif]/[sans] 常量改为对应 family 名称。
+/// 项目内嵌 Noto Serif SC / Noto Sans SC（已子集化打包于 assets/fonts/），
+/// 跨平台衬线/无衬线质感稳定，与 GitHub Pages 介绍页同源。
+/// - 标题/书名/章名用 Noto Serif SC（书卷气）
+/// - UI 正文用 Noto Sans SC
+/// fallback 链保留，兜底极少数子集未覆盖的生僻字（人名/古字等）。
 library;
 
 import 'package:flutter/material.dart';
@@ -14,8 +13,8 @@ import 'package:flutter/material.dart';
 class AppTypography {
   AppTypography._();
 
-  /// 衬线 · 用于书名/章名/书架标题（书卷气）
-  static const String serif = 'serif';
+  /// 衬线 · Noto Serif SC · 用于书名/章名/书架标题（书卷气）
+  static const String serif = 'NotoSerifSC';
 
   /// 衬线 fallback 链（跨平台系统宋体）
   static const List<String> serifFallback = [
@@ -27,8 +26,8 @@ class AppTypography {
     'Source Han Serif SC',
   ];
 
-  /// 无衬线 · UI 正文默认
-  static const String sans = 'sans-serif';
+  /// 无衬线 · Noto Sans SC · UI 正文默认
+  static const String sans = 'NotoSansSC';
 
   /// 无衬线 fallback 链
   static const List<String> sansFallback = [

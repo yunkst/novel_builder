@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/novel.dart';
 import '../../models/chapter.dart';
 
@@ -63,7 +64,12 @@ class ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                     '编辑模式',
                     // 徽章文字保持小号无衬线以提升对比可读性
                     // （背景为 colorScheme.secondary，白字保证对比度）
-                    style: const TextStyle(fontSize: 12),
+                    style: AppTypography.metaItalic.copyWith(
+                      fontSize: 12,
+                      fontFamily: AppTypography.sans,
+                      fontStyle: FontStyle.normal,
+                      color: context.appColors.onSemantic,
+                    ),
                   ),
                 ],
               ),

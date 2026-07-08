@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../screens/llm_config_management_screen.dart';
 import '../utils/toast_utils.dart';
 
@@ -64,7 +66,10 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI 配置'),
+        title: Text(
+          'AI 配置',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -74,20 +79,21 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
                 padding: const EdgeInsets.all(16.0),
                 children: [
                   // ── LLM 配置管理 ──
-                  const Text(
+                  Text(
                     'LLM 配置',
-                    style: TextStyle(
+                    style: AppTypography.novelTitle.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      color: context.appColors.ink,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '管理多个 LLM 后端配置（API URL、Key、模型），在 Agent 和章节生成中切换使用。',
-                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    style: AppTypography.bodyProse.copyWith(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: context.appColors.inkSoft,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Card(
@@ -112,11 +118,11 @@ class _DifySettingsScreenState extends State<DifySettingsScreen> {
                   const SizedBox(height: 16),
 
                   // ── AI 设定 ──
-                  const Text(
+                  Text(
                     'AI 设定',
-                    style: TextStyle(
+                    style: AppTypography.novelTitle.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      color: context.appColors.ink,
                     ),
                   ),
                   const SizedBox(height: 8),

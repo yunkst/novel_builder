@@ -7,6 +7,7 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
 import 'media_gallery_card.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 
 /// Agent 聊天消息气泡
 class AgentMessageBubble extends StatelessWidget {
@@ -73,9 +74,10 @@ class AgentMessageBubble extends StatelessWidget {
               children: [
                 Text(
                   _formatTime(message.timestamp),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                      ),
+                  style: AppTypography.metaItalic.copyWith(
+                    fontSize: 11,
+                    color: context.appColors.inkSoft.withValues(alpha: 0.7),
+                  ),
                 ),
                 if (isUser && onRollback != null) ...[
                   const SizedBox(width: 6),
@@ -99,8 +101,7 @@ class AgentMessageBubble extends StatelessWidget {
 
   /// 回滚按钮（小图标 + tooltip）,仅 user 消息 + onRollback != null 时渲染
   Widget _buildRollbackButton(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.4);
+    final muted = context.appColors.inkSoft.withValues(alpha: 0.7);
     return Tooltip(
       message: '回滚至此',
       child: InkWell(
@@ -203,25 +204,23 @@ class AgentMessageBubble extends StatelessWidget {
 
   MarkdownStyleSheet _markdownStyle(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = context.appColors;
     return MarkdownStyleSheet(
       p: theme.textTheme.bodyMedium!.copyWith(
-            color: theme.colorScheme.onSurface,
-            height: 1.4,
-          ),
-      h1: TextStyle(
-        color: theme.colorScheme.onSurface,
+        color: colors.ink,
+        height: 1.5,
+      ),
+      h1: AppTypography.chapterTitle.copyWith(
         fontSize: 20,
-        fontWeight: FontWeight.bold,
+        color: colors.ink,
       ),
-      h2: TextStyle(
-        color: theme.colorScheme.onSurface,
+      h2: AppTypography.chapterTitle.copyWith(
         fontSize: 18,
-        fontWeight: FontWeight.bold,
+        color: colors.ink,
       ),
-      h3: TextStyle(
-        color: theme.colorScheme.onSurface,
+      h3: AppTypography.novelTitle.copyWith(
         fontSize: 16,
-        fontWeight: FontWeight.bold,
+        color: colors.ink,
       ),
       code: theme.textTheme.bodyMedium?.copyWith(
         backgroundColor: theme.colorScheme.surfaceContainerHigh,
@@ -298,27 +297,53 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(statusIcon, size: 14, color: statusColor),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _runningLabel(call),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        color: statusColor,
-                        fontWeight: FontWeight.w500,
+                  // 第一行：状态图标 + 工具名 + 展开箭头
+                  Row(
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _runningLabel(call),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'monospace',
+                            color: statusColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        size: 16,
+                        color: context.appColors.inkSoft.withValues(alpha: 0.6),
+                      ),
+                    ],
                   ),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
+                  // 第二行：实时生成字数。独立占行避免挤掉第一行的工具名/展开箭头。
+                  // 与第一行文字左侧对齐：图标 14 + 间距 6 = 20
+                  Builder(builder: (_) {
+                    final progressLine = _progressLine(call);
+                    if (progressLine == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 2, 8, 0),
+                      child: Text(
+                        progressLine,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: statusColor.withValues(alpha: 0.75),
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -360,15 +385,19 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
   MediaGalleryData? get _mediaGallery =>
       parseMediaGallery(widget.call.result);
 
-  /// running 态标题文案：内部走 LLM 流式的工具显示「已生成 N 字」进度，
-  /// 其他工具维持原 `工具名...` 转圈语义。
+  /// 标题栏第一行文案：始终返回工具名（保持单行简洁，进度单独占第二行）。
   String _runningLabel(AgentToolCall call) {
     if (call.status != AgentToolStatus.running) return call.name;
+    return call.name;
+  }
+
+  /// 标题栏第二行：仅内部走 LLM 流式 + running 阶段展示，避免横向被进度挤掉。
+  /// 返回 null 时不渲染第二行，保持非流式工具的原视觉。
+  String? _progressLine(AgentToolCall call) {
+    if (call.status != AgentToolStatus.running) return null;
     final progress = call.progressChars;
-    if (progress != null && progress > 0) {
-      return '${call.name} · 已生成 $progress 字...';
-    }
-    return '${call.name}...';
+    if (progress == null || progress <= 0) return null;
+    return '已生成 $progress 字...';
   }
 
   Widget _buildExpandedBody(BuildContext context, AgentToolCall call) {
@@ -405,9 +434,11 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
       children: [
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          style: AppTypography.metaItalic.copyWith(
+            fontFamily: AppTypography.sans,
+            fontStyle: FontStyle.normal,
             fontWeight: FontWeight.w600,
+            color: context.appColors.inkSoft,
           ),
         ),
         const SizedBox(height: 2),

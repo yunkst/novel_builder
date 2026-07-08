@@ -16,7 +16,6 @@ services:
       - D:/Comfyui/ComfyUI_windows_portable/ComfyUI/models:/app/models
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
-      - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
       - DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
       # 代理配置 - 使用宿主机代理
       - HTTP_PROXY=http://host.docker.internal:7897

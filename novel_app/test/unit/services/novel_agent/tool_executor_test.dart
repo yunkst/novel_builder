@@ -790,6 +790,90 @@ void main() {
   });
 
   // ========================================================================
+  // delete_chapter
+  // ========================================================================
+  group('delete_chapter', () {
+    test('通过 position 删除已有章节后剩余章节 position 自动前移', () async {
+      final novelId = await insertNovel();
+      // 插入 3 章：chapterIndex=0,1,2，对应 position=1,2,3
+      await insertChapter(
+          chapterUrl: 'ch1', title: '第一章', chapterIndex: 0);
+      await insertChapter(
+          chapterUrl: 'ch2', title: '第二章', chapterIndex: 1);
+      await insertChapter(
+          chapterUrl: 'ch3', title: '第三章', chapterIndex: 2);
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_chapter',
+        {'position': 2},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      expect(json['deletedTitle'], '第二章');
+      expect(json['deletedPosition'], 2);
+      expect(json['remainingChapters'], 2);
+
+      // 验证剩余章节：原 ch1 (index 0) 仍在；原 ch3 重排到 index 1
+      final remaining = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
+      expect(remaining.length, 2);
+      expect(remaining.map((c) => c.title).toList(), ['第一章', '第三章']);
+      expect(remaining.map((c) => c.chapterIndex).toList(), [0, 1]);
+
+      // 验证 chapter_cache 也同步清理
+      final ch2Cache = await chapterRepo.getCachedChapter('ch2');
+      expect(ch2Cache, isNull);
+    });
+
+    test('position 越界时返回 chapter_position_out_of_range 引导', () async {
+      final novelId = await insertNovel();
+      await insertChapter(chapterIndex: 0);
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_chapter',
+        {'position': 99},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'chapter_position_out_of_range');
+      expect(json['suggested_tool'], 'list_chapters');
+
+      // 现有章节未被误删
+      final remaining = await chapterRepo.getCachedNovelChapters(defaultNovelUrl);
+      expect(remaining.length, 1);
+    });
+
+    test('未选小说时返回 no_current_novel 引导', () async {
+      final result = await executor.execute(
+        'delete_chapter',
+        {'position': 1},
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'no_current_novel');
+      expect(json['suggested_tool'], 'list_novels');
+    });
+
+    test('position 缺失时返回 missing_required_param', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_chapter',
+        <String, dynamic>{},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'missing_required_param');
+    });
+  });
+
+  // ========================================================================
   // list_characters
   // ========================================================================
   group('list_characters', () {
@@ -959,6 +1043,73 @@ void main() {
 
       expect(json['error'], 'duplicate');
       expect(json['message'].toString(), contains('update_character'));
+    });
+  });
+
+  // ========================================================================
+  // delete_character
+  // ========================================================================
+  group('delete_character', () {
+    test('按 name 删除已有角色后角色从列表消失', () async {
+      final novelId = await insertNovel();
+      await insertCharacter(name: '李云');
+      await insertCharacter(name: '张薇');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_character',
+        {'name': '李云'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['success'], true);
+      expect(json['deletedName'], '李云');
+      expect(json['message'].toString(), contains('李云'));
+
+      // 角色被删除，list_characters 只剩张薇
+      final remaining = await characterRepo.getCharacters(defaultNovelUrl);
+      expect(remaining.map((c) => c.name).toList(), ['张薇']);
+    });
+
+    test('删除不存在的角色返回 character_not_found 引导', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_character',
+        {'name': '不存在的角色'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'character_not_found');
+      expect(json['suggested_tool'], 'list_characters');
+    });
+
+    test('未选小说时返回 no_current_novel 引导', () async {
+      final result = await executor.execute(
+        'delete_character',
+        {'name': '李云'},
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'no_current_novel');
+      expect(json['suggested_tool'], 'list_novels');
+    });
+
+    test('name 缺失时返回 missing_required_param', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'delete_character',
+        <String, dynamic>{},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['error'], 'missing_required_param');
     });
   });
 

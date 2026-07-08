@@ -11,6 +11,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../services/media/media_types.dart';
 import '../media/media_view.dart';
 
@@ -104,7 +106,6 @@ class _MultiGalleryState extends State<_MultiGallery> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final total = widget.items.length;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -127,8 +128,8 @@ class _MultiGalleryState extends State<_MultiGallery> {
         const SizedBox(height: 6),
         Text(
           '${_index + 1} / $total',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          style: AppTypography.metaItalic.copyWith(
+            color: context.appColors.inkSoft,
           ),
         ),
       ],
@@ -137,6 +138,16 @@ class _MultiGalleryState extends State<_MultiGallery> {
 }
 
 /// 单个媒体槽位：MediaView + 点击全屏（全屏可滑动看 allItems 全部）。
+///
+/// 重要：[MediaView] 非全屏分支内部用了 `Stack(fit: StackFit.expand)`（见
+/// media_view.dart），该 Stack 在父约束纵轴 unbounded（如本卡片嵌在
+/// ListView.builder 的 item 的 Column 中时）会触发
+/// `BoxConstraints forces an infinite height` 异常，导致 ListView item
+/// 高度塌缩、滚动手势失灵。
+///
+/// 因此本槽位必须为 [MediaView] 提供 **bounded 父约束**：1:1 方形适合
+/// AI 生成的小说插图（ComfyUI 默认方形输出）。如未来需要其他比例，
+/// 把 [AspectRatio] 换成 [ConstrainedBox(maxHeight: ...)] 即可。
 class _GallerySlot extends StatelessWidget {
   final MediaGalleryItem item;
   final List<MediaGalleryItem> allItems;
@@ -150,13 +161,16 @@ class _GallerySlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MediaView(
-      mediaId: item.mediaId,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => _FullScreenGallery(
-            items: allItems,
-            initialIndex: index,
+    return AspectRatio(
+      aspectRatio: 1,
+      child: MediaView(
+        mediaId: item.mediaId,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _FullScreenGallery(
+              items: allItems,
+              initialIndex: index,
+            ),
           ),
         ),
       ),
@@ -200,7 +214,10 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
         foregroundColor: Colors.white,
         title: Text(
           total > 1 ? '${_index + 1} / $total' : (isVideo ? '视频' : '图片'),
-          style: const TextStyle(fontSize: 14),
+          style: AppTypography.metaItalic.copyWith(
+            fontSize: 14,
+            color: context.appColors.galleryOnDark,
+          ),
         ),
         leading: IconButton(
           icon: const Icon(Icons.close),

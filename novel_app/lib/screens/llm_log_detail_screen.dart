@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../services/llm_logger/llm_call_record.dart';
 import '../services/llm_logger/llm_logger.dart';
 import '../utils/format_utils.dart';
@@ -59,7 +61,10 @@ class _LlmLogDetailScreenState extends ConsumerState<LlmLogDetailScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('调用详情'),
+        title: Text(
+          '调用详情',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.copy),
@@ -77,16 +82,20 @@ class _LlmLogDetailScreenState extends ConsumerState<LlmLogDetailScreen> {
   }
 
   Widget _buildNotFound() {
-    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.search_off,
-              size: 48, color: theme.colorScheme.outline),
+              size: 48, color: context.appColors.inkSoft.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
-          Text('未找到该记录（可能已被清空）',
-              style: theme.textTheme.bodyMedium),
+          Text(
+            '未找到该记录（可能已被清空）',
+            style: AppTypography.bodyProse.copyWith(
+              fontSize: 15,
+              color: context.appColors.inkSoft,
+            ),
+          ),
         ],
       ),
     );
@@ -196,9 +205,11 @@ class _LlmLogDetailScreenState extends ConsumerState<LlmLogDetailScreen> {
       children: [
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          style: AppTypography.metaItalic.copyWith(
+            fontFamily: AppTypography.sans,
+            fontStyle: FontStyle.normal,
             fontWeight: FontWeight.w600,
+            color: context.appColors.inkSoft,
           ),
         ),
         const SizedBox(height: 4),

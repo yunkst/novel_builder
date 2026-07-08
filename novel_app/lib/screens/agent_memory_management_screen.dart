@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/database_providers.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../services/novel_agent/agent_scenario.dart';
 import '../services/novel_agent/agent_scenario_factory.dart';
 import '../utils/toast_utils.dart';
@@ -177,7 +179,10 @@ class _AgentMemoryManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agent 记忆管理'),
+        title: Text(
+          'Agent 记忆管理',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -236,23 +241,29 @@ class _AgentMemoryManagementScreenState
 
   /// 空状态占位
   Widget _buildEmptyState() {
-    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.psychology_outlined,
-              size: 64, color: theme.colorScheme.outline),
+              size: 64, color: context.appColors.inkSoft.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          Text('该场景暂无记忆',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.outline)),
+          Text(
+            '该场景暂无记忆',
+            style: AppTypography.chapterTitle.copyWith(
+              fontSize: 16,
+              color: context.appColors.inkSoft,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Agent 在对话中通过 patch_memory 工具记录经验，\n'
-              '也可点击右上角 + 手动添加。',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.outline)),
+          Text(
+            'Agent 在对话中通过 patch_memory 工具记录经验，\n'
+            '也可点击右上角 + 手动添加。',
+            textAlign: TextAlign.center,
+            style: AppTypography.metaItalic.copyWith(
+              color: context.appColors.inkSoft.withValues(alpha: 0.8),
+            ),
+          ),
         ],
       ),
     );
@@ -260,7 +271,6 @@ class _AgentMemoryManagementScreenState
 
   /// 单条记忆卡片
   Widget _buildMemoryCard(Map<String, dynamic> memory) {
-    final theme = Theme.of(context);
     final content = memory['content'] as String;
     final updatedAt = memory['updated_at'] as int;
     final updatedTime = DateTime.fromMillisecondsSinceEpoch(updatedAt);
@@ -272,14 +282,19 @@ class _AgentMemoryManagementScreenState
           content,
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium,
+          style: AppTypography.bodyProse.copyWith(
+            fontSize: 14,
+            height: 1.6,
+            color: context.appColors.ink,
+          ),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             '更新于 ${_formatTime(updatedTime)}',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.outline),
+            style: AppTypography.metaItalic.copyWith(
+              color: context.appColors.inkSoft,
+            ),
           ),
         ),
         trailing: PopupMenuButton<String>(
@@ -363,9 +378,9 @@ class _MemoryEditDialogState extends State<_MemoryEditDialog> {
           children: [
             Text(
               '场景：${widget.scenarioDisplayName}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+              style: AppTypography.metaItalic.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(

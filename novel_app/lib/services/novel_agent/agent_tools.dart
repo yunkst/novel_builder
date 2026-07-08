@@ -31,10 +31,12 @@ class AgentTools {
     _createChapter,
     _updateChapterContent,
     _rewriteChapter,
+    _deleteChapter,
     // ===== 角色 =====
     _listCharacters,
     _updateCharacter,
     _createCharacter,
+    _deleteCharacter,
     // ===== 设定 / 大纲 =====
     _updateBackgroundSetting,
     _updateOutline,
@@ -332,6 +334,33 @@ class AgentTools {
     },
   };
 
+  static const _deleteChapter = {
+    'type': 'function',
+    'function': {
+      'name': 'delete_chapter',
+      'description':
+          '删除当前小说的指定章节。\n'
+          'position 来自 list_chapters。删除成功后，后续章节的 position 自动前移。\n'
+          '⚠️ 破坏性操作：会同时删除章节元数据（novel_chapters）和缓存正文'
+          '（chapter_cache），无法恢复。删除前请先与用户确认意图，'
+          '建议先用 read_chapter_content 告知用户要删什么。\n'
+          '使用场景：\n'
+          '- 用户想删除某章（如写错/重写/合并到别章）\n'
+          '- 清理重复或明显不满意的章节\n'
+          '不适用：删除整本小说请用其他工具（暂无，请告知用户在书架页长按删除）。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'position': {
+            'type': 'integer',
+            'description': '要删除的章节位置（1-based，从 list_chapters 获取）。',
+          },
+        },
+        'required': ['position'],
+      },
+    },
+  };
+
   // ===== 角色 =====
 
   static const _listCharacters = {
@@ -458,6 +487,34 @@ class AgentTools {
             'type': 'array',
             'items': {'type': 'string'},
             'description': '别名列表（如 ["小李", "云哥"]）',
+          },
+        },
+        'required': ['name'],
+      },
+    },
+  };
+
+  static const _deleteCharacter = {
+    'type': 'function',
+    'function': {
+      'name': 'delete_character',
+      'description':
+          '删除当前小说中指定名字的角色。\n'
+          'name 来自 list_characters 返回的角色名。删除后该角色不再出现在角色列表，'
+          '也不会再作为写作上下文注入。\n'
+          '⚠️ 破坏性操作：会从 characters 表删除该角色记录，无法恢复。'
+          '删除前请先与用户确认意图，建议先用 list_characters 告知用户要删谁。\n'
+          '使用场景：\n'
+          '- 用户想删除多余/重复的角色\n'
+          '- 角色已废弃不再需要\n'
+          '注意：若该角色出现在已写好的章节正文中，正文字样不会被修改——删除只影响角色卡片数据。'
+          '如需改正文请用 update_chapter_content / rewrite_chapter。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'name': {
+            'type': 'string',
+            'description': '要删除的角色名称（来自 list_characters）',
           },
         },
         'required': ['name'],

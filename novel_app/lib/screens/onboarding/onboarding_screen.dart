@@ -17,7 +17,7 @@ import '../../widgets/onboarding/ai_capabilities_section.dart';
 /// 1. 欢迎页（APP 定位）
 /// 2. 后端服务（**可选**，用于多站点搜索/缓存）
 /// 3. 🌟 配置 AI 引擎（关键步骤：填一个 LLM 地址 + Key 即可解锁大部分 AI 能力）
-/// 4. 找书方式介绍（搜索 / URL 添加）
+/// 4. 找书方式介绍（浏览器浏览 → 添加小说）
 /// 5. 阅读增强亮点（AI 特写 / 插图 / 改写）
 /// 6. 完成
 ///
@@ -251,7 +251,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     icon: Icons.auto_stories,
                     iconColor: colorScheme.primary,
                     title: '欢迎使用 Novel Builder',
-                    description: '聚合多个小说站点，统一搜索、离线缓存，'
+                    description: '聚合多个小说站点资源，离线缓存随时阅读，'
                         '更有 AI 阅读增强让阅读体验更沉浸。',
                   ),
                   // 1 - 后端服务（可选）
@@ -260,15 +260,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   _buildAiConfigPage(context),
                   // 3 - 找书
                   _buildInfoPage(
-                    icon: Icons.search,
+                    icon: Icons.travel_explore,
                     iconColor: colorScheme.tertiary,
                     title: '轻松找到你想看的书',
-                    description: '在「搜索」页输入书名，跨多个站点一键检索；'
-                        '也可以用顶部链接按钮，直接粘贴小说网址添加。',
+                    description: '在「浏览器」中打开小说网站，浏览到目录页后，'
+                        '点右下角「添加小说」按钮即可一键收入书架。',
                     bullets: const [
-                      '关键词搜索，支持多站点',
-                      '粘贴网址快速导入',
-                      '一键加入书架，离线缓存',
+                      '浏览器内访问任意小说站点',
+                      '目录页自动识别，一键加入书架',
+                      '加入后离线缓存章节，随时畅读',
                     ],
                   ),
                   // 4 - 阅读增强亮点

@@ -145,6 +145,19 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color chatButtonPrimary;
   final Color chatButtonDisabled;
 
+  // ─── 阅读风语义色（纸感容器/墨字/分割线）──────────────────────
+  /// 卡片纸张色（浅色暖白纸 / 深色炭纸）
+  final Color paper;
+
+  /// 主墨字色（标题/强文字）
+  final Color ink;
+
+  /// 柔墨灰（正文/次要文字）
+  final Color inkSoft;
+
+  /// 分割线 / 边线
+  final Color divider;
+
   // ─── 其他 ─────────────────────────────────────────────────────
   /// 头像/沉浸式半透明阴影（30% 黑）
   final Color avatarShadow;
@@ -203,6 +216,10 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.chatDivider,
     required this.chatButtonPrimary,
     required this.chatButtonDisabled,
+    required this.paper,
+    required this.ink,
+    required this.inkSoft,
+    required this.divider,
     required this.avatarShadow,
     required this.errorAccent,
   });
@@ -265,6 +282,11 @@ class AppColors extends ThemeExtension<AppColors> {
     chatDivider: Color(0xFFDCCFB3),
     chatButtonPrimary: Color(0xFFB8843A),
     chatButtonDisabled: Color(0xFFC9BC9E),
+    // 阅读风语义色 · 晨读书馆
+    paper: Color(0xFFFFFDF8),
+    ink: Color(0xFF2B2620),
+    inkSoft: Color(0xFF6B6358),
+    divider: Color(0xFFE5DDCC),
     avatarShadow: Color(0x2A000000),
     errorAccent: Color(0xFFB23A2E),
   );
@@ -326,6 +348,11 @@ class AppColors extends ThemeExtension<AppColors> {
     chatDivider: Color(0xFF3A3128),
     chatButtonPrimary: Color(0xFFD9A05B),
     chatButtonDisabled: Color(0xFF3A3128),
+    // 阅读风语义色 · 暗夜书馆
+    paper: Color(0xFF241F16),
+    ink: Color(0xFFE8DCC4),
+    inkSoft: Color(0xFFB5A482),
+    divider: Color(0xFF3A3128),
     avatarShadow: Color(0x4D000000),
     errorAccent: Color(0xFFD9685A),
   );
@@ -382,6 +409,10 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? chatDivider,
     Color? chatButtonPrimary,
     Color? chatButtonDisabled,
+    Color? paper,
+    Color? ink,
+    Color? inkSoft,
+    Color? divider,
     Color? avatarShadow,
     Color? errorAccent,
   }) {
@@ -437,6 +468,10 @@ class AppColors extends ThemeExtension<AppColors> {
       chatDivider: chatDivider ?? this.chatDivider,
       chatButtonPrimary: chatButtonPrimary ?? this.chatButtonPrimary,
       chatButtonDisabled: chatButtonDisabled ?? this.chatButtonDisabled,
+      paper: paper ?? this.paper,
+      ink: ink ?? this.ink,
+      inkSoft: inkSoft ?? this.inkSoft,
+      divider: divider ?? this.divider,
       avatarShadow: avatarShadow ?? this.avatarShadow,
       errorAccent: errorAccent ?? this.errorAccent,
     );
@@ -508,7 +543,11 @@ class AppColors extends ThemeExtension<AppColors> {
           Color.lerp(chatButtonPrimary, other.chatButtonPrimary, t)!,
       chatButtonDisabled:
           Color.lerp(chatButtonDisabled, other.chatButtonDisabled, t)!,
-      avatarShadow: Color.lerp(avatarShadow, other.avatarShadow, t)!,
+      paper: Color.lerp(paper, other.paper, t)!,
+    ink: Color.lerp(ink, other.ink, t)!,
+    inkSoft: Color.lerp(inkSoft, other.inkSoft, t)!,
+    divider: Color.lerp(divider, other.divider, t)!,
+    avatarShadow: Color.lerp(avatarShadow, other.avatarShadow, t)!,
       errorAccent: Color.lerp(errorAccent, other.errorAccent, t)!,
     );
   }

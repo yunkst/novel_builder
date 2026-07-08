@@ -4,6 +4,7 @@ import '../core/providers/service_providers.dart';
 import '../utils/format_utils.dart';
 import '../utils/toast_utils.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../widgets/backup_confirm_dialog.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../widgets/restore_confirm_dialog.dart';
@@ -207,7 +208,10 @@ class _BackupManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('备份管理'),
+        title: Text(
+          '备份管理',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadBackupList,
@@ -242,15 +246,17 @@ class _BackupManagementScreenState
                 const SizedBox(width: 8),
                 Text(
                   '服务器备份列表',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: AppTypography.novelTitle.copyWith(
+                    fontSize: 15,
+                    color: context.appColors.ink,
+                  ),
                 ),
                 const Spacer(),
                 if (_backupList != null)
                   Text(
                     '${_backupList!.length} 条',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 14,
+                    style: AppTypography.metaItalic.copyWith(
+                      color: context.appColors.inkSoft,
                     ),
                   ),
               ],
@@ -293,7 +299,10 @@ class _BackupManagementScreenState
                 const SizedBox(width: 8),
                 Text(
                   '备份状态',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: AppTypography.novelTitle.copyWith(
+                    fontSize: 15,
+                    color: context.appColors.ink,
+                  ),
                 ),
               ],
             ),
@@ -320,9 +329,8 @@ class _BackupManagementScreenState
           width: 80,
           child: Text(
             label,
-            style: TextStyle(
+            style: AppTypography.metaItalic.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 14,
             ),
           ),
         ),
@@ -330,9 +338,9 @@ class _BackupManagementScreenState
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: AppTypography.bodyProse.copyWith(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              color: context.appColors.ink,
             ),
           ),
         ),
@@ -352,17 +360,16 @@ class _BackupManagementScreenState
           const SizedBox(height: 12),
           Text(
             '暂无服务器备份',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            style: AppTypography.bodyProse.copyWith(
               fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '点击上方"立即备份"按钮创建第一个备份',
-            style: TextStyle(
+            style: AppTypography.metaItalic.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
             ),
           ),
         ],
@@ -409,9 +416,9 @@ class _BackupManagementScreenState
                 children: [
                   Text(
                     fileName,
-                    style: const TextStyle(
+                    style: AppTypography.novelTitle.copyWith(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      color: context.appColors.ink,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -419,8 +426,7 @@ class _BackupManagementScreenState
                   const SizedBox(height: 4),
                   Text(
                     '$timeText  ·  ${FormatUtils.formatFileSize(fileSize)}',
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: AppTypography.metaItalic.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),

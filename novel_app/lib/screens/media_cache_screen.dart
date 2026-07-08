@@ -13,6 +13,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../services/media/media_proxy.dart';
 import '../../services/media/media_store.dart';
 import '../../services/media/media_types.dart';
@@ -106,9 +108,13 @@ class _MediaCacheScreenState extends ConsumerState<MediaCacheScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('媒体缓存')),
+      appBar: AppBar(
+        title: Text(
+          '媒体缓存',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -118,16 +124,25 @@ class _MediaCacheScreenState extends ConsumerState<MediaCacheScreen> {
                   child: Row(
                     children: [
                       Icon(Icons.folder_outlined,
-                          color: theme.colorScheme.primary),
+                          color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('总占用：${FormatUtils.formatFileSize(_usedSpace)}',
-                                style: theme.textTheme.titleSmall),
-                            Text('${_all.length} 项媒体',
-                                style: theme.textTheme.bodySmall),
+                            Text(
+                              '总占用：${FormatUtils.formatFileSize(_usedSpace)}',
+                              style: AppTypography.novelTitle.copyWith(
+                                fontSize: 14,
+                                color: context.appColors.ink,
+                              ),
+                            ),
+                            Text(
+                              '${_all.length} 项媒体',
+                              style: AppTypography.metaItalic.copyWith(
+                                color: context.appColors.inkSoft,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -154,7 +169,15 @@ class _MediaCacheScreenState extends ConsumerState<MediaCacheScreen> {
                 const Divider(height: 1),
                 Expanded(
                   child: _filtered.isEmpty
-                      ? const Center(child: Text('暂无媒体'))
+                      ? Center(
+                          child: Text(
+                            '暂无媒体',
+                            style: AppTypography.bodyProse.copyWith(
+                              fontSize: 15,
+                              color: context.appColors.inkSoft,
+                            ),
+                          ),
+                        )
                       : ListView.separated(
                           itemCount: _filtered.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -212,7 +235,9 @@ class _MediaTile extends StatelessWidget {
           FormatUtils.formatFileSize(item.localBytes),
           if (item.localOnly) '本地唯一副本',
         ].join(' · '),
-        style: theme.textTheme.bodySmall,
+        style: AppTypography.metaItalic.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline, size: 20),

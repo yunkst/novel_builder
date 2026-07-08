@@ -126,14 +126,15 @@ class NovelReaderApp extends ConsumerWidget {
     // 监听主题提供者
     final themeAsync = ref.watch(themeNotifierProvider);
 
+    // 系统主题下 Toast 颜色跟随平台亮度，保持与 MaterialApp 实际渲染一致
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
     return themeAsync.when(
       data: (themeState) {
+        final isLight = themeState.flutterThemeMode == ThemeMode.light ||
+            (themeState.flutterThemeMode == ThemeMode.system &&
+                platformBrightness == Brightness.light);
         // 同步主题色到 Toast 工具，使其能感知当前主题
-        ToastUtils.setThemeColors(
-          themeState.flutterThemeMode == ThemeMode.light
-              ? AppColors.light
-              : AppColors.dark,
-        );
+        ToastUtils.setThemeColors(isLight ? AppColors.light : AppColors.dark);
         return MaterialApp(
           title: 'Novel App',
           theme: themeState.getLightTheme(),

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Novel Builder · 现代化的全栈小说阅读平台</title>
+<meta name="description" content="Novel Builder 是一个现代化的全栈小说阅读平台，整合 11 个小说站点，提供跨平台搜索、阅读、缓存与 AI 增强功能。" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet" />
+<style>
+  /* ============ 浅色阅读风 · 纸张/书卷质感配色 ============ */
+  :root {
+    --bg: #faf7f2;          /* 主背景：温暖纸张白 */
+    --bg-alt: #f3ece0;      /* 区块分隔：略深纸色 */
+    --paper: #fffdf8;       /* 卡片纸张 */
+    --ink: #2b2620;         /* 标题墨黑 */
+    --ink-soft: #6b6358;    /* 正文柔墨灰 */
+    --ink-faint: #9a9186;   /* 弱化文字 */
+    --accent: #a0522d;      /* 书脊赭石 */
+    --accent-deep: #7e3f22; /* 深赭石（hover） */
+    --accent-soft: #e8d5c4; /* 浅赭石底 */
+    --gold: #b8860b;        /* 点缀金 */
+    --line: #e7ddcc;        /* 分割线 */
+    --code-bg: #2b2620;     /* 代码块深底 */
+    --shadow: 0 1px 2px rgba(43,38,32,.04), 0 8px 24px rgba(43,38,32,.06);
+    --shadow-lg: 0 4px 12px rgba(43,38,32,.06), 0 24px 48px rgba(43,38,32,.10);
+    --radius: 14px;
+    --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+    --sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    --maxw: 1140px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink-soft);
+    background: var(--bg);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+  code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ============ 导航 ============ */
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(250,247,242,.82);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  header.nav.scrolled { border-bottom-color: var(--line); box-shadow: 0 1px 0 rgba(43,38,32,.03); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 900; color: var(--ink); font-size: 19px; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--gold));
+    display: grid; place-items: center; color: #fff; font-size: 16px;
+    box-shadow: 0 4px 10px rgba(160,82,45,.35);
+  }
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a { font-size: 14.5px; color: var(--ink-soft); transition: color .2s; }
+  .nav-links a:hover { color: var(--accent); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 14.5px; font-weight: 500; padding: 10px 18px;
+    border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+    transition: all .2s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-primary:hover { background: #000; transform: translateY(-1px); }
+  .btn-outline { border-color: var(--line); color: var(--ink); background: var(--paper); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-gh { background: var(--accent); color: #fff; }
+  .btn-gh:hover { background: var(--accent-deep); }
+  .menu-toggle { display: none; background: none; border: none; font-size: 22px; color: var(--ink); cursor: pointer; }
+
+  /* ============ Hero ============ */
+  .hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
+  .hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(620px 380px at 12% 8%, rgba(184,134,11,.10), transparent 60%),
+      radial-gradient(560px 360px at 92% 12%, rgba(160,82,45,.10), transparent 62%);
+    pointer-events: none;
+  }
+  .hero-grid { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--accent-deep); font-weight: 500;
+    background: var(--accent-soft); padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  h1.title {
+    font-family: var(--serif); font-weight: 900; color: var(--ink);
+    font-size: clamp(38px, 5.4vw, 60px); line-height: 1.12; letter-spacing: -.5px;
+  }
+  h1.title em { font-style: normal; color: var(--accent); }
+  .lead { margin: 22px 0 30px; font-size: 17.5px; color: var(--ink-soft); max-width: 540px; }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
+  .badge { font-size: 12.5px; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line); padding: 5px 11px; border-radius: 6px; }
+
+  /* Hero 右侧：阅读器 mockup */
+  .mockup {
+    position: relative; border-radius: 26px;
+    background: linear-gradient(160deg, #fffdf8, #f3ece0);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line); overflow: hidden;
+    aspect-ratio: 4 / 3;
+  }
+  .mockup .reader {
+    position: absolute; inset: 0; padding: 30px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .reader .bar { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .reader .bar .back { color: var(--accent); font-size: 18px; }
+  .reader .bar .ch { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 15px; }
+  .reader .lines { display: flex; flex-direction: column; gap: 10px; }
+  .reader .ln { height: 9px; border-radius: 4px; background: var(--line); }
+  .reader .ln.s { width: 55%; }
+  .reader .ln.m { width: 82%; }
+  .reader .ln.l { width: 92%; }
+  .reader .ln.indent { margin-left: 24px; }
+  .reader .page-no { margin-top: auto; align-self: center; font-size: 12px; color: var(--ink-faint); }
+  .mockup .float-tag {
+    position: absolute; right: -14px; top: 28px;
+    background: var(--ink); color: var(--bg);
+    font-size: 12.5px; padding: 8px 14px; border-radius: 10px;
+    box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 7px;
+  }
+
+  /* ============ 亮点条 ============ */
+  .stats { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg-alt); padding: 38px 0; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; text-align: center; }
+  .stat .num { font-family: var(--serif); font-weight: 900; color: var(--ink); font-size: 36px; line-height: 1; }
+  .stat .num em { font-style: normal; color: var(--accent); }
+  .stat .lbl { margin-top: 8px; font-size: 13.5px; color: var(--ink-soft); }
+
+  /* ============ 通用 section ============ */
+  section.block { padding: 88px 0; }
+  .sec-head { text-align: center; max-width: 680px; margin: 0 auto 56px; }
+  .sec-kicker { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  h2.sec-title { font-family: var(--serif); font-weight: 800; color: var(--ink); font-size: clamp(28px, 3.4vw, 38px); margin: 12px 0 14px; line-height: 1.2; }
+  .sec-sub { color: var(--ink-soft); font-size: 16px; }
+
+  /* ============ 功能卡片 ============ */
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .feat {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 30px 28px; box-shadow: var(--shadow); transition: transform .25s, box-shadow .25s, border-color .25s;
+  }
+  .feat:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--accent-soft); }
+  .feat .ico { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; margin-bottom: 18px; background: var(--accent-soft); color: var(--accent-deep); }
+  .feat h3 { font-family: var(--serif); color: var(--ink); font-size: 20px; margin-bottom: 8px; }
+  .feat p { font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ============ 预览画廊（占位图） ============ */
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .shot { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--paper); }
+  .shot .placeholder {
+    aspect-ratio: 16 / 10; display: grid; place-items: center; text-align: center; padding: 24px;
+    background:
+      repeating-linear-gradient(45deg, rgba(160,82,45,.04) 0 12px, transparent 12px 24px),
+      var(--bg-alt);
+    border-bottom: 1px dashed var(--accent-soft);
+  }
+  .shot .placeholder .pico { font-size: 30px; margin-bottom: 10px; opacity: .55; }
+  .shot .placeholder .pttl { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 16px; }
+  .shot .placeholder .pdesc { font-size: 13px; color: var(--ink-faint); margin-top: 6px; max-width: 320px; }
+  .shot .cap { padding: 16px 20px; }
+  .shot .cap .t { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 15px; }
+  .shot .cap .d { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+
+  /* ============ 媒体卡片（录屏/截图/占位 三态） ============ */
+  .shot .media {
+    position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+    background: var(--bg-alt);
+    border-bottom: 1px dashed var(--accent-soft);
+  }
+  /* 视频：自动循环静音播放（移动端兼容） */
+  .shot .media video,
+  .shot .media img.live {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .shot .media video { background: var(--ink); }
+  /* 占位态（无视频无图片时显示） */
+  .shot .placeholder {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+    background:
+      repeating-linear-gradient(45deg, rgba(160,82,45,.04) 0 12px, transparent 12px 24px),
+      var(--bg-alt);
+  }
+  .shot .placeholder .pico { font-size: 30px; margin-bottom: 10px; opacity: .55; }
+  .shot .placeholder .pttl { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 16px; }
+  .shot .placeholder .pdesc { font-size: 13px; color: var(--ink-faint); margin-top: 6px; max-width: 320px; }
+  /* 播放角标（有视频时） */
+  .shot .badge-live {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    font-size: 11.5px; color: #fff; background: rgba(43,38,32,.72);
+    padding: 4px 9px; border-radius: 5px; backdrop-filter: blur(4px);
+    display: none; align-items: center; gap: 6px;
+  }
+  .shot .badge-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #ff5f57; }
+
+  /* ============ 技术栈 ============ */
+  .stack-wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .stack-col { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); }
+  .stack-col h3 { font-family: var(--serif); color: var(--ink); font-size: 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  .stack-col h3 .tag { font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; }
+  .chip { font-size: 13px; padding: 6px 12px; border-radius: 7px; background: var(--bg-alt); border: 1px solid var(--line); color: var(--ink-soft); }
+
+  /* ============ 快速开始 ============ */
+  .quick { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .quick-card { max-width: 760px; margin: 0 auto; background: var(--code-bg); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .quick-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; background: #211d18; }
+  .quick-bar .d { width: 12px; height: 12px; border-radius: 50%; }
+  .quick-bar .d1 { background: #ff5f57; } .quick-bar .d2 { background: #febc2e; } .quick-bar .d3 { background: #28c840; }
+  .quick-bar .fn { margin-left: 12px; color: #9a9186; font-size: 12.5px; }
+  pre.code { padding: 22px 24px; overflow-x: auto; color: #e7ddcc; font-size: 14px; line-height: 1.85; }
+  pre.code .c { color: #8a8174; }   /* comment */
+  pre.code .k { color: #d4a06a; }   /* keyword/cmd */
+  pre.code .s { color: #c8b48a; }   /* string-ish */
+  .quick-note { text-align: center; margin-top: 22px; font-size: 13.5px; color: var(--ink-soft); }
+
+  /* ============ 页脚 ============ */
+  footer { background: var(--ink); color: #c9bfae; padding: 60px 0 36px; }
+  .foot-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 36px; }
+  .foot-brand { font-family: var(--serif); font-weight: 900; color: #fff; font-size: 19px; margin-bottom: 12px; }
+  .foot-grid p { font-size: 14px; }
+  footer h4 { color: #fff; font-size: 14px; margin-bottom: 14px; font-weight: 600; }
+  footer ul { list-style: none; }
+  footer li { margin-bottom: 9px; }
+  footer li a { font-size: 13.5px; color: #b5a991; transition: color .2s; }
+  footer li a:hover { color: #fff; }
+  .foot-bottom { margin-top: 44px; padding-top: 22px; border-top: 1px solid #3d362e; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #8a8174; }
+
+  /* ============ 滚动渐入 ============ */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ============ 响应式 ============ */
+  @media (max-width: 920px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .mockup { max-width: 520px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; }
+    .feat-grid, .stack-wrap { grid-template-columns: 1fr; }
+    .gallery { grid-template-columns: 1fr; }
+    .foot-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .nav-links.open { display: flex; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; background: var(--paper); padding: 18px 24px; border-bottom: 1px solid var(--line); gap: 16px; box-shadow: var(--shadow); }
+    .menu-toggle { display: block; }
+    section.block { padding: 64px 0; }
+    .foot-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== 导航 ===================== -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <span class="mark">书</span>
+      Novel Builder
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#features">功能特性</a>
+      <a href="#preview">界面预览</a>
+      <a href="#stack">技术栈</a>
+      <a href="#quick">快速开始</a>
+      <a class="btn btn-gh" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">★ GitHub</a>
+    </nav>
+    <button class="menu-toggle" id="menuToggle" aria-label="菜单">☰</button>
+  </div>
+</header>
+
+<!-- ===================== Hero ===================== -->
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <span class="eyebrow"><span class="dot"></span> 开源 · 全栈 · AI 增强</span>
+        <h1 class="title">把 11 个书源，<br />收进 <em>一个</em> 阅读器。</h1>
+        <p class="lead">
+          Novel Builder 是一个现代化的全栈小说阅读平台，整合多个小说站点资源，
+          提供跨平台搜索、离线缓存、AI 场景插图与角色关系分析，
+          让追书体验从「找书」到「沉浸」一气呵成。
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">查看 GitHub →</a>
+          <a class="btn btn-outline" href="#quick">快速开始</a>
+        </div>
+        <div class="badges">
+          <span class="badge">Flutter 3.0+</span>
+          <span class="badge">FastAPI</span>
+          <span class="badge">PostgreSQL</span>
+          <span class="badge">Docker</span>
+          <span class="badge">MIT License</span>
+        </div>
+      </div>
+
+      <!-- ====== 占位：Hero 阅读器截图 ======
+           【需要的图片】
+           建议替换为一张真实的「阅读界面」截图（手机/桌面均可）。
+           推荐尺寸：约 960×720（4:3），PNG/JPG，体现书卷质感即可。
+           可直接替换下方 .mockup 结构为 <img src="assets/reader-preview.png" />
+      -->
+      <div class="mockup">
+        <div class="reader">
+          <div class="bar">
+            <span class="back">‹</span>
+            <span class="ch">第七章 · 风起</span>
+          </div>
+          <div class="lines">
+            <div class="ln l"></div>
+            <div class="ln m"></div>
+            <div class="ln l indent"></div>
+            <div class="ln m"></div>
+            <div class="ln s"></div>
+            <div class="ln l"></div>
+            <div class="ln m indent"></div>
+            <div class="ln l"></div>
+          </div>
+          <div class="page-no">— 1 / 24 —</div>
+        </div>
+        <div class="float-tag">📖 离线可读</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 亮点条 ===================== -->
+  <section class="stats">
+    <div class="wrap stats-grid">
+      <div class="stat reveal"><div class="num"><em>11</em></div><div class="lbl">整合小说站点</div></div>
+      <div class="stat reveal"><div class="num">AI</div><div class="lbl">工作流 + 智能对话</div></div>
+      <div class="stat reveal"><div class="num">3</div><div class="lbl">跨平台（Android / iOS / Windows）</div></div>
+      <div class="stat reveal"><div class="num">∞</div><div class="lbl">离线缓存，断网畅读</div></div>
+    </div>
+  </section>
+
+  <!-- ===================== 功能特性 ===================== -->
+  <section class="block" id="features">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">FEATURES</div>
+        <h2 class="sec-title">为追书而生的每一处细节</h2>
+        <p class="sec-sub">从书架管理到 AI 增强，覆盖找书、读书、品书的完整体验。</p>
+      </div>
+      <div class="feat-grid">
+        <div class="feat reveal">
+          <div class="ico">📚</div>
+          <h3>书架管理</h3>
+          <p>本地收藏与阅读进度跟踪，多端一致的私人书库，打开即续读。</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico">🔍</div>
+          <h3>跨站统一搜索</h3>
+          <p>聚合 11 个小说站点，一次搜索，横向比价章节来源与更新进度。</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico">💾</div>
+          <h3>离线缓存阅读</h3>
+          <p>章节内容本地 SQLite 缓存，断网也能流畅翻页，节省流量。</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico">🤖</div>
+          <h3>AI 对话与工作流</h3>
+          <p>DSL Engine 本地工作流 + Agent Chat 智能对话，信息提取与创意写作两不误。</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico">🎨</div>
+          <h3>AI 场景插图</h3>
+          <p>ComfyUI 后端生成场景插图，支持负向提示词，把文字读成画面。</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ico">🕸️</div>
+          <h3>角色关系图</h3>
+          <p>智能提取章节角色信息，可视化人物关系网络，理清长篇人物脉络。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 界面预览（占位图） ===================== -->
+  <section class="block" id="preview" style="background: var(--bg-alt); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">PREVIEW</div>
+        <h2 class="sec-title">看看它长什么样</h2>
+        <p class="sec-sub">下方为占位示意 —— 发布前请替换为真实截图。</p>
+      </div>
+      <div class="gallery">
+        <!--
+          ====== 媒体素材清单（放到 docs-site/assets/ 下，文件名对应 data-video / data-img）======
+          每张卡片：有「录屏 .mp4」就自动循环静音播放；否则显示「截图 .png」；都没有则显示占位。
+          1) 书架主页    demo-bookshelf.mp4 / .png   录屏建议 5-10s，展示滑动、点进书目
+          2) 阅读界面    demo-reader.mp4 / .png       录屏建议 5-10s，展示翻页与排版
+          3) AI 对话     demo-agent.mp4 / .png        录屏建议 5-10s，展示流式输出
+          4) 角色关系图  demo-relation.mp4 / .png     录屏建议 5-10s，展示关系网络展开
+          录屏要求：H.264 编码、无声轨（页面会静音循环播放）；横屏 16:10 最佳。
+        -->
+        <div class="shot reveal" data-video="assets/demo-bookshelf.mp4" data-img="assets/demo-bookshelf.png">
+          <div class="media">
+            <span class="badge-live">录屏</span>
+            <div class="placeholder">
+              <div>
+                <div class="pico">📚</div>
+                <div class="pttl">书架主页</div>
+                <div class="pdesc">待填：demo-bookshelf.mp4<br />或 .png · 16:10</div>
+              </div>
+            </div>
+          </div>
+          <div class="cap"><div class="t">书架管理</div><div class="d">收藏、进度、分组一目了然</div></div>
+        </div>
+        <div class="shot reveal" data-video="assets/demo-reader.mp4" data-img="assets/demo-reader.png">
+          <div class="media">
+            <span class="badge-live">录屏</span>
+            <div class="placeholder">
+              <div>
+                <div class="pico">📖</div>
+                <div class="pttl">阅读界面</div>
+                <div class="pdesc">待填：demo-reader.mp4<br />或 .png · 16:10</div>
+              </div>
+            </div>
+          </div>
+          <div class="cap"><div class="t">沉浸阅读</div><div class="d">书卷质感排版，离线可读</div></div>
+        </div>
+        <div class="shot reveal" data-video="assets/demo-agent.mp4" data-img="assets/demo-agent.png">
+          <div class="media">
+            <span class="badge-live">录屏</span>
+            <div class="placeholder">
+              <div>
+                <div class="pico">🤖</div>
+                <div class="pttl">AI 智能对话</div>
+                <div class="pdesc">待填：demo-agent.mp4<br />或 .png · 16:10</div>
+              </div>
+            </div>
+          </div>
+          <div class="cap"><div class="t">Agent Chat</div><div class="d">DSL Engine + 智能对话</div></div>
+        </div>
+        <div class="shot reveal" data-video="assets/demo-relation.mp4" data-img="assets/demo-relation.png">
+          <div class="media">
+            <span class="badge-live">录屏</span>
+            <div class="placeholder">
+              <div>
+                <div class="pico">🕸️</div>
+                <div class="pttl">角色关系图</div>
+                <div class="pdesc">待填：demo-relation.mp4<br />或 .png · 16:10</div>
+              </div>
+            </div>
+          </div>
+          <div class="cap"><div class="t">人物关系</div><div class="d">可视化角色关系网络</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 技术栈 ===================== -->
+  <section class="block" id="stack">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">TECH STACK</div>
+        <h2 class="sec-title">现代而务实的技术选型</h2>
+        <p class="sec-sub">Flutter 客户端 + FastAPI 后端 + PostgreSQL 缓存，容器化一键部署。</p>
+      </div>
+      <div class="stack-wrap">
+        <div class="stack-col reveal">
+          <h3><span class="tag">📱</span> 移动应用</h3>
+          <div class="chips">
+            <span class="chip">Flutter 3.0+</span>
+            <span class="chip">Dart</span>
+            <span class="chip">Riverpod</span>
+            <span class="chip">Material Design 3</span>
+            <span class="chip">SQLite</span>
+          </div>
+        </div>
+        <div class="stack-col reveal">
+          <h3><span class="tag">🌐</span> 后端服务</h3>
+          <div class="chips">
+            <span class="chip">FastAPI</span>
+            <span class="chip">PostgreSQL</span>
+            <span class="chip">SQLAlchemy</span>
+            <span class="chip">Scrapling</span>
+            <span class="chip">Playwright</span>
+          </div>
+        </div>
+        <div class="stack-col reveal">
+          <h3><span class="tag">🔧</span> 基础设施</h3>
+          <div class="chips">
+            <span class="chip">Docker Compose</span>
+            <span class="chip">Alembic</span>
+            <span class="chip">OpenAPI</span>
+            <span class="chip">GitHub Actions</span>
+            <span class="chip">ComfyUI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 快速开始 ===================== -->
+  <section class="block quick" id="quick">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">QUICK START</div>
+        <h2 class="sec-title">三分钟跑起来</h2>
+        <p class="sec-sub">使用 Docker Compose，一键拉起后端 API、数据库与爬虫服务。</p>
+      </div>
+      <div class="quick-card reveal">
+        <div class="quick-bar">
+          <span class="d d1"></span><span class="d d2"></span><span class="d d3"></span>
+          <span class="fn">bash</span>
+        </div>
+<pre class="code"><span class="c"># 1. 克隆项目</span>
+<span class="k">git</span> clone https://github.com/yunkst/novel_builder.git
+<span class="k">cd</span> novel_builder
+
+<span class="c"># 2. 配置环境变量</span>
+<span class="k">cp</span> .env.example .env
+
+<span class="c"># 3. 一键启动所有服务</span>
+<span class="k">docker-compose</span> up -d
+
+<span class="c"># 后端 API 文档 → http://localhost:3800/docs</span></pre>
+      </div>
+      <p class="quick-note">移动应用：进入 <code style="color:var(--accent)">novel_app/</code> 执行 <code style="color:var(--accent)">flutter pub get &amp;&amp; flutter run</code></p>
+    </div>
+  </section>
+</main>
+
+<!-- ===================== 页脚 ===================== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="foot-brand">📖 Novel Builder</div>
+        <p>现代化的全栈小说阅读平台，整合多站点资源，融合 AI 增强，让阅读更专注。</p>
+      </div>
+      <div>
+        <h4>项目</h4>
+        <ul>
+          <li><a href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">GitHub 仓库</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/releases" target="_blank" rel="noopener">版本发布</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/issues" target="_blank" rel="noopener">问题反馈</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>文档</h4>
+        <ul>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/user-guide.md" target="_blank" rel="noopener">使用指南</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/developer-guide.md" target="_blank" rel="noopener">开发者指南</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/deployment.md" target="_blank" rel="noopener">部署指南</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>社区</h4>
+        <ul>
+          <li><a href="https://github.com/yunkst/novel_builder/discussions" target="_blank" rel="noopener">讨论区</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">贡献指南</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/LICENSE" target="_blank" rel="noopener">MIT 许可证</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© Novel Builder · MIT License</span>
+      <span>Made with ❤️ by <a style="color:#c9bfae" href="https://github.com/yunkst" target="_blank" rel="noopener">yunkst</a></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // 导航滚动样式
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  document.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // 移动端菜单
+  const toggle = document.getElementById('menuToggle');
+  const links = document.getElementById('navLinks');
+  toggle.addEventListener('click', () => links.classList.toggle('open'));
+  links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => links.classList.remove('open')));
+
+  // 滚动渐入
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ====== 媒体卡片：录屏优先 → 截图兜底 → 占位（自动降级） ======
+  document.querySelectorAll('.shot').forEach(shot => {
+    const media  = shot.querySelector('.media');
+    const ph     = shot.querySelector('.placeholder');
+    const badge  = shot.querySelector('.badge-live');
+    const vSrc   = shot.dataset.video;
+    const iSrc   = shot.dataset.img;
+
+    function showImg(src) {
+      const img = document.createElement('img');
+      img.src = src; img.alt = ''; img.className = 'live';
+      img.onerror = () => img.remove(); // 加载失败则保留占位
+      media.insertBefore(img, ph);
+    }
+    function showVideo(src) {
+      const v = document.createElement('video');
+      v.src = src; v.muted = true; v.loop = true; v.playsInline = true;
+      v.preload = 'auto'; v.autoplay = true;
+      v.onerror = () => {
+        v.remove();
+        if (badge) badge.style.display = 'none';
+        if (iSrc) showImg(iSrc);        // 视频失败 → 退回截图
+      };
+      v.addEventListener('canplay', () => {
+        if (ph) ph.style.display = 'none';
+        if (badge) badge.style.display = 'inline-flex';
+        v.play().catch(() => {});
+      }, { once: true });
+      media.insertBefore(v, ph);
+    }
+
+    if (vSrc) showVideo(vSrc);
+    else if (iSrc) showImg(iSrc);
+  });
+</script>
+</body>
+</html>

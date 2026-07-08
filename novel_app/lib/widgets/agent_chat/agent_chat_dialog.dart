@@ -18,6 +18,7 @@ import 'package:novel_app/widgets/agent_chat/agent_message_bubble.dart';
 import 'package:novel_app/widgets/agent_chat/agent_novel_picker_dialog.dart';
 import 'package:novel_app/widgets/agent_chat/agent_scenario_config_dialog.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 
 /// Agent 聊天对话框
 class AgentChatDialog extends ConsumerStatefulWidget {
@@ -436,8 +437,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   }
 
   Widget _buildEmptyState() {
-    final theme = Theme.of(context);
     final chatState = ref.watch(currentChatStateProvider);
+    final colors = context.appColors;
 
     return Center(
       child: Column(
@@ -446,20 +447,21 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
           Icon(
             Icons.auto_awesome,
             size: 48,
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            color: colors.agentAccent.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(
             chatState.scenarioDisplayName,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            style: AppTypography.chapterTitle.copyWith(
+              fontSize: 16,
+              color: colors.inkSoft,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '输入消息开始对话',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            style: AppTypography.metaItalic.copyWith(
+              color: colors.inkSoft.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -588,7 +590,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                     '尚未选择小说 — 请 AI 调用 select_novel 或点击右侧切换',
                     style: TextStyle(
                       fontSize: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: context.appColors.inkSoft,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -597,16 +599,14 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                     TextSpan(children: [
                       TextSpan(
                         text: '当前小说：',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                        style: AppTypography.metaItalic.copyWith(
+                          color: context.appColors.inkSoft,
                         ),
                       ),
                       TextSpan(
                         text: currentNovel.title,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        style: AppTypography.novelTitle.copyWith(
+                          fontSize: 13,
                           color: appColors.agentAccent,
                         ),
                       ),
@@ -709,8 +709,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                     hintText:
                         chatState.isLoading ? '等待回复...' : '输入消息...',
                     hintStyle: TextStyle(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                      color: context.appColors.inkSoft.withValues(alpha: 0.5),
                     ),
                     filled: true,
                     fillColor: appColors.chatInputBackground,
@@ -763,7 +762,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     return _circleIconButton(
       icon: Icons.send_rounded,
       bg: theme.colorScheme.outline.withValues(alpha: 0.3),
-      fg: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+      fg: appColors.inkSoft.withValues(alpha: 0.5),
       onPressed: null,
       tooltip: '发送',
     );

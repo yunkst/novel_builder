@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/site_script.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
@@ -49,20 +50,18 @@ class SiteScriptPanel extends ConsumerWidget {
               children: [
                 const Icon(Icons.code, size: 20),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   '脚本管理',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: AppTypography.novelTitle.copyWith(
+                    fontSize: 16,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   '${scriptsAsync.valueOrNull?.length ?? 0} 个站点',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.color
-                        ?.withValues(alpha: 0.6),
+                  style: AppTypography.metaItalic.copyWith(
+                    color: context.appColors.inkSoft,
                   ),
                 ),
               ],
@@ -131,25 +130,16 @@ class SiteScriptPanel extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               '暂无提取脚本',
-              style: TextStyle(
+              style: AppTypography.bodyProse.copyWith(
                 fontSize: 14,
-                color: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.color
-                    ?.withValues(alpha: 0.6),
+                color: context.appColors.inkSoft,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'AI 生成脚本后会自动出现在这里',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.color
-                    ?.withValues(alpha: 0.4),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
               ),
             ),
           ],
@@ -169,7 +159,6 @@ class _ScriptCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final appColors = context.appColors;
-    final bodySmall = Theme.of(context).textTheme.bodySmall;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
@@ -184,9 +173,9 @@ class _ScriptCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   script.domain,
-                  style: const TextStyle(
+                  style: AppTypography.novelTitle.copyWith(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -231,9 +220,9 @@ class _ScriptCard extends ConsumerWidget {
           // 使用统计
           Text(
             '使用 ${script.useCount} 次 · ${_formatDate(script.createdAtDateTime)}',
-            style: TextStyle(
+            style: AppTypography.metaItalic.copyWith(
               fontSize: 11,
-              color: bodySmall?.color?.withValues(alpha: 0.6),
+              color: context.appColors.inkSoft,
             ),
           ),
           const SizedBox(height: 8),
@@ -357,14 +346,17 @@ class _ScriptCard extends ConsumerWidget {
           children: [
             Text(
               '域名: ${script.domain}',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: AppTypography.novelTitle.copyWith(
+                fontSize: 14,
+                color: context.appColors.ink,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               '输入要验证的页面 URL（脚本中的 {{URL}} 将被替换为该 URL）:',
-              style: TextStyle(
+              style: AppTypography.bodyProse.copyWith(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: context.appColors.inkSoft,
               ),
             ),
             const SizedBox(height: 8),
@@ -786,9 +778,10 @@ class _ScriptDetailDialogState extends State<_ScriptDetailDialog>
                   Expanded(
                     child: Text(
                       script.domain,
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: AppTypography.novelTitle.copyWith(
+                        fontSize: 16,
+                        color: context.appColors.ink,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -831,9 +824,9 @@ class _ScriptDetailDialogState extends State<_ScriptDetailDialog>
       return Center(
         child: Text(
           '$type 为空',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: AppTypography.metaItalic.copyWith(
             fontSize: 14,
+            color: context.appColors.inkSoft,
           ),
         ),
       );

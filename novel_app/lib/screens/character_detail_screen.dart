@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/character_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../services/logger_service.dart';
@@ -48,7 +49,10 @@ class _CharacterDetailScreenState
     final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_character.name),
+        title: Text(
+          _character.name,
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
@@ -127,17 +131,18 @@ class _CharacterDetailScreenState
         Text(
           c.name,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: AppTypography.chapterTitle.copyWith(
+            fontSize: 22,
+            color: context.appColors.ink,
+          ),
         ),
         if (subtitleParts.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
             subtitleParts.join(' · '),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
+            style: AppTypography.metaItalic.copyWith(
+              color: context.appColors.inkSoft,
+            ),
           ),
         ],
         if (c.aliases != null && c.aliases!.isNotEmpty) ...[
@@ -181,7 +186,13 @@ class _CharacterDetailScreenState
               children: [
                 Icon(icon, size: 18, color: context.appColors.agentAccent),
                 const SizedBox(width: 6),
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  title,
+                  style: AppTypography.novelTitle.copyWith(
+                    fontSize: 15,
+                    color: context.appColors.ink,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -189,7 +200,8 @@ class _CharacterDetailScreenState
               (content == null || content.isEmpty)
                   ? '—'
                   : content,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontSize: 14, height: 1.6, color: context.appColors.ink),
             ),
           ],
         ),
@@ -224,12 +236,19 @@ class _CharacterDetailScreenState
                 Icon(Icons.face_retouching_natural_outlined,
                     size: 18, color: context.appColors.agentAccent),
                 const SizedBox(width: 6),
-                Text('外貌', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  '外貌',
+                  style: AppTypography.novelTitle.copyWith(
+                    fontSize: 15,
+                    color: context.appColors.ink,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             if (!hasAny)
-              Text('—', style: Theme.of(context).textTheme.bodyMedium)
+              Text('—', style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontSize: 14, height: 1.6, color: context.appColors.ink))
             else
               ...rows.map((r) => _appearanceRow(r)),
           ],
@@ -249,18 +268,16 @@ class _CharacterDetailScreenState
             width: 72,
             child: Text(
               r.label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+              style: AppTypography.metaItalic.copyWith(
+                    color: context.appColors.inkSoft,
                   ),
             ),
           ),
           Expanded(
             child: Text(
               empty ? '—' : r.value!,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontSize: 14, height: 1.6, color: context.appColors.ink),
             ),
           ),
         ],
@@ -291,7 +308,10 @@ class _CharacterDetailScreenState
                     size: 18, color: context.appColors.info),
                 const SizedBox(width: 6),
                 Text('AI 生图提示词',
-                    style: Theme.of(context).textTheme.titleSmall),
+                    style: AppTypography.novelTitle.copyWith(
+                      fontSize: 15,
+                      color: context.appColors.ink,
+                    )),
               ],
             ),
             const SizedBox(height: 8),
@@ -312,16 +332,14 @@ class _CharacterDetailScreenState
         SizedBox(
           width: 48,
           child: Text(label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+              style: AppTypography.metaItalic.copyWith(
+                    color: context.appColors.inkSoft,
                   )),
         ),
         Expanded(
           child: Text(value ?? '',
-              style: Theme.of(context).textTheme.bodyMedium),
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontSize: 14, height: 1.6, color: context.appColors.ink)),
         ),
       ],
     );

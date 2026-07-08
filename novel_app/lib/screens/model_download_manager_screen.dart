@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/model_download_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/model_download_task.dart';
 import '../utils/format_utils.dart';
 
@@ -18,7 +19,10 @@ class ModelDownloadManagerScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('模型下载管理'),
+        title: Text(
+          '模型下载管理',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -44,11 +48,20 @@ class ModelDownloadManagerScreen extends ConsumerWidget {
           Icon(Icons.download_outlined,
               size: 64, color: Theme.of(context).disabledColor),
           const SizedBox(height: 16),
-          Text('暂无下载任务',
-              style: Theme.of(context).textTheme.bodyLarge),
+          Text(
+            '暂无下载任务',
+            style: AppTypography.bodyProse.copyWith(
+              fontSize: 15,
+              color: context.appColors.inkSoft,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('在浏览器中点击下载链接即可添加任务',
-              style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            '在浏览器中点击下载链接即可添加任务',
+            style: AppTypography.metaItalic.copyWith(
+              color: context.appColors.inkSoft,
+            ),
+          ),
         ],
       ),
     );
@@ -90,7 +103,10 @@ class _TaskCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     task.filename,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    style: AppTypography.novelTitle.copyWith(
+                      fontSize: 14,
+                      color: context.appColors.ink,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -102,7 +118,9 @@ class _TaskCard extends StatelessWidget {
             // 子目录
             Text(
               '→ /app/models/${task.targetSubdir}/',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
             ),
             const SizedBox(height: 8),
             // 进度条
@@ -178,7 +196,9 @@ class _TaskCard extends StatelessWidget {
           task.totalSize > 0 ? '${(task.downloadProgress * 100).toInt()}%' : '';
       return Text(
         '$pct  $downloaded / $total',
-        style: Theme.of(context).textTheme.bodySmall,
+        style: AppTypography.metaItalic.copyWith(
+          color: context.appColors.inkSoft,
+        ),
       );
     }
     if (task.isUploadPhase) {
@@ -187,7 +207,9 @@ class _TaskCard extends StatelessWidget {
       final pct = total > 0 ? '${(task.uploadProgress * 100).toInt()}%' : '';
       return Text(
         '$pct  块 $done/$total',
-        style: Theme.of(context).textTheme.bodySmall,
+        style: AppTypography.metaItalic.copyWith(
+          color: context.appColors.inkSoft,
+        ),
       );
     }
     return const SizedBox.shrink();

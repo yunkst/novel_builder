@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/logger_service.dart';
 import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../core/theme/log_level_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
@@ -314,20 +315,14 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                   Icon(
                     Icons.bug_report_outlined,
                     size: 64,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.4),
+                    color: context.appColors.inkSoft.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _hasActiveFilter ? '没有匹配的日志' : '暂无日志',
-                    style: TextStyle(
+                    style: AppTypography.bodyProse.copyWith(
                       fontSize: 16,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
+                      color: context.appColors.inkSoft,
                     ),
                   ),
                 ],

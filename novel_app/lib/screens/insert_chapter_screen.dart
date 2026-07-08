@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../utils/toast_utils.dart';
 
 /// 插入章节页面
@@ -78,7 +79,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen> {
           children: [
             Icon(Icons.add_circle, color: context.appColors.info),
             const SizedBox(width: 8),
-            Text(isEmpty ? '创建新章节' : '插入新章节'),
+            Text(
+              isEmpty ? '创建新章节' : '插入新章节',
+              style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+            ),
           ],
         ),
       ),
@@ -105,12 +109,10 @@ class _InsertChapterScreenState extends ConsumerState<InsertChapterScreen> {
                     isEmpty
                         ? '将为小说"${widget.novel.title}"创建第一章'
                         : '将在第${widget.afterIndex + 1}章"${widget.chapters[widget.afterIndex].title}"后插入新章节',
-                    style: TextStyle(
+                    style: AppTypography.bodyProse.copyWith(
                       fontSize: 14,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.7),
+                      height: 1.5,
+                      color: context.appColors.inkSoft,
                     ),
                   ),
                 ),

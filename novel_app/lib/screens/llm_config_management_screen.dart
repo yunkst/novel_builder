@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/services/ai_service_providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/llm_config.dart';
 import '../../services/logger_service.dart';
 
@@ -47,7 +48,10 @@ class _LlmConfigManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LLM 配置管理'),
+        title: Text(
+          'LLM 配置管理',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             onPressed: _addConfig,
@@ -70,11 +74,22 @@ class _LlmConfigManagementScreenState
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.cloud_off, size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+              color: context.appColors.inkSoft.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
-          Text('暂无 LLM 配置', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            '暂无 LLM 配置',
+            style: AppTypography.chapterTitle.copyWith(
+              fontSize: 16,
+              color: context.appColors.inkSoft,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('点击右上角 + 添加配置', style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            '点击右上角 + 添加配置',
+            style: AppTypography.metaItalic.copyWith(
+              color: context.appColors.inkSoft.withValues(alpha: 0.8),
+            ),
+          ),
         ],
       ),
     );

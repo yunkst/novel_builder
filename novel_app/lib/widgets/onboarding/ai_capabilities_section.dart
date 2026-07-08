@@ -14,7 +14,11 @@ class AiCapabilitiesSection extends StatelessWidget {
   const AiCapabilitiesSection({super.key});
 
   /// 引擎名称
-  static const String _engineName = 'DSL Engine';
+  ///
+  /// 这些能力主体由 AI Agent 驱动（角色对话、文生图、章节改写等），
+  /// 底层统一走 OpenAI 兼容的 LLM 调用。对用户统一称为「AI 引擎」，
+  /// 避免暴露内部 DSL Engine / AI Agent 的技术划分。
+  static const String _engineName = 'AI 引擎';
 
   @override
   Widget build(BuildContext context) {

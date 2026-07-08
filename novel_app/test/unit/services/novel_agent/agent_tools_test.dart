@@ -16,10 +16,10 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 23 个工具（新增 create_image_to_video）', () {
-      expect(AgentTools.allTools.length, 23, reason: '所有工具数应为 23（含 2026-07 新增的 create_image_to_video：'
-          'list/select/create novel + read/list/search chapter + create/update/rewrite chapter + '
-          'list/update/create character + background/update_outline/write_outline/get_outline + '
+    test('应该有 25 个工具（新增 delete_chapter 和 delete_character）', () {
+      expect(AgentTools.allTools.length, 25, reason: '所有工具数应为 25（2026-07 新增 delete_chapter / delete_character：'
+          'list/select/create novel + read/list/search chapter + create/update/rewrite/delete chapter + '
+          'list/update/create/delete character + background/update_outline/write_outline/get_outline + '
           'prompt tags + text2img 图片工具 + 图生视频工具）');
     });
 
@@ -148,6 +148,10 @@ void main() {
           required: ['position', 'rewriteInstruction']);
     });
 
+    test('delete_chapter — 需要 position（破坏性）', () {
+      verifyToolSchema('delete_chapter', required: ['position']);
+    });
+
     test('list_characters — 无参数（从上下文读取当前小说）', () {
       verifyToolSchema('list_characters');
     });
@@ -183,6 +187,10 @@ void main() {
             'backgroundStory',
             'aliases',
           ]);
+    });
+
+    test('delete_character — 需要 name（破坏性）', () {
+      verifyToolSchema('delete_character', required: ['name']);
     });
 
     test('update_background_setting — 需要 setting', () {
@@ -301,9 +309,11 @@ void main() {
       'create_chapter': '_createChapter',
       'update_chapter_content': '_updateChapterContent',
       'rewrite_chapter': '_rewriteChapterContent',
+      'delete_chapter': '_deleteChapter',
       'list_characters': '_listCharacters',
       'update_character': '_updateCharacter',
       'create_character': '_createCharacter',
+      'delete_character': '_deleteCharacter',
       'update_background_setting': '_updateBackgroundSetting',
       'update_outline': '_updateOutline',
       'write_outline': '_writeOutline',

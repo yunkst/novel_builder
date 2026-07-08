@@ -126,6 +126,8 @@ class ToolExecutor {
         case 'rewrite_chapter':
           return await _rewriteChapterContent(args, scenarioContext,
               onProgress: onProgress);
+        case 'delete_chapter':
+          return await _deleteChapter(args, scenarioContext);
         // ===== 角色 =====
         case 'list_characters':
           return await _listCharacters(args, scenarioContext);
@@ -133,6 +135,8 @@ class ToolExecutor {
           return await _updateCharacter(args, scenarioContext);
         case 'create_character':
           return await _createCharacter(args, scenarioContext);
+        case 'delete_character':
+          return await _deleteCharacter(args, scenarioContext);
         // ===== 设定 / 大纲 =====
         case 'update_background_setting':
           return await _updateBackgroundSetting(args, scenarioContext);
@@ -756,6 +760,66 @@ class ToolExecutor {
     });
   }
 
+  /// 删除指定章节（同时清理 novel_chapters 和 chapter_cache），并触发章节索引重排
+  ///
+  /// position 来自 list_chapters（1-based）。删除后调用 [ChapterRepository.cacheNovelChapters]
+  /// 传入剩余章节列表，由其内部的 [_reorderChapters] 把后续章节的 chapterIndex 连续化为 0,1,2...
+  /// 以保证再次调用 list_chapters / read_chapter_content 时 position 解析正确。
+  Future<String> _deleteChapter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (position, posErr) = parser.requireInt('position');
+    if (posErr != null) return posErr;
+
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final novelUrl = novelResolve.url!;
+
+    // 复用 _resolveChapterUrlByPosition 一并做越界校验，错误码 chapter_position_out_of_range 一致
+    final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
+    if (resolveResult.errorJson != null) {
+      return jsonEncode(resolveResult.errorJson);
+    }
+    final chapterUrl = resolveResult.url!;
+
+    final chapterRepo = ref.read(chapterRepositoryProvider);
+
+    // 先记下要删章节的标题（用于返回 message），避免删后查不到
+    final chapters = await chapterRepo.getCachedNovelChapters(novelUrl);
+    final deletedChapter = chapters.firstWhere(
+      (c) => c.url == chapterUrl,
+      orElse: () => chapters[position - 1],
+    );
+    final deletedTitle = deletedChapter.title;
+    final deletedIndex = deletedChapter.chapterIndex;
+
+    // 1) 同时清两张表
+    await chapterRepo.deleteCustomChapter(chapterUrl);
+
+    // 2) 触发索引重排：把剩余章节重新 cacheNovelChapters，内部的 _reorderChapters
+    //    会把 chapterIndex 连续化为 0,1,2...。注意：仅传剩余章节，避免对已删除行做无用 upsert。
+    final remaining = await chapterRepo.getCachedNovelChapters(novelUrl);
+    if (remaining.isNotEmpty) {
+      await chapterRepo.cacheNovelChapters(novelUrl, remaining);
+    }
+
+    LoggerService.instance.i(
+        '删除章节: novelUrl=$novelUrl position=$position title="$deletedTitle" index=$deletedIndex',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'delete_chapter']);
+    return jsonEncode({
+      'success': true,
+      'message': '章节「$deletedTitle」已删除（原 position=$position）。',
+      'deletedTitle': deletedTitle,
+      'deletedPosition': position,
+      'remainingChapters': remaining.length,
+    });
+  }
+
   /// 读取 AI 作家设定（用户在 AI 配置页填写的作家人设 prompt），返回 trim 后的字符串
   Future<String> _loadWriterPrompt() async {
     final raw = await PreferencesService.instance.getString('ai_writer_prompt');
@@ -1173,6 +1237,52 @@ class ToolExecutor {
       'success': true,
       'message': '角色 "$name" 已创建',
       'characterId': id,
+    });
+  }
+
+  /// 删除指定名字的角色
+  ///
+  /// 复用 findCharacterByName 取 ID（避免暴露真实 ID 给 LLM），存在则 deleteCharacter 删除。
+  /// 注意：仅删除 characters 表中的角色卡；该角色出现在章节正文里的字样不会被自动修改，
+  /// 如需改正文请用 update_chapter_content / rewrite_chapter。
+  Future<String> _deleteCharacter(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (name, nameErr) = parser.requireString('name');
+    if (nameErr != null) return nameErr;
+
+    final novelResolve = await _resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final novelUrl = novelResolve.url!;
+
+    final repo = ref.read(characterRepositoryProvider);
+    final existing = await repo.findCharacterByName(novelUrl, name);
+    if (existing == null) {
+      LoggerService.instance.d(
+        '工具引导错误: character_not_found name=$name',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', 'delete_character', 'character_not_found'],
+      );
+      return jsonEncode({
+        'error': 'character_not_found',
+        'message': '角色 "$name" 不存在。使用 list_characters 查看所有角色。',
+        'suggested_tool': 'list_characters',
+        'suggested_args': <String, dynamic>{},
+      });
+    }
+
+    await repo.deleteCharacter(existing.id!);
+
+    LoggerService.instance.i('删除角色: "$name" (id=${existing.id})',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'delete_character']);
+    return jsonEncode({
+      'success': true,
+      'message': '角色 "$name" 已删除',
+      'deletedName': name,
     });
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/novel.dart';
 import '../models/outline.dart';
 import '../services/logger_service.dart';
@@ -212,16 +213,16 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('大纲'),
+                Text(
+                  '大纲',
+                  style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+                ),
                 Text(
                   widget.novel.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
-                      ),
+                  style: AppTypography.metaItalic.copyWith(
+                    fontSize: 12,
+                    color: context.appColors.inkSoft,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -300,7 +301,11 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
               contentPadding: const EdgeInsets.all(16),
               counterText: '${_contentController.text.length} 字符',
             ),
-            style: const TextStyle(fontSize: 16, height: 1.5),
+            style: AppTypography.bodyProse.copyWith(
+              fontSize: 16,
+              height: 1.5,
+              color: context.appColors.ink,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -309,23 +314,17 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
             Icon(
               Icons.info_outline,
               size: 14,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
+              color: context.appColors.inkSoft,
             ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 _isModified ? '内容已修改，2 秒后自动保存或点击右上角保存' : '点击右上角保存按钮保存修改',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _isModified
-                          ? context.appColors.warning
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                    ),
+                style: AppTypography.metaItalic.copyWith(
+                  color: _isModified
+                      ? context.appColors.warning
+                      : context.appColors.inkSoft,
+                ),
               ),
             ),
           ],
@@ -341,12 +340,10 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
       return Center(
         child: Text(
           hasTitle ? '暂无大纲内容' : '暂无大纲，可在「编辑」页创建',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.5),
-              ),
+          style: AppTypography.bodyProse.copyWith(
+            fontSize: 16,
+            color: context.appColors.inkSoft,
+          ),
         ),
       );
     }
@@ -356,42 +353,54 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
       selectable: true,
       padding: const EdgeInsets.all(16),
       styleSheet: MarkdownStyleSheet(
-        p: Theme.of(context).textTheme.bodyMedium,
-        h1: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h2: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h3: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h4: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        strong: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        em: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-            ),
-        listBullet: Theme.of(context).textTheme.bodyMedium,
-        code: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
+        p: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          color: context.appColors.ink,
+        ),
+        h1: AppTypography.chapterTitle.copyWith(
+          fontSize: 22,
+          color: context.appColors.ink,
+        ),
+        h2: AppTypography.chapterTitle.copyWith(
+          fontSize: 19,
+          color: context.appColors.ink,
+        ),
+        h3: AppTypography.novelTitle.copyWith(
+          fontSize: 17,
+          color: context.appColors.ink,
+        ),
+        h4: AppTypography.novelTitle.copyWith(
+          fontSize: 15,
+          color: context.appColors.ink,
+        ),
+        strong: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: context.appColors.ink,
+        ),
+        em: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontStyle: FontStyle.italic,
+          color: context.appColors.ink,
+        ),
+        listBullet: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          color: context.appColors.inkSoft,
+        ),
+        code: AppTypography.bodyProse.copyWith(
+          fontSize: 13,
+          fontFamily: 'monospace',
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
         codeblockDecoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
-        blockquote: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.7),
-            ),
+        blockquote: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontStyle: FontStyle.italic,
+          color: context.appColors.inkSoft,
+        ),
         blockquoteDecoration: BoxDecoration(
           border: Border(
             left: BorderSide(
@@ -403,10 +412,7 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen>
         horizontalRuleDecoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.2),
+              color: context.appColors.divider,
               width: 1,
             ),
           ),

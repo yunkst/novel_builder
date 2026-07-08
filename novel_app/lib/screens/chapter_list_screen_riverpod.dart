@@ -171,7 +171,11 @@ class _ChapterListScreenRiverpodState
         children: [
           Text(
             state.errorMessage,
-            style: TextStyle(color: context.appColors.error),
+            style: AppTypography.bodyProse.copyWith(
+              fontSize: 15,
+              color: context.appColors.error,
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           ElevatedButton(

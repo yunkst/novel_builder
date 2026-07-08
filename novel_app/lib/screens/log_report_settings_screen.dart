@@ -4,6 +4,7 @@ import '../services/log_reporter_service.dart';
 import '../services/logger_service.dart';
 import '../core/providers/service_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../core/theme/log_level_colors.dart';
 import '../utils/toast_utils.dart';
 
@@ -47,7 +48,10 @@ class _LogReportSettingsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日志上报'),
+        title: Text(
+          '日志上报',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
       ),
       body: ListView(
         children: [
@@ -150,12 +154,9 @@ class _LogReportSettingsScreenState
               '• 缓冲区累积达到 20 条\n'
               '• 距上次上报超过 30 秒\n'
               '• 应用进入后台',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
-                  ),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
             ),
           ),
         ],

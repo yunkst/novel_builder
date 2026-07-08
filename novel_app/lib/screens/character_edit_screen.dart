@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../services/logger_service.dart';
@@ -95,7 +96,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? '编辑人物卡' : '新建人物卡'),
+        title: Text(
+          _isEditing ? '编辑人物卡' : '新建人物卡',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           TextButton.icon(
             onPressed: _isSaving ? null : _onSave,
@@ -182,10 +186,10 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: context.appColors.agentAccent,
-              fontWeight: FontWeight.bold,
-            ),
+        style: AppTypography.novelTitle.copyWith(
+          fontSize: 15,
+          color: context.appColors.agentAccent,
+        ),
       ),
     );
   }
@@ -288,12 +292,21 @@ class _CharacterEditScreenState extends ConsumerState<CharacterEditScreen> {
         children: [
           Icon(Icons.auto_awesome, size: 18, color: context.appColors.info),
           const SizedBox(width: 6),
-          Text('AI 生图提示词',
-              style: Theme.of(context).textTheme.titleSmall),
+          Text(
+            'AI 生图提示词',
+            style: AppTypography.novelTitle.copyWith(
+              fontSize: 15,
+              color: context.appColors.ink,
+            ),
+          ),
         ],
       ),
-      subtitle: const Text('普通用户可忽略，供生图功能使用',
-          style: TextStyle(fontSize: 12)),
+      subtitle: Text(
+        '普通用户可忽略，供生图功能使用',
+        style: AppTypography.metaItalic.copyWith(
+          color: context.appColors.inkSoft,
+        ),
+      ),
       children: [
         const SizedBox(height: 8),
         _buildMultilineField(
@@ -476,10 +489,12 @@ class _InputChipListState extends State<InputChipList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(widget.label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                )),
+        Text(
+          widget.label,
+          style: AppTypography.metaItalic.copyWith(
+            color: context.appColors.inkSoft,
+          ),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

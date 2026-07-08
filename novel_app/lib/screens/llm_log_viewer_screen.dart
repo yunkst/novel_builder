@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../services/llm_logger/llm_call_record.dart';
 import '../services/llm_logger/llm_logger.dart';
 import '../utils/format_utils.dart';
@@ -122,7 +123,10 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LLM 调用日志'),
+        title: Text(
+          'LLM 调用日志',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.content_copy),
@@ -152,8 +156,8 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
             child: Text(
               '共 ${_records.length} 条 · 占用 ${FormatUtils.formatFileSize(_totalSize)}'
               '${_isLoading ? ' · 加载中...' : ''}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
               ),
             ),
           ),
@@ -260,7 +264,6 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
 
   /// 空状态占位（参照 preload_queue_debug_screen 的 _buildEmpty 模式）
   Widget _buildEmpty(String message) {
-    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -270,20 +273,21 @@ class _LlmLogViewerScreenState extends ConsumerState<LlmLogViewerScreen> {
             Icon(
               Icons.smart_toy_outlined,
               size: 48,
-              color: theme.colorScheme.outline,
+              color: context.appColors.inkSoft.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
             Text(
               message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 15,
+                color: context.appColors.inkSoft,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '触发一次 AI 写作或角色对话后将显示',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft.withValues(alpha: 0.7),
               ),
             ),
           ],

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/logger_service.dart';
 import '../utils/toast_utils.dart';
 import '../core/providers/services/network_service_providers.dart';
+import '../core/theme/app_typography.dart';
 
 class BackendSettingsScreen extends ConsumerStatefulWidget {
   const BackendSettingsScreen({super.key});
@@ -100,7 +101,10 @@ class _BackendSettingsScreenState extends ConsumerState<BackendSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('后端服务配置'),
+        title: Text(
+          '后端服务配置',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/novel.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../widgets/common/common_widgets.dart';
 import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
@@ -233,9 +234,10 @@ class _BackgroundSettingScreenState
               contentPadding: const EdgeInsets.all(16),
               counterText: '${_controller.text.length} 字符',
             ),
-            style: const TextStyle(
+            style: AppTypography.bodyProse.copyWith(
               fontSize: 16,
               height: 1.5,
+              color: context.appColors.ink,
             ),
           ),
         ),
@@ -246,23 +248,17 @@ class _BackgroundSettingScreenState
             Icon(
               Icons.info_outline,
               size: 14,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
+              color: context.appColors.inkSoft,
             ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 _isModified ? '内容已修改，2秒后自动保存或点击右上角保存' : '点击右上角保存按钮保存修改',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _isModified
-                          ? context.appColors.warning
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                    ),
+                style: AppTypography.metaItalic.copyWith(
+                  color: _isModified
+                      ? context.appColors.warning
+                      : context.appColors.inkSoft,
+                ),
               ),
             ),
           ],
@@ -279,12 +275,10 @@ class _BackgroundSettingScreenState
       return Center(
         child: Text(
           '暂无内容',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.5),
-              ),
+          style: AppTypography.bodyProse.copyWith(
+            fontSize: 16,
+            color: context.appColors.inkSoft,
+          ),
         ),
       );
     }
@@ -294,43 +288,55 @@ class _BackgroundSettingScreenState
       selectable: true,
       padding: const EdgeInsets.all(16),
       styleSheet: MarkdownStyleSheet(
-        // 使用主题颜色，自动适配暗色模式
-        p: Theme.of(context).textTheme.bodyMedium,
-        h1: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h2: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h3: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        h4: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        strong: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-        em: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-            ),
-        listBullet: Theme.of(context).textTheme.bodyMedium,
-        code: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
+        // 正文用衬线书卷气，颜色走阅读墨色
+        p: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          color: context.appColors.ink,
+        ),
+        h1: AppTypography.chapterTitle.copyWith(
+          fontSize: 22,
+          color: context.appColors.ink,
+        ),
+        h2: AppTypography.chapterTitle.copyWith(
+          fontSize: 19,
+          color: context.appColors.ink,
+        ),
+        h3: AppTypography.novelTitle.copyWith(
+          fontSize: 17,
+          color: context.appColors.ink,
+        ),
+        h4: AppTypography.novelTitle.copyWith(
+          fontSize: 15,
+          color: context.appColors.ink,
+        ),
+        strong: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: context.appColors.ink,
+        ),
+        em: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontStyle: FontStyle.italic,
+          color: context.appColors.ink,
+        ),
+        listBullet: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          color: context.appColors.inkSoft,
+        ),
+        code: AppTypography.bodyProse.copyWith(
+          fontSize: 13,
+          fontFamily: 'monospace',
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
         codeblockDecoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
-        blockquote: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.7),
-            ),
+        blockquote: AppTypography.bodyProse.copyWith(
+          fontSize: 15,
+          fontStyle: FontStyle.italic,
+          color: context.appColors.inkSoft,
+        ),
         blockquoteDecoration: BoxDecoration(
           border: Border(
             left: BorderSide(
@@ -342,10 +348,7 @@ class _BackgroundSettingScreenState
         horizontalRuleDecoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.2),
+              color: context.appColors.divider,
               width: 1,
             ),
           ),
@@ -375,16 +378,16 @@ class _BackgroundSettingScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('背景设定'),
+                Text(
+                  '背景设定',
+                  style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+                ),
                 Text(
                   widget.novel.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
-                      ),
+                  style: AppTypography.metaItalic.copyWith(
+                    fontSize: 12,
+                    color: context.appColors.inkSoft,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

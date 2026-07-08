@@ -8,6 +8,8 @@ import '../widgets/highlighted_text.dart';
 import '../utils/toast_utils.dart';
 import '../services/logger_service.dart';
 import '../core/providers/chapter_search_providers.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import 'reader_screen.dart';
 
 /// 章节搜索页面 - Riverpod 版本
@@ -115,9 +117,10 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
         child: _SingleMatchHighlight(
           text: contextText,
           keywords: result.searchKeywords,
-          style: const TextStyle(
+          style: AppTypography.bodyProse.copyWith(
             fontSize: 14,
             height: 1.4,
+            color: context.appColors.ink,
           ),
         ),
       );
@@ -183,7 +186,10 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('搜索章节内容'),
+        title: Text(
+          '搜索章节内容',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           if (searchState.hasSearched)
             IconButton(
@@ -202,6 +208,7 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: '搜索 ${widget.novel.title} 的章节内容...',
+                hintStyle: TextStyle(color: context.appColors.inkSoft),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -215,7 +222,12 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
+                fillColor: context.appColors.paper,
+              ),
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 15,
+                height: 1.4,
+                color: context.appColors.ink,
               ),
               onSubmitted: _performSearch,
             ),
@@ -243,13 +255,18 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
   ) {
     // 显示加载中
     if (searchState.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在搜索...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              '正在搜索...',
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
+            ),
           ],
         ),
       );
@@ -264,31 +281,21 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
             Icon(
               Icons.search,
               size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
+              color: context.appColors.inkSoft.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               '输入关键词搜索章节内容',
-              style: TextStyle(
+              style: AppTypography.bodyProse.copyWith(
                 fontSize: 16,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.6),
+                color: context.appColors.inkSoft,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '支持搜索章节标题和内容',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.5),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -313,42 +320,28 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                 Icon(
                   Icons.search_off,
                   size: 64,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.4),
+                  color: context.appColors.inkSoft.withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   '未找到相关内容',
-                  style: TextStyle(
+                  style: AppTypography.bodyProse.copyWith(
                     fontSize: 16,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
+                    color: context.appColors.inkSoft,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '尝试使用其他关键词',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+                  style: AppTypography.metaItalic.copyWith(
+                    color: context.appColors.inkSoft.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   '提示：可以搜索章节标题或内容',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.4),
+                  style: AppTypography.metaItalic.copyWith(
+                    color: context.appColors.inkSoft.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -378,15 +371,13 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                               ? TitleHighlight(
                                   title: result.chapterTitle,
                                   keywords: result.searchKeywords,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                  style: AppTypography.novelTitle.copyWith(
                                     fontSize: 16,
                                   ),
                                 )
                               : Text(
                                   result.chapterTitle,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                  style: AppTypography.novelTitle.copyWith(
                                     fontSize: 16,
                                   ),
                                 ),
@@ -394,13 +385,8 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                         if (result.matchCount > 0)
                           Text(
                             ' (${result.matchCount}处匹配)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.6),
-                              fontWeight: FontWeight.normal,
+                            style: AppTypography.metaItalic.copyWith(
+                              color: context.appColors.inkSoft,
                             ),
                           ),
                       ],
@@ -416,12 +402,10 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             '缓存于 ${result.cachedAt.toString().substring(0, 19).replaceAll('-', '/')}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.5),
+                            style: AppTypography.metaItalic.copyWith(
+                              color: context.appColors.inkSoft.withValues(
+                                alpha: 0.8,
+                              ),
                             ),
                           ),
                         ),
@@ -463,31 +447,21 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
                   Icon(
                     Icons.error_outline,
                     size: 64,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .error
-                        .withValues(alpha: 0.6),
+                    color: context.appColors.error.withValues(alpha: 0.7),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     '加载章节列表失败',
-                    style: TextStyle(
+                    style: AppTypography.bodyProse.copyWith(
                       fontSize: 16,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
+                      color: context.appColors.inkSoft,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     error.toString(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.5),
+                    style: AppTypography.metaItalic.copyWith(
+                      color: context.appColors.inkSoft.withValues(alpha: 0.8),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -512,29 +486,21 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
               Icon(
                 Icons.error_outline,
                 size: 64,
-                color:
-                    Theme.of(context).colorScheme.error.withValues(alpha: 0.6),
+                color: context.appColors.error.withValues(alpha: 0.7),
               ),
               const SizedBox(height: 16),
               Text(
                 '搜索失败',
-                style: TextStyle(
+                style: AppTypography.bodyProse.copyWith(
                   fontSize: 16,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
+                  color: context.appColors.inkSoft,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 error.toString(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
+                style: AppTypography.metaItalic.copyWith(
+                  color: context.appColors.inkSoft.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),

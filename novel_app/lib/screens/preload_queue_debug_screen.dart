@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/preload_service.dart';
 import '../core/providers/service_providers.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../widgets/common/confirm_dialog.dart';
 
 /// 统计卡片定义（4 张，与 PreloadService 数据层对应）
@@ -330,8 +332,13 @@ class _PreloadQueueDebugScreenState
             Icon(Icons.inbox_outlined,
                 size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 12),
-            Text(message,
-                style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+            Text(
+              message,
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 14,
+                color: context.appColors.inkSoft,
+              ),
+            ),
           ],
         ),
       ),
@@ -354,7 +361,10 @@ class _PreloadQueueDebugScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('预加载队列'),
+        title: Text(
+          '预加载队列',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

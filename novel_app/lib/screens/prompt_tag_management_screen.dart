@@ -15,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/database_providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
 import '../../models/tag_group.dart';
@@ -277,7 +279,10 @@ class _PromptTagManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('提示词标签管理'),
+        title: Text(
+          '提示词标签管理',
+          style: AppTypography.chapterTitle.copyWith(fontSize: 18),
+        ),
         actions: [
           IconButton(
             onPressed: _addTag,
@@ -339,12 +344,12 @@ class _PromptTagManagementScreenState
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Text('暂无分类',
-                style: TextStyle(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5))),
+            Text(
+              '暂无分类',
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
+            ),
             const SizedBox(width: 12),
             IconButton.outlined(
               onPressed: _addCategory,
@@ -391,12 +396,9 @@ class _PromptTagManagementScreenState
         ListTile(
           dense: true,
           title: Text('分类',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
-                  )),
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              )),
           trailing: IconButton(
             onPressed: _addCategory,
             icon: const Icon(Icons.add, size: 18),
@@ -407,12 +409,12 @@ class _PromptTagManagementScreenState
         Expanded(
           child: _categories.isEmpty
               ? Center(
-                  child: Text('暂无分类',
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.4))),
+                  child: Text(
+                    '暂无分类',
+                    style: AppTypography.metaItalic.copyWith(
+                      color: context.appColors.inkSoft,
+                    ),
+                  ),
                 )
               : ListView.builder(
                   itemCount: _categories.length,
@@ -477,12 +479,13 @@ class _PromptTagManagementScreenState
                     .onSurface
                     .withValues(alpha: 0.2)),
             const SizedBox(height: 16),
-            Text('请选择左侧分类',
-                style: TextStyle(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5))),
+            Text(
+              '请选择左侧分类',
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 15,
+                color: context.appColors.inkSoft,
+              ),
+            ),
           ],
         ),
       );
@@ -504,20 +507,20 @@ class _PromptTagManagementScreenState
                     .onSurface
                     .withValues(alpha: 0.2)),
             const SizedBox(height: 16),
-            Text('该分类下暂无标签',
-                style: TextStyle(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5))),
+            Text(
+              '该分类下暂无标签',
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 15,
+                color: context.appColors.inkSoft,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('点击右上角 + 添加标签',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.4),
-                    )),
+            Text(
+              '点击右上角 + 添加标签',
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
+            ),
           ],
         ),
       );
@@ -607,18 +610,22 @@ class _PromptTagManagementScreenState
           tag.promptText,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: AppTypography.bodyProse.copyWith(
+            fontSize: 13,
+            height: 1.5,
+            color: context.appColors.ink,
+          ),
         ),
         subtitle: tag.reason.isNotEmpty
-            ? Text(tag.reason,
+            ? Text(
+                tag.reason,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.4)))
+                style: AppTypography.metaItalic.copyWith(
+                  fontSize: 11,
+                  color: context.appColors.inkSoft,
+                ),
+              )
             : null,
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, size: 16),
@@ -880,10 +887,7 @@ class _TagEditDialogState extends State<_TagEditDialog> {
                 border: const OutlineInputBorder(),
                 filled: hasPresetName,
                 fillColor: hasPresetName
-                    ? Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.05)
+                    ? context.appColors.divider.withValues(alpha: 0.3)
                     : null,
               ),
             ),
