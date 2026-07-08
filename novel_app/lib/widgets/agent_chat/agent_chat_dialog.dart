@@ -21,7 +21,10 @@ import '../../core/theme/app_colors.dart';
 
 /// Agent 聊天对话框
 class AgentChatDialog extends ConsumerStatefulWidget {
-  const AgentChatDialog({super.key});
+  /// 预填草稿（draftOnly 模式下由启动器注入；autoSend 模式不传）
+  final String? initialDraft;
+
+  const AgentChatDialog({super.key, this.initialDraft});
 
   @override
   ConsumerState<AgentChatDialog> createState() => _AgentChatDialogState();
@@ -40,9 +43,12 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   @override
   void initState() {
     super.initState();
-    _hasText = _inputController.text.trim().isNotEmpty;
     _inputController.addListener(_onInputChanged);
     _scrollController.addListener(_onScroll);
+    if (widget.initialDraft != null) {
+      _inputController.text = widget.initialDraft!;
+    }
+    _hasText = _inputController.text.trim().isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
