@@ -58,32 +58,6 @@ class ModelsResponse(BaseModel):
 
 
 # ============================================================================
-# APP版本管理相关API模式
-# ============================================================================
-
-
-class AppVersionUploadRequest(BaseModel):
-    """APP版本上传请求模式（已废弃，版本更新迁移到 GitHub Releases）."""
-
-    version: str = Field(..., min_length=1, max_length=20, description="版本号 (如 1.0.1)")
-    version_code: int = Field(..., ge=1, description="版本递增码")
-    changelog: str | None = Field(None, max_length=2000, description="更新日志")
-    force_update: bool = Field(False, description="是否强制更新")
-
-
-class AppVersionResponse(BaseModel):
-    """APP版本信息响应模式（已废弃，版本更新迁移到 GitHub Releases）."""
-
-    version: str = Field(..., description="版本号")
-    version_code: int = Field(..., description="版本递增码")
-    download_url: str = Field(..., description="下载URL")
-    file_size: int = Field(..., description="文件大小(字节)")
-    changelog: str | None = Field(None, description="更新日志")
-    force_update: bool = Field(False, description="是否强制更新")
-    created_at: str = Field(..., description="发布时间")
-
-
-# ============================================================================
 # 数据库备份相关API模式
 # ============================================================================
 

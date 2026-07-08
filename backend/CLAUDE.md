@@ -67,7 +67,7 @@ Python 后端是 Novel Builder 平台的 AI 与配套服务，提供 FastAPI 驱
 - `GET /security-check` - 安全配置检查（仅 DEBUG）
 - `GET /` - 服务信息与端点清单
 
-> **已废弃**：`/api/app-version/*` 已迁移到 GitHub Releases（前端 `github_release_service.dart`）。
+> **已移除**：`/api/app-version/*` 版本管理已迁移到 GitHub Releases（前端 `github_release_service.dart` 直接调 GitHub API），后端相关路由与 schema 已于 2026-07-08 删除。
 
 ## 关键依赖与配置
 
@@ -114,7 +114,6 @@ dependencies = [
 
 - `Text2ImgGenerateRequest` - 文生图请求（prompt / model_name / negative_prompt）
 - `WorkflowInfo` / `ModelsResponse` - 工作流与模型列表
-- `AppVersionUploadRequest` / `AppVersionResponse` - 已废弃，保留兼容
 - `BackupUploadResponse` / `BackupInfo` / `BackupListResponse` - 备份
 - `LogEntrySchema` / `LogUploadRequest` / `LogUploadResponse` - 日志上报
 - `ModelDirInfo` / `ModelUploadInit*` / `ModelChunkUploadResponse` / `ModelUploadStatusResponse` / `ModelUploadCompleteResponse` - 模型分块上传

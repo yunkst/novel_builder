@@ -382,15 +382,6 @@ async def get_models() -> ModelsResponse:
         raise handle_service_exception(e, logger, "获取模型列表")
 
 
-# ================= 缓存管理 API =================
-
-
-# ================= APP版本管理 API 已废弃 =================
-# 版本更新已迁移到 GitHub Releases：
-# https://github.com/yunkst/novel_builder/releases
-# 应用内通过 GitHub Releases API 检测更新（lib/services/github_release_service.dart）
-
-
 # 便于 Docker 容器启动时的提示
 @app.get("/")
 def index():

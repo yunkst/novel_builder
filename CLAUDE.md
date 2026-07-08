@@ -5,6 +5,7 @@
 - **2025-11-13**: AI上下文初始化，重新设计架构文档，添加模块化结构
 - **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DSL Engine + Scrapling + Riverpod
 - **2026-07-07**: 校准爬虫站点（9→11）、DB 版本（v21→v33）、移除无依据端口；DSL Engine 统一命名
+- **2026-07-08**: **移除 backend 搜索与多站点爬虫功能**。前端已改用 headless WebView + 本地 JS 提取脚本获取章节内容、本地书架搜索；后端爬虫/搜索/章节缓存成为死代码，删除 `app/services/` 下 21 个文件、4 张缓存表、Scrapling/Playwright 等依赖；新增 `20260708_drop_cache_tables` 迁移 drop `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache`。
 
 ## 项目愿景
 
@@ -23,26 +24,16 @@ graph TD
     B --> G["SQLite本地缓存"];
 
     C --> H["FastAPI后端服务"];
-    C --> I["多站点爬虫系统"];
-    C --> J["PostgreSQL缓存"];
+    C --> J["PostgreSQL任务表"];
 
     F --> K["书架管理"];
-    F --> L["搜索功能"];
-    F --> M["阅读界面"];
+    F --> L["搜索功能（本地）"];
+    F --> M["阅读界面（headless WebView）"];
     F --> N["AI集成（DSL Engine + Agent）"];
 
-    H --> O["搜索API"];
-    H --> P["章节API"];
-    H --> Q["缓存API"];
-    H --> R["版本管理API"];
-
-    I --> S["AliceSW"];
-    I --> T["点点（ddxsmf）"];
-    I --> U["书库（shukuge）"];
-    I --> V["我的书城（wodeshucheng）"];
-    I --> W["微风（wfxs）"];
-    I --> X["笔趣阁543"];
-    I --> Y["...共11站点"];
+    H --> O["AI文生图/图生视频API"];
+    H --> P["备份/日志API"];
+    H --> Q["模型管理API"];
 
     click B "./novel_app/CLAUDE.md" "查看 Flutter 移动应用模块"
     click C "./backend/CLAUDE.md" "查看 Python 后端模块"
@@ -59,10 +50,9 @@ graph TD
 
 ### 后端技术
 - **FastAPI**: Python Web框架
-- **PostgreSQL**: 主数据库
+- **PostgreSQL / SQLite**: 主数据库（生产 PostgreSQL，本地默认 SQLite）
 - **SQLAlchemy**: ORM框架
-- **Scrapling**: 现代网页爬虫引擎
-- **Playwright**: 高级网页自动化
+- **Alembic**: 数据库迁移
 
 ### 基础设施
 - **Docker & Docker Compose**: 容器化部署
@@ -75,14 +65,14 @@ graph TD
 | 模块路径 | 类型 | 主要功能 | 状态 |
 |---------|------|----------|------|
 | [novel_app](./novel_app/CLAUDE.md) | Flutter移动应用 | 小说阅读器，搜索，缓存，AI功能 | ✅ 活跃 |
-| [backend](./backend/CLAUDE.md) | FastAPI后端 | 多站点爬虫（11个），API服务，缓存管理 | ✅ 活跃 |
+| [backend](./backend/CLAUDE.md) | FastAPI后端 | AI文生图/图生视频、ComfyUI 客户端、备份、模型管理、日志上报 | ✅ 活跃 |
 
 ## 核心功能
 
 ### 📱 移动应用功能
 - **书架管理**: 本地小说收藏与阅读进度跟踪
-- **智能搜索**: 跨11个小说站点的统一搜索
-- **离线阅读**: 章节内容本地缓存
+- **本地搜索**: 本地书架搜索（前端实现，不调后端）
+- **离线阅读**: 章节内容本地缓存 + headless WebView 提取
 - **AI增强**: DSL Engine 本地工作流 + Agent Chat 智能对话
 - **场景插图**: AI生成的场景插图功能（ComfyUI 后端，支持负向提示词）
 - **角色卡管理**: 智能识别和提取章节角色信息
@@ -90,13 +80,14 @@ graph TD
 - **提纲管理**: 小说结构和章节规划
 
 ### 🌐 后端服务功能
-- **多站点爬虫**: 支持11个小说站点（基于 Scrapling）
-- **智能缓存**: PostgreSQL数据库缓存 + 装饰器模式
+- **AI 文生图 / 图生视频**: ComfyUI 任务提交与结果轮询，支持负向提示词
+- **ComfyUI 客户端**: 工作流占位符替换、模型目录浏览、分块上传
+- **数据备份**: 客户端数据库备份文件上传、列表、下载
+- **客户端日志上报**: 接收并持久化客户端日志
 - **实时API**: RESTful API with OpenAPI文档
-- **任务管理**: 后台缓存任务与进度跟踪
-- **WebSocket**: 实时进度推送
-- **版本管理**: APP版本上传与分发
-- **数据同步**: 小说数据导入/导出
+- **数据同步**: 备份导入/导出
+
+> 注：**多站点爬虫、搜索/章节接口、章节缓存已移除**（前端改用 headless WebView + 本地 JS 提取脚本 + 本地书架搜索，2026-07-08）。
 
 ### 🔧 基础设施功能
 - **容器化部署**: Docker Compose一键部署
@@ -137,8 +128,8 @@ docker-compose ps
 创建 `.env` 文件：
 ```env
 NOVEL_API_TOKEN=your_api_token_here
-NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,xspsw,wdscw,wodeshucheng,smxku,wfxs,shuhaoxs,biquge543,xqishen
 DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
+COMFYUI_API_URL=http://host.docker.internal:8188
 ```
 
 ## 测试策略
@@ -151,7 +142,7 @@ DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db
 ### 测试覆盖率
 - **Flutter应用**: 核心业务逻辑单元测试 + Riverpod Provider 测试
 - **后端服务**: API端点集成测试
-- **爬虫功能**: 模拟站点测试
+- **AI 功能**: ComfyUI 文生图/图生视频任务接口与工作流配置测试
 
 ## 编码规范
 
@@ -216,10 +207,9 @@ docker-compose logs -f
 
 ### 主要表结构
 - **bookshelf**: 小说元数据（历史命名，含阅读进度）
-- **chapter_cache**: 章节内容缓存
+- **chapter_cache**: 章节内容缓存（前端 SQLite 本地缓存）
 - **novel_chapters**: 章节列表元数据
 - **chapter_versions**: 章节历史版本（AI 编辑/重写留档）
-- **cache_tasks**: 缓存任务管理
 - **characters / character_relationships**: 角色与关系图
 - **outlines**: 大纲数据
 - **chat_sessions / chat_scenes**: Agent 对话会话与场景
@@ -230,10 +220,13 @@ docker-compose logs -f
 - **site_scripts**: 站点提取脚本
 - **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id，1.9.21 起含 negative_prompt）
 - **image_to_video_task**: 图生视频任务（ComfyUI prompt_id 为 task_id）
+- **client_logs**: 客户端日志（后端）
+
+> 后端 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache` 三张缓存表已于 2026-07-08 由 `20260708_drop_cache_tables` 迁移移除。
 
 ### 数据库版本
 - **前端SQLite**: v33 (novel_reader.db)
-- **后端PostgreSQL**: Alembic 管理
+- **后端PostgreSQL**: Alembic 管理（head: `20260708_drop_cache_tables`）
 - **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 
 ## API文档
@@ -244,28 +237,25 @@ docker-compose logs -f
 - **认证方式**: X-API-TOKEN header
 
 ### 主要端点
-- `GET /search`: 搜索小说
-- `GET /chapters`: 获取章节列表
-- `GET /chapter-content`: 获取章节内容
-- `POST /api/cache/create`: 创建缓存任务
-- `GET /api/cache/status/{task_id}`: 查询缓存状态
-- `GET /api/source-sites`: 获取支持的站点列表
 - `POST /api/text2img/generate`: 提交文生图任务（支持 negative_prompt 负向提示词），返回 task_id
 - `GET /api/text2img/image/{task_id}`: 按 task_id 取文生图结果（202 pending / 200 png / 404 失败）
 - `POST /api/image-to-video/generate`: 上传图片+提示词，提交图生视频任务，返回 task_id
 - `GET /api/image-to-video/video/{task_id}`: 按 task_id 取视频结果（202 pending / 200 mp4 / 404 失败）
 - `GET /api/models`: 获取可用文生图/图生视频模型列表
-- `POST /api/app-version/upload`: 上传APP版本
-- `GET /api/app-version/download/{version}`: 下载APP版本
+- `POST /api/backup/upload`: 上传数据库备份文件
+- `GET /api/backup/list`: 列出已上传备份
+- `GET /api/backup/download/{backup_id}`: 下载备份文件
+- `POST /api/logs/upload`: 上报客户端日志
+
+> 已移除：`/search`、`/chapters`、`/chapter-content`、`/novel-by-url`、`/source-sites`、`/api/cache/*`、`/ws/cache/*`、`/api/app-version/*`（版本管理迁移到 GitHub Releases，前端 `github_release_service.dart` 直接调 GitHub API）（2026-07-08）。
 
 ## 故障排除
 
 ### 常见问题
 1. **Flutter应用无法连接后端**: 检查API地址配置和Token
-2. **爬虫失败**: 检查代理设置和站点可用性
-3. **数据库连接失败**: 检查PostgreSQL服务状态
-4. **DSL Engine执行失败**: 确认AI设置中已配置API URL和Key
-5. **ComfyUI图片生成失败**: 确认ComfyUI服务运行正常
+2. **数据库连接失败**: 检查 PostgreSQL 服务状态
+3. **DSL Engine执行失败**: 确认AI设置中已配置API URL和Key
+4. **ComfyUI图片生成失败**: 确认 ComfyUI 服务运行正常
 
 ### 日志查看
 ```bash
