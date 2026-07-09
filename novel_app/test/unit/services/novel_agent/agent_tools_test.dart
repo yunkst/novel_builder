@@ -296,32 +296,34 @@ void main() {
   });
 
   group('AgentTools — schema vs 执行端字段双向对齐', () {
-    /// 工具名 → tool_executor.dart 中对应的私有方法名。
-    /// 该映射与 tool_executor.dart 的 execute() switch 同步；
-    /// 若方法被重命名，下面 _resolveExecutorMethodBodies 会找不到对应方法体。
-    const toolMethodMap = <String, String>{
-      'list_novels': '_listNovels',
-      'select_novel': '_selectNovel',
-      'create_novel': '_createNovel',
-      'read_chapter_content': '_readChapterContent',
-      'list_chapters': '_listChapters',
-      'search_in_chapters': '_searchInChapters',
-      'create_chapter': '_createChapter',
-      'update_chapter_content': '_updateChapterContent',
-      'rewrite_chapter': '_rewriteChapterContent',
-      'delete_chapter': '_deleteChapter',
-      'list_characters': '_listCharacters',
-      'update_character': '_updateCharacter',
-      'create_character': '_createCharacter',
-      'delete_character': '_deleteCharacter',
-      'update_background_setting': '_updateBackgroundSetting',
-      'update_outline': '_updateOutline',
-      'write_outline': '_writeOutline',
-      'get_outline': '_getOutline',
-      'list_prompt_tags': '_listPromptTags',
-      'get_prompt_tag': '_getPromptTag',
-      'save_prompt_tag': '_savePromptTag',
-      'delete_prompt_tag': '_deletePromptTag',
+    /// 工具名 → (子执行器文件名, 子执行器方法名)。
+    ///
+    /// 2026-07-10 拆分：原 tool_executor.dart 上的私有 `_xxxMethod`
+    /// 已按业务域拆到 7 个子执行器（位于 tool_executor/ 子目录），方法改为
+    /// 公开命名（去掉前导下划线）。本测试扫描子执行器源码切片。
+    const toolMethodMap = <String, ({String file, String method})>{
+      'list_novels': (file: 'novel_navigation_executor.dart', method: 'listNovels'),
+      'select_novel': (file: 'novel_navigation_executor.dart', method: 'selectNovel'),
+      'create_novel': (file: 'novel_navigation_executor.dart', method: 'createNovel'),
+      'read_chapter_content': (file: 'chapter_read_executor.dart', method: 'readChapterContent'),
+      'list_chapters': (file: 'chapter_read_executor.dart', method: 'listChapters'),
+      'search_in_chapters': (file: 'chapter_read_executor.dart', method: 'searchInChapters'),
+      'create_chapter': (file: 'chapter_write_executor.dart', method: 'createChapter'),
+      'update_chapter_content': (file: 'chapter_write_executor.dart', method: 'updateChapterContent'),
+      'rewrite_chapter': (file: 'chapter_write_executor.dart', method: 'rewriteChapterContent'),
+      'delete_chapter': (file: 'chapter_write_executor.dart', method: 'deleteChapter'),
+      'list_characters': (file: 'character_executor.dart', method: 'listCharacters'),
+      'update_character': (file: 'character_executor.dart', method: 'updateCharacter'),
+      'create_character': (file: 'character_executor.dart', method: 'createCharacter'),
+      'delete_character': (file: 'character_executor.dart', method: 'deleteCharacter'),
+      'update_background_setting': (file: 'outline_executor.dart', method: 'updateBackgroundSetting'),
+      'update_outline': (file: 'outline_executor.dart', method: 'updateOutline'),
+      'write_outline': (file: 'outline_executor.dart', method: 'writeOutline'),
+      'get_outline': (file: 'outline_executor.dart', method: 'getOutline'),
+      'list_prompt_tags': (file: 'prompt_tag_executor.dart', method: 'listPromptTags'),
+      'get_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'getPromptTag'),
+      'save_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'savePromptTag'),
+      'delete_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'deletePromptTag'),
     };
 
     /// 执行端接受、但 schema **有意不声明** 的字段。
@@ -334,17 +336,18 @@ void main() {
       'update_character': {'description'},
     };
 
-    /// 读取 tool_executor.dart 源码并按方法签名切片。
-    /// 返回 {_MethodName: methodBody}，键保留前导下划线，与 toolMethodMap 对齐。
+    /// 读取子执行器源码并按方法签名切片。
+    /// 返回 {methodName: methodBody}，键不含前导下划线（与 toolMethodMap 对齐）。
     Map<String, String> _resolveExecutorMethodBodies(String source) {
-      // 用方法签名作为切片锚点：Future<String> _methodName( ... )
-      // group(1) 含前导下划线，匹配 toolMethodMap 的 value 形态。
-      final sigPattern = RegExp(r'Future<String>\s+(_\w+)\s*\(');
+      // 子执行器方法签名：Future<String> methodName( ... )
+      // 不要求前导下划线；方法按 public 命名。
+      final sigPattern = RegExp(r'Future<String>\s+(\w+)\s*\(');
       final sigs = sigPattern.allMatches(source).toList();
 
       final bodies = <String, String>{};
       for (var i = 0; i < sigs.length; i++) {
         final name = sigs[i].group(1)!;
+        // 跳过 Dart 内置/库关键字方法名（例如 builder 之类），但匹配的列表很短。
         final start = sigs[i].end;
         // 切片到下一个方法签名（或文件末尾），不处理嵌套大括号
         // —— 字段提取正则只看 parser.xxx('...')，跨方法切片不影响结果。
@@ -361,16 +364,18 @@ void main() {
     }
 
     test('每个执行端读取的字段都在 schema 中声明（防 A 类 bug）', () {
-      final executorPath = 'lib/services/novel_agent/tool_executor.dart';
-      final src = File(executorPath).readAsStringSync();
-      final bodies = _resolveExecutorMethodBodies(src);
-
       for (final entry in toolMethodMap.entries) {
         final toolName = entry.key;
-        final methodName = entry.value;
+        final file = entry.value.file;
+        final methodName = entry.value.method;
+        final executorPath =
+            'lib/services/novel_agent/tool_executor/$file';
+        final src = File(executorPath).readAsStringSync();
+        final bodies = _resolveExecutorMethodBodies(src);
+
         final body = bodies[methodName];
         expect(body, isNotNull,
-            reason: '执行端找不到方法 $methodName（工具 $toolName）—— '
+            reason: '执行端找不到方法 $methodName（工具 $toolName @ $file）—— '
                 '若方法被重命名，请同步更新 toolMethodMap');
 
         var fields = _parsedFields(body!);
@@ -388,16 +393,18 @@ void main() {
     });
 
     test('每个 schema 声明的字段都被执行端读取（防 B 类 bug）', () {
-      final executorPath = 'lib/services/novel_agent/tool_executor.dart';
-      final src = File(executorPath).readAsStringSync();
-      final bodies = _resolveExecutorMethodBodies(src);
-
       for (final entry in toolMethodMap.entries) {
         final toolName = entry.key;
-        final methodName = entry.value;
+        final file = entry.value.file;
+        final methodName = entry.value.method;
+        final executorPath =
+            'lib/services/novel_agent/tool_executor/$file';
+        final src = File(executorPath).readAsStringSync();
+        final bodies = _resolveExecutorMethodBodies(src);
+
         final body = bodies[methodName];
         expect(body, isNotNull,
-            reason: '执行端找不到方法 $methodName（工具 $toolName）');
+            reason: '执行端找不到方法 $methodName（工具 $toolName @ $file）');
 
         final fields = _parsedFields(body!);
 
