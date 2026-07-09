@@ -61,9 +61,26 @@ void main() {
   /// 纵轴父约束 unbounded → 触发 `BoxConstraints forces an infinite height`。
   ///
   /// 不依赖 MediaView 异步/timer 路径，CI 100% 稳定。
+  ///
+  /// 注意：[WidgetTester.binding.setSurfaceSize] 修改的是 binding 级全局表面
+  /// 尺寸，跨测试持久。setSurfaceSize 必须在 test body 内调用（依赖 inTest
+  /// 断言），且每个测试末尾必须用 addTearDown 把 surface 恢复为默认（null），
+  /// 否则 400×800 的小屏会污染后续依赖默认 800×600 surface 的 widget 测试
+  /// （如 contextual_agent_launcher_test 的全屏 dialog）。
+  /// 注意：本测试组需要小屏 surface（400×800）来稳定触发 unbounded 约束。
+  /// 用 [WidgetTester.view.physicalSize]（现代 API）而非 binding.setSurfaceSize：
+  /// 前者随 WidgetTester 生命周期自动重置，不污染后续测试；后者修改 binding
+  /// 全局状态，需要手动恢复 addTearDown（曾因 inTest 断言在 setUp/tearDown
+  /// 不可用，导致跨测试污染 contextual_agent_launcher_test 等依赖默认 surface
+  /// 的 widget 测试）。
+  void useSmallSurface(WidgetTester tester) {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+  }
+
   testWidgets('回归 #1: 裸 Stack(StackFit.expand) 在 ListView+Column → 抛 RenderBox 异常',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 800));
+    useSmallSurface(tester);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -112,7 +129,7 @@ void main() {
   /// 验证修复模式(给 _GallerySlot 提供 bounded 父约束)有效。
   testWidgets('回归 #2: AspectRatio 包裹 → Stack(StackFit.expand) 不再抛异常',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 800));
+    useSmallSurface(tester);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -166,7 +183,6 @@ void main() {
   /// widget 树结构,允许 timer 噪音。
   testWidgets('回归 #3: MediaGalleryCard 单图分支含 AspectRatio 包裹',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 800));
     final card = MediaGalleryCard(
       data: MediaGalleryData(items: [
         MediaGalleryItem(mediaId: 'm0', kind: MediaKind.image, prompt: 'p0'),
