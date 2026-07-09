@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'dify_settings_screen.dart';
+import 'ai_settings_screen.dart';
 import 'prompt_tag_management_screen.dart';
 import 'agent_memory_management_screen.dart';
 import 'backend_settings_screen.dart';
@@ -148,7 +148,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const DifySettingsScreen(),
+                      builder: (context) => const AiSettingsScreen(),
                     ),
                   );
                 },

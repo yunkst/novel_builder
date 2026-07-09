@@ -56,6 +56,9 @@ class MediaProxy {
   final DatabaseConnection _dbConn;
   final ApiServiceWrapper _api;
 
+  /// 进程内自增计数器，避免同毫秒上传产生 id 碰撞。
+  int _idCounter = 0;
+
   MediaProxy({
     required DatabaseConnection dbConn,
     required ApiServiceWrapper api,
@@ -267,10 +270,11 @@ class MediaProxy {
   }
 
   /// 生成用户上传媒体的本机 id（与 backend task_id 隔离命名空间）。
-  /// 前缀 local_ 便于人工辨识，后接时间戳+低位伪随机。
+  /// 前缀 local_ 便于人工辨识，后接时间戳+进程内自增计数器，
+  /// 规避旧版 ts.remainder(9973) 伪随机在同毫秒内多次调用产生的碰撞。
   String _generateLocalId() {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    return 'local_${ts}_${ts.remainder(9973)}';
+    return 'local_${ts}_${++_idCounter}';
   }
 }
 

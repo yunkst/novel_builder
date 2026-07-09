@@ -32,8 +32,7 @@ class OutlineScreen extends ConsumerStatefulWidget {
   ConsumerState<OutlineScreen> createState() => _OutlineScreenState();
 }
 
-class _OutlineScreenState extends ConsumerState<OutlineScreen>
-    with SingleTickerProviderStateMixin {
+class _OutlineScreenState extends ConsumerState<OutlineScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
 

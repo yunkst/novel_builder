@@ -21,6 +21,7 @@ import '../../models/prompt_tag.dart';
 import '../../models/prompt_tag_category.dart';
 import '../../models/tag_group.dart';
 import '../../utils/toast_utils.dart';
+import '../../widgets/common/common_widgets.dart';
 
 // ============================================================
 // 主页面
@@ -155,22 +156,12 @@ class _PromptTagManagementScreenState
   }
 
   Future<void> _deleteCategory(PromptTagCategory category) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('删除分类「${category.name}」将同时删除该分类下所有标签，确定吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认删除',
+      message: '删除分类「${category.name}」将同时删除该分类下所有标签，确定吗？',
+      confirmText: '删除',
+      isDangerous: true,
     );
     if (confirmed != true || category.id == null) return;
     final tagRepo = ref.read(promptTagRepositoryProvider);
@@ -247,22 +238,12 @@ class _PromptTagManagementScreenState
   }
 
   Future<void> _deleteTag(PromptTag tag) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除标签「${tag.name}」吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认删除',
+      message: '确定要删除标签「${tag.name}」吗？',
+      confirmText: '删除',
+      isDangerous: true,
     );
     if (confirmed != true || tag.id == null) return;
     final repo = ref.read(promptTagRepositoryProvider);
@@ -684,22 +665,12 @@ class _PromptTagManagementScreenState
 
   /// 删除同名 group 下所有 tag
   Future<void> _deleteAllInGroup(TagGroup group) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除所有名为「${group.name}」的标签（${group.count} 条）吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '确认删除',
+      message: '确定要删除所有名为「${group.name}」的标签（${group.count} 条）吗？',
+      confirmText: '删除',
+      isDangerous: true,
     );
     if (confirmed != true) return;
     final repo = ref.read(promptTagRepositoryProvider);

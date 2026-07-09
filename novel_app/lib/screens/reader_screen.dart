@@ -163,11 +163,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         category: LogCategory.cache,
         tags: ['initialization', 'load-content'],
       );
-      if (mounted) {
-        setState(() {
-          // _contentController 会处理错误状态
-        });
-      }
     }
   }
 
@@ -608,8 +603,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           },
           onMenuAction: _handleMenuAction,
         ),
-        body: _buildBody(context, isEditMode, paragraphs),
-        floatingActionButton: _contentController.content.isEmpty
+        body: _buildBody(context, isEditMode, paragraphs, content),
+        floatingActionButton: content.isEmpty
             ? null
             : ReaderActionButtons(
                 isAutoScrolling: isAutoScrolling, // Mixin getter
@@ -625,6 +620,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BuildContext context,
     bool isEditMode,
     List<String> paragraphs,
+    String content,
   ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -639,7 +635,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     // 新增：检查内容是否为空（修复空白页面问题）
     if (!_isLoading &&
-        _contentController.content.trim().isEmpty &&
+        content.trim().isEmpty &&
         paragraphs.isEmpty) {
       return ReaderErrorView(
         errorMessage: '章节内容为空，请尝试刷新或联系开发者',

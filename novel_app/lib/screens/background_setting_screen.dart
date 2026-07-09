@@ -28,8 +28,7 @@ class BackgroundSettingScreen extends ConsumerStatefulWidget {
 }
 
 class _BackgroundSettingScreenState
-    extends ConsumerState<BackgroundSettingScreen>
-    with SingleTickerProviderStateMixin {
+    extends ConsumerState<BackgroundSettingScreen> {
   final TextEditingController _controller = TextEditingController();
 
   bool _isSaving = false;
