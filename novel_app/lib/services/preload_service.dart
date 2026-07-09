@@ -255,6 +255,21 @@ class PreloadService {
             continue;
           }
 
+          if (result.isLoadFailed || result.isScriptError) {
+            // 页面加载失败 / 脚本缺陷：跳过此任务
+            final reason = result.isScriptError ? 'scriptError' : 'loadFailed';
+            _totalFailed++;
+            _addFailedHistory(task, reason);
+            LoggerService.instance.w(
+              '预加载 $reason: url=${task.chapterUrl} domain=${Uri.tryParse(task.chapterUrl)?.host}',
+              category: LogCategory.cache,
+              tags: ['preload', reason],
+            );
+            _currentTask = null;
+            await _rateLimiter.acquire();
+            continue;
+          }
+
           // 成功：保存到数据库
           final chapter = Chapter(
             url: task.chapterUrl,

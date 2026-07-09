@@ -73,6 +73,10 @@ class HeadlessWebViewContentService {
   /// 低优先级请求是否应该让出（被高优先级抢占时设为 true）
   bool _shouldYield = false;
 
+  /// 让出信号：低优先级请求创建并 complete，
+  /// 高优先级请求通过 [Completer.future] 等待低优先级让出（替代 500ms 轮询）。
+  Completer<void>? _yieldedSignal;
+
   // ===== 脚本健康度追踪 =====
 
   /// 脚本连续失败次数（内存，不持久化）
@@ -89,10 +93,12 @@ class HeadlessWebViewContentService {
   ///   - [FetchPriority.high]：阅读器前台请求，可抢占正在执行的低优先级任务
   ///   - [FetchPriority.low]：预加载、历史上下文等后台任务
   ///
-  /// 返回 [FetchContentResult] 明确区分三种情况：
+  /// 返回 [FetchContentResult] 明确区分以下情况：
   /// - `isSuccess`：获取成功，通过 `.content` 获取结果
   /// - `isNoScript`：该域名无提取脚本，不可重试
   /// - `isBusy`：WebView 正忙（被互斥拦截），可等待重试
+  /// - `isLoadFailed`：页面加载失败（onLoadStop 超时/错误）或非解析类异常，可重试
+  /// - `isScriptError`：脚本结果 JSON 解析失败（FormatException），脚本本身有缺陷
   Future<FetchContentResult> fetchContent(
     String chapterUrl, {
     FetchPriority priority = FetchPriority.low,
@@ -132,24 +138,32 @@ class HeadlessWebViewContentService {
       }
     }
 
-    // 1. 查找该域名的提取脚本
-    final domain = _extractDomain(chapterUrl);
-    if (domain == null) return FetchContentResult.noScript();
-
-    final script = await _scriptRepo.getByDomain(domain);
-    if (script == null || !script.hasChapterContentJs) {
-      return FetchContentResult.noScript();
-    }
-
-    // 2. 确保 WebView 就绪
-    await _ensureWebView();
-
+    // ===== 同步置位互斥锁（避免 await 期间被并发穿过） =====
     _isFetching = true;
     _currentPriority = priority;
     _currentFetchingUrl = chapterUrl;
     _shouldYield = false;
+    // 为等待者创建让出信号
+    _yieldedSignal = Completer<void>();
+
+    String? scriptId;
+    String? logDomain;
 
     try {
+      // 1. 查找该域名的提取脚本
+      final domain = _extractDomain(chapterUrl);
+      if (domain == null) return FetchContentResult.noScript();
+      logDomain = domain;
+
+      final script = await _scriptRepo.getByDomain(domain);
+      if (script == null || !script.hasChapterContentJs) {
+        return FetchContentResult.noScript();
+      }
+      scriptId = script.id;
+
+      // 2. 确保 WebView 就绪
+      await _ensureWebView();
+
       LoggerService.instance.i(
         'HeadlessWebView: 开始获取 domain=$domain url=$chapterUrl '
         'priority=$priority',
@@ -221,31 +235,44 @@ class HeadlessWebViewContentService {
       );
     } on PageLoadFailedException {
       // 页面加载失败（onLoadStop 超时/错误）→ 区分于"真无脚本"，返回 loadFailed
-      _recordFailure(script.id);
+      if (scriptId != null) _recordFailure(scriptId);
       LoggerService.instance.w(
-        'HeadlessWebView: 页面加载失败，返回 loadFailed domain=$domain url=$chapterUrl',
+        'HeadlessWebView: 页面加载失败，返回 loadFailed domain=$logDomain url=$chapterUrl',
         category: LogCategory.cache,
         tags: ['headless-webview', 'fetch', 'load-failed'],
       );
       return FetchContentResult.loadFailed();
     } catch (e, stackTrace) {
-      _recordFailure(script.id);
+      if (scriptId != null) _recordFailure(scriptId);
+      // 区分 JSON 解析错误（脚本本身有缺陷）与其他失败
+      if (e is FormatException) {
+        LoggerService.instance.e(
+          'HeadlessWebView: 脚本结果 JSON 解析失败（脚本缺陷），返回 scriptError '
+          'domain=$logDomain scriptId=$scriptId error=$e',
+          stackTrace: stackTrace.toString(),
+          category: LogCategory.cache,
+          tags: ['headless-webview', 'fetch', 'script_error'],
+        );
+        return FetchContentResult.scriptError();
+      }
       LoggerService.instance.e(
-        'HeadlessWebView: 获取失败（catch 返回 noScript，区分于"真无脚本"） domain=$domain scriptId=${script.id} error=$e',
+        'HeadlessWebView: 获取失败（catch 返回 loadFailed，区分于"真无脚本"） '
+        'domain=$logDomain scriptId=$scriptId error=$e',
         stackTrace: stackTrace.toString(),
         category: LogCategory.cache,
-        tags: ['headless-webview', 'fetch', 'failed_no_script'],
+        tags: ['headless-webview', 'fetch', 'failed_load_failed'],
       );
-      LoggerService.instance.w(
-        'HeadlessWebView: 获取失败 domain=$domain error=$e',
-        category: LogCategory.cache,
-        tags: ['headless-webview', 'error'],
-      );
-      return FetchContentResult.noScript();
+      return FetchContentResult.loadFailed();
     } finally {
       _isFetching = false;
       _currentPriority = FetchPriority.low;
       _currentFetchingUrl = null;
+      // 通知等待让出信号的高优先级请求
+      final signal = _yieldedSignal;
+      _yieldedSignal = null;
+      if (signal != null && !signal.isCompleted) {
+        signal.complete();
+      }
     }
   }
 
@@ -262,18 +289,25 @@ class HeadlessWebViewContentService {
 
   /// 等待低优先级请求让出 WebView。
   ///
-  /// 返回 true 表示成功让出，false 表示等待超时。
+  /// 通过 [Completer] 等待低优请求退出（由 `finally` 块 `_yieldedSignal?.complete()`
+  /// 触发），最长 5 秒。返回 true 表示成功让出，false 表示等待超时。
   Future<bool> _waitForYield() async {
-    for (var i = 0; i < 10; i++) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!_isFetching) return true;
+    final signal = _yieldedSignal;
+    if (signal == null) {
+      // 等待者尚未存在（边界情况：进入方法时低优已退出），直接返回 true
+      return true;
     }
-    LoggerService.instance.d(
-      'HeadlessWebView: 等待让出超时（5s 轮询）',
-      category: LogCategory.cache,
-      tags: ['headless-webview', 'wait_yield', 'timeout'],
-    );
-    return false;
+    try {
+      await signal.future.timeout(const Duration(seconds: 5));
+      return true;
+    } on TimeoutException {
+      LoggerService.instance.d(
+        'HeadlessWebView: 等待让出超时（5s Completer）',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'wait_yield', 'timeout'],
+      );
+      return false;
+    }
   }
 
   // ===== 内部实现 =====

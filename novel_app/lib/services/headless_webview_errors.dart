@@ -22,26 +22,31 @@ enum FetchPriority {
 
 /// HeadlessWebView fetchContent 的结果类型
 ///
-/// 替代原来的 `ChapterContentResult?` 返回值，明确区分四种情况：
+/// 替代原来的 `ChapterContentResult?` 返回值，明确区分五种情况：
 /// - **成功**：携带 [ChapterContentResult]
 /// - **无脚本**：该域名没有提取脚本，不可重试
 /// - **忙碌**：WebView 正忙（被互斥拦截），可等待重试
-/// - **加载失败**：页面加载超时/错误（onLoadStop 未在时限内触发），可重试
+/// - **加载失败**：页面加载超时/错误（onLoadStop 未在时限内触发）或其他非解析类异常，可重试
+/// - **脚本错误**：提取脚本执行后 JSON 解析失败（FormatException），脚本本身有缺陷，
+///   不可立即重试（需要重新生成脚本）
 class FetchContentResult {
   final ChapterContentResult? _success;
   final bool _noScript;
   final bool _busy;
   final bool _loadFailed;
+  final bool _scriptError;
 
   const FetchContentResult._({
     ChapterContentResult? success,
     bool noScript = false,
     bool busy = false,
     bool loadFailed = false,
+    bool scriptError = false,
   })  : _success = success,
         _noScript = noScript,
         _busy = busy,
-        _loadFailed = loadFailed;
+        _loadFailed = loadFailed,
+        _scriptError = scriptError;
 
   /// 成功获取
   factory FetchContentResult.success(ChapterContentResult result) =>
@@ -59,6 +64,11 @@ class FetchContentResult {
   factory FetchContentResult.loadFailed() =>
       const FetchContentResult._(loadFailed: true);
 
+  /// 脚本执行后结果解析失败（JSON FormatException），
+  /// 提取脚本本身有缺陷，不可立即重试
+  factory FetchContentResult.scriptError() =>
+      const FetchContentResult._(scriptError: true);
+
   /// 是否获取成功
   bool get isSuccess => _success != null;
 
@@ -70,6 +80,9 @@ class FetchContentResult {
 
   /// 是否页面加载失败
   bool get isLoadFailed => _loadFailed;
+
+  /// 是否脚本结果解析失败
+  bool get isScriptError => _scriptError;
 
   /// 获取成功结果（仅在 [isSuccess] 为 true 时有效）
   ChapterContentResult get content => _success!;

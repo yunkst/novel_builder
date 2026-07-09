@@ -86,20 +86,24 @@ class HeadlessWebViewChapterListService {
       return FetchChapterListResult.busy();
     }
 
-    // 1. 查找该域名的提取脚本
-    final domain = _extractDomain(novelUrl);
-    if (domain == null) return FetchChapterListResult.noScript();
-
-    final script = await _scriptRepo.getByDomain(domain);
-    if (script == null || !script.hasChapterListJs) {
-      return FetchChapterListResult.noScript();
-    }
-
-    // 在 try 之前捕获 script.id，避免 catch 中重复查库
-    final scriptId = script.id;
-
+    // ===== 同步置位互斥锁（避免 await 期间被并发穿过） =====
     _isFetching = true;
+    String? scriptId;
+    String? logDomain;
     try {
+      // 1. 查找该域名的提取脚本
+      final domain = _extractDomain(novelUrl);
+      if (domain == null) return FetchChapterListResult.noScript();
+      logDomain = domain;
+
+      final script = await _scriptRepo.getByDomain(domain);
+      if (script == null || !script.hasChapterListJs) {
+        return FetchChapterListResult.noScript();
+      }
+
+      // 捕获 script.id 用于失败计数与日志，避免 catch 中重复查库
+      scriptId = script.id;
+
       LoggerService.instance.i(
         'HeadlessWebViewChapterList: 开始获取 domain=$domain url=$novelUrl',
         category: LogCategory.cache,
@@ -123,7 +127,7 @@ class HeadlessWebViewChapterListService {
       if (chapters.isEmpty) {
         _recordFailure(scriptId);
         LoggerService.instance.w(
-          'HeadlessWebViewChapterList: 脚本返回空章节列表 domain=$domain',
+          'HeadlessWebViewChapterList: 脚本返回空章节列表 domain=$logDomain',
           category: LogCategory.cache,
           tags: ['headless-webview', 'chapter-list', 'empty-result'],
         );
@@ -134,24 +138,24 @@ class HeadlessWebViewChapterListService {
       _recordSuccess(scriptId);
 
       LoggerService.instance.i(
-        'HeadlessWebViewChapterList: 获取成功 domain=$domain count=${chapters.length}',
+        'HeadlessWebViewChapterList: 获取成功 domain=$logDomain count=${chapters.length}',
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'success'],
       );
 
       return FetchChapterListResult.success(chapters);
     } on PageLoadFailedException {
-      _recordFailure(scriptId);
+      if (scriptId != null) _recordFailure(scriptId);
       LoggerService.instance.w(
-        'HeadlessWebViewChapterList: 页面加载失败 url=$novelUrl',
+        'HeadlessWebViewChapterList: 页面加载失败 url=$novelUrl domain=$logDomain',
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'load-failed'],
       );
       return FetchChapterListResult.loadFailed();
     } catch (e) {
-      _recordFailure(scriptId);
+      if (scriptId != null) _recordFailure(scriptId);
       LoggerService.instance.w(
-        'HeadlessWebViewChapterList: 获取失败 domain=$domain error=$e',
+        'HeadlessWebViewChapterList: 获取失败 domain=$logDomain url=$novelUrl error=$e',
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'error'],
       );
