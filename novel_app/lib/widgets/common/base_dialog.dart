@@ -56,6 +56,140 @@ class DialogAnimationConfig {
   );
 }
 
+/// 对话框构造器 Mixin
+///
+/// 抽出 [BaseDialog] 与 [BaseStatefulDialog] 共享的 UI helper 实现,
+/// 让无状态 ([BaseDialog]) 与有状态 ([BaseStatefulDialog]) 两种形态复用同一份代码,
+/// 避免重复实现。
+///
+/// 这些 helper 仅依赖 [BuildContext],不依赖任何成员状态,因此可以同时混入
+/// `StatelessWidget` 和 `StatefulWidget` 的子类。
+mixin DialogCreatorsMixin {
+  /// 构建分隔线
+  ///
+  /// 用于在对话框内容中创建视觉分隔
+  Widget buildDivider(BuildContext context) {
+    final theme = Theme.of(context);
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: theme.colorScheme.outlineVariant,
+    );
+  }
+
+  /// 构建信息提示卡片
+  ///
+  /// 用于显示提示信息或警告信息
+  ///
+  /// [message] 提示信息内容
+  /// [type] 提示类型（info、warning、error、success）
+  /// [icon] 自定义图标（可选）
+  Widget buildInfoCard({
+    required BuildContext context,
+    required String message,
+    InfoCardType type = InfoCardType.info,
+    IconData? icon,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // 根据类型确定颜色和图标
+    Color backgroundColor;
+    Color borderColor;
+    Color textColor;
+    IconData defaultIcon;
+
+    switch (type) {
+      case InfoCardType.info:
+        backgroundColor = colorScheme.primary.withValues(alpha: 0.08);
+        borderColor = colorScheme.primary.withValues(alpha: 0.3);
+        textColor = colorScheme.primary;
+        defaultIcon = Icons.info_outline;
+        break;
+      case InfoCardType.warning:
+        backgroundColor = colorScheme.error.withValues(alpha: 0.08);
+        borderColor = colorScheme.error.withValues(alpha: 0.3);
+        textColor = colorScheme.error;
+        defaultIcon = Icons.warning_amber;
+        break;
+      case InfoCardType.error:
+        backgroundColor = colorScheme.error.withValues(alpha: 0.1);
+        borderColor = colorScheme.error.withValues(alpha: 0.4);
+        textColor = colorScheme.error;
+        defaultIcon = Icons.error_outline;
+        break;
+      case InfoCardType.success:
+        backgroundColor = colorScheme.primary.withValues(alpha: 0.1);
+        borderColor = colorScheme.primary.withValues(alpha: 0.3);
+        textColor = colorScheme.primary;
+        defaultIcon = Icons.check_circle_outline;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon ?? defaultIcon,
+            size: 18,
+            color: textColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: textColor,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建带图标的标题
+  ///
+  /// 用于创建带图标的对话框标题
+  ///
+  /// [icon] 标题图标
+  /// [title] 标题文本
+  /// [color] 图标颜色（null表示使用主题色）
+  Widget buildTitleWithIcon({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    Color? color,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: color ?? colorScheme.primary,
+          size: 24,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleLarge,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// 基础对话框抽象类
 ///
 /// 提供统一的对话框样式、动画和行为规范。
@@ -67,6 +201,9 @@ class DialogAnimationConfig {
 /// - 统一的圆角和阴影
 /// - 自动处理状态栏颜色
 /// - 支持安全区域
+///
+/// 对于需要在内部管理状态(如 [TextEditingController])的对话框,
+/// 请改用 [BaseStatefulDialog]。
 ///
 /// 示例:
 /// ```dart
@@ -82,7 +219,8 @@ class DialogAnimationConfig {
 ///   }
 /// }
 /// ```
-abstract class BaseDialog extends StatelessWidget {
+abstract class BaseDialog extends StatelessWidget
+    with DialogCreatorsMixin {
   /// 对话框标题（可选）
   final String? title;
 
@@ -200,129 +338,8 @@ abstract class BaseDialog extends StatelessWidget {
   /// 返回相关元素之间的小间距
   static double get smallSpacing => 8.0;
 
-  /// 构建分隔线
-  ///
-  /// 用于在对话框内容中创建视觉分隔
-  Widget buildDivider(BuildContext context) {
-    final theme = Theme.of(context);
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: theme.colorScheme.outlineVariant,
-    );
-  }
-
-  /// 构建信息提示卡片
-  ///
-  /// 用于显示提示信息或警告信息
-  ///
-  /// [message] 提示信息内容
-  /// [type] 提示类型（info、warning、error、success）
-  /// [icon] 自定义图标（可选）
-  Widget buildInfoCard({
-    required BuildContext context,
-    required String message,
-    InfoCardType type = InfoCardType.info,
-    IconData? icon,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    // 根据类型确定颜色和图标
-    Color backgroundColor;
-    Color borderColor;
-    Color textColor;
-    IconData defaultIcon;
-
-    switch (type) {
-      case InfoCardType.info:
-        backgroundColor = colorScheme.primary.withValues(alpha: 0.08);
-        borderColor = colorScheme.primary.withValues(alpha: 0.3);
-        textColor = colorScheme.primary;
-        defaultIcon = Icons.info_outline;
-        break;
-      case InfoCardType.warning:
-        backgroundColor = colorScheme.error.withValues(alpha: 0.08);
-        borderColor = colorScheme.error.withValues(alpha: 0.3);
-        textColor = colorScheme.error;
-        defaultIcon = Icons.warning_amber;
-        break;
-      case InfoCardType.error:
-        backgroundColor = colorScheme.error.withValues(alpha: 0.1);
-        borderColor = colorScheme.error.withValues(alpha: 0.4);
-        textColor = colorScheme.error;
-        defaultIcon = Icons.error_outline;
-        break;
-      case InfoCardType.success:
-        backgroundColor = colorScheme.primary.withValues(alpha: 0.1);
-        borderColor = colorScheme.primary.withValues(alpha: 0.3);
-        textColor = colorScheme.primary;
-        defaultIcon = Icons.check_circle_outline;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon ?? defaultIcon,
-            size: 18,
-            color: textColor,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: textColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建带图标的标题
-  ///
-  /// 用于创建带图标的对话框标题
-  ///
-  /// [icon] 标题图标
-  /// [title] 标题文本
-  /// [color] 图标颜色（null表示使用主题色）
-  Widget buildTitleWithIcon({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    Color? color,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: color ?? colorScheme.primary,
-          size: 24,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: theme.textTheme.titleLarge,
-          ),
-        ),
-      ],
-    );
-  }
+  // buildDivider / buildInfoCard / buildTitleWithIcon
+  // 已抽到 DialogCreatorsMixin 共享实现,本类与 BaseStatefulDialog 都自动继承。
 }
 
 /// 信息卡片类型枚举
