@@ -44,7 +44,8 @@ void main() {
           'data: {"choices":[{"delta":{"content":"!"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks = SseParser.parseSseStream(sseData);
+      final chunks =
+          SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Hello', ' world', '!']);
     });
 
@@ -53,7 +54,8 @@ void main() {
           'data: {"choices":[{"delta":{"content":"B"}}]}\n\n'
           'data: [DONE]\n\n';
 
-      final chunks = SseParser.parseSseStream(sseData);
+      final chunks =
+          SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['A', 'B']);
     });
 
@@ -63,7 +65,8 @@ void main() {
           ': comment line\n'
           'data: [DONE]\n';
 
-      final chunks = SseParser.parseSseStream(sseData);
+      final chunks =
+          SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['X']);
     });
 
@@ -72,7 +75,8 @@ void main() {
           'data: {"choices":[{"delta":{"content":"Y"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks = SseParser.parseSseStream(sseData);
+      final chunks =
+          SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Y']);
     });
 
@@ -81,7 +85,8 @@ void main() {
           'data: {"choices":[{"delta":{"content":"Z"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks = SseParser.parseSseStream(sseData);
+      final chunks =
+          SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Z']);
     });
 

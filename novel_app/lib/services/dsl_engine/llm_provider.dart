@@ -285,14 +285,14 @@ class _ToolCallDelta {
 }
 
 class SseParser {
-  /// 解析标准 SSE 流，返回内容 chunk 列表
-  static List<String> parseSseStream(String raw) {
-    final result = parseSseStreamWithReasoning(raw);
-    return result.content;
-  }
-
-  /// 解析带 reasoning_content 的 SSE 流（Dify deepseek thinking 格式）
-  static SseParseResult parseSseStreamWithReasoning(String raw) {
+  /// 解析单行 SSE `data:` 帧，提取 (contentChunk, reasoningChunk)。
+  ///
+  /// 抽出来的共用骨架，供 [parseSseStreamWithReasoning]（Dify reasoning）
+  /// 与 [parseStreamingResult]（OpenAI tool_calls）复用：
+  /// - 跳过非 data 行、空 payload、[DONE] 哨兵
+  /// - 解析失败只 warn 一次，不影响后续帧
+  /// - 返回的字符串列表可能为空（取决于该帧只更新了哪类字段）
+  static (List<String>, List<String>) _parseDataPayload(String raw) {
     final content = <String>[];
     final reasoning = <String>[];
 
@@ -331,13 +331,21 @@ class SseParser {
       }
     }
 
+    return (content, reasoning);
+  }
+
+  /// 解析带 reasoning_content 的 SSE 流（Dify deepseek thinking 格式）
+  static SseParseResult parseSseStreamWithReasoning(String raw) {
+    final (content, reasoning) = _parseDataPayload(raw);
     return SseParseResult(content: content, reasoning: reasoning);
   }
 
   /// 解析流式响应为 StreamingResult（Phase 1: 支持 tool_calls）
+  ///
+  /// 复用 [_parseDataPayload] 提取 content / reasoning，额外收集
+  /// delta.tool_calls 列表。
   static StreamingResult parseStreamingResult(String raw) {
-    final contentChunks = <String>[];
-    final reasoningChunks = <String>[];
+    final (contentChunks, reasoningChunks) = _parseDataPayload(raw);
     final toolCallDeltas = <Map<String, dynamic>>[];
 
     final lines = raw.split('\n');
@@ -345,7 +353,6 @@ class SseParser {
       if (!line.startsWith('data:')) continue;
       final payload = line.substring(5).trim();
       if (payload.isEmpty || payload == '[DONE]') continue;
-
       try {
         final json = jsonDecode(payload) as Map<String, dynamic>;
         final choices = json['choices'] as List?;
@@ -353,20 +360,6 @@ class SseParser {
         final first = choices.first as Map<String, dynamic>;
         final delta = first['delta'] as Map<String, dynamic>?;
         if (delta == null) continue;
-
-        // reasoning_content
-        final rc = delta['reasoning_content'];
-        if (rc is String && rc.isNotEmpty) {
-          reasoningChunks.add(rc);
-        }
-
-        // 正常 content
-        final c = delta['content'];
-        if (c is String && c.isNotEmpty) {
-          contentChunks.add(c);
-        }
-
-        // tool_calls deltas
         final tcDeltas = delta['tool_calls'] as List?;
         if (tcDeltas != null) {
           for (final tc in tcDeltas) {
@@ -376,12 +369,12 @@ class SseParser {
           }
         }
       } catch (_) {
+        // tool_calls 解析失败独立 warn，骨架里已有内容/推理 warn，不会重复
         LoggerService.instance.w(
-          'SSE 流式结果解析失败',
+          'SSE tool_calls 解析失败: $line',
           category: LogCategory.ai,
-          tags: ['dsl', 'llm', 'sse'],
+          tags: ['dsl', 'llm', 'sse', 'tool_calls'],
         );
-        // 忽略解析失败
       }
     }
 

@@ -39,6 +39,25 @@ class _IdResolveResult {
   const _IdResolveResult.failure(this.errorJson) : url = null;
 }
 
+/// 章节 + 所属小说 URL 的解析结果
+///
+/// 由 [_ToolExecutor._resolveChapterUrlByPosition] 返回，成功时
+/// novelUrl / chapterUrl 必非空。把两段解析合并到一次调用中，避免下游
+/// （如 _rewriteChapterContent）再次调用 _resolveCurrentNovelUrl 重复查 DB，
+/// 也消除 `url!` 链式强解包。
+class _ChapterResolveResult {
+  final String? novelUrl;
+  final String? chapterUrl;
+  final Map<String, dynamic>? errorJson;
+  const _ChapterResolveResult.success({
+    required this.novelUrl,
+    required this.chapterUrl,
+  }) : errorJson = null;
+  const _ChapterResolveResult.failure(this.errorJson)
+      : novelUrl = null,
+        chapterUrl = null;
+}
+
 /// LLM 重写结果
 class _RewriteResult {
   final String? content;
@@ -159,9 +178,9 @@ class ToolExecutor {
         case 'list_text2img_models':
           return await _listText2ImgModels(args);
         case 'create_images':
-          return await _createImages(args, scenarioContext);
+          return await _createImages(args);
         case 'create_image_to_video':
-          return await _createImageToVideo(args, scenarioContext);
+          return await _createImageToVideo(args);
         default:
           LoggerService.instance.w('未知工具: $toolName',
               category: LogCategory.ai, tags: ['agent', 'tool', toolName, 'unknown']);
@@ -184,7 +203,29 @@ class ToolExecutor {
 
   // ===== ID / 位置解析辅助方法 =====
 
-  /// 解析当前小说 URL（从场景上下文中读取 currentNovelId）
+  /// 构造统一的引导错误 JSON Map。
+  ///
+  /// 由所有需要「引导 AI 自助修复」的失败分支调用：返回固定的
+  /// `{error, message, suggested_tool?, suggested_args?}` 结构，
+  /// 避免散落 12+ 处手写字面量导致键名/大小写漂移。
+  ///
+  /// [suggestedArgs] 为 null 时不写 suggested_args 键（向后兼容早期只带
+  /// suggested_tool 的错误，例如 outline_not_found）。
+  Map<String, dynamic> _guidanceError(
+    String code,
+    String message, {
+    String? suggestedTool,
+    Map<String, dynamic>? suggestedArgs,
+  }) {
+    return <String, dynamic>{
+      'error': code,
+      'message': message,
+      if (suggestedTool != null) 'suggested_tool': suggestedTool,
+      if (suggestedArgs != null) 'suggested_args': suggestedArgs,
+    };
+  }
+
+  /// 解析当前小说 URL（从场景上下文中读取 currentNovelId）。
   ///
   /// 未设置时返回 no_current_novel 错误，引导 AI 调用 list_novels + select_novel。
   Future<_IdResolveResult> _resolveCurrentNovelUrl(
@@ -197,13 +238,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'no_current_novel'],
       );
-      return _IdResolveResult.failure({
-        'error': 'no_current_novel',
-        'message':
-            '尚未选择当前小说。请先调用 list_novels 查看书架，然后用 select_novel 选定目标。',
-        'suggested_tool': 'list_novels',
-        'suggested_args': <String, dynamic>{},
-      });
+      return _IdResolveResult.failure(_guidanceError(
+        'no_current_novel',
+        '尚未选择当前小说。请先调用 list_novels 查看书架，然后用 select_novel 选定目标。',
+        suggestedTool: 'list_novels',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
     return _resolveNovelUrl(currentNovelId);
   }
@@ -218,12 +258,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'novel_not_found'],
       );
-      return _IdResolveResult.failure({
-        'error': 'novel_not_found',
-        'message': '小说ID $novelId 不存在。请先调用 list_novels 查看书架中的所有小说及其ID。',
-        'suggested_tool': 'list_novels',
-        'suggested_args': <String, dynamic>{},
-      });
+      return _IdResolveResult.failure(_guidanceError(
+        'novel_not_found',
+        '小说ID $novelId 不存在。请先调用 list_novels 查看书架中的所有小说及其ID。',
+        suggestedTool: 'list_novels',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
     return _IdResolveResult.success(novelUrl);
   }
@@ -238,15 +278,19 @@ class ToolExecutor {
     };
   }
 
-  /// position → chapterUrl 解析
+  /// position → (novelUrl, chapterUrl) 联合解析
   ///
+  /// 一次调用同时返回 novelUrl + chapterUrl，避免下游（如 _rewriteChapterContent）
+  /// 二次调用 _resolveCurrentNovelUrl 重复查 DB，也消除 `url!` 链式强解包。
   /// position 是 1-based 的顺序号，依赖 list_chapters 返回的顺序（按 chapterIndex ASC 排序）。
-  Future<_IdResolveResult> _resolveChapterUrlByPosition(
+  Future<_ChapterResolveResult> _resolveChapterUrlByPosition(
     AgentScenarioContext? ctx,
     int position,
   ) async {
     final novelResolve = await _resolveCurrentNovelUrl(ctx);
-    if (novelResolve.errorJson != null) return novelResolve;
+    if (novelResolve.errorJson != null) {
+      return _ChapterResolveResult.failure(novelResolve.errorJson);
+    }
     final novelUrl = novelResolve.url!;
 
     final repo = ref.read(chapterRepositoryProvider);
@@ -257,17 +301,20 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'chapter_position_out_of_range'],
       );
-      return _IdResolveResult.failure({
-        'error': 'chapter_position_out_of_range',
-        'message': chapters.isEmpty
+      return _ChapterResolveResult.failure(_guidanceError(
+        'chapter_position_out_of_range',
+        chapters.isEmpty
             ? '当前小说没有任何章节。请先调用 list_chapters 确认。'
             : '章节位置 $position 超出范围（当前小说共 ${chapters.length} 章）。'
                 '请先调用 list_chapters 查看有效位置。',
-        'suggested_tool': 'list_chapters',
-        'suggested_args': <String, dynamic>{},
-      });
+        suggestedTool: 'list_chapters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
-    return _IdResolveResult.success(chapters[position - 1].url);
+    return _ChapterResolveResult.success(
+      novelUrl: novelUrl,
+      chapterUrl: chapters[position - 1].url,
+    );
   }
 
   // ===== 小说导航 =====
@@ -299,12 +346,12 @@ class ToolExecutor {
       LoggerService.instance.w('select_novel: 小说不存在 id=$novelId',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'select_novel', 'not_found']);
-      return jsonEncode({
-        'error': 'novel_not_found',
-        'message': '小说ID $novelId 不存在。请先调用 list_novels。',
-        'suggested_tool': 'list_novels',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'novel_not_found',
+        '小说ID $novelId 不存在。请先调用 list_novels。',
+        suggestedTool: 'list_novels',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
     LoggerService.instance.i('select_novel: id=$novelId, title="${novel.title}"',
         category: LogCategory.ai, tags: ['agent', 'tool', 'select_novel']);
@@ -356,7 +403,7 @@ class ToolExecutor {
     if (resolveResult.errorJson != null) {
       return jsonEncode(resolveResult.errorJson);
     }
-    final chapterUrl = resolveResult.url!;
+    final chapterUrl = resolveResult.chapterUrl!;
 
     final repo = ref.read(chapterRepositoryProvider);
     final content = await repo.getCachedChapter(chapterUrl);
@@ -493,15 +540,15 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'create_chapter', 'position_out_of_range'],
       );
-      return jsonEncode({
-        'error': 'position_out_of_range',
-        'message': totalCount == 0
+      return jsonEncode(_guidanceError(
+        'position_out_of_range',
+        totalCount == 0
             ? '当前小说没有任何章节，position 只能为 1。'
             : '插入位置 $position 超出范围（当前共 $totalCount 章，有效范围 1~${totalCount + 1}）。'
                 '请先调用 list_chapters 查看有效位置。',
-        'suggested_tool': 'list_chapters',
-        'suggested_args': <String, dynamic>{},
-      });
+        suggestedTool: 'list_chapters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     // 确定章节标题
@@ -603,7 +650,7 @@ class ToolExecutor {
     if (resolveResult.errorJson != null) {
       return jsonEncode(resolveResult.errorJson);
     }
-    final chapterUrl = resolveResult.url!;
+    final chapterUrl = resolveResult.chapterUrl!;
 
     final chapterRepo = ref.read(chapterRepositoryProvider);
     final originalContent = await chapterRepo.getCachedChapter(chapterUrl);
@@ -646,12 +693,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'update_chapter_content', 'chapter_not_found'],
       );
-      return jsonEncode({
-        'error': 'chapter_not_found',
-        'message': '章节位置 $position 的数据库记录不存在或内容表无对应行。',
-        'suggested_tool': 'list_chapters',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'chapter_not_found',
+        '章节位置 $position 的数据库记录不存在或内容表无对应行。',
+        suggestedTool: 'list_chapters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     LoggerService.instance.i(
@@ -690,15 +737,15 @@ class ToolExecutor {
     final charNames = characterNames ?? const <String>[];
     final tags = tagNames ?? const <String>[];
 
+    // 一次解析同时拿到 novelUrl + chapterUrl，避免再调一次 _resolveCurrentNovelUrl 重复查 DB
     final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
     if (resolveResult.errorJson != null) {
       return jsonEncode(resolveResult.errorJson);
     }
-    final chapterUrl = resolveResult.url!;
+    final novelUrl = resolveResult.novelUrl!;
+    final chapterUrl = resolveResult.chapterUrl!;
 
     // 读取章节原文（重写基础）
-    final novelResolve = await _resolveCurrentNovelUrl(ctx);
-    final novelUrl = novelResolve.url!;
     final chapterRepo = ref.read(chapterRepositoryProvider);
     final chapters = await chapterRepo.getCachedNovelChapters(novelUrl);
     final chapter =
@@ -736,12 +783,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'rewrite_chapter', 'chapter_not_found'],
       );
-      return jsonEncode({
-        'error': 'chapter_not_found',
-        'message': '章节位置 $position 的数据库记录不存在或内容表无对应行。',
-        'suggested_tool': 'list_chapters',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'chapter_not_found',
+        '章节位置 $position 的数据库记录不存在或内容表无对应行。',
+        suggestedTool: 'list_chapters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     LoggerService.instance.i(
@@ -773,18 +820,13 @@ class ToolExecutor {
     final (position, posErr) = parser.requireInt('position');
     if (posErr != null) return posErr;
 
-    final novelResolve = await _resolveCurrentNovelUrl(ctx);
-    if (novelResolve.errorJson != null) {
-      return jsonEncode(novelResolve.errorJson);
-    }
-    final novelUrl = novelResolve.url!;
-
-    // 复用 _resolveChapterUrlByPosition 一并做越界校验，错误码 chapter_position_out_of_range 一致
+    // 一次解析同时拿到 novelUrl + chapterUrl，错误码与旧版本完全一致
     final resolveResult = await _resolveChapterUrlByPosition(ctx, position);
     if (resolveResult.errorJson != null) {
       return jsonEncode(resolveResult.errorJson);
     }
-    final chapterUrl = resolveResult.url!;
+    final novelUrl = resolveResult.novelUrl!;
+    final chapterUrl = resolveResult.chapterUrl!;
 
     final chapterRepo = ref.read(chapterRepositoryProvider);
 
@@ -1103,12 +1145,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'update_character', 'character_not_found'],
       );
-      return jsonEncode({
-        'error': 'character_not_found',
-        'message': '角色 "$name" 不存在。使用 create_character 创建新角色。',
-        'suggested_tool': 'list_characters',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'character_not_found',
+        '角色 "$name" 不存在。使用 create_character 创建新角色。',
+        suggestedTool: 'list_characters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     final (gender, genderErr) = parser.nullableString('gender');
@@ -1267,12 +1309,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'delete_character', 'character_not_found'],
       );
-      return jsonEncode({
-        'error': 'character_not_found',
-        'message': '角色 "$name" 不存在。使用 list_characters 查看所有角色。',
-        'suggested_tool': 'list_characters',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'character_not_found',
+        '角色 "$name" 不存在。使用 list_characters 查看所有角色。',
+        suggestedTool: 'list_characters',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     await repo.deleteCharacter(existing.id!);
@@ -1300,17 +1342,26 @@ class ToolExecutor {
     if (novelResolve.errorJson != null) {
       return jsonEncode(novelResolve.errorJson);
     }
-    final currentNovelId = ctx!.currentNovelId!;
+    // _resolveCurrentNovelUrl 成功即保证 ctx.currentNovelId != null，
+    // 此处用 ?. + if 消除 ctx!.currentNovelId! 双重强解包。
+    final currentNovelId = ctx?.currentNovelId;
+    if (currentNovelId == null) {
+      return jsonEncode(_guidanceError(
+        'no_current_novel',
+        '尚未选择当前小说。',
+        suggestedTool: 'list_novels',
+      ));
+    }
 
     final repo = ref.read(novelRepositoryProvider);
     final affected = await repo.updateBackgroundSettingById(currentNovelId, setting);
     if (affected == 0) {
-      return jsonEncode({
-        'error': 'novel_not_found',
-        'message': '当前小说不存在。',
-        'suggested_tool': 'list_novels',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'novel_not_found',
+        '当前小说不存在。',
+        suggestedTool: 'list_novels',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     LoggerService.instance.i('更新背景设定: novelId=$currentNovelId',
@@ -1351,12 +1402,12 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'update_outline', 'outline_not_read'],
       );
-      return jsonEncode({
-        'error': 'outline_not_read',
-        'message': '编辑大纲前请先调用 get_outline 读取当前内容。',
-        'suggested_tool': 'get_outline',
-        'suggested_args': <String, dynamic>{},
-      });
+      return jsonEncode(_guidanceError(
+        'outline_not_read',
+        '编辑大纲前请先调用 get_outline 读取当前内容。',
+        suggestedTool: 'get_outline',
+        suggestedArgs: const <String, dynamic>{},
+      ));
     }
 
     final repo = ref.read(outlineRepositoryProvider);
@@ -1365,11 +1416,11 @@ class ToolExecutor {
       LoggerService.instance.w('大纲不存在，引导用 write_outline 创建',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'update_outline', 'not_found']);
-      return jsonEncode({
-        'error': 'not_found',
-        'message': '暂无大纲，请用 write_outline 创建。',
-        'suggested_tool': 'write_outline',
-      });
+      return jsonEncode(_guidanceError(
+        'not_found',
+        '暂无大纲，请用 write_outline 创建。',
+        suggestedTool: 'write_outline',
+      ));
     }
 
     try {
@@ -1568,11 +1619,11 @@ class ToolExecutor {
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'get_prompt_tag', 'tag_not_found'],
         );
-        return jsonEncode({
-          'error': 'tag_not_found',
-          'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
-          'suggested_tool': 'list_prompt_tags',
-        });
+        return jsonEncode(_guidanceError(
+          'tag_not_found',
+          '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+          suggestedTool: 'list_prompt_tags',
+        ));
       }
       final t = tags.first;
       LoggerService.instance.i('查看提示标签详情: "${t.name}" (id=$id)',
@@ -1597,11 +1648,13 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'get_prompt_tag', 'tag_not_found'],
       );
-      return jsonEncode({
-        'error': 'tag_not_found',
-        'message': '没有名为 "$name" 的标签。',
+      return jsonEncode(<String, dynamic>{
+        ..._guidanceError(
+          'tag_not_found',
+          '没有名为 "$name" 的标签。',
+          suggestedTool: 'list_prompt_tags',
+        ),
         if (suggestedNames.isNotEmpty) 'suggested_names': suggestedNames,
-        'suggested_tool': 'list_prompt_tags',
       });
     }
     if (matched.length == 1) {
@@ -1682,12 +1735,12 @@ class ToolExecutor {
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'save_prompt_tag', 'tag_not_found'],
         );
-        return jsonEncode({
-          'error': 'tag_not_found',
-          'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
-          'suggested_tool': 'list_prompt_tags',
-          'suggested_args': <String, dynamic>{},
-        });
+        return jsonEncode(_guidanceError(
+          'tag_not_found',
+          '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+          suggestedTool: 'list_prompt_tags',
+          suggestedArgs: const <String, dynamic>{},
+        ));
       }
       final existing = existingTags.first;
       final updated = existing.copyWith(
@@ -1749,11 +1802,11 @@ class ToolExecutor {
         category: LogCategory.ai,
         tags: ['agent', 'tool', 'delete_prompt_tag', 'tag_not_found'],
       );
-      return jsonEncode({
-        'error': 'tag_not_found',
-        'message': '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
-        'suggested_tool': 'list_prompt_tags',
-      });
+      return jsonEncode(_guidanceError(
+        'tag_not_found',
+        '标签 ID $id 不存在。请先调用 list_prompt_tags 查看所有标签。',
+        suggestedTool: 'list_prompt_tags',
+      ));
     }
 
     final existing = existingTags.first;
@@ -1810,7 +1863,6 @@ class ToolExecutor {
   /// 否则后端静默忽略。
   Future<String> _createImages(
     Map<String, dynamic> args,
-    AgentScenarioContext? ctx,
   ) async {
     final parser = ToolArgParser(args);
     final (prompt, promptErr) = parser.requireString('prompt');
@@ -1884,7 +1936,6 @@ class ToolExecutor {
   /// UI 据此回源 GET /api/image-to-video/video/{mediaId}。
   Future<String> _createImageToVideo(
     Map<String, dynamic> args,
-    AgentScenarioContext? ctx,
   ) async {
     final parser = ToolArgParser(args);
     final (prompt, promptErr) = parser.requireString('prompt');
