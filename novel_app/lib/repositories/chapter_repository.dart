@@ -502,27 +502,32 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 更新用户创建的章节内容
+  ///
+  /// 跨 novel_chapters 与 chapter_cache 两表更新，使用事务保证原子性：
+  /// 任一表更新失败则整体回滚，避免出现标题已改但内容未改的不一致状态。
   @override
   Future<void> updateCustomChapter(
       String chapterUrl, String title, String content) async {
     final db = await database;
 
-    await db.update(
-      'novel_chapters',
-      {'title': title},
-      where: 'chapterUrl = ?',
-      whereArgs: [chapterUrl],
-    );
+    await db.transaction((txn) async {
+      await txn.update(
+        'novel_chapters',
+        {'title': title},
+        where: 'chapterUrl = ?',
+        whereArgs: [chapterUrl],
+      );
 
-    await db.update(
-      'chapter_cache',
-      {
-        'content': content,
-        'cachedAt': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'chapterUrl = ?',
-      whereArgs: [chapterUrl],
-    );
+      await txn.update(
+        'chapter_cache',
+        {
+          'content': content,
+          'cachedAt': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'chapterUrl = ?',
+        whereArgs: [chapterUrl],
+      );
+    });
 
     LoggerService.instance.i(
       '更新自定义章节: $chapterUrl',
@@ -532,21 +537,26 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
   }
 
   /// 删除用户创建的章节
+  ///
+  /// 跨 novel_chapters 与 chapter_cache 两表删除，使用事务保证原子性：
+  /// 任一表删除失败则整体回滚，避免出现章节元数据已删但缓存内容残留的不一致状态。
   @override
   Future<void> deleteCustomChapter(String chapterUrl) async {
     final db = await database;
 
-    await db.delete(
-      'novel_chapters',
-      where: 'chapterUrl = ?',
-      whereArgs: [chapterUrl],
-    );
+    await db.transaction((txn) async {
+      await txn.delete(
+        'novel_chapters',
+        where: 'chapterUrl = ?',
+        whereArgs: [chapterUrl],
+      );
 
-    await db.delete(
-      'chapter_cache',
-      where: 'chapterUrl = ?',
-      whereArgs: [chapterUrl],
-    );
+      await txn.delete(
+        'chapter_cache',
+        where: 'chapterUrl = ?',
+        whereArgs: [chapterUrl],
+      );
+    });
 
     _removeFromMemoryCache(chapterUrl);
     LoggerService.instance.i(

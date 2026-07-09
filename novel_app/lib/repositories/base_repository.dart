@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../core/interfaces/i_database_connection.dart';
+import '../services/logger_service.dart';
 
 /// Repository基础类
 ///
@@ -18,4 +19,24 @@ abstract class BaseRepository {
 
   /// Web平台检查
   bool get isWebPlatform => kIsWeb;
+
+  /// 统一的错误守护包装器
+  ///
+  /// 在 try 中执行 [body]；若抛出异常，记录 "Repository $opTag failed" 错误日志
+  /// （含异常对象与堆栈），然后 rethrow，保证调用方仍能感知原始异常。
+  ///
+  /// 用于消除各 Repository 方法中重复的 try/catch+log+rethrow 样板代码。
+  Future<T> guard<T>(String opTag, Future<T> Function() body) async {
+    try {
+      return await body();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'Repository $opTag failed',
+        stackTrace: st.toString(),
+        category: LogCategory.database,
+        tags: ['repository', 'guard'],
+      );
+      rethrow;
+    }
+  }
 }

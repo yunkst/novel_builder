@@ -87,20 +87,23 @@ class LlmConfigRepository extends BaseRepository
   @override
   Future<void> setDefault(int id) async {
     final db = await database;
-    // 先取消所有默认
-    await db.update(
-      _table,
-      {'is_default': 0, 'updated_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'is_default = ?',
-      whereArgs: [1],
-    );
-    // 再设置指定配置为默认
-    await db.update(
-      _table,
-      {'is_default': 1, 'updated_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // 两步 UPDATE 必须原子：先清除旧默认、再设置新默认，使用事务保证
+    // 任一步失败则整体回滚，避免出现"无默认"或"多默认"的不一致状态。
+    await db.transaction((txn) async {
+      await txn.update(
+        _table,
+        {'is_default': 0, 'updated_at': now},
+        where: 'is_default = ?',
+        whereArgs: [1],
+      );
+      await txn.update(
+        _table,
+        {'is_default': 1, 'updated_at': now},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
     LoggerService.instance.i('设置默认 LLM 配置: id=$id',
         category: LogCategory.database,
         tags: ['llm_config', 'set_default']);

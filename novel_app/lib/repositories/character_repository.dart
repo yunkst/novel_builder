@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import '../models/character.dart';
 import 'base_repository.dart';
