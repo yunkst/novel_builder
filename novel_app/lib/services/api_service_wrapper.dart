@@ -29,9 +29,11 @@ class ApiServiceWrapper {
   /// 公共构造函数 - 通过依赖注入创建实例
   ///
   /// [dio] Dio HTTP 客户端实例（可选，用于自定义配置）
-  ApiServiceWrapper([Dio? dio]) : _dio = dio ?? Dio(BaseOptions());
+  /// 若未提供,则构造一个全新的 [Dio] 实例（一次性创建,后续 [init] 复用同一实例,避免泄漏）。
+  ApiServiceWrapper([Dio? dio]) : _dio = dio ?? Dio();
 
-  Dio _dio;
+  /// 内部 Dio 实例（一次性创建,init() 复用而非重建,避免连接池/拦截器泄漏）
+  final Dio _dio;
 
   /// 只读暴露内部 Dio 实例
   ///
@@ -45,7 +47,8 @@ class ApiServiceWrapper {
 
   /// 初始化 API 客户端
   ///
-  /// 必须在使用前调用一次。此方法会重新配置 Dio 实例。
+  /// 必须在使用前调用一次。复用构造时一次性创建的 [Dio] 实例（不再重建）,
+  /// 仅更新其配置 / Adapter / 拦截器,避免连接池与 LogInterceptor 泄漏。
   Future<void> init() async {
     final host = await getHost();
 
@@ -64,26 +67,23 @@ class ApiServiceWrapper {
       throw Exception('后端 HOST 未配置');
     }
 
-    // 重新配置 Dio - 更新 baseUrl 和配置
-    // 注意：由于 _dio 是 final，我们需要重新创建 _api 实例
-    final configuredDio = Dio(BaseOptions(
-      baseUrl: host,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 90),
-      sendTimeout: const Duration(seconds: 30),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        // CORS headers for web requests
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers':
-            'Content-Type, Authorization, X-API-TOKEN',
-      },
-    ));
+    // 复用构造时一次性创建的 _dio,只更新配置 / adapter / 拦截器
+    _dio.options.baseUrl = host;
+    _dio.options.connectTimeout = const Duration(seconds: 10);
+    _dio.options.receiveTimeout = const Duration(seconds: 90);
+    _dio.options.sendTimeout = const Duration(seconds: 30);
+    _dio.options.headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      // CORS headers for web requests
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers':
+          'Content-Type, Authorization, X-API-TOKEN',
+    };
 
-    // 配置优化的HttpClientAdapter
-    configuredDio.httpClientAdapter = IOHttpClientAdapter(
+    // 重置 httpClientAdapter（关闭旧 client,创建新的）
+    _dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
         // 优化连接池配置：减少连接数避免资源耗尽
@@ -102,8 +102,12 @@ class ApiServiceWrapper {
       tags: ['success', 'api'],
     );
 
-    // 添加日志拦截器（仅在调试模式）
-    configuredDio.interceptors.add(LogInterceptor(
+    // 清理已有 LogInterceptor（防止重复 add 累积），再添加新的
+    _dio.interceptors
+        .whereType<LogInterceptor>()
+        .toList()
+        .forEach(_dio.interceptors.remove);
+    _dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: false, // 减少日志输出
       logPrint: (obj) => LoggerService.instance.d(
@@ -112,9 +116,6 @@ class ApiServiceWrapper {
         tags: ['interceptor'],
       ),
     ));
-
-    // 更新 _dio 字段
-    _dio = configuredDio;
 
     _initialized = true;
     LoggerService.instance.d(
@@ -169,17 +170,40 @@ class ApiServiceWrapper {
     return Exception('未知错误: $error');
   }
 
+  /// 统一异常包装器
+  ///
+  /// 把各业务方法的 try / catch / log / rethrow 收敛到这里:
+  /// - 内部 `body()` 抛出 → 走 [LoggerService] 记录,再通过 [_handleError] 转为
+  ///   统一 [Exception] 类型后抛给上层;
+  /// - 上层只需专注于业务实现,不再重复错误处理样板代码。
+  ///
+  /// [opTag] 用于日志的「操作名」标签,定位是哪一类业务失败。
+  Future<T> _guard<T>(String opTag, Future<T> Function() body) async {
+    try {
+      return await body();
+    } catch (e, st) {
+      LoggerService.instance.e(
+        opTag,
+        stackTrace: st.toString(),
+        category: LogCategory.network,
+        tags: ['error', 'api', 'failed'],
+      );
+      throw _handleError(e);
+    }
+  }
+
   /// 释放资源
   ///
-  /// 注意：ApiServiceWrapper 由 Provider 管理，不需要手动释放资源。
-  /// Provider 会自动管理实例的生命周期。
+  /// 真正关闭内部 [Dio]（含其 [HttpClientAdapter] 与连接池）并标记未初始化。
+  /// 由 Provider 在 dispose 阶段调用,也可手动调用。
   void dispose() {
     LoggerService.instance.i(
-      'ApiServiceWrapper.dispose() called (managed by Provider)',
+      'ApiServiceWrapper.dispose() called, closing Dio',
       category: LogCategory.network,
       tags: ['lifecycle', 'dispose'],
     );
-    // Provider 会管理资源生命周期，这里不需要手动释放
+    _dio.close(force: true);
+    _initialized = false;
   }
 
   // ========================================================================
@@ -197,7 +221,7 @@ class ApiServiceWrapper {
     ProgressCallback? onProgress,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('备份上传失败', () async {
       final token = await getToken();
 
       if (token == null || token.isEmpty) {
@@ -239,20 +263,7 @@ class ApiServiceWrapper {
       } else {
         throw Exception('备份上传失败：${response.statusCode}');
       }
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '备份上传失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'backup', 'failed'],
-      );
-      LoggerService.instance.e(
-        '备份上传异常: $e',
-        category: LogCategory.network,
-        tags: ['error', 'backup'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 获取服务器备份列表
@@ -261,7 +272,7 @@ class ApiServiceWrapper {
   /// 直接使用 _dio 绕过 OpenAPI 生成代码
   Future<List<Map<String, dynamic>>> getBackupList() async {
     _ensureInitialized();
-    try {
+    return _guard('获取备份列表失败', () async {
       final token = await getToken();
 
       if (token == null || token.isEmpty) {
@@ -290,15 +301,7 @@ class ApiServiceWrapper {
       } else {
         throw Exception('获取备份列表失败：${response.statusCode}');
       }
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '获取备份列表失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'backup', 'list', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 下载备份到本地文件
@@ -314,7 +317,7 @@ class ApiServiceWrapper {
     ProgressCallback? onProgress,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('备份下载失败: $backupId', () async {
       final token = await getToken();
 
       if (token == null || token.isEmpty) {
@@ -339,15 +342,7 @@ class ApiServiceWrapper {
         tags: ['backup', 'download', 'success'],
       );
       return savePath;
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '备份下载失败: $backupId',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'backup', 'download', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 删除服务器上的备份
@@ -355,7 +350,7 @@ class ApiServiceWrapper {
   /// [backupId] 备份唯一标识（如 "2025-07-15/novel_app_backup.db"）
   Future<void> deleteBackupOnServer({required String backupId}) async {
     _ensureInitialized();
-    try {
+    return _guard('备份删除失败: $backupId', () async {
       final token = await getToken();
 
       if (token == null || token.isEmpty) {
@@ -380,15 +375,7 @@ class ApiServiceWrapper {
       } else {
         throw Exception('备份删除失败：${response.statusCode}');
       }
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '备份删除失败: $backupId',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'backup', 'delete', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   // ======================== ComfyUI 模型分块上传 ========================
@@ -398,7 +385,7 @@ class ApiServiceWrapper {
   /// 返回 `[{name, size_bytes}]` 形式的列表
   Future<List<Map<String, dynamic>>> listModelDirs() async {
     _ensureInitialized();
-    try {
+    return _guard('获取模型目录列表失败', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -415,15 +402,7 @@ class ApiServiceWrapper {
         return dirs;
       }
       throw Exception('获取模型目录列表失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '获取模型目录列表失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'models', 'dirs', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 初始化一个分块上传任务
@@ -437,7 +416,7 @@ class ApiServiceWrapper {
     required int totalChunks,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('初始化模型上传失败', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -460,15 +439,7 @@ class ApiServiceWrapper {
         return response.data as Map<String, dynamic>;
       }
       throw Exception('初始化上传失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '初始化模型上传失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'models', 'init', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 上传一个分块
@@ -534,7 +505,7 @@ class ApiServiceWrapper {
     required String uploadId,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('查询上传状态失败: uploadId=$uploadId', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -547,15 +518,7 @@ class ApiServiceWrapper {
         return response.data as Map<String, dynamic>;
       }
       throw Exception('查询上传状态失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '查询上传状态失败: uploadId=$uploadId',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'models', 'status', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 完成分块上传，触发后端合并
@@ -565,7 +528,7 @@ class ApiServiceWrapper {
     required String uploadId,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('完成模型上传失败: uploadId=$uploadId', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -583,15 +546,7 @@ class ApiServiceWrapper {
         return response.data as Map<String, dynamic>;
       }
       throw Exception('完成上传失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '完成模型上传失败: uploadId=$uploadId',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'models', 'complete', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 取消分块上传，删除 backend 临时分块
@@ -626,7 +581,7 @@ class ApiServiceWrapper {
   /// （含正向/负向 prompt 的写法建议），为 null 表示后端未配置。
   Future<List<Map<String, dynamic>>> getText2ImgModels() async {
     _ensureInitialized();
-    try {
+    return _guard('获取文生图模型列表失败', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -651,15 +606,7 @@ class ApiServiceWrapper {
             .toList();
       }
       throw Exception('获取文生图模型列表失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '获取文生图模型列表失败',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'text2img', 'models', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 提交一个文生图任务（POST /api/text2img/generate）。
@@ -673,7 +620,7 @@ class ApiServiceWrapper {
     String? negativePrompt,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('提交文生图任务失败: prompt=${prompt.length}字符', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -698,15 +645,7 @@ class ApiServiceWrapper {
         throw Exception('后端未返回有效的 task_id');
       }
       throw Exception('提交文生图任务失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '提交文生图任务失败: prompt=${prompt.length}字符',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'text2img', 'generate', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 按 task_id 拉取文生图结果（GET /api/text2img/image/{task_id}）。
@@ -770,7 +709,7 @@ class ApiServiceWrapper {
     String? modelName,
   }) async {
     _ensureInitialized();
-    try {
+    return _guard('提交图生视频任务失败: prompt=${prompt.length}字符', () async {
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('API Token未配置');
@@ -794,15 +733,7 @@ class ApiServiceWrapper {
         throw Exception('后端未返回有效的 task_id');
       }
       throw Exception('提交图生视频任务失败：${response.statusCode}');
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '提交图生视频任务失败: prompt=${prompt.length}字符',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['error', 'image_to_video', 'generate', 'failed'],
-      );
-      throw _handleError(e);
-    }
+    });
   }
 
   /// 按 task_id 拉取图生视频结果（GET /api/image-to-video/video/{task_id}）。

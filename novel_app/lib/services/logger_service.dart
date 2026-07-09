@@ -415,6 +415,14 @@ class LoggerService {
     if (_lastPersistTime == null ||
         now.difference(_lastPersistTime!).inMilliseconds >= _flushIntervalMs) {
       _persistChain();
+    } else {
+      // 兜底：仅在内存置 _pendingPersist 但未立即写的分支,
+      // 安排一个延后的 _persistChain,确保最后一批日志不卡在内存
+      // (避免后续无新日志触发 _schedulePersist 时,当前待写日志被遗忘)。
+      Future.delayed(
+        Duration(milliseconds: _flushIntervalMs),
+        () => _persistChain(),
+      );
     }
   }
 
