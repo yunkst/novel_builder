@@ -16,6 +16,8 @@ import '../core/theme/app_typography.dart';
 import '../models/site_script.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
+import 'common/bottom_sheet_header.dart';
+import 'empty_states/empty_state_view.dart';
 
 /// 脚本管理面板（通过 showModalBottomSheet 弹出）
 class SiteScriptPanel extends ConsumerWidget {
@@ -32,42 +34,20 @@ class SiteScriptPanel extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 拖拽把手
-          const SizedBox(height: 8),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.outline,
-              borderRadius: BorderRadius.circular(2),
+          BottomSheetHeader(
+            icon: Icons.code,
+            title: '脚本管理',
+            titleStyle: AppTypography.novelTitle.copyWith(
+              fontSize: 16,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            trailing: Text(
+              '${scriptsAsync.valueOrNull?.length ?? 0} 个站点',
+              style: AppTypography.metaItalic.copyWith(
+                color: context.appColors.inkSoft,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          // 标题栏
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(Icons.code, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '脚本管理',
-                  style: AppTypography.novelTitle.copyWith(
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${scriptsAsync.valueOrNull?.length ?? 0} 个站点',
-                  style: AppTypography.metaItalic.copyWith(
-                    color: context.appColors.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 16),
           // 列表区域
           Flexible(
             child: scriptsAsync.when(
@@ -112,39 +92,10 @@ class SiteScriptPanel extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.code_off,
-              size: 48,
-              color: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.color
-                  ?.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '暂无提取脚本',
-              style: AppTypography.bodyProse.copyWith(
-                fontSize: 14,
-                color: context.appColors.inkSoft,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'AI 生成脚本后会自动出现在这里',
-              style: AppTypography.metaItalic.copyWith(
-                color: context.appColors.inkSoft,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const EmptyStateView(
+      icon: Icons.code_off,
+      title: '暂无提取脚本',
+      subtitle: 'AI 生成脚本后会自动出现在这里',
     );
   }
 }

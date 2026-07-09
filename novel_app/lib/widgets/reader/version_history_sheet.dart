@@ -4,6 +4,8 @@ import '../../core/providers/database_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/chapter_version.dart';
 import '../../utils/toast_utils.dart';
+import '../common/bottom_sheet_header.dart';
+import '../empty_states/empty_state_view.dart';
 
 /// 版本历史底部面板
 ///
@@ -78,29 +80,16 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 拖拽把手
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: colorScheme.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          // 标题行
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
+          BottomSheetHeader(
+            icon: Icons.history,
+            title: '版本历史',
+            titleStyle: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.history, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  '版本历史',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
                   child: Text(
                     widget.chapterTitle,
                     style: TextStyle(
@@ -109,7 +98,8 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (_versions.isNotEmpty)
+                if (_versions.isNotEmpty) ...[
+                  const SizedBox(width: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -126,10 +116,10 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ),
-          const Divider(height: 1),
           // 版本列表
           Flexible(
             child: _isLoading
@@ -155,31 +145,10 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
   }
 
   Widget _buildEmptyState() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.history_toggle_off,
-              size: 48, color: colorScheme.outlineVariant),
-          const SizedBox(height: 12),
-          Text(
-            '暂无历史版本',
-            style: TextStyle(
-                fontSize: 14, color: colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '编辑或AI改写章节时，旧内容会自动保存为历史版本',
-            style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant
-                    .withValues(alpha: 0.7)),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const EmptyStateView(
+      icon: Icons.history_toggle_off,
+      title: '暂无历史版本',
+      subtitle: '编辑或AI改写章节时，旧内容会自动保存为历史版本',
     );
   }
 

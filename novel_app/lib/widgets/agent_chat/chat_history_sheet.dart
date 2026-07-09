@@ -5,6 +5,7 @@ import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/models/chat_session.dart';
 
+import '../common/bottom_sheet_header.dart';
 import '../empty_states/empty_state_view.dart';
 import 'chat_history_list_item.dart';
 
@@ -41,40 +42,15 @@ class ChatHistorySheet extends ConsumerWidget {
           child: Column(
             children: [
               // 顶部把手 + 标题 + 新建按钮
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 36,
-                              height: 4,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.outlineVariant,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          Text('会话历史',
-                              style: theme.textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      tooltip: '新建会话',
-                      onPressed: () => _createNewSession(context, ref),
-                    ),
-                  ],
+              BottomSheetHeader(
+                icon: Icons.history,
+                title: '会话历史',
+                trailing: IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: '新建会话',
+                  onPressed: () => _createNewSession(context, ref),
                 ),
               ),
-              const Divider(height: 1),
               // 列表
               Expanded(
                 child: sessionsAsync.when(

@@ -14,6 +14,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'common/bottom_sheet_header.dart';
 
 class AddNovelPreviewSheet extends StatefulWidget {
   /// 提取到的小说标题
@@ -66,51 +67,28 @@ class _AddNovelPreviewSheetState extends State<AddNovelPreviewSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 拖拽手柄
-          const SizedBox(height: 8),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.outline,
-              borderRadius: BorderRadius.circular(2),
+          BottomSheetHeader(
+            icon: Icons.menu_book,
+            title: '预览小说信息',
+            titleStyle: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w600),
+            trailing: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '共 $totalChapters 章',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-
-          // 标题行
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(Icons.menu_book, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  '预览小说信息',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const Spacer(),
-                // 章节数标签
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '共 $totalChapters 章',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 16),
 
           // 小说标题（可编辑）
           Padding(
