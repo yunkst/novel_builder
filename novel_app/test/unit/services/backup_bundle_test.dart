@@ -47,9 +47,7 @@ void main() {
     dbPath = p.join(dbDir, 'novel_reader.db');
     await Directory(dbDir).create(recursive: true);
 
-    try {
-      await DatabaseConnection().close();
-    } catch (_) {}
+    await DatabaseConnection.resetInstance();
     for (final f in [
       dbPath,
       p.join(dbDir, 'novel_reader.db.bak'),
@@ -64,9 +62,7 @@ void main() {
   });
 
   tearDown(() async {
-    try {
-      await DatabaseConnection().close();
-    } catch (_) {}
+    await DatabaseConnection.resetInstance();
   });
 
   group('encodePref / shouldExcludeKey', () {

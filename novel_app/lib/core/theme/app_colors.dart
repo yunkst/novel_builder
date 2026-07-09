@@ -73,66 +73,6 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Gallery 深色背景上的纯白文字/图标
   final Color galleryOnDark;
 
-  // ─── 关系图调色板（业务数据色，集中管理）───────────────────────
-  /// 中心节点强调渐变起始色（亮主题为浅橙，暗主题沿用）
-  final Color graphCenterStart;
-
-  /// 中心节点强调渐变结束色
-  final Color graphCenterEnd;
-
-  /// 中心节点轮廓/光晕颜色
-  final Color graphCenterGlow;
-
-  /// 中心节点次级轮廓色
-  final Color graphCenterBorder;
-
-  /// 中心节点深色背景上的文字/光晕色
-  final Color graphCenterOnDark;
-
-  // ─── 角色性别色（业务数据色）─────────────────────────────────
-  /// 男角色节点色
-  final Color graphGenderMale;
-
-  /// 女角色节点色
-  final Color graphGenderFemale;
-
-  /// 未指定性别角色节点色
-  final Color graphGenderUnknown;
-
-  // ─── 关系类型色（业务数据色）─────────────────────────────────
-  /// 关系类型"亲密关系"色
-  final Color graphRelationIntimate;
-
-  /// 关系类型"家庭"色
-  final Color graphRelationFamily;
-
-  /// 关系类型"恋人"色
-  final Color graphRelationLover;
-
-  /// 关系类型"朋友"色
-  final Color graphRelationFriend;
-
-  /// 关系类型"敌对"色
-  final Color graphRelationHostile;
-
-  /// 关系类型"敌对（深）"色
-  final Color graphRelationHostileDeep;
-
-  /// 关系类型"竞争对手"色
-  final Color graphRelationRival;
-
-  /// 关系类型"同事"色
-  final Color graphRelationColleague;
-
-  /// 关系类型"师徒"色
-  final Color graphRelationMaster;
-
-  /// 关系类型"盟友"色
-  final Color graphRelationAlly;
-
-  /// 关系类型"默认"色
-  final Color graphRelationDefault;
-
   // ─── 聊天暗色系 ──────────────────────────────────────────────
   final Color chatInputBackground;
   final Color chatPrimaryText;
@@ -187,25 +127,6 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onInfoContainer,
     required this.galleryOverlay,
     required this.galleryOnDark,
-    required this.graphCenterStart,
-    required this.graphCenterEnd,
-    required this.graphCenterGlow,
-    required this.graphCenterBorder,
-    required this.graphCenterOnDark,
-    required this.graphGenderMale,
-    required this.graphGenderFemale,
-    required this.graphGenderUnknown,
-    required this.graphRelationIntimate,
-    required this.graphRelationFamily,
-    required this.graphRelationLover,
-    required this.graphRelationFriend,
-    required this.graphRelationHostile,
-    required this.graphRelationHostileDeep,
-    required this.graphRelationRival,
-    required this.graphRelationColleague,
-    required this.graphRelationMaster,
-    required this.graphRelationAlly,
-    required this.graphRelationDefault,
     required this.chatInputBackground,
     required this.chatPrimaryText,
     required this.chatSecondaryText,
@@ -251,26 +172,6 @@ class AppColors extends ThemeExtension<AppColors> {
     onInfoContainer: Color(0xFF0E2840),
     galleryOverlay: Color(0xB3F3EADA),
     galleryOnDark: Color(0xFFFFFFFF),
-    // 关系图调色板（业务色，与暗色一致）
-    graphCenterStart: Color(0xFFFFA726),
-    graphCenterEnd: Color(0xFFEF6C00),
-    graphCenterGlow: Color(0x80EF6C00),
-    graphCenterBorder: Color(0xFFFFCC80),
-    graphCenterOnDark: Color(0xFFFBE9E7),
-    graphGenderMale: Color(0xFF1976D2),
-    graphGenderFemale: Color(0xFFE91E63),
-    graphGenderUnknown: Color(0xFF9C27B0),
-    graphRelationIntimate: Color(0xFFE53935),
-    graphRelationFamily: Color(0xFF00897B),
-    graphRelationLover: Color(0xFFEC407A),
-    graphRelationFriend: Color(0xFF1E88E5),
-    graphRelationHostile: Color(0xFFD32F2F),
-    graphRelationHostileDeep: Color(0xFFB71C1C),
-    graphRelationRival: Color(0xFFEF6C00),
-    graphRelationColleague: Color(0xFFFFA000),
-    graphRelationMaster: Color(0xFF3949AB),
-    graphRelationAlly: Color(0xFF43A047),
-    graphRelationDefault: Color(0xFF757575),
     // 聊天 · 暖纸色系
     chatInputBackground: Color(0xFFEBE3D2),
     chatPrimaryText: Color(0xFF2A2018),
@@ -317,26 +218,6 @@ class AppColors extends ThemeExtension<AppColors> {
     onInfoContainer: Color(0xFFD8E2EE),
     galleryOverlay: Color(0xB3FFFFFF),
     galleryOnDark: Color(0xFFFFFFFF),
-    // 关系图调色板（业务色，与亮色一致）
-    graphCenterStart: Color(0xFFFFA726),
-    graphCenterEnd: Color(0xFFEF6C00),
-    graphCenterGlow: Color(0x80EF6C00),
-    graphCenterBorder: Color(0xFFFFCC80),
-    graphCenterOnDark: Color(0xFFFBE9E7),
-    graphGenderMale: Color(0xFF1976D2),
-    graphGenderFemale: Color(0xFFE91E63),
-    graphGenderUnknown: Color(0xFF9C27B0),
-    graphRelationIntimate: Color(0xFFE53935),
-    graphRelationFamily: Color(0xFF00897B),
-    graphRelationLover: Color(0xFFEC407A),
-    graphRelationFriend: Color(0xFF1E88E5),
-    graphRelationHostile: Color(0xFFD32F2F),
-    graphRelationHostileDeep: Color(0xFFB71C1C),
-    graphRelationRival: Color(0xFFEF6C00),
-    graphRelationColleague: Color(0xFFFFA000),
-    graphRelationMaster: Color(0xFF3949AB),
-    graphRelationAlly: Color(0xFF43A047),
-    graphRelationDefault: Color(0xFF757575),
     // 聊天 · 深炭羊皮纸系
     chatInputBackground: Color(0xFF241F16),
     chatPrimaryText: Color(0xFFE8DCC4),
@@ -380,25 +261,6 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? onInfoContainer,
     Color? galleryOverlay,
     Color? galleryOnDark,
-    Color? graphCenterStart,
-    Color? graphCenterEnd,
-    Color? graphCenterGlow,
-    Color? graphCenterBorder,
-    Color? graphCenterOnDark,
-    Color? graphGenderMale,
-    Color? graphGenderFemale,
-    Color? graphGenderUnknown,
-    Color? graphRelationIntimate,
-    Color? graphRelationFamily,
-    Color? graphRelationLover,
-    Color? graphRelationFriend,
-    Color? graphRelationHostile,
-    Color? graphRelationHostileDeep,
-    Color? graphRelationRival,
-    Color? graphRelationColleague,
-    Color? graphRelationMaster,
-    Color? graphRelationAlly,
-    Color? graphRelationDefault,
     Color? chatInputBackground,
     Color? chatPrimaryText,
     Color? chatSecondaryText,
@@ -438,25 +300,6 @@ class AppColors extends ThemeExtension<AppColors> {
       onInfoContainer: onInfoContainer ?? this.onInfoContainer,
       galleryOverlay: galleryOverlay ?? this.galleryOverlay,
       galleryOnDark: galleryOnDark ?? this.galleryOnDark,
-      graphCenterStart: graphCenterStart ?? this.graphCenterStart,
-      graphCenterEnd: graphCenterEnd ?? this.graphCenterEnd,
-      graphCenterGlow: graphCenterGlow ?? this.graphCenterGlow,
-      graphCenterBorder: graphCenterBorder ?? this.graphCenterBorder,
-      graphCenterOnDark: graphCenterOnDark ?? this.graphCenterOnDark,
-      graphGenderMale: graphGenderMale ?? this.graphGenderMale,
-      graphGenderFemale: graphGenderFemale ?? this.graphGenderFemale,
-      graphGenderUnknown: graphGenderUnknown ?? this.graphGenderUnknown,
-      graphRelationIntimate: graphRelationIntimate ?? this.graphRelationIntimate,
-      graphRelationFamily: graphRelationFamily ?? this.graphRelationFamily,
-      graphRelationLover: graphRelationLover ?? this.graphRelationLover,
-      graphRelationFriend: graphRelationFriend ?? this.graphRelationFriend,
-      graphRelationHostile: graphRelationHostile ?? this.graphRelationHostile,
-      graphRelationHostileDeep: graphRelationHostileDeep ?? this.graphRelationHostileDeep,
-      graphRelationRival: graphRelationRival ?? this.graphRelationRival,
-      graphRelationColleague: graphRelationColleague ?? this.graphRelationColleague,
-      graphRelationMaster: graphRelationMaster ?? this.graphRelationMaster,
-      graphRelationAlly: graphRelationAlly ?? this.graphRelationAlly,
-      graphRelationDefault: graphRelationDefault ?? this.graphRelationDefault,
       chatInputBackground: chatInputBackground ?? this.chatInputBackground,
       chatPrimaryText: chatPrimaryText ?? this.chatPrimaryText,
       chatSecondaryText: chatSecondaryText ?? this.chatSecondaryText,
@@ -509,25 +352,6 @@ class AppColors extends ThemeExtension<AppColors> {
       onInfoContainer: Color.lerp(onInfoContainer, other.onInfoContainer, t)!,
       galleryOverlay: Color.lerp(galleryOverlay, other.galleryOverlay, t)!,
       galleryOnDark: Color.lerp(galleryOnDark, other.galleryOnDark, t)!,
-      graphCenterStart: Color.lerp(graphCenterStart, other.graphCenterStart, t)!,
-      graphCenterEnd: Color.lerp(graphCenterEnd, other.graphCenterEnd, t)!,
-      graphCenterGlow: Color.lerp(graphCenterGlow, other.graphCenterGlow, t)!,
-      graphCenterBorder: Color.lerp(graphCenterBorder, other.graphCenterBorder, t)!,
-      graphCenterOnDark: Color.lerp(graphCenterOnDark, other.graphCenterOnDark, t)!,
-      graphGenderMale: Color.lerp(graphGenderMale, other.graphGenderMale, t)!,
-      graphGenderFemale: Color.lerp(graphGenderFemale, other.graphGenderFemale, t)!,
-      graphGenderUnknown: Color.lerp(graphGenderUnknown, other.graphGenderUnknown, t)!,
-      graphRelationIntimate: Color.lerp(graphRelationIntimate, other.graphRelationIntimate, t)!,
-      graphRelationFamily: Color.lerp(graphRelationFamily, other.graphRelationFamily, t)!,
-      graphRelationLover: Color.lerp(graphRelationLover, other.graphRelationLover, t)!,
-      graphRelationFriend: Color.lerp(graphRelationFriend, other.graphRelationFriend, t)!,
-      graphRelationHostile: Color.lerp(graphRelationHostile, other.graphRelationHostile, t)!,
-      graphRelationHostileDeep: Color.lerp(graphRelationHostileDeep, other.graphRelationHostileDeep, t)!,
-      graphRelationRival: Color.lerp(graphRelationRival, other.graphRelationRival, t)!,
-      graphRelationColleague: Color.lerp(graphRelationColleague, other.graphRelationColleague, t)!,
-      graphRelationMaster: Color.lerp(graphRelationMaster, other.graphRelationMaster, t)!,
-      graphRelationAlly: Color.lerp(graphRelationAlly, other.graphRelationAlly, t)!,
-      graphRelationDefault: Color.lerp(graphRelationDefault, other.graphRelationDefault, t)!,
       chatInputBackground:
           Color.lerp(chatInputBackground, other.chatInputBackground, t)!,
       chatPrimaryText: Color.lerp(chatPrimaryText, other.chatPrimaryText, t)!,

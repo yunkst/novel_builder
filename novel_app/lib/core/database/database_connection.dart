@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../interfaces/i_database_connection.dart';
 import '../../services/logger_service.dart';
 import 'database_migrations.dart';
@@ -41,6 +41,21 @@ class DatabaseConnection implements IDatabaseConnection {
     _database = testDatabase;
     final connection = DatabaseConnection._internal();
     return connection;
+  }
+
+  /// 重置单例状态（仅测试使用）
+  ///
+  /// 关闭当前持有的数据库连接并清空 [_instance] / [_database] 静态字段，
+  /// 确保下一个 `DatabaseConnection()` 工厂调用会构造全新实例、打开新连接。
+  ///
+  /// 用例：使用真实文件 DB 的测试（如 backup_service_test）在 setUp/tearDown
+  /// 调用本方法，强制跨测试隔离——否则前一个测试的 stale handle 会让
+  /// 下一次 openDatabase 拿到不一致状态（如缺表的空 DB，迁移失败）。
+  @visibleForTesting
+  static Future<void> resetInstance() async {
+    await _database?.close();
+    _database = null;
+    _instance = null;
   }
 
   // ==================== IDatabaseConnection 接口实现 ====================

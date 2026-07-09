@@ -5,6 +5,7 @@ import '../core/providers/character_providers.dart';
 import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/gender_palette.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../services/logger_service.dart';
@@ -95,7 +96,7 @@ class _CharacterDetailScreenState
 
   Widget _buildHero(AppColors colors) {
     final mediaId = _character.avatarMediaId;
-    final genderColor = _genderColor(colors);
+    final genderColor = GenderPalette.of(_character.gender);
     final hasMedia = mediaId != null && mediaId.isNotEmpty;
     return Center(
       child: Container(
@@ -346,17 +347,6 @@ class _CharacterDetailScreenState
   }
 
   // ─── 辅助 ───────────────────────────────────────────────────
-
-  Color _genderColor(AppColors colors) {
-    switch (_character.gender) {
-      case '男':
-        return colors.graphGenderMale;
-      case '女':
-        return colors.graphGenderFemale;
-      default:
-        return colors.graphGenderUnknown;
-    }
-  }
 
   void _showFullScreenAvatar(String mediaId) {
     Navigator.of(context).push(

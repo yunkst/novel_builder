@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/character_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/gender_palette.dart';
 import '../models/character.dart';
 import '../models/novel.dart';
 import '../widgets/character/avatar_media.dart';
@@ -248,7 +249,7 @@ class _CharacterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final genderColor = _genderColor(colors, character.gender);
+    final genderColor = GenderPalette.of(character.gender);
 
     final subtitleParts = <String>[
       if (character.gender != null && character.gender!.isNotEmpty)
@@ -316,16 +317,5 @@ class _CharacterCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _genderColor(AppColors colors, String? gender) {
-    switch (gender) {
-      case '男':
-        return colors.graphGenderMale;
-      case '女':
-        return colors.graphGenderFemale;
-      default:
-        return colors.graphGenderUnknown;
-    }
   }
 }

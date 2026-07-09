@@ -133,10 +133,11 @@ void main() {
       // 触发 PathNotFoundException，在干净的 CI 环境上尤为明显）
       await Directory(dbDir).create(recursive: true);
 
-      // 清理上次测试残留
-      try {
-        await DatabaseConnection().close();
-      } catch (_) {}
+      // 强制重置 DatabaseConnection 单例 + 清理残留文件。
+      // 单例 static _database / _instance 不重置会让前一个测试留下的 stale
+      // handle 污染本测试（典型表现：'no such table: novel_chapters'，
+      // 因为 sqflite 拿到空文件 → 跳过 onCreate → 不跑迁移）。
+      await DatabaseConnection.resetInstance();
       for (final f in [dbPath, tempPath, bakPath]) {
         try {
           File(f).deleteSync();
@@ -145,9 +146,7 @@ void main() {
     });
 
     tearDown(() async {
-      try {
-        await DatabaseConnection().close();
-      } catch (_) {}
+      await DatabaseConnection.resetInstance();
       for (final f in [dbPath, tempPath, bakPath]) {
         try {
           File(f).deleteSync();
