@@ -86,15 +86,14 @@ NovelCover(novel)
 
 ## 5. 数据层
 
-### 5.1 DB 迁移 v34 → v35
+### 5.1 DB 迁移 v35 → v36
 
 **文件**：`lib/core/database/database_migrations.dart`
 
-- 版本号：`currentVersion` 从 34 升到 35（注：实际版本号以代码现状为准，需先 Read 确认当前 `latestVersion` / `databaseVersion` 常量）
-- `_onUpgrade` 追加分支：`if (oldVersion < 35)`
-- SQL：`ALTER TABLE bookshelf ADD COLUMN coverMediaId TEXT;`
-- `onCreate` 的建表语句同步加 `coverMediaId TEXT` 列（保证全新安装也带该列）
-- 模式参照 v34 的 `characters.avatarMediaId` 迁移（`database_migrations.dart:740-761`）
+- 版本号：`currentVersion` 从 35 升到 36（v35 已被 character_relationships 重建占用）
+- `_migrateToVersion` switch 追加分支：`case 36:`
+- SQL：`ALTER TABLE bookshelf ADD COLUMN coverMediaId TEXT;`（用现有 `_addColumnIfNotExists` helper，幂等）
+- 模式参照 v34 的 `characters.avatarMediaId` 迁移（`_addColumnIfNotExists(db, 'characters', 'avatarMediaId', 'TEXT')`，`database_migrations.dart:758`）
 
 **保留不动**：`bookshelf.coverUrl TEXT` 列（用户决定保留）。
 
@@ -356,10 +355,11 @@ Widget build(BuildContext context) {
 
 | 文件 | 改动类型 |
 |------|---------|
-| `lib/core/database/database_migrations.dart` | 新增 v35 迁移 + onCreate 建表补列 |
+| `lib/core/database/database_migrations.dart` | 新增 v36 迁移加 `coverMediaId` 列 |
 | `lib/models/novel.dart` | 新增 `coverMediaId` 字段 + toMap/fromMap/copyWith |
 | `lib/core/interfaces/repositories/i_novel_repository.dart` | 新增 `updateCoverMediaIdById` 接口 |
-| `lib/repositories/novel_repository.dart` | 新增 `updateCoverMediaIdById` 实现 |
+| `lib/repositories/novel_repository.dart` | 新增 `updateCoverMediaIdById` + `getNovelById` 补 `coverMediaId` 映射 |
+| `lib/repositories/bookshelf_repository.dart` | `getNovelsByBookshelf` 两处 Novel 构造补 `coverMediaId` 映射 |
 | `lib/services/novel_agent/agent_tools.dart` | 新增 `_setNovelCover` schema + 加入 allTools |
 | `lib/services/novel_agent/tool_executor.dart` | switch 新增 case |
 | `lib/services/novel_agent/tool_executor/novel_navigation_executor.dart` | 新增 `setNovelCover` 方法 |
