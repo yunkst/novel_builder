@@ -346,6 +346,7 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       coverUrl: maps.first['coverUrl'] as String?,
       description: maps.first['description'] as String?,
       backgroundSetting: maps.first['backgroundSetting'] as String?,
+      coverMediaId: maps.first['coverMediaId'] as String?,
       lastReadChapterIndex: maps.first['lastReadChapter'] as int?,
     );
   }
@@ -370,5 +371,31 @@ class NovelRepository extends BaseRepository implements INovelRepository {
     final novelUrl = await getNovelUrlById(id);
     if (novelUrl == null) return 0;
     return updateBackgroundSetting(novelUrl, setting);
+  }
+
+  /// 根据 ID 更新小说封面媒体 ID
+  @override
+  Future<int> updateCoverMediaIdById(int id, String? mediaId) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    try {
+      final db = await database;
+      return await db.update(
+        'bookshelf',
+        {'coverMediaId': mediaId},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新封面失败: id=$id - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'cover', 'failed'],
+      );
+      rethrow;
+    }
   }
 }

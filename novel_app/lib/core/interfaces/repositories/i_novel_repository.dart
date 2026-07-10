@@ -104,4 +104,12 @@ abstract class INovelRepository {
   /// [setting] 背景设定内容
   /// 返回受影响的行数，ID 不存在则返回 0
   Future<int> updateBackgroundSettingById(int id, String? setting);
+
+  /// 根据 ID 更新小说封面媒体 ID
+  ///
+  /// [id] bookshelf.id
+  /// [mediaId] 媒体资源 ID（来自 create_images / create_image_to_video），
+  ///   传 null 表示清空封面（回到程序化占位）
+  /// 返回受影响的行数，ID 不存在则返回 0
+  Future<int> updateCoverMediaIdById(int id, String? mediaId);
 }
