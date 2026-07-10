@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/database_providers.dart';
 import '../../../models/novel.dart';
 import '../../logger_service.dart';
+import '../agent_scenario.dart';
 import '../tool_arg_parser.dart' show ToolArgParser;
 import '../tool_executor_helpers.dart';
 
@@ -87,6 +88,52 @@ class NovelNavigationExecutor with ToolExecutorHelpers {
       'novelId': id,
       'title': title,
       'message': '小说 "$title" 已创建并自动切换为当前工作小说。',
+    });
+  }
+
+  /// 设置当前小说封面（set_novel_cover 工具）
+  ///
+  /// 从场景上下文取 currentNovelId，写 bookshelf.coverMediaId。
+  /// mediaId 为 null 表示清空封面。与 update_background_setting 同构：
+  /// 先 resolveCurrentNovelUrl 校验小说存在，再用 currentNovelId 写库。
+  Future<String> setNovelCover(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final parser = ToolArgParser(args);
+    final (mediaId, mediaIdErr) = parser.nullableString('mediaId');
+    if (mediaIdErr != null) return mediaIdErr;
+
+    final novelResolve = await resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final currentNovelId = ctx?.currentNovelId;
+    if (currentNovelId == null) {
+      return jsonEncode(guidanceError(
+        'no_current_novel',
+        '尚未选择当前小说。请先调用 list_novels 再用 select_novel 选定目标。',
+        suggestedTool: 'list_novels',
+      ));
+    }
+
+    final repo = ref.read(novelRepositoryProvider);
+    final affected = await repo.updateCoverMediaIdById(currentNovelId, mediaId);
+    if (affected == 0) {
+      return jsonEncode(guidanceError(
+        'novel_not_found',
+        '当前小说不存在。',
+        suggestedTool: 'list_novels',
+      ));
+    }
+
+    LoggerService.instance.i('设置封面: novelId=$currentNovelId, mediaId=$mediaId',
+        category: LogCategory.ai, tags: ['agent', 'tool', 'set_novel_cover']);
+    return jsonEncode({
+      'success': true,
+      'novelId': currentNovelId,
+      'coverMediaId': mediaId,
+      'cleared': mediaId == null,
     });
   }
 }

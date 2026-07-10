@@ -131,6 +131,9 @@ class ToolExecutor with ToolExecutorHelpers {
           return await _outline.writeOutline(args, scenarioContext);
         case 'get_outline':
           return await _outline.getOutline(args, scenarioContext);
+        // ===== 小说封面 =====
+        case 'set_novel_cover':
+          return await _novelNav.setNovelCover(args, scenarioContext);
         // ===== 提示标签 =====
         case 'list_prompt_tags':
           return await _promptTag.listPromptTags(args);
