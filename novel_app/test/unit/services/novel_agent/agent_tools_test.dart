@@ -218,6 +218,10 @@ void main() {
     test('get_outline — 无参数（从上下文读取当前小说）', () {
       verifyToolSchema('get_outline');
     });
+
+    test('set_novel_cover — 需要 mediaId（null 表示清空封面）', () {
+      verifyToolSchema('set_novel_cover', required: ['mediaId']);
+    });
   });
 
   group('AgentTools — 参数类型验证', () {
@@ -324,6 +328,7 @@ void main() {
       'get_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'getPromptTag'),
       'save_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'savePromptTag'),
       'delete_prompt_tag': (file: 'prompt_tag_executor.dart', method: 'deletePromptTag'),
+      'set_novel_cover': (file: 'novel_navigation_executor.dart', method: 'setNovelCover'),
     };
 
     /// 执行端接受、但 schema **有意不声明** 的字段。

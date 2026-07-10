@@ -1,7 +1,10 @@
-/// 小说导航子执行器 — list_novels / select_novel / create_novel
+/// 小说导航子执行器 — list_novels / select_novel / create_novel / set_novel_cover
 ///
-/// 三个工具都不依赖当前小说上下文（list_novels 无参可调，select_novel 由
-/// novelId 定位，create_novel 是创建并自动切换），因此共用 helper 较少。
+/// 工具依赖关系：
+/// - list_novels / select_novel / create_novel 不依赖当前小说上下文
+///   （list 无参可调，select_novel 由 novelId 定位，create_novel 是创建并自动切换）。
+/// - set_novel_cover 依赖 AgentScenarioContext.currentNovelId，必须在
+///   select_novel 之后调用。
 library;
 
 import 'dart:convert';
