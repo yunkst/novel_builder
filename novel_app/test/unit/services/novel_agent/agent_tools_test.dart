@@ -16,11 +16,11 @@ import 'package:novel_app/services/novel_agent/agent_tools.dart';
 
 void main() {
   group('AgentTools.allTools — 基础验证', () {
-    test('应该有 25 个工具（新增 delete_chapter 和 delete_character）', () {
-      expect(AgentTools.allTools.length, 25, reason: '所有工具数应为 25（2026-07 新增 delete_chapter / delete_character：'
+    test('应该有 26 个工具（新增 set_novel_cover）', () {
+      expect(AgentTools.allTools.length, 26, reason: '所有工具数应为 26（2026-07 新增 set_novel_cover：'
           'list/select/create novel + read/list/search chapter + create/update/rewrite/delete chapter + '
           'list/update/create/delete character + background/update_outline/write_outline/get_outline + '
-          'prompt tags + text2img 图片工具 + 图生视频工具）');
+          'set_novel_cover + prompt tags + text2img 图片工具 + 图生视频工具）');
     });
 
     test('每个工具都有 type=function', () {

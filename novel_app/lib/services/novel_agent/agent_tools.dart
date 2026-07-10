@@ -42,6 +42,8 @@ class AgentTools {
     _updateOutline,
     _writeOutline,
     _getOutline,
+    // ===== 小说封面 =====
+    _setNovelCover,
     // ===== 提示标签 =====
     _listPromptTags,
     _getPromptTag,
@@ -539,6 +541,28 @@ class AgentTools {
           },
         },
         'required': ['setting'],
+      },
+    },
+  };
+
+  static const _setNovelCover = {
+    'type': 'function',
+    'function': {
+      'name': 'set_novel_cover',
+      'description': '设置当前小说的封面。先用 create_images（图片）或 '
+          'create_image_to_video（视频）生成媒体拿到 mediaId，再把 mediaId 传到这里。'
+          '封面接受图片或视频，展示时保持原比例裁剪（不拉伸变形），不会叠加书名文字。'
+          '如需清空封面回到默认占位图，mediaId 传 null。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'mediaId': {
+            'type': ['string', 'null'],
+            'description': '由 create_images / create_image_to_video 返回的 mediaId；'
+                '传 null 表示清空封面',
+          },
+        },
+        'required': ['mediaId'],
       },
     },
   };
