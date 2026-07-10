@@ -6,6 +6,7 @@
 - **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DSL Engine + Scrapling + Riverpod
 - **2026-07-07**: 校准爬虫站点（9→11）、DB 版本（v21→v33）、移除无依据端口；DSL Engine 统一命名
 - **2026-07-08**: **移除 backend 搜索与多站点爬虫功能**。前端已改用 headless WebView + 本地 JS 提取脚本获取章节内容、本地书架搜索；后端爬虫/搜索/章节缓存成为死代码，删除 `app/services/` 下 21 个文件、4 张缓存表、Scrapling/Playwright 等依赖；新增 `20260708_drop_cache_tables` 迁移 drop `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache`。
+- **2026-07-10**: 小说封面媒体化。bookshelf 加 coverMediaId 列（v36），新增 set_novel_cover 工具，NovelCover 命中走 MediaView（图/视频，BoxFit.cover 不拉伸）。镜像角色头像 avatarMediaId 模式。
 
 ## 项目愿景
 
@@ -225,7 +226,7 @@ docker-compose logs -f
 > 后端 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache` 三张缓存表已于 2026-07-08 由 `20260708_drop_cache_tables` 迁移移除。
 
 ### 数据库版本
-- **前端SQLite**: v33 (novel_reader.db)
+- **前端SQLite**: v36 (novel_reader.db)
 - **后端PostgreSQL**: Alembic 管理（head: `20260708_drop_cache_tables`）
 - **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 

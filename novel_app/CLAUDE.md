@@ -384,7 +384,8 @@ class Novel {
   final String author;             // 作者
   final String url;                // 小说URL（唯一标识）
   final bool isInBookshelf;        // 是否在书架
-  final String? coverUrl;          // 封面URL
+  final String? coverUrl;          // 封面URL（旧字段，兼容保留）
+  final String? coverMediaId;      // 封面媒体资源 ID（图/视频，v36 新增，走 MediaView，BoxFit.cover 不拉伸）
   final String? description;       // 简介
   final String? backgroundSetting; // 背景设定
 }
@@ -473,7 +474,7 @@ AI Agent 对话消息模型。
 ### 本地数据库
 
 - **类型**: SQLite
-- **版本**: v21
+- **版本**: v36
 - **文件名**: novel_reader.db
 - **位置**: 应用私有目录（通过`path_provider`获取）
 
@@ -490,8 +491,9 @@ AI Agent 对话消息模型。
 
 1. **bookshelf** (小说表)
    - 存储小说元数据、阅读进度
-   - 字段：id, title, author, url, cover_url, description, background_setting
+   - 字段：id, title, author, url, coverUrl, coverMediaId, description, background_setting
    - 索引：url（唯一）、last_read_at、is_in_bookshelf
+   - coverMediaId（v36 新增）存 set_novel_cover 工具写入的 mediaId，NovelCover 命中走 MediaView 渲染（图/视频，BoxFit.cover 不拉伸）
 
 2. **bookshelves** (书架分类表)
    - 书架分类功能（如"我的收藏"、"玄幻小说"）
@@ -548,7 +550,7 @@ class DatabaseConnection implements IDatabaseConnection {
   @override
   Future<Database> get database async {
     // 单例模式，返回SQLite实例
-    // 版本: v21
+    // 版本: v36
     // onCreate: 创建所有表
     // onUpgrade: 执行数据库迁移
   }
