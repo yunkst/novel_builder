@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_typography.dart';
 import '../../models/novel.dart';
+import '../media/media_view.dart';
 
 /// 小说封面
 ///
@@ -48,6 +49,38 @@ class _NovelCoverState extends State<NovelCover> {
 
   @override
   Widget build(BuildContext context) {
+    // AI 封面命中：走 MediaView 渲染（图片/视频），纯图不叠加任何程序化装饰。
+    // boxFit=cover 保证保持原比例裁切，不拉伸变形（与 AvatarMedia 一致）。
+    // 加载/失败/pending 由 MediaView 自带状态机承担，NovelCover 不再自管 fallback。
+    final coverMediaId = widget.novel.coverMediaId;
+    if (coverMediaId != null && coverMediaId.isNotEmpty) {
+      final width = widget.width;
+      final height = width * 4 / 3;
+      return SizedBox(
+        width: width,
+        height: height,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 14,
+                offset: Offset(-2, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: MediaView(
+              mediaId: coverMediaId,
+              boxFit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
+
     final width = widget.width;
     final height = width * 4 / 3;
 
