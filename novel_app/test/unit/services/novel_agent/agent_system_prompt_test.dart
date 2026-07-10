@@ -141,7 +141,8 @@ void main() {
       final prompt = AgentSystemPrompt.build();
       expect(prompt, contains('## 工作原则'));
       expect(prompt, contains('1. 选定目标'));
-      expect(prompt, contains('5. 修改操作完成后向用户汇报'));
+      expect(prompt, contains('5. 修改小说封面'));
+      expect(prompt, contains('6. 修改操作完成后向用户汇报'));
     });
 
     test('memories 非空时渲染编号列表', () {
@@ -152,6 +153,13 @@ void main() {
       expect(prompt, contains('## 经验记忆'));
       expect(prompt, contains('[1] 大纲不需要标题'));
       expect(prompt, contains('[2] 每轮注入用户上下文'));
+    });
+
+    test('system prompt 提及 set_novel_cover 封面工具', () {
+      final prompt = AgentSystemPrompt.build();
+
+      expect(prompt, contains('set_novel_cover'));
+      expect(prompt, contains('封面'));
     });
   });
 }

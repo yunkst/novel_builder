@@ -41,7 +41,12 @@ class AgentSystemPrompt {
         '（1-based 顺序号），不是 URL 或数据库 ID。');
     buffer.writeln('4. 创建新小说：用户要求"新建一本小说"时，直接调用 create_novel '
         '（只需 title，可选 description），系统会自动切换为当前工作小说。');
-    buffer.writeln('5. 修改操作完成后向用户汇报。');
+    buffer.writeln('5. 修改小说封面：先用 create_images（图片）或 '
+        'create_image_to_video（视频）生成媒体，从返回结果里选最合适的一张，'
+        '把它的 mediaId 传给 set_novel_cover。封面接受图片或视频，'
+        '封面图本身不需要包含书名文字（书名会在书架标题区独立展示）。'
+        '如需恢复默认占位封面，调 set_novel_cover 时 mediaId 传 null。');
+    buffer.writeln('6. 修改操作完成后向用户汇报。');
     buffer.writeln();
 
     // 注入经验记忆（编号 [N] 形式，供 patch_memory 工具用编号定位）
