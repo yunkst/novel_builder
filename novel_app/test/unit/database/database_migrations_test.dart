@@ -496,7 +496,7 @@ void main() {
 
     group('currentVersion', () {
       test('currentVersion 应为 DatabaseMigrations.currentVersion', () {
-        expect(DatabaseMigrations.currentVersion, 35);
+        expect(DatabaseMigrations.currentVersion, 36);
       });
     });
 

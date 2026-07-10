@@ -10,8 +10,8 @@ void main() {
   });
   tearDown(() async => db.close());
 
-  test('currentVersion 为 35', () {
-    expect(DatabaseMigrations.currentVersion, 35);
+  test('currentVersion 为 36', () {
+    expect(DatabaseMigrations.currentVersion, 36);
   });
 
   test('character_relationships 表有全部新列', () async {
