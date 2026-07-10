@@ -21,6 +21,11 @@ class Novel {
   final String? description;
   final String? backgroundSetting;
 
+  /// 封面媒体资源 ID（图像/视频），经 MediaView 渲染。
+  /// 由 set_novel_cover 工具写入；为 null 时 NovelCover 走程序化占位。
+  /// 旧 coverUrl 字段保留兼容，但新代码优先使用本字段。
+  final String? coverMediaId;
+
   /// 上次阅读章节索引（来自 bookshelf.lastReadChapter）
   final int? lastReadChapterIndex;
 
@@ -36,6 +41,7 @@ class Novel {
     this.coverUrl,
     this.description,
     this.backgroundSetting,
+    this.coverMediaId,
     this.lastReadChapterIndex,
     this.readingProgress,
   });
@@ -54,6 +60,7 @@ class Novel {
       'coverUrl': coverUrl,
       'description': description,
       'backgroundSetting': backgroundSetting,
+      'coverMediaId': coverMediaId,
     };
   }
 
@@ -72,6 +79,7 @@ class Novel {
       coverUrl: map['coverUrl'] as String?,
       description: map['description'] as String?,
       backgroundSetting: map['backgroundSetting'] as String?,
+      coverMediaId: map['coverMediaId'] as String?,
       lastReadChapterIndex: map['lastReadChapter'] as int?,
       readingProgress: lastReadTime?.toDouble(),
     );
@@ -86,6 +94,7 @@ class Novel {
     String? coverUrl,
     String? description,
     String? backgroundSetting,
+    String? coverMediaId,
     int? lastReadChapterIndex,
     double? readingProgress,
   }) {
@@ -98,6 +107,7 @@ class Novel {
       coverUrl: coverUrl ?? this.coverUrl,
       description: description ?? this.description,
       backgroundSetting: backgroundSetting ?? this.backgroundSetting,
+      coverMediaId: coverMediaId ?? this.coverMediaId,
       lastReadChapterIndex:
           lastReadChapterIndex ?? this.lastReadChapterIndex,
       readingProgress: readingProgress ?? this.readingProgress,
