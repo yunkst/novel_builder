@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 35;
+  static const int currentVersion = 36;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -795,6 +795,16 @@ class DatabaseMigrations {
         await _addColumnIfNotExists(
             db, 'characters', 'firstAppearanceChapter', 'INTEGER');
         _log('迁移 v34 → v35: 重建 character_relationships 为区间模型, characters 加 firstAppearanceChapter');
+        break;
+
+      // ========== 版本 36：小说封面媒体化 ==========
+      // bookshelf 加 coverMediaId 列（小说封面迁移到 mediaId 体系）：
+      //   - 存 create_images / create_image_to_video 返回的 mediaId
+      //   - 由 set_novel_cover 工具写入，NovelCover 命中时走 MediaView 渲染
+      // 旧 coverUrl 列保留不动（历史遗留，2026-07-08 爬虫移除后基本为 null）。
+      case 36:
+        await _addColumnIfNotExists(db, 'bookshelf', 'coverMediaId', 'TEXT');
+        _log('迁移 v35 → v36: bookshelf 加 coverMediaId 列');
         break;
     }
   }
