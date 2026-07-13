@@ -964,6 +964,22 @@ class MockINovelRepository extends _i1.Mock implements _i14.INovelRepository {
         ),
         returnValue: _i7.Future<int>.value(0),
       ) as _i7.Future<int>);
+
+  @override
+  _i7.Future<int> updateCoverMediaIdById(
+    int? id,
+    String? mediaId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateCoverMediaIdById,
+          [
+            id,
+            mediaId,
+          ],
+        ),
+        returnValue: _i7.Future<int>.value(0),
+      ) as _i7.Future<int>);
 }
 
 /// A class which mocks [HeadlessWebViewChapterListService].

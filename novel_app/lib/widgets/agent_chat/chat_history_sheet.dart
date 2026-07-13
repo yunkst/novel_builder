@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
-import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
-import 'package:novel_app/models/chat_session.dart';
 
 import '../common/bottom_sheet_header.dart';
 import '../empty_states/empty_state_view.dart';
@@ -102,15 +100,8 @@ class ChatHistorySheet extends ConsumerWidget {
   }
 
   Future<void> _createNewSession(BuildContext context, WidgetRef ref) async {
-    final repo = ref.read(chatSessionRepositoryProvider);
-    final id = await repo.createSession(ChatSession(
-      scenarioId: scenarioId,
-      title: '',
-    ));
-    // 切换到新 session（运行中时由 ScenarioSession.adoptSession 内部 cancel 老 agent 兜底）
-    ref.read(currentChatSessionIdProvider.notifier).state = id;
-    await ref.read(scenarioSessionsProvider.notifier).switchSession(scenarioId, id);
-    ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
+    // 复用 ScenarioSessionsNotifier.startNewSession（与对话窗口右上角按钮共用同一段逻辑）
+    await ref.read(scenarioSessionsProvider.notifier).startNewSession(scenarioId);
     if (context.mounted) {
       Navigator.of(context).pop();
     }

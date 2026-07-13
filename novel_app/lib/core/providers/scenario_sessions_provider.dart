@@ -16,11 +16,13 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/chat_session.dart';
 import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import 'agent_scenario_provider.dart';
 import 'chat_session_providers.dart';
 import 'agent_chat_state.dart';
+import 'database_providers.dart';
 import 'scenario_session.dart';
 
 /// 最大并发 session 数
@@ -105,6 +107,21 @@ class ScenarioSessionsNotifier
     _syncState(scenarioId);
     // 触发重新 hydrate（内部 await，状态变化会通过 _onStateChanged 同步）
     session.hydrateIfNeeded();
+  }
+
+  /// 新建一条空白会话并切换过去（旧会话保留在历史列表）。
+  ///
+  /// 「对话窗口右上角按钮」与「会话历史 → 新建会话」共用本方法，保证两处入口行为一致。
+  /// 运行中新建会话时，由 [ScenarioSession.adoptSession] 内部 cancel 老 agent 兜底，
+  /// 避免流式 segment 落进新 session 造成数据污染。
+  Future<void> startNewSession(String scenarioId) async {
+    final repo = _ref.read(chatSessionRepositoryProvider);
+    final id = await repo.createSession(
+      ChatSession(scenarioId: scenarioId, title: ''),
+    );
+    _ref.read(currentChatSessionIdProvider.notifier).state = id;
+    await switchSession(scenarioId, id); // adoptSession + hydrateIfNeeded
+    _ref.invalidate(chatSessionsByScenarioProvider(scenarioId));
   }
 
   /// 获取当前场景的 session（如果已创建）
