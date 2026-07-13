@@ -75,6 +75,9 @@ dependencies:
   # 图片裁剪
   image_cropper: ^8.0.2
 
+  # 图片选择（相册）
+  image_picker: ^1.1.2
+
   # 依赖注入 (未使用，已注释)
   # get_it: ^7.6.4
 

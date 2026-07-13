@@ -49,5 +49,11 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要访问相册以选择图片发送给助手</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>需要访问相册以保存裁剪后的图片</string>
+	<key>NSCameraUsageDescription</key>
+	<string>需要相机权限以拍摄图片发送给助手</string>
 </dict>
 </plist>
