@@ -249,7 +249,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                   final scenarioId = ref.read(currentAgentScenarioProvider);
                   ref
                       .read(scenarioSessionsProvider.notifier)
-                      .startNewSession(scenarioId);
+                      .switchSession(scenarioId, null);
                 },
                 tooltip: '新建会话',
               ),
