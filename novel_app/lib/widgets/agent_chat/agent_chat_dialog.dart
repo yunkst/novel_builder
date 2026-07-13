@@ -243,12 +243,15 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 tooltip: _isFullscreen ? '退出全屏' : '全屏',
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline,
+                icon: Icon(Icons.add_comment,
                     color: appColors.agentOnBrandMuted, size: 20),
                 onPressed: () {
-                  session?.clearConversation();
+                  final scenarioId = ref.read(currentAgentScenarioProvider);
+                  ref
+                      .read(scenarioSessionsProvider.notifier)
+                      .startNewSession(scenarioId);
                 },
-                tooltip: '清空对话',
+                tooltip: '新建会话',
               ),
               IconButton(
                 icon: Icon(Icons.close,
@@ -755,7 +758,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
         icon: Icons.send_rounded,
         bg: appColors.agentAccent,
         fg: appColors.agentOnBrand,
-        onPressed: () => _sendMessage(session),
+        onPressed: () { _sendMessage(session); },
         tooltip: '发送',
       );
     }
@@ -828,12 +831,12 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     _focusNode.requestFocus();
   }
 
-  void _sendMessage(ScenarioSession? session) {
+  Future<void> _sendMessage(ScenarioSession? session) async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
     _inputController.clear();
-    session?.sendMessage(text);
+    await session?.sendMessage(content: text, imageMediaIds: const <String>[]);
 
     _focusNode.requestFocus();
   }
