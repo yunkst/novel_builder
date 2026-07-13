@@ -52,7 +52,7 @@ class ContextualAgentLauncher {
     // 5. autoSend 模式：立即发送（草稿作为首条可见 user message）
     if (request.mode == LaunchMode.autoSend) {
       final session = notifier.get(request.scenarioId);
-      await session.sendMessage(request.draftMessage);
+      await session.sendMessage(content: request.draftMessage);
     }
   }
 }

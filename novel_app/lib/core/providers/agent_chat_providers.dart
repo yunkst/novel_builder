@@ -124,7 +124,7 @@ class AgentChatNotifier extends StateNotifier<AgentChatState> {
   /// 发送消息 — 委托给当前场景的 ScenarioSession
   Future<void> sendMessage(String content) async {
     final session = _ensureSession;
-    await session.sendMessage(content);
+    await session.sendMessage(content: content);
     // 同步状态
     state = session.state;
   }

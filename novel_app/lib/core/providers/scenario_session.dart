@@ -94,6 +94,29 @@ class ScenarioSession {
   /// UI 视图消息：从 _agentMessages 投影出 user/assistant（含 segments）。
   List<AgentChatMessage> get _uiMessages => _projectUiMessages(_agentMessages);
 
+  /// 把 user 消息的 content（可能含图片占位文本）解析成 segments。
+  /// 占位文本 [用户上传了图片 mediaId=xxx] → ImageSegment；其余文本 → TextSegment。
+  static List<AgentChatSegment> _parseUserSegments(String content) {
+    final segments = <AgentChatSegment>[];
+    int lastEnd = 0;
+    for (final match in _imagePlaceholderRe.allMatches(content)) {
+      // 占位之前的文本（非空才加）
+      if (match.start > lastEnd) {
+        final text = content.substring(lastEnd, match.start).trim();
+        if (text.isNotEmpty) segments.add(TextSegment(text));
+      }
+      segments.add(ImageSegment(mediaId: match.group(1)!));
+      lastEnd = match.end;
+    }
+    // 尾部剩余文本
+    if (lastEnd < content.length) {
+      final text = content.substring(lastEnd).trim();
+      if (text.isNotEmpty) segments.add(TextSegment(text));
+    }
+    if (segments.isEmpty) return [TextSegment(content)];
+    return segments;
+  }
+
   /// 投影：agent ChatMessage 列表 → UI AgentChatMessage 列表
   ///
   /// 规则：
@@ -109,7 +132,8 @@ class ScenarioSession {
         case 'system':
           continue;
         case 'user':
-          ui.add(AgentChatMessage.user(m.content ?? ''));
+          ui.add(AgentChatMessage.userFromSegments(
+              _parseUserSegments(m.content ?? '')));
           break;
         case 'assistant':
           final segments = <AgentChatSegment>[];
@@ -310,23 +334,43 @@ class ScenarioSession {
     _onStateChanged = callback;
   }
 
+  /// 占位文本契约：用户上传图片时拼进 content，供 agent 识别 + 投影层还原。
+  /// 格式：[用户上传了图片 mediaId=<mediaId>]
+  static final RegExp _imagePlaceholderRe =
+      RegExp(r'\[用户上传了图片 mediaId=([^\]]+)\]');
+
   /// 发送消息 — Agent 在本 session 内独立运行
-  Future<void> sendMessage(String content) async {
-    if (content.trim().isEmpty) return;
+  Future<void> sendMessage({
+    required String content,
+    List<String> imageMediaIds = const [],
+  }) async {
+    final text = content.trim();
+    if (text.isEmpty && imageMediaIds.isEmpty) return;
 
     // 运行中再发：先中断当前回合（落库 partial），再发送新消息。
     await _interruptIfRunning();
 
     await _ensureSessionId();
 
+    // 拼接 agent 视角 content：图片占位文本（图在前）+ 用户原文
+    final buf = StringBuffer();
+    for (final id in imageMediaIds) {
+      buf.writeln('[用户上传了图片 mediaId=$id]');
+    }
+    if (text.isNotEmpty) {
+      buf.write(text);
+    }
+    final agentContent = buf.toString().trim();
+
     LoggerService.instance.i(
-      'ScenarioSession [$scenarioId] 发送消息: length=${content.length} sessionId=$_sessionId',
+      'ScenarioSession [$scenarioId] 发送消息: length=${agentContent.length} '
+      'images=${imageMediaIds.length} sessionId=$_sessionId',
       category: LogCategory.ai,
       tags: ['session', 'send', scenarioId],
     );
 
     // user 消息即时进 _agentMessages + 落库
-    final userMsg = ChatMessage(role: 'user', content: content.trim());
+    final userMsg = ChatMessage(role: 'user', content: agentContent);
     _agentMessages.add(userMsg);
     _state = _state.copyWith(
       messages: _uiMessages,
@@ -335,7 +379,7 @@ class ScenarioSession {
     _notifyStateChanged();
     await _persistAgentMessage(userMsg);
 
-    await _beginAgentRun(content.trim());
+    await _beginAgentRun(agentContent);
   }
 
   /// 启动一轮 Agent 回合

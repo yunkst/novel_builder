@@ -197,7 +197,7 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      await session.sendMessage('你好');
+      await session.sendMessage(content: '你好');
 
       // 流式完成后应包含 user + assistant 消息
       expect(session.state.messages.length, 2,
@@ -223,7 +223,7 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      await session.sendMessage('测试消息');
+      await session.sendMessage(content: '测试消息');
       expect(session.state.messages.isNotEmpty, isTrue);
 
       session.clearConversation();
@@ -235,8 +235,8 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      await session.sendMessage('');
-      await session.sendMessage('   ');
+      await session.sendMessage(content: '');
+      await session.sendMessage(content: '   ');
 
       expect(mockService.sendMessageCallCount, 0);
       expect(session.state.messages, isEmpty);
@@ -254,12 +254,12 @@ void main() {
       final extractSession = sessions.get(ScenarioIds.webviewExtract);
 
       // 在 writing 场景发送消息
-      await writingSession.sendMessage('写作消息');
+      await writingSession.sendMessage(content: '写作消息');
       expect(writingSession.state.messages.length, 2);
       expect(writingSession.state.messages.first.content, contains('写作消息'));
 
       // 在 webview_extract 场景发送消息
-      await extractSession.sendMessage('提取消息');
+      await extractSession.sendMessage(content: '提取消息');
       expect(extractSession.state.messages.length, 2);
       expect(extractSession.state.messages.first.content, contains('提取消息'));
 
@@ -275,8 +275,8 @@ void main() {
       final writingSession = sessions.get(ScenarioIds.writing);
       final extractSession = sessions.get(ScenarioIds.webviewExtract);
 
-      await writingSession.sendMessage('写作消息');
-      await extractSession.sendMessage('提取消息');
+      await writingSession.sendMessage(content: '写作消息');
+      await extractSession.sendMessage(content: '提取消息');
 
       // 清空 writing 场景
       writingSession.clearConversation();
@@ -295,7 +295,7 @@ void main() {
       final writingSession = sessions.get(ScenarioIds.writing);
 
       // 由于 sendMessage 是同步执行的 mock，发送完成后 running 已重置
-      await writingSession.sendMessage('测试');
+      await writingSession.sendMessage(content: '测试');
       expect(mockService.isRunningFor(ScenarioIds.writing), isFalse);
     });
   });
@@ -310,12 +310,12 @@ void main() {
 
       // 在 writing 场景发送消息
       final writingSession = sessions.get(ScenarioIds.writing);
-      await writingSession.sendMessage('写作消息');
+      await writingSession.sendMessage(content: '写作消息');
       final writingMessages = writingSession.state.messages;
 
       // 切换到 webview_extract
       final extractSession = sessions.get(ScenarioIds.webviewExtract);
-      await extractSession.sendMessage('提取消息');
+      await extractSession.sendMessage(content: '提取消息');
 
       // 切回 writing — session 应该还在
       final writingAgain = sessions.get(ScenarioIds.writing);
@@ -363,7 +363,7 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
 
       final writingSession = sessions.get(ScenarioIds.writing);
-      await writingSession.sendMessage('消息');
+      await writingSession.sendMessage(content: '消息');
       expect(sessions.hasSession(ScenarioIds.writing), isTrue);
 
       sessions.disposeSession(ScenarioIds.writing);
@@ -461,7 +461,7 @@ void main() {
       final session = sessions.get(ScenarioIds.writing);
 
       // 发送消息会触发 MockNovelAgentService 发出 TextDelta + Done 事件
-      await session.sendMessage('调用工具');
+      await session.sendMessage(content: '调用工具');
 
       // 验证消息结构
       final lastMsg = session.state.messages.last;
@@ -480,7 +480,7 @@ void main() {
 
       expect(session.lifecycle, SessionLifecycle.fresh);
 
-      await session.sendMessage('测试');
+      await session.sendMessage(content: '测试');
       expect(session.lifecycle, SessionLifecycle.idle);
     });
 
@@ -522,7 +522,7 @@ void main() {
       final slowSession = slowSessions.get(ScenarioIds.writing);
 
       // 启动慢发送：mock 会先 emit TextDelta，再 delay 100ms
-      final sendFuture = slowSession.sendMessage('测试');
+      final sendFuture = slowSession.sendMessage(content: '测试');
 
       // 等 _isRunning=true 并让 TextDelta 被 listener 处理进 _pendingSegments。
       // 100ms 给微任务链足够的时间窗口（_persistAgentMessage + listen + add TextDelta）。
@@ -558,7 +558,7 @@ void main() {
 
       // 第一次：模拟失败
       mockService.failNextRounds = 1;
-      await session.sendMessage('你好');
+      await session.sendMessage(content: '你好');
 
       expect(session.state.error, isNotNull, reason: '首轮失败应设置 error');
       expect(session.state.messages.length, 1);
@@ -586,13 +586,13 @@ void main() {
       final session = sessions.get(ScenarioIds.writing);
 
       // 第一轮正常：messages = [user1, assistant1]
-      await session.sendMessage('第一条');
+      await session.sendMessage(content: '第一条');
       expect(session.state.messages.length, 2);
 
       // 第二轮失败且带半成品：messages = [user1, assistant1, user2, assistant_half]
       mockService.failNextRounds = 1;
       mockService.emitPartialBeforeFail = true;
-      await session.sendMessage('第二条');
+      await session.sendMessage(content: '第二条');
       expect(session.state.error, isNotNull);
       expect(session.state.messages.length, 4,
           reason: '半成品 assistant 应已入列');
@@ -628,7 +628,7 @@ void main() {
       final slowSession = slowSessions.get(ScenarioIds.writing);
 
       // 启动慢发送
-      final sendFuture = slowSession.sendMessage('慢消息');
+      final sendFuture = slowSession.sendMessage(content: '慢消息');
 
       // 等 _isRunning=true
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -671,8 +671,8 @@ void main() {
       final session = sessions.get(ScenarioIds.writing);
 
       // 构造两轮对话：[user1, assistant1, user2, assistant2]
-      await session.sendMessage('第一条');
-      await session.sendMessage('第二条');
+      await session.sendMessage(content: '第一条');
+      await session.sendMessage(content: '第二条');
       expect(session.state.messages.length, 4);
 
       String? callbackContent;
@@ -692,8 +692,8 @@ void main() {
       final session = sessions.get(ScenarioIds.writing);
 
       // 构造两轮对话：[user1, assistant1, user2, assistant2]
-      await session.sendMessage('第一条');
-      await session.sendMessage('第二条');
+      await session.sendMessage(content: '第一条');
+      await session.sendMessage(content: '第二条');
       expect(session.state.messages.length, 4);
 
       // UI index 2 = user2
@@ -725,10 +725,10 @@ void main() {
       final slowSession = slowSessions.get(ScenarioIds.writing);
 
       // 先发一条消息建立历史
-      await slowSession.sendMessage('前置消息');
+      await slowSession.sendMessage(content: '前置消息');
 
       // 启动慢发送
-      final sendFuture = slowSession.sendMessage('慢消息');
+      final sendFuture = slowSession.sendMessage(content: '慢消息');
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
 
@@ -750,7 +750,7 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      await session.sendMessage('测试');
+      await session.sendMessage(content: '测试');
       expect(session.state.messages.length, 2);
 
       // 负索引
@@ -775,7 +775,7 @@ void main() {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      await session.sendMessage('测试');
+      await session.sendMessage(content: '测试');
       // messages = [user, assistant]，index 1 是 assistant
       expect(session.state.messages.length, 2);
       expect(session.state.messages[1].role, AgentChatRole.assistant);
@@ -787,6 +787,72 @@ void main() {
 
       expect(result, isFalse, reason: '指向 assistant 的索引应拒绝回滚');
       expect(session.state.messages.length, 2, reason: '非 user 目标不应影响消息');
+    });
+  });
+
+  // ===========================================================================
+  // 6. sendMessage 图片附件（Task 4 新增）
+  // ===========================================================================
+
+  group('sendMessage 图片附件', () {
+    test('双空拦截：空 content + 空 imageMediaIds 不入栈', () async {
+      final mock = MockNovelAgentService();
+      final c = createContainer(mock);
+      final session = c.read(scenarioSessionsProvider.notifier).get(ScenarioIds.writing);
+
+      await session.sendMessage(content: '');
+
+      expect(session.state.messages, isEmpty);
+      expect(mock.sendMessageCallCount, 0);
+    });
+
+    test('单图无文：拼占位文本，agent 收到 mediaId；UI 消息还原 ImageSegment',
+        () async {
+      final mock = MockNovelAgentService();
+      final c = createContainer(mock);
+      final session = c.read(scenarioSessionsProvider.notifier).get(ScenarioIds.writing);
+
+      await session.sendMessage(
+        content: '',
+        imageMediaIds: const ['local_abc123'],
+      );
+
+      // agent 视角收到的 userInput 含占位文本
+      expect(mock.sendMessageUserInputs.last,
+          contains('[用户上传了图片 mediaId=local_abc123]'));
+      // UI 消息：user 一条（assistant 因 mock 流式一定会加进来）
+      expect(session.state.messages.length, greaterThanOrEqualTo(1));
+      final userMsg = session.state.messages.first;
+      expect(userMsg.role, AgentChatRole.user);
+      // 投影层还原出 ImageSegment
+      expect(userMsg.segments.whereType<ImageSegment>().length, 1);
+      expect(userMsg.segments.whereType<ImageSegment>().first.mediaId,
+          'local_abc123');
+    });
+
+    test('单图有文：占位文本 + 用户原文', () async {
+      final mock = MockNovelAgentService();
+      final c = createContainer(mock);
+      final session = c.read(scenarioSessionsProvider.notifier).get(ScenarioIds.writing);
+
+      await session.sendMessage(
+        content: '把这张图变成水墨风视频',
+        imageMediaIds: const ['local_abc123'],
+      );
+
+      expect(mock.sendMessageUserInputs.last,
+          contains('[用户上传了图片 mediaId=local_abc123]'));
+      expect(mock.sendMessageUserInputs.last,
+          contains('把这张图变成水墨风视频'));
+      final userMsg = session.state.messages.first;
+      expect(userMsg.role, AgentChatRole.user);
+      expect(userMsg.segments.whereType<ImageSegment>().length, 1);
+      // 用户原文作为 TextSegment 保留
+      expect(
+          userMsg.segments
+              .whereType<TextSegment>()
+              .any((t) => t.content.contains('把这张图变成水墨风视频')),
+          isTrue);
     });
   });
 }

@@ -73,6 +73,15 @@ class AgentChatMessage {
         segments: [TextSegment(content)],
       );
 
+  /// 创建用户消息（直接使用 segments 列表，含 ImageSegment 等多类型片段）
+  ///
+  /// 用于投影层把含图片占位文本的 user content 还原为多 segment 消息。
+  factory AgentChatMessage.userFromSegments(List<AgentChatSegment> segments) =>
+      AgentChatMessage(
+        role: AgentChatRole.user,
+        segments: segments,
+      );
+
   /// 创建助手消息（兼容旧格式：文本 + 工具调用列表）
   ///
   /// 生成结构为 [TextSegment(content), ToolCallSegment×N]

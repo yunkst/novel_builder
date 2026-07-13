@@ -29,7 +29,7 @@ void main() {
         final mockSession = MockScenarioSession();
 
         when(mockNotifier.switchSession(any, any)).thenAnswer((_) async {});
-        when(mockSession.sendMessage(any)).thenAnswer((_) async {});
+        when(mockSession.sendMessage(content: any)).thenAnswer((_) async {});
         when(mockNotifier.get(any)).thenReturn(mockSession);
 
         late ProviderContainer container;
@@ -77,7 +77,7 @@ void main() {
         );
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
-        verify(mockSession.sendMessage('请生成提取脚本')).called(1);
+        verify(mockSession.sendMessage(content: '请生成提取脚本')).called(1);
       },
       retry: 3,
     );
@@ -136,7 +136,7 @@ void main() {
         );
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
-        verifyNever(mockSession.sendMessage(any));
+        verifyNever(mockSession.sendMessage(content: any));
       },
       retry: 3,
     );
