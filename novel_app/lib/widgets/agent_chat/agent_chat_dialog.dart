@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/agent_chat_state.dart';
@@ -5,6 +7,9 @@ import 'package:novel_app/core/providers/agent_scenario_provider.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/core/providers/scenario_session.dart';
+import 'package:novel_app/services/image_picker_service.dart';
+import 'package:novel_app/services/media/media_proxy.dart';
+import 'package:novel_app/services/media/media_types.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario_factory.dart';
 import 'package:novel_app/core/providers/reading_context_providers.dart';
 import 'package:novel_app/models/agent_chat_message.dart';
@@ -17,6 +22,7 @@ import 'package:novel_app/widgets/agent_chat/chat_history_sheet.dart';
 import 'package:novel_app/widgets/agent_chat/agent_message_bubble.dart';
 import 'package:novel_app/widgets/agent_chat/agent_novel_picker_dialog.dart';
 import 'package:novel_app/widgets/agent_chat/agent_scenario_config_dialog.dart';
+import 'package:novel_app/widgets/media/media_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 
@@ -25,7 +31,14 @@ class AgentChatDialog extends ConsumerStatefulWidget {
   /// 预填草稿（draftOnly 模式下由启动器注入；autoSend 模式不传）
   final String? initialDraft;
 
-  const AgentChatDialog({super.key, this.initialDraft});
+  /// 选图服务注入入口（默认走真实实现，测试可注入 fake）。
+  final ImagePickerService? imagePickerService;
+
+  const AgentChatDialog({
+    super.key,
+    this.initialDraft,
+    this.imagePickerService,
+  });
 
   @override
   ConsumerState<AgentChatDialog> createState() => _AgentChatDialogState();
@@ -40,6 +53,15 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   bool _hasText = false;
   // 消息列表是否贴底:驱动"回到底部"按钮显隐 + 新消息自动跟随策略
   bool _isAtBottom = true;
+
+  // 待发送的已上传图片 mediaId（单选单图，null 表示无）。
+  String? _attachedMediaId;
+  // 选图+上传进行中（控制 + 按钮转圈与禁用）。
+  bool _isPickingImage = false;
+
+  // ImagePickerService 钩子（默认走真实实现，测试可通过构造参数注入）。
+  ImagePickerService get _imagePicker =>
+      widget.imagePickerService ?? ImagePickerService();
 
   @override
   void initState() {
@@ -108,13 +130,19 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     });
 
     return Dialog(
-      insetPadding: _isFullscreen ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: _isFullscreen
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(_isFullscreen ? 0 : 16),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: _isFullscreen ? double.infinity : MediaQuery.of(context).size.width * 0.92,
-            maxHeight: _isFullscreen ? double.infinity : MediaQuery.of(context).size.height * 0.8,
+            maxWidth: _isFullscreen
+                ? double.infinity
+                : MediaQuery.of(context).size.width * 0.92,
+            maxHeight: _isFullscreen
+                ? double.infinity
+                : MediaQuery.of(context).size.height * 0.8,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -202,29 +230,36 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                       .firstOrNull;
                   if (info != null) {
                     // 切换场景：设置当前 scenario + 懒创建目标 session
-                    ref.read(currentAgentScenarioProvider.notifier).state = info.id;
+                    ref.read(currentAgentScenarioProvider.notifier).state =
+                        info.id;
                     // 新 scenario 还没选会话，重置 sessionId 让 ScenarioSession 自取最近
-                    ref.read(currentChatSessionIdProvider.notifier).state = null;
+                    ref.read(currentChatSessionIdProvider.notifier).state =
+                        null;
                     ref.read(scenarioSessionsProvider.notifier).get(info.id);
                   }
                 },
-                itemBuilder: (context) => AgentScenarioFactory.availableScenarios
-                    .map((s) => PopupMenuItem(
-                          value: s.id,
-                          child: Row(
-                            children: [
-                              Text(s.icon, style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 8),
-                              Text(s.displayName),
-                              if (s.id == chatState.scenarioId) ...[
-                                const Spacer(),
-                                Icon(Icons.check, size: 16,
-                                    color: Theme.of(context).colorScheme.primary),
-                              ],
-                            ],
-                          ),
-                        ))
-                    .toList(),
+                itemBuilder: (context) =>
+                    AgentScenarioFactory.availableScenarios
+                        .map((s) => PopupMenuItem(
+                              value: s.id,
+                              child: Row(
+                                children: [
+                                  Text(s.icon,
+                                      style: const TextStyle(fontSize: 16)),
+                                  const SizedBox(width: 8),
+                                  Text(s.displayName),
+                                  if (s.id == chatState.scenarioId) ...[
+                                    const Spacer(),
+                                    Icon(Icons.check,
+                                        size: 16,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                                  ],
+                                ],
+                              ),
+                            ))
+                        .toList(),
               ),
               // 场景配置按钮
               IconButton(
@@ -402,39 +437,64 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             children: [
               Icon(Icons.link, size: 14, color: appColors.agentAccent),
               const SizedBox(width: 4),
-              Text('当前页面', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: appColors.agentAccent)),
+              Text('当前页面',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: appColors.agentAccent)),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(currentUrl, style: const TextStyle(fontFamily: 'monospace', fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(currentUrl,
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Wrap(spacing: 6, runSpacing: 4, children: [
             _chip(context, Icons.pageview, 'page_info', '$pageInfoCount'),
-            _chip(context, Icons.check_circle_outline, 'execute_js', executeJsOk > 0 ? '$executeJsOk ok' : '0', theme.colorScheme.tertiary),
-            if (executeJsFail > 0) _chip(context, Icons.error_outline, 'execute_js', '$executeJsFail fail', theme.colorScheme.error),
-            if (saveScriptOk > 0) _chip(context, Icons.save_outlined, 'saved', '', theme.colorScheme.tertiary),
-            if (hasCacheHit) _chip(context, Icons.flash_on, 'cache hit', '', theme.colorScheme.tertiary),
+            _chip(
+                context,
+                Icons.check_circle_outline,
+                'execute_js',
+                executeJsOk > 0 ? '$executeJsOk ok' : '0',
+                theme.colorScheme.tertiary),
+            if (executeJsFail > 0)
+              _chip(context, Icons.error_outline, 'execute_js',
+                  '$executeJsFail fail', theme.colorScheme.error),
+            if (saveScriptOk > 0)
+              _chip(context, Icons.save_outlined, 'saved', '',
+                  theme.colorScheme.tertiary),
+            if (hasCacheHit)
+              _chip(context, Icons.flash_on, 'cache hit', '',
+                  theme.colorScheme.tertiary),
           ]),
         ],
       ),
     );
   }
 
-  Widget _chip(BuildContext context, IconData icon, String label, String value, [Color? color]) {
-    final c = color ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+  Widget _chip(BuildContext context, IconData icon, String label, String value,
+      [Color? color]) {
+    final c =
+        color ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
     final text = value.isEmpty ? label : '$label $value';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: c.withValues(alpha: 0.3))),
+      decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: c.withValues(alpha: 0.3))),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 12, color: c),
         const SizedBox(width: 3),
-        Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontFamily: 'monospace',
-              color: c,
-            )),
+        Text(text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: c,
+                )),
       ]),
     );
   }
@@ -500,15 +560,13 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                   ? null
                   : () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const LlmConfigManagementScreen(),
+                          builder: (_) => const LlmConfigManagementScreen(),
                         ),
                       ),
               icon: const Icon(Icons.settings, size: 14),
               label: const Text('去设置', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: appColors.error,
@@ -516,14 +574,12 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             )
           else
             TextButton.icon(
-              onPressed: session == null
-                  ? null
-                  : () => session.retryLastRound(),
+              onPressed:
+                  session == null ? null : () => session.retryLastRound(),
               icon: const Icon(Icons.refresh, size: 14),
               label: const Text('重试', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: appColors.error,
@@ -623,8 +679,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             icon: const Icon(Icons.swap_horiz, size: 14),
             label: const Text('切换', style: TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               minimumSize: const Size(0, 28),
               foregroundColor: appColors.agentAccent,
             ),
@@ -678,8 +733,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   Widget _buildInputBar(AgentChatState chatState, ScenarioSession? session) {
     final theme = Theme.of(context);
     final appColors = context.appColors;
-    final quickPrompts =
-        ScenarioQuickPrompts.forScenario(chatState.scenarioId);
+    final quickPrompts = ScenarioQuickPrompts.forScenario(chatState.scenarioId);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -697,10 +751,56 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
           // 快速输入提示词（仅在场景配置了提示词且非加载时显示）
           if (quickPrompts.isNotEmpty && !chatState.isLoading)
             _buildQuickPrompts(quickPrompts, theme, appColors),
-          // 微信式输入区：输入框与发送/停止按钮同行
+          // 待发送图片预览（仅有附件时显示，单图，右上角可删）
+          if (_attachedMediaId != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Stack(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: 80,
+                        maxHeight: 80,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: MediaView(
+                          mediaId: _attachedMediaId!,
+                          boxFit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _attachedMediaId = null),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // 微信式输入区：+ 按钮 + 输入框 + 发送/停止按钮同行
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              _buildAttachButton(theme, appColors),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _inputController,
@@ -709,8 +809,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                   maxLines: 5,
                   minLines: 1,
                   decoration: InputDecoration(
-                    hintText:
-                        chatState.isLoading ? '等待回复...' : '输入消息...',
+                    hintText: chatState.isLoading ? '等待回复...' : '输入消息...',
                     hintStyle: TextStyle(
                       color: context.appColors.inkSoft.withValues(alpha: 0.5),
                     ),
@@ -753,12 +852,14 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
         tooltip: '停止',
       );
     }
-    if (_hasText) {
+    if (_hasText || _attachedMediaId != null) {
       return _circleIconButton(
         icon: Icons.send_rounded,
         bg: appColors.agentAccent,
         fg: appColors.agentOnBrand,
-        onPressed: () { _sendMessage(session); },
+        onPressed: () {
+          _sendMessage(session);
+        },
         tooltip: '发送',
       );
     }
@@ -771,20 +872,83 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     );
   }
 
+  /// + 附件按钮（圆形 40x40，与发送按钮同款）。
+  /// 上传进行中显示转圈态并禁用点击。
+  Widget _buildAttachButton(ThemeData theme, AppColors appColors) {
+    return _circleIconButton(
+      icon: Icons.add_rounded,
+      bg: appColors.chatInputBackground,
+      fg: appColors.inkSoft,
+      onPressed: _isPickingImage ? null : () => _onAttachTap(),
+      tooltip: '上传图片',
+      child: _isPickingImage
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(appColors.inkSoft),
+              ),
+            )
+          : null,
+    );
+  }
+
+  /// 点击 + 触发选图 -> 上传 -> 预览。
+  /// 单选单图：已有附件时拒绝；上传中禁用按钮；失败弹 SnackBar。
+  Future<void> _onAttachTap() async {
+    if (!mounted) return;
+    // 单选单图：已有附件时拒绝
+    if (_attachedMediaId != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('一次只支持一张图片，发送或删除后再选')),
+        );
+      }
+      return;
+    }
+    setState(() => _isPickingImage = true);
+    try {
+      final Uint8List? bytes = await _imagePicker.pickAndCrop();
+      if (bytes == null) return; // 用户取消
+      // 注册为 local_ mediaId（复用 MediaProxy.upload）
+      final mediaId =
+          await ref.read(mediaProxyProvider).upload(bytes, MediaKind.image);
+      if (!mounted) return;
+      setState(() => _attachedMediaId = mediaId);
+    } on ImageTooLargeException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('图片上传失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
   /// 圆形图标按钮（无文字，固定 40x40）
+  ///
+  /// [child] 非 null 时用 [child] 替代默认 Icon（用于上传按钮的转圈态）。
   Widget _circleIconButton({
     required IconData icon,
     required Color bg,
     required Color fg,
     required VoidCallback? onPressed,
     required String tooltip,
+    Widget? child,
   }) {
     return Material(
       color: bg,
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: IconButton(
-        icon: Icon(icon, size: 20, color: fg),
+        icon: child ?? Icon(icon, size: 20, color: fg),
         onPressed: onPressed,
         tooltip: tooltip,
         padding: EdgeInsets.zero,
@@ -806,8 +970,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
         runSpacing: 4,
         children: prompts.map((p) {
           return ActionChip(
-            avatar: Icon(Icons.auto_awesome, size: 14,
-                color: appColors.agentAccent),
+            avatar: Icon(Icons.auto_awesome,
+                size: 14, color: appColors.agentAccent),
             label: Text(p.label, style: const TextStyle(fontSize: 12)),
             backgroundColor: appColors.agentAccent.withValues(alpha: 0.08),
             side: BorderSide(
@@ -833,12 +997,20 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
 
   Future<void> _sendMessage(ScenarioSession? session) async {
     final text = _inputController.text.trim();
-    if (text.isEmpty) return;
+    final hasImage = _attachedMediaId != null;
+    if (text.isEmpty && !hasImage) return;
+
+    final imageIds =
+        _attachedMediaId != null ? [_attachedMediaId!] : const <String>[];
 
     _inputController.clear();
-    await session?.sendMessage(content: text, imageMediaIds: const <String>[]);
+    setState(() {
+      _hasText = false;
+      _attachedMediaId = null;
+    });
+    await session?.sendMessage(content: text, imageMediaIds: imageIds);
 
-    _focusNode.requestFocus();
+    if (mounted) _focusNode.requestFocus();
   }
 
   /// 回滚到指定 user 消息 — 弹确认框,通过后删除该消息及之后所有记录,
