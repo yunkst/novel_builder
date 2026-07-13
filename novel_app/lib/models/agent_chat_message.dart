@@ -30,6 +30,13 @@ class ToolCallSegment extends AgentChatSegment {
   const ToolCallSegment(this.call);
 }
 
+/// 用户上传的图片段（仅 user 消息）。
+/// mediaId 来自 MediaProxy.upload（前缀 local_），渲染走 MediaView。
+class ImageSegment extends AgentChatSegment {
+  final String mediaId;
+  const ImageSegment({required this.mediaId});
+}
+
 /// Agent 聊天消息
 class AgentChatMessage {
   final AgentChatRole role;
@@ -109,6 +116,9 @@ class AgentChatMessage {
             if (c.result != null) 'result': c.result,
           };
         }
+        if (s is ImageSegment) {
+          return {'type': 'image', 'mediaId': s.mediaId};
+        }
         // 未知子类降级为 text（防御未来扩展）
         return {'type': 'text', 'content': ''};
       }).toList();
@@ -152,6 +162,11 @@ class AgentChatMessage {
             status: status,
             result: item['result']?.toString(),
           )));
+        } else if (type == 'image') {
+          final mediaId = item['mediaId']?.toString() ?? '';
+          if (mediaId.isNotEmpty) {
+            result.add(ImageSegment(mediaId: mediaId));
+          }
         }
         // 未知 type 跳过
       }
