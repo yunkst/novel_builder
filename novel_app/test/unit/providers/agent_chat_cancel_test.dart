@@ -79,6 +79,17 @@ class MockNovelAgentService implements NovelAgentService {
     }
   }
 
+  /// 桩：cancel 测试不触发续跑路径，直接成功 emit done
+  @override
+  Future<void> resumeFromMessages({
+    required String scenarioId,
+    required List<dynamic> initialMessages,
+    required AgentScenarioContext scenarioContext,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    _controller.add(const AgentDoneEvent());
+  }
+
   @override
   void cancelFor(String scenarioId) {
     cancelForCallCount++;

@@ -39,6 +39,11 @@ class MockNovelAgentService implements NovelAgentService {
   final List<String> sendMessageUserInputs = [];
   final Duration? delay;
 
+  /// resumeFromMessages 调用计数与入参记录（retryLastRound 新语义走此路径）
+  int resumeFromMessagesCallCount = 0;
+  final List<String> resumeFromMessagesScenarioIds = [];
+  final List<List<dynamic>> resumeFromMessagesInitialMessages = [];
+
   /// cancelFor 被调用的次数（按 scenarioId 累计）。
   /// 供「运行中写操作先 cancel 再执行」的新机制断言使用。
   int cancelForCallCount = 0;
@@ -115,6 +120,70 @@ class MockNovelAgentService implements NovelAgentService {
       _controller.add(const AgentDoneEvent());
 
       // 再等一帧让事件传播到 listener
+      await Future<void>.delayed(Duration.zero);
+    } finally {
+      _runningByScenario.remove(scenarioId);
+      _completers.remove(scenarioId);
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  /// resumeFromMessages 实现：复用 sendMessage 的失败注入逻辑（failNextRounds / emitPartialBeforeFail）
+  /// 成功路径 emit 一个 TextDelta + Done，失败路径可选 emit 半成品 + Error。
+  @override
+  Future<void> resumeFromMessages({
+    required String scenarioId,
+    required List<dynamic> initialMessages,
+    required AgentScenarioContext scenarioContext,
+  }) async {
+    // 同场景串行
+    if (_runningByScenario[scenarioId] == true) {
+      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
+      return;
+    }
+
+    resumeFromMessagesCallCount++;
+    resumeFromMessagesScenarioIds.add(scenarioId);
+    resumeFromMessagesInitialMessages.add(List<dynamic>.from(initialMessages));
+    _runningByScenario[scenarioId] = true;
+
+    final completer = Completer<void>();
+    _completers[scenarioId] = completer;
+
+    final shouldFail = failNextRounds > 0;
+    if (shouldFail) {
+      failNextRounds--;
+    }
+
+    try {
+      await Future<void>.delayed(Duration.zero);
+
+      if (shouldFail) {
+        if (emitPartialBeforeFail) {
+          _controller.add(TextDeltaEvent('[$scenarioId] 半成品回复...'));
+          await Future<void>.delayed(Duration.zero);
+        }
+        _controller.add(AgentErrorEvent('模拟 LLM 调用失败'));
+        await Future<void>.delayed(Duration.zero);
+        return;
+      }
+
+      // 续跑成功：从 initialMessages 末尾取 user content 还原回复（便于断言）
+      String lastUserContent = '';
+      for (int i = initialMessages.length - 1; i >= 0; i--) {
+        final m = initialMessages[i];
+        if (m is ChatMessage && m.role == 'user') {
+          lastUserContent = m.content ?? '';
+          break;
+        }
+      }
+      _controller.add(TextDeltaEvent('[$scenarioId] 回复: $lastUserContent'));
+      if (delay != null) {
+        await Future<void>.delayed(delay!);
+      }
+      _controller.add(const AgentDoneEvent());
       await Future<void>.delayed(Duration.zero);
     } finally {
       _runningByScenario.remove(scenarioId);
@@ -552,7 +621,7 @@ void main() {
   // ===========================================================================
 
   group('retryLastRound', () {
-    test('失败首轮重试 → 用同一 user content 重新调用 Agent，error 清空', () async {
+    test('失败首轮重试 → 走 resumeFromMessages 续跑，error 清空', () async {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
@@ -566,12 +635,19 @@ void main() {
       expect(session.state.messages.last.content, '你好');
       expect(mockService.sendMessageCallCount, 1);
 
-      // 重试（mock 此时已恢复正常）
+      // 重试（mock 此时已恢复正常）—— 新语义走 resumeFromMessages
       await session.retryLastRound();
 
-      expect(mockService.sendMessageCallCount, 2, reason: '重试应再调一次 sendMessage');
-      expect(mockService.sendMessageUserInputs.last, '你好',
-          reason: '重试应使用原 user content');
+      expect(mockService.sendMessageCallCount, 1,
+          reason: '重试不应再调 sendMessage');
+      expect(mockService.resumeFromMessagesCallCount, 1,
+          reason: '重试应走 resumeFromMessages 续跑');
+      // 续跑传给 service 的 initialMessages 末尾应是 user「你好」
+      final resumedMsgs = mockService.resumeFromMessagesInitialMessages.last;
+      expect(resumedMsgs.last, isA<ChatMessage>());
+      expect((resumedMsgs.last as ChatMessage).role, 'user');
+      expect((resumedMsgs.last as ChatMessage).content, '你好',
+          reason: '续跑应保留原 user 消息，不重复 append');
       expect(session.state.error, isNull, reason: '重试后 error 应清空');
       expect(session.state.messages.length, 2,
           reason: '重试成功后应有 user + assistant');
@@ -581,7 +657,8 @@ void main() {
       expect(session.state.messages.last.role, AgentChatRole.assistant);
     });
 
-    test('半成品 assistant 在末尾时重试 → 删半成品，重发最后一条 user', () async {
+    test('前一轮成功 + 当前轮半成品失败时重试 → 保留前一轮，砍除失败轮 partial，续跑',
+        () async {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
@@ -589,7 +666,7 @@ void main() {
       await session.sendMessage(content: '第一条');
       expect(session.state.messages.length, 2);
 
-      // 第二轮失败且带半成品：messages = [user1, assistant1, user2, assistant_half]
+      // 第二轮失败 + 半成品：messages = [user1, assistant1, user2, assistant_half]
       mockService.failNextRounds = 1;
       mockService.emitPartialBeforeFail = true;
       await session.sendMessage(content: '第二条');
@@ -601,17 +678,37 @@ void main() {
       expect(session.state.messages.last.role, AgentChatRole.assistant,
           reason: '末尾应是半成品 assistant');
 
-      // 重试：应删掉半成品 assistant，保留 user2，重发 user2.content
+      // 重试：新语义保留前一轮成功 ReAct，只砍除失败轮 partial
       await session.retryLastRound();
 
-      expect(mockService.sendMessageUserInputs.last, '第二条',
-          reason: '重试应使用最后一条 user 的 content');
+      // 走 resumeFromMessages 而非 sendMessage
+      expect(mockService.resumeFromMessagesCallCount, 1,
+          reason: '重试应走 resumeFromMessages 续跑');
+      expect(mockService.sendMessageCallCount, 2,
+          reason: 'sendMessage 只在用户主动发消息时调用（首轮+第二轮 = 2），重试不走');
+
+      // 续跑传给 service 的 messages 应保留 user1 + assistant1 + user2（去掉 assistant_half）
+      final resumedMsgs = mockService.resumeFromMessagesInitialMessages.last;
+      expect(resumedMsgs.length, 3,
+          reason: '应保留前一轮 [user1, assistant1] + 失败轮的 user2');
+      expect((resumedMsgs[0] as ChatMessage).role, 'user');
+      expect((resumedMsgs[0] as ChatMessage).content, '第一条');
+      expect((resumedMsgs[1] as ChatMessage).role, 'assistant');
+      expect((resumedMsgs[2] as ChatMessage).role, 'user');
+      expect((resumedMsgs[2] as ChatMessage).content, '第二条',
+          reason: '失败轮的 user2 必须保留');
+
+      // UI 状态：保留 [user1, assistant1, user2] + 重试成功 new assistant = 4
       expect(session.state.messages.length, 4,
-          reason: '截断后 [user1, assistant1, user2] = 3 条，重试成功再 +1 assistant = 4');
-      expect(session.state.messages[2].role, AgentChatRole.user);
-      expect(session.state.messages[2].content, '第二条');
+          reason: '保留前一轮成功 + user2 + 重试新 assistant = 4');
+      expect(session.state.messages[0].content, '第一条',
+          reason: '前一轮 user 必须保留');
+      expect(session.state.messages[1].role, AgentChatRole.assistant,
+          reason: '前一轮 assistant 必须保留');
+      expect(session.state.messages[2].content, '第二条',
+          reason: '失败轮的 user 必须保留');
       expect(session.state.messages.last.role, AgentChatRole.assistant,
-          reason: '重试成功后末尾应是新的 assistant');
+          reason: '末尾应是重试成功的新 assistant');
       expect(session.state.error, isNull);
     });
 
@@ -634,7 +731,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(slowSession.isRunning, isTrue, reason: '前置：慢发送应正在运行');
 
-      // 运行中调 retry：interrupt-then-act = cancel 落库 partial → 截断 → 重发
+      // 运行中调 retry：interrupt-then-act = cancel 落 partial（finalize error → 设置 _failedRoundStartIndex）
+      // → 砍除失败轮残留 → resumeFromMessages 续跑（保留之前成功轮）
       await slowSession.retryLastRound();
 
       // 新契约：旧的拒绝文案 "Agent 正在运行，无法重试" 不再产生
@@ -648,16 +746,65 @@ void main() {
       await sendFuture;
     });
 
-    test('messages 中无 user 消息时 → 拒绝并设置 error 提示', () async {
+    test('全新 session 无失败轮时 → 拒绝并设置 error 提示', () async {
       final sessions = container.read(scenarioSessionsProvider.notifier);
       final session = sessions.get(ScenarioIds.writing);
 
-      // 全新 session，messages 为空，直接调 retryLastRound
+      // 全新 session，无失败轮记录，直接调 retryLastRound
       await session.retryLastRound();
 
-      expect(session.state.error, '没有可重试的用户消息');
+      expect(session.state.error, '当前没有可重试的失败轮次');
       expect(mockService.sendMessageCallCount, 0,
-          reason: '无 user 消息时不应调用 Agent');
+          reason: '无失败轮时不应调用 sendMessage');
+      expect(mockService.resumeFromMessagesCallCount, 0,
+          reason: '无失败轮时不应调用 resumeFromMessages');
+    });
+
+    test('3 轮成功 + 第 4 轮失败 → 重试只砍第 4 轮，保留前 3 轮 ReAct', () async {
+      final sessions = container.read(scenarioSessionsProvider.notifier);
+      final session = sessions.get(ScenarioIds.writing);
+
+      // 前 3 轮都成功
+      await session.sendMessage(content: '轮1');
+      await session.sendMessage(content: '轮2');
+      await session.sendMessage(content: '轮3');
+      expect(session.state.messages.length, 6, reason: '3 轮各 user+assistant = 6');
+
+      // 第 4 轮失败 + 半成品
+      mockService.failNextRounds = 1;
+      mockService.emitPartialBeforeFail = true;
+      await session.sendMessage(content: '轮4');
+      expect(session.state.error, isNotNull);
+      expect(session.state.messages.length, 8,
+          reason: '前 3 轮(6) + 轮4 user + 轮4 半成品 assistant = 8');
+
+      // 重试：保留前 3 轮，砍掉第 4 轮半成品，续跑第 4 轮
+      await session.retryLastRound();
+
+      expect(mockService.resumeFromMessagesCallCount, 1,
+          reason: '重试走 resumeFromMessages');
+
+      // 续跑传给 service 的 messages：前 3 轮完整 + 轮4 user（去掉半成品 assistant）
+      final resumedMsgs = mockService.resumeFromMessagesInitialMessages.last;
+      expect(resumedMsgs.length, 7,
+          reason: '前 3 轮(6) + 轮4 user = 7（半成品 assistant 已砍除）');
+      expect((resumedMsgs.last as ChatMessage).role, 'user');
+      expect((resumedMsgs.last as ChatMessage).content, '轮4',
+          reason: '失败轮的 user4 必须保留');
+
+      // UI 状态：前 3 轮完整 + 轮4 user + 重试新 assistant = 8
+      expect(session.state.messages.length, 8);
+      // 前 3 轮内容必须一字不变（保留成功 ReAct）
+      expect(session.state.messages[0].content, '轮1');
+      expect(session.state.messages[1].role, AgentChatRole.assistant);
+      expect(session.state.messages[2].content, '轮2');
+      expect(session.state.messages[3].role, AgentChatRole.assistant);
+      expect(session.state.messages[4].content, '轮3');
+      expect(session.state.messages[5].role, AgentChatRole.assistant);
+      expect(session.state.messages[6].content, '轮4', reason: '用户消息 4 必须保留');
+      expect(session.state.messages.last.role, AgentChatRole.assistant,
+          reason: '末尾应是重试成功的新 assistant');
+      expect(session.state.error, isNull);
     });
   });
 

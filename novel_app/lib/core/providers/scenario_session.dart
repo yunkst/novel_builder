@@ -66,6 +66,10 @@ class ScenarioSession {
   final List<AgentChatSegment> _pendingSegments = [];
   StreamSubscription<AgentEvent>? _agentSub;
 
+  /// 失败轮 partial 起点（_agentMessages 索引）：finalize error 时记录为「最后一条 user 索引 + 1」
+  /// retryLastRound 据此砍除失败轮残留。AgentDoneEvent 时清空。
+  int? _failedRoundStartIndex;
+
   // ===== 会话状态 =====
   late AgentChatState _state;
   SessionLifecycle _lifecycle = SessionLifecycle.fresh;
@@ -409,40 +413,38 @@ class ScenarioSession {
     }
   }
 
-  /// 重试上次失败的 Agent 回合。
+  /// 重试上次失败的 Agent 回合（仅重试当前这一轮 LLM 请求，保留之前成功的多轮 ReAct）。
   ///
-  /// 找到 _agentMessages 里最后一条 user，删除其后所有消息（含 tool/assistant），
-  /// 同步删 DB，然后用该 user 的 content 重新触发 Agent。
-  /// 运行中重试 = cancel 当前回合（落库 partial） → 截断 → 重新触发。
+  /// 失败轮的 partial 已通过 [_failedRoundStartIndex] 标记：
+  /// - 砍除 [_failedRoundStartIndex, _agentMessages.length) 区间（失败轮残留）
+  /// - 保留 [0, _failedRoundStartIndex) 即之前所有成功轮 + 失败轮的 user 消息
+  /// - 同步删 DB（[_deleteAgentMessagesFromDb]）
+  /// - 调用 [_resumeAgentRun] 走 [NovelAgentService.resumeFromMessages] 续跑，
+  ///   不 append user、不注入阅读上下文前缀（user 已经是 history 的一部分）。
+  ///
+  /// 运行中重试 = cancel 当前回合（落库 partial → finalize 错误 → _failedRoundStartIndex 被设置）
+  /// → 砍除失败轮 → resumeFromMessages 续跑。
   Future<void> retryLastRound() async {
-    // 运行中：先 cancel 落 partial，再截断到 last user（partial 在末尾会被一并砍掉）
+    // 运行中：先 cancel 落 partial，finalize 会设置 _failedRoundStartIndex
     await _interruptIfRunning();
 
-    int lastUserIndex = -1;
-    for (int i = _agentMessages.length - 1; i >= 0; i--) {
-      if (_agentMessages[i].role == 'user') {
-        lastUserIndex = i;
-        break;
-      }
-    }
-    if (lastUserIndex < 0) {
+    final failedAt = _failedRoundStartIndex;
+    if (failedAt == null) {
       LoggerService.instance.w(
-        'ScenarioSession [$scenarioId] 拒绝重试：无 user 消息',
+        'ScenarioSession [$scenarioId] 拒绝重试：无失败轮记录',
         category: LogCategory.ai,
-        tags: ['session', 'retry', 'no_user', scenarioId],
+        tags: ['session', 'retry', 'no_failure', scenarioId],
       );
-      _notifyStateError('没有可重试的用户消息');
+      _notifyStateError('当前没有可重试的失败轮次');
       return;
     }
 
-    final userContent = _agentMessages[lastUserIndex].content ?? '';
-    final cutFrom = lastUserIndex + 1;
-    final removedCount = _agentMessages.length - cutFrom;
-    _agentMessages.removeRange(cutFrom, _agentMessages.length);
+    final removedCount = _agentMessages.length - failedAt;
+    _agentMessages.removeRange(failedAt, _agentMessages.length);
 
     LoggerService.instance.i(
-      'ScenarioSession [$scenarioId] 重试：截断至 lastUserIndex=$lastUserIndex, '
-      '删掉其后 $removedCount 条',
+      'ScenarioSession [$scenarioId] 重试：失败起点=$failedAt, '
+      '删掉其后 $removedCount 条 (保留之前的成功 ReAct)',
       category: LogCategory.ai,
       tags: ['session', 'retry', scenarioId],
     );
@@ -454,10 +456,53 @@ class ScenarioSession {
     );
     _notifyStateChanged();
 
-    // 同步删 DB：删掉 cutFrom 之后的所有消息
-    await _deleteAgentMessagesFromDb(cutFrom);
+    // 同步删 DB：删掉 failedAt 之后的所有消息
+    await _deleteAgentMessagesFromDb(failedAt);
 
-    await _beginAgentRun(userContent);
+    // 在触发新一轮前清空失败标记，避免 resume 失败时 finalize 再次覆盖到已被砍掉的位置
+    _failedRoundStartIndex = null;
+
+    await _resumeAgentRun();
+  }
+
+  /// 续跑 Agent —— 与 [_runAgent] 区别：不 append user、不调 sendMessage、走 resumeFromMessages。
+  ///
+  /// 调用前置条件：调用方已砍除失败轮残留，[_agentMessages] 末尾是 user（含）或 tool
+  /// （之前 ReAct 失败在某 tool 调用之后）。无论哪种情况，service 都会原样传给 loop.run。
+  Future<void> _resumeAgentRun() async {
+    _lifecycle = SessionLifecycle.active;
+    _isRunning = true;
+    _currentToken = CancellationToken();
+    _pendingSegments.clear();
+
+    _state = _state.copyWith(
+      isLoading: true,
+      streamingSegments: const [],
+      error: null,
+    );
+    _notifyStateChanged();
+
+    try {
+      final agentService = _ref.read(novelAgentServiceProvider);
+      await _agentSub?.cancel();
+      _agentSub = agentService.events.listen(_handleAgentEvent);
+
+      final scenarioContext = _buildScenarioContext();
+
+      await agentService.resumeFromMessages(
+        scenarioId: scenarioId,
+        initialMessages: List<ChatMessage>.from(_agentMessages),
+        scenarioContext: scenarioContext,
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ScenarioSession [$scenarioId] 续跑 Agent 启动失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['session', 'agent_run', 'resume_failed', scenarioId],
+      );
+      _finalizeAgentResponse(error: '续跑失败: $e');
+    }
   }
 
   /// 取消本 session 的 Agent（不影响其他 session）
@@ -620,6 +665,8 @@ class ScenarioSession {
     _notifyStateChanged();
 
     unawaited(_deleteAgentMessagesFromDb(agentIdx));
+    // rollback 砍掉了 user 消息及其后所有内容，失败轮标记必然失效 → 清空避免 retry 误用
+    _failedRoundStartIndex = null;
     contentCallback(userContent);
     return true;
   }
@@ -726,6 +773,7 @@ class ScenarioSession {
         _handleCompaction(e);
 
       case AgentDoneEvent _:
+        _failedRoundStartIndex = null;
         _finalizeAgentResponse();
 
       case AgentErrorEvent e:
@@ -747,6 +795,16 @@ class ScenarioSession {
         category: LogCategory.ai,
         tags: ['session', 'agent-error', scenarioId],
       );
+      // 失败轮起点 = 最后一条 user 索引 + 1（保留 user，砍除失败轮 partial/assistant/tool）
+      // addAll 之前记录，避免被本轮 finalize 出来的 newMessages 污染
+      int lastUserIdx = -1;
+      for (int i = _agentMessages.length - 1; i >= 0; i--) {
+        if (_agentMessages[i].role == 'user') {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      _failedRoundStartIndex = lastUserIdx >= 0 ? lastUserIdx + 1 : null;
     }
 
     final newMessages = <ChatMessage>[];

@@ -17,6 +17,7 @@ import 'package:novel_app/services/llm_config_service.dart';
 
 import '../ai/ai_service_factory.dart';
 import '../../utils/cancellation_token.dart';
+import '../dsl_engine/llm_provider.dart' show LlmProvider;
 import 'agent_event.dart';
 import 'agent_loop.dart';
 import 'agent_scenario.dart';
@@ -104,33 +105,18 @@ class NovelAgentService {
     _tokensByScenario[scenarioId] = token;
 
     try {
-      // 构造 LLM Provider（从 LlmConfigService 获取激活配置，支持场景级覆盖）
-      final configService = ref.read(llmConfigServiceProvider);
-      await configService.ensureMigratedFromLegacy();
-      await configService.ensureGlobalActiveMigrated();
-      final activeConfig =
-          await configService.getActiveConfig(scenarioId: scenarioId);
-      if (activeConfig == null) {
-        _controller.add(const AgentErrorEvent(
-            LlmConfigService.notConfiguredMessage));
-        return;
-      }
-      final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
-      final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
-
-      // 构造场景（异步，可能需要初始化 Headless WebView）
-      final scenario =
-          await AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
+      final env = await _buildAgentEnv(scenarioId, scenarioContext);
+      if (env == null) return; // _buildAgentEnv 已 emit notConfiguredMessage
 
       try {
         // 构造循环
-        final loop = AgentLoop(llm: llm, scenario: scenario);
+        final loop = AgentLoop(llm: env.llm, scenario: env.scenario);
 
         // 加载场景经验记忆（在 buildSystemPrompt 前调用，让场景有缓存）
-        await scenario.getMemories();
+        await env.scenario.getMemories();
 
         // 构造 system prompt（由场景生成；用户上下文/当前工作小说由下面 user message 注入）
-        final systemPrompt = scenario.buildSystemPrompt(scenarioContext);
+        final systemPrompt = env.scenario.buildSystemPrompt(scenarioContext);
 
         // 构造本轮 user message：把"用户正在阅读 / 当前工作小说"作为临时上下文
         // 注入到用户输入头部。history 保持原文（落库的也是原文）。
@@ -164,7 +150,7 @@ class NovelAgentService {
         );
       } finally {
         // 场景资源清理（如释放 HeadlessWebViewPool 使用权）
-        await scenario.cleanup();
+        await env.scenario.cleanup();
       }
     } catch (e, stack) {
       LoggerService.instance.e('Agent 请求处理失败: $e',
@@ -176,6 +162,99 @@ class NovelAgentService {
       _runningByScenario.remove(scenarioId);
       _tokensByScenario.remove(scenarioId);
     }
+  }
+
+  /// 从给定的消息序列继续运行 Agent 循环，不 append user。
+  ///
+  /// 用于 ScenarioSession.retryLastRound：失败轮的 partial 已砍除，
+  /// 调用方把剩余（含末尾 user）的 messages 直接交给 loop.run。
+  /// 不调用 buildUserContextPrefix：retry 时阅读上下文应保持 user 当时的样子，
+  /// 否则会污染 LLM 看到的历史。
+  Future<void> resumeFromMessages({
+    required String scenarioId,
+    required List<ChatMessage> initialMessages,
+    required AgentScenarioContext scenarioContext,
+  }) async {
+    // 同 sendMessage 的并发兜底：retryLastRound 前会 _interruptIfRunning，
+    // 理论上不该撞上 busy；保留作为防御，避免静默吞并
+    if (_runningByScenario[scenarioId] == true) {
+      LoggerService.instance.w(
+        'Agent 拒绝续跑（场景 $scenarioId 已在运行中，应由 ScenarioSession.cancel() 兜底）',
+        category: LogCategory.ai,
+        tags: ['agent', 'service', 'busy', 'resume', scenarioId],
+      );
+      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
+      return;
+    }
+
+    _runningByScenario[scenarioId] = true;
+    final token = CancellationToken();
+    _tokensByScenario[scenarioId] = token;
+
+    try {
+      final env = await _buildAgentEnv(scenarioId, scenarioContext);
+      if (env == null) return; // _buildAgentEnv 已 emit notConfiguredMessage
+
+      try {
+        final loop = AgentLoop(llm: env.llm, scenario: env.scenario);
+        await env.scenario.getMemories();
+        final systemPrompt = env.scenario.buildSystemPrompt(scenarioContext);
+
+        // ★ 与 sendMessage 的关键差异：不 append user，不注入 contextPrefix
+        await loop.run(
+          initialMessages: initialMessages,
+          systemPrompt: systemPrompt,
+          emit: (event) => _controller.add(event),
+          cancellationToken: token,
+        );
+
+        final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
+        LoggerService.instance.i(
+          'Agent 续跑完成$cancelledTag (scenario=$scenarioId, initialMessages=${initialMessages.length})',
+          category: LogCategory.ai,
+          tags: ['agent', 'service', 'resume_complete', scenarioId],
+        );
+      } finally {
+        await env.scenario.cleanup();
+      }
+    } catch (e, stack) {
+      LoggerService.instance.e('Agent 续跑失败: $e',
+          stackTrace: stack.toString(),
+          category: LogCategory.ai,
+          tags: ['agent', 'service', 'resume_error', scenarioId]);
+      _controller.add(AgentErrorEvent(e.toString()));
+    } finally {
+      _runningByScenario.remove(scenarioId);
+      _tokensByScenario.remove(scenarioId);
+    }
+  }
+
+  /// 构造 Agent 运行所需的 LLM Provider + Scenario。
+  ///
+  /// sendMessage 与 resumeFromMessages 共用：
+  /// - LLM config 拉取（支持场景级覆盖）
+  /// - scenario 异步构造（可能需要初始化 Headless WebView）
+  ///
+  /// 返回 null 表示 LLM 未配置（已 emit notConfiguredMessage error 事件）。
+  Future<({LlmProvider llm, AgentScenario scenario})?> _buildAgentEnv(
+    String scenarioId,
+    AgentScenarioContext scenarioContext,
+  ) async {
+    final configService = ref.read(llmConfigServiceProvider);
+    await configService.ensureMigratedFromLegacy();
+    await configService.ensureGlobalActiveMigrated();
+    final activeConfig =
+        await configService.getActiveConfig(scenarioId: scenarioId);
+    if (activeConfig == null) {
+      _controller.add(const AgentErrorEvent(
+          LlmConfigService.notConfiguredMessage));
+      return null;
+    }
+    final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
+    final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
+    final scenario =
+        await AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
+    return (llm: llm, scenario: scenario);
   }
 
   /// 取消当前运行（仅关闭流，不中断底层 HTTP）
