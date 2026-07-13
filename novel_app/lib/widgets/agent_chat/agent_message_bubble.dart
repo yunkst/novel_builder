@@ -6,6 +6,7 @@ import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
 import 'media_gallery_card.dart';
+import '../media/media_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 
@@ -120,13 +121,73 @@ class AgentMessageBubble extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
-    final text = message.content;
-    return Text(
-      text,
-      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-            color: context.appColors.agentOnBrand,
-            height: 1.4,
-          ),
+    final segments = message.segments;
+    // 无 ImageSegment 时走原文本路径（性能 + 不破坏现有样式）
+    final hasImage = segments.any((s) => s is ImageSegment);
+    if (!hasImage) {
+      return Text(
+        message.content,
+        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+              color: context.appColors.agentOnBrand,
+              height: 1.4,
+            ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final seg in segments)
+          if (seg is ImageSegment)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 200,
+                  maxHeight: 200,
+                ),
+                child: MediaView(
+                  mediaId: seg.mediaId,
+                  onTap: () => _showImageFullScreen(context, seg.mediaId),
+                ),
+              ),
+            )
+          else if (seg is TextSegment)
+            Text(
+              seg.content,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: context.appColors.agentOnBrand,
+                    height: 1.4,
+                  ),
+            ),
+      ],
+    );
+  }
+
+  /// 图片全屏查看（点击缩略图触发）
+  void _showImageFullScreen(BuildContext context, String mediaId) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Center(child: MediaView(mediaId: mediaId)),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -156,6 +217,13 @@ class AgentMessageBubble extends StatelessWidget {
                 bottom: isLast ? 0 : 4,
               ),
               child: AgentToolCallCard(call: s.call),
+            ),
+          ImageSegment s => ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
+              child: MediaView(
+                mediaId: s.mediaId,
+                onTap: () => _showImageFullScreen(context, s.mediaId),
+              ),
             ),
         };
       }).toList(),
