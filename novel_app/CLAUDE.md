@@ -4,6 +4,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-07-13**: Agent Chat 图片上传。输入栏加 `+` 按钮（相册选图 + image_cropper 1:1 裁剪），复用 `MediaProxy.upload` 注册 `local_` mediaId；`AgentChatSegment` 新增 `ImageSegment` 子类；`ScenarioSession.sendMessage` 加 `imageMediaIds` 参数，mediaId 编码成占位文本 `[用户上传了图片 mediaId=xxx]` 拼进 content 落库；投影层 `_projectUiMessages` 解析占位文本还原 `ImageSegment`（重启可见，无需 DB 迁移）；user 气泡按 segments 渲染遇 `ImageSegment` 走 `MediaView`。新增 `image_picker` 依赖、iOS 相册/相机权限描述。图片作为"素材"供 `create_image_to_video` / `update_character` 等工具使用，不走多模态 LLM 链路。
 - **2026-06-29**: DatabaseService 门面彻底删除，所有调用改为直接使用 Repository Provider；删除 PaginationController、repository_providers.dart（合并入 database_providers.dart）等死代码；清理 Dify 残留引用
 - **2026-06-11**: 更新文档，移除 Dify 引用，DSL Engine + AI Agent 成为 AI 主力
 - **2026-06-09**: 移除 Dify 云端依赖（v1.7.4），仅保留本地 DSL Engine
