@@ -2,16 +2,19 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
 import 'media_gallery_card.dart';
+import 'subagent_tool_card.dart';
 import '../media/media_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 
 /// Agent 聊天消息气泡
-class AgentMessageBubble extends StatelessWidget {
+class AgentMessageBubble extends ConsumerWidget {
   final AgentChatMessage message;
   /// 流式 segments（当前回合进行中时非空，历史消息为 null）
   final List<AgentChatSegment>? streamingSegments;
@@ -31,7 +34,7 @@ class AgentMessageBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == AgentChatRole.user;
 
     // 流式气泡用 streamingSegments，历史气泡用 message.segments
@@ -65,7 +68,7 @@ class AgentMessageBubble extends StatelessWidget {
             ),
             child: isUser
                 ? _buildContent(context)
-                : _buildAssistantContent(context, effectiveSegments, isStreaming),
+                : _buildAssistantContent(context, ref, effectiveSegments, isStreaming),
           ),
           if (showTimestamp) ...[
             const SizedBox(height: 2),
@@ -194,12 +197,14 @@ class AgentMessageBubble extends StatelessWidget {
   /// 按 segments 顺序交替渲染文本片段和工具调用卡片
   Widget _buildAssistantContent(
     BuildContext context,
+    WidgetRef ref,
     List<AgentChatSegment> segments,
     bool isStreaming,
   ) {
     if (segments.isEmpty) return const SizedBox.shrink();
 
     final lastIndex = segments.length - 1;
+    final sessionId = ref.watch(currentChatSessionIdProvider)?.toString() ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,7 +221,16 @@ class AgentMessageBubble extends StatelessWidget {
                 top: idx > 0 ? 8 : 0,
                 bottom: isLast ? 0 : 4,
               ),
-              child: AgentToolCallCard(call: s.call),
+              // 子任务（dispatch_subagent）走专属卡片，其他工具保留原卡片。
+              // 任务 11 接入时把 onTap 改为 push SubagentDetailScreen。
+              child: s.call.name == 'dispatch_subagent'
+                  ? SubagentToolCard(
+                      sessionId: sessionId,
+                      toolCallId: s.call.id,
+                      task: (s.call.arguments['task'] as String?) ?? '',
+                      onTap: null,
+                    )
+                  : AgentToolCallCard(call: s.call),
             ),
           ImageSegment s => ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
