@@ -4,7 +4,12 @@
 /// - 初始 state 从 SharedPreferences 加载（默认 false）
 /// - toggle 翻转 state 并写盘
 /// - setDesktopMode 写盘 + 刷新 state
-/// - _load 失败降级为 AsyncError
+///
+/// 未覆盖 `_load` 失败降级为 AsyncError 分支：
+/// `BrowserSettingsService` 为单例，难以注入替换；
+/// 底层 `PreferencesService.getBool` 内部已 try/catch 并返回 null，
+/// 实际触发需 SharedPreferences 层抛异常。该分支仅一行 `state = AsyncValue.error(e, st)`，
+/// 逻辑简单，依赖代码审查与手动验收，不单独构造 mock 覆盖。
 ///
 /// 运行:
 ///   cd novel_app

@@ -110,13 +110,13 @@ void main() {
     );
     await tester.pump();
 
-    // 打开溢出菜单
+    // 打开溢出菜单，桌面模式初始未勾选
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
 
     expect(find.text('桌面模式'), findsOneWidget);
+    expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
 
-    // 初始未勾选
     final before = container.read(browserDesktopModeProvider).value;
     expect(before, isFalse);
 
@@ -126,5 +126,11 @@ void main() {
 
     final after = container.read(browserDesktopModeProvider).value;
     expect(after, isTrue);
+
+    // 重新打开菜单，桌面模式已勾选
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.check_box), findsOneWidget);
   });
 }
