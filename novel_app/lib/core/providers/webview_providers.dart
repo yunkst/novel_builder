@@ -5,10 +5,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/site_script.dart';
 import '../../services/logger_service.dart';
 import '../../services/bookmark_service.dart';
+import '../../services/browser_settings_service.dart';
 import '../../widgets/model_save_location_dialog.dart';
 import 'database_providers.dart';
 import 'model_download_providers.dart';
 import 'services/network_service_providers.dart';
+
+/// 构造桌面/手机模式的 InAppWebViewSettings
+///
+/// 把配置构造抽成纯函数以便单测（InAppWebViewController 是平台类无法 mock）。
+/// - 桌面: 桌面 UA + DESKTOP contentMode + overview 缩放
+/// - 手机: 空 UA(系统默认) + MOBILE contentMode
+/// useWideViewPort 两种模式都 true（允许宽视口，避免挤压）。
+InAppWebViewSettings desktopModeSettings(bool isDesktop) {
+  return InAppWebViewSettings(
+    javaScriptEnabled: true,
+    preferredContentMode: isDesktop
+        ? UserPreferredContentMode.DESKTOP
+        : UserPreferredContentMode.MOBILE,
+    userAgent: isDesktop ? BrowserSettingsService.desktopUserAgent : '',
+    useWideViewPort: true,
+    loadWithOverviewMode: isDesktop,
+  );
+}
 
 /// 当前显示的 URL（地址栏订阅）
 final webviewCurrentUrlProvider = StateProvider<String>(
