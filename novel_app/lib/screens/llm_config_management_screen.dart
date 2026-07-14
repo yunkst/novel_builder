@@ -195,15 +195,10 @@ class _LlmConfigManagementScreenState
   }
 
   Future<void> _duplicateConfig(LlmConfig config) async {
-    final now = DateTime.now();
-    final newConfig = config.copyWith(
-      id: null,
-      name: '${config.name} (副本)',
-      isDefault: false,
-      createdAt: now,
-      updatedAt: now,
-    );
-    await _saveConfig(newConfig);
+    // 用 model.duplicate() 而非 config.copyWith(id: null, ...)。
+    // copyWith 的可空字段用 `id ?? this.id`，传 null 会沿用原 id，导致
+    // LlmConfigRepository.save 走 update 分支把原配置覆盖（历史 bug）。
+    await _saveConfig(config.duplicate());
   }
 
   Future<void> _setDefault(int id) async {

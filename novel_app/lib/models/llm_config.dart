@@ -53,6 +53,25 @@ class LlmConfig {
             (map['updated_at'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
       );
 
+  /// 生成一个用于「复制」的无 id 副本。
+  ///
+  /// 必须用这个方法而不是 `copyWith(id: null)`：copyWith 用 `id ?? this.id`
+  /// 处理可空字段，传 null 会沿用原 id，导致 [LlmConfigRepository.save] 走
+  /// update 分支把原配置覆盖掉（复制 bug 的根因）。这里走构造函数，强制 id 为 null。
+  LlmConfig duplicate({String suffix = ' (副本)'}) {
+    final now = DateTime.now();
+    return LlmConfig(
+      name: '$name$suffix',
+      apiUrl: apiUrl,
+      apiKey: apiKey,
+      model: model,
+      isDefault: false,
+      sortOrder: sortOrder,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
   LlmConfig copyWith({
     int? id,
     String? name,

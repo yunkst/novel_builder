@@ -282,3 +282,17 @@ design_preview/
 shelf-preview
 
 .superpowers/
+
+# 番茄小说反爬调研产物（字体文件、截图、抓取样本、调研笔记）
+fanqie-evidence/
+fanqie-*.png
+fanqie-home.png
+fanqie-login.png
+fanqie-login-page.png
+fanqie-book.png
+fanqie-search.png
+fanqie-reader.png
+fanqie-cdp.png
+fanqie-visible.png
+fanqie-headed.png
+fanqie-now.png

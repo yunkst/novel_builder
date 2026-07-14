@@ -29,7 +29,8 @@ void main() {
         final mockSession = MockScenarioSession();
 
         when(mockNotifier.switchSession(any, any)).thenAnswer((_) async {});
-        when(mockSession.sendMessage(content: any)).thenAnswer((_) async {});
+        when(mockSession.sendMessage(content: anyNamed('content')))
+            .thenAnswer((_) async {});
         when(mockNotifier.get(any)).thenReturn(mockSession);
 
         late ProviderContainer container;
@@ -136,7 +137,7 @@ void main() {
         );
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
-        verifyNever(mockSession.sendMessage(content: any));
+        verifyNever(mockSession.sendMessage(content: anyNamed('content')));
       },
       retry: 3,
     );
