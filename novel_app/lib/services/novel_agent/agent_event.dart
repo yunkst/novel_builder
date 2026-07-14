@@ -56,13 +56,18 @@ enum AgentState {
 
 /// Agent 流式事件（sealed class）
 sealed class AgentEvent {
-  const AgentEvent();
+  /// 运行实例标识。null = 主 Agent 旧路径；非 null = 某次 dispatch_subagent 派出的子 Agent。
+  /// 由 NovelAgentService/SubagentRunner 在 emit 包装时注入。
+  /// ⚠️ 未来新增 AgentEvent 子类时，必须同步加可选命名参数 `runId` 并转发给 super，
+  /// 否则该事件无法被 EventTagger 打标、会导致事件隔离失效。
+  final String? runId;
+  const AgentEvent({this.runId});
 }
 
 /// 文本增量（LLM 思考输出）
 class TextDeltaEvent extends AgentEvent {
   final String text;
-  const TextDeltaEvent(this.text);
+  const TextDeltaEvent(this.text, {String? runId}) : super(runId: runId);
 }
 
 /// 工具调用开始
@@ -70,7 +75,9 @@ class ToolCallStartEvent extends AgentEvent {
   final String name;
   final Map<String, dynamic> args;
   final String toolCallId;
-  const ToolCallStartEvent(this.name, this.args, this.toolCallId);
+  const ToolCallStartEvent(this.name, this.args, this.toolCallId,
+      {String? runId})
+      : super(runId: runId);
 }
 
 /// 工具调用结束
@@ -86,7 +93,8 @@ class ToolCallEndEvent extends AgentEvent {
     this.result, {
     this.fullResult,
     this.success = true,
-  });
+    String? runId,
+  }) : super(runId: runId);
 }
 
 /// 工具调用进度（流式生成中）
@@ -97,18 +105,20 @@ class ToolCallEndEvent extends AgentEvent {
 class ToolProgressEvent extends AgentEvent {
   final String toolCallId;
   final int generatedChars;
-  const ToolProgressEvent(this.toolCallId, this.generatedChars);
+  const ToolProgressEvent(this.toolCallId, this.generatedChars,
+      {String? runId})
+      : super(runId: runId);
 }
 
 /// Agent 循环结束
 class AgentDoneEvent extends AgentEvent {
-  const AgentDoneEvent();
+  const AgentDoneEvent({String? runId}) : super(runId: runId);
 }
 
 /// Agent 错误
 class AgentErrorEvent extends AgentEvent {
   final String error;
-  const AgentErrorEvent(this.error);
+  const AgentErrorEvent(this.error, {String? runId}) : super(runId: runId);
 }
 
 /// 上下文压缩事件
@@ -141,7 +151,8 @@ class CompactionEvent extends AgentEvent {
     required this.keptMessageCount,
     required this.droppedMessageCount,
     required this.droppedAgentFromIndex,
-  });
+    String? runId,
+  }) : super(runId: runId);
 
   /// 压缩率（0-1）
   double get compressionRatio =>
