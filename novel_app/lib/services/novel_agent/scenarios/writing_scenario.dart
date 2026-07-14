@@ -10,6 +10,7 @@ library;
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/subagent_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
@@ -68,10 +69,18 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     // dispatch_subagent：委托给 SubagentRunner（任务 7）
     // 事件回流通过 SubagentRunner 内部 agentService.events.add 发到全局流，
     // 本方法不负责转发。
+    //
+    // 任务 8 #6 key 对齐：parentSessionId 必须与 ScenarioSession 读取/取消侧
+    // 用的 key 一致——统一为 `currentChatSessionIdProvider.toString()`。
+    // 之前用 scenarioId（String）会导致 SubagentRegistry 的
+    // `getByToolCallId(parentSessionId, ...)` 和
+    // `cancelAllForSession(parentSessionId)` 找不到 run（两侧 key 不匹配）。
     if (name == 'dispatch_subagent') {
       try {
+        final parentSessionId =
+            _ref.read(currentChatSessionIdProvider)?.toString() ?? 'unknown';
         return await _ref.read(subagentRunnerProvider).dispatch(
-              parentSessionId: _currentContext?.scenarioId ?? 'writing',
+              parentSessionId: parentSessionId,
               task: (args['task'] as String?) ?? '',
               allowedTools: ((args['allowed_tools'] as List?) ?? const [])
                   .map((e) => e.toString())

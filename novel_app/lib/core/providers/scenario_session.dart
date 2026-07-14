@@ -36,7 +36,30 @@ import 'current_novel_provider.dart';
 import 'database_providers.dart';
 import 'agent_chat_state.dart';
 import 'reading_context_providers.dart';
+import 'subagent_providers.dart';
 import 'webview_providers.dart';
+
+/// 判定主 ScenarioSession 是否应处理某个 [AgentEvent]。
+///
+/// 任务 8 引入：子 Agent（dispatch_subagent 派出）事件已被 EventTagger 打 runId
+/// 后发到全局 `agentService.events` 流，主 ScenarioSession 不能再无差别吸收这些
+/// 事件——否则子 Agent 的 TextDelta/ToolCall 会污染主对话历史。
+///
+/// 规则（简化版，不查 SubagentRegistry）：
+/// - [AgentEvent.runId] == null：主 Agent 旧路径事件（service 不改路径）→ 处理
+/// - [AgentEvent.runId] == [mainSessionId]：主 Agent 自身打标事件（预留）→ 处理
+/// - 其它（带 runId 但非主）：不论是本 session 派的子 Agent 还是别 session 的事件，
+///   一律忽略。主 session 只关心"这是不是我自己的事件"。
+///
+/// [mainSessionId] 为 null 时，只有 runId == null 的事件会被处理；任何带 runId
+/// 的事件都被视为子/外部事件而忽略。当前主 Agent 事件 runId 始终为 null，
+/// 传 null 仍然正确。
+bool shouldMainSessionHandleEvent(AgentEvent event, String? mainSessionId) {
+  final runId = event.runId;
+  if (runId == null) return true; // 主 Agent 旧路径
+  if (runId == mainSessionId) return true; // 主 Agent 自身打标（预留）
+  return false; // 子 Agent 或别 session 事件
+}
 
 /// 场景会话生命周期状态
 enum SessionLifecycle {
@@ -509,12 +532,24 @@ class ScenarioSession {
   ///
   /// 返回 Future 以便写操作 `await cancel()` 形成 interrupt-then-act 语义；
   /// 内部仍为同步逻辑（落库走 unawaited fire-and-forget），不引入真实异步等待。
+  ///
+  /// 任务 8：级联取消本 session 派出的所有活跃子 Agent（dispatch_subagent）。
+  /// 主 Agent 中断时，子 Agent 也必须停下，否则它们的事件流仍在写
+  /// `agentService.events`，虽然 [shouldMainSessionHandleEvent] 会过滤掉，
+  /// 但子 Agent 自身仍在消耗 LLM/工具资源。parentSessionId 与
+  /// [WritingScenario.executeTool] 写入侧保持一致，统一为 `sessionId.toString()`。
   Future<void> cancel() async {
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 请求已取消',
       category: LogCategory.ai,
       tags: ['session', 'cancel', scenarioId],
     );
+
+    // 级联取消本 session 派出的所有活跃子 Agent run
+    final sessionIdStr = _sessionId?.toString();
+    if (sessionIdStr != null) {
+      _ref.read(subagentRunnerProvider).cancelAllForSession(sessionIdStr);
+    }
 
     if (_currentToken != null) {
       _currentToken!.cancel(reason: '用户主动取消 / 写操作中断');
@@ -703,7 +738,15 @@ class ScenarioSession {
   }
 
   /// 处理 Agent 事件 — 只更新本 session 的 _pendingSegments
+  ///
+  /// 任务 8：开头按 runId 过滤——子 Agent（dispatch_subagent 派出）的事件
+  /// 通过全局 `agentService.events` 流回流到本监听器，但主 session 必须忽略它们，
+  /// 否则子 Agent 的 TextDelta/ToolCall 会被吸收进主对话历史造成污染。
+  /// 详见 [shouldMainSessionHandleEvent]。
   void _handleAgentEvent(AgentEvent event) {
+    if (!shouldMainSessionHandleEvent(event, _sessionId?.toString())) {
+      return; // 子 Agent 或别 session 事件：主 session 忽略
+    }
     switch (event) {
       case TextDeltaEvent e:
         if (_pendingSegments.isNotEmpty &&
