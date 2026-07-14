@@ -29,6 +29,49 @@ InAppWebViewSettings desktopModeSettings(bool isDesktop) {
   );
 }
 
+// ============================================================
+// 浏览器桌面模式开关
+// ============================================================
+
+/// 浏览器桌面模式开关状态
+///
+/// 初始从 [BrowserSettingsService] 加载持久化值；toggle/setDesktopMode
+/// 写盘并刷新 state。screen 用 ref.watch 读值注入 initialSettings，
+/// 用 ref.listen 触发运行时切换。
+final browserDesktopModeProvider =
+    StateNotifierProvider<BrowserSettingsNotifier, AsyncValue<bool>>(
+  (ref) => BrowserSettingsNotifier(),
+);
+
+/// 浏览器桌面模式状态管理
+class BrowserSettingsNotifier extends StateNotifier<AsyncValue<bool>> {
+  BrowserSettingsNotifier() : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  /// 从持久化加载初始值；失败降级为 AsyncError（screen 用 value ?? false 兜底）
+  Future<void> _load() async {
+    try {
+      final v = await BrowserSettingsService.instance.isDesktopMode();
+      state = AsyncData(v);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// 设置桌面模式并持久化
+  Future<void> setDesktopMode(bool value) async {
+    await BrowserSettingsService.instance.setDesktopMode(value);
+    state = AsyncData(value);
+  }
+
+  /// 翻转当前模式
+  Future<void> toggle() async {
+    final current = state.value ?? false;
+    await setDesktopMode(!current);
+  }
+}
+
 /// 当前显示的 URL（地址栏订阅）
 final webviewCurrentUrlProvider = StateProvider<String>(
   (ref) => 'https://so.com',

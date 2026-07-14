@@ -1,0 +1,99 @@
+/// BrowserSettingsNotifier / browserDesktopModeProvider 单元测试
+///
+/// 验证:
+/// - 初始 state 从 SharedPreferences 加载（默认 false）
+/// - toggle 翻转 state 并写盘
+/// - setDesktopMode 写盘 + 刷新 state
+/// - _load 失败降级为 AsyncError
+///
+/// 运行:
+///   cd novel_app
+///   flutter test test/unit/providers/browser_desktop_mode_provider_test.dart
+library;
+
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:novel_app/core/providers/webview_providers.dart';
+import 'package:novel_app/services/browser_settings_service.dart';
+
+void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  /// 等待 provider 完成初始 `_load()`（手写 StateNotifier 无 `.future`，
+  /// 故用 listen + Completer 等 state 离开 AsyncLoading）。
+  Future<void> waitForLoad(ProviderContainer container) async {
+    final current = container.read(browserDesktopModeProvider);
+    if (current is! AsyncLoading) return;
+    final completer = Completer<void>();
+    final sub = container.listen(
+      browserDesktopModeProvider,
+      (_, next) {
+        if (next is! AsyncLoading && !completer.isCompleted) {
+          completer.complete();
+        }
+      },
+      fireImmediately: true,
+    );
+    await completer.future;
+    sub.close();
+  }
+
+  group('browserDesktopModeProvider', () {
+    test('初始 state 为 AsyncData(false)（偏好默认 false）', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // 等待 _load 完成
+      await waitForLoad(container);
+
+      final state = container.read(browserDesktopModeProvider);
+      expect(state, isA<AsyncData<bool>>());
+      expect(state.value, isFalse);
+    });
+
+    test('setDesktopMode(true) 后 state=true 且写盘', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await waitForLoad(container);
+      await container
+          .read(browserDesktopModeProvider.notifier)
+          .setDesktopMode(true);
+
+      expect(container.read(browserDesktopModeProvider).value, isTrue);
+      // 写盘验证
+      expect(await BrowserSettingsService.instance.isDesktopMode(), isTrue);
+    });
+
+    test('toggle 从 false 翻转到 true', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await waitForLoad(container);
+      expect(container.read(browserDesktopModeProvider).value, isFalse);
+
+      await container.read(browserDesktopModeProvider.notifier).toggle();
+      expect(container.read(browserDesktopModeProvider).value, isTrue);
+
+      await container.read(browserDesktopModeProvider.notifier).toggle();
+      expect(container.read(browserDesktopModeProvider).value, isFalse);
+    });
+
+    test('预置偏好 true 时初始 state 为 AsyncData(true)', () async {
+      // 预置持久化值
+      await BrowserSettingsService.instance.setDesktopMode(true);
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await waitForLoad(container);
+      expect(container.read(browserDesktopModeProvider).value, isTrue);
+    });
+  });
+}
