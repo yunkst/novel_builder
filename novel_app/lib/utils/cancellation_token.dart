@@ -153,3 +153,22 @@ class CancellationToken {
   }
 
 }
+
+/// CancellationToken 的可取消句柄。
+///
+/// 主 Agent / SubagentRunner 持有 source，调 cancel() 触发；
+/// AgentLoop 持有 source.token 做检查点判断。
+///
+/// 与现有 [CancellationToken] 的关系：现有 CancellationToken 自身已经是
+/// source+token 合一（cancel() + isCancelled），本类是为了让"持有方"与
+/// "感知方"接口语义更清晰（持有方只暴露 cancel，感知方只暴露 token/isCancelled）。
+class CancellationTokenSource {
+  CancellationTokenSource() : token = CancellationToken();
+  final CancellationToken token;
+  bool _cancelled = false;
+  bool get isCancelled => _cancelled;
+  void cancel({String? reason}) {
+    _cancelled = true;
+    token.cancel(reason: reason ?? 'CancellationTokenSource.cancel');
+  }
+}
