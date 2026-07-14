@@ -240,6 +240,27 @@ class WebViewControllerNotifier
     await state?.reload();
   }
 
+  /// 应用桌面/移动模式配置并 reload
+  ///
+  /// controller 未就绪（state == null）时静默 return；
+  /// 否则用 [desktopModeSettings] 构造配置调 setSettings，再 reload 让新 UA 生效。
+  /// 失败仅记录日志，不阻塞 UI（与 [goBack] 超时保护同一思路）。
+  Future<void> applyDesktopMode(bool isDesktop) async {
+    final controller = state;
+    if (controller == null) return;
+    try {
+      await controller.setSettings(settings: desktopModeSettings(isDesktop));
+      await controller.reload();
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        'applyDesktopMode($isDesktop) 失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['webview', 'desktop-mode', 'error'],
+      );
+    }
+  }
+
   /// URL 规范化
   /// - baidu.com → https://baidu.com
   /// - 小说（无点号）→ 搜索
