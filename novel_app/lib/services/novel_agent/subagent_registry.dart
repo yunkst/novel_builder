@@ -55,17 +55,12 @@ class SubagentRegistry {
     return list;
   }
 
-  /// 统计某 session 正在占用槽位的 run（running + pending）
+  /// 统计某 session 占用槽位/排队的 run（running + pending，即 !isTerminal）
+  ///
+  /// 用于 4 并发上限判断（[SubagentRunner._waitForSlot]）和 30 排队上限判断
+  /// （[SubagentRunner.dispatch]）。两个语义此前由 countActiveBySession 和
+  /// countTotalBySession 分别承担，但二者实现等价，已合并以消除歧义。
   int countActiveBySession(String parentSessionId) {
-    final m = _runsBySession[parentSessionId];
-    if (m == null) return 0;
-    return m.values.where((r) =>
-        r.state == SubagentRunState.running ||
-        r.state == SubagentRunState.pending).length;
-  }
-
-  /// 统计某 session 全部活跃 run（含排队），用于 30 上限判断
-  int countTotalBySession(String parentSessionId) {
     final m = _runsBySession[parentSessionId];
     if (m == null) return 0;
     return m.values.where((r) => !r.isTerminal).length;

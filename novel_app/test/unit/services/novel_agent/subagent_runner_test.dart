@@ -32,7 +32,6 @@ void main() {
         await runner.enqueueForTest('s1',
             task: 't$i', allowedTools: const ['get_outline']);
       }
-      expect(registry.countTotalBySession('s1'), 5);
       expect(registry.countActiveBySession('s1'), 5);
     });
 

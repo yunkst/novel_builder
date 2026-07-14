@@ -75,7 +75,7 @@ class SubagentRunner {
     int? parentCurrentNovelId,
     void Function(AgentEvent)? emitParent,
   }) async {
-    if (registry.countTotalBySession(parentSessionId) >= maxQueue) {
+    if (registry.countActiveBySession(parentSessionId) >= maxQueue) {
       LoggerService.instance.w(
         'dispatch_subagent 拒绝：已达单轮上限 $maxQueue (session=$parentSessionId)',
         category: LogCategory.ai,
@@ -105,12 +105,31 @@ class SubagentRunner {
       return jsonEncode({'error': 'missing_param', 'message': 'task 不能为空'});
     }
 
-    await _waitForSlot(parentSessionId);
-    await _runOne(
-      run,
-      emitParent: emitParent,
-      parentCurrentNovelId: parentCurrentNovelId,
-    );
+    try {
+      await _waitForSlot(parentSessionId);
+      await _runOne(
+        run,
+        emitParent: emitParent,
+        parentCurrentNovelId: parentCurrentNovelId,
+      );
+    } catch (e, stack) {
+      // 异常路径兜底：避免 registry 留僵尸 run
+      // 例如 _waitForSlot 抛 TimeoutException 时 run 还是 pending，会导致
+      // countActiveBySession 误判后续 dispatch 达 30 上限。
+      if (run.state == SubagentRunState.pending ||
+          run.state == SubagentRunState.running) {
+        run.state = SubagentRunState.failed;
+        run.errorMessage = e.toString();
+      }
+      LoggerService.instance.e(
+        '子 Agent dispatch 失败 (runId=${run.runId}): $e',
+        stackTrace: stack.toString(),
+        category: LogCategory.ai,
+        tags: ['agent', 'subagent', 'dispatch_error'],
+      );
+      // 重新抛给主 Agent（WritingScenario.executeTool 会 catch 转 error JSON）
+      rethrow;
+    }
 
     return _buildResultJson(run);
   }
@@ -285,7 +304,7 @@ class SubagentRunner {
     required String task,
     required List<String> allowedTools,
   }) async {
-    if (registry.countTotalBySession(sessionId) >= maxQueue) {
+    if (registry.countActiveBySession(sessionId) >= maxQueue) {
       return jsonEncode({
         'error': 'max_subagents_reached',
         'message': '已达上限',
