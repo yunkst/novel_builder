@@ -56,5 +56,19 @@ void main() {
       run.errorMessage = 'LLM 配置缺失';
       expect(run.progressSummary.contains('LLM 配置缺失'), isTrue);
     });
+
+    test('progressSummary pending 返回排队中', () {
+      final run = SubagentRun(
+          runId: 'r', parentSessionId: 's', task: 't', allowedTools: const [], toolCallId: 'tc');
+      expect(run.state, SubagentRunState.pending);
+      expect(run.progressSummary, '排队中…');
+    });
+
+    test('progressSummary cancelled 返回已取消', () {
+      final run = SubagentRun(
+          runId: 'r', parentSessionId: 's', task: 't', allowedTools: const [], toolCallId: 'tc');
+      run.state = SubagentRunState.cancelled;
+      expect(run.progressSummary, '已取消');
+    });
   });
 }

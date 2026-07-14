@@ -165,10 +165,8 @@ class CancellationToken {
 class CancellationTokenSource {
   CancellationTokenSource() : token = CancellationToken();
   final CancellationToken token;
-  bool _cancelled = false;
-  bool get isCancelled => _cancelled;
+  bool get isCancelled => token.isCancelled;
   void cancel({String? reason}) {
-    _cancelled = true;
     token.cancel(reason: reason ?? 'CancellationTokenSource.cancel');
   }
 }
