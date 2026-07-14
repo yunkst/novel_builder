@@ -18,9 +18,10 @@ import 'contextual_agent_launcher_test.mocks.dart';
 
 void main() {
   // 这两个 testWidgets 会真实打开 AgentChatDialog，dialog 内若挂载 MediaView
-  // 会用 Timer.periodic(10s) 轮询；在 widget test 的 fake clock 下，
-  // _verifyInvariants 偶发报 "Timer is still pending"（与测试运行时序相关，
-  // 单跑通过、连跑偶发失败）。retry: 3 让 flaky 自动重试，不影响断言有效性。
+  // 会启动 Timer.periodic(10s) 轮询；测试结束前若不关闭 dialog，MediaView 不卸载、
+  // timer 不 cancel，_verifyInvariants 会报 "Timer is still pending"（CI 上必现）。
+  // 根治：每个用例末尾 pop dialog 并 pump 到 dismiss 完成，让 MediaView dispose 取消 timer。
+  // retry: 3 作为额外保险（环境抖动时不影响断言有效性）。
   group('ContextualAgentLauncher.launch', () {
     testWidgets(
       'autoSend 模式: 切场景 + switchSession(id, null) + 调 sendMessage',
@@ -79,6 +80,12 @@ void main() {
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
         verify(mockSession.sendMessage(content: '请生成提取脚本')).called(1);
+
+        // 关闭 launcher 打开的 dialog：让其中 MediaView 卸载、cancel 其
+        // Timer.periodic，否则 _verifyInvariants 会因 timersPending 失败（CI 必现根因）。
+        Navigator.of(capturedContext, rootNavigator: true).pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
       },
       retry: 3,
     );
@@ -138,6 +145,12 @@ void main() {
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
         verifyNever(mockSession.sendMessage(content: anyNamed('content')));
+
+        // 关闭 launcher 打开的 dialog：让其中 MediaView 卸载、cancel 其
+        // Timer.periodic，否则 _verifyInvariants 会因 timersPending 失败（CI 必现根因）。
+        Navigator.of(capturedContext, rootNavigator: true).pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
       },
       retry: 3,
     );
