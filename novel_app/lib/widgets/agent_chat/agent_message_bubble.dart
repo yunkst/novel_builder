@@ -9,6 +9,7 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
 import 'media_gallery_card.dart';
 import 'subagent_tool_card.dart';
+import '../../screens/subagent_detail_screen.dart';
 import '../media/media_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -221,14 +222,20 @@ class AgentMessageBubble extends ConsumerWidget {
                 top: idx > 0 ? 8 : 0,
                 bottom: isLast ? 0 : 4,
               ),
-              // 子任务（dispatch_subagent）走专属卡片，其他工具保留原卡片。
-              // 任务 11 接入时把 onTap 改为 push SubagentDetailScreen。
+              // dispatch_subagent 走 SubagentToolCard（任务 10），点击跳转详情页（任务 11）。
               child: s.call.name == 'dispatch_subagent'
                   ? SubagentToolCard(
                       sessionId: sessionId,
                       toolCallId: s.call.id,
                       task: (s.call.arguments['task'] as String?) ?? '',
-                      onTap: null,
+                      onTap: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => SubagentDetailScreen(
+                            sessionId: sessionId,
+                            toolCallId: s.call.id,
+                          ),
+                        ));
+                      },
                     )
                   : AgentToolCallCard(call: s.call),
             ),
