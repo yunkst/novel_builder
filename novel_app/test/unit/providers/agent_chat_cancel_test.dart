@@ -109,6 +109,11 @@ class MockNovelAgentService implements NovelAgentService {
   }
 
   @override
+  void addEvent(AgentEvent event) {
+    _controller.add(event);
+  }
+
+  @override
   void dispose() {
     _controller.close();
   }
