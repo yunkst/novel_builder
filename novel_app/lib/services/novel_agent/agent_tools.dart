@@ -53,6 +53,8 @@ class AgentTools {
     _listText2ImgModels,
     _createImages,
     _createImageToVideo,
+    // ===== 子 Agent =====
+    _dispatchSubagent,
   ];
 
   /// 查找工具定义（带日志）
@@ -66,6 +68,19 @@ class AgentTools {
       }
     }
     return null;
+  }
+
+  /// 按白名单过滤工具定义（供 SubagentScenario 使用）
+  ///
+  /// - 自动剔除 `dispatch_subagent`（强制单层嵌套，子 Agent 不能再派子 Agent）
+  /// - 忽略不存在的工具名
+  /// - 空白名单返回空列表
+  static List<Map<String, dynamic>> filterTools(List<String> allowed) {
+    final allowedSet = allowed.toSet()..remove('dispatch_subagent');
+    if (allowedSet.isEmpty) return const <Map<String, dynamic>>[];
+    return allTools
+        .where((t) => allowedSet.contains(t['function']['name']))
+        .toList(growable: false);
   }
 
   // ===== 小说导航 =====
@@ -181,14 +196,34 @@ class AgentTools {
     'function': {
       'name': 'search_in_chapters',
       'description':
-          '在当前小说所有已缓存章节中搜索包含指定关键词的内容。'
-          '返回匹配的章节列表和上下文片段，结果中包含每个章节的 position。',
+          '在当前小说所有已缓存章节中搜索包含指定关键词的内容，返回关键词周围约 80 字的'
+          '上下文片段（带前后省略号），适合定位特定情节、道具、台词、设定。\n'
+          '返回顶层包含 keyword、totalChaptersHit、totalMatches、truncated、'
+          'truncatedChapters、count 等统计字段；每章返回 position、chapterTitle、'
+          'matchCount、matchedText（关键词回显）和 snippets（采样后的上下文片段）。\n'
+          '高频词（如主角名）会命中很多章节，建议用 positionFrom/positionTo 分段查询'
+          '（每次 20-50 章），避免单次结果过大；position 来自 list_chapters。\n'
+          '服务端对单次返回的章节数和片段数有兜底上限（分别为 50 章 / 每章 3 片段 / 全局 30'
+          '片段），超量时通过 truncated / truncatedChapters 标记告知，请缩小范围或换更精确的'
+          '关键词后重试。',
       'parameters': {
         'type': 'object',
         'properties': {
           'keyword': {
             'type': 'string',
             'description': '搜索关键词',
+          },
+          'positionFrom': {
+            'type': 'integer',
+            'description':
+                '可选。搜索起始章节位置（1-based，含），来自 list_chapters 返回的 position。'
+                '与 positionTo 配合使用以分段查询长小说。',
+          },
+          'positionTo': {
+            'type': 'integer',
+            'description':
+                '可选。搜索结束章节位置（1-based，含）。须 >= positionFrom，否则报错。'
+                '不传或只传一端时，另一端视为不限制。',
           },
         },
         'required': ['keyword'],
@@ -869,6 +904,42 @@ class AgentTools {
           },
         },
         'required': ['prompt', 'sourceMediaId'],
+      },
+    },
+  };
+
+  // ===== 子 Agent =====
+
+  static const _dispatchSubagent = {
+    'type': 'function',
+    'function': {
+      'name': 'dispatch_subagent',
+      'description':
+          '派出一个子 Agent 独立执行子任务，适用于可拆分的复杂工作（如梳理大量章节的人物关系、'
+          '分卷总结大纲）。子 Agent 只能使用 allowed_tools 列表中的工具，无法继续派子 Agent。\n'
+          '使用要点：\n'
+          '- task 要足够具体，让子 Agent 能独立完成\n'
+          '- allowed_tools 只放子 Agent 真正需要的工具\n'
+          '- 同一轮可派多个 dispatch_subagent 并行执行\n'
+          '- 子 Agent 完成后返回结构化 Markdown 总结',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'task': {
+            'type': 'string',
+            'description':
+                '交给子 Agent 的任务说明，例如：'
+                '"请阅读第1-30章并梳理主要人物关系，输出每个人物的出场章节和关系。"',
+          },
+          'allowed_tools': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                '子 Agent 可调用的工具名白名单。必须从当前可用工具中选择，'
+                '不能包含 dispatch_subagent（子 Agent 不能再派子 Agent）。',
+          },
+        },
+        'required': ['task', 'allowed_tools'],
       },
     },
   };
