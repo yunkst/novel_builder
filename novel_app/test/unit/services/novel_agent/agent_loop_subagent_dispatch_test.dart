@@ -107,15 +107,13 @@ class _DispatchAgentScenario with AgentScenarioCleanupMixin
   final Map<String, Duration> toolDelays;
 
   /// 工具名 → 固定返回 JSON（不配置则返回 {"ok": true}）
-  final Map<String, Map<String, dynamic>> toolResults;
+  final Map<String, Map<String, dynamic>> toolResults = const {};
 
   /// 工具调用记录：开始时间、结束时间、toolCallId
   final List<_ToolExecutionRecord> executions = [];
 
   _DispatchAgentScenario({
     this.toolDelays = const {},
-    // ignore: unused_element_parameter
-    this.toolResults = const {},
   });
 
   @override

@@ -69,15 +69,29 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     // 事件回流通过 SubagentRunner 内部 agentService.events.add 发到全局流，
     // 本方法不负责转发。
     if (name == 'dispatch_subagent') {
-      return await _ref.read(subagentRunnerProvider).dispatch(
-            parentSessionId: _currentContext?.scenarioId ?? 'writing',
-            task: (args['task'] as String?) ?? '',
-            allowedTools: ((args['allowed_tools'] as List?) ?? const [])
-                .map((e) => e.toString())
-                .toList(),
-            parentToolCallId: toolCallId ?? '',
-            parentCurrentNovelId: _currentContext?.currentNovelId,
-          );
+      try {
+        return await _ref.read(subagentRunnerProvider).dispatch(
+              parentSessionId: _currentContext?.scenarioId ?? 'writing',
+              task: (args['task'] as String?) ?? '',
+              allowedTools: ((args['allowed_tools'] as List?) ?? const [])
+                  .map((e) => e.toString())
+                  .toList(),
+              parentToolCallId: toolCallId ?? '',
+              parentCurrentNovelId: _currentContext?.currentNovelId,
+            );
+      } catch (e) {
+        // SubagentRunner.dispatch 头部 try-catch 会 rethrow（如 _waitForSlot 的
+        // TimeoutException），若不在此处转 error JSON，异常会沿
+        // AgentLoop._executeSingleTool 上抛到 run 外层 catch，被
+        // _isTransientNetworkError 判为瞬态网络错误触发 round 整体重试，
+        // LLM 永远收不到 dispatch 失败的 error JSON。
+        // 改为返回 error JSON 字符串，AgentLoop 据 `error` 字段判 toolSuccess=false
+        // 并把结果作为 tool result 回灌 LLM，让 LLM 决策换路径或告知用户。
+        return jsonEncode({
+          'error': 'subagent_dispatch_failed',
+          'message': '子 Agent 派发失败: $e',
+        });
+      }
     }
     // select_novel / create_novel 需要同步更新 _currentContext，
     // 确保同一 LLM 响应中后续工具调用能作用于新小说
