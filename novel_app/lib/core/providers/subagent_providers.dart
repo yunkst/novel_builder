@@ -63,7 +63,7 @@ final subagentRunProvider =
 /// `currentChatSessionIdProvider` 为 null（未选会话）时返回空列表。
 ///
 /// 依赖链：
-/// - [currentChatSessionIdProvider]：StateProvider<int?>，UI 切换时刷新
+/// - [currentChatSessionIdProvider]：`StateProvider<int?>`，UI 切换时刷新
 /// - [subagentRegistryProvider]：注册表，dispatch / cancel 时变更（订阅需 ref.invalidate）
 final currentSubagentRunsProvider = Provider<List<SubagentRun>>((ref) {
   final registry = ref.watch(subagentRegistryProvider);
