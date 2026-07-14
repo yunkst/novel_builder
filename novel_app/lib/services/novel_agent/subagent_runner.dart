@@ -25,6 +25,7 @@ import '../../models/agent_chat_message.dart';
 import 'agent_event.dart';
 import 'agent_loop.dart';
 import 'agent_scenario.dart';
+import 'novel_agent_service.dart';
 import 'subagent_registry.dart';
 import 'subagent_scenario.dart';
 import 'subagent_run.dart';
@@ -38,6 +39,12 @@ class SubagentRunner {
   final Ref ref;
   final SubagentRegistry registry;
 
+  /// 主 Agent 服务：用于把打标后事件直接发到全局流。
+  ///
+  /// 决策 1：子 Agent 事件不再依赖 emitParent 转发，
+  /// 直接 `agentService.events.add(tagged)` 走全局流（主 session 已订阅）。
+  final NovelAgentService agentService;
+
   /// LLM Provider 工厂覆盖（仅测试用）。
   ///
   /// 非空时 [dispatch] 用本工厂构造 LLM；为 null 走 [_buildLlmForScenario] 默认链路。
@@ -46,19 +53,26 @@ class SubagentRunner {
   SubagentRunner({
     required this.ref,
     required this.registry,
+    required this.agentService,
     LlmProvider Function(String scenarioId)? llmProviderFactory,
   }) : _llmProviderFactoryOverride = llmProviderFactory;
 
-  /// 测试用工厂：注入 [registry]，不依赖完整 [Ref]（forTest 路径不发真请求）。
+  /// 测试用工厂：注入 [registry] + 可选 [agentService]，不依赖完整 [Ref]。
   ///
-  /// 测试如需注入 mock LLM 走真实 [dispatch] 链路，可传 [llmProviderFactory]。
+  /// - 不传 [agentService] 时自动构造一个 NovelAgentService(_ThrowRef())：
+  ///   NovelAgentService 构造只创建 broadcast 流，不立即触发 ref 调用；
+  ///   forTest 路径若意外走到 sendMessage / resumeFromMessages 会抛 StateError，
+  ///   但 `_onSubagentEvent` 直接 events.add 不会触发 ref。
+  /// - 测试如需注入 mock LLM 走真实 [dispatch] 链路，可传 [llmProviderFactory]。
   factory SubagentRunner.forTest({
     required SubagentRegistry registry,
+    NovelAgentService? agentService,
     LlmProvider Function(String scenarioId)? llmProviderFactory,
   }) {
     return SubagentRunner(
       ref: _ThrowRef(),
       registry: registry,
+      agentService: agentService ?? NovelAgentService(_ThrowRef()),
       llmProviderFactory: llmProviderFactory,
     );
   }
@@ -66,14 +80,18 @@ class SubagentRunner {
   /// 入队一个子任务。
   ///
   /// 超过 [maxQueue] 立即返回错误 JSON；否则返回 run 后的结果 JSON。
-  /// 调用方通常是主 Agent 的 ToolExecutor 路径，把 [parentToolCallId] 透传。
+  /// 调用方通常是主 Agent 的 WritingScenario.executeTool 路径，
+  /// 把 [parentToolCallId] 透传。
+  ///
+  /// 决策 1：子 Agent 事件**直接通过 [agentService].events.add 发到全局流**，
+  /// 不再依赖 emitParent 转发——主 session 已订阅 agentService.events，
+  /// 子 Agent 事件能被主 session 看到。
   Future<String> dispatch({
     required String parentSessionId,
     required String task,
     required List<String> allowedTools,
     required String parentToolCallId,
     int? parentCurrentNovelId,
-    void Function(AgentEvent)? emitParent,
   }) async {
     if (registry.countActiveBySession(parentSessionId) >= maxQueue) {
       LoggerService.instance.w(
@@ -109,7 +127,6 @@ class SubagentRunner {
       await _waitForSlot(parentSessionId);
       await _runOne(
         run,
-        emitParent: emitParent,
         parentCurrentNovelId: parentCurrentNovelId,
       );
     } catch (e, stack) {
@@ -157,7 +174,6 @@ class SubagentRunner {
 
   Future<void> _runOne(
     SubagentRun run, {
-    void Function(AgentEvent)? emitParent,
     int? parentCurrentNovelId,
   }) async {
     run.state = SubagentRunState.running;
@@ -183,7 +199,7 @@ class SubagentRunner {
         systemPrompt: scenario.buildSystemPrompt(AgentScenarioContext(
           currentNovelId: parentCurrentNovelId,
         )),
-        emit: (event) => _onSubagentEvent(event, run, emitParent),
+        emit: (event) => _onSubagentEvent(event, run),
         cancellationToken: run.tokenSource!.token,
       );
 
@@ -205,11 +221,14 @@ class SubagentRunner {
     }
   }
 
-  void _onSubagentEvent(
-      AgentEvent event, SubagentRun run, void Function(AgentEvent)? emitParent) {
+  /// 子 Agent 事件处理器：打标 + 投影 + 直接发到全局流。
+  ///
+  /// 决策 1：通过 [agentService.addEvent] 直接发全局流（主 session 已订阅路径），
+  /// 不再依赖调用方传入 emitParent。
+  void _onSubagentEvent(AgentEvent event, SubagentRun run) {
     final tagged = EventTagger.tag(event, run.runId);
     SubagentStateProjector.project(tagged, run);
-    emitParent?.call(tagged);
+    agentService.addEvent(tagged);
   }
 
   /// 从最终 chatState 倒序找首条非空 assistant 消息文本作为 finalSummary。

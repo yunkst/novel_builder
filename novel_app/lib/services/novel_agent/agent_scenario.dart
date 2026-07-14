@@ -77,10 +77,16 @@ abstract class AgentScenario {
   ///
   /// [onProgress] 可选进度回调，供内部走 LLM 流式的工具（如 create_chapter /
   /// update_chapter_content）上报已生成字符数。不传或工具无流式生成时忽略。
+  ///
+  /// [toolCallId] LLM tool_calls[i].id（任务 7 引入），用于：
+  /// - WritingScenario.executeTool 透传给 SubagentRunner.dispatch(parentToolCallId:)
+  /// - 未来场景内按 toolCallId 做幂等 / 关联查询
+  /// 不使用此参数的场景实现忽略即可（默认 null）。
   Future<String> executeTool(
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   });
 
   /// 当本轮 LLM 响应无 tool_calls（即将结束循环）时的注入钩子

@@ -134,6 +134,7 @@ class _FakeScenario with AgentScenarioCleanupMixin implements AgentScenario {
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     executed.add((name: name, args: Map<String, dynamic>.from(args)));
     return jsonEncode({'ok': true});

@@ -49,6 +49,15 @@ class NovelAgentService {
   /// 事件流
   Stream<AgentEvent> get events => _controller.stream;
 
+  /// 公开的事件写入入口（供 SubagentRunner 等子组件回流事件到主 Agent 流）
+  ///
+  /// 决策 1（任务 7）：子 Agent 不再由 emitParent 转发事件，
+  /// 直接调本方法把打标后事件发到全局流（主 session 已订阅）。
+  /// 内部就是 `_controller.add`，只是把 StreamController 私有封装。
+  void addEvent(AgentEvent event) {
+    _controller.add(event);
+  }
+
   /// 取消指定场景的 Agent 回合
   ///
   /// 只取消目标场景，不影响其他场景的运行。

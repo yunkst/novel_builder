@@ -285,7 +285,14 @@ class AgentLoop {
           toolCalls: toolCalls,
         ));
 
-        // 5. 执行每个工具调用
+        // 5. 执行工具调用
+        //
+        // 任务 7：拆分「普通工具串行 + dispatch_subagent 并行」
+        // - 普通工具（read_chapter / list_novels 等）：保持串行（按 toolCalls 顺序）
+        // - dispatch_subagent：先收集再 Future.wait 并行（子 Agent 间互不阻塞）
+        // - 普通工具先全部跑完，再并行派发子 Agent（避免子 Agent 与普通工具
+        //   并发产生不可预测的时序）
+        final subagentCalls = <ToolCall>[];
         for (final call in toolCalls) {
           // 检查点 C：批量工具执行中途被取消，跳过剩余工具
           if (cancellationToken?.isCancelled == true) {
@@ -297,80 +304,33 @@ class AgentLoop {
             return;
           }
 
-          LoggerService.instance.d('工具调度: ${call.name} (scenario=${_scenario.id})',
-              category: LogCategory.ai, tags: ['agent', 'tool', call.name, _scenario.id]);
-          emit(ToolCallStartEvent(call.name, call.arguments, call.id));
-
-          // 流式进度节流：仅 create_chapter / update_chapter_content 这类
-          // 内部走 LLM 流式的工具会触发 onProgress 回调。
-          // - 首个非空 chunk 必发，避免短章节全程无进度
-          // - 之后每累计 100 字发一次（一章 ~3000 字约 30 次，UI 刷新可控）
-          // - 流结束不强制最后一次 emit：紧随其后的 ToolCallEndEvent 会切到 completed
-          const progressThreshold = 100;
-          var lastEmittedChars = 0;
-          var firstProgressEmitted = false;
-
-          // 执行工具（委托给场景），流式进度按 100 字节流上报
-          final rawResult = await _scenario.executeTool(
-            call.name,
-            call.arguments,
-            onProgress: (n) {
-              if (!firstProgressEmitted) {
-                firstProgressEmitted = true;
-                lastEmittedChars = n;
-                emit(ToolProgressEvent(call.id, n));
-              } else if (n - lastEmittedChars >= progressThreshold) {
-                lastEmittedChars = n;
-                emit(ToolProgressEvent(call.id, n));
-              }
-            },
-          );
-
-          // 工具结果格式化：截断逻辑委托给 ToolResultFormatter。
-          // llm = 合法 JSON（可能截断），给 LLM；full = 完整版，给 DB。
-          Map<String, dynamic> result;
-          try {
-            result = jsonDecode(rawResult) as Map<String, dynamic>;
-          } catch (_) {
-            LoggerService.instance.w(
-              '工具结果 JSON 解析失败: ${call.name}, raw=${rawResult.length}字符',
-              category: LogCategory.ai,
-              tags: ['agent', 'tool', call.name, 'json_parse_failed'],
-            );
-            result = {'raw': rawResult};
+          if (call.name == 'dispatch_subagent') {
+            subagentCalls.add(call);
+            continue;
           }
 
-          final formatted =
-              _toolResultFormatter.format(result);
-          final resultStr = formatted.llm;
-          final fullResultStr = formatted.full;
+          await _executeSingleTool(call, emit, messages, cancellationToken);
+        }
 
-          if (resultStr.length < fullResultStr.length) {
-            LoggerService.instance.d(
-              '工具结果截断: ${call.name} originalLen=${fullResultStr.length} → ${resultStr.length}',
-              category: LogCategory.ai,
-              tags: ['agent', 'tool', call.name, 'truncated'],
-            );
+        // 子 Agent 并行派发：同一轮内多个 dispatch_subagent 互不阻塞。
+        // 每个 _executeSingleTool 返回它构造的 tool 消息，并行结束后按原序
+        // append 到 messages（保持顺序可预测，避免并发 modify 同一列表）。
+        if (subagentCalls.isNotEmpty) {
+          // 检查点 C（再次）：派发子 Agent 前再确认未被取消
+          if (cancellationToken?.isCancelled == true) {
+            LoggerService.instance.i(
+                'Agent 循环已取消，跳过 ${subagentCalls.length} 个 dispatch_subagent (scenario=${_scenario.id})',
+                category: LogCategory.ai,
+                tags: ['agent', 'loop', 'cancelled', _scenario.id]);
+            emit(const AgentDoneEvent());
+            return;
           }
-
-          messages.add(ChatMessage(
-            role: 'tool',
-            content: resultStr,
-            toolCallId: call.id,
+          final parallelMessages = await Future.wait(subagentCalls.map(
+            (call) => _executeSingleTool(call, emit, const [], cancellationToken),
           ));
-
-          final toolSuccess = !result.containsKey('error');
-          emit(ToolCallEndEvent(
-            call.name,
-            call.id,
-            resultStr,
-            fullResult: fullResultStr,
-            success: toolSuccess,
-          ));
-          LoggerService.instance.i(
-              '工具完成: ${call.name} (success=$toolSuccess, resultLen=${resultStr.length}, fullLen=${fullResultStr.length}, scenario=${_scenario.id})',
-              category: LogCategory.ai,
-              tags: ['agent', 'tool', call.name, toolSuccess ? 'success' : 'error', _scenario.id]);
+          for (final msg in parallelMessages) {
+            if (msg != null) messages.add(msg);
+          }
         }
 
         // 本轮成功执行（含工具调用）→ 进入下一轮，重置重试计数
@@ -457,5 +417,105 @@ class AgentLoop {
     if (e is TimeoutException) return true;
     if (e is RetryableHttpException) return true;
     return false;
+  }
+
+  /// 执行单个工具调用（emit 事件 + 格式化结果 + append tool 消息）
+  ///
+  /// 任务 7：从原「第 5 步 for 循环体」抽出，使普通串行与 dispatch_subagent 并行
+  /// 共用同一段逻辑。**保持与原循环体 100% 一致行为**（含 onProgress 节流、
+  /// JSON 解析容错、截断日志、toolSuccess 判断）。
+  ///
+  /// [messagesToAppend] 串行路径直接传入 `messages`（原地 add）；
+  /// 并行路径传入 `const []` 以避免并发 modify 原列表——函数返回构造好的
+  /// tool ChatMessage，由调用方按原序追加到 messages。
+  /// 返回 null 表示当前不应修改 messages（目前未使用，预留）。
+  Future<ChatMessage?> _executeSingleTool(
+    ToolCall call,
+    void Function(AgentEvent) emit,
+    List<ChatMessage> messagesToAppend,
+    CancellationToken? cancellationToken,
+  ) async {
+    LoggerService.instance.d('工具调度: ${call.name} (scenario=${_scenario.id})',
+        category: LogCategory.ai, tags: ['agent', 'tool', call.name, _scenario.id]);
+    emit(ToolCallStartEvent(call.name, call.arguments, call.id));
+
+    // 流式进度节流：仅 create_chapter / update_chapter_content 这类
+    // 内部走 LLM 流式的工具会触发 onProgress 回调。
+    // - 首个非空 chunk 必发，避免短章节全程无进度
+    // - 之后每累计 100 字发一次（一章 ~3000 字约 30 次，UI 刷新可控）
+    // - 流结束不强制最后一次 emit：紧随其后的 ToolCallEndEvent 会切到 completed
+    const progressThreshold = 100;
+    var lastEmittedChars = 0;
+    var firstProgressEmitted = false;
+
+    // 执行工具（委托给场景），流式进度按 100 字节流上报
+    final rawResult = await _scenario.executeTool(
+      call.name,
+      call.arguments,
+      onProgress: (n) {
+        if (!firstProgressEmitted) {
+          firstProgressEmitted = true;
+          lastEmittedChars = n;
+          emit(ToolProgressEvent(call.id, n));
+        } else if (n - lastEmittedChars >= progressThreshold) {
+          lastEmittedChars = n;
+          emit(ToolProgressEvent(call.id, n));
+        }
+      },
+      toolCallId: call.id, // 任务 7 透传父 toolCallId，供 dispatch_subagent 用
+    );
+
+    // 工具结果格式化：截断逻辑委托给 ToolResultFormatter。
+    // llm = 合法 JSON（可能截断），给 LLM；full = 完整版，给 DB。
+    Map<String, dynamic> result;
+    try {
+      result = jsonDecode(rawResult) as Map<String, dynamic>;
+    } catch (_) {
+      LoggerService.instance.w(
+        '工具结果 JSON 解析失败: ${call.name}, raw=${rawResult.length}字符',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', call.name, 'json_parse_failed'],
+      );
+      result = {'raw': rawResult};
+    }
+
+    final formatted = _toolResultFormatter.format(result);
+    final resultStr = formatted.llm;
+    final fullResultStr = formatted.full;
+
+    if (resultStr.length < fullResultStr.length) {
+      LoggerService.instance.d(
+        '工具结果截断: ${call.name} originalLen=${fullResultStr.length} → ${resultStr.length}',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', call.name, 'truncated'],
+      );
+    }
+
+    final toolMessage = ChatMessage(
+      role: 'tool',
+      content: resultStr,
+      toolCallId: call.id,
+    );
+
+    if (messagesToAppend.isNotEmpty) {
+      // 串行路径：原地 add
+      messagesToAppend.add(toolMessage);
+    }
+    // 并行路径：返回构造好的消息，调用方稍后顺序追加
+
+    final toolSuccess = !result.containsKey('error');
+    emit(ToolCallEndEvent(
+      call.name,
+      call.id,
+      resultStr,
+      fullResult: fullResultStr,
+      success: toolSuccess,
+    ));
+    LoggerService.instance.i(
+        '工具完成: ${call.name} (success=$toolSuccess, resultLen=${resultStr.length}, fullLen=${fullResultStr.length}, scenario=${_scenario.id})',
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', call.name, toolSuccess ? 'success' : 'error', _scenario.id]);
+
+    return messagesToAppend.isEmpty ? toolMessage : null;
   }
 }

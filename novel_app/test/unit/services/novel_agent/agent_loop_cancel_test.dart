@@ -132,6 +132,7 @@ class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario 
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     if (toolDelay != null) {
       await Future<void>.delayed(toolDelay!);
@@ -411,6 +412,7 @@ class _CancelAfterFirstToolScenario with AgentScenarioCleanupMixin
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     final result = await inner.executeTool(name, args);
     if (!_firstDone) {

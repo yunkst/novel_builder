@@ -2,12 +2,16 @@
 ///
 /// 将 AgentTools + ToolExecutor + AgentSystemPrompt 统一封装为
 /// AgentScenario 实现，不改变任何行为。
+///
+/// 任务 7：在工具执行入口加 `dispatch_subagent` 委托分支，把 LLM 派出的
+/// 子任务转交给 SubagentRunner（共享 NovelAgentService 事件流）。
 library;
 
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
+import 'package:novel_app/core/providers/subagent_providers.dart';
 import 'package:novel_app/services/logger_service.dart';
 
 import '../agent_scenario.dart';
@@ -50,6 +54,7 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     LoggerService.instance.d(
       'WritingScenario 执行工具: $name',
@@ -59,6 +64,20 @@ class WritingScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     // patch_memory 由场景自行处理（需要 AgentMemoryRepository + 记忆缓存）
     if (name == 'patch_memory') {
       return await _executePatchMemory(args);
+    }
+    // dispatch_subagent：委托给 SubagentRunner（任务 7）
+    // 事件回流通过 SubagentRunner 内部 agentService.events.add 发到全局流，
+    // 本方法不负责转发。
+    if (name == 'dispatch_subagent') {
+      return await _ref.read(subagentRunnerProvider).dispatch(
+            parentSessionId: _currentContext?.scenarioId ?? 'writing',
+            task: (args['task'] as String?) ?? '',
+            allowedTools: ((args['allowed_tools'] as List?) ?? const [])
+                .map((e) => e.toString())
+                .toList(),
+            parentToolCallId: toolCallId ?? '',
+            parentCurrentNovelId: _currentContext?.currentNovelId,
+          );
     }
     // select_novel / create_novel 需要同步更新 _currentContext，
     // 确保同一 LLM 响应中后续工具调用能作用于新小说

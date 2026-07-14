@@ -240,6 +240,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     // 任意工具调用都视为 agent 在"行动"，标记供 onNoToolCalls 状态机判断
     _hadToolCallSinceLastCheck = true;

@@ -54,6 +54,7 @@ $task
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async {
     // 双重保险：dispatch_subagent 永远不在子 Agent 可调工具里
     if (name == 'dispatch_subagent') {

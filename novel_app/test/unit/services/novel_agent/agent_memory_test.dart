@@ -394,6 +394,7 @@ class _TestScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMixin
     String name,
     Map<String, dynamic> args, {
     void Function(int generatedChars)? onProgress,
+    String? toolCallId,
   }) async => '';
 
   @override

@@ -78,6 +78,12 @@ class SubagentRegistry {
     _toolCallIndex.remove(parentSessionId);
   }
 
+  /// 清空所有 session 的 run（应用级 dispose 时调用，subagentRegistryProvider.onDispose）
+  void clearAll() {
+    _runsBySession.clear();
+    _toolCallIndex.clear();
+  }
+
   /// 保留最近 keep 个 run（不限终态），清掉更早的——控制内存
   /// 用于「保留最近 N 个供回看」（spec §5.3 N=20）
   void pruneForSession(String parentSessionId, {required int keep}) {
