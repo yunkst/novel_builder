@@ -13,6 +13,7 @@ class SiteScript {
   final int lastUsedAt;
   final int useCount;
   final int verified;
+  final bool ocr; // 是否需要 OCR 后处理（字体反爬）。v37 新增。
 
   const SiteScript({
     required this.id,
@@ -25,6 +26,7 @@ class SiteScript {
     required this.lastUsedAt,
     required this.useCount,
     required this.verified,
+    this.ocr = false,
   });
 
   /// 从数据库 Map 构造
@@ -40,6 +42,7 @@ class SiteScript {
       lastUsedAt: map['last_used_at'] as int,
       useCount: (map['use_count'] as int?) ?? 0,
       verified: (map['verified'] as int?) ?? 0,
+      ocr: (map['ocr'] as int?) == 1,
     );
   }
 
@@ -56,6 +59,7 @@ class SiteScript {
       'last_used_at': lastUsedAt,
       'use_count': useCount,
       'verified': verified,
+      'ocr': ocr ? 1 : 0,
     };
   }
 
@@ -67,6 +71,9 @@ class SiteScript {
 
   /// 是否已验证
   bool get isVerified => verified == 1;
+
+  /// 是否需要 OCR 后处理（字体反爬）
+  bool get needsOcr => ocr;
 
   /// 创建时间（DateTime）
   DateTime get createdAtDateTime =>
@@ -84,6 +91,7 @@ class SiteScript {
     int? lastUsedAt,
     int? useCount,
     int? verified,
+    bool? ocr,
   }) {
     return SiteScript(
       id: id ?? this.id,
@@ -96,6 +104,7 @@ class SiteScript {
       lastUsedAt: lastUsedAt ?? this.lastUsedAt,
       useCount: useCount ?? this.useCount,
       verified: verified ?? this.verified,
+      ocr: ocr ?? this.ocr,
     );
   }
 }
