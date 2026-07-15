@@ -2,6 +2,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-07-15**: OCR 提取器产品化。site_scripts 加 ocr 列（v37）；OcrPredictor 改 recognizeImage(base64Png)；新增 OcrRestoreService（restorePuaInText/verifyFontFamily/readableRatio）+ 系统 OCR-JS 模板；HeadlessWebViewContentService/ChapterListService 加 OCR 还原钩子；save_script 重写为分次保存+落库前验证（domain/run_id/script_type/test_url/ocr）；prompt 加提取器创建流程。番茄字体反爬正文可读。
 - **2025-11-13**: AI上下文初始化，重新设计架构文档，添加模块化结构
 - **2026-06-11**: 文档大整理，移除 Dify 引用，更新为 DSL Engine + Scrapling + Riverpod
 - **2026-07-07**: 校准爬虫站点（9→11）、DB 版本（v21→v33）、移除无依据端口；DSL Engine 统一命名
@@ -218,7 +219,7 @@ docker-compose logs -f
 - **agent_memories**: Agent 经验记忆
 - **llm_configs**: LLM 配置
 - **model_downloads**: 模型分片下载
-- **site_scripts**: 站点提取脚本
+- **site_scripts**: 站点提取脚本（v37 加 ocr 列，标识字体反爬 OCR 提取器）
 - **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id，1.9.21 起含 negative_prompt）
 - **image_to_video_task**: 图生视频任务（ComfyUI prompt_id 为 task_id）
 - **client_logs**: 客户端日志（后端）
@@ -226,7 +227,7 @@ docker-compose logs -f
 > 后端 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache` 三张缓存表已于 2026-07-08 由 `20260708_drop_cache_tables` 迁移移除。
 
 ### 数据库版本
-- **前端SQLite**: v36 (novel_reader.db)
+- **前端SQLite**: v37 (novel_reader.db)
 - **后端PostgreSQL**: Alembic 管理（head: `20260708_drop_cache_tables`）
 - **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 
