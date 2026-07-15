@@ -50,6 +50,13 @@ class SubagentRunner {
   /// 非空时 [dispatch] 用本工厂构造 LLM；为 null 走 [_buildLlmForScenario] 默认链路。
   final LlmProvider Function(String scenarioId)? _llmProviderFactoryOverride;
 
+  /// 按 sessionId 隔离的 FIFO 等待队列：超 [maxConcurrent] 的 dispatch 在此排队。
+  ///
+  /// 每个 entry 是一个 [Completer]，[_runOne] 完成后在 finally 调 [_releaseSlot]
+  /// 按 FIFO 唤起下一个等待者。替代旧版 50ms 轮询 + 5 分钟 TimeoutException：
+  /// 无 busy-wait、无超时防御、确定性 FIFO。
+  final Map<String, List<Completer<void>>> _waitingQueues = {};
+
   SubagentRunner({
     required this.ref,
     required this.registry,
@@ -93,6 +100,9 @@ class SubagentRunner {
     required String parentToolCallId,
     int? parentCurrentNovelId,
   }) async {
+    // 单轮上限（含 running + pending）：
+    // 由于 pending run 已占 _waitingQueues 中的位置，
+    // countActiveBySession 会自然把它们计入（state 不变）。
     if (registry.countActiveBySession(parentSessionId) >= maxQueue) {
       LoggerService.instance.w(
         'dispatch_subagent 拒绝：已达单轮上限 $maxQueue (session=$parentSessionId)',
@@ -123,15 +133,33 @@ class SubagentRunner {
       return jsonEncode({'error': 'missing_param', 'message': 'task 不能为空'});
     }
 
+    // 并发控制（Completer 队列版）：
+    // - count 包含本次新建的 run（同 session 内 pending + running）
+    // - ≤ maxConcurrent 立即放行（Dart 单线程 + sync create/check 原子，前 N 个依次放行）
+    // - 超 maxConcurrent 入队 FIFO，等待前序 run 完成时 [_releaseSlot] 唤起
+    Completer<void>? waiter;
+    if (registry.countActiveBySession(parentSessionId) > maxConcurrent) {
+      waiter = Completer<void>();
+      (_waitingQueues[parentSessionId] ??= <Completer<void>>[]).add(waiter);
+    }
+
     try {
-      await _waitForSlot(parentSessionId);
+      if (waiter != null) {
+        LoggerService.instance.d(
+          'dispatch_subagent 排队等待槽位 (runId=${run.runId}, session=$parentSessionId, '
+          'queuePos=${_waitingQueues[parentSessionId]!.length})',
+          category: LogCategory.ai,
+          tags: ['agent', 'subagent', 'queued'],
+        );
+        await waiter.future;
+      }
       await _runOne(
         run,
         parentCurrentNovelId: parentCurrentNovelId,
       );
     } catch (e, stack) {
       // 异常路径兜底：避免 registry 留僵尸 run
-      // 例如 _waitForSlot 抛 TimeoutException 时 run 还是 pending，会导致
+      // 例如 LLM 抛错 / 取消 / 异常时 run 还是 pending 或 running，会导致
       // countActiveBySession 误判后续 dispatch 达 30 上限。
       if (run.state == SubagentRunState.pending ||
           run.state == SubagentRunState.running) {
@@ -146,29 +174,31 @@ class SubagentRunner {
       );
       // 重新抛给主 Agent（WritingScenario.executeTool 会 catch 转 error JSON）
       rethrow;
+    } finally {
+      // 无论如何都要释放槽位：成功/失败/取消都让下一个 waiter 跑起来。
+      _releaseSlot(parentSessionId);
     }
 
     return _buildResultJson(run);
   }
 
-  /// 等待并发槽位：若当前 session 已有 ≥ maxConcurrent 个活跃 run 则自旋等待。
+  /// 释放一个槽位：唤醒 FIFO 队首等待者（若存在）。
   ///
-  /// 当前 AgentLoop 是顺序执行 tool_calls，所以本方法的等待场景实际上不会触发，
-  /// 留作未来 AgentLoop 并行工具调用 / UI 直发 dispatch 时的扩展点。
-  Future<void> _waitForSlot(String sessionId) async {
-    var spins = 0;
-    while (registry.countActiveBySession(sessionId) > maxConcurrent) {
-      spins++;
-      if (spins > 6000) {
-        // 防御：自旋 5 分钟仍未等到槽位则放弃（避免死锁阻塞主 Agent）
-        LoggerService.instance.e(
-          'dispatch_subagent 等待槽位超时 (session=$sessionId)',
-          category: LogCategory.ai,
-          tags: ['agent', 'subagent', 'slot_timeout'],
-        );
-        throw TimeoutException('子 Agent 等待并发槽位超时');
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+  /// 由 [_runOne] 的 finally 调用（成功/失败/取消路径都会走）。
+  /// Completer 模型下无超时需求：只要有 run 终结就能推进队列。
+  void _releaseSlot(String sessionId) {
+    final queue = _waitingQueues[sessionId];
+    if (queue == null || queue.isEmpty) {
+      _waitingQueues.remove(sessionId);
+      return;
+    }
+    final next = queue.removeAt(0);
+    if (!next.isCompleted) {
+      next.complete();
+    }
+    // 队列清空时主动清理 map，避免内存泄漏（按 session 维度）
+    if (queue.isEmpty) {
+      _waitingQueues.remove(sessionId);
     }
   }
 
@@ -315,6 +345,13 @@ class SubagentRunner {
         run.tokenSource?.cancel(reason: '主 Agent 取消');
       }
     }
+    // 清掉等待队列里未触发的 completer，避免测试或 session 关闭后泄漏
+    final queue = _waitingQueues.remove(sessionId);
+    if (queue != null) {
+      for (final c in queue) {
+        if (!c.isCompleted) c.complete();
+      }
+    }
   }
 
   /// 测试专用：只入队 registry 不真跑。
@@ -335,6 +372,16 @@ class SubagentRunner {
       allowedTools: allowedTools,
     );
     return jsonEncode({'success': true, 'runId': run.runId});
+  }
+
+  /// 测试专用：清掉全部等待队列的 completer（避免跨测试状态污染）。
+  void clearWaitingQueuesForTest() {
+    for (final queue in _waitingQueues.values) {
+      for (final c in queue) {
+        if (!c.isCompleted) c.complete();
+      }
+    }
+    _waitingQueues.clear();
   }
 
   /// 测试专用：暴露 dispatch 入口但不要求 parentToolCallId（用空字符串占位）。

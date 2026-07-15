@@ -22,6 +22,7 @@ import 'package:novel_app/services/novel_agent/subagent_registry.dart';
 import 'package:novel_app/services/novel_agent/subagent_runner.dart';
 import 'package:novel_app/services/novel_agent/subagent_state_projector.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
+import '../../../helpers/noop_llm_http_client.dart';
 
 void main() {
   group('SubagentRunner 并发控制', () {
@@ -313,23 +314,74 @@ void main() {
       expect(runs.first.state, SubagentRunState.completed);
       expect(runs.first.chatState.messages, isNotEmpty);
     });
+
+    test('同轮 5 个 dispatch（4 槽 + 1 排队）按 FIFO 顺序启动', () async {
+      // 验证修复 1：Completer 队列版并发控制
+      // - 5 个 dispatch 同时派发（Future.wait）
+      // - 前 4 个立即进入 running（_runOne 调度）
+      // - 第 5 个排队等待，前 4 个中任一完成时自动唤起
+      //
+      // 用 GateLlm 控制 LLM 完成时序：前 4 个 LLM 各持有 completer 不结束，
+      // 直到测试主动 complete 第 1 个，验证第 5 个随后被唤起。
+      final llm = GateSubagentLlm();
+      final registry = SubagentRegistry();
+      final runner = SubagentRunner.forTest(
+        registry: registry,
+        llmProviderFactory: (_) => llm,
+      );
+
+      final futures = <Future<String>>[];
+      for (var i = 0; i < 5; i++) {
+        futures.add(runner.dispatch(
+          parentSessionId: 's1',
+          task: 'task-$i',
+          allowedTools: const [],
+          parentToolCallId: 'parent-tc-$i',
+        ));
+      }
+
+      // 让 sync 部分（create + 入队）全部跑完
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // 前 4 个 run 应处于 running（GateSubagentLlm 已被调用 4 次）
+      // 第 5 个应处于 pending（等待 completer）
+      final runs = registry.listForSession('s1');
+      expect(runs, hasLength(5));
+      final runningCount =
+          runs.where((r) => r.state == SubagentRunState.running).length;
+      final pendingCount =
+          runs.where((r) => r.state == SubagentRunState.pending).length;
+      expect(runningCount, 4, reason: '前 4 个应立即 running');
+      expect(pendingCount, 1, reason: '第 5 个应 pending 等待槽位');
+      expect(llm.callCount, 4, reason: '只有前 4 个调了 LLM');
+
+      // 释放第 1 个 LLM gate → 第 1 个 run 完成 → _releaseSlot 唤起第 5 个
+      llm.release(0);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // 第 5 个应已被唤起进入 running
+      expect(llm.callCount, 5, reason: '第 5 个应已调 LLM');
+      final pendingAfter =
+          registry.listForSession('s1').where((r) => r.state == SubagentRunState.pending).length;
+      expect(pendingAfter, 0, reason: '不应再有 pending 的 run');
+
+      // 清理：释放剩余 gate 让所有 dispatch 完成
+      for (var i = 1; i < 5; i++) {
+        llm.release(i);
+      }
+      await Future.wait(futures);
+
+      // 全部应完成
+      final allCompleted = registry.listForSession('s1').every(
+          (r) => r.state == SubagentRunState.completed);
+      expect(allCompleted, isTrue);
+    });
   });
 }
 
 // ---------------------------------------------------------------------------
 // 端到端测试专用 fake
 // ---------------------------------------------------------------------------
-
-class _FakeHttpClient implements LlmHttpClient {
-  @override
-  Future<String> postJson(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-  @override
-  Stream<String> postJsonStream(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-}
 
 /// 复用现有 FakeLlmProvider 范式：override chatStreamWithTools 不发真实请求。
 class FakeSubagentLlm extends LlmProvider {
@@ -340,7 +392,7 @@ class FakeSubagentLlm extends LlmProvider {
             apiKey: 'test',
             defaultModel: 'test-model',
           ),
-          httpClient: _FakeHttpClient(),
+          httpClient: NoopLlmHttpClient(),
         );
 
   final List<ScriptedLlmResponse> _script = [];
@@ -376,4 +428,52 @@ class ScriptedLlmResponse {
     this.contentChunks = const [],
     this.toolCallDeltas,
   });
+}
+
+/// 可控时序的子 Agent LLM：每次 chatStreamWithTools 调用挂起在 completer 上，
+/// 直到测试调用 [release]。
+///
+/// 用途：精确控制子 Agent 完成的相对顺序，验证 FIFO 唤醒语义
+/// （第 5 个 dispatch 在前 N 个完成时依次唤起）。
+class GateSubagentLlm extends LlmProvider {
+  GateSubagentLlm()
+      : super(
+          const LlmConfig(
+            baseUrl: 'http://localhost',
+            apiKey: 'test',
+            defaultModel: 'test-model',
+          ),
+          httpClient: NoopLlmHttpClient(),
+        );
+
+  final List<Completer<void>> _gates = [];
+  int callCount = 0;
+
+  /// 释放第 [index] 个 LLM 调用的 gate（0-based），让该子 Agent 完成。
+  void release(int index) {
+    while (_gates.length <= index) {
+      _gates.add(Completer<void>());
+    }
+    if (!_gates[index].isCompleted) {
+      _gates[index].complete();
+    }
+  }
+
+  @override
+  Stream<LlmStreamChunk> chatStreamWithTools({
+    required List<ChatMessage> messages,
+    String? model,
+    int? maxTokens,
+    double? temperature,
+    List<Map<String, dynamic>>? tools,
+    String? toolChoice,
+  }) async* {
+    callCount++;
+    final myIndex = callCount - 1;
+    while (_gates.length <= myIndex) {
+      _gates.add(Completer<void>());
+    }
+    await _gates[myIndex].future;
+    yield const LlmStreamChunk(contentChunk: 'ok', finishReason: 'stop');
+  }
 }
