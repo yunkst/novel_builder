@@ -36,21 +36,28 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/chapter_content_result.dart';
 import '../repositories/site_script_repository.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import 'headless_webview_errors.dart';
+import 'ocr_render_js.dart';
+import 'ocr_restore_service.dart';
 import 'webview_page_loader.dart';
 
 class HeadlessWebViewContentService {
   final SiteScriptRepository _scriptRepo;
+  final Ref? _ref; // 产品路径非 null（读 ocrPredictorProvider），测试可不传
 
   HeadlessWebViewContentService({
     required SiteScriptRepository scriptRepo,
-  }) : _scriptRepo = scriptRepo;
+    Ref? ref,
+  })  : _scriptRepo = scriptRepo,
+        _ref = ref;
 
   // ===== Headless WebView 单例 =====
 
@@ -185,7 +192,7 @@ class HeadlessWebViewContentService {
       }
 
       // 4. 执行提取脚本
-      final content = await _executeContentScript(
+      final result = await _executeContentScript(
         script.chapterContentJs,
         chapterUrl,
       );
@@ -201,7 +208,7 @@ class HeadlessWebViewContentService {
       }
 
       // 5. 校验内容
-      if (content == null || content.trim().isEmpty) {
+      if (result == null || result.content.trim().isEmpty) {
         _recordFailure(script.id);
         LoggerService.instance.w(
           'HeadlessWebView: 脚本返回空内容 domain=$domain',
@@ -211,10 +218,10 @@ class HeadlessWebViewContentService {
         return FetchContentResult.noScript();
       }
 
-      if (content.trim().length < 50) {
+      if (result.content.trim().length < 50) {
         _recordFailure(script.id);
         LoggerService.instance.w(
-          'HeadlessWebView: 内容过短(${content.length}字符) domain=$domain',
+          'HeadlessWebView: 内容过短(${result.content.length}字符) domain=$domain',
           category: LogCategory.cache,
           tags: ['headless-webview', 'short-content'],
         );
@@ -225,13 +232,30 @@ class HeadlessWebViewContentService {
       _recordSuccess(script.id);
 
       LoggerService.instance.i(
-        'HeadlessWebView: 获取成功 domain=$domain len=${content.length}',
+        'HeadlessWebView: 获取成功 domain=$domain len=${result.content.length}',
         category: LogCategory.cache,
         tags: ['headless-webview', 'success'],
       );
 
+      // 7. OCR 还原（needsOcr 时对 PUA 反爬文本走 PP-OCRv6）
+      String finalContent = result.content;
+      final fontFamily = result.fontFamily;
+      if (script.needsOcr) {
+        finalContent = await restoreContentIfNeeded(
+          needsOcr: true,
+          content: finalContent,
+          fontFamily: fontFamily,
+          // 产品路径 _ref 非 null；provider 注入保证（见 network_service_providers）
+          restoreService: OcrRestoreService(_ref!, _renderPua),
+        );
+      }
+
       return FetchContentResult.success(
-        ChapterContentResult(content: content, fromCache: false),
+        ChapterContentResult(
+          content: finalContent,
+          fontFamily: fontFamily,
+          fromCache: false,
+        ),
       );
     } on PageLoadFailedException {
       // 页面加载失败（onLoadStop 超时/错误）→ 区分于"真无脚本"，返回 loadFailed
@@ -283,6 +307,40 @@ class HeadlessWebViewContentService {
     _controller = null;
     _pageLoader.reset();
     _scriptFailureCount.clear();
+  }
+
+  // ===== OCR 还原编排 =====
+
+  /// OCR 还原编排：[needsOcr] 时调 [restoreService] 还原 PUA，失败降级返回原文。
+  ///
+  /// 抽成 static `@visibleForTesting` 便于在纯 Dart 环境单测编排逻辑，
+  /// 绕开 WebView 平台实现限制（fetchContent 走到 _ensureWebView 会抛异常）。
+  /// 产品路径由 [fetchContent] 在 `script.needsOcr` 时调用。
+  @visibleForTesting
+  static Future<String> restoreContentIfNeeded({
+    required bool needsOcr,
+    required String content,
+    required String? fontFamily,
+    required OcrRestoreService restoreService,
+  }) async {
+    if (!needsOcr) return content;
+    try {
+      final r = await restoreService.restorePuaInText(content, fontFamily);
+      LoggerService.instance.i(
+        'HeadlessWebView OCR 还原: decoded=${r.decodedCount}/${r.totalPuaCount}',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'ocr', 'restore'],
+      );
+      return r.text;
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        'HeadlessWebView OCR 还原失败，降级返回原文: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'ocr', 'restore-failed'],
+      );
+      return content; // 降级
+    }
   }
 
   // ===== 优先级抢占 =====
@@ -405,7 +463,9 @@ class HeadlessWebViewContentService {
   ///
   /// 使用 3 秒粒度循环检查抢占信号 [_shouldYield]，
   /// 使低优先级请求最多 3 秒就能响应抢占。
-  Future<String?> _executeContentScript(
+  ///
+  /// 返回 record `(content, fontFamily)`：fontFamily 可空（脚本未声明时为 null）。
+  Future<({String content, String? fontFamily})?> _executeContentScript(
     String scriptTemplate,
     String pageUrl,
   ) async {
@@ -453,13 +513,22 @@ class HeadlessWebViewContentService {
         final data = jsonDecode(jsonStr);
 
         // 兼容两种返回格式：
-        // 1. { "title": "...", "content": "..." }
+        // 1. { "title": "...", "content": "...", "font_family": "..." }
+        //    （agent 也可能写 camelCase fontFamily，两个都兜底取）
         // 2. 直接字符串内容
         if (data is Map<String, dynamic>) {
-          return (data['content'] as String?)?.trim();
+          final c = (data['content'] as String?)?.trim();
+          final ff = (data['font_family'] as String? ??
+                  data['fontFamily'] as String?)
+              ?.trim();
+          if (c == null) return null;
+          return (
+            content: c,
+            fontFamily: (ff == null || ff.isEmpty) ? null : ff,
+          );
         }
         if (data is String) {
-          return data.trim();
+          return (content: data.trim(), fontFamily: null);
         }
 
         return null;
@@ -477,6 +546,31 @@ class HeadlessWebViewContentService {
       tags: ['headless-webview', 'execute_script', 'timeout'],
     );
     return null;
+  }
+
+  /// 渲染单个 PUA 码点为 base64 PNG（供 [OcrRestoreService] 用）。
+  ///
+  /// 在已加载反爬字体的页面上跑系统 OCR-JS（[buildOcrRenderJs]）。
+  /// OCR-JS 是合法 async IIFE，[WebViewJsExecutor.extractAsyncFunctionBody]
+  /// 只剥 IIFE 外壳、不校验 `{{URL}}`，可直接用。
+  ///
+  /// 返回值是 base64 字符串（非 JSON），故直接取 [JsResult.value]，
+  /// 不走 `stringifyJsResult` + `jsonDecode`（base64 不是合法 JSON 会抛 FormatException）。
+  Future<String> _renderPua(int codepoint, String fontFamily) async {
+    if (_controller == null) {
+      throw StateError('WebView 未就绪，无法渲染 PUA');
+    }
+    final js = buildOcrRenderJs(codepoint, fontFamily);
+    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
+    final result = await _controller!
+        .callAsyncJavaScript(functionBody: functionBody)
+        .timeout(const Duration(seconds: 30));
+    if (result == null || result.error != null) {
+      throw Exception('OCR 渲染失败 cp=$codepoint: ${result?.error}');
+    }
+    final value = result.value;
+    if (value is String) return value;
+    throw Exception('OCR 渲染返回非字符串: $value');
   }
 
   // ===== 脚本健康度 =====

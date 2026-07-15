@@ -18,6 +18,7 @@ import 'package:novel_app/services/headless_webview_errors.dart';
 import 'package:novel_app/repositories/site_script_repository.dart';
 import 'package:novel_app/models/site_script.dart';
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/services/ocr_restore_service.dart';
 
 import '../../helpers/test_database_setup.dart';
 
@@ -39,6 +40,26 @@ class MockSiteScriptRepository extends Mock implements SiteScriptRepository {
         returnValue: Future<void>.value(),
         returnValueForMissingStub: Future<void>.value(),
       ) as Future<void>;
+}
+
+// ===== Mock OcrRestoreService =====
+//
+// restorePuaInText 内部对单字符渲染/识别失败做了 per-codepoint try-catch
+// （吞掉异常 + 替换 □），因此用 forTesting + 抛异常的 renderPua 无法触发
+// restoreContentIfNeeded 的整体降级分支。改用 Mockito 直接 stub
+// restorePuaInText 抛异常，才能验证降级路径。
+class MockOcrRestoreService extends Mock implements OcrRestoreService {
+  @override
+  Future<OcrRestoreResult> restorePuaInText(String text, String? fontFamily) =>
+      super.noSuchMethod(
+        Invocation.method(#restorePuaInText, [text, fontFamily]),
+        returnValue: Future<OcrRestoreResult>.value(
+          OcrRestoreResult('', 0, 0),
+        ),
+        returnValueForMissingStub: Future<OcrRestoreResult>.value(
+          OcrRestoreResult('', 0, 0),
+        ),
+      ) as Future<OcrRestoreResult>;
 }
 
 // ===== 测试辅助：构造 SiteScript =====
@@ -300,6 +321,60 @@ void main() {
       service.dispose();
       service.dispose();
       expect(service, isNotNull);
+    });
+  });
+
+  // ================================================================
+  // restoreContentIfNeeded — OCR 还原编排（static @visibleForTesting）
+  //
+  // 抽成 static 函数便于在纯 Dart 环境单测 OCR 编排逻辑，
+  // 绕开 WebView 平台实现限制（fetchContent 走到 _ensureWebView 会抛异常）。
+  // ================================================================
+  group('restoreContentIfNeeded (OCR 编排)', () {
+    test('needsOcr=true 调 restoreService 还原 PUA', () async {
+      final restore = OcrRestoreService.forTesting(
+        renderPua: (cp, _) async => 'mock',
+        recognizeImageFn: (_) async => '字',
+      );
+      final out = await HeadlessWebViewContentService.restoreContentIfNeeded(
+        needsOcr: true,
+        content: '前${String.fromCharCode(0xE3E8)}后',
+        fontFamily: 'F',
+        restoreService: restore,
+      );
+      expect(out, contains('字'));
+      expect(out, isNot(contains(String.fromCharCode(0xE3E8))));
+    });
+
+    test('needsOcr=false 不还原直接返回原文', () async {
+      final restore = OcrRestoreService.forTesting(
+        renderPua: (_, __) async => '',
+        recognizeImageFn: (_) async => 'X',
+      );
+      final out = await HeadlessWebViewContentService.restoreContentIfNeeded(
+        needsOcr: false,
+        content: '原文',
+        fontFamily: null,
+        restoreService: restore,
+      );
+      expect(out, '原文');
+    });
+
+    test('restoreService 抛异常降级返回原文', () async {
+      // restorePuaInText 内部吞掉 per-codepoint 异常（替 □），
+      // 故用 Mockito 直接 stub restorePuaInText 抛异常验证整体降级分支。
+      final restore = MockOcrRestoreService();
+      final original = '前${String.fromCharCode(0xE3E8)}后';
+      when(restore.restorePuaInText(original, 'F'))
+          .thenThrow(Exception('restore failed'));
+      final out = await HeadlessWebViewContentService.restoreContentIfNeeded(
+        needsOcr: true,
+        content: original,
+        fontFamily: 'F',
+        restoreService: restore,
+      );
+      expect(out, original); // 降级
+      verify(restore.restorePuaInText(original, 'F')).called(1);
     });
   });
 }

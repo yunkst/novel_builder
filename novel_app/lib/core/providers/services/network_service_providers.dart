@@ -264,7 +264,7 @@ PreloadService preloadService(Ref ref) {
 @Riverpod(keepAlive: true)
 HeadlessWebViewContentService headlessWebViewContentService(Ref ref) {
   final scriptRepo = ref.watch(siteScriptRepositoryProvider);
-  return HeadlessWebViewContentService(scriptRepo: scriptRepo);
+  return HeadlessWebViewContentService(scriptRepo: scriptRepo, ref: ref);
 }
 
 /// HeadlessWebViewChapterListService Provider
