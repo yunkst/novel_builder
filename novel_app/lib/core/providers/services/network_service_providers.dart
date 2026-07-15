@@ -288,5 +288,5 @@ HeadlessWebViewContentService headlessWebViewContentService(Ref ref) {
 @Riverpod(keepAlive: true)
 HeadlessWebViewChapterListService headlessWebViewChapterListService(Ref ref) {
   final scriptRepo = ref.watch(siteScriptRepositoryProvider);
-  return HeadlessWebViewChapterListService(scriptRepo: scriptRepo);
+  return HeadlessWebViewChapterListService(scriptRepo: scriptRepo, ref: ref);
 }

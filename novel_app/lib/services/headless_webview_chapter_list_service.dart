@@ -36,21 +36,28 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/chapter.dart';
 import '../repositories/site_script_repository.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
+import '../services/ocr_restore_service.dart';
 import 'headless_webview_errors.dart';
+import 'ocr_render_js.dart';
 import 'webview_page_loader.dart';
 
 class HeadlessWebViewChapterListService {
   final SiteScriptRepository _scriptRepo;
+  final Ref? _ref; // 产品路径非 null（读 ocrPredictorProvider），测试可不传
 
   HeadlessWebViewChapterListService({
     required SiteScriptRepository scriptRepo,
-  }) : _scriptRepo = scriptRepo;
+    Ref? ref,
+  })  : _scriptRepo = scriptRepo,
+        _ref = ref;
 
   // ===== 自管 Headless WebView 单例 =====
 
@@ -116,14 +123,46 @@ class HeadlessWebViewChapterListService {
       // 3. 加载页面（onLoadStop 等待，超时抛 PageLoadFailedException）
       await _loadPage(novelUrl);
 
-      // 4. 执行提取脚本
-      final chapters = await _executeChapterListScript(
+      // 4. 执行提取脚本（返回 title + chapters + 可选 fontFamily）
+      final result = await _executeChapterListScript(
         _controller!,
         script.chapterListJs,
         novelUrl,
       );
+      if (result == null) {
+        _recordFailure(scriptId);
+        return FetchChapterListResult.noScript();
+      }
 
-      // 5. 校验结果
+      String title = result.title;
+      String? fontFamily = result.fontFamily;
+      List<Chapter> chapters = result.chapters;
+
+      // 5. OCR 还原（needsOcr 时对 PUA 反爬文本走 PP-OCRv6）
+      if (script.needsOcr) {
+        try {
+          final restored = await restoreChapterListIfNeeded(
+            needsOcr: true,
+            title: title,
+            chapters: chapters,
+            fontFamily: fontFamily,
+            // 产品路径 _ref 非 null；provider 注入保证（见 network_service_providers）
+            restoreService: OcrRestoreService(_ref!, _renderPua),
+          );
+          title = restored.title;
+          chapters = restored.chapters;
+        } catch (e, stackTrace) {
+          // restoreChapterListIfNeeded 已 try-catch，此处为防御兜底
+          LoggerService.instance.w(
+            'HeadlessWebViewChapterList: OCR 还原异常未降级（理论上不可达）',
+            stackTrace: stackTrace.toString(),
+            category: LogCategory.cache,
+            tags: ['headless-webview', 'chapter-list', 'ocr', 'unexpected'],
+          );
+        }
+      }
+
+      // 6. 校验结果
       if (chapters.isEmpty) {
         _recordFailure(scriptId);
         LoggerService.instance.w(
@@ -134,7 +173,7 @@ class HeadlessWebViewChapterListService {
         return FetchChapterListResult.noScript();
       }
 
-      // 6. 成功 → 清除失败计数，标记已使用
+      // 7. 成功 → 清除失败计数，标记已使用
       _recordSuccess(scriptId);
 
       LoggerService.instance.i(
@@ -262,7 +301,14 @@ class HeadlessWebViewChapterListService {
   }
 
   /// 执行 chapter_list_js 提取脚本
-  Future<List<Chapter>> _executeChapterListScript(
+  ///
+  /// 返回 record `(title, chapters, fontFamily)`：
+  /// - title：脚本返回的顶层标题（可空，缺失时为空串；目前 service 出口不外传，
+  ///   仅供 OCR 还原内部使用）
+  /// - chapters：章节列表
+  /// - fontFamily：脚本可选声明的反爬字体族名（OCR 还原时用），可空
+  Future<({String title, List<Chapter> chapters, String? fontFamily})?>
+      _executeChapterListScript(
     InAppWebViewController controller,
     String scriptTemplate,
     String pageUrl,
@@ -275,7 +321,7 @@ class HeadlessWebViewChapterListService {
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'validation'],
       );
-      return [];
+      return null;
     }
 
     // 替换 {{URL}} → 实际 URL
@@ -297,10 +343,10 @@ class HeadlessWebViewChapterListService {
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'execute_timeout'],
       );
-      return [];
+      return null;
     }
 
-    if (result == null) return [];
+    if (result == null) return null;
 
     if (result.error != null) {
       LoggerService.instance.w(
@@ -308,7 +354,7 @@ class HeadlessWebViewChapterListService {
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'js-error'],
       );
-      return [];
+      return null;
     }
 
     // 解析返回值
@@ -322,7 +368,7 @@ class HeadlessWebViewChapterListService {
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'empty_result'],
       );
-      return [];
+      return null;
     }
 
     final chapters = <Chapter>[];
@@ -336,7 +382,97 @@ class HeadlessWebViewChapterListService {
       }
     }
 
-    return chapters;
+    // 顶层 title（脚本可选返回）
+    final title = (data['title']?.toString() ?? '').trim();
+
+    // 可选 fontFamily：snake/camel 兜底
+    final ff = (data['font_family'] as String? ?? data['fontFamily'] as String?)
+        ?.trim();
+    final fontFamily = (ff == null || ff.isEmpty) ? null : ff;
+
+    return (
+      title: title,
+      chapters: chapters,
+      fontFamily: fontFamily,
+    );
+  }
+
+  // ===== OCR 还原编排 =====
+
+  /// OCR 还原编排：[needsOcr] 时调 [restoreService] 还原 title 与每个
+  /// `chapter.title` 中的 PUA 码点，**url 与 chapterIndex 保留**；失败降级
+  /// 返回原 record。
+  ///
+  /// 抽成 static `@visibleForTesting` 便于在纯 Dart 环境单测编排逻辑，
+  /// 绕开 WebView 平台实现限制（fetchChapterList 走到 _ensureWebView 会抛异常）。
+  /// 产品路径由 [fetchChapterList] 在 `script.needsOcr` 时调用。
+  ///
+  /// 注：目前 service 出口 [FetchChapterListResult.success] 仅携带 chapters，
+  /// title 还原后暂不外传——但本函数完整还原 title 以满足未来扩展（如目录页
+  /// 顶层标题展示）和测试断言完整性。
+  @visibleForTesting
+  static Future<({String title, List<Chapter> chapters})>
+      restoreChapterListIfNeeded({
+    required bool needsOcr,
+    required String title,
+    required List<Chapter> chapters,
+    required String? fontFamily,
+    required OcrRestoreService restoreService,
+  }) async {
+    if (!needsOcr) return (title: title, chapters: chapters);
+    try {
+      final newTitle =
+          (await restoreService.restorePuaInText(title, fontFamily)).text;
+      final newChapters = <Chapter>[];
+      for (final c in chapters) {
+        final t =
+            (await restoreService.restorePuaInText(c.title, fontFamily)).text;
+        newChapters.add(Chapter(
+          title: t,
+          url: c.url, // url 不动
+          chapterIndex: c.chapterIndex, // chapterIndex 保留
+        ));
+      }
+      LoggerService.instance.i(
+        'HeadlessWebViewChapterList OCR 还原: n=${chapters.length}',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'ocr', 'restore'],
+      );
+      return (title: newTitle, chapters: newChapters);
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        'HeadlessWebViewChapterList OCR 还原失败，降级返回原文: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'ocr', 'restore-failed'],
+      );
+      return (title: title, chapters: chapters); // 降级
+    }
+  }
+
+  /// 渲染单个 PUA 码点为 base64 PNG（供 [OcrRestoreService] 用）。
+  ///
+  /// 在已加载反爬字体的页面上跑系统 OCR-JS（[buildOcrRenderJs]）。
+  /// OCR-JS 是合法 async IIFE，[WebViewJsExecutor.extractAsyncFunctionBody]
+  /// 只剥 IIFE 外壳、不校验 `{{URL}}`，可直接用。
+  ///
+  /// 返回值是 base64 字符串（非 JSON），故直接取 [JsResult.value]，
+  /// 不走 `stringifyJsResult` + `jsonDecode`（base64 不是合法 JSON 会抛 FormatException）。
+  Future<String> _renderPua(int codepoint, String fontFamily) async {
+    if (_controller == null) {
+      throw StateError('WebView 未就绪，无法渲染 PUA');
+    }
+    final js = buildOcrRenderJs(codepoint, fontFamily);
+    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
+    final result = await _controller!
+        .callAsyncJavaScript(functionBody: functionBody)
+        .timeout(const Duration(seconds: 30));
+    if (result == null || result.error != null) {
+      throw Exception('OCR 渲染失败 cp=$codepoint: ${result?.error}');
+    }
+    final value = result.value;
+    if (value is String) return value;
+    throw Exception('OCR 渲染返回非字符串: $value');
   }
 
   // ===== 脚本健康度 =====
