@@ -26,6 +26,7 @@ import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
 import 'package:novel_app/utils/retry_helper.dart';
+import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -40,7 +41,7 @@ class _ScriptedErrorLlm extends LlmProvider {
             apiKey: 'test',
             defaultModel: 'test-model',
           ),
-          httpClient: _NoopHttpClient(),
+          httpClient: NoopLlmHttpClient(),
         );
 
   final List<_ScriptedItem> _script = [];
@@ -139,18 +140,6 @@ class _FakeScenario with AgentScenarioCleanupMixin implements AgentScenario {
     executed.add((name: name, args: Map<String, dynamic>.from(args)));
     return jsonEncode({'ok': true});
   }
-}
-
-class _NoopHttpClient implements LlmHttpClient {
-  @override
-  Future<String> postJson(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-
-  @override
-  Stream<String> postJsonStream(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
 }
 
 Future<List<AgentEvent>> runLoop(

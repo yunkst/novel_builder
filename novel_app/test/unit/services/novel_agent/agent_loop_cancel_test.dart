@@ -21,6 +21,7 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
+import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -36,7 +37,7 @@ class FakeLlmProvider extends LlmProvider {
           baseUrl: 'http://localhost',
           apiKey: 'test',
           defaultModel: 'test-model',
-        ), httpClient: _FakeHttpClient());
+        ), httpClient: NoopLlmHttpClient());
 
   final List<ScriptedResponse> _script = [];
   int callCount = 0;
@@ -421,16 +422,4 @@ class _CancelAfterFirstToolScenario with AgentScenarioCleanupMixin
     }
     return result;
   }
-}
-
-/// 占位 HTTP 客户端：FakeLlmProvider 已 override chatStreamWithTools，不发真实请求
-class _FakeHttpClient implements LlmHttpClient {
-  @override
-  Future<String> postJson(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-  @override
-  Stream<String> postJsonStream(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
 }

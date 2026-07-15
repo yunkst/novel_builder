@@ -21,21 +21,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/llm_provider.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
+import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
 // Fakes（与 agent_loop_cancel_test.dart 同范式，独立文件避免测试间耦合）
 // ---------------------------------------------------------------------------
-
-class _FakeHttpClient implements LlmHttpClient {
-  @override
-  Future<String> postJson(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-  @override
-  Stream<String> postJsonStream(
-          String url, Map<String, String> headers, String body) =>
-      throw UnimplementedError();
-}
 
 /// 按预设脚本返回流式响应的假 LLM Provider
 class _ScriptedLlm extends LlmProvider {
@@ -46,7 +36,7 @@ class _ScriptedLlm extends LlmProvider {
             apiKey: 'test',
             defaultModel: 'test-model',
           ),
-          httpClient: _FakeHttpClient(),
+          httpClient: NoopLlmHttpClient(),
         );
 
   final List<_ScriptedResponse> _script = [];
