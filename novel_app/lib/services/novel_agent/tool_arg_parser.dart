@@ -64,6 +64,22 @@ class ToolArgParser {
     return (0, _typeError(key, 'int', v.runtimeType));
   }
 
+  /// 提取必填 bool 参数
+  ///
+  /// - null 或缺失 → missing_error
+  /// - bool → 直接返回
+  /// - 其他类型 → type_error
+  ///
+  /// 用于 save_script 的 ocr 开关（agent 必须显式表态）。
+  (bool, String?) requireBool(String key) {
+    if (!args.containsKey(key) || args[key] == null) {
+      return (false, _missingError(key));
+    }
+    final v = args[key];
+    if (v is bool) return (v, null);
+    return (false, _typeError(key, 'boolean', v.runtimeType));
+  }
+
   // ══════════════════════════════════════
   // 可选参数
   // ══════════════════════════════════════
