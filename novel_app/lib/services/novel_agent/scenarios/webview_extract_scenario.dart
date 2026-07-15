@@ -110,12 +110,12 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('1. get_page_info → 获取 DOM 结构和页面类型');
     buf.writeln('2. get_cached_script → 有缓存则 execute_js(run_id=...) 重跑验证，无则新生成');
     buf.writeln('3. execute_js(script=...) 测试脚本，获取 __meta.run_id');
-    buf.writeln('4. save_script(domain, list_run_id, content_run_id) 零重传保存 → 完成');
+    buf.writeln('4. save_script 分两次落库（chapter_list + chapter_content），落库前自动验证');
     buf.writeln();
 
     buf.writeln('## run_id 机制');
     buf.writeln('- 不要在上下文保留完整脚本 → 用 run_id 句柄引用');
-    buf.writeln('- 重跑: execute_js(run_id=<id>) → 保存: save_script(domain, list_run_id=<id>, content_run_id=<id>)');
+    buf.writeln('- 重跑: execute_js(run_id=<id>) → 保存: save_script(domain, run_id=<id>, script_type=..., test_url=..., ocr=...)');
     buf.writeln();
 
     buf.writeln('## JS 脚本规范');
@@ -126,6 +126,33 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('- 翻页: 检测下一页 → 点击 → await new Promise(r => setTimeout(r, 1000)) → 继续');
     buf.writeln('- 只使用标准 DOM API（querySelector, innerText），不依赖 jQuery/Vue/React');
     buf.writeln('- 跳过广告段落（含本章未完、一秒记住等）');
+    buf.writeln();
+
+    buf.writeln('## 提取器创建流程（强制）');
+    buf.writeln('完整提取器需调用两次 save_script：一次 chapter_list，一次 chapter_content。');
+    buf.writeln('save_script 会在落库前强制试运行验证，失败返回诊断指导你修 JS。');
+    buf.writeln();
+    buf.writeln('### 流程');
+    buf.writeln('1. 用 execute_js 反复调试脚本，确认能拿到正确结构：');
+    buf.writeln('   - chapter_list 脚本返回 {title, chapters:[{title,url}]}');
+    buf.writeln('   - chapter_content 脚本返回 {title, content, font_family}');
+    buf.writeln('2. 调用 save_script 落库（两次）：');
+    buf.writeln('   - save_script(domain, run_id, script_type="chapter_list",    test_url=<目录页>, ocr=<true|false>)');
+    buf.writeln('   - save_script(domain, run_id, script_type="chapter_content", test_url=<章节页>, ocr=<同上>)');
+    buf.writeln('3. save_script 返回 success=false -> 按 diagnostic/suggestion 修 JS，重新 execute_js 调试，再 save_script');
+    buf.writeln('   （注意：两次调用要分别验证通过，落库前都会跑一次试运行）');
+    buf.writeln();
+    buf.writeln('### 字体反爬检测（ocr 判定）');
+    buf.writeln('若 DOM 文本含大量 PUA 私用区码点（U+E000-F8FF，表现为不可读的乱码方块），');
+    buf.writeln('且页面通过 @font-face 加载自定义字体绑定到正文/标题元素（典型如番茄小说），');
+    buf.writeln('这是字体反爬，ocr 应传 true。');
+    buf.writeln();
+    buf.writeln('OCR 模式下：');
+    buf.writeln('- chapter_content_js 必须额外返回 font_family（用 getComputedStyle(正文元素).fontFamily）');
+    buf.writeln('- content 保留原始 PUA 文本（不要在 JS 里尝试解码）');
+    buf.writeln('- 同一站点的两次 save_script（list + content）必须传相同的 ocr 值');
+    buf.writeln();
+    buf.writeln('不要在 JS 里做 PUA 到真字的替换（你拿不到字体映射），交给运行时 OCR。');
     buf.writeln();
 
     buf.writeln('## 错误处理');

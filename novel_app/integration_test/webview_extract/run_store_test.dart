@@ -214,6 +214,7 @@ void main() {
     // ========================================================================
     // 4. save_script run_id 模式 → 零重传保存
     //    先用 execute_js 跑两个脚本获取 run_id，再用 run_id 保存
+    //    （v37 OCR 提取器：save_script 改为分次落库，参数为 run_id + script_type + test_url + ocr）
     // ========================================================================
     {
       // 注册目录脚本 run_id
@@ -223,41 +224,54 @@ void main() {
       final listRunId = (listResult['__meta'] as Map)['run_id'] as String;
       expect(listRunId, startsWith('exec_'));
 
+      // 用新 schema 保存目录脚本（先验证后落库；test_url 必传）
+      // 注意：save_script 走 headless WebView 真实加载 test_url 跑验证，
+      // 集成测试在 headless=true 时会跑真验证。list 脚本输出的 title/chapters
+      // 来自 WebViewTestHelper 的 list 页面（可正确解析），不传 ocr 走默认 false。
+      final listSaveResult = await callTool(scenario, 'save_script', {
+        'domain': 'example.com',
+        'run_id': listRunId,
+        'script_type': 'chapter_list',
+        'test_url': WebViewTestHelper.testBaseUrl,
+        'ocr': false,
+      });
+      expect(listSaveResult['success'], isTrue,
+          reason: '目录脚本应验证通过：$listSaveResult');
+
       // 注册内容脚本 run_id
       final contentResult = await callTool(scenario, 'execute_js', {
         'script': chapterContentScript,
       });
       final contentRunId2 = (contentResult['__meta'] as Map)['run_id'] as String;
 
-      // 用 run_id 保存（零重传：不传 chapter_list_js / chapter_content_js）
-      final saveResult = await callTool(scenario, 'save_script', {
+      // 用新 schema 保存内容脚本（test_url 指向 content 测试页）
+      final contentSaveResult = await callTool(scenario, 'save_script', {
         'domain': 'example.com',
-        'list_run_id': listRunId,
-        'content_run_id': contentRunId2,
+        'run_id': contentRunId2,
+        'script_type': 'chapter_content',
+        'test_url': WebViewTestHelper.testBaseUrl,
+        'ocr': false,
       });
-
-      expect(saveResult['success'], isTrue);
-      expect(saveResult['domain'], 'example.com');
-      expect(saveResult['id'], isNotNull);
-      expect(saveResult['message'].toString(), contains('run_id'));
-      expect(saveResult['source_run_ids'], {
-        'list': listRunId,
-        'content': contentRunId2,
-      });
+      expect(contentSaveResult['success'], isTrue,
+          reason: '内容脚本应验证通过：$contentSaveResult');
     }
 
     // ========================================================================
     // 5. save_script run_id_not_found 错误
+    //    （v37 新 schema：domain/run_id/script_type/test_url/ocr）
     // ========================================================================
     {
       final json = await callTool(scenario, 'save_script', {
         'domain': 'example.com',
-        'list_run_id': 'exec_dead',
-        'content_run_id': 'exec_also_dead',
+        'run_id': 'exec_dead',
+        'script_type': 'chapter_list',
+        'test_url': WebViewTestHelper.testBaseUrl,
+        'ocr': false,
       });
 
-      expect(json['error'], 'run_id');
-      expect(json['missing_run_ids'], isNotNull);
+      expect(json['success'], false);
+      expect(json['reason'], 'run_id_not_found');
+      expect(json['message'].toString(), contains('exec_dead'));
       expect(json['store_size'], isNotNull);
       expect(json['suggestion'], isNotNull);
     }
