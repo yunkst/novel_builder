@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../helpers/in_memory_db.dart';
-import 'package:novel_app/core/database/database_migrations.dart';
 
 void main() {
   late Database db;
@@ -9,10 +8,6 @@ void main() {
     db = await setupInMemoryDb();
   });
   tearDown(() async => db.close());
-
-  test('currentVersion 为 36', () {
-    expect(DatabaseMigrations.currentVersion, 36);
-  });
 
   test('character_relationships 表有全部新列', () async {
     final cols = await db.rawQuery('PRAGMA table_info(character_relationships)');

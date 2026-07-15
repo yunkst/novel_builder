@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 36;
+  static const int currentVersion = 37;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -805,6 +805,16 @@ class DatabaseMigrations {
       case 36:
         await _addColumnIfNotExists(db, 'bookshelf', 'coverMediaId', 'TEXT');
         _log('迁移 v35 → v36: bookshelf 加 coverMediaId 列');
+        break;
+
+      // ========== 版本 37：site_scripts 加 ocr 列（字体反爬 OCR 标记） ==========
+      // ocr=1 表示该站点提取器需要 OCR 后处理（番茄小说等 PUA 字体反爬）。
+      // 默认 0，所有现有提取器自动是非 OCR 模式，零破坏。
+      // 由 save_script 落库时写入；HeadlessWebView service 读取决定是否走 OCR 还原。
+      case 37:
+        await _addColumnIfNotExists(
+            db, 'site_scripts', 'ocr', 'INTEGER NOT NULL DEFAULT 0');
+        _log('迁移 v36 → v37: site_scripts 加 ocr 列');
         break;
     }
   }
