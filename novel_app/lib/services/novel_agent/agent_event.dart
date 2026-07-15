@@ -67,7 +67,7 @@ sealed class AgentEvent {
 /// 文本增量（LLM 思考输出）
 class TextDeltaEvent extends AgentEvent {
   final String text;
-  const TextDeltaEvent(this.text, {String? runId}) : super(runId: runId);
+  const TextDeltaEvent(this.text, {super.runId});
 }
 
 /// 工具调用开始
@@ -76,8 +76,7 @@ class ToolCallStartEvent extends AgentEvent {
   final Map<String, dynamic> args;
   final String toolCallId;
   const ToolCallStartEvent(this.name, this.args, this.toolCallId,
-      {String? runId})
-      : super(runId: runId);
+      {super.runId});
 }
 
 /// 工具调用结束
@@ -93,8 +92,8 @@ class ToolCallEndEvent extends AgentEvent {
     this.result, {
     this.fullResult,
     this.success = true,
-    String? runId,
-  }) : super(runId: runId);
+    super.runId,
+  });
 }
 
 /// 工具调用进度（流式生成中）
@@ -106,19 +105,18 @@ class ToolProgressEvent extends AgentEvent {
   final String toolCallId;
   final int generatedChars;
   const ToolProgressEvent(this.toolCallId, this.generatedChars,
-      {String? runId})
-      : super(runId: runId);
+      {super.runId});
 }
 
 /// Agent 循环结束
 class AgentDoneEvent extends AgentEvent {
-  const AgentDoneEvent({String? runId}) : super(runId: runId);
+  const AgentDoneEvent({super.runId});
 }
 
 /// Agent 错误
 class AgentErrorEvent extends AgentEvent {
   final String error;
-  const AgentErrorEvent(this.error, {String? runId}) : super(runId: runId);
+  const AgentErrorEvent(this.error, {super.runId});
 }
 
 /// 上下文压缩事件
@@ -151,8 +149,8 @@ class CompactionEvent extends AgentEvent {
     required this.keptMessageCount,
     required this.droppedMessageCount,
     required this.droppedAgentFromIndex,
-    String? runId,
-  }) : super(runId: runId);
+    super.runId,
+  });
 
   /// 压缩率（0-1）
   double get compressionRatio =>
