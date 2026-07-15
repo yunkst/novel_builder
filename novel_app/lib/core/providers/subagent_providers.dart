@@ -12,9 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/novel_agent/novel_agent_service.dart';
 import '../../services/novel_agent/subagent_registry.dart';
-import '../../services/novel_agent/subagent_run.dart';
 import '../../services/novel_agent/subagent_runner.dart';
-import 'chat_session_providers.dart';
 
 /// 子 Agent 注册表
 ///
@@ -38,36 +36,4 @@ final subagentRunnerProvider = Provider<SubagentRunner>((ref) {
     registry: registry,
     agentService: agentService,
   );
-});
-
-/// 按 (sessionId, runId) 索引查询单个 SubagentRun
-///
-/// 供 SubagentToolCard / SubagentDetailScreen 订阅。
-/// 查不到返回 null（run 尚未创建 / 已 prune / parentSessionId 不匹配）。
-///
-/// 任务 8 已统一 parentSessionId 口径为 `sessionId.toString()`，
-/// 因此入参 sessionId 用 String 与 [SubagentRegistry] 一致。
-///
-/// 参数为位置 record `(String sessionId, String runId)`，访问用 `$1` / `$2`。
-final subagentRunProvider =
-    Provider.family<SubagentRun?, (String sessionId, String runId)>(
-  (ref, pair) {
-    final registry = ref.watch(subagentRegistryProvider);
-    return registry.get(pair.$1, pair.$2);
-  },
-);
-
-/// 当前 session 派出的所有 subagent run（按 createdAt 升序）
-///
-/// 供 SubagentToolCard 列表 / 主气泡卡片渲染用。
-/// `currentChatSessionIdProvider` 为 null（未选会话）时返回空列表。
-///
-/// 依赖链：
-/// - [currentChatSessionIdProvider]：`StateProvider<int?>`，UI 切换时刷新
-/// - [subagentRegistryProvider]：注册表，dispatch / cancel 时变更（订阅需 ref.invalidate）
-final currentSubagentRunsProvider = Provider<List<SubagentRun>>((ref) {
-  final registry = ref.watch(subagentRegistryProvider);
-  final sessionId = ref.watch(currentChatSessionIdProvider);
-  if (sessionId == null) return const <SubagentRun>[];
-  return registry.listForSession(sessionId.toString());
 });
