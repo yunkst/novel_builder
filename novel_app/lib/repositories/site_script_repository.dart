@@ -184,6 +184,7 @@ class SiteScriptRepository extends BaseRepository {
     required String chapterContentJs,
     String urlPattern = '',
     String sampleUrl = '',
+    bool ocr = false, // v37 新增，默认 false 向后兼容
   }) async {
     try {
       final db = await database;
@@ -208,6 +209,7 @@ class SiteScriptRepository extends BaseRepository {
             'sample_url': sampleUrl,
             'last_used_at': now,
             'verified': 0, // 脚本内容变了，需要重新验证
+            'ocr': ocr ? 1 : 0,
           },
           where: 'id = ?',
           whereArgs: [row['id']],
@@ -249,6 +251,7 @@ class SiteScriptRepository extends BaseRepository {
         'last_used_at': now,
         'use_count': 0,
         'verified': 0,
+        'ocr': ocr ? 1 : 0,
       });
       LoggerService.instance.i(
         '新增域名脚本 (upsert): domain=$domain id=$id',
@@ -262,6 +265,64 @@ class SiteScriptRepository extends BaseRepository {
         stackTrace: stackTrace.toString(),
         category: LogCategory.database,
         tags: ['site_script', 'upsert', 'failed'],
+      );
+      rethrow;
+    }
+  }
+
+  /// 增量更新某域名某类型脚本（save_script 分次保存用）。
+  ///
+  /// - [scriptType] 为 `'chapter_list'` 或 `'chapter_content'`，决定更新哪列。
+  /// - 同时更新 [ocr] 列（保证两次保存的 ocr 标记一致）。
+  /// - 若 domain 不存在 → 返回 (success=false, reason='domain_not_found')，不自动
+  ///   create（避免半截提取器：list 存了 content 没存）。
+  /// - 更新后 verified 重置为 0（脚本内容变了需重新验证）。
+  /// - url_pattern 不写（save_script 不再产出该字段，DB 列保留历史值不动）。
+  Future<({bool success, String? id, String? reason})> updateScriptPart({
+    required String domain,
+    required String scriptType,
+    required String scriptJs,
+    required bool ocr,
+  }) async {
+    try {
+      final db = await database;
+      final existing = await db.query(
+        'site_scripts',
+        where: 'domain = ?',
+        whereArgs: [domain],
+        orderBy: 'last_used_at DESC',
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        return (success: false, id: null, reason: 'domain_not_found');
+      }
+      final id = existing.first['id'] as String;
+      final column = scriptType == 'chapter_list'
+          ? 'chapter_list_js'
+          : 'chapter_content_js';
+      await db.update(
+        'site_scripts',
+        {
+          column: scriptJs,
+          'ocr': ocr ? 1 : 0,
+          'last_used_at': DateTime.now().millisecondsSinceEpoch,
+          'verified': 0,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      LoggerService.instance.i(
+        'updateScriptPart: domain=$domain type=$scriptType ocr=$ocr id=$id',
+        category: LogCategory.database,
+        tags: ['site_script', 'update_part'],
+      );
+      return (success: true, id: id, reason: null);
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        'updateScriptPart 失败: domain=$domain - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['site_script', 'update_part', 'failed'],
       );
       rethrow;
     }

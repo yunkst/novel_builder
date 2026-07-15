@@ -442,4 +442,78 @@ void main() {
       expect(saved.chapterContentJs, 'c2');
     });
   });
+
+  // ===== updateScriptPart（分次增量更新） =====
+
+  group('updateScriptPart', () {
+    test('分次写 list/content 不互相覆盖', () async {
+      // 先插一条种子记录（updateScriptPart 不自动 create）
+      await repo.upsertByDomain(
+        domain: 'fanqienovel.com',
+        chapterListJs: 'LIST_SEED',
+        chapterContentJs: 'CONTENT_SEED',
+        ocr: false,
+      );
+
+      // 第一次：只写 chapter_list_js
+      await repo.updateScriptPart(
+        domain: 'fanqienovel.com',
+        scriptType: 'chapter_list',
+        scriptJs: 'LIST_NEW',
+        ocr: false,
+      );
+      final after1 = await repo.getByDomain('fanqienovel.com');
+      expect(after1!.chapterListJs, 'LIST_NEW');
+      expect(after1.chapterContentJs, 'CONTENT_SEED', reason: '未触及列应保持原值');
+      expect(after1.ocr, isFalse);
+      expect(after1.verified, 0, reason: '脚本内容变了，verified 应重置为 0');
+
+      // 第二次：只写 chapter_content_js + ocr=true
+      await repo.updateScriptPart(
+        domain: 'fanqienovel.com',
+        scriptType: 'chapter_content',
+        scriptJs: 'CONTENT_NEW',
+        ocr: true,
+      );
+      final after2 = await repo.getByDomain('fanqienovel.com');
+      expect(after2!.chapterListJs, 'LIST_NEW', reason: '第一次写入的不应丢失');
+      expect(after2.chapterContentJs, 'CONTENT_NEW');
+      expect(after2.ocr, isTrue);
+    });
+
+    test('domain 不存在时返回错误，不自动 create', () async {
+      final result = await repo.updateScriptPart(
+        domain: 'not.exist',
+        scriptType: 'chapter_list',
+        scriptJs: 'X',
+        ocr: false,
+      );
+      expect(result.success, isFalse);
+      expect(result.reason, 'domain_not_found');
+      expect(await repo.getByDomain('not.exist'), isNull);
+    });
+  });
+
+  // ===== upsertByDomain ocr 参数 =====
+
+  group('upsertByDomain ocr', () {
+    test('ocr=true 落库后读回 needsOcr', () async {
+      await repo.upsertByDomain(
+        domain: 'a.com',
+        chapterListJs: 'L',
+        chapterContentJs: 'C',
+        ocr: true,
+      );
+      expect((await repo.getByDomain('a.com'))!.needsOcr, isTrue);
+    });
+
+    test('ocr 默认 false（向后兼容）', () async {
+      await repo.upsertByDomain(
+        domain: 'b.com',
+        chapterListJs: 'L',
+        chapterContentJs: 'C',
+      );
+      expect((await repo.getByDomain('b.com'))!.ocr, isFalse);
+    });
+  });
 }
