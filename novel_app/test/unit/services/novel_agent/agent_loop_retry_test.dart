@@ -26,6 +26,7 @@ import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
 import 'package:novel_app/utils/retry_helper.dart';
+import '../../../helpers/fake_agent_scenario.dart';
 import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
@@ -105,30 +106,11 @@ class _ScriptedResponse {
 }
 
 /// 无参可调的最小假场景
-class _FakeScenario with AgentScenarioCleanupMixin implements AgentScenario {
-  @override
-  final String id = 'fake';
-
-  @override
-  final String displayName = 'Fake';
-
-  @override
-  final List<Map<String, dynamic>> tools = const [];
-
+class _FakeScenario extends BaseFakeAgentScenario {
   final List<({String name, Map<String, dynamic> args})> executed = [];
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) => 'sys';
-
-  @override
-  Future<List<String>> getMemories() async => const [];
-
-  @override
-  Future<MemoryPatchResult> patchMemory(int? index, String newText) async =>
-      MemoryPatchResult.error('x', const []);
-
-  @override
-  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
 
   @override
   Future<String> executeTool(

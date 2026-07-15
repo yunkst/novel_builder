@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/llm_provider.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
+import '../../../helpers/fake_agent_scenario.dart';
 import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
@@ -82,22 +83,15 @@ class _ScriptedResponse {
 ///
 /// 重写 executeTool 接 toolCallId（命名参数），用以验证 AgentLoop 透传 call.id。
 /// 同时记录每个工具的 start/end wall clock 和 toolCallId，供测试断言。
-class _DispatchAgentScenario with AgentScenarioCleanupMixin
-    implements AgentScenario {
+class _DispatchAgentScenario extends BaseFakeAgentScenario {
   @override
   final String id = 'dispatch-test';
 
   @override
   final String displayName = 'Dispatch Test Scenario';
 
-  @override
-  final List<Map<String, dynamic>> tools = const [];
-
   /// 按工具名配置的延时（默认 0）
   final Map<String, Duration> toolDelays;
-
-  /// 工具名 → 固定返回 JSON（不配置则返回 {"ok": true}）
-  final Map<String, Map<String, dynamic>> toolResults = const {};
 
   /// 工具调用记录：开始时间、结束时间、toolCallId
   final List<_ToolExecutionRecord> executions = [];
@@ -108,16 +102,6 @@ class _DispatchAgentScenario with AgentScenarioCleanupMixin
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) => 'sys';
-
-  @override
-  Future<List<String>> getMemories() async => const [];
-
-  @override
-  Future<MemoryPatchResult> patchMemory(int? index, String newText) async =>
-      MemoryPatchResult.error('not available', const []);
-
-  @override
-  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
 
   @override
   Future<String> executeTool(
@@ -138,8 +122,7 @@ class _DispatchAgentScenario with AgentScenarioCleanupMixin
       start: start,
       end: end,
     ));
-    final result = toolResults[name] ?? {'ok': true};
-    return _encodeJson(result);
+    return _encodeJson({'ok': true});
   }
 }
 

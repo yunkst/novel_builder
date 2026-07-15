@@ -21,6 +21,7 @@ import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
+import '../../../helpers/fake_agent_scenario.dart';
 import '../../../helpers/noop_llm_http_client.dart';
 
 // ---------------------------------------------------------------------------
@@ -91,15 +92,12 @@ class ScriptedResponse {
 }
 
 /// 记录工具调用、可注入延时的假场景
-class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario {
+class FakeAgentScenario extends BaseFakeAgentScenario {
   @override
   final String id = 'fake';
 
   @override
   final String displayName = 'Fake Scenario';
-
-  @override
-  final List<Map<String, dynamic>> tools = const [];
 
   /// 每次工具执行前的延时（模拟慢工具）
   final Duration? toolDelay;
@@ -117,16 +115,6 @@ class FakeAgentScenario with AgentScenarioCleanupMixin implements AgentScenario 
 
   @override
   String buildSystemPrompt(AgentScenarioContext context) => 'system-prompt';
-
-  @override
-  Future<List<String>> getMemories() async => const [];
-
-  @override
-  Future<MemoryPatchResult> patchMemory(int? index, String newText) async =>
-      MemoryPatchResult.error('not available', const []);
-
-  @override
-  Future<String?> onNoToolCalls(List<ChatMessage> messages) async => null;
 
   @override
   Future<String> executeTool(
