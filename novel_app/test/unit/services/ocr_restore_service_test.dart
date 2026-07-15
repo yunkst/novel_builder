@@ -51,6 +51,20 @@ void main() {
       expect(r.text, '□字');
       expect(r.decodedCount, 1);
     });
+
+    test('重复 PUA：decodedCount 按码点去重，decodedRatio 不超 1.0', () async {
+      final svc = _buildService(
+        renderPua: (cp, _) async => 'mock_$cp',
+        recognizeImage: (_) async => '字',
+      );
+      // 同一 PUA 0xE3E8 出现两次
+      final text = '前${String.fromCharCode(0xE3E8)}中${String.fromCharCode(0xE3E8)}后';
+      final r = await svc.restorePuaInText(text, 'F');
+      expect(r.totalPuaCount, 1);       // 去重 1 个码点
+      expect(r.decodedCount, 1);        // 码点维度，不重复计
+      expect(r.decodedRatio, 1.0);      // 不超 1.0
+      expect(r.text, '前字中字后');      // 两次出现都替换
+    });
   });
 
   group('verifyFontFamily', () {

@@ -77,13 +77,11 @@ class OcrRestoreService {
     }
 
     final sb = StringBuffer();
-    int decoded = 0;
     for (final r in text.runes) {
       if (isPua(r)) {
         final d = puaToChar[r] ?? '';
         if (d.isNotEmpty) {
           sb.write(d);
-          decoded++;
         } else {
           sb.write('□');
         }
@@ -91,6 +89,9 @@ class OcrRestoreService {
         sb.writeCharCode(r);
       }
     }
+    // decodedCount 改码点维度：成功识别的不同 PUA 码点数（与 totalPuaCount 同维度），
+    // 避免高频字（如"的"）多次出现导致 decodedRatio > 1.0 违反成功率语义。
+    final decoded = puaToChar.values.where((v) => v.isNotEmpty).length;
     return OcrRestoreResult(sb.toString(), decoded, puaCodepoints.length);
   }
 
