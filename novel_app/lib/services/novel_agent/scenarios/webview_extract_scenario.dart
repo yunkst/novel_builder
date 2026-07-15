@@ -7,15 +7,21 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/core/providers/extraction_task_providers.dart';
 import 'package:novel_app/core/providers/webview_add_novel_providers.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
+import 'package:novel_app/repositories/site_script_repository.dart';
+import 'package:novel_app/services/headless_webview_pool.dart';
 import 'package:novel_app/services/logger_service.dart';
+import 'package:novel_app/services/ocr_render_js.dart';
+import 'package:novel_app/services/ocr_restore_service.dart';
 
 import '../agent_scenario.dart';
+import '../tool_arg_parser.dart';
 import 'run_store.dart';
 import 'webview_js_executor.dart';
 
@@ -1080,255 +1086,418 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     });
   }
 
-  /// 保存提取脚本到数据库
+  /// 保存提取脚本到数据库。
   ///
-  /// ## 双模式
+  /// ## 设计（落库前强制验证）
   ///
-  /// ### run_id 模式（新，推荐）
-  /// - 传 `list_run_id` + `content_run_id`，从 RunStore 取已验证的脚本存库
-  /// - **零重传**——脚本内容不经过 LLM 上下文
-  /// - 保存的版本天然与测试版本一致（引用同一 RunStore 记录）
+  /// 旧逻辑：直接读 RunStore 脚本 → 校验 → 一次 upsertByDomain 写两段。
+  /// 新逻辑：分次保存（scheme/agent 协议决定），每次 save_script 只存**一种**
+  /// script_type，且**必须**先在 test_url 上跑通验证脚本（含 OCR 验证 if ocr=true），
+  /// 再调用 `updateScriptPart` 落库。
   ///
-  /// ### 旧模式（兼容）
-  /// - 传 `domain` + `chapter_list_js` + `chapter_content_js` 完整脚本
-  /// - 校验 `{{URL}}` 占位符后存库
-  /// - 向后兼容现有测试和旧 AI 行为
-  /// 保存脚本后通知 UI 失效重读
+  /// 业务流程拆解：
+  /// 1. agent 用 `execute_js(script=...)` 测试 → 返回 `__meta.run_id`
+  /// 2. agent 用 `save_script(domain, run_id, script_type=chapter_list, test_url, ocr)`
+  ///    → 后端加载 test_url → 跑脚本 → 结构校验 → （ocr=true 时）OCR 验证 →
+  ///    `updateScriptPart(domain, script_type=chapter_list, ...)` 落库
+  /// 3. 同理 chapter_content 走第二步
+  /// 4. 同一 domain 的两次 save_script ocr 值必须一致（ToolSchema 语义约束）
   ///
-  /// `_saveScript` 直接 `db.insert('site_scripts')` 写库，绕过了 Provider 状态管理。
-  /// 若不主动失效，三个 UI 入口都看不到新脚本：
-  /// - 脚本管理面板（`siteScriptListProvider`，StateNotifier 仅初始化加载一次）
-  /// - 「添加小说」FAB（`webviewCurrentSiteScriptProvider`，FutureProvider 仅在
-  ///   URL host 变化时重查；agent 写库后 URL 未变，不会自动失效）
+  /// ## 测试入口
   ///
-  /// 因此在每次 insert 成功后调用本方法：
-  /// - `refresh()` 让脚本管理面板重新 `getAll()`
-  /// - `invalidate()` 强制 FAB 按钮按当前域名重查，立即出现
+  /// 核心验证流程已抽成 static [validateAndPersistScript]，
+  /// 单测通过 mock SiteScriptRepository / OcrRestoreService 注入 jsResult 覆盖。
+  /// executor 自身（涉及 HeadlessWebViewPool 平台依赖）只能走集成测试。
   void _notifyScriptSaved() {
     _ref.read(siteScriptListProvider.notifier).refresh();
     _ref.invalidate(webviewCurrentSiteScriptProvider);
   }
 
+  /// save_script：按 script_type 分次保存，落库前强制试运行验证。
+  ///
+  /// 流程：
+  /// 1. 解析参数（domain/run_id/script_type/test_url/ocr）
+  /// 2. RunStore.get(run_id) 取脚本
+  /// 3. acquire HeadlessWebViewPool → loadPage(test_url) → callAsyncJavaScript(script)
+  /// 4. 结构校验（按 script_type）
+  /// 5. ocr=true → OcrRestoreService 验证（verifyFontFamily + restorePuaInText + readableRatio）
+  /// 6. 全通过 → updateScriptPart 落库；失败返回诊断 JSON
+  ///
+  /// 核心校验逻辑在 [validateAndPersistScript]（静态，可单测）；
+  /// 本方法负责参数解析 + WebView 执行 + 异常映射。
   Future<String> _saveScript(Map<String, dynamic> args) async {
-    final listRunId = args['list_run_id'] as String?;
-    final contentRunId = args['content_run_id'] as String?;
-    final domain = args['domain'] as String?;
-    final urlPattern = args['url_pattern'] as String? ?? '';
+    final parser = ToolArgParser(args);
+    final (domain, e1) = parser.requireString('domain');
+    final (runId, e2) = parser.requireString('run_id');
+    final (scriptType, e3) = parser.requireString('script_type');
+    final (testUrl, e4) = parser.requireString('test_url');
+    final (ocr, e5) = parser.requireBool('ocr');
 
-    // ── run_id 模式 ──
-    if (listRunId != null && contentRunId != null) {
-      // 取 RunStore 中的脚本内容
-      final listEntry = _runStore.get(listRunId);
-      final contentEntry = _runStore.get(contentRunId);
+    for (final err in [e1, e2, e3, e4, e5]) {
+      if (err != null) return err; // 参数错误直接返回（错误 JSON 已构造好）
+    }
 
-      // 逐个检查缺失
-      final missing = <String, String>{};
-      if (listEntry == null) {
-        missing['list_run_id'] = listRunId;
-      }
-      if (contentEntry == null) {
-        missing['content_run_id'] = contentRunId;
-      }
-      if (domain == null || domain.isEmpty) {
-        missing['domain'] = 'domain 参数缺失或为空';
-      }
-
-      if (missing.isNotEmpty) {
-        final msg = missing.containsKey('domain')
-            ? '缺少 domain 参数'
-            : 'RunStore 中未找到以下 run_id（可能已被淘汰）: ${missing.keys.join(", ")}';
-        return jsonEncode({
-          'error': 'run_id',
-          'message': msg,
-          'missing_run_ids': missing,
-          'store_size': _runStore.length,
-          'suggestion': missing.containsKey('domain')
-              ? '请传入 save_script(domain, list_run_id, content_run_id) 中的 domain 参数'
-              : '用 execute_js(script=...) 重新执行脚本获取新的 run_id，然后调用 save_script(list_run_id=..., content_run_id=...)',
-        });
-      }
-
-      final chapterListJs = listEntry!.script;
-      final chapterContentJs = contentEntry!.script;
-
-      // 校验（RunStore 中的脚本应该已通过校验，但加一层防御）
-      final listVal = WebViewJsExecutor.validateScript(chapterListJs);
-      if (listVal != null) {
-        return jsonEncode({
-          'error': 'SCRIPT_VALIDATION_FAILED',
-          'message': 'RunStore 中的目录脚本校验失败（数据不一致，请用 script 模式重新生成）',
-          'script_type': 'chapter_list_js',
-          'run_id': listRunId,
-          'validation_error': listVal,
-        });
-      }
-      final contentVal = WebViewJsExecutor.validateScript(chapterContentJs);
-      if (contentVal != null) {
-        return jsonEncode({
-          'error': 'SCRIPT_VALIDATION_FAILED',
-          'message': 'RunStore 中的内容脚本校验失败（数据不一致，请用 script 模式重新生成）',
-          'script_type': 'chapter_content_js',
-          'run_id': contentRunId,
-          'validation_error': contentVal,
-        });
-      }
-
-      String id;
-      bool isInsert;
-      try {
-        final siteScriptRepo = _ref.read(siteScriptRepositoryProvider);
-        final result = await siteScriptRepo.upsertByDomain(
-          domain: domain!, // 已通过上面的 missing 检查保证非空
-          chapterListJs: chapterListJs,
-          chapterContentJs: chapterContentJs,
-          urlPattern: urlPattern,
-          sampleUrl: _currentUrl,
-        );
-        id = result.id;
-        isInsert = result.isInsert;
-      } catch (e, stackTrace) {
-        LoggerService.instance.e(
-          '保存脚本到数据库失败 (run_id模式): domain=$domain - $e',
-          stackTrace: stackTrace.toString(),
-          category: LogCategory.database,
-          tags: ['agent', 'webview-extract', 'save_script', 'db_error'],
-        );
-        return jsonEncode({
-          'error': 'DB_SAVE_FAILED',
-          'message': '保存脚本到数据库失败: $e',
-          'domain': domain,
-          'suggestion': '数据库可能被锁，请重试 save_script',
-        });
-      }
-
-      _scriptSavedThisSession = true;
-      _notifyScriptSaved();
-
-      LoggerService.instance.i(
-        '保存提取脚本 (run_id 模式): domain=$domain, id=$id, isInsert=$isInsert, listId=$listRunId, contentId=$contentRunId',
-        category: LogCategory.ai,
-        tags: ['agent', 'webview-extract', 'save_script', 'run_id', isInsert ? 'insert' : 'update'],
-      );
-
+    if (scriptType != 'chapter_list' && scriptType != 'chapter_content') {
       return jsonEncode({
-        'success': true,
-        'id': id,
-        'domain': domain,
-        'message': isInsert
-            ? '脚本已保存（通过 run_id 引用，测试版本与保存版本一致）'
-            : '脚本已更新（覆盖同域名旧版本，verified 已重置）',
-        'source_run_ids': {'list': listRunId, 'content': contentRunId},
-        if (!isInsert) 'note': 'verified 已重置为 0，新脚本需重新验证',
+        'error': 'invalid_script_type',
+        'message': 'script_type 必须是 chapter_list 或 chapter_content',
+        'received': scriptType,
       });
     }
 
-    // ── 旧模式（兼容）：传完整脚本 ──
-    final chapterListJs = args['chapter_list_js'] as String?;
-    final chapterContentJs = args['chapter_content_js'] as String?;
-
-    // 逐个检查，精确报告缺失字段
-    final missing = <String>[];
-    if (domain == null || domain.isEmpty) missing.add('domain');
-    if (chapterListJs == null || chapterListJs.isEmpty) {
-      missing.add('chapter_list_js');
-    }
-    if (chapterContentJs == null || chapterContentJs.isEmpty) {
-      missing.add('chapter_content_js');
-    }
-    if (missing.isNotEmpty) {
+    // 取脚本
+    final entry = _runStore.get(runId);
+    if (entry == null) {
       return jsonEncode({
-        'error': 'missing_param',
-        'message': '缺少必需的参数: ${missing.join(", ")}',
-        'missing': missing,
-        'received_keys': args.keys.toList(),
-        'suggestion':
-            missing.contains('domain') && listRunId == null
-                ? '请补充 domain 参数。或使用 run_id 模式：save_script(list_run_id=..., content_run_id=...)+domain'
-                : listRunId != null
-                    ? '请补充所有必需的 run_id 参数（list_run_id + content_run_id + domain）'
-                    : '请补充缺失参数。注意字段名是下划线格式: domain / chapter_list_js / chapter_content_js',
+        'success': false,
+        'reason': 'run_id_not_found',
+        'message': 'RunStore 中未找到 run_id（可能已被淘汰）',
+        'run_id': runId,
+        'store_size': _runStore.length,
+        'suggestion': '用 execute_js(script=...) 重新执行脚本获取新 run_id',
       });
     }
+    final scriptJs = entry.script;
 
-    // 防呆校验：目录脚本
-    final listValidation = WebViewJsExecutor.validateScript(chapterListJs!);
-    if (listValidation != null) {
-      LoggerService.instance.w(
-        '保存时目录脚本校验失败: $listValidation',
-        category: LogCategory.ai,
-        tags: ['agent', 'webview-extract', 'save_script', 'validation'],
-      );
-      return jsonEncode({
-        'error': 'SCRIPT_VALIDATION_FAILED',
-        'message': '目录脚本校验失败',
-        'script_type': 'chapter_list_js',
-        'validation_error': listValidation,
-        'suggestion': listValidation,
-      });
-    }
-
-    // 防呆校验：内容脚本
-    final contentValidation = WebViewJsExecutor.validateScript(chapterContentJs!);
-    if (contentValidation != null) {
-      LoggerService.instance.w(
-        '保存时内容脚本校验失败: $contentValidation',
-        category: LogCategory.ai,
-        tags: ['agent', 'webview-extract', 'save_script', 'validation'],
-      );
-      return jsonEncode({
-        'error': 'SCRIPT_VALIDATION_FAILED',
-        'message': '内容脚本校验失败',
-        'script_type': 'chapter_content_js',
-        'validation_error': contentValidation,
-        'suggestion': contentValidation,
-      });
-    }
-
-    // {{URL}} 占位符原样存入数据库，不做替换
-    String id;
-    bool isInsert;
+    // acquire pool 跑脚本
+    InAppWebViewController? controller;
     try {
-      final siteScriptRepo = _ref.read(siteScriptRepositoryProvider);
-      final result = await siteScriptRepo.upsertByDomain(
-        domain: domain!, // 已通过上面的 missing 检查保证非空
-        chapterListJs: chapterListJs,
-        chapterContentJs: chapterContentJs,
-        urlPattern: urlPattern,
-        sampleUrl: _currentUrl,
+      final pool = _ref.read(headlessWebViewPoolProvider);
+      controller = await pool.acquire();
+
+      // 加载 test_url（pool controller 无 onLoadStop 注册，用 URL 轮询等待）
+      await controller.loadUrl(urlRequest: URLRequest(url: WebUri(testUrl)));
+      await _waitControllerForUrl(controller, testUrl);
+
+      // 替换 {{URL}} → test_url（提取脚本约定含 {{URL}}）
+      final resolved = scriptJs.replaceAll('{{URL}}', testUrl);
+      final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(resolved);
+      final result = await controller
+          .callAsyncJavaScript(functionBody: functionBody)
+          .timeout(const Duration(seconds: 60));
+      if (result == null || result.error != null) {
+        return jsonEncode({
+          'success': false,
+          'reason': 'js_execute_failed',
+          'diagnostic': '脚本在 test_url 上执行失败',
+          'js_error': result?.error?.toString(),
+          'suggestion': '检查脚本选择器是否匹配该页面，或页面是否需要等待加载',
+        });
+      }
+      final jsonStr = WebViewJsExecutor.stringifyJsResult(result.value);
+      final jsResult = jsonDecode(jsonStr);
+
+      // 构造 OcrRestoreService（ocr=true 时通过 pool controller 渲染 PUA）
+      final OcrRestoreService? restoreService = ocr
+          ? OcrRestoreService(
+              _ref,
+              (cp, ff) => _renderPuaViaController(controller!, cp, ff),
+            )
+          : null;
+
+      // 委托静态校验 + 落库（可单测）
+      final outcome = await validateAndPersistScript(
+        domain: domain,
+        scriptType: scriptType,
+        ocr: ocr,
+        scriptJs: scriptJs,
+        jsResult: jsResult,
+        repo: _ref.read(siteScriptRepositoryProvider),
+        restoreService: restoreService,
       );
-      id = result.id;
-      isInsert = result.isInsert;
+
+      if (outcome['success'] == true) {
+        _scriptSavedThisSession = true;
+        _notifyScriptSaved();
+      }
+      return jsonEncode(outcome);
+    } on TimeoutException {
+      return jsonEncode({
+        'success': false,
+        'reason': 'test_timeout',
+        'message': '脚本在 test_url 上执行超时（60s）',
+        'suggestion': '脚本可能卡在翻页/等待，检查 setTimeout 和翻页逻辑',
+      });
     } catch (e, stackTrace) {
       LoggerService.instance.e(
-        '保存脚本到数据库失败 (兼容模式): domain=$domain - $e',
+        'save_script 验证异常: domain=$domain - $e',
         stackTrace: stackTrace.toString(),
-        category: LogCategory.database,
-        tags: ['agent', 'webview-extract', 'save_script', 'db_error'],
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'error'],
       );
       return jsonEncode({
-        'error': 'DB_SAVE_FAILED',
-        'message': '保存脚本到数据库失败: $e',
-        'domain': domain,
-        'suggestion': '数据库可能被锁，请重试 save_script',
+        'success': false,
+        'reason': 'internal_error',
+        'message': '$e',
       });
+    } finally {
+      if (controller != null) {
+        _ref.read(headlessWebViewPoolProvider).release();
+      }
+    }
+  }
+
+  /// 在 pool controller 上轮询等待页面 URL 匹配 [targetUrl]。
+  ///
+  /// HeadlessWebViewPool 的 WebView 构造时**未注册 onLoadStop**（_ensureReady
+  /// 用 `HeadlessInAppWebView(onWebViewCreated: ...)` 无 onLoadStop 参数），
+  /// 因此 WebViewPageLoader 的事件驱动等待在此不可用，沿用 getUrl 字符串轮询。
+  /// 超时信任 loadUrl 调用本身（同 [_ensureHeadlessPageLoaded] 的 trustOnTimeout 策略）。
+  Future<void> _waitControllerForUrl(
+    InAppWebViewController controller,
+    String targetUrl,
+  ) async {
+    final start = DateTime.now();
+    while (DateTime.now().difference(start) < _pageLoadTimeout) {
+      await Future.delayed(_pollInterval);
+      try {
+        final current = await controller.getUrl();
+        if (current != null && current.toString() == targetUrl) {
+          await Future.delayed(_domStabilizeDelay);
+          return;
+        }
+      } catch (_) {
+        // 轮询getUrl 偶尔失败继续等
+      }
+    }
+    // 超时不抛：Headless WebView getUrl 在某些平台不更新，信任 loadUrl 调用
+    LoggerService.instance.w(
+      'save_script: test_url 轮询等待超时，信任 loadUrl 调用 url=$targetUrl',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'save_script', 'page-wait-timeout'],
+    );
+    await Future.delayed(_headlessTrustDelay);
+  }
+
+  /// 通过 pool controller 跑 OCR-JS（渲染单个 PUA 码点 → base64 PNG）。
+  ///
+  /// 复用 [buildOcrRenderJs]（系统内置 OCR-JS 模板），
+  /// 返回 base64 字符串（不带 `data:image/png;base64,` 前缀）。
+  ///
+  /// 抛异常：[TimeoutException]（>30s）或脚本执行错误。
+  Future<String> _renderPuaViaController(
+    InAppWebViewController controller,
+    int codepoint,
+    String fontFamily,
+  ) async {
+    final js = buildOcrRenderJs(codepoint, fontFamily);
+    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
+    final result = await controller
+        .callAsyncJavaScript(functionBody: functionBody)
+        .timeout(const Duration(seconds: 30));
+    if (result == null || result.error != null) {
+      throw Exception(
+        'OCR 渲染失败 cp=0x${codepoint.toRadixString(16)}: ${result?.error}',
+      );
+    }
+    final value = result.value;
+    if (value is String) return value; // base64 字符串，原样返回
+    throw Exception('OCR 渲染返回非字符串: $value');
+  }
+
+  /// 验证脚本结果并落库（可单测，绕开 WebView 平台依赖）。
+  ///
+  /// 接收"已执行的 JS 结果"（jsResult，由 executor 通过 callAsyncJavaScript
+  /// 调用并 jsonDecode 后传入），完成：
+  /// 1. 结构校验（[_validateScriptResult]）
+  /// 2. ocr=true → OCR 验证（[_validateOcr]）
+  /// 3. 全通过 → [SiteScriptRepository.updateScriptPart] 落库
+  ///
+  /// 返回值（始终为 Map，executor 再 jsonEncode）：
+  /// - 失败：`{success: false, reason, diagnostic, suggestion, ...}`
+  /// - 成功：`{success: true, domain, script_type, ocr, [ocr_applied], ...}`
+  @visibleForTesting
+  static Future<Map<String, dynamic>> validateAndPersistScript({
+    required String domain,
+    required String scriptType,
+    required bool ocr,
+    required String scriptJs,
+    required dynamic jsResult,
+    required SiteScriptRepository repo,
+    OcrRestoreService? restoreService,
+  }) async {
+    // 1. 结构校验
+    final structErr = _validateScriptResult(jsResult, scriptType, ocr);
+    if (structErr != null) {
+      return {
+        'success': false,
+        ...structErr,
+        'returned_sample': _sample(jsResult),
+      };
     }
 
-    _scriptSavedThisSession = true;
-    _notifyScriptSaved();
+    // 2. OCR 验证（ocr=true 时强制走）
+    if (ocr) {
+      if (restoreService == null) {
+        return {
+          'success': false,
+          'reason': 'restore_service_missing',
+          'diagnostic': 'ocr=true 但 restoreService 未注入（实现错误）',
+        };
+      }
+      final fontFamily = _extractFontFamily(jsResult);
+      final ocrErr =
+          await _validateOcr(restoreService, fontFamily, jsResult, scriptType);
+      if (ocrErr != null) {
+        return {'success': false, ...ocrErr};
+      }
+    }
 
-    LoggerService.instance.i(
-      '保存提取脚本 (旧模式): domain=$domain, id=$id, isInsert=$isInsert',
-      category: LogCategory.ai,
-      tags: ['agent', 'webview-extract', 'save_script', 'legacy', isInsert ? 'insert' : 'update'],
+    // 3. 落库
+    final saveResult = await repo.updateScriptPart(
+      domain: domain,
+      scriptType: scriptType,
+      scriptJs: scriptJs,
+      ocr: ocr,
     );
+    if (!saveResult.success) {
+      return {
+        'success': false,
+        'reason': saveResult.reason ?? 'unknown',
+        'domain': domain,
+        'suggestion': '先调用 save_script(script_type=chapter_list) 建立该 domain 记录，'
+            '再调 chapter_content（updateScriptPart 不自动 create）',
+      };
+    }
 
-    return jsonEncode({
+    return {
       'success': true,
-      'id': id,
       'domain': domain,
-      'message': isInsert ? '脚本已保存' : '脚本已更新（覆盖同域名旧版本，verified 已重置）',
-      if (!isInsert) 'note': 'verified 已重置为 0，新脚本需重新验证',
-    });
+      'script_type': scriptType,
+      'ocr': ocr,
+      'id': saveResult.id,
+      if (ocr) 'ocr_applied': true,
+    };
+  }
+
+  /// 结构校验：返回 null 表示通过，否则返回含 reason/diagnostic/suggestion 的 map。
+  ///
+  /// chapter_list 校验：`chapters` 必须是非空 List，每项 title/url 非空。
+  /// chapter_content 校验：`content` 长度 >= 50；ocr=true 时 `font_family` 非空。
+  static Map<String, dynamic>? _validateScriptResult(
+    dynamic data,
+    String scriptType,
+    bool ocr,
+  ) {
+    if (data is! Map) {
+      return {
+        'reason': 'invalid_structure',
+        'diagnostic': '脚本返回非对象（期望 {title, content/chapters}）',
+        'suggestion': '脚本最后应 return JSON.stringify({title:..., content:...})',
+      };
+    }
+
+    if (scriptType == 'chapter_list') {
+      final chapters = data['chapters'];
+      if (chapters is! List || chapters.isEmpty) {
+        return {
+          'reason': 'chapters_empty',
+          'diagnostic': 'chapters 为空或非数组',
+          'suggestion': '检查目录选择器是否匹配到章节列表',
+        };
+      }
+      for (final c in chapters) {
+        if (c is! Map ||
+            ((c['title'] as String?) ?? '').isEmpty ||
+            ((c['url'] as String?) ?? '').isEmpty) {
+          return {
+            'reason': 'chapter_missing_field',
+            'diagnostic': '某 chapter 缺少 title 或 url',
+            'suggestion': '每个 chapter 必须有非空 title 和 url',
+          };
+        }
+      }
+      return null;
+    }
+
+    // chapter_content
+    final content = ((data['content'] as String?) ?? '').trim();
+    if (content.length < 50) {
+      return {
+        'reason': 'content_too_short',
+        'diagnostic': 'content 长度 ${content.length} < 50，可能选择器没匹配正文',
+        'suggestion': '检查正文选择器，或等待页面加载完成再提取',
+      };
+    }
+    if (ocr) {
+      final ff = _extractFontFamily(data);
+      if (ff.isEmpty) {
+        return {
+          'reason': 'font_family_missing',
+          'diagnostic': 'OCR 模式下 chapter_content 脚本必须返回 font_family',
+          'suggestion': '在脚本里加 const ff = getComputedStyle(正文元素).fontFamily; '
+              '返回 {title, content, font_family: ff}',
+        };
+      }
+    }
+    return null;
+  }
+
+  /// OCR 验证：字体有效性 + PUA 还原 + 可读率/解码率达标。
+  ///
+  /// 返回 null 表示通过；否则返回含 reason 的诊断 map（均带 ocr_applied=true）。
+  ///
+  /// 1. `verifyFontFamily` 失败 → `font_family_invalid`
+  /// 2. `restorePuaInText` 后 `readableRatio < 0.85` → `readable_ratio_below_threshold`
+  /// 3. 有 PUA 但 `decodedRatio < 0.8` → `decoded_ratio_below_threshold`
+  static Future<Map<String, dynamic>?> _validateOcr(
+    OcrRestoreService svc,
+    String fontFamily,
+    dynamic data,
+    String scriptType,
+  ) async {
+    if (!await svc.verifyFontFamily(fontFamily)) {
+      return {
+        'reason': 'font_family_invalid',
+        'ocr_applied': true,
+        'font_family': fontFamily,
+        'diagnostic': '该 font_family 渲染不同 PUA 产生相同占位框，字体族名无效或未加载',
+        'suggestion': '确认 getComputedStyle 取的是正文元素且字体已加载；检查 font-family 值',
+      };
+    }
+
+    // 拼接待还原文本：content 或 title+chapters[].title
+    final textToRestore = scriptType == 'chapter_content'
+        ? ((data['content'] as String?) ?? '')
+        : '${data['title'] ?? ''} ${(data['chapters'] as List?)?.map((c) => c['title'] ?? '').join(' ')}';
+
+    final restored = await svc.restorePuaInText(textToRestore, fontFamily);
+    final ratio = svc.readableRatio(restored.text);
+    if (ratio < 0.85) {
+      return {
+        'reason': 'readable_ratio_below_threshold',
+        'ocr_applied': true,
+        'readable_ratio': ratio,
+        'decoded_ratio': restored.decodedRatio,
+        'diagnostic': 'OCR 还原后 CJK 占比过低，font_family 可能无效或模型解码失败',
+        'suggestion': '检查 font_family 是否正确（用 getComputedStyle(正文元素).fontFamily）',
+      };
+    }
+    if (restored.totalPuaCount > 0 && restored.decodedRatio < 0.8) {
+      return {
+        'reason': 'decoded_ratio_below_threshold',
+        'ocr_applied': true,
+        'decoded_ratio': restored.decodedRatio,
+        'total_pua': restored.totalPuaCount,
+        'diagnostic': 'PUA 识别成功率 < 80%',
+        'suggestion': '模型对该字体解码效果差，可考虑 LLM 兜底（非本期）',
+      };
+    }
+    return null; // 通过
+  }
+
+  /// 从 jsResult 中取 font_family（snake/camel 兜底）。
+  static String _extractFontFamily(dynamic data) {
+    if (data is! Map) return '';
+    final v = data['font_family'] ?? data['fontFamily'];
+    if (v is! String) return '';
+    return v.trim();
+  }
+
+  /// 截取结果摘要（最多 200 字），用于诊断返回。
+  static String _sample(dynamic data) {
+    final s = data.toString();
+    return s.length > 200 ? '${s.substring(0, 200)}...' : s;
   }
 
   /// 列出所有已保存脚本
@@ -1651,12 +1820,11 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     'type': 'function',
     'function': {
       'name': 'save_script',
-      'description':
-          '保存提取脚本到本地数据库。'
-          '支持两种模式：\n'
-          '  1. **run_id 模式**（推荐，零重传）：save_script(domain, list_run_id, content_run_id)。'
-          '从 RunStore 引用已测试通过的脚本，保存版本与测试版本天然一致。\n'
-          '  2. **旧模式**（兼容）：传 domain + chapter_list_js + chapter_content_js 完整脚本。',
+      'description': '保存提取脚本到本地数据库（按脚本类型分次保存，落库前强制试运行验证）。'
+          '工作流程：headless WebView 打开 test_url -> 运行 run_id 指向的 JS -> '
+          '校验结果结构 -> 若 ocr=true 走 OCR 还原 -> 全部通过才落库。'
+          '验证失败时返回诊断信息指导你修改 JS，不落库。'
+          '完整提取器需调用两次：一次 script_type=chapter_list，一次 script_type=chapter_content。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -1664,30 +1832,34 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
             'type': 'string',
             'description': '网站域名',
           },
-          'list_run_id': {
+          'run_id': {
             'type': 'string',
-            'description':
-                '【run_id 模式】目录提取脚本在 RunStore 中的 run_id（exec_xxx）。'
-                '从之前 execute_js 调用的 __meta.run_id 获取。',
+            'description': '脚本在 RunStore 中的 run_id（exec_xxx），'
+                '从之前 execute_js 调用的 __meta.run_id 获取。'
+                '必须是你已测试通过的脚本，save_script 会用它做落库前验证。',
           },
-          'content_run_id': {
+          'script_type': {
             'type': 'string',
-            'description':
-                '【run_id 模式】内容提取脚本在 RunStore 中的 run_id（exec_xxx）。',
+            'enum': ['chapter_list', 'chapter_content'],
+            'description': '保存的脚本类型。chapter_list 返回 {title, chapters:[{title,url}]}；'
+                'chapter_content 返回 {title, content, font_family}（OCR 模式需 font_family）。',
           },
-          'chapter_list_js': {
+          'test_url': {
             'type': 'string',
-            'description': '【旧模式】目录提取 JS 脚本（完整内容）。',
+            'description': '验证用页面 URL。chapter_list 用目录页 URL，'
+                'chapter_content 用章节内容页 URL。save_script 会真实加载该 URL 跑 JS 做验证。',
           },
-          'chapter_content_js': {
-            'type': 'string',
-            'description': '【旧模式】内容提取 JS 脚本（完整内容）。',
-          },
-          'url_pattern': {
-            'type': 'string',
-            'description': 'URL 模式正则（可选，用于匹配目录页URL）',
+          'ocr': {
+            'type': 'boolean',
+            'description': '该站点是否需要 OCR 后处理（字体反爬）。'
+                '判定依据：DOM 文本含大量 PUA 码点（U+E000-F8FF），'
+                '或 @font-face 引用第三方 CDN 自定义字体绑定到正文/标题元素。'
+                '对 chapter_content：还原 content 里的 PUA；'
+                '对 chapter_list：还原 title 字段里的 PUA（小说名 + 章名）。'
+                '同一站点的两次 save_script（list + content）必须传相同的 ocr 值。',
           },
         },
+        'required': ['domain', 'run_id', 'script_type', 'test_url', 'ocr'],
       },
     },
   };
