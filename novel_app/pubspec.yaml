@@ -114,9 +114,6 @@ dependencies:
   yaml: ^3.1.2
   jinja: ^0.6.6
 
-  # OCR PoC：章节截图识别（仅 main_ocr_test.dart 使用）
-  google_mlkit_text_recognition: ^0.13.0
-
   # OCR PoC：PP-OCRv6 离线识别（仅 main_ppocr_demo.dart 使用）
   flutter_onnxruntime: ^1.6.0
   image: ^4.3.0

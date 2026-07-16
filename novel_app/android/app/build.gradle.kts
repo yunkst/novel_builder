@@ -82,9 +82,3 @@ android {
 flutter {
     source = "../.."
 }
-
-dependencies {
-    // ML Kit 中文 OCR 模型（google_mlkit_text_recognition 默认只捆绑拉丁文，
-    // TextRecognitionScript.chinese 需要这个类，否则 NoClassDefFoundError）
-    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
-}
