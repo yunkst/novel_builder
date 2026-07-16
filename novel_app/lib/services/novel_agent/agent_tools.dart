@@ -624,15 +624,15 @@ class AgentTools {
     'function': {
       'name': 'update_outline',
       'description':
-          '对当前小说的大纲做精确字符串替换（局部修改）。'
-          '调用前必须先用 get_outline 读取大纲，未读过会报 outline_not_read。\n'
+          '对当前小说的大纲做精确字符串替换（局部修改）。\n'
           '参数说明：\n'
-          '- oldString：要被替换的原文（必须与 get_outline 返回的 content 中的片段一致）。\n'
+          '- oldString：要被替换的原文（建议先 get_outline 拿到当前 content，逐字复制其中片段，避免用臆测内容匹配失败）。\n'
           '- newString：替换后的内容（必须与 oldString 不同）。\n'
           '- replaceAll：可选，默认 false。true 表示替换所有匹配；false 时若 oldString 在大纲中出现多次会报 ambiguous_match。\n'
           '失败情况：\n'
           '- oldString 找不到 → not_found。请用 get_outline 返回的原文，逐字复制（含缩进）。\n'
           '- oldString 多处且未设 replaceAll=true → ambiguous_match。请补更多上下文行让匹配唯一，或设 replaceAll=true。\n'
+          '- 大纲不存在 → not_found，请改用 write_outline 创建。\n'
           '- 想整篇重写或新建大纲，请改用 write_outline。',
       'parameters': {
         'type': 'object',

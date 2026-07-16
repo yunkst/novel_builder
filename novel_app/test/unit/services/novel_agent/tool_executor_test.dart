@@ -1383,11 +1383,12 @@ void main() {
   // update_outline (edit 风格)
   // ========================================================================
   group('update_outline', () {
-    test('未先 get_outline → outline_not_read（引导先读）', () async {
+    test('未先 get_outline 也能 update 成功（已去掉 read-before-write 约束）', () async {
       final novelId = await insertNovel();
       await insertOutline(content: '原内容');
       final ctx = _ctx(novelId);
 
+      // 不调 get_outline，直接 update_outline
       final result = await executor.execute(
         'update_outline',
         {'oldString': '原内容', 'newString': '新内容'},
@@ -1395,8 +1396,12 @@ void main() {
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
 
-      expect(json['error'], 'outline_not_read');
-      expect(json['suggested_tool'], 'get_outline');
+      expect(json['success'], true);
+      expect(json['error'], isNull,
+          reason: '已去掉 outline_not_read 约束，未读也能 edit');
+
+      final outline = await outlineRepo.getOutlineByNovelUrl(defaultNovelUrl);
+      expect(outline!.content, '新内容');
     });
 
     test('先 get_outline 再 update_outline → 成功，DB 内容已替换', () async {
@@ -1491,7 +1496,7 @@ void main() {
     test('大纲不存在 → not_found，引导用 write_outline', () async {
       final novelId = await insertNovel();
       final ctx = _ctx(novelId);
-      // 跳过 get_outline 直接 update_outline
+      // 不调 get_outline 直接 update_outline（约束已去，能走到真正的 not_found 分支）
       final result = await executor.execute(
         'update_outline',
         {'oldString': 'A', 'newString': 'B'},
@@ -1499,7 +1504,8 @@ void main() {
       );
       final json = jsonDecode(result) as Map<String, dynamic>;
 
-      expect(json['error'], 'outline_not_read');
+      expect(json['error'], 'not_found');
+      expect(json['suggested_tool'], 'write_outline');
     });
 
     test('行 trim 容错：AI 漏了行尾空格仍能命中', () async {

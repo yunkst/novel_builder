@@ -5,9 +5,8 @@
 ///
 /// ★ 本类是 facade：负责 execute 入口（短路 / switch 分发 / try-catch），
 /// 把 21 个工具按业务域拆给 7 个子执行器。共享 helper 抽到
-/// [ToolExecutorHelpers] mixin；read-before-write 跨工具共享状态抽到
-/// [OutlineReadTracker]。所有子执行器懒创建（late final），避免构造时
-/// ref.read 触发副作用。
+/// [ToolExecutorHelpers] mixin。所有子执行器懒创建（late final），
+/// 避免构造时 ref.read 触发副作用。
 library;
 
 import 'dart:convert';
@@ -18,7 +17,6 @@ import '../logger_service.dart';
 import '../dsl_engine/llm_provider.dart' show kArgsParseErrorKey,
     kArgsParseErrorDetailKey, kArgsRawPreviewKey;
 import 'agent_scenario.dart';
-import 'outline_read_tracker.dart';
 import 'tool_executor/chapter_read_executor.dart';
 import 'tool_executor/chapter_write_executor.dart';
 import 'tool_executor/character_executor.dart';
@@ -29,20 +27,17 @@ import 'tool_executor/prompt_tag_executor.dart';
 import 'tool_executor_helpers.dart';
 
 class ToolExecutor with ToolExecutorHelpers {
-  ToolExecutor(this.ref) : _outlineReadTracker = OutlineReadTracker();
+  ToolExecutor(this.ref);
 
   @override
   final Ref ref;
-
-  /// 大纲 read-before-write 状态跟踪器（跨 update_outline/write_outline/get_outline 共享）
-  final OutlineReadTracker _outlineReadTracker;
 
   // 懒创建子执行器（避免构造时 Eager 触发 ref.read）
   late final _novelNav = NovelNavigationExecutor(ref);
   late final _chapterRead = ChapterReadExecutor(ref);
   late final _chapterWrite = ChapterWriteExecutor(ref);
   late final _character = CharacterExecutor(ref);
-  late final _outline = OutlineExecutor(ref, _outlineReadTracker);
+  late final _outline = OutlineExecutor(ref);
   late final _promptTag = PromptTagExecutor(ref);
   late final _media = MediaExecutor(ref);
 

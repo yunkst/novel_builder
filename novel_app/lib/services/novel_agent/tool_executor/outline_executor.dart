@@ -1,8 +1,5 @@
 /// 设定 / 大纲子执行器 — update_background_setting /
 /// update_outline / write_outline / get_outline
-///
-/// update_outline/write_outline/get_outline 三个工具共享
-/// [OutlineReadTracker] 的 read-before-write 状态（由 facade 注入）。
 library;
 
 import 'dart:convert';
@@ -14,15 +11,13 @@ import '../../../models/outline.dart';
 import '../../logger_service.dart';
 import '../tool_arg_parser.dart' show ToolArgParser;
 import '../agent_scenario.dart';
-import '../outline_read_tracker.dart';
 import '../outline_replacer.dart';
 import '../tool_executor_helpers.dart';
 
 class OutlineExecutor with ToolExecutorHelpers {
-  OutlineExecutor(this.ref, this._readTracker);
+  OutlineExecutor(this.ref);
   @override
   final Ref ref;
-  final OutlineReadTracker _readTracker;
 
   /// 读取当前小说的背景设定（get_background_setting 工具）
   ///
@@ -145,22 +140,6 @@ class OutlineExecutor with ToolExecutorHelpers {
     }
     final novelUrl = novelResolve.url!;
 
-    // read-before-write 校验：本循环内必须先 get_outline 读过大纲，
-    // 避免用 AI 脑海中的旧快照覆盖当前内容（与 opencode edit 的 FileTime 同源）。
-    if (!_readTracker.hasRead(novelUrl)) {
-      LoggerService.instance.d(
-        '工具引导错误: outline_not_read novelUrl=$novelUrl',
-        category: LogCategory.ai,
-        tags: ['agent', 'tool', 'update_outline', 'outline_not_read'],
-      );
-      return jsonEncode(guidanceError(
-        'outline_not_read',
-        '编辑大纲前请先调用 get_outline 读取当前内容。',
-        suggestedTool: 'get_outline',
-        suggestedArgs: const <String, dynamic>{},
-      ));
-    }
-
     final repo = ref.read(outlineRepositoryProvider);
     final outline = await repo.getOutlineByNovelUrl(novelUrl);
     if (outline == null) {
@@ -195,8 +174,6 @@ class OutlineExecutor with ToolExecutorHelpers {
       return jsonEncode({'error': errorCode, 'message': e.message});
     }
 
-    // 大纲已被改写，重新标记已读，避免连续编辑被拦截
-    _readTracker.markRead(novelUrl);
     LoggerService.instance.i('更新大纲: novelUrl=$novelUrl',
         category: LogCategory.ai, tags: ['agent', 'tool', 'update_outline']);
     return jsonEncode({'success': true, 'message': '大纲已更新'});
@@ -229,8 +206,6 @@ class OutlineExecutor with ToolExecutorHelpers {
       updatedAt: DateTime.now(),
     );
     await repo.saveOutline(outline);
-    // 整篇重写后同样标记已读，使后续 update_outline 可直接生效
-    _readTracker.markRead(novelUrl);
     LoggerService.instance.i('写入大纲: novelUrl=$novelUrl',
         category: LogCategory.ai, tags: ['agent', 'tool', 'write_outline']);
     return jsonEncode({'success': true, 'message': '大纲已保存'});
@@ -255,9 +230,7 @@ class OutlineExecutor with ToolExecutorHelpers {
       return jsonEncode({'error': 'not_found', 'message': '暂无大纲'});
     }
 
-    // 读成功后标记「已读」，供 update_outline 的 read-before-write 校验
-    _readTracker.markRead(novelUrl);
-
+    // 读成功后供 LLM 拿到当前大纲内容（用于后续 update_outline 的 oldString 参考）
     final novelContext = buildCurrentNovelContext(ctx);
     LoggerService.instance.i('获取大纲成功',
         category: LogCategory.ai, tags: ['agent', 'tool', 'get_outline']);
