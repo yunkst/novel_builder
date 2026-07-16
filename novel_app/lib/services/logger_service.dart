@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint, kReleaseMode;
@@ -225,6 +226,9 @@ class LoggerService {
   ///
   /// WARNING: 此方法仅用于单元测试，生产代码不应调用。
   static void resetForTesting() {
+    // 取消尚未 fire 的延迟持久化 timer，避免跨测试残留的 pending timer
+    // 触发 widget test 的 _verifyInvariants（timersPending 断言）。
+    _instance?._pendingFlushTimer?.cancel();
     // 创建新的 ValueNotifier 以确保测试间状态隔离
     _logChangeNotifier = ValueNotifier<int>(0);
     _instance = null;
@@ -258,6 +262,11 @@ class LoggerService {
 
   /// 上次持久化时间
   DateTime? _lastPersistTime;
+
+  /// 兜底延迟持久化的 timer（_schedulePersist 在距上次写入 < 间隔时安排）。
+  /// 保存引用以便测试时取消，避免跨测试残留的 pending timer 触发 widget test
+  /// 的 _verifyInvariants（timersPending 断言）。
+  Timer? _pendingFlushTimer;
 
   /// 日志变化通知器
   ///
@@ -419,9 +428,15 @@ class LoggerService {
       // 兜底：仅在内存置 _pendingPersist 但未立即写的分支,
       // 安排一个延后的 _persistChain,确保最后一批日志不卡在内存
       // (避免后续无新日志触发 _schedulePersist 时,当前待写日志被遗忘)。
-      Future.delayed(
+      // 保存 timer 引用以便 resetForTesting 取消，避免跨测试残留的 pending timer
+      // 触发 widget test 的 _verifyInvariants（timersPending）。
+      _pendingFlushTimer?.cancel();
+      _pendingFlushTimer = Timer(
         Duration(milliseconds: _flushIntervalMs),
-        () => _persistChain(),
+        () {
+          _pendingFlushTimer = null;
+          _persistChain();
+        },
       );
     }
   }

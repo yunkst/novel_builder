@@ -178,7 +178,7 @@ final preloadServiceProvider = Provider<PreloadService>.internal(
 // ignore: unused_element
 typedef PreloadServiceRef = ProviderRef<PreloadService>;
 String _$headlessWebViewContentServiceHash() =>
-    r'26a8a40b4f21f416141880f61921ed366e05dabd';
+    r'a9d7bd3e61f61370fc731bf3303f7af9a222c0b8';
 
 /// SceneIllustrationService 和 SceneIllustrationCacheService 已删除，相关 provider 已移除。
 /// HeadlessWebViewContentService Provider
@@ -224,7 +224,7 @@ final headlessWebViewContentServiceProvider =
 typedef HeadlessWebViewContentServiceRef
     = ProviderRef<HeadlessWebViewContentService>;
 String _$headlessWebViewChapterListServiceHash() =>
-    r'2f442b2e2e69dcd6956261b0e34cb9eedfd14860';
+    r'c0c666e0516358c3e4254c8eaa78a7ad2e3301f6';
 
 /// HeadlessWebViewChapterListService Provider
 ///

@@ -296,3 +296,7 @@ fanqie-cdp.png
 fanqie-visible.png
 fanqie-headed.png
 fanqie-now.png
+
+# OCR 准确率测试临时资产（番茄截图，PoC 用，别提交）
+novel_app/tool/ocr_test_assets/
+novel_app/lib/main_ocr_test.dart

@@ -11,17 +11,25 @@ import 'package:novel_app/core/providers/scenario_session.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/services/agent_launcher/agent_launch_request.dart';
 import 'package:novel_app/services/agent_launcher/contextual_agent_launcher.dart';
+import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 
 @GenerateNiceMocks([MockSpec<ScenarioSessionsNotifier>(), MockSpec<ScenarioSession>()])
 import 'contextual_agent_launcher_test.mocks.dart';
 
 void main() {
-  // 这两个 testWidgets 会真实打开 AgentChatDialog，dialog 内若挂载 MediaView
-  // 会启动 Timer.periodic(10s) 轮询；测试结束前若不关闭 dialog，MediaView 不卸载、
-  // timer 不 cancel，_verifyInvariants 会报 "Timer is still pending"（CI 上必现）。
-  // 根治：每个用例末尾 pop dialog 并 pump 到 dismiss 完成，让 MediaView dispose 取消 timer。
-  // retry: 3 作为额外保险（环境抖动时不影响断言有效性）。
+  setUp(() {
+    // 取消更早测试可能残留的 LoggerService 延迟持久化 timer，避免其作为 pending
+    // timer 触发本 widget test 的 _verifyInvariants（timersPending 断言）。
+    LoggerService.resetForTesting();
+  });
+
+  // 这两个 testWidgets 会真实打开 AgentChatDialog 并触发会话初始化，
+  // 期间（或前面其它测试）经由 LoggerService 记日志时，LoggerService 在
+  // 距上次持久化 <1s 时会安排一个 1s 后的兜底 timer；若测试结束前没取消，
+  // 这个 pending timer 会触发 _verifyInvariants 的 timersPending 断言（CI 必现）。
+  // 根治：setUp 调 LoggerService.resetForTesting() 取消残留 timer（与其它触发
+  // 日志的 webview 测试对齐）。retry:3 作额外保险，不影响断言有效性。
   group('ContextualAgentLauncher.launch', () {
     testWidgets(
       'autoSend 模式: 切场景 + switchSession(id, null) + 调 sendMessage',
@@ -80,12 +88,6 @@ void main() {
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
         verify(mockSession.sendMessage(content: '请生成提取脚本')).called(1);
-
-        // 关闭 launcher 打开的 dialog：让其中 MediaView 卸载、cancel 其
-        // Timer.periodic，否则 _verifyInvariants 会因 timersPending 失败（CI 必现根因）。
-        Navigator.of(capturedContext, rootNavigator: true).pop();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
       },
       retry: 3,
     );
@@ -145,12 +147,6 @@ void main() {
         verify(mockNotifier.switchSession(ScenarioIds.webviewExtract, null))
             .called(1);
         verifyNever(mockSession.sendMessage(content: anyNamed('content')));
-
-        // 关闭 launcher 打开的 dialog：让其中 MediaView 卸载、cancel 其
-        // Timer.periodic，否则 _verifyInvariants 会因 timersPending 失败（CI 必现根因）。
-        Navigator.of(capturedContext, rootNavigator: true).pop();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
       },
       retry: 3,
     );

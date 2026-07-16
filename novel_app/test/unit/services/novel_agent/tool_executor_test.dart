@@ -607,6 +607,106 @@ void main() {
       expect(json['error'], 'missing_required_param');
       expect(json['param'], 'keyword');
     });
+
+    test('上下文片段含前后内容（非关键词回显）', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: '前文内容剑客后文内容');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'search_in_chapters',
+        {'keyword': '剑客'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      final first = (json['results'] as List).first as Map<String, dynamic>;
+      final snippets = first['snippets'] as List;
+
+      expect(snippets, isNotEmpty);
+      final snippet = snippets.first as String;
+      expect(snippet, contains('剑客'));
+      // 证明带了前后文（不再是关键词自身回显）
+      expect(snippet.length, greaterThan('剑客'.length));
+      expect(snippet, contains('前文'));
+      expect(snippet, contains('后文'));
+    });
+
+    test('高频词被采样并标注 truncated', () async {
+      final novelId = await insertNovel();
+      // 5 个命中点，间隔 100 字符（> 2*radius=160 触发合并？需 >= 2*radius）
+      // 2*radius=160，间隔 100 会被合并 → 用 100 不行，要 >= 161
+      // 改用 200 字符 padding 确保 5 个独立窗口
+      final padding = '甲。' * 100; // 200 chars
+      final content = List.generate(5, (_) => '${padding}李明$padding').join();
+      await insertChapter(content: content);
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'search_in_chapters',
+        {'keyword': '李明'},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      final first = (json['results'] as List).first as Map<String, dynamic>;
+
+      expect(first['matchCount'], 5); // 原始命中数完整
+      expect((first['snippets'] as List).length, 3); // 被 cap 到 3
+      expect(json['truncated'], true);
+    });
+
+    test('章节范围过滤：positionFrom/positionTo', () async {
+      final novelId = await insertNovel();
+      // 插入 5 章，每章都含"剑客"
+      for (var i = 0; i < 5; i++) {
+        await insertChapter(
+          chapterUrl: 'https://example.com/ch_$i',
+          content: '剑客走在路上',
+          chapterIndex: i,
+        );
+      }
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'search_in_chapters',
+        {
+          'keyword': '剑客',
+          'positionFrom': 2,
+          'positionTo': 4,
+        },
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      final results = json['results'] as List;
+
+      expect(json['positionFrom'], 2);
+      expect(json['positionTo'], 4);
+      expect(json['totalChaptersHit'], 3); // 范围内真实命中章数
+      expect(json['totalMatches'], 3); // 每章 1 次命中
+      expect(results.length, 3);
+      for (final r in results) {
+        final pos = r['position'] as int;
+        expect(pos, greaterThanOrEqualTo(2));
+        expect(pos, lessThanOrEqualTo(4));
+      }
+    });
+
+    test('章节范围非法 from>to → invalid_range', () async {
+      final novelId = await insertNovel();
+      await insertChapter(content: '剑客');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'search_in_chapters',
+        {
+          'keyword': '剑客',
+          'positionFrom': 5,
+          'positionTo': 2,
+        },
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['error'], 'invalid_range');
+    });
   });
 
   // ========================================================================
@@ -1110,6 +1210,90 @@ void main() {
       final json = jsonDecode(result) as Map<String, dynamic>;
 
       expect(json['error'], 'missing_required_param');
+    });
+  });
+
+  // ========================================================================
+  // get_background_setting
+  // ========================================================================
+  group('get_background_setting', () {
+    test('返回已有背景设定全文', () async {
+      final novelId = await insertNovel(
+        title: '凡人修仙传',
+        backgroundSetting: '修仙界分九重天，灵气稀薄。',
+      );
+      final ctx = _writingContext(novelId, '凡人修仙传');
+
+      final result = await executor.execute(
+        'get_background_setting',
+        {},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['setting'], '修仙界分九重天，灵气稀薄。');
+      expect(json['empty'], false);
+      expect((json['novel'] as Map)['title'], '凡人修仙传');
+    });
+
+    test('背景设定为空 → empty=true 并引导创建', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'get_background_setting',
+        {},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+
+      expect(json['empty'], true);
+      expect(json['setting'], isNull);
+      expect(json['suggested_tool'], 'update_background_setting');
+    });
+
+    test('背景设定仅空白 → 视为空', () async {
+      final novelId = await insertNovel(backgroundSetting: '   \n  ');
+      final ctx = _ctx(novelId);
+
+      final result = await executor.execute(
+        'get_background_setting',
+        {},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['empty'], true);
+    });
+
+    test('update 后 get 能读回最新内容', () async {
+      final novelId = await insertNovel();
+      final ctx = _ctx(novelId);
+
+      await executor.execute(
+        'update_background_setting',
+        {'setting': '赛博朋克都市'},
+        scenarioContext: ctx,
+      );
+
+      final result = await executor.execute(
+        'get_background_setting',
+        {},
+        scenarioContext: ctx,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['setting'], '赛博朋克都市');
+      expect(json['empty'], false);
+    });
+
+    test('无上下文 → no_current_novel', () async {
+      final result = await executor.execute(
+        'get_background_setting',
+        {},
+        scenarioContext: _noNovelContext,
+      );
+      final json = jsonDecode(result) as Map<String, dynamic>;
+      expect(json['error'], 'no_current_novel');
+      expect(json['suggested_tool'], 'list_novels');
     });
   });
 
