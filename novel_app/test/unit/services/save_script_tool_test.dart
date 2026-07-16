@@ -219,12 +219,7 @@ void main() {
       ));
     });
 
-    // ── 新增：ocr_no_pua 前置闸（Task 3 / TDD RED）────────────────
-    // 当前实现尚未加"含 PUA 才允许走 OCR"前置校验，下面 3.1 / 3.2 两个用例
-    // 应失败于 font_family_invalid（或 font_family_missing），Task 4 实现后转 GREEN。
-    // 3.3 是回归保护：含 PUA 的合法 chapter_list 不应被新闸误伤。
-
-    test('ocr=true chapter_content 文本无 PUA → ocr_no_pua，不调 verifyFontFamily 也落库', () async {
+    test('ocr=true chapter_content 文本无 PUA → ocr_no_pua，不调 verifyFontFamily 也不落库', () async {
       final repo = MockSiteScriptRepository();
       final svc = MockOcrRestoreService();
       when(svc.verifyFontFamily(any)).thenAnswer((_) async => false);

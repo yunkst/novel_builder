@@ -930,7 +930,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       if (!loaded && !_isHeadless) {
         return jsonEncode({
           'error': 'NAVIGATE_TIMEOUT',
-          'message': '跳转后等待页面加载超时（30秒）',
+          'message': '跳转后等待页面加载超时（60秒）',
           'target_url': url,
           'suggestion': '检查网络连接，或目标网站是否可访问',
         });
@@ -1361,6 +1361,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
         return {
           'success': false,
           'reason': 'ocr_no_pua',
+          // TODO(ocr_applied 语义): 此字段在拒绝路径上返回 true 但 OCR 实际未执行（闸先于 OCR 运行）。
+          // 与本文件 font_family_missing 不返回 ocr_applied 的惯例不一致；无消费方从失败路径读取，待后续统一语义。
           'ocr_applied': true,
           'diagnostic': 'ocr=true 但脚本返回文本中未检测到 PUA 码点（U+E000-F8FF），不符合字体反爬判定条件',
           'suggestion': '请重新确认该站点是否真的有字体反爬。若确认无 PUA，调用 save_script 时传 ocr=false；'
