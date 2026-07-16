@@ -249,10 +249,12 @@ void main() {
               normal.start.isAtSameMomentAs(dispatch.start), isTrue,
           reason: '普通工具 list_novels 应在 dispatch_subagent 之前开始');
 
-      // 普通工具必须早于 dispatch_subagent 结束（串行语义）
-      expect(normal.end.isBefore(dispatch.start), isTrue,
+      // 普通工具必须早于 dispatch_subagent 结束（串行语义）。
+      // 用 <= 而非 < 容忍同毫秒边界（Future.delayed + DateTime.now 在跨测试文件
+      // 场景下调度抖动可能让 end 与 start 落在同一毫秒，但仍属串行先完成语义）。
+      expect(!normal.end.isAfter(dispatch.start), isTrue,
           reason:
-              'list_novels 串行跑完（end < dispatch.start）；不是与 dispatch_subagent 并行');
+              'list_novels 串行跑完（end <= dispatch.start）；不是与 dispatch_subagent 并行');
     });
 
     test('toolCallId 透传到 scenario.executeTool', () async {
