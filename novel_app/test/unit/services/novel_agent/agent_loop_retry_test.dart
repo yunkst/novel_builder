@@ -280,5 +280,44 @@ void main() {
       expect(scenario.executed, hasLength(1));
       expect(events.last, isA<AgentDoneEvent>());
     });
+
+    test('RetryableHttpException(429) → round 重试 → 成功（验证 429/408 归 Retryable）',
+        () async {
+      // 修复前：429 被归 NonRetryableHttpException → round-level 不接 → 直接 AgentError
+      // 修复后：429 被归 RetryableHttpException → round-level 自动跟进 → 成功
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const RetryableHttpException(
+          429, 'rate limited', '',
+          retryAfterMs: 50,
+        ))
+        ..enqueue(
+          response: const _ScriptedResponse(contentChunks: ['限流后恢复']),
+        );
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      final events = await runLoop(loop);
+      expect(llm.callCount, 2, reason: '429 装入 RetryableHttpException 后 round-level 接住');
+      expect(events.last, isA<AgentDoneEvent>(),
+          reason: '最终应完成而非 AgentError');
+    });
+
+    test('RetryableHttpException(408) → round 重试 → 成功（Request Timeout 同 429 路径）',
+        () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const RetryableHttpException(
+          408, 'request timeout', '',
+          retryAfterMs: 50,
+        ))
+        ..enqueue(
+          response: const _ScriptedResponse(contentChunks: ['timeout 后恢复']),
+        );
+      final loop = AgentLoop(llm: llm, scenario: _FakeScenario());
+      final events = await runLoop(loop);
+      expect(llm.callCount, 2);
+      expect(events.last, isA<AgentDoneEvent>());
+    });
   });
 }

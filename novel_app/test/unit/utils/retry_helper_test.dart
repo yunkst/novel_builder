@@ -259,4 +259,206 @@ void main() {
       );
     });
   });
+
+  group('RetryableHttpException.retryAfterMs', () {
+    test('带 retryAfterMs 字段构造 → 字段可读', () {
+      const e = RetryableHttpException(429, '', '', retryAfterMs: 5000);
+      expect(e.statusCode, 429);
+      expect(e.retryAfterMs, 5000);
+    });
+
+    test('旧式三参 const 构造仍合法（retryAfterMs 默认 null）', () {
+      const e = RetryableHttpException(503, '', '');
+      expect(e.retryAfterMs, isNull);
+    });
+
+    test('toString 包含 retryAfterMs（仅在非 null 时）', () {
+      const a = RetryableHttpException(429, '', '');
+      const b = RetryableHttpException(429, '', '', retryAfterMs: 1000);
+      expect(a.toString(), isNot(contains('retryAfter')));
+      expect(b.toString(), contains('retryAfter=1000ms'));
+    });
+  });
+
+  group('withRetry + Retry-After 优先', () {
+    test('Retry-After > 0 时按服务端值等待，不走指数退避', () async {
+      var calls = 0;
+      final sw = Stopwatch()..start();
+      await withRetry(
+        () async {
+          calls++;
+          if (calls < 2) {
+            throw const RetryableHttpException(429, '', '', retryAfterMs: 200);
+          }
+          return 'ok';
+        },
+        config: const RetryConfig(
+          maxAttempts: 3,
+          initialDelay: Duration(seconds: 10), // 大值确认没走指数退避
+        ),
+        label: 'retry_after_test',
+      );
+      sw.stop();
+      expect(calls, 2);
+      // 指数退避会等 ~10s；Retry-After=200ms → 应远小于此
+      expect(sw.elapsedMilliseconds, lessThan(2000),
+          reason: 'Retry-After=200ms 应立即等待后重试，不走指数退避');
+    });
+
+    test('Retry-After > maxDelay → clamp 到 maxDelay', () async {
+      var calls = 0;
+      final sw = Stopwatch()..start();
+      try {
+        await withRetry(
+          () async {
+            calls++;
+            throw const RetryableHttpException(
+              503, '', '',
+              retryAfterMs: 999999, // 远超 maxDelay
+            );
+          },
+          config: const RetryConfig(
+            maxAttempts: 2,
+            initialDelay: Duration(seconds: 1),
+            maxDelay: Duration(milliseconds: 100),
+          ),
+          label: 'retry_after_clamp_test',
+        );
+      } catch (_) {}
+      sw.stop();
+      // maxDelay=100ms → 应小于 500ms（去除调度抖动）
+      expect(sw.elapsedMilliseconds, lessThan(500),
+          reason: 'Retry-After=999999 应被 clamp 到 maxDelay=100ms');
+      expect(calls, 2);
+    });
+
+    test('Retry-After == 0 → 回退指数退避（防雷鸣群）', () async {
+      var calls = 0;
+      final sw = Stopwatch()..start();
+      try {
+        await withRetry(
+          () async {
+            calls++;
+            throw const RetryableHttpException(429, '', '', retryAfterMs: 0);
+          },
+          config: const RetryConfig(
+            maxAttempts: 2,
+            initialDelay: Duration(milliseconds: 100),
+            maxDelay: Duration(milliseconds: 100),
+          ),
+          label: 'retry_after_zero_test',
+        );
+      } catch (_) {}
+      sw.stop();
+      // retryAfterMs=0 → 回退指数退避（initialDelay=100ms + jitter）→ 应大于 50ms
+      expect(sw.elapsedMilliseconds, greaterThanOrEqualTo(50),
+          reason: 'retryAfterMs=0 应回退指数退避而非立即重试');
+      expect(sw.elapsedMilliseconds, lessThan(500));
+    });
+  });
+
+  group('parseRetryAfterMs', () {
+    test('整数秒：Retry-After: 120 → 120000ms', () {
+      expect(parseRetryAfterMs('120'), 120000);
+    });
+
+    test('整数秒含空格：先 trim 再解析', () {
+      expect(parseRetryAfterMs('  120  '), 120000);
+    });
+
+    test('HTTP-date（未来时间）→ 正值', () {
+      final future = DateTime.now().toUtc().add(const Duration(hours: 1));
+      final header = future.toUtc().toIso8601String();
+      // dart:io HttpDate 接受 RFC 1123 格式（IMF-fixdate）
+      final rfc1123 = HttpDate.format(future.toUtc());
+      final ms = parseRetryAfterMs(rfc1123);
+      expect(ms, isNotNull);
+      expect(ms, greaterThan(0));
+      // 与 1h 误差应在 ±2s（测试运行耗时）
+      expect(ms!, lessThanOrEqualTo(3600000 + 2000));
+      // ISO8601 不被支持（HttpDate.parse 会抛）→ 返回 null
+      expect(parseRetryAfterMs(header), isNull);
+    });
+
+    test('非法字符串 → null（不抛异常）', () {
+      expect(parseRetryAfterMs('garbage'), isNull);
+    });
+
+    test('null / 空字符串 → null', () {
+      expect(parseRetryAfterMs(null), isNull);
+      expect(parseRetryAfterMs(''), isNull);
+    });
+  });
+
+  group('RetryConfig 默认值', () {
+    test('maxAttempts == 8', () {
+      expect(const RetryConfig().maxAttempts, 8);
+    });
+
+    test('maxDelay == 60s', () {
+      expect(const RetryConfig().maxDelay, const Duration(seconds: 60));
+    });
+
+    test('initialDelay == 500ms', () {
+      expect(const RetryConfig().initialDelay,
+          const Duration(milliseconds: 500));
+    });
+
+    test('multiplier == 2.0 / jitterFactor == 0.25（保留）', () {
+      const cfg = RetryConfig();
+      expect(cfg.multiplier, 2.0);
+      expect(cfg.jitterFactor, 0.25);
+    });
+
+    test('8 次全失败 → 抛最后一次异常，总 attempt=8', () async {
+      var calls = 0;
+      await expectLater(
+        () => withRetry(
+          () async {
+            calls++;
+            throw const SocketException('always');
+          },
+          config: const RetryConfig(
+            maxAttempts: 8,
+            initialDelay: Duration(milliseconds: 1),
+            maxDelay: Duration(milliseconds: 10),
+          ),
+          label: 'max_attempts_test',
+        ),
+        throwsA(isA<SocketException>()),
+      );
+      expect(calls, 8, reason: 'maxAttempts=8 应执行 8 次');
+    });
+  });
+
+  group('isRetryableStatus', () {
+    test('5xx → true', () {
+      expect(isRetryableStatus(500), true);
+      expect(isRetryableStatus(502), true);
+      expect(isRetryableStatus(503), true);
+      expect(isRetryableStatus(599), true);
+    });
+
+    test('429 → true（关键：限流现在重试）', () {
+      expect(isRetryableStatus(429), true);
+    });
+
+    test('408 → true（Request Timeout）', () {
+      expect(isRetryableStatus(408), true);
+    });
+
+    test('其余 4xx → false', () {
+      expect(isRetryableStatus(400), false);
+      expect(isRetryableStatus(401), false);
+      expect(isRetryableStatus(403), false);
+      expect(isRetryableStatus(404), false,
+          reason: '404 是 4xx，不应重试');
+      expect(isRetryableStatus(422), false);
+    });
+
+    test('2xx / 3xx → false', () {
+      expect(isRetryableStatus(200), false);
+      expect(isRetryableStatus(301), false);
+    });
+  });
 }

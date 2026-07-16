@@ -30,11 +30,26 @@ class RetryableHttpException implements Exception {
   final int statusCode;
   final String body;
   final String url;
-  const RetryableHttpException(this.statusCode, this.body, this.url);
+
+  /// 服务端 Retry-After 头解析后的毫秒数；null 表示服务端未提供。
+  ///
+  /// [withRetry] 优先使用此值（clamp 到 [RetryConfig.maxDelay]），
+  /// 否则走指数退避。
+  final int? retryAfterMs;
+
+  /// [retryAfterMs] 为可选命名参数：旧式 `RetryableHttpException(503, '', '')`
+  /// 三参调用仍合法且保持 const 构造。
+  const RetryableHttpException(
+    this.statusCode,
+    this.body,
+    this.url, {
+    this.retryAfterMs,
+  });
 
   @override
   String toString() =>
-      'RetryableHttpException(status=$statusCode, url=$url)';
+      'RetryableHttpException(status=$statusCode, url=$url'
+      '${retryAfterMs != null ? ', retryAfter=${retryAfterMs}ms' : ''})';
 }
 
 class NonRetryableHttpException implements Exception {
@@ -48,18 +63,21 @@ class NonRetryableHttpException implements Exception {
       'NonRetryableHttpException(status=$statusCode, url=$url)';
 }
 
-/// 重试策略
+  /// 重试策略
 class RetryConfig {
-  /// 总尝试次数（含首次）。默认 3。
+  /// 总尝试次数（含首次）。默认 8。
+  ///
+  /// 移动端折中：ci-code-reviewer 用 20 次硬刚，移动端用户体感差；
+  /// 8 次 + 60s cap 最坏 ~123s，足够覆盖 LLM 限流恢复。
   final int maxAttempts;
 
-  /// 首次重试前的等待。默认 1s。
+  /// 首次重试前的等待。默认 500ms。
   final Duration initialDelay;
 
-  /// 单次退避上限。默认 30s。
+  /// 单次退避上限。默认 60s。
   final Duration maxDelay;
 
-  /// 退避倍数。默认 2.0（1s → 2s → 4s ...）。
+  /// 退避倍数。默认 2.0（500ms → 1s → 2s ...）。
   final double multiplier;
 
   /// 抖动比例 0..1，默认 0.25（±25%）。
@@ -69,9 +87,9 @@ class RetryConfig {
   final bool Function(Object error)? shouldRetry;
 
   const RetryConfig({
-    this.maxAttempts = 3,
-    this.initialDelay = const Duration(seconds: 1),
-    this.maxDelay = const Duration(seconds: 30),
+    this.maxAttempts = 8,
+    this.initialDelay = const Duration(milliseconds: 500),
+    this.maxDelay = const Duration(seconds: 60),
     this.multiplier = 2.0,
     this.jitterFactor = 0.25,
     this.shouldRetry,
@@ -109,7 +127,12 @@ Future<T> withRetry<T>(
       if (attempt >= config.maxAttempts || !should(e)) {
         rethrow;
       }
-      final delayMs = _computeDelayMs(attempt: attempt, config: config);
+      final delayMs = _computeDelayMs(
+        attempt: attempt,
+        config: config,
+        retryAfterMs:
+            e is RetryableHttpException ? e.retryAfterMs : null,
+      );
       LoggerService.instance.w(
         '$label 第 $attempt 次失败 (${e.runtimeType}: $e)，'
         '${delayMs}ms 后重试',
@@ -126,7 +149,14 @@ Future<T> withRetry<T>(
 int _computeDelayMs({
   required int attempt,
   required RetryConfig config,
+  int? retryAfterMs,
 }) {
+  // 服务端 Retry-After 优先（权威指示）。clamp 到 maxDelay 防恶意大值。
+  // 0 视为无指导意义，回退指数退避（防雷鸣群）。
+  if (retryAfterMs != null && retryAfterMs > 0) {
+    return retryAfterMs.clamp(0, config.maxDelay.inMilliseconds).toInt();
+  }
+  // 否则指数退避 + 抖动
   final raw = config.initialDelay.inMilliseconds *
       pow(config.multiplier, attempt - 1);
   final capped = raw.clamp(0, config.maxDelay.inMilliseconds).toInt();
@@ -135,4 +165,39 @@ int _computeDelayMs({
       ? 0
       : _rand.nextInt(2 * jitterRange) - jitterRange;
   return (capped + jitter).clamp(0, config.maxDelay.inMilliseconds).toInt();
+}
+
+/// 解析 HTTP Retry-After 头。返回毫秒数；失败返回 null。
+///
+/// 支持两种格式（RFC 7231 §7.1.3）：
+/// - 整数秒：`Retry-After: 120` → 120000ms
+/// - HTTP-date：`Retry-After: Wed, 21 Oct 2026 07:28:00 GMT` → 与 now 的差值
+///
+/// 解析失败/格式异常返回 null（调用方走指数退避），
+/// 绝不抛异常——Retry-After 解析不能影响重试主流程。
+int? parseRetryAfterMs(String? headerValue) {
+  if (headerValue == null || headerValue.isEmpty) return null;
+  final trimmed = headerValue.trim();
+  // 整数秒
+  final seconds = int.tryParse(trimmed);
+  if (seconds != null) return seconds * 1000;
+  // HTTP-date（dart:io HttpDate 同步解析）
+  try {
+    final dt = HttpDate.parse(trimmed);
+    final diff = dt.difference(DateTime.now());
+    return diff.isNegative ? 0 : diff.inMilliseconds;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 判定 HTTP 状态码是否可重试（429/408/5xx）。
+///
+/// - 5xx：服务端错误，重试
+/// - 429：Too Many Requests，限流后重试
+/// - 408：Request Timeout，客户端超时但服务端建议重试
+///
+/// 其余 4xx 业务错误（400/401/403/404 等）不重试，立即抛出。
+bool isRetryableStatus(int statusCode) {
+  return statusCode >= 500 || statusCode == 429 || statusCode == 408;
 }
