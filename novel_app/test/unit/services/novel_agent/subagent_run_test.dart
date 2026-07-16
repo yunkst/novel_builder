@@ -71,4 +71,33 @@ void main() {
       expect(run.progressSummary, '已取消');
     });
   });
+
+  group('done 完成信号', () {
+    SubagentRun newRun() => SubagentRun(
+        runId: 'r',
+        parentSessionId: 's',
+        task: 't',
+        allowedTools: const [],
+        toolCallId: 'tc');
+
+    test('初始 done 未完成', () {
+      final run = newRun();
+      expect(run.isDone, isFalse);
+    });
+
+    test('completeDone 后 done 完成且 isDone 为 true', () async {
+      final run = newRun();
+      run.completeDone();
+      await run.done;
+      expect(run.isDone, isTrue);
+    });
+
+    test('completeDone 幂等，重复调用不抛', () {
+      final run = newRun();
+      run.completeDone();
+      run.completeDone();
+      run.completeDone();
+      expect(run.isDone, isTrue);
+    });
+  });
 }

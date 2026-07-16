@@ -548,7 +548,7 @@ class ScenarioSession {
     // 级联取消本 session 派出的所有活跃子 Agent run
     final sessionIdStr = _sessionId?.toString();
     if (sessionIdStr != null) {
-      _ref.read(subagentRunnerProvider).cancelAllForSession(sessionIdStr);
+      await _ref.read(subagentRunnerProvider).cancelAllForSession(sessionIdStr);
     }
 
     if (_currentToken != null) {

@@ -44,6 +44,25 @@ class SubagentRun {
   /// 取消令牌源；SubagentRunner 启动时创建，cancel() 时触发
   CancellationTokenSource? tokenSource;
 
+  /// 运行终止信号：[SubagentRunner._runOne] 终态时 complete（成功/失败/取消均走）。
+  ///
+  /// 供 [SubagentRunner.cancelAllForSession] 与详情页停止按钮 await，
+  /// 使 cancel 调用方能确定性等待子 Agent 真正退出（配合 AgentLoop stream 中断）。
+  final Completer<void> _doneCompleter = Completer<void>();
+
+  /// 子 Agent 真正终止的 Future。
+  Future<void> get done => _doneCompleter.future;
+
+  /// 是否已终止（[done] 已 complete）。
+  bool get isDone => _doneCompleter.isCompleted;
+
+  /// 标记 run 终止（幂等）。由 [SubagentRunner._runOne] 的 finally 调用。
+  void completeDone() {
+    if (!_doneCompleter.isCompleted) {
+      _doneCompleter.complete();
+    }
+  }
+
   /// 全局事件流订阅（按 runId 过滤后更新 chatState）
   StreamSubscription<AgentEvent>? eventSub;
 

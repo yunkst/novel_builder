@@ -13,7 +13,12 @@ import '../services/novel_agent/subagent_run.dart';
 ///
 /// 返回键仅 pop 页面，不取消子 Agent；取消需通过 AppBar 的停止按钮显式触发
 /// （调 `run.tokenSource?.cancel(reason: '用户主动停止')`）。
-class SubagentDetailScreen extends ConsumerWidget {
+/// 任务 23：停止按钮点击后 await `run.done`，按钮置 loading 状态
+/// 防止用户在子 Agent 真正退出前重复点击或误以为无效。
+///
+/// 返回键仅 pop 页面，不取消子 Agent；取消需通过 AppBar 的停止按钮显式触发
+///（调 `run.tokenSource?.cancel(reason: '用户主动停止')`）。
+class SubagentDetailScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final String toolCallId;
 
@@ -24,9 +29,18 @@ class SubagentDetailScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SubagentDetailScreen> createState() =>
+      _SubagentDetailScreenState();
+}
+
+class _SubagentDetailScreenState extends ConsumerState<SubagentDetailScreen> {
+  /// 停止按钮是否正在等待子 Agent 真正退出
+  bool _stopping = false;
+
+  @override
+  Widget build(BuildContext context) {
     final registry = ref.watch(subagentRegistryProvider);
-    final run = registry.getByToolCallId(sessionId, toolCallId);
+    final run = registry.getByToolCallId(widget.sessionId, widget.toolCallId);
 
     if (run == null) {
       return Scaffold(
@@ -35,8 +49,9 @@ class SubagentDetailScreen extends ConsumerWidget {
       );
     }
 
-    final showStop = run.state == SubagentRunState.running ||
-        run.state == SubagentRunState.pending;
+    final showStop = !_stopping &&
+        (run.state == SubagentRunState.running ||
+            run.state == SubagentRunState.pending);
 
     return Scaffold(
       appBar: AppBar(
@@ -46,13 +61,20 @@ class SubagentDetailScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          if (showStop)
+          if (_stopping)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (showStop)
             IconButton(
               icon: const Icon(Icons.stop),
               tooltip: '停止',
-              onPressed: () {
-                run.tokenSource?.cancel(reason: '用户主动停止');
-              },
+              onPressed: _onStop,
             ),
         ],
       ),
@@ -65,6 +87,22 @@ class SubagentDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// 停止子 Agent：cancel 令牌 + 等待 run.done 后恢复按钮。
+  Future<void> _onStop() async {
+    final registry = ref.read(subagentRegistryProvider);
+    final run =
+        registry.getByToolCallId(widget.sessionId, widget.toolCallId);
+    if (run == null) return;
+    setState(() => _stopping = true);
+    try {
+      run.tokenSource?.cancel(reason: '用户主动停止');
+      await run.done.timeout(const Duration(seconds: 15));
+    } catch (_) {
+      // 超时不影响 UI 恢复
+    }
+    if (mounted) setState(() => _stopping = false);
   }
 }
 

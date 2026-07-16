@@ -18,6 +18,17 @@ import 'agent_scenario.dart';
 import 'context_compactor.dart';
 import 'tool_result_formatter.dart';
 
+/// Agent 循环取消行为
+///
+/// - [graceful]：默认。收到 cancel 后不中断底层 LLM stream，等本轮输出完
+///   再停止（主 Agent 现有行为，保留 check-point B 语义）。
+/// - [immediate]：cancel 时立即 cancel stream subscription，中断底层 LLM 连接，
+///   子 Agent 秒级退出。不会等待本轮输出完。
+enum AgentLoopCancelBehavior {
+  graceful,
+  immediate,
+}
+
 /// Agent 循环配置
 class AgentLoopConfig {
   final int maxRounds;
@@ -45,12 +56,16 @@ class AgentLoopConfig {
   /// 重试计数与外层 round 独立：成功后 [roundRetryCount] 重置。
   final int networkRetryPerRound;
 
+  /// 收到取消信号后的行为（主 Agent 默认 gentle，子 Agent 传 immediate）。
+  final AgentLoopCancelBehavior cancelBehavior;
+
   const AgentLoopConfig({
     this.maxRounds = 50,
     this.toolResultMaxChars = 50000,
     this.compaction = const CompactorConfig(),
     this.llmStreamTimeout = const Duration(minutes: 5),
     this.networkRetryPerRound = 2,
+    this.cancelBehavior = AgentLoopCancelBehavior.graceful,
   });
 }
 
@@ -172,20 +187,64 @@ class AgentLoop {
           },
         );
 
-        await for (final chunk in streamSource) {
-          // 实时 emit 文本增量 → UI 流式展示
-          if (chunk.isContent) {
-            contentChunkCount++;
-            emit(TextDeltaEvent(chunk.contentChunk!));
+        // 任务 20/21：显式 subscription + Completer 消费流式响应。
+        // - 当 [cancelBehavior] == [AgentLoopCancelBehavior.immediate] 时，注册
+        //   cancellationToken 监听器，cancel 时 cancel subscription 立即退出
+        //   （子 Agent 秒级退出，不等本轮 LLM 输出完）。
+        // - 当 [cancelBehavior] == [AgentLoopCancelBehavior.graceful]（默认/主 Agent）时，
+        //   不注册监听器，保持原 await for 的“本轮输出完再停”语义。
+        // 处理逻辑与原 await for 完全等价：emit 文本、累积 tool_calls、记 finishReason。
+        final streamCompleter = Completer<void>();
+        late final StreamSubscription<LlmStreamChunk> streamSub;
+        void Function()? unregisterCancel;
+
+        void completeStream() {
+          if (!streamCompleter.isCompleted) {
+            streamCompleter.complete();
           }
-          // 累积 tool_calls delta
-          if (chunk.isToolCallDelta) {
-            streamingResult.toolCallDeltas.addAll(chunk.toolCallDeltas);
-          }
-          // 记录 finish_reason
-          if (chunk.isFinished) {
-            streamFinishReason = chunk.finishReason;
-          }
+        }
+
+        streamSub = streamSource.listen(
+          (chunk) {
+            // 实时 emit 文本增量 → UI 流式展示
+            if (chunk.isContent) {
+              contentChunkCount++;
+              emit(TextDeltaEvent(chunk.contentChunk!));
+            }
+            // 累积 tool_calls delta
+            if (chunk.isToolCallDelta) {
+              streamingResult.toolCallDeltas.addAll(chunk.toolCallDeltas);
+            }
+            // 记录 finish_reason
+            if (chunk.isFinished) {
+              streamFinishReason = chunk.finishReason;
+            }
+          },
+          onError: (e, s) {
+            unregisterCancel?.call();
+            if (!streamCompleter.isCompleted) {
+              streamCompleter.completeError(e, s);
+            }
+          },
+          onDone: () {
+            unregisterCancel?.call();
+            completeStream();
+          },
+        );
+
+        if (_config.cancelBehavior == AgentLoopCancelBehavior.immediate) {
+          unregisterCancel = cancellationToken?.register(() {
+            if (!streamCompleter.isCompleted) {
+              streamSub.cancel();
+              completeStream();
+            }
+          });
+        }
+
+        try {
+          await streamCompleter.future;
+        } finally {
+          unregisterCancel?.call();
         }
 
         // 2. 流结束后聚合 tool_calls

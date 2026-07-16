@@ -172,6 +172,9 @@ class SubagentRunner {
         category: LogCategory.ai,
         tags: ['agent', 'subagent', 'dispatch_error'],
       );
+      // 任务 19：异常路径兜底 ensure done（_runOne 的 finally 也覆盖，但
+      // 比如 LLM 构造抛错时 _runOne 根本没进，dispatch catch 提前收到）。
+      run.completeDone();
       // 重新抛给主 Agent（WritingScenario.executeTool 会 catch 转 error JSON）
       rethrow;
     } finally {
@@ -220,7 +223,13 @@ class SubagentRunner {
       });
 
       final llm = await _buildLlmForScenario('writing');
-      final loop = AgentLoop(llm: llm, scenario: scenario);
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: scenario,
+        config: const AgentLoopConfig(
+          cancelBehavior: AgentLoopCancelBehavior.immediate,
+        ),
+      );
 
       await loop.run(
         initialMessages: [
@@ -246,6 +255,9 @@ class SubagentRunner {
       run.state = SubagentRunState.failed;
       run.errorMessage = e.toString();
     } finally {
+      // 任务 17：终态信号（成功/失败/取消均走此路径），
+      // 供 cancelAllForSession / 详情页停止按钮 await 真正退出。
+      run.completeDone();
       await run.eventSub?.cancel();
       run.eventSub = null;
     }
@@ -339,11 +351,24 @@ class SubagentRunner {
   }
 
   /// 取消某 session 全部活跃 run（主 Agent cancel 时级联）。
-  void cancelAllForSession(String sessionId) {
-    for (final run in registry.listForSession(sessionId)) {
-      if (!run.isTerminal) {
-        run.tokenSource?.cancel(reason: '主 Agent 取消');
-      }
+  ///
+  /// 任务 18：返回 [Future] 并 await 所有活跃 run 的 `done` 信号，
+  /// 使 cancel 调用方能确定性等待子 Agent 真正退出（根治资源泄露 + 竞态）。
+  /// AgentLoop 在 cancel 时会中断底层 LLM stream（任务 21），秒级退出；
+  /// 若因工具执行等无法中断的阶段卡住，[doneTimeout] 总超时兜底 warn 放弃，
+  /// 避免卡死 cancel 链路。
+  ///
+  /// [doneTimeout] 默认 15s；测试可短超时快速验证兜底路径。
+  Future<void> cancelAllForSession(
+    String sessionId, {
+    Duration doneTimeout = const Duration(seconds: 15),
+  }) async {
+    final activeRuns = registry
+        .listForSession(sessionId)
+        .where((r) => !r.isTerminal)
+        .toList();
+    for (final run in activeRuns) {
+      run.tokenSource?.cancel(reason: '主 Agent 取消');
     }
     // 清掉等待队列里未触发的 completer，避免测试或 session 关闭后泄漏
     final queue = _waitingQueues.remove(sessionId);
@@ -351,6 +376,17 @@ class SubagentRunner {
       for (final c in queue) {
         if (!c.isCompleted) c.complete();
       }
+    }
+    if (activeRuns.isEmpty) return;
+    try {
+      await Future.wait(activeRuns.map((r) => r.done)).timeout(doneTimeout);
+    } on TimeoutException {
+      LoggerService.instance.w(
+        'cancelAllForSession 等子 Agent done 超时 ${doneTimeout.inSeconds}s '
+        '(session=$sessionId, unfinished=${activeRuns.where((r) => !r.isDone).length})',
+        category: LogCategory.ai,
+        tags: ['agent', 'subagent', 'cancel_timeout'],
+      );
     }
   }
 

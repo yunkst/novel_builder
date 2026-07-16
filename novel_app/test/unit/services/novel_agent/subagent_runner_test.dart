@@ -262,7 +262,7 @@ void main() {
   });
 
   group('SubagentRunner.cancelAllForSession', () {
-    test('级联取消未终态 run 的 tokenSource', () {
+    test('级联取消未终态 run 的 tokenSource', () async {
       final registry = SubagentRegistry();
       final runner = SubagentRunner.forTest(registry: registry);
       final r1 = registry.create(
@@ -273,10 +273,61 @@ void main() {
       r1.tokenSource = CancellationTokenSource();
       r2.state = SubagentRunState.completed; // 已终态，不应再取消
 
-      runner.cancelAllForSession('s1');
+      await runner.cancelAllForSession('s1');
 
       expect(r1.tokenSource!.isCancelled, isTrue);
     });
+
+    test('cancel 后 await 返回时所有活跃 run 已终止（done 已 complete）', () async {
+      final registry = SubagentRegistry();
+      final runner = SubagentRunner.forTest(registry: registry);
+      final r1 = registry.create(
+          parentSessionId: 's1', task: 't1', allowedTools: const []);
+      final r2 = registry.create(
+          parentSessionId: 's1', task: 't2', allowedTools: const []);
+      r1.state = SubagentRunState.running;
+      r1.tokenSource = CancellationTokenSource();
+      r2.state = SubagentRunState.running;
+      r2.tokenSource = CancellationTokenSource();
+
+      // 模拟子 Agent 收到 cancel 后 done 完成
+      Future<void>.delayed(const Duration(milliseconds: 10), () {
+        r1.state = SubagentRunState.cancelled;
+        r1.completeDone();
+        r2.state = SubagentRunState.cancelled;
+        r2.completeDone();
+      });
+
+      await runner.cancelAllForSession('s1');
+
+      expect(r1.isDone, isTrue);
+      expect(r2.isDone, isTrue);
+      expect(r1.isTerminal, isTrue);
+      expect(r2.isTerminal, isTrue);
+    });
+
+    test('无活跃 run 时 cancelAllForSession 立即返回', () async {
+      final registry = SubagentRegistry();
+      final runner = SubagentRunner.forTest(registry: registry);
+      // 没有创建任何 run
+      await runner.cancelAllForSession('s-empty');
+      // 不抛错、不卡死
+    });
+
+    test('run done 永远不完成时 cancelAllForSession 15s 超时兜底（不抛错）', () async {
+      final registry = SubagentRegistry();
+      final runner = SubagentRunner.forTest(registry: registry);
+      final r1 = registry.create(
+          parentSessionId: 's1', task: 't1', allowedTools: const []);
+      r1.state = SubagentRunState.running;
+      r1.tokenSource = CancellationTokenSource();
+      // 故意不调用 r1.completeDone()，模拟"工具执行卡死 / 路径异常"
+      // 这里用 1s 短超时做测试，避免真等 15s
+      // 实际兜底时间是常量 Duration(seconds: 15)
+      await runner.cancelAllForSession('s1', doneTimeout: const Duration(seconds: 1));
+      // 超时后 r1.isDone 仍为 false（未完成），但 cancelAllForSession 不抛错
+      expect(r1.isDone, isFalse);
+    }, timeout: const Timeout(Duration(seconds: 5)));
   });
 
   group('SubagentRunner.dispatch 端到端（mock LLM）', () {

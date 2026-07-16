@@ -63,6 +63,9 @@ void main() {
       await tester.pump();
 
       expect(run.tokenSource?.isCancelled, isTrue);
+      // 让 _onStop 的 await run.done 完成，避免遗留 timer
+      run.completeDone();
+      await tester.pump();
     });
 
     testWidgets('completed 状态不显示停止按钮', (tester) async {
@@ -101,6 +104,51 @@ void main() {
       await tester.pump();
 
       expect(find.text('子 Agent 不存在或已清理'), findsOneWidget);
+    });
+
+    testWidgets('停止按钮点击后等 done 完成才恢复（loading → 按钮）',
+        (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final registry = container.read(subagentRegistryProvider);
+      final run = registry.create(
+        parentSessionId: 's1',
+        task: 't',
+        allowedTools: const [],
+        toolCallId: 'tc1',
+      );
+      run.state = SubagentRunState.running;
+      run.tokenSource = CancellationTokenSource();
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SubagentDetailScreen(sessionId: 's1', toolCallId: 'tc1'),
+        ),
+      ));
+      await tester.pump();
+
+      // 模拟 _onStop 等待 done：测试期间不主动 completeDone，
+      // 先验证按钮变 loading
+      await tester.tap(find.byIcon(Icons.stop));
+      // 不 pump 立即让 tap 落地，只 pump 一次让 _onStop 走完到 await
+      await tester.pump();
+
+      // 按钮应已消失（CircularProgressIndicator 出现）
+      expect(find.byIcon(Icons.stop), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // 状态应已被 cancel
+      expect(run.tokenSource?.isCancelled, isTrue);
+
+      // 现在 completeDone，让 _onStop 恢复按钮
+      run.state = SubagentRunState.cancelled;
+      run.completeDone();
+      // 给 _onStop 的 await run.done 解析 + 后续 setState + 重建窗口时间
+      await tester.pump(const Duration(seconds: 16));
+      await tester.pump();
+
+      // run 进入终态后，停止按钮按现状（不再显示）
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 }
