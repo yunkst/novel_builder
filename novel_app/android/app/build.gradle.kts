@@ -40,6 +40,18 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // PP-OCRv6: 限制 ABI 避免 APK 体积过大。
+        // release 只打真机 arm（armeabi-v7a / arm64-v8a）；
+        // debug 追加 x86_64 让 Android 模拟器能加载 onnxruntime-android 原生库。
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
+    }
+
+    // PP-OCRv6: 禁止压缩 .onnx，避免运行时加载过慢/失败
+    androidResources {
+        noCompress += listOf("onnx")
     }
 
     signingConfigs {
@@ -69,4 +81,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ML Kit 中文 OCR 模型（google_mlkit_text_recognition 默认只捆绑拉丁文，
+    // TextRecognitionScript.chinese 需要这个类，否则 NoClassDefFoundError）
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }

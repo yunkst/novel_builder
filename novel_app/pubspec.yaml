@@ -113,6 +113,13 @@ dependencies:
   # DSL 引擎依赖
   yaml: ^3.1.2
   jinja: ^0.6.6
+
+  # OCR PoC：章节截图识别（仅 main_ocr_test.dart 使用）
+  google_mlkit_text_recognition: ^0.13.0
+
+  # OCR PoC：PP-OCRv6 离线识别（仅 main_ppocr_demo.dart 使用）
+  flutter_onnxruntime: ^1.6.0
+  image: ^4.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -165,9 +172,14 @@ flutter:
         - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  # OCR PoC 测试图与 PP-OCRv6 资源（PoC 跑完就删，不进入产品）
+  assets:
+    - tool/ocr_test_assets/chapter_full.png
+    - tool/ocr_test_assets/font.ttf
+    - tool/ocr_test_assets/pua_list.json
+    - tool/ocr_test_assets/chapter_raw_text.txt
+    - assets/models/inference.onnx
+    - assets/models/ppocrv6_dict.txt
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
