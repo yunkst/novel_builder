@@ -28,10 +28,14 @@ import 'save_script_tool_test.mocks.dart';
 void main() {
   // ─── 工具函数 ───
 
-  /// 72 字正文（远超 50 下限）。预生成以避免在 const default 参数中使用字符串乘法。
+  /// 73 字正文（远超 50 下限），末尾追加 1 个 PUA 码点（U+E000）。
+  ///
+  /// PUA 后缀为后续 OCR 路径新增的"含 PUA 才允许走 OCR"前置闸服务：
+  /// 默认 contentResult() 必须能穿过该闸，不影响其它既有用例。
   const longContent = '正常正文文字正常正文文字正常正文文字正常正文文字'
       '正常正文文字正常正文文字正常正文文字正常正文文字'
-      '正常正文文字正常正文文字正常正文文字正常正文文字';
+      '正常正文文字正常正文文字正常正文文字正常正文文字'
+      '\u{E000}';
 
   /// 构造一个 chapter_content 用的合法 jsResult（含 content + font_family）
   Map<String, dynamic> contentResult({
@@ -55,14 +59,18 @@ void main() {
       };
 
   /// 构造一个验证通过的 OcrRestoreService mock
+  ///
+  /// restorePuaInText：把 `\u{E000}` 替换成 CJK 常用字「字」，
+  /// 返回 `OcrRestoreResult(cleaned, cleaned.length, 1)`，
+  /// 模拟 1 个 PUA 码点被 100% 成功还原。
   MockOcrRestoreService goodRestore() {
     final svc = MockOcrRestoreService();
     when(svc.verifyFontFamily(any)).thenAnswer((_) async => true);
-    // restorePuaInText：不动 content（无 PUA），原样返回
     when(svc.restorePuaInText(any, any))
         .thenAnswer((inv) async {
       final t = inv.positionalArguments[0] as String;
-      return OcrRestoreResult(t, t.length, 0);
+      final cleaned = t.replaceAll('\u{E000}', '字');
+      return OcrRestoreResult(cleaned, cleaned.length, 1);
     });
     when(svc.readableRatio(any)).thenReturn(1.0);
     return svc;
@@ -209,6 +217,93 @@ void main() {
         scriptJs: anyNamed('scriptJs'),
         ocr: anyNamed('ocr'),
       ));
+    });
+
+    // ── 新增：ocr_no_pua 前置闸（Task 3 / TDD RED）────────────────
+    // 当前实现尚未加"含 PUA 才允许走 OCR"前置校验，下面 3.1 / 3.2 两个用例
+    // 应失败于 font_family_invalid（或 font_family_missing），Task 4 实现后转 GREEN。
+    // 3.3 是回归保护：含 PUA 的合法 chapter_list 不应被新闸误伤。
+
+    test('ocr=true chapter_content 文本无 PUA → ocr_no_pua，不调 verifyFontFamily 也落库', () async {
+      final repo = MockSiteScriptRepository();
+      final svc = MockOcrRestoreService();
+      when(svc.verifyFontFamily(any)).thenAnswer((_) async => false);
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        ocr: true,
+        scriptJs: 'js',
+        // 64+ 字无 PUA 纯正常正文（>=50 下限以满足结构校验）
+        jsResult: contentResult(
+          content: '没有PUA的纯正常正文没有PUA的纯正常正文'
+              '没有PUA的纯正常正文没有PUA的纯正常正文'
+              '没有PUA的纯正常正文没有PUA的纯正常正文'
+              '没有PUA的纯正常正文没有PUA的纯正常正文',
+        ),
+        repo: repo,
+        restoreService: svc,
+      );
+
+      expect(result['success'], false);
+      expect(result['reason'], 'ocr_no_pua');
+      verifyNever(svc.verifyFontFamily(any));
+      verifyNever(repo.updateScriptPart(
+        domain: anyNamed('domain'),
+        scriptType: anyNamed('scriptType'),
+        scriptJs: anyNamed('scriptJs'),
+        ocr: anyNamed('ocr'),
+      ));
+    });
+
+    test('ocr=true chapter_list 所有 title 无 PUA → ocr_no_pua', () async {
+      final repo = MockSiteScriptRepository();
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_list',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: {
+          'title': '书名',
+          'chapters': [
+            {'title': '第一章 起始', 'url': 'https://a.com/c1'},
+            {'title': '第二章 发展', 'url': 'https://a.com/c2'},
+          ],
+        },
+        repo: repo,
+        restoreService: MockOcrRestoreService(),
+      );
+
+      expect(result['success'], false);
+      expect(result['reason'], 'ocr_no_pua');
+    });
+
+    test('ocr=true chapter_list 标题含 1 个 PUA → 通过闸（不返回 ocr_no_pua）', () async {
+      final repo = MockSiteScriptRepository();
+      when(repo.updateScriptPart(
+        domain: anyNamed('domain'),
+        scriptType: anyNamed('scriptType'),
+        scriptJs: anyNamed('scriptJs'),
+        ocr: anyNamed('ocr'),
+      )).thenAnswer((_) async => (success: true, id: 'site_list_pua', reason: null));
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_list',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: {
+          'title': '书名\u{E001}',
+          'chapters': [
+            {'title': '第一章 起始', 'url': 'https://a.com/c1'},
+          ],
+        },
+        repo: repo,
+        restoreService: goodRestore(),
+      );
+
+      expect(result['success'], true);
+      expect(result['reason'], isNot('ocr_no_pua'));
     });
   });
 
