@@ -502,7 +502,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
 
   // ===== WebView 加载等待（统一 _ensureHeadlessPageLoaded 和 _navigateTo 的轮询逻辑）=====
 
-  static const _pageLoadTimeout = Duration(seconds: 30);
+  static const _pageLoadTimeout = Duration(seconds: 60);
   static const _pollInterval = Duration(milliseconds: 500);
   static const _domStabilizeDelay = Duration(milliseconds: 500);
   static const _headlessTrustDelay = Duration(seconds: 2);
@@ -1201,7 +1201,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(resolved);
       final result = await controller
           .callAsyncJavaScript(functionBody: functionBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
       if (result == null || result.error != null) {
         return jsonEncode({
           'success': false,
@@ -1242,7 +1242,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       return jsonEncode({
         'success': false,
         'reason': 'test_timeout',
-        'message': '脚本在 test_url 上执行超时（60s）',
+        'message': '脚本在 test_url 上执行超时（120s）',
         'suggestion': '脚本可能卡在翻页/等待，检查 setTimeout 和翻页逻辑',
       });
     } catch (e, stackTrace) {
