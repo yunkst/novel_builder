@@ -123,6 +123,8 @@ class ToolExecutor with ToolExecutorHelpers {
         case 'delete_character':
           return await _character.deleteCharacter(args, scenarioContext);
         // ===== 设定 / 大纲 =====
+        case 'get_background_setting':
+          return await _outline.getBackgroundSetting(args, scenarioContext);
         case 'update_background_setting':
           return await _outline.updateBackgroundSetting(args, scenarioContext);
         case 'update_outline':

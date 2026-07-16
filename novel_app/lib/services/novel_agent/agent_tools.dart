@@ -38,6 +38,7 @@ class AgentTools {
     _createCharacter,
     _deleteCharacter,
     // ===== 设定 / 大纲 =====
+    _getBackgroundSetting,
     _updateBackgroundSetting,
     _updateOutline,
     _writeOutline,
@@ -560,6 +561,22 @@ class AgentTools {
   };
 
   // ===== 设定 / 大纲 =====
+
+  static const _getBackgroundSetting = {
+    'type': 'function',
+    'function': {
+      'name': 'get_background_setting',
+      'description':
+          '获取当前小说的世界观与背景设定全文。'
+          '修改背景设定（update_background_setting）前应先调用本工具了解当前内容，'
+          '避免覆盖已有设定。当前小说未设置过背景设定时返回 empty=true 并引导创建。',
+      'parameters': {
+        'type': 'object',
+        'properties': <String, dynamic>{},
+        'required': <String>[],
+      },
+    },
+  };
 
   static const _updateBackgroundSetting = {
     'type': 'function',

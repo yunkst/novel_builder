@@ -24,6 +24,63 @@ class OutlineExecutor with ToolExecutorHelpers {
   final Ref ref;
   final OutlineReadTracker _readTracker;
 
+  /// 读取当前小说的背景设定（get_background_setting 工具）
+  ///
+  /// 与 [updateBackgroundSetting] 对称：先 [resolveCurrentNovelUrl] 校验小说
+  /// 存在，再 getNovelById 取 backgroundSetting 字段。背景设定为空（未设置或仅
+  /// 空白）时不视为错误，返回 empty=true 并引导用 update_background_setting 创建。
+  Future<String> getBackgroundSetting(
+    Map<String, dynamic> args,
+    AgentScenarioContext? ctx,
+  ) async {
+    final novelResolve = await resolveCurrentNovelUrl(ctx);
+    if (novelResolve.errorJson != null) {
+      return jsonEncode(novelResolve.errorJson);
+    }
+    final currentNovelId = ctx?.currentNovelId;
+    if (currentNovelId == null) {
+      return jsonEncode(guidanceError(
+        'no_current_novel',
+        '尚未选择当前小说。',
+        suggestedTool: 'list_novels',
+      ));
+    }
+
+    final repo = ref.read(novelRepositoryProvider);
+    final novel = await repo.getNovelById(currentNovelId);
+    // resolveCurrentNovelUrl 已保证小说存在；此处兜底防 DB 在两次查询间被删。
+    if (novel == null) {
+      return jsonEncode(guidanceError(
+        'novel_not_found',
+        '当前小说不存在。',
+        suggestedTool: 'list_novels',
+      ));
+    }
+
+    final setting = novel.backgroundSetting;
+    final isEmpty = setting == null || setting.trim().isEmpty;
+    final novelContext = buildCurrentNovelContext(ctx);
+    LoggerService.instance.i(
+      '获取背景设定: novelId=$currentNovelId, empty=$isEmpty',
+      category: LogCategory.ai,
+      tags: ['agent', 'tool', 'get_background_setting'],
+    );
+    if (isEmpty) {
+      return jsonEncode({
+        'novel': novelContext,
+        'setting': null,
+        'empty': true,
+        'message': '当前小说暂无背景设定。如需建立世界观设定，请用 update_background_setting。',
+        'suggested_tool': 'update_background_setting',
+      });
+    }
+    return jsonEncode({
+      'novel': novelContext,
+      'setting': setting,
+      'empty': false,
+    });
+  }
+
   Future<String> updateBackgroundSetting(
     Map<String, dynamic> args,
     AgentScenarioContext? ctx,
