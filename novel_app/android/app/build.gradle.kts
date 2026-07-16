@@ -40,16 +40,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-
-        // PP-OCRv6: 限制 ABI 避免 APK 体积过大。
-        // release 只打真机 arm（armeabi-v7a / arm64-v8a）；
-        // debug 追加 x86_64 让 Android 模拟器能加载 onnxruntime-android 原生库。
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
-        }
     }
 
-    // PP-OCRv6: 禁止压缩 .onnx，避免运行时加载过慢/失败
+    // PP-OCRv6: 禁止压缩 .onnx，避免运行时加载过慢/失败。
+    // 注意：不要在这里设 ndk.abiFilters，会与 CI 的 flutter build apk --split-per-abi
+    // 冲突（splits abi filters 与全局 ndk abiFilters 不能同时存在）。ABI 控制交给
+    // splits/release config；开发者本机用 flutter build apk --release（非 split），
+    // 模拟器需要 x86_64 可临时切到 debug 模式跑。
     androidResources {
         noCompress += listOf("onnx")
     }
