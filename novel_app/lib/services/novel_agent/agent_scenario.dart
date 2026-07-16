@@ -352,13 +352,7 @@ class ScenarioQuickPrompt {
 /// 与场景的工具集 / system prompt 工作流同源维护，
 /// UI 通过 [forScenario] 按场景 ID 取数。未配置的场景返回空列表（不渲染 chip 行）。
 abstract final class ScenarioQuickPrompts {
-  static const _webviewExtract = <ScenarioQuickPrompt>[
-    ScenarioQuickPrompt(
-      label: '为这个网站生成提取脚本',
-      text: '请为当前网站编写可复用的提取脚本：先用 get_page_info 探测页面结构，'
-          '再生成目录提取脚本和内容提取脚本，测试通过后用 save_script 保存到本地数据库。',
-    ),
-  ];
+  static const _webviewExtract = <ScenarioQuickPrompt>[];
 
   /// 获取指定场景的快速输入提示词
   ///
