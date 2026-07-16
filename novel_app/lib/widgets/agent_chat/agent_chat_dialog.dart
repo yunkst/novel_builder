@@ -795,17 +795,15 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 ),
               ),
             ),
-          // 微信式输入区：+ 按钮 + 输入框 + 发送/停止按钮同行
+          // 输入区：输入框 + 右侧三态按钮（attach/send/stop）
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildAttachButton(theme, appColors),
-              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _inputController,
                   focusNode: _focusNode,
-                  enabled: !chatState.isLoading,
+                  enabled: true,
                   maxLines: 5,
                   minLines: 1,
                   decoration: InputDecoration(
@@ -826,71 +824,17 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 ),
               ),
               const SizedBox(width: 8),
-              _buildSendStopButton(chatState, session, theme, appColors),
+              _AgentInputTrailingButton(
+                mode: _trailingMode(chatState),
+                isPickingImage: _isPickingImage,
+                onAttach: _onAttachTap,
+                onSend: () => _sendMessage(session),
+                onStop: () => session?.cancel(),
+              ),
             ],
           ),
         ],
       ),
-    );
-  }
-
-  /// 发送/停止按钮（圆形 40x40，微信风格）
-  ///
-  /// 状态优先级：isLoading（停止）> _hasText（可发送）> 空内容（禁用）。
-  Widget _buildSendStopButton(
-    AgentChatState chatState,
-    ScenarioSession? session,
-    ThemeData theme,
-    AppColors appColors,
-  ) {
-    if (chatState.isLoading) {
-      return _circleIconButton(
-        icon: Icons.stop_rounded,
-        bg: appColors.error,
-        fg: appColors.agentOnBrand,
-        onPressed: () => session?.cancel(),
-        tooltip: '停止',
-      );
-    }
-    if (_hasText || _attachedMediaId != null) {
-      return _circleIconButton(
-        icon: Icons.send_rounded,
-        bg: appColors.agentAccent,
-        fg: appColors.agentOnBrand,
-        onPressed: () {
-          _sendMessage(session);
-        },
-        tooltip: '发送',
-      );
-    }
-    return _circleIconButton(
-      icon: Icons.send_rounded,
-      bg: theme.colorScheme.outline.withValues(alpha: 0.3),
-      fg: appColors.inkSoft.withValues(alpha: 0.5),
-      onPressed: null,
-      tooltip: '发送',
-    );
-  }
-
-  /// + 附件按钮（圆形 40x40，与发送按钮同款）。
-  /// 上传进行中显示转圈态并禁用点击。
-  Widget _buildAttachButton(ThemeData theme, AppColors appColors) {
-    return _circleIconButton(
-      icon: Icons.add_rounded,
-      bg: appColors.chatInputBackground,
-      fg: appColors.inkSoft,
-      onPressed: _isPickingImage ? null : () => _onAttachTap(),
-      tooltip: '上传图片',
-      child: _isPickingImage
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(appColors.inkSoft),
-              ),
-            )
-          : null,
     );
   }
 
@@ -932,31 +876,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     }
   }
 
-  /// 圆形图标按钮（无文字，固定 40x40）
-  ///
-  /// [child] 非 null 时用 [child] 替代默认 Icon（用于上传按钮的转圈态）。
-  Widget _circleIconButton({
-    required IconData icon,
-    required Color bg,
-    required Color fg,
-    required VoidCallback? onPressed,
-    required String tooltip,
-    Widget? child,
-  }) {
-    return Material(
-      color: bg,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: IconButton(
-        icon: child ?? Icon(icon, size: 20, color: fg),
-        onPressed: onPressed,
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-      ),
-    );
-  }
-
   /// 快速输入提示词 chip 行
   Widget _buildQuickPrompts(
     List<ScenarioQuickPrompt> prompts,
@@ -995,7 +914,17 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     _focusNode.requestFocus();
   }
 
+  /// 推导输入栏右侧按钮模式。
+  /// 优先级：isLoading（停止） > 有文本/有图（发送） > 完全空（添加图片）。
+  _TrailingMode _trailingMode(AgentChatState chatState) {
+    if (chatState.isLoading) return _TrailingMode.stop;
+    if (_hasText || _attachedMediaId != null) return _TrailingMode.send;
+    return _TrailingMode.attach;
+  }
+
   Future<void> _sendMessage(ScenarioSession? session) async {
+    // 防御守卫：运行中即使被意外触发也不发送（UI 上按钮是 stop，正常不会到这）。
+    if (session?.state.isLoading ?? false) return;
     final text = _inputController.text.trim();
     final hasImage = _attachedMediaId != null;
     if (text.isEmpty && !hasImage) return;
@@ -1068,4 +997,135 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
       },
     );
   }
+}
+
+/// 输入栏右侧按钮三态模式。
+///
+/// 优先级：stop（运行中） > send（有文本或已挂图） > attach（完全空）。
+enum _TrailingMode { attach, send, stop }
+
+/// 输入栏右侧三态按钮（attach / send / stop）。
+///
+/// 三种模式共用同一 40x40 圆形容器，切换时通过 [AnimatedSwitcher]
+/// 做淡入淡出 + 0.85→1.0 缩放过渡（~180ms）。attach 模式下支持
+/// [isPickingImage] 转圈态。
+class _AgentInputTrailingButton extends StatelessWidget {
+  final _TrailingMode mode;
+  final bool isPickingImage;
+  final VoidCallback? onAttach;
+  final VoidCallback? onSend;
+  final VoidCallback? onStop;
+
+  static final _scaleTween = Tween<double>(begin: 0.85, end: 1.0);
+
+  const _AgentInputTrailingButton({
+    required this.mode,
+    this.isPickingImage = false,
+    this.onAttach,
+    this.onSend,
+    this.onStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final appColors = context.appColors;
+    final config = _resolveConfig(appColors);
+
+    final Widget overlay = config.showProgress
+        ? SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(config.fg),
+            ),
+          )
+        : Icon(config.icon, size: 20, color: config.fg);
+
+    final button = Material(
+      color: config.bg,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: IconButton(
+        icon: overlay,
+        onPressed: config.onPressed,
+        tooltip: config.tooltip,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      ),
+    );
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(scale: _scaleTween.animate(anim), child: child),
+      ),
+      // 默认 layoutBuilder 会在 child 切换时缩放容器；用 Stack 叠放避免
+      // 输入框宽度被中间状态挤压。
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      child: SizedBox(
+        key: ValueKey(mode),
+        width: 40,
+        height: 40,
+        child: button,
+      ),
+    );
+  }
+
+  _TrailingButtonConfig _resolveConfig(AppColors appColors) {
+    switch (mode) {
+      case _TrailingMode.attach:
+        return _TrailingButtonConfig(
+          icon: Icons.add_rounded,
+          bg: appColors.chatInputBackground,
+          fg: appColors.inkSoft,
+          onPressed: isPickingImage ? null : onAttach,
+          tooltip: '添加图片',
+          showProgress: isPickingImage,
+        );
+      case _TrailingMode.send:
+        return _TrailingButtonConfig(
+          icon: Icons.send_rounded,
+          bg: appColors.agentAccent,
+          fg: appColors.agentOnBrand,
+          onPressed: onSend,
+          tooltip: '发送',
+        );
+      case _TrailingMode.stop:
+        return _TrailingButtonConfig(
+          icon: Icons.stop_rounded,
+          bg: appColors.error,
+          fg: appColors.agentOnBrand,
+          onPressed: onStop,
+          tooltip: '停止',
+        );
+    }
+  }
+}
+
+class _TrailingButtonConfig {
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final VoidCallback? onPressed;
+  final String tooltip;
+  final bool showProgress;
+
+  const _TrailingButtonConfig({
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.onPressed,
+    required this.tooltip,
+    this.showProgress = false,
+  });
 }
