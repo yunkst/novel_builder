@@ -1355,6 +1355,19 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
 
     // 2. OCR 验证（ocr=true 时强制走）
     if (ocr) {
+      // 2.0 前置闸：ocr=true 必须见到 PUA 码点，否则直接拒绝（避免 agent 误传 true 走无谓 OCR 流程）
+      final ocrTargetText = _extractOcrTargetText(jsResult, scriptType);
+      if (!_containsPrivateUseArea(ocrTargetText)) {
+        return {
+          'success': false,
+          'reason': 'ocr_no_pua',
+          'ocr_applied': true,
+          'diagnostic': 'ocr=true 但脚本返回文本中未检测到 PUA 码点（U+E000-F8FF），不符合字体反爬判定条件',
+          'suggestion': '请重新确认该站点是否真的有字体反爬。若确认无 PUA，调用 save_script 时传 ocr=false；'
+              '若应该有 PUA 但检测失败，请检查脚本是否正确返回了带 PUA 的原始文本（不要在 JS 里替换）',
+        };
+      }
+
       if (restoreService == null) {
         return {
           'success': false,
@@ -1519,6 +1532,34 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     final v = data['font_family'] ?? data['fontFamily'];
     if (v is! String) return '';
     return v.trim();
+  }
+
+  /// 检查文本中是否含 PUA 私用区码点（U+E000..U+F8FF）。阈值 ≥1 即视为存在字体反爬特征。
+  ///
+  /// 用 text.runes 逐码点比较，避免在源码字面量里嵌入 PUA 字符（OCR 测试不友好），
+  /// 也避免 RegExp 字符类对 Unicode 转义的解析行为差异。
+  static bool _containsPrivateUseArea(String text) {
+    return text.runes.any((r) => r >= 0xE000 && r <= 0xF8FF);
+  }
+
+  /// 从 jsResult 提取 OCR 模式需要扫描 PUA 的目标文本。
+  ///
+  /// - chapter_content: 直接取 content
+  /// - chapter_list: 拼接 title + 所有 chapters[].title（小说名 + 章名里也可能含 PUA）
+  static String _extractOcrTargetText(dynamic jsResult, String scriptType) {
+    if (jsResult is! Map) return '';
+    if (scriptType == 'chapter_content') {
+      return ((jsResult['content'] as String?) ?? '');
+    }
+    final title = (jsResult['title'] as String?) ?? '';
+    final chapters = jsResult['chapters'];
+    final chapterTitles = chapters is List
+        ? chapters
+            .whereType<Map>()
+            .map((c) => (c['title'] as String?) ?? '')
+            .join(' ')
+        : '';
+    return '$title $chapterTitles';
   }
 
   /// 截取结果摘要（最多 200 字），用于诊断返回。
@@ -1878,9 +1919,11 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           },
           'ocr': {
             'type': 'boolean',
-            'description': '该站点是否需要 OCR 后处理（字体反爬）。'
-                '判定依据：DOM 文本含大量 PUA 码点（U+E000-F8FF），'
-                '或 @font-face 引用第三方 CDN 自定义字体绑定到正文/标题元素。'
+            'description': '该站点是否需要 OCR 后处理（字体反爬）的硬性开关。\n'
+                '传 true 的充要条件：脚本返回的文本中出现 PUA 私用区码点（U+E000–F8FF，页面表现是乱码方块）。\n'
+                '若页面文本正常可读，必须传 false。\n'
+                '传 true 时，save_script 会先扫描文本中是否存在 PUA 码点；若无则直接拒绝落库并返回 reason=ocr_no_pua。\n'
+                '判定方法：在脚本探测阶段留意 execute_js 返回值里是否含 PUA 或乱码方块；可用 JS 码点扫描 console.log([...text].some(c => c >= 0xE000 && c <= 0xF8FF))。\n'
                 '对 chapter_content：还原 content 里的 PUA；'
                 '对 chapter_list：还原 title 字段里的 PUA（小说名 + 章名）。'
                 '同一站点的两次 save_script（list + content）必须传相同的 ocr 值。',
