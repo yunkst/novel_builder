@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.9.29+102
+version: 1.9.30+103
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -169,12 +169,10 @@ flutter:
         - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700
 
-  # OCR PoC 测试图与 PP-OCRv6 资源（PoC 跑完就删，不进入产品）
+  # PP-OCRv6 模型资源（inference.onnx + ppocrv6_dict.txt 已入库）。
+  # 注：tool/ocr_test_assets/ 下的测试图（chapter_full.png 等）被 .gitignore 排除、
+  # 不入库，故不在此声明——PoC 入口文件本机跑时本地提供即可。
   assets:
-    - tool/ocr_test_assets/chapter_full.png
-    - tool/ocr_test_assets/font.ttf
-    - tool/ocr_test_assets/pua_list.json
-    - tool/ocr_test_assets/chapter_raw_text.txt
     - assets/models/inference.onnx
     - assets/models/ppocrv6_dict.txt
 
