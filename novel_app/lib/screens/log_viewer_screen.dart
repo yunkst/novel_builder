@@ -56,7 +56,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   void _onLogChanged() {
     // 当日志发生变化时重新加载
     if (mounted) {
-      _loadLogs();
+      setState(() {
+        _loadLogs();
+      });
     }
   }
 
@@ -88,9 +90,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
       logs = loggerService.getLogs();
     }
 
-    setState(() {
-      _displayedLogs = logs;
-    });
+    _displayedLogs = logs;
   }
 
   /// 判断是否有活跃的过滤器
@@ -119,8 +119,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
     }
 
     final text = _displayedLogs.map((log) {
-      final stackTrace =
-          log.stackTrace != null ? '\n${log.stackTrace}' : '';
+      final stackTrace = log.stackTrace != null ? '\n${log.stackTrace}' : '';
       return '[${LoggerService.formatTimestamp(log.timestamp)}] [${log.level.label}] [${log.category.label}] ${log.message}$stackTrace';
     }).join('\n\n---\n\n');
 
@@ -177,7 +176,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
 
     if (confirmed == true && mounted) {
       await ref.read(loggerServiceProvider).clearLogs();
-      _loadLogs();
+      setState(() {
+        _loadLogs();
+      });
       ToastUtils.showSuccess('日志已清空');
     }
   }
@@ -334,74 +335,81 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                 if (_hasActiveFilter)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    color:
-                        Theme.of(context).colorScheme.secondaryContainer,
-                    child: Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        if (_selectedLevel != null)
-                          Chip(
-                            label: Text(
-                              '级别: ${_selectedLevel!.label}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            avatar: Icon(_selectedLevel!.icon,
-                                size: 14,
-                                color: _getLevelColor(_selectedLevel!)),
-                            onDeleted: () {
-                              setState(() {
-                                _selectedLevel = null;
-                                _loadLogs();
-                              });
-                            },
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        if (_selectedCategory != null)
-                          Chip(
-                            label: Text(
-                              '分类: ${_selectedCategory!.label}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            avatar: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _getCategoryColor(
-                                    _selectedCategory!),
-                                shape: BoxShape.circle,
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (_selectedLevel != null)
+                                Chip(
+                                  label: Text(
+                                    '级别: ${_selectedLevel!.label}',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  avatar: Icon(_selectedLevel!.icon,
+                                      size: 14,
+                                      color: _getLevelColor(_selectedLevel!)),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _selectedLevel = null;
+                                      _loadLogs();
+                                    });
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              if (_selectedCategory != null)
+                                Chip(
+                                  label: Text(
+                                    '分类: ${_selectedCategory!.label}',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  avatar: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _getCategoryColor(_selectedCategory!),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _selectedCategory = null;
+                                      _loadLogs();
+                                    });
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              if (_searchQuery.isNotEmpty)
+                                Chip(
+                                  label: Text(
+                                    '搜索: $_searchQuery',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  avatar: const Icon(Icons.search, size: 14),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _loadLogs();
+                                    });
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              TextButton(
+                                onPressed: _clearFilters,
+                                child: const Text('清除全部'),
                               ),
-                            ),
-                            onDeleted: () {
-                              setState(() {
-                                _selectedCategory = null;
-                                _loadLogs();
-                              });
-                            },
-                            visualDensity: VisualDensity.compact,
+                            ],
                           ),
-                        if (_searchQuery.isNotEmpty)
-                          Chip(
-                            label: Text(
-                              '搜索: $_searchQuery',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            avatar: const Icon(Icons.search, size: 14),
-                            onDeleted: () {
-                              setState(() {
-                                _searchQuery = '';
-                                _loadLogs();
-                              });
-                            },
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        TextButton(
-                          onPressed: _clearFilters,
-                          child: const Text('清除全部'),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 8),
                         Text(
                           '${_displayedLogs.length} 条',
                           style: TextStyle(
@@ -420,8 +428,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                     itemCount: _displayedLogs.length,
                     reverse: true,
                     itemBuilder: (context, index) {
-                      final log = _displayedLogs[
-                          _displayedLogs.length - 1 - index];
+                      final log =
+                          _displayedLogs[_displayedLogs.length - 1 - index];
                       return Card(
                         margin: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -433,8 +441,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                             color: _getLevelColor(log.level),
                           ),
                           title: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // 消息内容
                               Text(
@@ -459,40 +466,34 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                             .withValues(alpha: 0.2),
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize:
-                                        MaterialTapTargetSize
-                                            .shrinkWrap,
-                                    visualDensity:
-                                        VisualDensity.compact,
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
                                   ),
                                   ...log.tags.map((tag) => Chip(
                                         label: Text(
                                           tag,
-                                          style:
-                                              Theme.of(context).textTheme.bodySmall,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
                                         ),
-                                        backgroundColor:
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.1),
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.1),
                                         padding: EdgeInsets.zero,
                                         materialTapTargetSize:
-                                            MaterialTapTargetSize
-                                                .shrinkWrap,
-                                        visualDensity:
-                                            VisualDensity.compact,
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        visualDensity: VisualDensity.compact,
                                       )),
                                 ],
                               ),
                             ],
                           ),
                           subtitle: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                LoggerService.formatTimestamp(
-                                    log.timestamp),
+                                LoggerService.formatTimestamp(log.timestamp),
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall!
@@ -510,25 +511,26 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                                     _showStackTraceDialog(log);
                                   },
                                   child: Padding(
-                                    padding:
-                                        const EdgeInsets.only(top: 4),
+                                    padding: const EdgeInsets.only(top: 4),
                                     child: Text(
                                       '查看堆栈信息',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall!
                                           .copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        decoration:
-                                            TextDecoration.underline,
-                                      ),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
                                     ),
                                   ),
                                 ),
                             ],
                           ),
+                          onTap: () => _showLogDetailDialog(log),
+                          trailing: const Icon(Icons.chevron_right, size: 18),
                         ),
                       );
                     },
@@ -605,8 +607,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
             child: Text(
               log.stackTrace ?? '无堆栈信息',
               style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                fontFamily: 'monospace',
-              ),
+                    fontFamily: 'monospace',
+                  ),
             ),
           ),
         ),
@@ -617,12 +619,69 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
           ),
           TextButton(
             onPressed: () {
-              Clipboard.setData(
-                  ClipboardData(text: log.stackTrace ?? ''));
+              Clipboard.setData(ClipboardData(text: log.stackTrace ?? ''));
               Navigator.pop(context);
               ToastUtils.showSuccess('已复制堆栈信息');
             },
             child: const Text('复制'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 单条日志的纯文本格式（用于复制全部信息）
+  String _formatLogForCopy(LogEntry log) => LoggerService.formatLogForCopy(log);
+
+  /// 复制单条日志全部信息到剪贴板
+  Future<void> _copyLogEntry(LogEntry log) async {
+    final text = _formatLogForCopy(log);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ToastUtils.showSuccess('已复制日志全部信息到剪贴板');
+    }
+  }
+
+  /// 显示日志详情对话框
+  ///
+  /// 展示单条日志的全部字段（时间/级别/分类/标签/消息/堆栈），
+  /// 并提供"复制全部信息"按钮。展示内容与 [_formatLogForCopy] 一致，
+  /// 确保"所见即所复制"。
+  void _showLogDetailDialog(LogEntry log) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(log.level.icon, color: _getLevelColor(log.level)),
+            const SizedBox(width: 8),
+            const Text('日志详情'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              _formatLogForCopy(log),
+              style: Theme.of(ctx)
+                  .textTheme
+                  .bodySmall!
+                  .copyWith(fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('复制全部信息'),
+            onPressed: () async {
+              await _copyLogEntry(log);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
           ),
         ],
       ),
