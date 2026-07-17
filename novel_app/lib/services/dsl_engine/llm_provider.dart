@@ -634,13 +634,14 @@ class LlmProvider {
   ///
   /// [fromJson] — 从 `Map<String, dynamic>` 构造目标类型
   /// [schemaDescription] — JSON 结构描述（如 '格式: {"roles": [...], "background": "..."}'）
-  /// [retryOnParseError] — JSON 解析失败时自动重试次数（默认 1 次）
+  /// [retryOnParseError] — JSON 解析失败时应用层重试次数（默认 0 次，
+  ///   彻底交给 [withRetry] 的传输层重试；JSON 内容质量问题不应靠重试修复）
   /// [temperature] — 默认 0.3（低温度更确定性）
   Future<T?> chatForJson<T>({
     required List<ChatMessage> messages,
     required T Function(Map<String, dynamic>) fromJson,
     String schemaDescription = '',
-    int retryOnParseError = 1,
+    int retryOnParseError = 0,
     String? model,
     int? maxTokens,
     double? temperature,
@@ -934,8 +935,7 @@ class IoLlmHttpClient implements LlmHttpClient {
 
   /// 单次 HTTP 调用（被 [postJson] 包装重试）
   ///
-  /// 5xx → 抛 [RetryableHttpException]（withRetry 会重试）
-  /// 4xx → 抛 [NonRetryableHttpException]（withRetry 立即终止）
+  /// 4xx/5xx → 统一抛 [RetryableHttpException]（withRetry 全部重试）
   /// 2xx/3xx → 返回响应 body 字符串
   Future<String> _postJsonOnce(
       String url, Map<String, String> headers, String body) async {
@@ -969,34 +969,25 @@ class IoLlmHttpClient implements LlmHttpClient {
     );
 
     if (statusCode >= 400) {
+      // 所有 4xx/5xx 统一重试（用户策略：瞬态 4xx 也尽量自愈，避免直接打断会话）
       // 读 Retry-After 头（429/503 通常带）；解析失败返回 null 走指数退避
       final retryAfterMs = parseRetryAfterMs(
         response.headers.value('retry-after'),
       );
-      if (isRetryableStatus(statusCode)) {
-        LoggerService.instance.w(
-          'LLM HTTP $statusCode (retryable): '
-          '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
-          'url=$url',
-          category: LogCategory.ai,
-          stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
-          tags: ['dsl', 'llm', 'http', 'post_json', 'retryable'],
-        );
-        throw RetryableHttpException(
-          statusCode,
-          responseBody,
-          url,
-          retryAfterMs: retryAfterMs,
-        );
-      } else {
-        LoggerService.instance.w(
-          'LLM HTTP 4xx: $statusCode',
-          category: LogCategory.ai,
-          stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
-          tags: ['dsl', 'llm', 'http', 'post_json', 'non_retryable'],
-        );
-        throw NonRetryableHttpException(statusCode, responseBody, url);
-      }
+      LoggerService.instance.w(
+        'LLM HTTP $statusCode (retryable): '
+        '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
+        'url=$url',
+        category: LogCategory.ai,
+        stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
+        tags: ['dsl', 'llm', 'http', 'post_json', 'retryable'],
+      );
+      throw RetryableHttpException(
+        statusCode,
+        responseBody,
+        url,
+        retryAfterMs: retryAfterMs,
+      );
     }
     return responseBody;
   }
@@ -1025,7 +1016,7 @@ class IoLlmHttpClient implements LlmHttpClient {
   /// 流式握手阶段：到 statusCode 拿到为止
   ///
   /// 返回 [_StreamHandshake] 包含握手成功的 bodyStream 与日志上下文。
-  /// 5xx → 抛 [RetryableHttpException]；4xx → 抛 [NonRetryableHttpException]。
+  /// 4xx/5xx → 统一抛 [RetryableHttpException]。
   Future<_StreamHandshake> _postJsonStreamHandshake(
       String url, Map<String, String> headers, String body) async {
     final logId = _generateLogId();
@@ -1060,30 +1051,21 @@ class IoLlmHttpClient implements LlmHttpClient {
       final retryAfterMs = parseRetryAfterMs(
         response.headers.value('retry-after'),
       );
-      if (isRetryableStatus(statusCode)) {
-        LoggerService.instance.w(
-          'LLM HTTP $statusCode (stream, retryable): '
-          '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
-          'url=$url',
-          category: LogCategory.ai,
-          stackTrace: ctx,
-          tags: ['dsl', 'llm', 'http', 'stream_establish', 'retryable'],
-        );
-        throw RetryableHttpException(
-          statusCode,
-          errorBody,
-          url,
-          retryAfterMs: retryAfterMs,
-        );
-      } else {
-        LoggerService.instance.w(
-          'LLM HTTP 4xx (stream): $statusCode',
-          category: LogCategory.ai,
-          stackTrace: ctx,
-          tags: ['dsl', 'llm', 'http', 'stream_establish', 'non_retryable'],
-        );
-        throw NonRetryableHttpException(statusCode, errorBody, url);
-      }
+      // 所有 4xx/5xx 统一重试（用户策略：瞬态 4xx 也尽量自愈）
+      LoggerService.instance.w(
+        'LLM HTTP $statusCode (stream, retryable): '
+        '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
+        'url=$url',
+        category: LogCategory.ai,
+        stackTrace: ctx,
+        tags: ['dsl', 'llm', 'http', 'stream_establish', 'retryable'],
+      );
+      throw RetryableHttpException(
+        statusCode,
+        errorBody,
+        url,
+        retryAfterMs: retryAfterMs,
+      );
     }
     return _StreamHandshake(
       bodyStream: response.transform(utf8.decoder),

@@ -488,9 +488,9 @@ class AgentLoop {
   /// - [SocketException] / [HandshakeException] → true（TCP/TLS 层断开）
   /// - [TimeoutException] → true（来自 [chatStreamWithTools] 的 [Duration] 超时
   ///   或 dart:io HttpClient 超时）
-  /// - [RetryableHttpException]（5xx）→ true
-  /// - [FormatException] / [StateError] / 4xx [NonRetryableHttpException] →
-  ///   false（逻辑错误，重复执行无意义）
+  /// - [RetryableHttpException]（4xx/5xx）→ true（传输层 withRetry 已重试，
+  ///   此处为 round-level 兜底；自 2026-07-17 起 4xx 也统一可重试）
+  /// - [FormatException] / [StateError] → false（逻辑错误，重复执行无意义）
   bool _isTransientNetworkError(Object e) {
     if (e is SocketException) return true;
     if (e is HandshakeException) return true;

@@ -126,9 +126,8 @@ void main() {
       expect(calls, 2);
     });
 
-    test('RetryableHttpException 默认判定为可重试；NonRetryableHttpException 不重试',
-        () async {
-      // 可重试
+    test('RetryableHttpException（含 4xx/5xx）默认判定为可重试', () async {
+      // 5xx
       var calls = 0;
       await withRetry(
         () async {
@@ -144,23 +143,37 @@ void main() {
       );
       expect(calls, 2);
 
-      // 不可重试：立即抛出，只调一次
+      // 4xx 也走重试（自 2026-07-17 起统一策略）
       calls = 0;
-      await expectLater(
-        () => withRetry(
-          () async {
-            calls++;
-            throw const NonRetryableHttpException(400, '', '');
-          },
-          config: const RetryConfig(
-            maxAttempts: 3,
-            initialDelay: Duration(milliseconds: 1),
-          ),
-          label: 'test',
+      await withRetry(
+        () async {
+          calls++;
+          if (calls < 2) throw const RetryableHttpException(400, '', '');
+          return 'ok';
+        },
+        config: const RetryConfig(
+          maxAttempts: 3,
+          initialDelay: Duration(milliseconds: 1),
         ),
-        throwsA(isA<NonRetryableHttpException>()),
+        label: 'test',
       );
-      expect(calls, 1);
+      expect(calls, 2, reason: '4xx 错误也走重试');
+
+      // 401 鉴权错误同样重试
+      calls = 0;
+      await withRetry(
+        () async {
+          calls++;
+          if (calls < 2) throw const RetryableHttpException(401, '', '');
+          return 'ok';
+        },
+        config: const RetryConfig(
+          maxAttempts: 3,
+          initialDelay: Duration(milliseconds: 1),
+        ),
+        label: 'test',
+      );
+      expect(calls, 2, reason: '401 也走重试');
     });
 
     test('退避时间随 attempt 递增且有上限', () async {
@@ -236,9 +249,18 @@ void main() {
       );
     });
 
-    test('RetryableHttpException → true', () {
+    test('RetryableHttpException（含 4xx）→ true', () {
       expect(
         RetryConfig.defaultShouldRetry(const RetryableHttpException(500, '', '')),
+        true,
+      );
+      expect(
+        RetryConfig.defaultShouldRetry(const RetryableHttpException(400, '', '')),
+        true,
+        reason: '4xx 也统一可重试',
+      );
+      expect(
+        RetryConfig.defaultShouldRetry(const RetryableHttpException(401, '', '')),
         true,
       );
     });
@@ -250,13 +272,9 @@ void main() {
       );
     });
 
-    test('FormatException / StateError / NonRetryableHttpException → false', () {
+    test('FormatException / StateError → false（非 HTTP 逻辑错误）', () {
       expect(RetryConfig.defaultShouldRetry(const FormatException('x')), false);
       expect(RetryConfig.defaultShouldRetry(StateError('x')), false);
-      expect(
-        RetryConfig.defaultShouldRetry(const NonRetryableHttpException(400, '', '')),
-        false,
-      );
     });
   });
 
@@ -333,12 +351,10 @@ void main() {
     });
 
     test('Retry-After == 0 → 回退指数退避（防雷鸣群）', () async {
-      var calls = 0;
       final sw = Stopwatch()..start();
       try {
         await withRetry(
           () async {
-            calls++;
             throw const RetryableHttpException(429, '', '', retryAfterMs: 0);
           },
           config: const RetryConfig(
@@ -447,13 +463,13 @@ void main() {
       expect(isRetryableStatus(408), true);
     });
 
-    test('其余 4xx → false', () {
-      expect(isRetryableStatus(400), false);
-      expect(isRetryableStatus(401), false);
-      expect(isRetryableStatus(403), false);
-      expect(isRetryableStatus(404), false,
-          reason: '404 是 4xx，不应重试');
-      expect(isRetryableStatus(422), false);
+    test('所有 4xx + 5xx → true（含 400/401/403/404/422）', () {
+      expect(isRetryableStatus(400), true,
+          reason: '4xx 统一重试（用户策略：宁可多等也尽量自愈）');
+      expect(isRetryableStatus(401), true);
+      expect(isRetryableStatus(403), true);
+      expect(isRetryableStatus(404), true);
+      expect(isRetryableStatus(422), true);
     });
 
     test('2xx / 3xx → false', () {

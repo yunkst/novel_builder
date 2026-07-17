@@ -2,7 +2,7 @@
 ///
 /// 设计目标：
 /// - 仅用于阻塞调用（[Future<T>]）；流式重试由调用方控制握手阶段后 [yield*]
-/// - 默认仅重试瞬态错误（网络/超时/5xx），4xx 业务错误立即抛出
+/// - 默认重试所有 HTTP 错误（网络/超时/4xx/5xx）；非 HTTP 的 Dart 逻辑异常不重试
 /// - 退避：initialDelay * multiplier^(attempt-1)，clamp 到 maxDelay
 /// - 抖动：±jitterFactor（默认 25%），避免雷鸣群
 ///
@@ -22,10 +22,10 @@ import 'dart:math';
 
 import '../services/logger_service.dart';
 
-/// 区分可重试与不可重试 HTTP 错误
+/// HTTP 错误统一走 [RetryableHttpException]
 ///
-/// 5xx 走 [RetryableHttpException]，4xx 走 [NonRetryableHttpException]。
-/// [RetryConfig.defaultShouldRetry] 据此决定是否重试。
+/// 所有 4xx/5xx 统一抛 [RetryableHttpException]，[RetryConfig.defaultShouldRetry]
+/// 一律重试。非 HTTP 的 Dart 逻辑异常（FormatException/StateError 等）不重试。
 class RetryableHttpException implements Exception {
   final int statusCode;
   final String body;
@@ -50,17 +50,6 @@ class RetryableHttpException implements Exception {
   String toString() =>
       'RetryableHttpException(status=$statusCode, url=$url'
       '${retryAfterMs != null ? ', retryAfter=${retryAfterMs}ms' : ''})';
-}
-
-class NonRetryableHttpException implements Exception {
-  final int statusCode;
-  final String body;
-  final String url;
-  const NonRetryableHttpException(this.statusCode, this.body, this.url);
-
-  @override
-  String toString() =>
-      'NonRetryableHttpException(status=$statusCode, url=$url)';
 }
 
   /// 重试策略
@@ -191,13 +180,15 @@ int? parseRetryAfterMs(String? headerValue) {
   }
 }
 
-/// 判定 HTTP 状态码是否可重试（429/408/5xx）。
+/// 判定 HTTP 状态码是否可重试（所有 4xx + 5xx）。
 ///
+/// 自 2026-07-17 起所有 HTTP 错误统一重试：代理网关偶发 400/401、上游短暂
+/// 故障等瞬态 4xx 也纳入重试，避免直接打断会话——宁可指数退避多等也尽量自愈。
+///
+/// - 4xx：含 400/401/403/404/408/422/429，一律重试
 /// - 5xx：服务端错误，重试
-/// - 429：Too Many Requests，限流后重试
-/// - 408：Request Timeout，客户端超时但服务端建议重试
 ///
-/// 其余 4xx 业务错误（400/401/403/404 等）不重试，立即抛出。
+/// 2xx/3xx 成功响应不进入此判断（调用方仅在 statusCode >= 400 时调用）。
 bool isRetryableStatus(int statusCode) {
-  return statusCode >= 500 || statusCode == 429 || statusCode == 408;
+  return statusCode >= 400;
 }

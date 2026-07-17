@@ -1378,11 +1378,13 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       }
       return jsonEncode(outcome);
     } on TimeoutException {
-      // 仅由 callAsyncJavaScript 的 .timeout(120s) 触发（acquire 死锁已消除）。
+      // 兜底主脚本 .timeout(120s)。OCR 渲染超时（30s）已被
+      // validateAndPersistScript 内部 try/catch 转为 ocr_verify_timeout，
+      // 不会走到这里。
       return jsonEncode({
         'success': false,
         'reason': 'test_timeout',
-        'message': '脚本在 test_url 上执行超时（>120s）',
+        'message': '主脚本在 test_url 上执行超时(>120s)',
         'suggestion': '脚本可能卡在翻页/等待，检查 setTimeout 和翻页逻辑',
       });
     } catch (e, stackTrace) {
@@ -1516,8 +1518,25 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
         };
       }
       final fontFamily = _extractFontFamily(jsResult);
-      final ocrErr =
-          await _validateOcr(restoreService, fontFamily, jsResult, scriptType);
+      // OCR 验证内部 _renderPuaViaController 的 callAsyncJavaScript 带 30s 超时
+      // （ocr_render_js.dart 模板首行 await document.fonts.ready 在冷启动页面
+      // 上等字体下载，常 >30s）。这里单独捕获 TimeoutException 转 ocr_verify_timeout，
+      // 避免冒泡到 _saveScript 外层 on TimeoutException 被误报成 "主脚本 120s 超时"。
+      // 仅 catch TimeoutException：OCR 渲染失败抛的 Exception 仍冒泡走 internal_error。
+      Map<String, dynamic>? ocrErr;
+      try {
+        ocrErr = await _validateOcr(restoreService, fontFamily, jsResult, scriptType);
+      } on TimeoutException {
+        return {
+          'success': false,
+          'reason': 'ocr_verify_timeout',
+          'ocr_applied': true,
+          'message': 'OCR 验证阶段单字渲染超时(>30s)，通常因 save_script 冷启动页面后 @font-face 字体未下载完',
+          'diagnostic': 'document.fonts.ready 在 loadUrl(test_url) 之后未及时 resolve',
+          'suggestion': '这是字体冷加载耗时导致的误报，非提取脚本缺陷。'
+              '脚本本身已通过 execute_js 验证；若频繁出现，后续会在 loadUrl 后显式等 fonts.ready 再触发 OCR 验证',
+        };
+      }
       if (ocrErr != null) {
         return {'success': false, ...ocrErr};
       }
