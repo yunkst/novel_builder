@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/theme/app_colors.dart';
+import '../services/browser_settings_service.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
@@ -195,6 +196,16 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     },
                     onLoadStop: (controller, url) {
                       notifier.handleLoadStop(url);
+                      // 桌面模式：覆盖 viewport meta 到桌面宽，让宽度判断型
+                      // 站点切桌面布局。仅改 viewport，不影响 UA / 缩放配置。
+                      final isDesktop =
+                          ref.read(browserDesktopModeProvider).value ?? false;
+                      if (isDesktop) {
+                        controller.evaluateJavascript(
+                          source: BrowserSettingsService
+                              .desktopViewportOverrideJs,
+                        );
+                      }
                     },
                     onProgressChanged: (controller, progress) {
                       notifier.handleProgress(progress);

@@ -40,5 +40,16 @@ void main() {
           contains('Windows NT 10.0'));
       expect(BrowserSettingsService.desktopUserAgent, contains('Chrome/'));
     });
+
+    test('desktopViewportOverrideJs 含桌面宽 viewport 覆盖逻辑', () {
+      // 强制桌面宽，让响应式断点命中桌面分支
+      expect(BrowserSettingsService.desktopViewportOverrideJs,
+          contains('width=1024'));
+      expect(BrowserSettingsService.desktopViewportOverrideJs,
+          contains('name="viewport"'));
+      // 必须先删除旧 meta，避免站点原 viewport meta 残留干扰
+      expect(BrowserSettingsService.desktopViewportOverrideJs,
+          contains('remove()'));
+    });
   });
 }
