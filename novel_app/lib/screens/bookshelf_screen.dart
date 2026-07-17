@@ -92,6 +92,41 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     );
   }
 
+  /// 清除小说 AI 封面（恢复默认程序化占位图）
+  ///
+  /// 仅当存在 AI 封面（coverMediaId 非空）时入口可见。
+  /// 清空 coverMediaId 写 NULL，NovelCover 自动回退到程序化封面。
+  Future<void> _clearNovelCover(Novel novel) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: '清除封面',
+      message: '确定要清除《${novel.title}》的封面吗？\n清除后将恢复为默认占位封面。',
+      confirmText: '清除',
+    );
+
+    if (confirmed == true) {
+      try {
+        final novelRepository = ref.read(novelRepositoryProvider);
+        await novelRepository.updateCoverMediaIdByUrl(novel.url, null);
+        if (mounted) {
+          ToastUtils.showSuccess('封面已清除', context: context);
+        }
+        // 刷新书架列表，让 NovelCover 立即回退到程序化封面
+        ref.invalidate(bookshelfNovelsProvider);
+      } catch (e, stackTrace) {
+        if (!mounted) return;
+        ErrorHelper.showErrorWithLog(
+          context,
+          '清除封面失败',
+          error: e,
+          stackTrace: stackTrace,
+          category: LogCategory.database,
+          tags: ['bookshelf', 'clear_cover', 'failed'],
+        );
+      }
+    }
+  }
+
   /// 继续阅读 - 直接打开上次阅读的章节
   ///
   /// [novel] 要阅读的小说
@@ -340,8 +375,19 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                   _editNovelTitle(novel);
                 },
               ),
+              if (novel.coverMediaId != null && novel.coverMediaId!.isNotEmpty)
+                ListTile(
+                  leading: Icon(Icons.image_not_supported_outlined,
+                      color: colors.warning),
+                  title: const Text('清除封面'),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _clearNovelCover(novel);
+                  },
+                ),
               ListTile(
-                leading: Icon(Icons.drive_file_move_outline, color: colors.warning),
+                leading:
+                    Icon(Icons.drive_file_move_outline, color: colors.warning),
                 title: const Text('移动到书架'),
                 onTap: () {
                   Navigator.pop(sheetCtx);
@@ -562,7 +608,7 @@ class _ShelfMetaBar extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            '长按封面管理',
+            '长按管理',
             style: AppTypography.metaItalic.copyWith(
               fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
