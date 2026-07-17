@@ -250,6 +250,22 @@ class MockINovelRepository extends _i1.Mock implements _i3.INovelRepository {
         ),
         returnValue: _i4.Future<int>.value(0),
       ) as _i4.Future<int>);
+
+  @override
+  _i4.Future<int> updateCoverMediaIdByUrl(
+    String? novelUrl,
+    String? mediaId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateCoverMediaIdByUrl,
+          [
+            novelUrl,
+            mediaId,
+          ],
+        ),
+        returnValue: _i4.Future<int>.value(0),
+      ) as _i4.Future<int>);
 }
 
 /// A class which mocks [ChapterLoader].

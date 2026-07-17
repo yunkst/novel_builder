@@ -10,7 +10,6 @@ import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
 import '../widgets/webview_add_novel_button.dart';
-import 'model_download_manager_screen.dart';
 
 /// 浏览器主屏幕
 ///
@@ -125,9 +124,6 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                         case 'script':
                           _showScriptPanel(context);
                           break;
-                        case 'download':
-                          _showDownloadManager(context);
-                          break;
                         case 'desktopMode':
                           await ref
                               .read(browserDesktopModeProvider.notifier)
@@ -143,10 +139,6 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                       const PopupMenuItem<String>(
                         value: 'script',
                         child: Text('脚本管理'),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'download',
-                        child: Text('模型下载管理'),
                       ),
                       const PopupMenuDivider(),
                       PopupMenuItem<String>(
@@ -227,14 +219,6 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     onReceivedError: (controller, request, error) {
                       notifier.handleError(error);
                     },
-                    onDownloadStartRequest: (controller, request) {
-                      notifier.handleDownloadStart(
-                        url: request.url.toString(),
-                        context: context,
-                        ref: ref,
-                        sourcePage: ref.read(webviewCurrentUrlProvider),
-                      );
-                    },
                   ),
                 ),
               ],
@@ -280,15 +264,6 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => const SiteScriptPanel(),
-    );
-  }
-
-  /// 跳转到模型下载管理页
-  void _showDownloadManager(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ModelDownloadManagerScreen(),
-      ),
     );
   }
 }
