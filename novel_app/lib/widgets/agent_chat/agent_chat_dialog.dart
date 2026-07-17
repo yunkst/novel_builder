@@ -22,6 +22,7 @@ import 'package:novel_app/widgets/agent_chat/chat_history_sheet.dart';
 import 'package:novel_app/widgets/agent_chat/agent_message_bubble.dart';
 import 'package:novel_app/widgets/agent_chat/agent_novel_picker_dialog.dart';
 import 'package:novel_app/widgets/agent_chat/agent_scenario_config_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/retry_banner.dart';
 import 'package:novel_app/widgets/media/media_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -155,6 +156,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null && !chatState.isLoading)
                 _buildErrorBar(chatState.error!, session),
+              const RetryBanner(),
               _buildContextTag(),
               _buildInputBar(chatState, session),
             ],
