@@ -42,14 +42,15 @@ void main() {
     });
 
     test('desktopViewportOverrideJs 含桌面宽 viewport 覆盖逻辑', () {
+      final js = BrowserSettingsService.desktopViewportOverrideJs;
       // 强制桌面宽，让响应式断点命中桌面分支
-      expect(BrowserSettingsService.desktopViewportOverrideJs,
-          contains('width=1024'));
-      expect(BrowserSettingsService.desktopViewportOverrideJs,
-          contains('name="viewport"'));
-      // 必须先删除旧 meta，避免站点原 viewport meta 残留干扰
-      expect(BrowserSettingsService.desktopViewportOverrideJs,
-          contains('remove()'));
+      expect(js, contains('width=1200'));
+      expect(js, contains('name="viewport"'));
+      // 仅桌面 UA 执行：手机 UA 直接 return，不破坏手机布局
+      expect(js, contains('Windows NT'));
+      expect(js, contains('return;'));
+      // 允许用户双指缩放（PC 页在手机屏字小）
+      expect(js, contains('user-scalable=yes'));
     });
   });
 }

@@ -14,9 +14,10 @@ import 'services/network_service_providers.dart';
 /// 构造桌面/手机模式的 InAppWebViewSettings
 ///
 /// 把配置构造抽成纯函数以便单测（InAppWebViewController 是平台类无法 mock）。
-/// - 桌面: 桌面 UA + DESKTOP contentMode + overview 缩放
-/// - 手机: 空 UA(系统默认) + MOBILE contentMode
+/// - 桌面: 桌面 UA + DESKTOP contentMode + overview 缩放 + 开启缩放控件机制
+/// - 手机: 空 UA(系统默认) + MOBILE contentMode + 关闭桌面缩放按钮
 /// useWideViewPort 两种模式都 true（允许宽视口，避免挤压）。
+/// 缩放相关字段在两种模式都显式设置，避免运行时 setSettings 切换残留。
 InAppWebViewSettings desktopModeSettings(bool isDesktop) {
   return InAppWebViewSettings(
     javaScriptEnabled: true,
@@ -26,6 +27,11 @@ InAppWebViewSettings desktopModeSettings(bool isDesktop) {
     userAgent: isDesktop ? BrowserSettingsService.desktopUserAgent : '',
     useWideViewPort: true,
     loadWithOverviewMode: isDesktop,
+    // PC 网页在手机屏字小，桌面模式允许手势缩放（双指捏合）。
+    // 开启缩放控件机制但隐藏 +/- 按钮，避免遮挡内容。
+    supportZoom: true,
+    builtInZoomControls: isDesktop,
+    displayZoomControls: false,
   );
 }
 

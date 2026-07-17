@@ -19,6 +19,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -99,6 +100,30 @@ void main() {
 
       await waitForLoad(container);
       expect(container.read(browserDesktopModeProvider).value, isTrue);
+    });
+  });
+
+  group('desktopModeSettings', () {
+    test('桌面模式: DESKTOP contentMode + 桌面UA + overview + 缩放支持', () {
+      final s = desktopModeSettings(true);
+      expect(s.preferredContentMode, UserPreferredContentMode.DESKTOP);
+      expect(s.userAgent, BrowserSettingsService.desktopUserAgent);
+      expect(s.useWideViewPort, isTrue);
+      expect(s.loadWithOverviewMode, isTrue);
+      // PC 网页在手机屏字小，需支持手势缩放（双指捏合）
+      expect(s.supportZoom, isTrue);
+      expect(s.builtInZoomControls, isTrue);
+      expect(s.displayZoomControls, isFalse);
+    });
+
+    test('手机模式: MOBILE contentMode + 空UA + 不开桌面缩放按钮', () {
+      final s = desktopModeSettings(false);
+      expect(s.preferredContentMode, UserPreferredContentMode.MOBILE);
+      expect(s.userAgent, '');
+      expect(s.loadWithOverviewMode, isFalse);
+      // 显式关闭桌面缩放按钮配置，防止运行时切换 setSettings 残留
+      expect(s.builtInZoomControls, isFalse);
+      expect(s.displayZoomControls, isFalse);
     });
   });
 }

@@ -466,7 +466,7 @@ class LlmProvider {
       body['response_format'] = responseFormat;
     }
     if (tools != null && tools.isNotEmpty) {
-      body['tools'] = tools;
+      body['tools'] = _normalizeToolsSchema(tools);
     }
     if (toolChoice != null && toolChoice.isNotEmpty) {
       body['tool_choice'] = toolChoice;
@@ -475,6 +475,37 @@ class LlmProvider {
       body.addAll(extra);
     }
     return body;
+  }
+
+  /// 规范化 function 工具 schema，补全缺失的 `required` 字段。
+  ///
+  /// 严格的 OpenAI 兼容代理（new-api / OneAPI / 部分 DeepSeek 直连）在 JSON Schema
+  /// 校验时要求 `function.parameters.required` 必须是数组；缺失会被当作 `null`，
+  /// 导致 400 "null is not of type \"array\"`。webview_extract 等场景中的无参工具
+  /// 往往只写 `parameters: {type: 'object', properties: {}}` 而遗漏 `required`。
+  /// 本方法在请求体构造层统一补全：缺则补空数组，已有则原样保留。
+  List<Map<String, dynamic>> _normalizeToolsSchema(
+    List<Map<String, dynamic>> tools,
+  ) {
+    return tools.map((tool) {
+      final fn = tool['function'];
+      if (fn is! Map<String, dynamic>) return tool;
+
+      final params = fn['parameters'];
+      if (params is! Map<String, dynamic>) return tool;
+      if (params.containsKey('required')) return tool;
+
+      // 工具定义可能是 static const，必须深拷贝一层再修改
+      final newParams = Map<String, dynamic>.from(params);
+      newParams['required'] = <String>[];
+
+      final newFn = Map<String, dynamic>.from(fn);
+      newFn['parameters'] = newParams;
+
+      final newTool = Map<String, dynamic>.from(tool);
+      newTool['function'] = newFn;
+      return newTool;
+    }).toList();
   }
 
   /// 默认请求头
