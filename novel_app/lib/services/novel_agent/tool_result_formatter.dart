@@ -99,21 +99,27 @@ class ToolResultFormatter {
     return _hardClamp(combined, maxTotal);
   }
 
-  /// 硬兜底：若裁剪后仍超预算，补足缺失的闭合括号保证 JSON 合法
+  /// 硬兜底：若裁剪后仍超预算，在 JSON 结构字符处截断，保证字符串一定闭合
   ///
-  /// 算法估算误差可能让结果略超预算（如 50018 vs 50000）。
-  /// 由于 `_trimValue` 已经按预算为每个字段分配了字符数，硬校验主要是：
-  /// 1) 把超长部分（18 字符）截掉到 budget
-  /// 2) 数 {, [ 的开括号数，补对应数量的 } 让 JSON 结构完整
+  /// 原实现只统计 {, [ 深度，把截断点设在 raw [budget] 处，这会让截断点
+  /// 落在字符串字面量中间，导致 jsonDecode 报 Unterminated string
+  /// （OCR / HTML 等含大量特殊字符的长文本场景频发）。
+  ///
+  /// 修复：扫描时记录最后一个"截断后仍为合法 JSON 前缀"的位置 [bestEnd]
+  /// 及其括号深度 [bestDepth]，在该处截断并补缺失的 `}`。
+  /// 合法截断点 = 字符串外的 `,`（截到逗号前，保留前序字段）或 `}` / `]`
+  /// （截到括号后）。这样字符串字面量永远完整闭合。
   ///
   /// 这是最后兜底：正常情况下 `_trimValue` 的 10% 安全裕量足以避免走到这。
   String _hardClamp(String encoded, int budget) {
     if (encoded.length <= budget) return encoded;
 
-    // 从前往后数 {, [ 深度
     int depth = 0;
     bool inString = false;
     bool escaped = false;
+    int bestEnd = -1;
+    int bestDepth = 0;
+
     for (int i = 0; i < budget; i++) {
       final ch = encoded[i];
       if (escaped) {
@@ -129,16 +135,44 @@ class ToolResultFormatter {
         continue;
       }
       if (inString) continue;
+
       if (ch == '{' || ch == '[') depth++;
-      if (ch == '}' || ch == ']') depth--;
+      if (ch == '}' || ch == ']') {
+        depth--;
+        bestEnd = i + 1;
+        bestDepth = depth;
+      } else if (ch == ',') {
+        bestEnd = i;
+        bestDepth = depth;
+      }
     }
 
-    // 截到 budget 并补足缺失的 }
-    String cut = encoded.substring(0, budget);
-    if (depth > 0) {
-      cut = '$cut${'}' * depth}';
+    // 1) Prefer: truncate at structural char outside string
+    if (bestEnd > 0) {
+      final cut = encoded.substring(0, bestEnd);
+      final closing = bestDepth > 0 ? '}' * bestDepth : '';
+      return '$cut$closing';
     }
-    return cut;
+
+    // 2) Fallback: budget is entirely inside a string literal (single huge field).
+    //    Hand-rolling escape / surrogate boundary checks is error-prone, so let
+    //    jsonDecode itself be the judge: probe from budget downward, first point
+    //    that decodes cleanly wins. Rare path; perf acceptable.
+    if (depth <= 0) return '{}';
+    final closing = '}' * depth;
+    final close = '"$closing';
+    for (int tryK = budget - close.length; tryK > 0; tryK--) {
+      // skip UTF-16 low surrogate to avoid splitting surrogate pairs
+      if ((encoded.codeUnitAt(tryK) & 0xFC00) == 0xDC00) continue;
+      final candidate = '${encoded.substring(0, tryK)}$close';
+      try {
+        jsonDecode(candidate);
+        return candidate;
+      } catch (_) {
+        // truncation landed mid-escape or other invalid spot, try earlier
+      }
+    }
+    return '{}';
   }
 
   /// 错误分支：保留 error/message/suggestion + partial_data（不含 error 重复）
