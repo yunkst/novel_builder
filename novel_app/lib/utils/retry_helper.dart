@@ -100,11 +100,17 @@ final _rand = Random();
 /// 用 [config] 包裹 [fn] 的执行，失败时按指数退避 + 抖动重试
 ///
 /// [label] 仅用于日志标签（方便排查是哪个调用在重试）。
+/// [onRetry] 可选回调：每次重试前触发，参数为 `(attempt, maxAttempts,
+/// delayMs, error)`，可用于驱动 LLM 重试 UI 横幅等场景。默认 null，
+/// 不传则完全向后兼容（旧调用点零行为变化）。回调抛出的异常会被吞掉，
+/// 不影响重试主流程。
 /// 最终失败时抛出**最后一次**的异常（不会用 RetryableHttpException 包它）。
 Future<T> withRetry<T>(
   Future<T> Function() fn, {
   RetryConfig config = const RetryConfig(),
   String label = 'retry',
+  void Function(int attempt, int maxAttempts, int delayMs, Object error)?
+      onRetry,
 }) async {
   final should = config.shouldRetry ?? RetryConfig.defaultShouldRetry;
   Object? lastError;
@@ -128,6 +134,15 @@ Future<T> withRetry<T>(
         category: LogCategory.network,
         tags: ['retry', label],
       );
+      // 通知调用方（用于 LLM 重试 UI 横幅等场景）；null 时不调用，
+      // 完全向后兼容。回调抛错被吞掉，不影响重试主流程。
+      if (onRetry != null) {
+        try {
+          onRetry(attempt, config.maxAttempts, delayMs, e);
+        } catch (_) {
+          // onRetry 异常被吞掉，不影响重试主流程
+        }
+      }
       await Future<void>.delayed(Duration(milliseconds: delayMs));
     }
   }

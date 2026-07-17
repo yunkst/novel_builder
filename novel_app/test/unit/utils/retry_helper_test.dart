@@ -229,6 +229,82 @@ void main() {
       expect(inRange, greaterThan(durations.length * 0.8),
           reason: '80% 以上的样本应落在退避 ±25% 区间');
     });
+
+    group('withRetry.onRetry 回调', () {
+      test('首次成功 → onRetry 调用 0 次', () async {
+        final calls = <List<int>>[]; // [attempt, maxAttempts]
+        final result = await withRetry(
+          () async => 'ok',
+          config: const RetryConfig(
+            maxAttempts: 3,
+            initialDelay: Duration(milliseconds: 1),
+          ),
+          onRetry: (a, m, d, e) => calls.add([a, m]),
+        );
+        expect(result, 'ok');
+        expect(calls, isEmpty);
+      });
+
+      test('第 1 次失败,第 2 次成功 → onRetry 调用 1 次,attempt=1',
+          () async {
+        final calls = <List<int>>[];
+        var invocations = 0;
+        final result = await withRetry(
+          () async {
+            invocations++;
+            if (invocations < 2) throw const SocketException('boom');
+            return 'ok';
+          },
+          config: const RetryConfig(
+            maxAttempts: 3,
+            initialDelay: Duration(milliseconds: 1),
+          ),
+          onRetry: (a, m, d, e) {
+            calls.add([a, m, d]);
+          },
+        );
+        expect(result, 'ok');
+        expect(invocations, 2);
+        expect(calls, hasLength(1));
+        expect(calls.first[0], 1, reason: '失败 → 重试 1 次 → attempt=1');
+        expect(calls.first[1], 3, reason: 'maxAttempts 透传');
+        expect(calls.first[2], greaterThan(0), reason: 'delayMs > 0');
+      });
+
+      test('全失败 maxAttempts=3 → onRetry 调用 2 次 (maxAttempts-1)',
+          () async {
+        final calls = <int>[];
+        await expectLater(
+          () => withRetry(
+            () async => throw const SocketException('always'),
+            config: const RetryConfig(
+              maxAttempts: 3,
+              initialDelay: Duration(milliseconds: 1),
+            ),
+            onRetry: (a, m, d, e) => calls.add(a),
+          ),
+          throwsA(isA<SocketException>()),
+        );
+        expect(calls, [1, 2], reason: '全失败 → 重试 2 次 → attempt 1,2');
+      });
+
+      test('onRetry=null 默认行为不变(向后兼容)', () async {
+        var invocations = 0;
+        final result = await withRetry(
+          () async {
+            invocations++;
+            if (invocations < 2) throw const SocketException('boom');
+            return 'ok';
+          },
+          config: const RetryConfig(
+            maxAttempts: 3,
+            initialDelay: Duration(milliseconds: 1),
+          ),
+        );
+        expect(result, 'ok');
+        expect(invocations, 2, reason: '默认值 null → 不调用 onRetry,行为不变');
+      });
+    });
   });
 
   group('RetryConfig.defaultShouldRetry', () {
