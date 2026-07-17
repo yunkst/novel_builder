@@ -17,6 +17,7 @@ import 'dart:io' as io;
 import 'dart:math';
 
 import 'package:novel_app/services/llm_logger/llm_logger.dart';
+import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/utils/json_utils.dart';
 import 'package:novel_app/utils/retry_helper.dart';
@@ -930,6 +931,18 @@ class IoLlmHttpClient implements LlmHttpClient {
     return withRetry(
       () => _postJsonOnce(url, headers, body),
       label: 'llm_post',
+      onRetry: (a, m, d, e) {
+        try {
+          RetrySignals.instance.reportTransport(
+            attempt: a,
+            maxAttempts: m,
+            delayMs: d,
+            error: e,
+          );
+        } catch (_) {
+          // report 失败不影响重试
+        }
+      },
     );
   }
 
@@ -989,6 +1002,7 @@ class IoLlmHttpClient implements LlmHttpClient {
         retryAfterMs: retryAfterMs,
       );
     }
+    RetrySignals.instance.clear();
     return responseBody;
   }
 
@@ -1003,6 +1017,18 @@ class IoLlmHttpClient implements LlmHttpClient {
       () => _postJsonStreamHandshake(url, headers, body),
       config: const RetryConfig(maxAttempts: 3),
       label: 'llm_stream_establish',
+      onRetry: (a, m, d, e) {
+        try {
+          RetrySignals.instance.reportTransport(
+            attempt: a,
+            maxAttempts: m,
+            delayMs: d,
+            error: e,
+          );
+        } catch (_) {
+          // report 失败不影响重试
+        }
+      },
     );
 
     yield* _wrapStreamWithLogging(
@@ -1067,6 +1093,7 @@ class IoLlmHttpClient implements LlmHttpClient {
         retryAfterMs: retryAfterMs,
       );
     }
+    RetrySignals.instance.clear();
     return _StreamHandshake(
       bodyStream: response.transform(utf8.decoder),
       logId: logId,
