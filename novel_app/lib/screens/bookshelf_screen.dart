@@ -102,10 +102,9 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// 复用 [ImagePickerService]（相册选图 + 自由裁剪）+ [MediaProxy.upload]
   /// 生成 `local_` mediaId，写入 bookshelf.coverMediaId，并刷新书架列表。
   /// 用户在选图/裁剪任一步取消则静默返回；图片 >10MB 提示。
+  ///
+  /// 注意：用 url 定位（书架页 Novel 不含 id，避免 novelId==null 静默失败）。
   Future<void> _setNovelCover(Novel novel) async {
-    final novelId = novel.id;
-    if (novelId == null) return;
-
     Uint8List? bytes;
     try {
       bytes = await ImagePickerService().pickAndCrop();
@@ -132,13 +131,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
           await ref.read(mediaProxyProvider).upload(bytes, MediaKind.image);
       await ref
           .read(novelRepositoryProvider)
-          .updateCoverMediaIdById(novelId, mediaId);
+          .updateCoverMediaIdByUrl(novel.url, mediaId);
       ref.invalidate(bookshelfNovelsProvider);
       if (mounted) {
         ToastUtils.showSuccess('封面已设置', context: context);
       }
       LoggerService.instance.i(
-        '设置封面: novelId=$novelId mediaId=$mediaId',
+        '设置封面: novelUrl=${novel.url} mediaId=$mediaId',
         category: LogCategory.database,
         tags: ['bookshelf', 'cover', 'set'],
       );
@@ -159,20 +158,19 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   ///
   /// 与 set_novel_cover 工具的 mediaId=null 语义一致——media 是共享资源，
   /// 同一张图也可能被章节插图/角色头像引用，故不在此级联删除文件。
+  ///
+  /// 用 url 定位（书架页 Novel 不含 id，避免 novelId==null 静默失败）。
   Future<void> _removeNovelCover(Novel novel) async {
-    final novelId = novel.id;
-    if (novelId == null) return;
-
     try {
       await ref
           .read(novelRepositoryProvider)
-          .updateCoverMediaIdById(novelId, null);
+          .updateCoverMediaIdByUrl(novel.url, null);
       ref.invalidate(bookshelfNovelsProvider);
       if (mounted) {
         ToastUtils.showSuccess('封面已删除', context: context);
       }
       LoggerService.instance.i(
-        '删除封面: novelId=$novelId',
+        '删除封面: novelUrl=${novel.url}',
         category: LogCategory.database,
         tags: ['bookshelf', 'cover', 'remove'],
       );
@@ -438,7 +436,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                 },
               ),
               ListTile(
-                leading: Icon(Icons.drive_file_move_outline, color: colors.warning),
+                leading:
+                    Icon(Icons.drive_file_move_outline, color: colors.warning),
                 title: const Text('移动到书架'),
                 onTap: () {
                   Navigator.pop(sheetCtx);
@@ -676,7 +675,7 @@ class _ShelfMetaBar extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            '长按封面管理',
+            '长按管理',
             style: AppTypography.metaItalic.copyWith(
               fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),

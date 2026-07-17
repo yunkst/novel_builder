@@ -402,4 +402,33 @@ class NovelRepository extends BaseRepository implements INovelRepository {
       rethrow;
     }
   }
+
+  /// 根据 URL 更新小说封面媒体 ID
+  ///
+  /// 书架页 UI 清封面用（`getNovelsByBookshelf` 返回的 Novel 不含 id，
+  /// UI 只能拿到 url）。与 [updateCoverMediaIdById] 等价，定位键不同。
+  @override
+  Future<int> updateCoverMediaIdByUrl(String novelUrl, String? mediaId) async {
+    if (isWebPlatform) {
+      return 0;
+    }
+
+    try {
+      final db = await database;
+      return await db.update(
+        'bookshelf',
+        {'coverMediaId': mediaId},
+        where: 'url = ?',
+        whereArgs: [novelUrl],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新封面失败: url=$novelUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['novel', 'cover', 'failed'],
+      );
+      rethrow;
+    }
+  }
 }

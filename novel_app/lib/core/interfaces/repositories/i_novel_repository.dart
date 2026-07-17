@@ -112,4 +112,13 @@ abstract class INovelRepository {
   ///   传 null 表示清空封面（回到程序化占位）
   /// 返回受影响的行数，ID 不存在则返回 0
   Future<int> updateCoverMediaIdById(int id, String? mediaId);
+
+  /// 根据 URL 更新小说封面媒体 ID
+  ///
+  /// 与 [updateCoverMediaIdById] 等价，但以 URL 定位。书架页 UI 用本方法
+  /// （`getNovelsByBookshelf` 返回的 Novel 不含 id，UI 侧只能拿到 url）。
+  /// [novelUrl] 小说 URL（唯一标识）
+  /// [mediaId] 媒体资源 ID，传 null 表示清空封面（回到程序化占位）
+  /// 返回受影响的行数，URL 不存在则返回 0
+  Future<int> updateCoverMediaIdByUrl(String novelUrl, String? mediaId);
 }

@@ -53,4 +53,37 @@ void main() {
     final affected = await repo.updateCoverMediaIdById(99999, 'media-x');
     expect(affected, 0);
   });
+
+  // ========== updateCoverMediaIdByUrl（书架页 UI 清封面用） ==========
+
+  test('updateCoverMediaIdByUrl 写入 mediaId 后可读回', () async {
+    final id = await seedNovel('custom://u1');
+    final affected =
+        await repo.updateCoverMediaIdByUrl('custom://u1', 'media-u1');
+    expect(affected, 1);
+
+    final novel = await repo.getNovelByUrl('custom://u1');
+    expect(novel?.coverMediaId, 'media-u1');
+    // 交叉验证 id-based 也读到一致
+    final byId = await repo.getNovelById(id);
+    expect(byId?.coverMediaId, 'media-u1');
+  });
+
+  test('updateCoverMediaIdByUrl 传入 null 清空封面', () async {
+    await seedNovel('custom://u2');
+    await repo.updateCoverMediaIdByUrl('custom://u2', 'media-u2');
+    final affected = await repo.updateCoverMediaIdByUrl('custom://u2', null);
+    expect(affected, 1);
+
+    final novel = await repo.getNovelByUrl('custom://u2');
+    expect(novel?.coverMediaId, isNull);
+  });
+
+  test('updateCoverMediaIdByUrl 不存在的 url 返回 0', () async {
+    final affected = await repo.updateCoverMediaIdByUrl(
+      'custom://not-exist',
+      'media-x',
+    );
+    expect(affected, 0);
+  });
 }
