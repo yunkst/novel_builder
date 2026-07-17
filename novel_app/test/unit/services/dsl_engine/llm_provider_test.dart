@@ -192,6 +192,66 @@ void main() {
 
       expect(body['response_format'], {'type': 'json_object'});
     });
+
+    test('tools 缺少 required 时自动补全为空数组（OpenAI 兼容代理兼容）', () {
+      // 背景：严格的 OpenAI 兼容代理（new-api / OneAPI / 部分直连 DeepSeek）
+      // 要求 function.parameters.required 必须是数组；缺失会被当作 null
+      // 报 400 "null is not of type \"array\""。
+      // webview_extract 场景的无参工具（get_page_info 等）恰好缺 required 字段，
+      // 必须在请求体构造层统一补全。
+      final provider = LlmProvider(LlmConfig(
+        baseUrl: 'https://api.deepseek.com/v1',
+        apiKey: 'sk-test',
+        defaultModel: 'deepseek-chat',
+      ), httpClient: _FakeHttpClient());
+
+      final tools = <Map<String, dynamic>>[
+        {
+          'type': 'function',
+          'function': {
+            'name': 'get_page_info',
+            'description': 'desc',
+            'parameters': {
+              'type': 'object',
+              'properties': <String, dynamic>{},
+              // 故意不写 required
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'navigate_to',
+            'description': 'desc',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'url': {'type': 'string'},
+              },
+              'required': ['url'], // 已有 required，不应被改动
+            },
+          },
+        },
+      ];
+
+      final body = provider.buildRequestBody(
+        messages: [ChatMessage(role: 'user', content: 'hi')],
+        tools: tools,
+        toolChoice: 'auto',
+      );
+
+      final outTools = body['tools'] as List;
+      expect(outTools.length, 2);
+
+      // 缺 required → 补空数组（修复后此断言通过，修复前为 null → 失败）
+      final p1 = (outTools[0] as Map)['function']['parameters'] as Map;
+      expect(p1['required'], isA<List>());
+      expect(p1['required'] as List, isEmpty);
+
+      // 已有 required → 原样保留
+      final p2 = (outTools[1] as Map)['function']['parameters'] as Map;
+      expect(p2['required'], ['url']);
+    });
   });
 
   group('LlmProvider URL construction', () {
