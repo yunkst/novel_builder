@@ -59,9 +59,10 @@ void main() {
 
     // 旧版本第 4 步签名（list_run_id + content_run_id）必须已被替换
     expect(prompt, isNot(contains('save_script(domain, list_run_id, content_run_id)')));
-    // 新流程引用
-    expect(prompt, contains('save_script 分两次落库'));
-    expect(prompt, contains('落库前自动验证'));
+    // 新流程引用：分两个阶段完成 + 落库前强制试运行验证
+    expect(prompt, contains('分两个阶段完成'));
+    expect(prompt, contains('落库前'));
+    expect(prompt, contains('强制试运行验证'));
   });
 
   test('prompt run_id 机制段已使用新 schema', () {
@@ -73,5 +74,14 @@ void main() {
     expect(prompt, isNot(contains('content_run_id=<id>')));
     // 新版保存示例
     expect(prompt, contains('save_script(domain, run_id=<id>, script_type=..., test_url=..., ocr=...)'));
+  });
+
+  test('prompt 工作流程含 get_cached_script 的 present/missing 增量反馈', () {
+    final scenario = buildScenario();
+    final prompt = scenario.buildSystemPrompt(testContext());
+
+    // Agent 应能从 prompt 知道：get_cached_script 返回 present/missing，并按 missing 补缺失项
+    expect(prompt, contains('present/missing'));
+    expect(prompt, contains('缺失项只补缺失的那一种'));
   });
 }
