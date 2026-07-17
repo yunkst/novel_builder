@@ -13,6 +13,7 @@ import 'package:novel_app/utils/cancellation_token.dart';
 import 'package:novel_app/utils/retry_helper.dart' show RetryableHttpException;
 
 import '../dsl_engine/llm_provider.dart';
+import '../dsl_engine/retry_signals.dart';
 import 'agent_event.dart';
 import 'agent_scenario.dart';
 import 'context_compactor.dart';
@@ -332,6 +333,7 @@ class AgentLoop {
           }
 
           emit(const AgentDoneEvent());
+          RetrySignals.instance.clear();
           LoggerService.instance.i('Agent 循环完成（无工具调用，共 $round 轮, scenario=${_scenario.id}）',
               category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);
           return;
@@ -412,6 +414,26 @@ class AgentLoop {
             stackTrace: stack.toString(),
             tags: ['agent', 'loop', 'round_retry', _scenario.id],
           );
+          // 同一行:emit 事件(供未来 subagent 详情页)+ 直接调
+          // RetrySignals(走 UI 横幅,绕开事件流过滤 — spec §3.1.1 方案 B)。
+          // 顺序:先 reportRound → 后 emit RetryEvent,以便 emit 回调
+          // (如 EventTagger 子 Agent 详情)读到一致的 RetryState。
+          try {
+            RetrySignals.instance.reportRound(
+              attempt: roundRetryCount,
+              maxAttempts: _config.networkRetryPerRound,
+              delayMs: delay.inMilliseconds,
+              error: e,
+            );
+          } catch (_) {
+            // report 失败不影响重试主流程
+          }
+          emit(RetryEvent(
+            attempt: roundRetryCount,
+            maxAttempts: _config.networkRetryPerRound,
+            delayMs: delay.inMilliseconds,
+            errorCategory: categorizeRetryError(e),
+          ));
           await Future<void>.delayed(delay);
           // 退避期间收到取消 → 优雅结束，不再重试
           if (cancellationToken?.isCancelled == true) {
@@ -420,6 +442,7 @@ class AgentLoop {
                 category: LogCategory.ai,
                 tags: ['agent', 'loop', 'round_retry', 'cancelled', _scenario.id]);
             emit(const AgentDoneEvent());
+            RetrySignals.instance.clear();
             return;
           }
           continue; // 重试本轮，不递增 round
@@ -431,6 +454,7 @@ class AgentLoop {
             category: LogCategory.ai,
             tags: ['agent', 'loop', 'error', _scenario.id]);
         emit(AgentErrorEvent(e.toString()));
+        RetrySignals.instance.clear();
         return;
       }
     }
@@ -457,6 +481,7 @@ class AgentLoop {
       );
     }
     emit(const AgentDoneEvent());
+    RetrySignals.instance.clear();
     LoggerService.instance.i('Agent 循环完成（达到最大轮数, scenario=${_scenario.id}）',
         category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);
   }

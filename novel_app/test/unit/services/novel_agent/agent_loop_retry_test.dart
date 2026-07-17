@@ -21,6 +21,7 @@ import 'dart:io' show SocketException;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/llm_provider.dart';
+import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
@@ -361,6 +362,117 @@ void main() {
       final events = await runLoop(loop);
       expect(llm.callCount, 2);
       expect(events.last, isA<AgentDoneEvent>());
+    });
+
+    test('RetryableHttpException(401) → round 重试 → 成功（鉴权 4xx 也统一重试）',
+        () async {
+      // 模拟 token 偶发过期 → round-level 兜底重试。
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const RetryableHttpException(
+          401, 'unauthorized', '',
+          retryAfterMs: 50,
+        ))
+        ..enqueue(
+          response: const _ScriptedResponse(contentChunks: ['鉴权后恢复']),
+        );
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      final events = await runLoop(loop);
+      expect(llm.callCount, 2);
+      expect(events.last, isA<AgentDoneEvent>());
+    });
+  });
+
+  group('Round-level RetryEvent + RetrySignals 接线', () {
+    setUp(() => RetrySignals.instance.resetForTest());
+    tearDown(() => RetrySignals.instance.resetForTest());
+
+    test('RetryableHttpException(503) → emit RetryEvent + RetrySignals.reportRound',
+        () async {
+      final emitted = <AgentEvent>[];
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const RetryableHttpException(503, 'mt', ''))
+        ..enqueue(
+          response: const _ScriptedResponse(contentChunks: ['已恢复']),
+        );
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(maxRounds: 5, networkRetryPerRound: 2),
+      );
+      await loop.run(
+        initialMessages: const [ChatMessage(role: 'user', content: 'hi')],
+        systemPrompt: 'sys',
+        emit: emitted.add,
+      );
+
+      final retryEvents =
+          emitted.whereType<RetryEvent>().toList(growable: false);
+      expect(retryEvents, hasLength(1),
+          reason: 'round-level 抛错一次 → emit RetryEvent 一次');
+      expect(retryEvents.first.attempt, 1);
+      expect(retryEvents.first.maxAttempts, 2,
+          reason: 'maxAttempts 来自 _config.networkRetryPerRound');
+      expect(retryEvents.first.errorCategory, '服务端 503');
+
+      // loop 成功结束 → AgentDoneEvent 已 clear,横幅消失。
+      // (RetrySignals 在 round-level 重试前已 reportRound,但 AgentDoneEvent
+      // emit 后被 clear() — 通过下方断言确认时序)
+      expect(RetrySignals.instance.notifier.value, isNull,
+          reason: 'AgentDoneEvent 后 RetrySignals.clear()');
+    });
+
+    test('SocketException 抛尽 → AgentErrorEvent → RetrySignals.clear()',
+        () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const SocketException('a'))
+        ..enqueue(throwMode: const SocketException('b'))
+        ..enqueue(throwMode: const SocketException('c'));
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      // 先制造一个 active state,验证 loop 结束(AgentErrorEvent)时被 clear
+      RetrySignals.instance.reportRound(
+        attempt: 1,
+        maxAttempts: 2,
+        delayMs: 1000,
+        error: const SocketException('before-loop'),
+      );
+      expect(RetrySignals.instance.notifier.value, isNotNull,
+          reason: 'sanity: signal 在 loop 前是 active');
+
+      await loop.run(
+        initialMessages: const [ChatMessage(role: 'user', content: 'hi')],
+        systemPrompt: 'sys',
+        emit: (e) {},
+      );
+
+      expect(RetrySignals.instance.notifier.value, isNull,
+          reason: 'AgentErrorEvent 后 RetrySignals.clear()');
+    });
+
+    test('成功后 AgentDoneEvent → RetrySignals.clear()', () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(throwMode: const RetryableHttpException(503, 'mt', ''))
+        ..enqueue(response: const _ScriptedResponse(contentChunks: ['ok']));
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      await loop.run(
+        initialMessages: const [ChatMessage(role: 'user', content: 'hi')],
+        systemPrompt: 'sys',
+        emit: (e) {},
+      );
+
+      expect(RetrySignals.instance.notifier.value, isNull,
+          reason: 'AgentDoneEvent 后 RetrySignals.clear()');
     });
   });
 }
