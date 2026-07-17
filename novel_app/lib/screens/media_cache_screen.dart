@@ -19,7 +19,9 @@ import '../../services/media/media_proxy.dart';
 import '../../services/media/media_store.dart';
 import '../../services/media/media_types.dart';
 import '../../utils/format_utils.dart';
-import '../widgets/common/confirm_dialog.dart';
+import '../../widgets/common/confirm_dialog.dart';
+import '../../widgets/media/media_view.dart';
+import 'package:photo_view/photo_view.dart';
 
 class MediaCacheScreen extends ConsumerStatefulWidget {
   const MediaCacheScreen({super.key});
@@ -221,7 +223,7 @@ class _MediaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListTile(
-      leading: _thumb(),
+      leading: _thumb(context),
       title: Text(
         item.mediaId,
         maxLines: 1,
@@ -246,23 +248,110 @@ class _MediaTile extends StatelessWidget {
     );
   }
 
-  Widget _thumb() {
+  Widget _thumb(BuildContext context) {
     if (item.kind == MediaKind.video) {
-      return const Icon(Icons.play_circle_outline);
+      return GestureDetector(
+        onTap: () => _openVideo(context),
+        child: const Icon(Icons.play_circle_outline),
+      );
     }
     return FutureBuilder<File?>(
       future: MediaStore.instance.getFile(item.mediaId, MediaKind.image),
       builder: (context, snap) {
         final f = snap.data;
         if (f != null) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child:
-                Image.file(f, width: 44, height: 44, fit: BoxFit.cover),
+          return GestureDetector(
+            onTap: () => _openImage(context, f),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Hero(
+                tag: 'media_cache_image_${item.mediaId}',
+                child: Image.file(
+                  f,
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
           );
         }
         return const Icon(Icons.image_outlined);
       },
+    );
+  }
+
+  void _openImage(BuildContext context, File file) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MediaImagePreviewScreen(
+          file: file,
+          heroTag: 'media_cache_image_${item.mediaId}',
+        ),
+      ),
+    );
+  }
+
+  void _openVideo(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MediaView(
+          mediaId: item.mediaId,
+          fullscreen: true,
+        ),
+      ),
+    );
+  }
+}
+
+/// 本地图片全屏预览页
+///
+/// 使用 PhotoView 支持缩放，带 Hero 过渡和单击退出。
+class MediaImagePreviewScreen extends StatefulWidget {
+  final File file;
+  final String heroTag;
+
+  /// 图片内容构建器；默认使用 PhotoView 支持缩放。
+  /// 测试时可注入轻量 widget 避免 PhotoView 动画挂起。
+  final Widget Function(BuildContext context, File file)? imageBuilder;
+
+  const MediaImagePreviewScreen({
+    required this.file,
+    required this.heroTag,
+    this.imageBuilder,
+  });
+
+  @override
+  State<MediaImagePreviewScreen> createState() => _MediaImagePreviewScreenState();
+}
+
+class _MediaImagePreviewScreenState extends State<MediaImagePreviewScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final builder = widget.imageBuilder ??
+        (context, file) => PhotoView(
+              imageProvider: FileImage(file),
+              backgroundDecoration: const BoxDecoration(color: Colors.black),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 4,
+              loadingBuilder: (_, __) => const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Hero(
+          tag: widget.heroTag,
+          child: builder(context, widget.file),
+        ),
+      ),
     );
   }
 }
