@@ -242,6 +242,37 @@ class ChatSessionRepository extends BaseRepository
   }
 
   @override
+  Future<int> updateMessageContent(int messageId, String content) async {
+    try {
+      final db = await database;
+      final updated = await db.update(
+        _tableMessages,
+        {
+          'content': content,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [messageId],
+      );
+      LoggerService.instance.d(
+        '更新消息内容: messageId=$messageId 影响 $updated 行',
+        category: LogCategory.database,
+        tags: ['chat_message', 'update_content', 'success'],
+      );
+      return updated;
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '更新消息内容失败: messageId=$messageId - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chat_message', 'update_content', 'failed'],
+      );
+      // 落库失败不应影响 UI 已更新的结果，返回 0 表示无影响
+      return 0;
+    }
+  }
+
+  @override
   Future<List<ChatMessageRecord>> listMessages(
     int sessionId, {
     int? limit,

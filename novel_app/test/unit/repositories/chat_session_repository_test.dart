@@ -209,5 +209,39 @@ void main() {
       final after = await repo.getSession(sid);
       expect(after!.updatedAt.isAfter(before!.updatedAt), isTrue);
     });
+
+    test('updateMessageContent 覆盖单条消息 content（重试落库）', () async {
+      final sid = await repo.createSession(
+          ChatSession(scenarioId: 'writing', title: 'retry update'));
+      // 先写一条 tool 消息
+      await repo.appendMessage(ChatMessageRecord.fromAgentMessage(
+          sid,
+          0,
+          ChatMessage(
+              role: 'tool', content: '{"old":true}', toolCallId: 'c1')));
+      final before = await repo.getSession(sid);
+      await Future.delayed(const Duration(milliseconds: 5));
+
+      final messages = await repo.listMessages(sid);
+      final msgId = messages.first.id!;
+      final affected = await repo.updateMessageContent(msgId, '{"new":true}');
+
+      expect(affected, 1);
+      final reloaded = await repo.listMessages(sid);
+      expect(reloaded.first.content, '{"new":true}',
+          reason: 'content 应被新结果覆盖');
+
+      final after = await repo.getSession(sid);
+      expect(
+          after!.updatedAt == before!.updatedAt,
+          isTrue,
+          reason:
+              'updateMessageContent 不应刷新 session.updatedAt（重试不改会话活跃度）');
+    });
+
+    test('updateMessageContent 不存在的 messageId 返回 0（不抛异常）', () async {
+      final affected = await repo.updateMessageContent(99999, '{"x":1}');
+      expect(affected, 0);
+    });
   });
 }

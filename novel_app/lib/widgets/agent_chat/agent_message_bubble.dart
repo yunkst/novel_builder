@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
+import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
 import 'package:novel_app/models/agent_chat_message.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'chapter_rewrite_entry_card.dart';
@@ -223,6 +224,7 @@ class AgentMessageBubble extends ConsumerWidget {
                 bottom: isLast ? 0 : 4,
               ),
               // dispatch_subagent 走 SubagentToolCard（任务 10），点击跳转详情页（任务 11）。
+              // 其他工具走 AgentToolCallCard：onRetry 由 dialog 注入，UI 端只判 running 决定是否显示按钮。
               child: s.call.name == 'dispatch_subagent'
                   ? SubagentToolCard(
                       sessionId: sessionId,
@@ -237,7 +239,12 @@ class AgentMessageBubble extends ConsumerWidget {
                         ));
                       },
                     )
-                  : AgentToolCallCard(call: s.call),
+                  : AgentToolCallCard(
+                      call: s.call,
+                      onRetry: () => ref
+                          .read(currentSessionProvider)
+                          ?.retryToolCall(s.call.id),
+                    ),
             ),
           ImageSegment s => ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
@@ -344,7 +351,13 @@ class AgentMessageBubble extends ConsumerWidget {
 /// 使用 StatefulWidget 确保流式更新时不丢失展开状态。
 class AgentToolCallCard extends StatefulWidget {
   final AgentToolCall call;
-  const AgentToolCallCard({super.key, required this.call});
+  final VoidCallback? onRetry;
+
+  const AgentToolCallCard({
+    super.key,
+    required this.call,
+    this.onRetry,
+  });
 
   @override
   State<AgentToolCallCard> createState() => _AgentToolCallCardState();
@@ -511,7 +524,32 @@ class _AgentToolCallCardState extends State<AgentToolCallCard> {
               _formatJsonString(call.result!),
             ),
           ],
+          // 重试按钮：仅对已结束工具（completed / error / rejected）显示
+          if (call.status != AgentToolStatus.running && widget.onRetry != null) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _buildRetryButton(context),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildRetryButton(BuildContext context) {
+    final retry = widget.onRetry;
+    return Tooltip(
+      message: '重试此工具',
+      child: TextButton.icon(
+        onPressed: retry,
+        icon: const Icon(Icons.refresh, size: 14),
+        label: const Text('重试', style: TextStyle(fontSize: 12)),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          minimumSize: const Size(0, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
       ),
     );
   }

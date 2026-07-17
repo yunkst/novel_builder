@@ -51,6 +51,13 @@ abstract class IChatSessionRepository {
   /// 失败时整体回滚。返回新插入的 message 行 id。
   Future<int> appendMessage(ChatMessageRecord record);
 
+  /// 更新单条已落库消息的 content（用于工具重试原地覆盖结果）。
+  ///
+  /// 仅刷新 message 自身的 timestamp，**不**刷新 session.updatedAt——
+  /// 重试不改变会话活跃度，只改一条历史工具结果。
+  /// 返回受影响行数（0 表示消息已被删/不存在）。
+  Future<int> updateMessageContent(int messageId, String content);
+
   /// 获取会话的消息（按 agentMsgIndex ASC 排序）
   ///
   /// [limit] / [offset] 支持分页，避免长会话冷启动一次性全量加载。

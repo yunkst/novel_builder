@@ -26,6 +26,8 @@ import '../../models/chat_session.dart';
 import '../../models/chat_message_record.dart';
 import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_event.dart';
+import '../../services/novel_agent/scenarios/writing_scenario.dart';
+import '../../services/novel_agent/tool_result_formatter.dart';
 import '../../services/novel_agent/agent_scenario.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import '../../services/novel_agent/novel_agent_service.dart';
@@ -487,6 +489,179 @@ class ScenarioSession {
 
     await _resumeAgentRun();
   }
+
+  /// 重试单个工具调用 — 用新结果原地覆盖旧 tool 消息（不触发新一轮 LLM 思考）。
+  ///
+  /// 调用入口：UI 在已结束工具卡片（completed / error / rejected）上点击「重试」。
+  ///
+  /// 行为契约：
+  /// - name / arguments / toolCallId **完全不变**（assistant.toolCalls[i].id 关联的就是它）
+  /// - 重新执行工具，结果经 [ToolResultFormatter] 截断为 `formatted.llm`，与
+  ///   [AgentLoop._executeSingleTool] 落库路径完全一致——保证「用户看到 = LLM 看到」
+  /// - 同步更新三处：内存 `_agentMessages`、UI `_state.messages`、DB `chat_messages.content`
+  /// - select_novel / create_novel 重试成功后同步 `_currentNovel`（与正常 ToolCallEndEvent 一致）
+  ///
+  /// 边界：
+  /// - 运行中先 [cancel] 落 partial（interrupt-then-act），保证内存与 DB 索引对齐
+  /// - dispatch_subagent 不走本路径（UI 渲染 SubagentToolCard，根本不显示重试按钮）
+  /// - webview_extract 场景工具不支持重试（页面 DOM 状态已不可知，重试无意义）
+  Future<void> retryToolCall(String toolCallId) async {
+    // 1. interrupt-then-act：让 pending 消息 finalize 进 _agentMessages + DB
+    await _interruptIfRunning();
+
+    final sid = _sessionId;
+    if (sid == null) {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] 拒绝重试工具：无 sessionId',
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'no_session', scenarioId],
+      );
+      _notifyStateError('当前会话未保存，无法重试');
+      return;
+    }
+
+    // 2. 找 assistant（含该 toolCallId）+ 紧随其后的 tool 消息
+    String? toolName;
+    Map<String, dynamic>? toolArgs;
+    int? toolIdx;
+    for (var i = _agentMessages.length - 1; i >= 0; i--) {
+      final m = _agentMessages[i];
+      final calls = m.toolCalls ?? const <ToolCall>[];
+      final hit = calls.where((c) => c.id == toolCallId).firstOrNull;
+      if (hit != null) {
+        toolName = hit.name;
+        toolArgs = hit.arguments;
+        // tool 消息紧跟在 assistant 之后，找第一个 role='tool' && toolCallId 匹配
+        for (var j = i + 1; j < _agentMessages.length; j++) {
+          final tm = _agentMessages[j];
+          if (tm.role == 'tool' && tm.toolCallId == toolCallId) {
+            toolIdx = j;
+            break;
+          }
+          if (tm.role == 'assistant' || tm.role == 'user') break;
+        }
+        break;
+      }
+    }
+
+    if (toolName == null || toolArgs == null) {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] 重试失败：找不到 toolCallId=$toolCallId',
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'not_found', scenarioId],
+      );
+      _notifyStateError('找不到该工具调用');
+      return;
+    }
+    if (toolIdx == null) {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] 重试失败：toolCallId=$toolCallId 无对应 tool 消息',
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'no_tool_msg', scenarioId],
+      );
+      _notifyStateError('该工具调用没有结果可替换');
+      return;
+    }
+
+    // 3. 防御：dispatch_subagent 不走本路径
+    if (toolName == 'dispatch_subagent') {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] 拒绝重试 dispatch_subagent',
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'subagent_rejected', scenarioId],
+      );
+      return;
+    }
+    // 4. 防御：webview_extract 场景工具不支持重试
+    if (scenarioId == ScenarioIds.webviewExtract) {
+      LoggerService.instance.w(
+        'ScenarioSession [$scenarioId] 拒绝重试 webview_extract 工具 $toolName',
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'webview_rejected', scenarioId],
+      );
+      _notifyStateError('网页提取工具依赖当前页面状态，无法重试');
+      return;
+    }
+
+    // 5. 从 DB 取该 tool 消息的主键 id（内存 ChatMessage 不带 id）
+    final repo = _ref.read(chatSessionRepositoryProvider);
+    final records = await repo.listMessages(sid);
+    if (toolIdx >= records.length) {
+      _notifyStateError('会话记录与内存不一致，无法重试');
+      return;
+    }
+    final messageId = records[toolIdx].id;
+
+    LoggerService.instance.i(
+      'ScenarioSession [$scenarioId] 重试工具: $toolName (toolCallId=$toolCallId, toolIdx=$toolIdx)',
+      category: LogCategory.ai,
+      tags: ['session', 'retry_tool', scenarioId, toolName],
+    );
+
+    // 6. 重新执行工具
+    //    仅支持 writing 场景：直接构造 WritingScenario（构造零成本、无 WebView 池副作用），
+    //    复用 select_novel / create_novel / patch_memory 的后置 hook。
+    String newResultStr;
+    try {
+      final scenario = WritingScenario(_ref);
+      String rawResult;
+      try {
+        rawResult = await scenario.executeTool(
+          toolName,
+          Map<String, dynamic>.from(toolArgs),
+          toolCallId: toolCallId,
+        );
+      } finally {
+        await scenario.cleanup();
+      }
+
+      // 7. 截断为 formatted.llm（与 AgentLoop._executeSingleTool 落库路径一致）
+      Map<String, dynamic> result;
+      try {
+        result = jsonDecode(rawResult) as Map<String, dynamic>;
+      } catch (_) {
+        result = {'raw': rawResult};
+      }
+      final formatted = ToolResultFormatter(maxChars: 50000).format(result);
+      newResultStr = formatted.llm;
+
+      // 8. select_novel / create_novel 重试成功后同步 _currentNovel（与 ToolCallEndEvent 一致）
+      if (toolName == 'select_novel' || toolName == 'create_novel') {
+        _handleSelectNovelFromResult(rawResult);
+      }
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ScenarioSession [$scenarioId] 重试工具 $toolName 失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['session', 'retry_tool', 'exec_failed', scenarioId],
+      );
+      _notifyStateError('重试失败: $e');
+      return;
+    }
+
+    // 9. 更新内存真理源
+    _agentMessages[toolIdx] = ChatMessage(
+      role: 'tool',
+      content: newResultStr,
+      toolCallId: toolCallId,
+    );
+
+    // 10. 刷新 UI（用户看到 = LLM 将看到的 content）
+    _state = _state.copyWith(
+      messages: _uiMessages,
+      streamingSegments: const [],
+    );
+    // retry 成功后清空失败标记，避免后续 retryLastRound 误砍 retry 过的消息
+    _failedRoundStartIndex = null;
+    _notifyStateChanged();
+
+    // 11. 落库（LLM 下次 hydrate 看到的 = 用户看到的）
+    if (messageId != null) {
+      unawaited(repo.updateMessageContent(messageId, newResultStr));
+    }
+  }
+
 
   /// 续跑 Agent —— 与 [_runAgent] 区别：不 append user、不调 sendMessage、走 resumeFromMessages。
   ///
