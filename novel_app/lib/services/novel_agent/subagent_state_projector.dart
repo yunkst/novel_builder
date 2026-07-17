@@ -66,6 +66,19 @@ class EventTagger {
           droppedAgentFromIndex: droppedAgentFromIndex,
           runId: runId,
         ),
+      RetryEvent(
+        attempt: final attempt,
+        maxAttempts: final maxAttempts,
+        delayMs: final delayMs,
+        errorCategory: final errorCategory
+      ) =>
+        RetryEvent(
+          attempt: attempt,
+          maxAttempts: maxAttempts,
+          delayMs: delayMs,
+          errorCategory: errorCategory,
+          runId: runId,
+        ),
     };
   }
 }
@@ -172,6 +185,11 @@ class SubagentStateProjector {
 
       case CompactionEvent():
         // No-op: spec §8.2 由 ScenarioSession 处理 CompactionEvent
+        return;
+
+      case RetryEvent():
+        // No-op:UI 横幅走 RetrySignals(由 agent_loop 直接调,
+        // 不经事件流)。本 case 仅为 exhaustive 完整性。
         return;
     }
   }

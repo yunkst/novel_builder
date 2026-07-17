@@ -996,6 +996,11 @@ class ScenarioSession {
 
       case AgentErrorEvent e:
         _finalizeAgentResponse(error: e.error);
+
+      case RetryEvent _:
+        // No-op:主 Agent RetryEvent 由 agent_loop 直接调 RetrySignals,
+        // 这里不再投影(spec §3.1.1 方案 B);仅 exhaustive 兜底。
+        break;
     }
     _notifyStateChanged();
   }
