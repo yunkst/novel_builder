@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -188,6 +190,17 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     initialUrlRequest:
                         URLRequest(url: WebUri('https://so.com')),
                     initialSettings: desktopModeSettings(desktopMode),
+                    // 桌面模式：AT_DOCUMENT_END 注入 viewport 覆盖脚本，时机早于
+                    // onLoadStop，能赶在响应式断点首次判断前拨正为桌面宽。
+                    // 脚本内自带 UA 自适配，手机 UA 直接 return，不破坏手机布局。
+                    initialUserScripts: UnmodifiableListView<UserScript>([
+                      UserScript(
+                        source: BrowserSettingsService
+                            .desktopViewportOverrideJs,
+                        injectionTime:
+                            UserScriptInjectionTime.AT_DOCUMENT_END,
+                      ),
+                    ]),
                     onWebViewCreated: (controller) {
                       notifier.setController(controller);
                     },
@@ -196,8 +209,9 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     },
                     onLoadStop: (controller, url) {
                       notifier.handleLoadStop(url);
-                      // 桌面模式：覆盖 viewport meta 到桌面宽，让宽度判断型
-                      // 站点切桌面布局。仅改 viewport，不影响 UA / 缩放配置。
+                      // 桌面模式兜底：initialUserScripts 已在 AT_DOCUMENT_END 注入，
+                      // 此处再执行一次防 SPA 延迟渲染（initialUserScripts 未生效时）。
+                      // 仅改 viewport，不影响 UA / 缩放配置。
                       final isDesktop =
                           ref.read(browserDesktopModeProvider).value ?? false;
                       if (isDesktop) {

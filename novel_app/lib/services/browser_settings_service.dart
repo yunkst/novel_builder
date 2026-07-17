@@ -27,22 +27,39 @@ class BrowserSettingsService {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  /// 桌面模式注入 JS：删除现有 viewport meta，强制插入桌面宽度 viewport。
+  /// 桌面模式注入 JS：覆盖 viewport meta 为桌面宽度，让响应式站点切 PC 布局。
   ///
-  /// Android WebView 的 layout viewport 宽度由页面 viewport meta 决定。
+  /// 设计要点：
+  /// 1. **UA 自适配**：仅当 UA 含 `Windows NT`（桌面 UA）时执行；手机 UA（空串=
+  ///    系统默认）直接 return，不破坏手机布局。运行时切换桌面/手机会 setSettings
+  ///    UA + reload，reload 后本脚本重新执行并按新 UA 自适配，无需重建 WebView。
+  /// 2. **复用 meta**：querySelector 找到现有 viewport meta 改其 content，找不到
+  ///    才创建。不删除重建，避免站点 JS 缓存的 meta 引用失效。
+  /// 3. **时机**：通过 initialUserScripts 在 `AT_DOCUMENT_END` 注入（DOM 解析完成、
+  ///    资源未加载完），早于 onLoadStop，能赶在首次渲染前拨正响应式断点。
+  ///    onLoadStop 再兜底执行一次，防延迟渲染的 SPA。
+  /// 4. **允许缩放**：PC 页在手机屏字小，`user-scalable=yes` + `maximum-scale`
+  ///    让用户双指放大。
+  ///
+  /// 背景：Android WebView 的 layout viewport 宽度由页面 viewport meta 决定。
   /// 移动端站点多用 `width=device-width`，导致 layout viewport 等于 WebView
-  /// 物理像素宽，响应式断点（如 min-width: 1280）命中手机分支。本脚本在
-  /// onLoadStop 后覆盖 viewport meta 为桌面宽，让站点识别为桌面并按 PC 版
-  /// 渲染。注意：iOS 上 `preferredContentMode: DESKTOP` 已能处理，但注入
-  /// 脚本跨平台无害，统一执行以保持行为一致。
+  /// 物理像素宽，响应式断点（如 min-width: 1280）命中手机分支。仅在 onLoadStop
+  /// 改 viewport 太晚（布局已渲染），必须在文档解析阶段提前覆盖。iOS 上
+  /// `preferredContentMode: DESKTOP` 已能处理，但本脚本靠 UA 自适配，跨平台无害。
   static const String desktopViewportOverrideJs = r'''
 (function() {
-  var metas = document.querySelectorAll('meta[name="viewport"]');
-  metas.forEach(function(m) { m.remove(); });
-  var meta = document.createElement('meta');
-  meta.name = 'viewport';
-  meta.content = 'width=1024, initial-scale=1.0';
-  document.head.appendChild(meta);
+  if (!/Windows NT/.test(navigator.userAgent)) return;
+  function setDesktopViewport() {
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'viewport';
+      document.head.appendChild(meta);
+    }
+    meta.content = 'width=1200, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+  }
+  setDesktopViewport();
+  document.addEventListener('DOMContentLoaded', setDesktopViewport);
 })();
 ''';
 
