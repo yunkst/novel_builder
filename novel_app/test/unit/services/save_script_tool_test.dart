@@ -12,8 +12,10 @@
 /// - 全部验证通过 → success=true，repo.updateScriptPart 调一次（参数正确）
 /// - ocr=false 结构通过 → success=true，ocr=false 直接落库，restoreService 不被调
 /// - 结构校验：chapters_empty / chapter_missing_field / font_family_missing / invalid_structure
-/// - 落库：domain_not_found → 失败返回，不抛
+/// - 落库：repo 返回失败 reason → 透传失败返回，不抛
 library;
+
+import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
@@ -299,6 +301,67 @@ void main() {
 
       expect(result['success'], true);
       expect(result['reason'], isNot('ocr_no_pua'));
+    });
+  });
+
+  group('validateAndPersistScript - OCR 验证异常', () {
+    test('verifyFontFamily 抛 TimeoutException → ocr_verify_timeout，不落库', () async {
+      final repo = MockSiteScriptRepository();
+      final svc = MockOcrRestoreService();
+      // 模拟 OCR-JS 的 document.fonts.ready 在冷启动页面 30s 内未 resolve，
+      // _renderPuaViaController 的 .timeout(30s) 抛 TimeoutException 冒泡到 verifyFontFamily
+      when(svc.verifyFontFamily(any)).thenThrow(
+        TimeoutException('callAsyncJavaScript 超时', const Duration(seconds: 30)),
+      );
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: contentResult(),
+        repo: repo,
+        restoreService: svc,
+      );
+
+      expect(result['success'], false);
+      expect(result['reason'], 'ocr_verify_timeout');
+      expect(result['ocr_applied'], true);
+      verifyNever(repo.updateScriptPart(
+        domain: anyNamed('domain'),
+        scriptType: anyNamed('scriptType'),
+        scriptJs: anyNamed('scriptJs'),
+        ocr: anyNamed('ocr'),
+      ));
+    });
+
+    test('restorePuaInText 抛 TimeoutException → 同样转 ocr_verify_timeout', () async {
+      // verifyFontFamily 通过后，restorePuaInText 渲染正文大量 PUA 时单字超时冒泡
+      final repo = MockSiteScriptRepository();
+      final svc = MockOcrRestoreService();
+      when(svc.verifyFontFamily(any)).thenAnswer((_) async => true);
+      when(svc.restorePuaInText(any, any)).thenThrow(
+        TimeoutException('callAsyncJavaScript 超时', const Duration(seconds: 30)),
+      );
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: contentResult(),
+        repo: repo,
+        restoreService: svc,
+      );
+
+      expect(result['success'], false);
+      expect(result['reason'], 'ocr_verify_timeout');
+      verifyNever(repo.updateScriptPart(
+        domain: anyNamed('domain'),
+        scriptType: anyNamed('scriptType'),
+        scriptJs: anyNamed('scriptJs'),
+        ocr: anyNamed('ocr'),
+      ));
     });
   });
 
