@@ -647,4 +647,27 @@ class LoggerService {
     final second = dt.second.toString().padLeft(2, '0');
     return '$year-$month-$day $hour:$minute:$second';
   }
+
+  /// 格式化单条日志为可读的纯文本（用于复制全部信息）
+  ///
+  /// 包含时间、级别、分类、标签、消息、堆栈，便于贴到工单/聊天里排查问题。
+  /// 展示内容与日志详情对话框一致，确保"所见即所复制"。
+  static String formatLogForCopy(LogEntry log) {
+    final buf = StringBuffer()
+      ..writeln('时间: ${formatTimestamp(log.timestamp)}')
+      ..writeln('级别: ${log.level.label}')
+      ..writeln('分类: ${log.category.label}');
+    if (log.tags.isNotEmpty) {
+      buf.writeln('标签: ${log.tags.join(', ')}');
+    }
+    buf
+      ..writeln('消息: ${log.message}')
+      ..writeln();
+    if (log.stackTrace != null && log.stackTrace!.isNotEmpty) {
+      buf
+        ..writeln('堆栈:')
+        ..writeln(log.stackTrace);
+    }
+    return buf.toString().trimRight();
+  }
 }
