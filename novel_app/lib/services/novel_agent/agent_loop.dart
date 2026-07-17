@@ -100,6 +100,10 @@ class AgentLoop {
   /// [emit] 事件回调
   /// [cancellationToken] 取消令牌；触发取消后，当前这轮 LLM 输出完成，
   ///   但循环不再执行后续工具、不再进入下一轮（不中断底层 LLM HTTP）。
+  /// [pendingInjections] 运行中补充消息源：每轮 LLM 调用前调用一次，
+  ///   返回当前排队的 user 补充文本列表（可能为空）。loop 把它们 append 到
+  ///   messages，让本轮 LLM 看到补充消息（不打断上一轮已在进行的 LLM 流）。
+  ///   由 [NovelAgentService] 维护的 per-scenario 队列提供。null = 无注入能力（子 Agent）。
   /// [messageOwners] 可选对齐信息：长度 = [initialMessages] 的长度，
   ///   元素为对应 AgentMessage 在 UI 列表中的索引，-1 表示 system 消息不映射。
   ///   压缩时透传给 [ContextCompactor.compact]，用于反推被丢弃的 AgentMessage 区间，
@@ -109,6 +113,7 @@ class AgentLoop {
     required String systemPrompt,
     required void Function(AgentEvent event) emit,
     CancellationToken? cancellationToken,
+    List<String> Function()? pendingInjections,
   }) async {
     final messages = <ChatMessage>[
       ChatMessage(role: 'system', content: systemPrompt),
@@ -135,8 +140,24 @@ class AgentLoop {
         LoggerService.instance.d('Agent 循环第 $round 轮 (${_scenario.id})',
             category: LogCategory.ai, tags: ['agent', 'loop', _scenario.id]);
 
-        // 0. 上下文压缩检查（每轮 LLM 调用前）
-        //    防止 messages 无限增长导致超出 LLM 上下文窗口
+        // 0a. 运行中补充消息注入（每轮 LLM 调用前 drain）
+        //     用户在 agent 运行中追加的消息由 [NovelAgentService] 排队，
+        //     此处拉取并 append 到 messages，让本轮 LLM 调用看到。
+        //     不打断上一轮（drain 只在两 round 边界执行）；不 emit
+        //     InjectedUserInputEvent（UI 计数已在 service.injectUserMessage 完成）。
+        final injected = pendingInjections?.call() ?? const <String>[];
+        for (final text in injected) {
+          if (text.trim().isEmpty) continue;
+          messages.add(ChatMessage(role: 'user', content: text));
+          LoggerService.instance.i(
+            'Agent 注入补充 user: ${text.length} 字 (round $round, scenario=${_scenario.id})',
+            category: LogCategory.ai,
+            tags: ['agent', 'loop', 'inject', _scenario.id],
+          );
+        }
+
+        // 0b. 上下文压缩检查（每轮 LLM 调用前）
+        //     防止 messages 无限增长导致超出 LLM 上下文窗口
         if (_compactor.needsCompaction(messages)) {
           LoggerService.instance.w(
             '触发上下文压缩: 消息总量 ${messages.length} '

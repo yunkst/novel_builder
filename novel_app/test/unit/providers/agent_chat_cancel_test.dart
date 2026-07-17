@@ -48,6 +48,12 @@ class MockNovelAgentService implements NovelAgentService {
   @override
   Stream<AgentEvent> get events => _controller.stream;
 
+  /// A 方案桩：cancel 测试不走运行中补充消息路径，直接转发事件即可。
+  @override
+  void injectUserMessage(String scenarioId, String text) {
+    _controller.add(InjectedUserInputEvent(text, scenarioId: scenarioId));
+  }
+
   @override
   Future<void> sendMessage({
     required String userInput,
