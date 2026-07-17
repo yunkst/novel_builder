@@ -155,6 +155,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null && !chatState.isLoading)
                 _buildErrorBar(chatState.error!, session),
+              if (chatState.isLoading && chatState.supplementaryCount > 0)
+                _buildSupplementBar(chatState.supplementaryCount, session),
               _buildContextTag(),
               _buildInputBar(chatState, session),
             ],
@@ -590,6 +592,41 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     );
   }
 
+  /// A 方案：运行中补充消息状态条。
+  /// 显示"已补充 N 条，将在下一轮处理"+ 停止按钮（主动取消走 cancel 路径，
+  /// 队列内的补充消息也会被 cancelFor 一并清空）。
+  Widget _buildSupplementBar(int count, ScenarioSession? session) {
+    final appColors = context.appColors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: appColors.agentAccent.withValues(alpha: 0.08),
+      child: Row(
+        children: [
+          Icon(Icons.edit_note, size: 16, color: appColors.agentAccent),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '已补充 $count 条消息，将在下一轮处理',
+              style: TextStyle(fontSize: 12, color: appColors.agentAccent),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: session == null ? null : () => session.cancel(),
+            icon: const Icon(Icons.stop_rounded, size: 14),
+            label: const Text('停止', style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: appColors.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContextTag() {
     final readingContext = ref.watch(readingContextProvider);
     if (!readingContext.hasContext) return const SizedBox.shrink();
@@ -807,7 +844,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                   maxLines: 5,
                   minLines: 1,
                   decoration: InputDecoration(
-                    hintText: chatState.isLoading ? '等待回复...' : '输入消息...',
+                    // A 方案：运行中也允许输入，hint 不再切换"等待回复..."
+                    hintText: '输入消息...',
                     hintStyle: TextStyle(
                       color: context.appColors.inkSoft.withValues(alpha: 0.5),
                     ),
@@ -827,6 +865,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               _AgentInputTrailingButton(
                 mode: _trailingMode(chatState),
                 isPickingImage: _isPickingImage,
+                isSupplementary: chatState.isLoading,
                 onAttach: _onAttachTap,
                 onSend: () => _sendMessage(session),
                 onStop: () => session?.cancel(),
@@ -914,17 +953,21 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     _focusNode.requestFocus();
   }
 
-  /// 推导输入栏右侧按钮模式。
-  /// 优先级：isLoading（停止） > 有文本/有图（发送） > 完全空（添加图片）。
+  /// 推导输入栏右侧按钮模式（A 方案：永远 send/attach，不再切 stop）。
+  /// 优先级：有文本/有图（发送） > 完全空（添加图片）。
+  ///
+  /// A 方案下运行中不再让按钮变 stop —— 用户运行中点 send = 补充消息，
+  /// 由 ScenarioSession 落库 + service.injectUserMessage 排队让下一轮 LLM 看到。
+  /// 主动取消按钮改由 [_buildSupplementBar] 顶部条提供（仅 isLoading 时显示）。
   _TrailingMode _trailingMode(AgentChatState chatState) {
-    if (chatState.isLoading) return _TrailingMode.stop;
     if (_hasText || _attachedMediaId != null) return _TrailingMode.send;
     return _TrailingMode.attach;
   }
 
   Future<void> _sendMessage(ScenarioSession? session) async {
-    // 防御守卫：运行中即使被意外触发也不发送（UI 上按钮是 stop，正常不会到这）。
-    if (session?.state.isLoading ?? false) return;
+    // A 方案：去掉"运行中拒绝"兜底。运行中发送 = 补充消息，由 ScenarioSession
+    // 落库 + service.injectUserMessage 排队，loop 下一轮 drain 到 LLM 上下文。
+    // UI 上不再提示拒绝，仅 toast 提示"已补充"由 supplementaryCount 状态条承担。
     final text = _inputController.text.trim();
     final hasImage = _attachedMediaId != null;
     if (text.isEmpty && !hasImage) return;
@@ -1012,6 +1055,9 @@ enum _TrailingMode { attach, send, stop }
 class _AgentInputTrailingButton extends StatelessWidget {
   final _TrailingMode mode;
   final bool isPickingImage;
+  /// A 方案：isLoading 时 send 按钮视觉变浅 + tooltip 改"补充消息"，
+  /// 提示用户当前点 send 是补充而非开始新对话。
+  final bool isSupplementary;
   final VoidCallback? onAttach;
   final VoidCallback? onSend;
   final VoidCallback? onStop;
@@ -1021,6 +1067,7 @@ class _AgentInputTrailingButton extends StatelessWidget {
   const _AgentInputTrailingButton({
     required this.mode,
     this.isPickingImage = false,
+    this.isSupplementary = false,
     this.onAttach,
     this.onSend,
     this.onStop,
@@ -1095,10 +1142,12 @@ class _AgentInputTrailingButton extends StatelessWidget {
       case _TrailingMode.send:
         return _TrailingButtonConfig(
           icon: Icons.send_rounded,
-          bg: appColors.agentAccent,
+          bg: isSupplementary
+              ? appColors.agentAccent.withValues(alpha: 0.5)
+              : appColors.agentAccent,
           fg: appColors.agentOnBrand,
           onPressed: onSend,
-          tooltip: '发送',
+          tooltip: isSupplementary ? '补充到下一轮' : '发送',
         );
       case _TrailingMode.stop:
         return _TrailingButtonConfig(

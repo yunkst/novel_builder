@@ -26,6 +26,12 @@ class AgentChatState {
   /// 当前 Agent 操作的目标小说（select_novel 工具设置）
   final CurrentNovel? currentNovel;
 
+  // ===== 运行中补充消息计数 =====
+  /// 用户在 agent 运行中（isLoading）追加的补充消息条数。
+  /// 收到 [InjectedUserInputEvent] 时 +1；下次正常 sendMessage（开始新一轮）时清零。
+  /// UI 据此在输入栏顶部展示"已补充 N 条消息，将在下一轮处理"提示。
+  final int supplementaryCount;
+
   const AgentChatState({
     this.messages = const [],
     this.isLoading = false,
@@ -34,6 +40,7 @@ class AgentChatState {
     this.scenarioId = ScenarioIds.writing,
     this.scenarioDisplayName = '小说写作助手',
     this.currentNovel,
+    this.supplementaryCount = 0,
   });
 
   AgentChatState copyWith({
@@ -45,6 +52,7 @@ class AgentChatState {
     String? scenarioDisplayName,
     CurrentNovel? currentNovel,
     bool clearCurrentNovel = false,
+    int? supplementaryCount,
   }) {
     return AgentChatState(
       messages: messages ?? this.messages,
@@ -55,6 +63,8 @@ class AgentChatState {
       scenarioDisplayName: scenarioDisplayName ?? this.scenarioDisplayName,
       currentNovel:
           clearCurrentNovel ? null : (currentNovel ?? this.currentNovel),
+      // 不传 = 保持原值；显式传 0 = 清零（新一轮 sendMessage 时）
+      supplementaryCount: supplementaryCount ?? this.supplementaryCount,
     );
   }
 }

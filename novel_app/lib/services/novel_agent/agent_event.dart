@@ -119,6 +119,29 @@ class AgentErrorEvent extends AgentEvent {
   const AgentErrorEvent(this.error, {super.runId});
 }
 
+/// 运行中注入的 user 补充消息
+///
+/// 触发场景：用户在运行中（agent 已发首轮 user 但 loop 还在跑）追加新消息。
+/// 与普通 sendMessage 的差别：不打断当前 LLM stream / 当前 tool 调用，
+/// 在 AgentLoop 检查点 A 边界被 drain 到 messages 里供下一轮 LLM 看到。
+///
+/// [scenarioId] 标识触发 inject 的场景，避免跨 scenario 的 broadcast 流把
+/// 计数加到错误 session 的状态里（每个 ScenarioSession 都会监听 events 流）。
+///
+/// UI 用 [text] 渲染"已补充 X 条"提示；ScenarioSession 拿到这个事件 +1
+/// supplementaryCount（仅当 [scenarioId] 匹配本 session 的 _state.scenarioId），
+/// 便于"恢复 sendMessage 时清零"。
+class InjectedUserInputEvent extends AgentEvent {
+  final String text;
+  final String? scenarioId;
+
+  const InjectedUserInputEvent(
+    this.text, {
+    this.scenarioId,
+    super.runId,
+  });
+}
+
 /// 上下文压缩事件
 ///
 /// 在 Agent 循环自动压缩消息列表时触发。ScenarioSession 据此同步裁剪内存 + 删 DB。

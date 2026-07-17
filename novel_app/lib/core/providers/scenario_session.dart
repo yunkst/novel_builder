@@ -369,15 +369,16 @@ class ScenarioSession {
       RegExp(r'\[用户上传了图片 mediaId=([^\]]+)\]');
 
   /// 发送消息 — Agent 在本 session 内独立运行
+  ///
+  /// A 方案：运行中不再 cancel 落 partial，改为把 user 消息落库 +
+  /// 投到 service 的 inject 队列，让下一轮 LLM 调用看到（不打断当前轮）。
+  /// 非运行中保持原逻辑（_beginAgentRun）。
   Future<void> sendMessage({
     required String content,
     List<String> imageMediaIds = const [],
   }) async {
     final text = content.trim();
     if (text.isEmpty && imageMediaIds.isEmpty) return;
-
-    // 运行中再发：先中断当前回合（落库 partial），再发送新消息。
-    await _interruptIfRunning();
 
     await _ensureSessionId();
 
@@ -393,20 +394,36 @@ class ScenarioSession {
 
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 发送消息: length=${agentContent.length} '
-      'images=${imageMediaIds.length} sessionId=$_sessionId',
+      'images=${imageMediaIds.length} sessionId=$_sessionId running=$_isRunning',
       category: LogCategory.ai,
       tags: ['session', 'send', scenarioId],
     );
 
-    // user 消息即时进 _agentMessages + 落库
+    // user 消息即时进 _agentMessages + 落库（与现状一致；A 方案下这是
+    // 即时落库 + 后续 inject 双轨写入，_agentMessages 不重复加）
     final userMsg = ChatMessage(role: 'user', content: agentContent);
     _agentMessages.add(userMsg);
+    final isRunningNow = _isRunning;
+
     _state = _state.copyWith(
       messages: _uiMessages,
       isLoading: true,
+      // 真正新一轮 sendMessage（非 inject）清零 supplementaryCount
+      supplementaryCount: isRunningNow ? null : 0,
     );
     _notifyStateChanged();
     await _persistAgentMessage(userMsg);
+
+    // 运行中：把 user 消息投到 service 队列，由 loop 下一轮 drain。
+    // 不调 _beginAgentRun（已有 loop 在跑）。queue 立即返回 + emit 反馈事件，
+    // 用户在 UI 上看到"已补充"的 supplementaryCount +1。
+    if (isRunningNow) {
+      _ref.read(novelAgentServiceProvider).injectUserMessage(
+            scenarioId,
+            agentContent,
+          );
+      return;
+    }
 
     await _beginAgentRun(agentContent);
   }
@@ -450,8 +467,12 @@ class ScenarioSession {
   /// 运行中重试 = cancel 当前回合（落库 partial → finalize 错误 → _failedRoundStartIndex 被设置）
   /// → 砍除失败轮 → resumeFromMessages 续跑。
   Future<void> retryLastRound() async {
-    // 运行中：先 cancel 落 partial，finalize 会设置 _failedRoundStartIndex
-    await _interruptIfRunning();
+    // retry 入口（error 状态的重试按钮）此时 _isRunning 必然为 false
+    // （_finalizeAgentResponse(error) 已跑、_pendingSegments 已清）。
+    // 防御：若仍有残留 pending（状态错乱），落 partial 后再 retry。
+    if (_pendingSegments.isNotEmpty) {
+      await cancel();
+    }
 
     final failedAt = _failedRoundStartIndex;
     if (failedAt == null) {
@@ -506,8 +527,11 @@ class ScenarioSession {
   /// - dispatch_subagent 不走本路径（UI 渲染 SubagentToolCard，根本不显示重试按钮）
   /// - webview_extract 场景工具不支持重试（页面 DOM 状态已不可知，重试无意义）
   Future<void> retryToolCall(String toolCallId) async {
-    // 1. interrupt-then-act：让 pending 消息 finalize 进 _agentMessages + DB
-    await _interruptIfRunning();
+    // 1. retry 入口此时 _isRunning 必然为 false（工具卡片重试按钮仅在非 loading
+    //    完成态显示）。防御：若有残留 pending，落 partial 后再操作。
+    if (_pendingSegments.isNotEmpty) {
+      await cancel();
+    }
 
     final sid = _sessionId;
     if (sid == null) {
@@ -996,6 +1020,20 @@ class ScenarioSession {
 
       case AgentErrorEvent e:
         _finalizeAgentResponse(error: e.error);
+
+      case InjectedUserInputEvent e:
+        // 运行中补充消息的 UI 计数 +1。
+        // 文本本身已由 sendMessage running 分支 append 到 _agentMessages 并落库，
+        // service.injectUserMessage 已把它投到 loop 待 drain 队列；
+        // 此处仅更新计数让 UI 展示"已补充 N 条"。不重复 add _agentMessages。
+        //
+        // 二次过滤：events 是 broadcast 流，多 ScenarioSession 都监听；
+        // 只把本 scenario 的 inject 计入本 session（runId 已被
+        // shouldMainSessionHandleEvent 放行，这里按 scenarioId 再卡一道）。
+        if (e.scenarioId != null && e.scenarioId != scenarioId) break;
+        _state = _state.copyWith(
+          supplementaryCount: _state.supplementaryCount + 1,
+        );
     }
     _notifyStateChanged();
   }

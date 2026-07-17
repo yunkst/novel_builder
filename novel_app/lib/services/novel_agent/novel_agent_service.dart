@@ -38,6 +38,15 @@ class NovelAgentService {
   /// 按场景跟踪取消令牌
   final Map<String, CancellationToken> _tokensByScenario = {};
 
+  /// 按场景排队的运行中补充消息（A 方案）。
+  ///
+  /// 当 `sendMessage` 检测到本场景已在运行时，把 user 文本追加到此队列，
+  /// 由 `AgentLoop.run` 通过 `pendingInjections` 回调 drain 到 messages，
+  /// 让下一轮 LLM 调用看到（不打断当前 LLM stream / 当前 tool 调用）。
+  ///
+  /// 取消（[cancelFor] / [cancelAll]）时清空对应队列，避免孤狼消息。
+  final Map<String, List<String>> _pendingInjectionsByScenario = {};
+
   NovelAgentService(this.ref);
 
   /// 是否有指定场景正在运行
@@ -45,6 +54,40 @@ class NovelAgentService {
 
   /// 是否有任何场景正在运行
   bool get isRunning => _runningByScenario.values.any((v) => v);
+
+  /// 运行中补充消息入口（A 方案）。
+  ///
+  /// 由 [ScenarioSession.sendMessage] 在 `_isRunning == true` 时调用：
+  /// 把 user 文本排队，等当前 loop 下一轮通过 `pendingInjections` 回调
+  /// drain 到 messages，让本轮 LLM 看到（不打断当前 LLM stream / tool 调用）。
+  /// emit [InjectedUserInputEvent] 让 UI 立刻反馈"已补充 N 条"。
+  void injectUserMessage(String scenarioId, String text) {
+    _enqueueInjection(scenarioId, text);
+  }
+
+  /// 排队一条补充消息 + emit UI 反馈事件（sendMessage/injectUserMessage 共用）。
+  void _enqueueInjection(String scenarioId, String text) {
+    if (text.trim().isEmpty) return;
+    _pendingInjectionsByScenario
+        .putIfAbsent(scenarioId, () => <String>[])
+        .add(text);
+    LoggerService.instance.i(
+      'Agent 排队补充消息 (scenario=$scenarioId, length=${text.length})',
+      category: LogCategory.ai,
+      tags: ['agent', 'service', 'inject', 'queue', scenarioId],
+    );
+    _controller.add(InjectedUserInputEvent(text, scenarioId: scenarioId));
+  }
+
+  /// drain 本场景排队的补充消息（供 loop.run 的 pendingInjections 回调）。
+  /// 取出并清空队列；空队列返回 const [] 避免 alloc。
+  List<String> _drainInjections(String scenarioId) {
+    final list = _pendingInjectionsByScenario[scenarioId];
+    if (list == null || list.isEmpty) return const <String>[];
+    final out = List<String>.from(list);
+    list.clear();
+    return out;
+  }
 
   /// 事件流
   Stream<AgentEvent> get events => _controller.stream;
@@ -63,6 +106,8 @@ class NovelAgentService {
   /// 只取消目标场景，不影响其他场景的运行。
   /// 对应 Agent 的线程局部中断：只中断目标线程，不误杀其他会话。
   void cancelFor(String scenarioId) {
+    // 取消 = 用户撤回本回合，排队的补充消息一并丢弃（避免孤狼）
+    _pendingInjectionsByScenario.remove(scenarioId);
     final token = _tokensByScenario[scenarioId];
     if (token != null) {
       LoggerService.instance.i(
@@ -77,6 +122,7 @@ class NovelAgentService {
 
   /// 取消所有正在运行的 Agent
   void cancelAll() {
+    _pendingInjectionsByScenario.clear();
     for (final entry in _tokensByScenario.entries) {
       entry.value.cancel(reason: '取消所有 (scenario=${entry.key})');
     }
@@ -96,16 +142,12 @@ class NovelAgentService {
     required String scenarioId,
     required AgentScenarioContext scenarioContext,
   }) async {
-    // 同场景串行兜底：正常路径下 ScenarioSession 在 sendMessage 前会先 cancel
-    // 当前回合（interrupt-then-act），不会并发调用。到达这里说明上层（ScenarioSession）
-    // 有 bug——未在写操作前 cancel。发出 error 事件便于上层感知，避免静默吞并。
+    // A 方案：运行中不再拒绝，改为排队补充消息。消息由 AgentLoop.run 的
+    // pendingInjections 回调在下一轮 drain 到 messages，让本轮 LLM 看到
+    // （不打断当前 LLM stream / 当前 tool 调用）。UI 计数由 _enqueueInjection
+    // emit 的 InjectedUserInputEvent 完成。
     if (_runningByScenario[scenarioId] == true) {
-      LoggerService.instance.w(
-        'Agent 拒绝请求（场景 $scenarioId 已在运行中，应由 ScenarioSession.cancel() 兜底）',
-        category: LogCategory.ai,
-        tags: ['agent', 'service', 'busy', scenarioId],
-      );
-      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
+      _enqueueInjection(scenarioId, userInput);
       return;
     }
 
@@ -149,6 +191,7 @@ class NovelAgentService {
           systemPrompt: systemPrompt,
           emit: (event) => _controller.add(event),
           cancellationToken: token,
+          pendingInjections: () => _drainInjections(scenarioId),
         );
 
         final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
@@ -170,6 +213,8 @@ class NovelAgentService {
     } finally {
       _runningByScenario.remove(scenarioId);
       _tokensByScenario.remove(scenarioId);
+      // loop 已退出，残余的排队补充消息永远不会被 drain → 清空避免孤狼
+      _pendingInjectionsByScenario.remove(scenarioId);
     }
   }
 
@@ -184,15 +229,12 @@ class NovelAgentService {
     required List<ChatMessage> initialMessages,
     required AgentScenarioContext scenarioContext,
   }) async {
-    // 同 sendMessage 的并发兜底：retryLastRound 前会 _interruptIfRunning，
-    // 理论上不该撞上 busy；保留作为防御，避免静默吞并
+    // A 方案：与 sendMessage 对称。retryLastRound 调本方法前应已确保
+    // _isRunning=false（失败轮 finalize 后 _isRunning 被设回 false），
+    // 正常不会撞；万一上层 race 兜底走 inject 路径（传空串 = noop，
+    // _enqueueInjection 会 trim 过滤），不抛错不丢。
     if (_runningByScenario[scenarioId] == true) {
-      LoggerService.instance.w(
-        'Agent 拒绝续跑（场景 $scenarioId 已在运行中，应由 ScenarioSession.cancel() 兜底）',
-        category: LogCategory.ai,
-        tags: ['agent', 'service', 'busy', 'resume', scenarioId],
-      );
-      _controller.add(AgentErrorEvent('场景 $scenarioId 的 Agent 正在运行中'));
+      _enqueueInjection(scenarioId, '');
       return;
     }
 
@@ -215,6 +257,7 @@ class NovelAgentService {
           systemPrompt: systemPrompt,
           emit: (event) => _controller.add(event),
           cancellationToken: token,
+          pendingInjections: () => _drainInjections(scenarioId),
         );
 
         final cancelledTag = token.isCancelled ? ' (cancelled)' : '';
@@ -235,6 +278,8 @@ class NovelAgentService {
     } finally {
       _runningByScenario.remove(scenarioId);
       _tokensByScenario.remove(scenarioId);
+      // 同 sendMessage：loop 退出后残余排队消息不会被 drain，清空避免孤狼
+      _pendingInjectionsByScenario.remove(scenarioId);
     }
   }
 

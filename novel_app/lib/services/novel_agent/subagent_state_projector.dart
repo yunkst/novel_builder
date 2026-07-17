@@ -51,6 +51,8 @@ class EventTagger {
         ToolProgressEvent(toolCallId, generatedChars, runId: runId),
       AgentDoneEvent() => AgentDoneEvent(runId: runId),
       AgentErrorEvent(:final error) => AgentErrorEvent(error, runId: runId),
+      InjectedUserInputEvent(:final text, :final scenarioId) =>
+        InjectedUserInputEvent(text, scenarioId: scenarioId, runId: runId),
       CompactionEvent(
         removedChars: final removedChars,
         originalChars: final originalChars,
@@ -172,6 +174,10 @@ class SubagentStateProjector {
 
       case CompactionEvent():
         // No-op: spec §8.2 由 ScenarioSession 处理 CompactionEvent
+        return;
+
+      case InjectedUserInputEvent():
+        // No-op: 主 session 行为（运行中补充消息），子 Agent 不处理
         return;
     }
   }
