@@ -62,11 +62,9 @@ class _RetryBannerState extends State<RetryBanner> {
             ? Colors.orange.withValues(alpha: 0.12)
             : Colors.blue.withValues(alpha: 0.12);
         // 倒计时到 0 或 delayMs≤1s 都显示「重试中…」
-        final remainingText = _remainingSeconds <= 0
-            ? '重试中…'
-            : '$_remainingSeconds s 后重试';
-        final tail =
-            state.delayMs > 1000 ? ' · $remainingText' : ' · 重试中';
+        final remainingText =
+            _remainingSeconds <= 0 ? '重试中…' : '$_remainingSeconds s 后重试';
+        final tail = state.delayMs > 1000 ? ' · $remainingText' : ' · 重试中';
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

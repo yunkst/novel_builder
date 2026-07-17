@@ -163,8 +163,10 @@ class AgentLoop {
 
         // 1. 调用 LLM（流式 + 工具定义），逐 chunk 实时 emit
         final toolsCount = _scenario.tools.length;
-        LoggerService.instance.d('调用 LLM (round $round, $toolsCount 个工具, 流式, scenario=${_scenario.id})',
-            category: LogCategory.ai, tags: ['agent', 'llm', 'request']);
+        LoggerService.instance.d(
+            '调用 LLM (round $round, $toolsCount 个工具, 流式, scenario=${_scenario.id})',
+            category: LogCategory.ai,
+            tags: ['agent', 'llm', 'request']);
 
         final streamingResult = StreamingResult();
         String? streamFinishReason;
@@ -173,11 +175,13 @@ class AgentLoop {
         // ★ 流式超时：超过 [llmStreamTimeout] 无事件到达 → TimeoutException
         // → 由 catch 块判定为瞬态网络错误，触发 round 重试
         final streamTimeout = _config.llmStreamTimeout;
-        final streamSource = _llm.chatStreamWithTools(
+        final streamSource = _llm
+            .chatStreamWithTools(
           messages: messages,
           tools: _scenario.tools,
           toolChoice: 'auto',
-        ).timeout(
+        )
+            .timeout(
           streamTimeout,
           onTimeout: (EventSink<LlmStreamChunk> sink) {
             sink.addError(TimeoutException(
@@ -284,8 +288,7 @@ class AgentLoop {
         final isAbnormalEmpty = fullContent.isEmpty &&
             toolCalls.isEmpty &&
             streamFinishReason != 'tool_calls';
-        final logMessage =
-            'LLM 流式响应 (round $round): '
+        final logMessage = 'LLM 流式响应 (round $round): '
             'contentChunks=$contentChunkCount, '
             'contentLength=${fullContent.length}, '
             'toolCalls=${toolCalls.length}, '
@@ -334,8 +337,10 @@ class AgentLoop {
 
           emit(const AgentDoneEvent());
           RetrySignals.instance.clear();
-          LoggerService.instance.i('Agent 循环完成（无工具调用，共 $round 轮, scenario=${_scenario.id}）',
-              category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);
+          LoggerService.instance.i(
+              'Agent 循环完成（无工具调用，共 $round 轮, scenario=${_scenario.id}）',
+              category: LogCategory.ai,
+              tags: ['agent', 'loop_end', _scenario.id]);
           return;
         }
 
@@ -387,7 +392,8 @@ class AgentLoop {
             return;
           }
           final parallelMessages = await Future.wait(subagentCalls.map(
-            (call) => _executeSingleTool(call, emit, const [], cancellationToken),
+            (call) =>
+                _executeSingleTool(call, emit, const [], cancellationToken),
           ));
           for (final msg in parallelMessages) {
             if (msg != null) messages.add(msg);
@@ -440,7 +446,13 @@ class AgentLoop {
             LoggerService.instance.i(
                 'Agent 重试退避期间被取消 (round=$round, scenario=${_scenario.id})',
                 category: LogCategory.ai,
-                tags: ['agent', 'loop', 'round_retry', 'cancelled', _scenario.id]);
+                tags: [
+                  'agent',
+                  'loop',
+                  'round_retry',
+                  'cancelled',
+                  _scenario.id
+                ]);
             emit(const AgentDoneEvent());
             RetrySignals.instance.clear();
             return;
@@ -459,8 +471,10 @@ class AgentLoop {
       }
     }
 
-    LoggerService.instance.i('Agent 达到最大轮数限制 (${_config.maxRounds}, scenario=${_scenario.id})，发起强制总结',
-        category: LogCategory.ai, tags: ['agent', 'max_rounds', _scenario.id]);
+    LoggerService.instance.i(
+        'Agent 达到最大轮数限制 (${_config.maxRounds}, scenario=${_scenario.id})，发起强制总结',
+        category: LogCategory.ai,
+        tags: ['agent', 'max_rounds', _scenario.id]);
     messages.add(ChatMessage(
       role: 'user',
       content: '请用一句话总结你已完成的操作。',
@@ -520,7 +534,8 @@ class AgentLoop {
     CancellationToken? cancellationToken,
   ) async {
     LoggerService.instance.d('工具调度: ${call.name} (scenario=${_scenario.id})',
-        category: LogCategory.ai, tags: ['agent', 'tool', call.name, _scenario.id]);
+        category: LogCategory.ai,
+        tags: ['agent', 'tool', call.name, _scenario.id]);
     emit(ToolCallStartEvent(call.name, call.arguments, call.id));
 
     // 流式进度节流：仅 create_chapter / update_chapter_content 这类
@@ -598,7 +613,13 @@ class AgentLoop {
     LoggerService.instance.i(
         '工具完成: ${call.name} (success=$toolSuccess, resultLen=${resultStr.length}, fullLen=${fullResultStr.length}, scenario=${_scenario.id})',
         category: LogCategory.ai,
-        tags: ['agent', 'tool', call.name, toolSuccess ? 'success' : 'error', _scenario.id]);
+        tags: [
+          'agent',
+          'tool',
+          call.name,
+          toolSuccess ? 'success' : 'error',
+          _scenario.id
+        ]);
 
     return messagesToAppend.isEmpty ? toolMessage : null;
   }

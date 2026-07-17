@@ -224,8 +224,7 @@ void main() {
         durations.add(sw.elapsedMilliseconds);
       }
       // 至少有一个落在 75~125 区间（多数应满足；CI 抖动可能个别越界）
-      final inRange =
-          durations.where((d) => d >= 70 && d <= 200).length;
+      final inRange = durations.where((d) => d >= 70 && d <= 200).length;
       expect(inRange, greaterThan(durations.length * 0.8),
           reason: '80% 以上的样本应落在退避 ±25% 区间');
     });
@@ -245,8 +244,7 @@ void main() {
         expect(calls, isEmpty);
       });
 
-      test('第 1 次失败,第 2 次成功 → onRetry 调用 1 次,attempt=1',
-          () async {
+      test('第 1 次失败,第 2 次成功 → onRetry 调用 1 次,attempt=1', () async {
         final calls = <List<int>>[];
         var invocations = 0;
         final result = await withRetry(
@@ -271,8 +269,7 @@ void main() {
         expect(calls.first[2], greaterThan(0), reason: 'delayMs > 0');
       });
 
-      test('全失败 maxAttempts=3 → onRetry 调用 2 次 (maxAttempts-1)',
-          () async {
+      test('全失败 maxAttempts=3 → onRetry 调用 2 次 (maxAttempts-1)', () async {
         final calls = <int>[];
         await expectLater(
           () => withRetry(
@@ -327,16 +324,19 @@ void main() {
 
     test('RetryableHttpException（含 4xx）→ true', () {
       expect(
-        RetryConfig.defaultShouldRetry(const RetryableHttpException(500, '', '')),
+        RetryConfig.defaultShouldRetry(
+            const RetryableHttpException(500, '', '')),
         true,
       );
       expect(
-        RetryConfig.defaultShouldRetry(const RetryableHttpException(400, '', '')),
+        RetryConfig.defaultShouldRetry(
+            const RetryableHttpException(400, '', '')),
         true,
         reason: '4xx 也统一可重试',
       );
       expect(
-        RetryConfig.defaultShouldRetry(const RetryableHttpException(401, '', '')),
+        RetryConfig.defaultShouldRetry(
+            const RetryableHttpException(401, '', '')),
         true,
       );
     });
@@ -492,8 +492,8 @@ void main() {
     });
 
     test('initialDelay == 500ms', () {
-      expect(const RetryConfig().initialDelay,
-          const Duration(milliseconds: 500));
+      expect(
+          const RetryConfig().initialDelay, const Duration(milliseconds: 500));
     });
 
     test('multiplier == 2.0 / jitterFactor == 0.25（保留）', () {
@@ -540,8 +540,7 @@ void main() {
     });
 
     test('所有 4xx + 5xx → true（含 400/401/403/404/422）', () {
-      expect(isRetryableStatus(400), true,
-          reason: '4xx 统一重试（用户策略：宁可多等也尽量自愈）');
+      expect(isRetryableStatus(400), true, reason: '4xx 统一重试（用户策略：宁可多等也尽量自愈）');
       expect(isRetryableStatus(401), true);
       expect(isRetryableStatus(403), true);
       expect(isRetryableStatus(404), true);

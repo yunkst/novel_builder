@@ -8,7 +8,6 @@ library;
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/utils/retry_helper.dart';
@@ -17,8 +16,7 @@ void main() {
   setUp(() => RetrySignals.instance.resetForTest());
 
   group('RetrySignals', () {
-    test('reportTransport → notifier.value 写入 transport state',
-        () async {
+    test('reportTransport → notifier.value 写入 transport state', () async {
       final notified = <RetryState?>[];
       RetrySignals.instance.notifier.addListener(() {
         notified.add(RetrySignals.instance.notifier.value);

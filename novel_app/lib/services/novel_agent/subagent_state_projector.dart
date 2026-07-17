@@ -107,11 +107,7 @@ class SubagentStateProjector {
         run.lastThought = _currentStreamingText(segments);
         return;
 
-      case ToolCallStartEvent(
-          :final name,
-          :final args,
-          :final toolCallId
-        ):
+      case ToolCallStartEvent(:final name, :final args, :final toolCallId):
         // 工具段始终是独立的新段（不合并相邻工具）
         final newSegment = ToolCallSegment(AgentToolCall(
           id: toolCallId,
@@ -132,11 +128,7 @@ class SubagentStateProjector {
         run.chatState = state.copyWith(streamingSegments: segments);
         return;
 
-      case ToolCallEndEvent(
-          :final toolCallId,
-          :final result,
-          :final success
-        ):
+      case ToolCallEndEvent(:final toolCallId, :final result, :final success):
         final segments = _updateToolSegment(
           state.streamingSegments,
           toolCallId,
@@ -172,8 +164,7 @@ class SubagentStateProjector {
           if (state.streamingSegments.isNotEmpty)
             AgentChatMessage(
               role: AgentChatRole.assistant,
-              segments:
-                  List<AgentChatSegment>.from(state.streamingSegments),
+              segments: List<AgentChatSegment>.from(state.streamingSegments),
             ),
           AgentChatMessage.user('[Agent 错误] $error'),
         ];
@@ -199,7 +190,10 @@ class SubagentStateProjector {
       List<AgentChatSegment> segs, String text) {
     if (segs.isNotEmpty && segs.last is TextSegment) {
       final last = segs.last as TextSegment;
-      return [...segs.sublist(0, segs.length - 1), TextSegment(last.content + text)];
+      return [
+        ...segs.sublist(0, segs.length - 1),
+        TextSegment(last.content + text)
+      ];
     }
     return [...segs, TextSegment(text)];
   }

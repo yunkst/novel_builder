@@ -47,12 +47,11 @@ class RetryableHttpException implements Exception {
   });
 
   @override
-  String toString() =>
-      'RetryableHttpException(status=$statusCode, url=$url'
+  String toString() => 'RetryableHttpException(status=$statusCode, url=$url'
       '${retryAfterMs != null ? ', retryAfter=${retryAfterMs}ms' : ''})';
 }
 
-  /// 重试策略
+/// 重试策略
 class RetryConfig {
   /// 总尝试次数（含首次）。默认 8。
   ///
@@ -125,8 +124,7 @@ Future<T> withRetry<T>(
       final delayMs = _computeDelayMs(
         attempt: attempt,
         config: config,
-        retryAfterMs:
-            e is RetryableHttpException ? e.retryAfterMs : null,
+        retryAfterMs: e is RetryableHttpException ? e.retryAfterMs : null,
       );
       LoggerService.instance.w(
         '$label 第 $attempt 次失败 (${e.runtimeType}: $e)，'
@@ -161,13 +159,12 @@ int _computeDelayMs({
     return retryAfterMs.clamp(0, config.maxDelay.inMilliseconds).toInt();
   }
   // 否则指数退避 + 抖动
-  final raw = config.initialDelay.inMilliseconds *
-      pow(config.multiplier, attempt - 1);
+  final raw =
+      config.initialDelay.inMilliseconds * pow(config.multiplier, attempt - 1);
   final capped = raw.clamp(0, config.maxDelay.inMilliseconds).toInt();
   final jitterRange = (capped * config.jitterFactor).toInt();
-  final jitter = jitterRange == 0
-      ? 0
-      : _rand.nextInt(2 * jitterRange) - jitterRange;
+  final jitter =
+      jitterRange == 0 ? 0 : _rand.nextInt(2 * jitterRange) - jitterRange;
   return (capped + jitter).clamp(0, config.maxDelay.inMilliseconds).toInt();
 }
 

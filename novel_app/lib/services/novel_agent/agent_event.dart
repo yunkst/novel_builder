@@ -104,8 +104,7 @@ class ToolCallEndEvent extends AgentEvent {
 class ToolProgressEvent extends AgentEvent {
   final String toolCallId;
   final int generatedChars;
-  const ToolProgressEvent(this.toolCallId, this.generatedChars,
-      {super.runId});
+  const ToolProgressEvent(this.toolCallId, this.generatedChars, {super.runId});
 }
 
 /// Agent 循环结束
@@ -157,8 +156,7 @@ class CompactionEvent extends AgentEvent {
       originalChars > 0 ? removedChars / originalChars : 0;
 
   /// 友好描述
-  String get description =>
-      '已压缩上下文：$removedChars 字符'
+  String get description => '已压缩上下文：$removedChars 字符'
       '（保留 $keptMessageCount 条，丢弃 $droppedMessageCount 条）';
 }
 

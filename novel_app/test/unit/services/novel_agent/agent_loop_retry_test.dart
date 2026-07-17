@@ -51,8 +51,8 @@ class _ScriptedErrorLlm extends LlmProvider {
 
   /// 入队一条脚本：throwMode 非 null 表示该轮直接抛错；否则按 response yield
   void enqueue({Object? throwMode, _ScriptedResponse? response}) {
-    assert(throwMode != null || response != null,
-        'throwMode 与 response 至少一个非空');
+    assert(
+        throwMode != null || response != null, 'throwMode 与 response 至少一个非空');
     _script.add(_ScriptedItem(throwMode: throwMode, response: response));
   }
 
@@ -202,8 +202,7 @@ void main() {
       expect((events.last as AgentErrorEvent).error, contains('JSON 损坏'));
     });
 
-    test('连续 3 次 SocketException → 超 networkRetryPerRound=2 → 终止',
-        () async {
+    test('连续 3 次 SocketException → 超 networkRetryPerRound=2 → 终止', () async {
       final llm = _ScriptedErrorLlm()
         ..enqueue(throwMode: const SocketException('x'))
         ..enqueue(throwMode: const SocketException('x'))
@@ -219,8 +218,7 @@ void main() {
       expect(events.last, isA<AgentErrorEvent>());
     });
 
-    test('重试退避期间收到取消 → 优雅结束（AgentDoneEvent），第 2 轮不调用',
-        () async {
+    test('重试退避期间收到取消 → 优雅结束（AgentDoneEvent），第 2 轮不调用', () async {
       final llm = _ScriptedErrorLlm()
         ..enqueue(throwMode: const SocketException('x'));
       final loop = AgentLoop(llm: llm, scenario: _FakeScenario());
@@ -247,8 +245,7 @@ void main() {
       expect(llm.callCount, 1);
     });
 
-    test('重试成功后 roundRetryCount 重置（连续两轮瞬态错误均能恢复）',
-        () async {
+    test('重试成功后 roundRetryCount 重置（连续两轮瞬态错误均能恢复）', () async {
       // 第 1 轮：抛错 → 重试 → 成功（带 tool_call）
       // 第 2 轮（工具返回后）：抛错 → 重试 → 成功（文本结束）
       final llm = _ScriptedErrorLlm()
@@ -285,8 +282,11 @@ void main() {
     test('RetryableHttpException(429) → round 重试 → 成功', () async {
       // 自 2026-07-17 起所有 4xx/5xx 统一重试，429/408 只是历史最先纳入白名单的两种
       final llm = _ScriptedErrorLlm()
-        ..enqueue(throwMode: const RetryableHttpException(
-          429, 'rate limited', '',
+        ..enqueue(
+            throwMode: const RetryableHttpException(
+          429,
+          'rate limited',
+          '',
           retryAfterMs: 50,
         ))
         ..enqueue(
@@ -299,15 +299,18 @@ void main() {
       );
       final events = await runLoop(loop);
       expect(llm.callCount, 2, reason: '429 已被 RetryableHttpException 统一兜住');
-      expect(events.last, isA<AgentDoneEvent>(),
-          reason: '最终应完成而非 AgentError');
+      expect(events.last, isA<AgentDoneEvent>(), reason: '最终应完成而非 AgentError');
     });
 
-    test('RetryableHttpException(408) → round 重试 → 成功（Request Timeout 同 429 路径）',
+    test(
+        'RetryableHttpException(408) → round 重试 → 成功（Request Timeout 同 429 路径）',
         () async {
       final llm = _ScriptedErrorLlm()
-        ..enqueue(throwMode: const RetryableHttpException(
-          408, 'request timeout', '',
+        ..enqueue(
+            throwMode: const RetryableHttpException(
+          408,
+          'request timeout',
+          '',
           retryAfterMs: 50,
         ))
         ..enqueue(
@@ -322,12 +325,14 @@ void main() {
       expect(events.last, isA<AgentDoneEvent>());
     });
 
-    test('RetryableHttpException(400) → round 重试 → 成功（业务 4xx 也统一重试）',
-        () async {
+    test('RetryableHttpException(400) → round 重试 → 成功（业务 4xx 也统一重试）', () async {
       // 自 2026-07-17 起所有 4xx 统一重试：这里模拟代理网关偶发 400。
       final llm = _ScriptedErrorLlm()
-        ..enqueue(throwMode: const RetryableHttpException(
-          400, 'bad request', '',
+        ..enqueue(
+            throwMode: const RetryableHttpException(
+          400,
+          'bad request',
+          '',
           retryAfterMs: 50,
         ))
         ..enqueue(
@@ -339,16 +344,19 @@ void main() {
         config: const AgentLoopConfig(networkRetryPerRound: 2),
       );
       final events = await runLoop(loop);
-      expect(llm.callCount, 2, reason: '400 已被 round-level 接住，不再立即报 AgentError');
+      expect(llm.callCount, 2,
+          reason: '400 已被 round-level 接住，不再立即报 AgentError');
       expect(events.last, isA<AgentDoneEvent>());
     });
 
-    test('RetryableHttpException(401) → round 重试 → 成功（鉴权 4xx 也统一重试）',
-        () async {
+    test('RetryableHttpException(401) → round 重试 → 成功（鉴权 4xx 也统一重试）', () async {
       // 模拟 token 偶发过期 → round-level 兜底重试。
       final llm = _ScriptedErrorLlm()
-        ..enqueue(throwMode: const RetryableHttpException(
-          401, 'unauthorized', '',
+        ..enqueue(
+            throwMode: const RetryableHttpException(
+          401,
+          'unauthorized',
+          '',
           retryAfterMs: 50,
         ))
         ..enqueue(
@@ -364,12 +372,14 @@ void main() {
       expect(events.last, isA<AgentDoneEvent>());
     });
 
-    test('RetryableHttpException(401) → round 重试 → 成功（鉴权 4xx 也统一重试）',
-        () async {
+    test('RetryableHttpException(401) → round 重试 → 成功（鉴权 4xx 也统一重试）', () async {
       // 模拟 token 偶发过期 → round-level 兜底重试。
       final llm = _ScriptedErrorLlm()
-        ..enqueue(throwMode: const RetryableHttpException(
-          401, 'unauthorized', '',
+        ..enqueue(
+            throwMode: const RetryableHttpException(
+          401,
+          'unauthorized',
+          '',
           retryAfterMs: 50,
         ))
         ..enqueue(
@@ -390,7 +400,8 @@ void main() {
     setUp(() => RetrySignals.instance.resetForTest());
     tearDown(() => RetrySignals.instance.resetForTest());
 
-    test('RetryableHttpException(503) → emit RetryEvent + RetrySignals.reportRound',
+    test(
+        'RetryableHttpException(503) → emit RetryEvent + RetrySignals.reportRound',
         () async {
       final emitted = <AgentEvent>[];
       final llm = _ScriptedErrorLlm()
