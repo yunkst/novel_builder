@@ -15,7 +15,6 @@ import 'package:novel_app/core/providers/extraction_task_providers.dart';
 import 'package:novel_app/core/providers/webview_add_novel_providers.dart';
 import 'package:novel_app/core/providers/webview_providers.dart';
 import 'package:novel_app/repositories/site_script_repository.dart';
-import 'package:novel_app/services/headless_webview_pool.dart';
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/services/ocr_render_js.dart';
 import 'package:novel_app/services/ocr_restore_service.dart';
@@ -108,7 +107,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
 
     buf.writeln('## 工作流程');
     buf.writeln('1. get_page_info → 获取 DOM 结构和页面类型');
-    buf.writeln('2. get_cached_script → 有缓存则 execute_js(run_id=...) 重跑验证，无则新生成');
+    buf.writeln('2. get_cached_script → 看 present/missing 列表：已有项 execute_js(run_id=...) 重跑验证，缺失项只补缺失的那一种（save_script(script_type=...)），无缓存则新生成');
     buf.writeln('3. 阶段一：目录页 execute_js 测试 chapter_list 脚本 → 成功立刻 save_script 落库');
     buf.writeln('4. navigate_to → 从目录结果中挑一个章节 URL 跳转到内容页');
     buf.writeln('5. 阶段二：内容页 execute_js 测试 chapter_content 脚本 → 成功立刻 save_script 落库');
@@ -1024,8 +1023,23 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   ///
   /// 业务字段（id / domain / use_count / verified）平铺到顶层，保持向后兼容。
   /// 完整脚本内容**不返回**到顶层（避免占上下文）；需要时可调 `inspect_script(run_id)`。
+  ///
+  /// ## v37+ 增量反馈（script_type + present/missing）
+  /// save_script 改为分次落库后，Agent 需要知道**哪些脚本类型已存在、哪些缺失**，
+  /// 才能精准补缺失项。本工具：
+  /// - 顶层 `present` / `missing` 始终返回，列出当前域名已有/缺失的脚本类型。
+  /// - 全查模式（不传 `script_type`）：`list_run_id` / `content_run_id` 始终存在，
+  ///   但对应脚本**空字符串**时值为 `null`（让 Agent 明确看到 null，区分"未注册"
+  ///   和"已注册"两种状态）。
+  /// - 单查模式（传 `script_type`）：只校验/只注册请求的那一种，返回更精简。
   Future<String> _getCachedScript(Map<String, dynamic> args) async {
     final domain = args['domain'] as String?;
+    final rawScriptType = args['script_type'] as String?;
+    // 仅接受 chapter_list / chapter_content，其它值（null/乱填）走全查兜底
+    final scriptType = (rawScriptType == 'chapter_list' ||
+            rawScriptType == 'chapter_content')
+        ? rawScriptType
+        : null;
     final url = _currentUrl;
 
     // 提取域名
@@ -1068,45 +1082,157 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     }
 
     if (results.isEmpty) {
+      // 整域名无记录：双类型都列在 missing
       return jsonEncode({
         'found': false,
         'domain': effectiveDomain,
-        'message': '该域名无缓存脚本，需要新生成提取脚本',
-        'suggestion': '请用 execute_js(script=...) 测试新脚本，测试通过后用 save_script(list_run_id=..., content_run_id=..., domain=...) 保存',
+        if (scriptType != null) 'script_type': scriptType,
+        'present': <String>[],
+        'missing': scriptType == 'chapter_list'
+            ? <String>['chapter_list']
+            : scriptType == 'chapter_content'
+                ? <String>['chapter_content']
+                : <String>['chapter_list', 'chapter_content'],
+        'message': scriptType == null
+            ? '该域名无缓存脚本，需要新生成提取脚本'
+            : '该域名 $scriptType 脚本缺失',
+        'suggestion': scriptType == null
+            ? '请用 execute_js(script=...) 测试新脚本，测试通过后用 save_script(domain, run_id, script_type=chapter_list, test_url=..., ocr=...) 和 save_script(..., script_type=chapter_content, ...) 分两次落库'
+            : '请用 execute_js(script=...) 测试新脚本，测试通过后用 save_script(domain, run_id, script_type=$scriptType, test_url=..., ocr=...) 保存',
       });
     }
 
     // 取最近使用的一个脚本，注册到 RunStore 并返回 run_id
     final row = results.first;
-    final listJs = row['chapter_list_js'] as String? ?? '';
-    final contentJs = row['chapter_content_js'] as String? ?? '';
+    final listJs = (row['chapter_list_js'] as String? ?? '').trim();
+    final contentJs = (row['chapter_content_js'] as String? ?? '').trim();
     final dbId = row['id'] as String;
 
+    final hasList = listJs.isNotEmpty;
+    final hasContent = contentJs.isNotEmpty;
+    final present = <String>[
+      if (hasList) 'chapter_list',
+      if (hasContent) 'chapter_content',
+    ];
+    final missing = <String>[
+      if (!hasList) 'chapter_list',
+      if (!hasContent) 'chapter_content',
+    ];
+
+    // 单查模式：只处理请求的那一种，未命中走 found=false 分支
+    if (scriptType == 'chapter_list' && !hasList) {
+      LoggerService.instance.i(
+        '查询缓存脚本: domain=$effectiveDomain, type=chapter_list, missing',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'get_cached_script', 'missing'],
+      );
+      return jsonEncode({
+        'found': false,
+        'domain': effectiveDomain,
+        'script_type': 'chapter_list',
+        'present': present,
+        'missing': <String>['chapter_list'],
+        'message': '该域名 chapter_list 脚本缺失',
+        'suggestion':
+            '请用 execute_js(script=...) 测试新脚本，测试通过后用 save_script(domain, run_id, script_type=chapter_list, test_url=..., ocr=...) 保存',
+      });
+    }
+    if (scriptType == 'chapter_content' && !hasContent) {
+      LoggerService.instance.i(
+        '查询缓存脚本: domain=$effectiveDomain, type=chapter_content, missing',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'get_cached_script', 'missing'],
+      );
+      return jsonEncode({
+        'found': false,
+        'domain': effectiveDomain,
+        'script_type': 'chapter_content',
+        'present': present,
+        'missing': <String>['chapter_content'],
+        'message': '该域名 chapter_content 脚本缺失',
+        'suggestion':
+            '请用 execute_js(script=...) 测试新脚本，测试通过后用 save_script(domain, run_id, script_type=chapter_content, test_url=..., ocr=...) 保存',
+      });
+    }
+
     // 注册到 RunStore（db_xxx 形式）
-    final listRunId = _runStore.put(
-      script: listJs,
-      success: true,
-      source: RunEntrySource.database,
-      rawId: dbId,
-      domain: effectiveDomain,
-    );
-    final contentRunId = _runStore.put(
-      script: contentJs,
-      success: true,
-      source: RunEntrySource.database,
-      rawId: dbId,
-      domain: effectiveDomain,
-    );
+    // 单查模式：只注册请求的那一种；全查模式：注册所有非空的，空项保持 null
+    final String? listRunId;
+    final String? contentRunId;
+    if (scriptType == 'chapter_list') {
+      listRunId = _runStore.put(
+        script: listJs,
+        success: true,
+        source: RunEntrySource.database,
+        rawId: dbId,
+        domain: effectiveDomain,
+      );
+      contentRunId = null;
+    } else if (scriptType == 'chapter_content') {
+      contentRunId = _runStore.put(
+        script: contentJs,
+        success: true,
+        source: RunEntrySource.database,
+        rawId: dbId,
+        domain: effectiveDomain,
+      );
+      listRunId = null;
+    } else {
+      // 全查模式：只注册非空项，空项保持 null
+      listRunId = hasList
+          ? _runStore.put(
+              script: listJs,
+              success: true,
+              source: RunEntrySource.database,
+              rawId: dbId,
+              domain: effectiveDomain,
+            )
+          : null;
+      contentRunId = hasContent
+          ? _runStore.put(
+              script: contentJs,
+              success: true,
+              source: RunEntrySource.database,
+              rawId: dbId,
+              domain: effectiveDomain,
+            )
+          : null;
+    }
 
     LoggerService.instance.i(
-      '查询缓存脚本: domain=$effectiveDomain, found=1, list=$listRunId, content=$contentRunId',
+      '查询缓存脚本: domain=$effectiveDomain, present=$present, missing=$missing, list=$listRunId, content=$contentRunId',
       category: LogCategory.ai,
       tags: ['agent', 'webview-extract', 'get_cached_script'],
     );
 
+    // 组装 hint，引导 Agent 补缺失项
+    final hintParts = <String>[];
+    if (hasList && listRunId != null) {
+      hintParts.add('execute_js(run_id=$listRunId) 重跑目录脚本');
+    }
+    if (hasContent && contentRunId != null) {
+      hintParts.add('execute_js(run_id=$contentRunId) 重跑内容脚本');
+    }
+    final String message;
+    if (missing.isEmpty) {
+      message = '已加载缓存脚本到 RunStore。用 ${hintParts.join('，')}';
+    } else {
+      final missingSaveHint = missing
+          .map((t) =>
+              'save_script(domain, run_id, script_type=$t, test_url=..., ocr=...)')
+          .join(' 和 ');
+      message =
+          '已加载 ${present.join('+')} 脚本到 RunStore（${hintParts.join('，')}）。'
+          '${missing.join('、')} 缺失 → 生成后用 $missingSaveHint 补全';
+    }
+
     return jsonEncode({
-      'found': true,
+      // found 表示「有可用脚本可执行」，两段都空（异常数据）算作无
+      'found': present.isNotEmpty,
       'domain': effectiveDomain,
+      if (scriptType != null) 'script_type': scriptType,
+      'present': present,
+      'missing': missing,
       'id': dbId,
       'list_run_id': listRunId,
       'content_run_id': contentRunId,
@@ -1114,8 +1240,10 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       'verified': row['verified'],
       'url_pattern': row['url_pattern'],
       'sample_url': row['sample_url'],
-      'message':
-          '已加载缓存脚本到 RunStore。用 execute_js(run_id=$listRunId) 重跑目录脚本，execute_js(run_id=$contentRunId) 重跑内容脚本',
+      'message': message,
+      if (missing.isNotEmpty)
+        'suggestion':
+            '请针对 ${missing.join('、')} 单独生成脚本并 save_script 补全；已有项 ${present.join('+')} 可直接 execute_js(run_id=...) 重跑',
     });
   }
 
@@ -1151,7 +1279,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   /// 流程：
   /// 1. 解析参数（domain/run_id/script_type/test_url/ocr）
   /// 2. RunStore.get(run_id) 取脚本
-  /// 3. acquire HeadlessWebViewPool → loadPage(test_url) → callAsyncJavaScript(script)
+  /// 3. 复用场景 _webviewController → loadPage(test_url) → callAsyncJavaScript(script)
+  ///    （不重新 pool.acquire，否则与场景已持有的锁互锁，详见方法内注释）
   /// 4. 结构校验（按 script_type）
   /// 5. ocr=true → OcrRestoreService 验证（verifyFontFamily + restorePuaInText + readableRatio）
   /// 6. 全通过 → updateScriptPart 落库；失败返回诊断 JSON
@@ -1192,13 +1321,17 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     }
     final scriptJs = entry.script;
 
-    // acquire pool 跑脚本
-    InAppWebViewController? controller;
+    // 复用场景已持有的 _webviewController 跑脚本。
+    //
+    // Headless 模式下 _webviewController 就是场景构造时从 HeadlessWebViewPool
+    // acquire 出来的同一实例（见 AgentScenarioFactory.build），且场景会在整个
+    // Agent 循环结束后通过 cleanup 钩子统一 release。因此此处**不能**再次
+    // pool.acquire()——否则会与场景已持有的排他锁互锁（_waitForUseRight 30s
+    // 超时），表现为 save_script "120s 超时"（实为 acquire 死锁）。
+    // execute_js 同样直接用 _webviewController，故两者行为/计时一致。
+    final controller = _webviewController;
     try {
-      final pool = _ref.read(headlessWebViewPoolProvider);
-      controller = await pool.acquire();
-
-      // 加载 test_url（pool controller 无 onLoadStop 注册，用 URL 轮询等待）
+      // 加载 test_url（_webviewController 无 onLoadStop 注册，用 URL 轮询等待）
       await controller.loadUrl(urlRequest: URLRequest(url: WebUri(testUrl)));
       await _waitControllerForUrl(controller, testUrl);
 
@@ -1220,11 +1353,11 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       final jsonStr = WebViewJsExecutor.stringifyJsResult(result.value);
       final jsResult = jsonDecode(jsonStr);
 
-      // 构造 OcrRestoreService（ocr=true 时通过 pool controller 渲染 PUA）
+      // 构造 OcrRestoreService（ocr=true 时通过 _webviewController 渲染 PUA）
       final OcrRestoreService? restoreService = ocr
           ? OcrRestoreService(
               _ref,
-              (cp, ff) => _renderPuaViaController(controller!, cp, ff),
+              (cp, ff) => _renderPuaViaController(controller, cp, ff),
             )
           : null;
 
@@ -1245,10 +1378,11 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       }
       return jsonEncode(outcome);
     } on TimeoutException {
+      // 仅由 callAsyncJavaScript 的 .timeout(120s) 触发（acquire 死锁已消除）。
       return jsonEncode({
         'success': false,
         'reason': 'test_timeout',
-        'message': '脚本在 test_url 上执行超时（120s）',
+        'message': '脚本在 test_url 上执行超时（>120s）',
         'suggestion': '脚本可能卡在翻页/等待，检查 setTimeout 和翻页逻辑',
       });
     } catch (e, stackTrace) {
@@ -1263,11 +1397,9 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
         'reason': 'internal_error',
         'message': '$e',
       });
-    } finally {
-      if (controller != null) {
-        _ref.read(headlessWebViewPoolProvider).release();
-      }
     }
+    // 注意：此处**不**调 pool.release()，释放由场景 cleanup 钩子统一负责
+    // （见 AgentScenarioFactory.build），否则会把场景已持有的锁错误释放。
   }
 
   /// 在 pool controller 上轮询等待页面 URL 匹配 [targetUrl]。
@@ -1878,7 +2010,10 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           '查询指定域名是否已有缓存的提取脚本。找到后自动注册到 RunStore 并返回 '
           'list_run_id + content_run_id，**不返回完整脚本内容**（避免占上下文）。'
           '后续可直接 execute_js(run_id=list_run_id) 重跑，零重抄。'
-          '若需查看完整内容（调试），用 inspect_script(run_id=...)。',
+          '若需查看完整内容（调试），用 inspect_script(run_id=...)。\n'
+          '返回 JSON 顶层带 `present` / `missing` 列表，列出当前域名哪些脚本类型已有、哪些缺失。'
+          'Agent 应按 missing 项精准调用 save_script(script_type=...) 补全，避免重复生成已有脚本。\n'
+          '传 `script_type` 可只查询某一种类型（节省 RunStore 槽位与返回体大小）。',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -1886,6 +2021,14 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
             'type': 'string',
             'description':
                 '要查询的域名（如 www.example.com）。不填则使用当前页面域名。',
+          },
+          'script_type': {
+            'type': 'string',
+            'enum': ['chapter_list', 'chapter_content'],
+            'description':
+                '【可选】只查询并返回指定类型的脚本。'
+                '不传=按旧语义同时查询两种类型（list_run_id + content_run_id 一次性返回）。'
+                'Agent 补缺失时推荐传值：上次结果 missing 列表里的某一项。',
           },
         },
       },
