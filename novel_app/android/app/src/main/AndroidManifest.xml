@@ -48,14 +48,6 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
 
-        <!-- Background Downloader Service -->
-        <service
-            android:name="com.bbflight.background_downloader.DownloadService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
-
         <!-- FileProvider for APK installation -->
         <provider
             android:name="androidx.core.content.FileProvider"

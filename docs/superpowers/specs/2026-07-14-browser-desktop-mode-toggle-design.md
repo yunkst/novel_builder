@@ -14,7 +14,7 @@
 - `InAppWebView.initialSettings`（`webview_browser_screen.dart:145-147`）仅设 `javaScriptEnabled: true`，**没有任何 UA / `preferredContentMode` / `useWideViewPort` / `loadWithOverviewMode` 设置**
 - 项目里 `flutter_inappwebview: 6.1.5`（`pubspec.lock:421`），6.x 用 `InAppWebViewSettings`（不是 5.x 的 `InAppWebViewGroupOptions`）
 - 全量搜索 `userAgent` / `preferredContentMode` / `useWideViewPort` / `loadWithOverviewMode` / `桌面` / `desktop` 在 `lib/` 下均无任何匹配 —— 完全从零建设
-- AppBar actions 已有 6 个图标（后退/前进/刷新/收藏夹/脚本管理/模型下载，屏幕文件 L86-123），用户反馈"顶部图标有点太多了"
+- AppBar actions 原 6 个图标，2026-07-17 移除 webview 模型下载链路后剩 5 个图标（后退/前进/刷新/收藏夹/脚本管理），用户反馈"顶部图标有点太多了"
 
 持久化范式已就绪：
 
@@ -44,7 +44,7 @@
 
 | 维度 | 决策 | 依据 |
 |------|------|------|
-| 入口形态 | **AppBar 溢出菜单 `PopupMenuButton(⋮)`**（部分溢出方案） | 用户确认。保留后退/前进/刷新在顶部（高频），收藏夹/脚本/模型下载 + 桌面模式 开关收进 `⋮`。导航体验不变、顶部清爽 |
+| 入口形态 | **AppBar 溢出菜单 `PopupMenuButton(⋮)`**（部分溢出方案） | 用户确认。保留后退/前进/刷新在顶部（高频），收藏夹/脚本 + 桌面模式 开关收进 `⋮`。导航体验不变、顶部清爽 |
 | 影响范围 | **仅用户浏览器 Tab** | 用户确认。后台 Headless WebView（AI 抓取）不动 |
 | 状态持久化 | **全局 SharedPreferences 持久化** | 与项目「设置类偏好」惯例一致（参考 ReaderSettingsService） |
 | 默认值 | **手机模式**（`desktopMode = false`） | 用户确认。现状即手机模式 |
@@ -69,7 +69,6 @@
 │   ┌────────────────────┐                                    │
 │   │ 收藏夹              │                                    │
 │   │ 脚本管理            │                                    │
-│   │ 模型下载管理        │                                    │
 │   │ ───────────────  │                                    │
 │   │ ✓ 桌面模式         │  ← CheckedPopupMenuItem            │
 │   └────────────────────┘                                    │
@@ -113,7 +112,7 @@
 |---|---|---|---|
 | 1 | `lib/services/browser_settings_service.dart` 🆕 | 单例 + 键常量 + 桌面 UA 常量 + `isDesktopMode()` / `setDesktopMode()` | ~50 |
 | 2 | `lib/core/providers/webview_providers.dart` | 新增 `BrowserSettingsNotifier` + `browserDesktopModeProvider`；给 `WebViewControllerNotifier` 加 `applyDesktopMode(bool)` | +60 |
-| 3 | `lib/screens/webview_browser_screen.dart` | AppBar actions 改造为部分溢出菜单（保留后退/前进/刷新 + `⋮` 含收藏夹/脚本/下载/分隔线/桌面模式）；`InAppWebView.initialSettings` 读 provider 注入配置；`ref.listen` 触发切换 | +50 / -20 |
+| 3 | `lib/screens/webview_browser_screen.dart` | AppBar actions 改造为部分溢出菜单（保留后退/前进/刷新 + `⋮` 含收藏夹/脚本/分隔线/桌面模式）；`InAppWebView.initialSettings` 读 provider 注入配置；`ref.listen` 触发切换 | +50 / -20 |
 
 总计约 **+140 行，1 个新文件，2 处编辑**。无 `pubspec.yaml` 改动（依赖已齐），无 build_runner 运行。
 
@@ -239,9 +238,6 @@ PopupMenuButton<String>(
       case 'script':
         _showScriptPanel(context);
         break;
-      case 'download':
-        _showDownloadManager(context);
-        break;
       case 'desktopMode':
         await ref.read(browserDesktopModeProvider.notifier).toggle();
         break;
@@ -252,7 +248,6 @@ PopupMenuButton<String>(
     return [
       const PopupMenuItem(value: 'bookmark', child: Text('收藏夹')),
       const PopupMenuItem(value: 'script', child: Text('脚本管理')),
-      const PopupMenuItem(value: 'download', child: Text('模型下载管理')),
       const PopupMenuDivider(),
       CheckedPopupMenuItem(
         value: 'desktopMode',
@@ -405,7 +400,7 @@ webviewControllerProvider.notifier.applyDesktopMode(v)
 - [ ] `flutter format lib/` 已跑
 - [ ] 手动验收（桌面 dev 环境）：
   - 打开浏览器 Tab → AppBar 顶部只剩「← → ⟳ [地址栏] ⋮」
-  - 点 `⋮` → 弹出「收藏夹 / 脚本管理 / 模型下载管理 / ─── / ☐ 桌面模式」
+  - 点 `⋮` → 弹出「收藏夹 / 脚本管理 / ─── / ☐ 桌面模式」
   - 点「桌面模式」→ 菜单关闭、当前页面 reload 后变成 PC 端布局、勾选变 `☑`
   - 重启 App → 浏览器仍在桌面模式（无需再次设置）
   - 切回「手机模式」→ 当前页面 reload 后恢复移动版布局

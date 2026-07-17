@@ -5,6 +5,7 @@
 ## 变更记录 (Changelog)
 
 - **2026-07-15**: OCR 提取器产品化。site_scripts 加 ocr 列（v37）；OcrPredictor 改 recognizeImage(base64Png)；新增 OcrRestoreService（restorePuaInText/verifyFontFamily/readableRatio）+ 系统 OCR-JS 模板；HeadlessWebViewContentService/ChapterListService 加 OCR 还原钩子；save_script 重写为分次保存+落库前验证（domain/run_id/script_type/test_url/ocr）；prompt 加提取器创建流程。番茄字体反爬正文可读。
+- **2026-07-17**: **移除 webview 模型下载链路**。Webview 浏览器不再支持下载模型到后端 `/app/models`：删除 `model_download_manager_screen` / `model_save_location_dialog` / `model_download_service` / `model_download_repository` / `model_download_task` 模型 / `model_download_providers` 共 6 文件；移除 `webview_providers.handleDownloadStart` + `InAppWebView.onDownloadStartRequest` 入口；删除 `ApiServiceWrapper` 中 `listModelDirs` / `initModelUpload` / `uploadModelChunk` / `getModelUploadStatus` / `completeModelUpload` / `cancelModelUpload` 6 个方法；DB v37→v38 migration drop `model_download_tasks` 表；pubspec 移除 `background_downloader` 依赖、Manifest 同步删除 `Background Downloader Service`；原本器自带的模型文件可通过 `docker compose cp` / `scp` 直传，不再需要 APP 内导。
 - **2026-07-14**: 浏览器桌面/手机模式切换开关。新建 `BrowserSettingsService`（SharedPreferences 持久化 + 桌面 UA 常量）+ `browserDesktopModeProvider`（手写 StateNotifier）；`WebViewControllerNotifier` 加 `applyDesktopMode`（运行时 setSettings + reload）；浏览器 AppBar 改部分溢出菜单（保留后退/前进/刷新 + `⋮` 收纳收藏夹/脚本/模型下载/桌面模式开关）。仅影响用户浏览器 Tab，不动后台 Headless WebView。
 - **2026-07-13**: Agent Chat 图片上传。输入栏加 `+` 按钮（相册选图 + image_cropper 1:1 裁剪），复用 `MediaProxy.upload` 注册 `local_` mediaId；`AgentChatSegment` 新增 `ImageSegment` 子类；`ScenarioSession.sendMessage` 加 `imageMediaIds` 参数，mediaId 编码成占位文本 `[用户上传了图片 mediaId=xxx]` 拼进 content 落库；投影层 `_projectUiMessages` 解析占位文本还原 `ImageSegment`（重启可见，无需 DB 迁移）；user 气泡按 segments 渲染遇 `ImageSegment` 走 `MediaView`。新增 `image_picker` 依赖、iOS 相册/相机权限描述。图片作为"素材"供 `create_image_to_video` / `update_character` 等工具使用，不走多模态 LLM 链路。
 - **2026-06-29**: DatabaseService 门面彻底删除，所有调用改为直接使用 Repository Provider；删除 PaginationController、repository_providers.dart（合并入 database_providers.dart）等死代码；清理 Dify 残留引用
@@ -320,10 +321,11 @@ image_cropper: ^8.0.2         # 图片裁剪
 #### 应用功能
 ```yaml
 fluttertoast: ^8.2.4          # Toast消息
-background_downloader: ^8.0.0 # 后台下载
 permission_handler: ^11.0.0   # 权限请求
 package_info_plus: ^8.0.0     # 包信息
 ```
+
+> 已移除：`background_downloader: ^8.0.0`（2026-07-17 webview 不再下载模型；APP更新仍走 `AppUpdateService` + `Dio.download`）。
 
 #### 图可视化
 ```yaml

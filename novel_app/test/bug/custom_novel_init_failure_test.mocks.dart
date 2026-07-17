@@ -238,102 +238,6 @@ class MockApiServiceWrapper extends _i1.Mock implements _i6.ApiServiceWrapper {
       ) as _i7.Future<void>);
 
   @override
-  _i7.Future<List<Map<String, dynamic>>> listModelDirs() => (super.noSuchMethod(
-        Invocation.method(
-          #listModelDirs,
-          [],
-        ),
-        returnValue: _i7.Future<List<Map<String, dynamic>>>.value(
-            <Map<String, dynamic>>[]),
-      ) as _i7.Future<List<Map<String, dynamic>>>);
-
-  @override
-  _i7.Future<Map<String, dynamic>> initModelUpload({
-    required String? filename,
-    required String? targetSubdir,
-    required int? totalSize,
-    required int? chunkSize,
-    required int? totalChunks,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #initModelUpload,
-          [],
-          {
-            #filename: filename,
-            #targetSubdir: targetSubdir,
-            #totalSize: totalSize,
-            #chunkSize: chunkSize,
-            #totalChunks: totalChunks,
-          },
-        ),
-        returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
-
-  @override
-  _i7.Future<Map<String, dynamic>> uploadModelChunk({
-    required String? uploadId,
-    required int? index,
-    required List<int>? chunkBytes,
-    _i2.ProgressCallback? onProgress,
-    _i2.CancelToken? cancelToken,
-  }) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #uploadModelChunk,
-          [],
-          {
-            #uploadId: uploadId,
-            #index: index,
-            #chunkBytes: chunkBytes,
-            #onProgress: onProgress,
-            #cancelToken: cancelToken,
-          },
-        ),
-        returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
-
-  @override
-  _i7.Future<Map<String, dynamic>> getModelUploadStatus(
-          {required String? uploadId}) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getModelUploadStatus,
-          [],
-          {#uploadId: uploadId},
-        ),
-        returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
-
-  @override
-  _i7.Future<Map<String, dynamic>> completeModelUpload(
-          {required String? uploadId}) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #completeModelUpload,
-          [],
-          {#uploadId: uploadId},
-        ),
-        returnValue:
-            _i7.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
-      ) as _i7.Future<Map<String, dynamic>>);
-
-  @override
-  _i7.Future<void> cancelModelUpload({required String? uploadId}) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #cancelModelUpload,
-          [],
-          {#uploadId: uploadId},
-        ),
-        returnValue: _i7.Future<void>.value(),
-        returnValueForMissingStub: _i7.Future<void>.value(),
-      ) as _i7.Future<void>);
-
-  @override
   _i7.Future<List<Map<String, dynamic>>> getText2ImgModels() =>
       (super.noSuchMethod(
         Invocation.method(
@@ -975,6 +879,22 @@ class MockINovelRepository extends _i1.Mock implements _i14.INovelRepository {
           #updateCoverMediaIdById,
           [
             id,
+            mediaId,
+          ],
+        ),
+        returnValue: _i7.Future<int>.value(0),
+      ) as _i7.Future<int>);
+
+  @override
+  _i7.Future<int> updateCoverMediaIdByUrl(
+    String? novelUrl,
+    String? mediaId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateCoverMediaIdByUrl,
+          [
+            novelUrl,
             mediaId,
           ],
         ),

@@ -90,8 +90,8 @@ dependencies:
   # Toast消息提示
   fluttertoast: ^8.2.4
 
-  # APP更新功能
-  background_downloader: ^8.0.0
+  # APP更新功能（自 v1.10 起 webview 不再下载模型，background_downloader 仅供
+  # AppUpdateService 通过 Dio.download 通道使用，如未来彻底切换可继续瘦身）
   permission_handler: ^11.0.0
   package_info_plus: ^8.0.0
   # 设备信息（用于按 CPU 架构选择 APK）

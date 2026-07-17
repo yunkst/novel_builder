@@ -260,6 +260,22 @@ class MockINovelRepository extends _i1.Mock implements _i4.INovelRepository {
         ),
         returnValue: _i5.Future<int>.value(0),
       ) as _i5.Future<int>);
+
+  @override
+  _i5.Future<int> updateCoverMediaIdByUrl(
+    String? novelUrl,
+    String? mediaId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateCoverMediaIdByUrl,
+          [
+            novelUrl,
+            mediaId,
+          ],
+        ),
+        returnValue: _i5.Future<int>.value(0),
+      ) as _i5.Future<int>);
 }
 
 /// A class which mocks [IDatabaseConnection].
