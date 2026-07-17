@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/toast_utils.dart';
 import '../models/novel.dart';
 import '../models/bookshelf.dart';
 import '../services/logger_service.dart';
+import '../services/image_picker_service.dart';
+import '../services/media/media_proxy.dart';
+import '../services/media/media_types.dart';
 import '../utils/error_helper.dart';
 import '../widgets/bookshelf_selector.dart';
 import '../widgets/common/common_widgets.dart';
@@ -90,6 +95,98 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         }
       },
     );
+  }
+
+  /// 从相册选图、裁剪并设为小说封面。
+  ///
+  /// 复用 [ImagePickerService]（相册选图 + 自由裁剪）+ [MediaProxy.upload]
+  /// 生成 `local_` mediaId，写入 bookshelf.coverMediaId，并刷新书架列表。
+  /// 用户在选图/裁剪任一步取消则静默返回；图片 >10MB 提示。
+  Future<void> _setNovelCover(Novel novel) async {
+    final novelId = novel.id;
+    if (novelId == null) return;
+
+    Uint8List? bytes;
+    try {
+      bytes = await ImagePickerService().pickAndCrop();
+    } on ImageTooLargeException catch (e) {
+      if (!mounted) return;
+      ToastUtils.showError('$e', context: context);
+      return;
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '选择图片失败',
+        error: e,
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['bookshelf', 'cover', 'pick', 'failed'],
+      );
+      return;
+    }
+    if (bytes == null) return; // 用户取消
+
+    try {
+      final mediaId =
+          await ref.read(mediaProxyProvider).upload(bytes, MediaKind.image);
+      await ref
+          .read(novelRepositoryProvider)
+          .updateCoverMediaIdById(novelId, mediaId);
+      ref.invalidate(bookshelfNovelsProvider);
+      if (mounted) {
+        ToastUtils.showSuccess('封面已设置', context: context);
+      }
+      LoggerService.instance.i(
+        '设置封面: novelId=$novelId mediaId=$mediaId',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'cover', 'set'],
+      );
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '设置封面失败',
+        error: e,
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['bookshelf', 'cover', 'set', 'failed'],
+      );
+    }
+  }
+
+  /// 删除小说封面（仅清空 coverMediaId，不删除 media 文件）。
+  ///
+  /// 与 set_novel_cover 工具的 mediaId=null 语义一致——media 是共享资源，
+  /// 同一张图也可能被章节插图/角色头像引用，故不在此级联删除文件。
+  Future<void> _removeNovelCover(Novel novel) async {
+    final novelId = novel.id;
+    if (novelId == null) return;
+
+    try {
+      await ref
+          .read(novelRepositoryProvider)
+          .updateCoverMediaIdById(novelId, null);
+      ref.invalidate(bookshelfNovelsProvider);
+      if (mounted) {
+        ToastUtils.showSuccess('封面已删除', context: context);
+      }
+      LoggerService.instance.i(
+        '删除封面: novelId=$novelId',
+        category: LogCategory.database,
+        tags: ['bookshelf', 'cover', 'remove'],
+      );
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      ErrorHelper.showErrorWithLog(
+        context,
+        '删除封面失败',
+        error: e,
+        stackTrace: stackTrace,
+        category: LogCategory.database,
+        tags: ['bookshelf', 'cover', 'remove', 'failed'],
+      );
+    }
   }
 
   /// 继续阅读 - 直接打开上次阅读的章节
@@ -356,6 +453,23 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                   _showBookshelfSelectionDialog(novel, 'copy');
                 },
               ),
+              ListTile(
+                leading: Icon(Icons.image_outlined, color: colors.info),
+                title: const Text('设置封面'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _setNovelCover(novel);
+                },
+              ),
+              if (novel.coverMediaId != null)
+                ListTile(
+                  leading: Icon(Icons.hide_image_outlined, color: colors.chatHintText),
+                  title: const Text('删除封面'),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _removeNovelCover(novel);
+                  },
+                ),
               ListTile(
                 leading: Icon(Icons.delete_outline, color: colors.error),
                 title: const Text('从书架移除'),
