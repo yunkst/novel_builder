@@ -102,15 +102,16 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln();
 
     buf.writeln('## 工作目标');
-    buf.writeln('为当前小说网站编写可复用的 JS 提取脚本，经 execute_js 验证后 save_script 保存到本地数据库。');
-    buf.writeln('核心产出：目录提取（chapter_list_js）+ 内容提取（chapter_content_js），两段都必须测试通过。');
+    buf.writeln('为当前小说网站编写可复用的 JS 提取脚本，先完成目录提取并立即保存，再跳转到章节页完成内容提取并保存。');
+    buf.writeln('核心产出：目录提取（chapter_list_js）+ 内容提取（chapter_content_js）。');
     buf.writeln();
 
     buf.writeln('## 工作流程');
     buf.writeln('1. get_page_info → 获取 DOM 结构和页面类型');
     buf.writeln('2. get_cached_script → 有缓存则 execute_js(run_id=...) 重跑验证，无则新生成');
-    buf.writeln('3. execute_js(script=...) 测试脚本，获取 __meta.run_id');
-    buf.writeln('4. save_script 分两次落库（chapter_list + chapter_content），落库前自动验证');
+    buf.writeln('3. 阶段一：目录页 execute_js 测试 chapter_list 脚本 → 成功立刻 save_script 落库');
+    buf.writeln('4. navigate_to → 从目录结果中挑一个章节 URL 跳转到内容页');
+    buf.writeln('5. 阶段二：内容页 execute_js 测试 chapter_content 脚本 → 成功立刻 save_script 落库');
     buf.writeln();
 
     buf.writeln('## run_id 机制');
@@ -128,19 +129,24 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('- 跳过广告段落（含本章未完、一秒记住等）');
     buf.writeln();
 
-    buf.writeln('## 提取器创建流程（强制）');
-    buf.writeln('完整提取器需调用两次 save_script：一次 chapter_list，一次 chapter_content。');
+    buf.writeln('## 提取器创建流程（强制，分阶段）');
+    buf.writeln('完整提取器必须按顺序分两个阶段完成，每个阶段独立测试通过后立即落库，不要攒到一起处理。');
     buf.writeln('save_script 会在落库前强制试运行验证，失败返回诊断指导你修 JS。');
     buf.writeln();
-    buf.writeln('### 流程');
-    buf.writeln('1. 用 execute_js 反复调试脚本，确认能拿到正确结构：');
-    buf.writeln('   - chapter_list 脚本返回 {title, chapters:[{title,url}]}');
-    buf.writeln('   - chapter_content 脚本返回 {title, content, font_family}');
-    buf.writeln('2. 调用 save_script 落库（两次）：');
-    buf.writeln('   - save_script(domain, run_id, script_type="chapter_list",    test_url=<目录页>, ocr=<true|false>)');
-    buf.writeln('   - save_script(domain, run_id, script_type="chapter_content", test_url=<章节页>, ocr=<同上>)');
-    buf.writeln('3. save_script 返回 success=false -> 按 diagnostic/suggestion 修 JS，重新 execute_js 调试，再 save_script');
-    buf.writeln('   （注意：两次调用要分别验证通过，落库前都会跑一次试运行）');
+    buf.writeln('### 阶段一：目录提取（落库后才能进阶段二）');
+    buf.writeln('1. 当前已在目录页（chapter_list）：get_page_info 确认页面类型');
+    buf.writeln('2. execute_js(script=...) 反复调试，确认返回 {title, chapters:[{title,url}]} 且 chapters 非空');
+    buf.writeln('3. 拿到 __meta.run_id 后立刻调用：');
+    buf.writeln('   save_script(domain, run_id, script_type="chapter_list", test_url=<目录页>, ocr=<true|false>)');
+    buf.writeln('4. save_script 返回 success=true 才能进入阶段二；返回 success=false 则按 diagnostic/suggestion 修 JS，重新 execute_js，再 save_script');
+    buf.writeln();
+    buf.writeln('### 阶段二：内容提取');
+    buf.writeln('1. 从阶段一拿到的 chapters 数组里挑一个章节 URL（建议选非第一/最后章节的中间章节）');
+    buf.writeln('2. navigate_to(url=<该章节URL>) 跳转到内容页，等待加载完成');
+    buf.writeln('3. execute_js(script=...) 反复调试 chapter_content 脚本，确认返回 {title, content, font_family}');
+    buf.writeln('4. 拿到 __meta.run_id 后立刻调用：');
+    buf.writeln('   save_script(domain, run_id, script_type="chapter_content", test_url=<该章节URL>, ocr=<同上>)');
+    buf.writeln('5. save_script 返回 success=false 仍按诊断修 JS 重试，直到成功');
     buf.writeln();
     buf.writeln('### 字体反爬检测（ocr 判定）');
     buf.writeln('若 DOM 文本含大量 PUA 私用区码点（U+E000-F8FF，表现为不可读的乱码方块），');
