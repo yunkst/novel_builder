@@ -175,6 +175,8 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null && !chatState.isLoading)
                 _buildErrorBar(chatState.error!, session),
+              if (chatState.isLoading)
+                _buildStopBar(session),
               if (chatState.isLoading && chatState.supplementaryCount > 0)
                 _buildSupplementBar(chatState.supplementaryCount, session),
               const RetryBanner(),
@@ -623,6 +625,40 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 foregroundColor: appColors.error,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// 停止条：agent 运行时在输入栏上方始终显示，提供停止入口。
+  /// 与 [_buildSupplementBar] 独立，不依赖 supplementaryCount。
+  Widget _buildStopBar(ScenarioSession? session) {
+    final appColors = context.appColors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: appColors.error.withValues(alpha: 0.06),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 8, color: appColors.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '正在生成回复...',
+              style: TextStyle(fontSize: 12, color: appColors.error),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: session == null ? null : () => session.cancel(),
+            icon: const Icon(Icons.stop_rounded, size: 16),
+            label: const Text('停止', style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: appColors.error,
+            ),
+          ),
         ],
       ),
     );
