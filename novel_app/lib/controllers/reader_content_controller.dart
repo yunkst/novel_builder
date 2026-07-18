@@ -56,7 +56,9 @@ class ReaderContentController {
 
   /// 初始化Controller
   ///
-  /// 初始化API服务，准备加载章节
+  /// 初始化API服务。API 初始化失败不阻断后续流程：章节内容提取已完全走
+  /// HeadlessWebView + 本地缓存，不依赖后端 API。失败时只记日志，调用方
+  /// 仍可正常调用 [loadChapter]。
   Future<void> initialize() async {
     try {
       await _apiService.init();
@@ -65,16 +67,15 @@ class ReaderContentController {
         category: LogCategory.ui,
         tags: ['reader'],
       );
-    } catch (e) {
-      _ref
-          .read(chapterContentStateNotifierProvider.notifier)
-          .setError('初始化API失败: $e');
-      LoggerService.instance.e(
-        'ReaderContentController: API初始化失败 - $e',
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        'ReaderContentController: API 初始化失败（非致命，内容提取走 HeadlessWebView）: $e',
+        stackTrace: stackTrace.toString(),
         category: LogCategory.ui,
-        tags: ['reader'],
+        tags: ['reader', 'api', 'non-fatal'],
       );
-      rethrow;
+      // 不 setError、不 rethrow——loadChapter 的缓存+HeadlessWebView 路径
+      // 不需要后端 API。
     }
   }
 

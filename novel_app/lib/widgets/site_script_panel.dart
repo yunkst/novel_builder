@@ -11,11 +11,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
+import '../core/providers/ocr_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../models/site_script.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
+import '../services/ocr_render_js.dart';
+import '../services/ocr_restore_service.dart';
 import 'common/bottom_sheet_header.dart';
 import 'empty_states/empty_state_view.dart';
 
@@ -286,7 +289,11 @@ class _ScriptCard extends ConsumerWidget {
   /// 验证：弹出 URL 输入框
   void _showVerifyConfirm(
       BuildContext context, WidgetRef ref, SiteScript script) {
-    final urlController = TextEditingController(text: script.sampleUrl);
+    final currentUrl = ref.read(webviewCurrentUrlProvider);
+    final defaultUrl = currentUrl.isNotEmpty && currentUrl != 'https://so.com'
+        ? currentUrl
+        : script.sampleUrl;
+    final urlController = TextEditingController(text: defaultUrl);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -493,6 +500,56 @@ class _ScriptCard extends ConsumerWidget {
 
     if (!context.mounted) return;
 
+    // OCR 判断与还原（与正式提取路径一致）
+    final needsOcr = scriptType == 'chapter_list_js'
+        ? script.chapterListOcr
+        : script.chapterContentOcr;
+    String? ocrRestoredText;
+    double? readableRatio;
+    double? decodedRatio;
+    String? ocrError;
+
+    if (needsOcr && resultStr != null && errorMsg == null) {
+      try {
+        final jsResult = jsonDecode(resultStr);
+        final fontFamily = _extractFontFamily(jsResult);
+        if (fontFamily.isEmpty) {
+          ocrError = '脚本标记为 OCR，但返回结果中缺少 font_family 字段';
+        } else {
+          final restoreService = OcrRestoreService.forTesting(
+            renderPua: (cp, ff) =>
+                _renderPuaViaController(controller, cp, ff),
+            recognizeImageFn: (b64) async {
+              final predictor = await ref.read(ocrPredictorProvider.future);
+              return predictor.recognizeImage(b64);
+            },
+          );
+          // 验证字体有效性
+          final fontValid = await restoreService.verifyFontFamily(fontFamily);
+          if (!fontValid) {
+            ocrError = '字体家族 "$fontFamily" 验证失败（PUA 渲染无差异）';
+          } else {
+            // 提取目标文本并还原
+            final targetText = _extractOcrTargetText(jsResult, scriptType);
+            final restored = await restoreService.restorePuaInText(
+              targetText,
+              fontFamily,
+            );
+            ocrRestoredText = restored.text;
+            readableRatio = restoreService.readableRatio(restored.text);
+            decodedRatio = restored.decodedRatio;
+            if (restored.totalPuaCount == 0) {
+              ocrError = '脚本标记为 OCR，但返回文本中未检测到 PUA 码点';
+            }
+          }
+        }
+      } on TimeoutException {
+        ocrError = 'OCR 验证超时（>30秒）';
+      } catch (e) {
+        ocrError = 'OCR 处理异常: $e';
+      }
+    }
+
     // 展示结果
     _showVerifyResultDialog(
       context,
@@ -502,6 +559,11 @@ class _ScriptCard extends ConsumerWidget {
       testUrl,
       resultStr,
       errorMsg,
+      needsOcr: needsOcr,
+      ocrRestoredText: ocrRestoredText,
+      readableRatio: readableRatio,
+      decodedRatio: decodedRatio,
+      ocrError: ocrError,
     );
   }
 
@@ -513,9 +575,16 @@ class _ScriptCard extends ConsumerWidget {
     String scriptType,
     String testUrl,
     String? resultStr,
-    String? errorMsg,
-  ) {
+    String? errorMsg, {
+    bool needsOcr = false,
+    String? ocrRestoredText,
+    double? readableRatio,
+    double? decodedRatio,
+    String? ocrError,
+  }) {
     final success = errorMsg == null && resultStr != null;
+    // OCR 整体成功：标记 OCR 的脚本，还原文本非空且无 OCR 错误
+    final ocrSuccess = needsOcr && ocrRestoredText != null && ocrError == null;
 
     if (success) {
       ref.read(siteScriptListProvider.notifier).verifyScript(script.id);
@@ -538,7 +607,7 @@ class _ScriptCard extends ConsumerWidget {
           ],
         ),
         content: SizedBox(
-          width: 400,
+          width: 420,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,13 +615,60 @@ class _ScriptCard extends ConsumerWidget {
               _buildResultRow(context, '脚本类型',
                   scriptType == 'chapter_list_js' ? '目录脚本' : '内容脚本'),
               _buildResultRow(context, '测试 URL', testUrl),
+              if (needsOcr)
+                _buildResultRow(context, 'OCR 标识', '是（字体反爬）'),
               if (errorMsg != null)
                 _buildResultRow(context, '错误信息', errorMsg,
                     color: context.appColors.error),
+              if (ocrError != null)
+                _buildResultRow(context, 'OCR 警告', ocrError,
+                    color: context.appColors.warning),
+              if (ocrSuccess) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'OCR 还原结果:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(maxHeight: 160),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: context.appColors.success.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      ocrRestoredText,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '可读性: ${(readableRatio! * 100).toStringAsFixed(1)}%  |  '
+                  'PUA 解码率: ${(decodedRatio! * 100).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: readableRatio >= 0.85
+                        ? context.appColors.success
+                        : context.appColors.warning,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               if (resultStr != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  '返回结果:',
+                  '原始返回:',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -680,6 +796,54 @@ class _ScriptCard extends ConsumerWidget {
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  // ===== OCR 辅助方法（与正式提取路径 webview_extract_scenario.dart 一致）=====
+
+  /// 从 jsResult 中取 font_family（snake/camel 兜底）。
+  static String _extractFontFamily(dynamic data) {
+    if (data is! Map) return '';
+    final v = data['font_family'] ?? data['fontFamily'];
+    if (v is! String) return '';
+    return v.trim();
+  }
+
+  /// 从 jsResult 提取 OCR 目标文本。
+  /// - chapter_content: 直接取 content
+  /// - chapter_list: 拼接 title + 所有 chapters[].title
+  static String _extractOcrTargetText(dynamic jsResult, String scriptType) {
+    if (jsResult is! Map) return '';
+    if (scriptType == 'chapter_content_js') {
+      return ((jsResult['content'] as String?) ?? '');
+    }
+    final title = (jsResult['title'] as String?) ?? '';
+    final chapters = jsResult['chapters'];
+    final chapterTitles = chapters is List
+        ? chapters
+            .whereType<Map>()
+            .map((c) => (c['title'] as String?) ?? '')
+            .join(' ')
+        : '';
+    return '$title $chapterTitles';
+  }
+
+  /// 在当前浏览器 WebView 中渲染单个 PUA 码点 → 返回 base64 PNG。
+  static Future<String> _renderPuaViaController(
+    dynamic controller,
+    int codepoint,
+    String fontFamily,
+  ) async {
+    final js = buildOcrRenderJs(codepoint, fontFamily);
+    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
+    final result = await controller
+        .callAsyncJavaScript(functionBody: functionBody)
+        .timeout(const Duration(seconds: 30));
+    if (result == null || result.error != null) {
+      throw Exception('OCR 渲染失败 cp=$codepoint: ${result?.error}');
+    }
+    final value = result.value;
+    if (value is String) return value;
+    throw Exception('OCR 渲染返回非字符串: $value');
   }
 }
 

@@ -122,7 +122,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('- 脚本是 async IIFE: (async function() { ... return JSON.stringify(result); })()');
     buf.writeln('- 首行必须声明 `const PAGE_URL = \'{{URL}}\';`，禁止 window.location.href');
     buf.writeln('- 目录返回: { "title": "...", "chapters": [{ "title": "...", "url": "..." }] }');
-    buf.writeln('- 内容返回: { "title": "...", "content": "..." }');
+    buf.writeln('- chapters 必须按章节顺序从小到大排列（第一章 → 最新章），不要倒序');
+    buf.writeln('- 内容返回: { "title": "...", "content": "..." }，content 中段落之间必须用 \\n 分隔');
     buf.writeln('- 翻页: 检测下一页 → 点击 → await new Promise(r => setTimeout(r, 1000)) → 继续');
     buf.writeln('- 只使用标准 DOM API（querySelector, innerText），不依赖 jQuery/Vue/React');
     buf.writeln('- 跳过广告段落（含本章未完、一秒记住等）');

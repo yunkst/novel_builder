@@ -223,6 +223,9 @@ class MockNovelAgentService implements NovelAgentService {
   void dispose() {
     _controller.close();
   }
+
+  @override
+  void injectUserMessage(String scenarioId, String text) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +408,9 @@ void main() {
       sessions.get(ScenarioIds.writing);
       sessions.get(ScenarioIds.webviewExtract);
 
+      // 等待微任务：_scheduleSync 将 state 写入推迟到微任务执行
+      await Future<void>.delayed(Duration.zero);
+
       final state = container.read(scenarioSessionsProvider);
       expect(state.containsKey(ScenarioIds.writing), isTrue);
       expect(state.containsKey(ScenarioIds.webviewExtract), isTrue);
@@ -416,7 +422,7 @@ void main() {
   // ===========================================================================
 
   group('LRU 淘汰', () {
-    test('超过 _maxSessions 时淘汰空闲 session', () {
+    test('超过 _maxSessions 时淘汰空闲 session', () async {
       final sessions = container.read(scenarioSessionsProvider.notifier);
 
       // 创建最多 8 个 session
@@ -424,11 +430,18 @@ void main() {
         sessions.get('scenario_$i');
       }
 
+      // 等待微任务：_scheduleSync 将 _evictIfNeeded + _syncState 推迟到微任务
+      await Future<void>.delayed(Duration.zero);
+
       // 验证已创建 8 个
       expect(sessions.activeSessionIds.length, 8);
 
       // 创建第 9 个，应触发淘汰
       sessions.get('scenario_8');
+
+      // 等待微任务执行淘汰
+      await Future<void>.delayed(Duration.zero);
+
       // 淘汰后应仍然 <= 8
       expect(sessions.activeSessionIds.length, lessThanOrEqualTo(8));
     });

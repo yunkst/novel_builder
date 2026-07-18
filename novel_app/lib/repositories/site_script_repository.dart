@@ -244,7 +244,7 @@ class SiteScriptRepository extends BaseRepository {
       }
 
       // INSERT：首次保存
-      final id = now.toString();
+      final id = '${now}_${DateTime.now().microsecondsSinceEpoch % 100000}';
       await db.insert('site_scripts', {
         'id': id,
         'domain': domain,

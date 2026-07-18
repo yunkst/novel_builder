@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/providers/agent_chat_state.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
+import 'package:novel_app/services/dsl_engine/retry_signals.dart';
+import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/widgets/agent_chat/agent_chat_dialog.dart';
 
 /// 测试辅助：用安全 overrides 包装 AgentChatDialog，避免 ScenarioSessionsNotifier
@@ -47,6 +49,16 @@ TextButton? _findTextButtonByText(WidgetTester tester, String text) {
 }
 
 void main() {
+  // 避免 RetrySignals 全局单例残留影响测试（RetryBanner 订阅它并启动 Timer）
+  setUp(() {
+    RetrySignals.instance.resetForTest();
+    LoggerService.resetForTesting();
+  });
+  tearDown(() {
+    RetrySignals.instance.resetForTest();
+    LoggerService.resetForTesting();
+  });
+
   // 输入栏右侧二态按钮（A 方案，2026-07-18）：
   //   有文本 OR 有图     -> 发送（运行中为"补充到下一轮"）
   //   完全空 (无文无图)  -> 添加图片

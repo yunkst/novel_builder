@@ -139,22 +139,19 @@ class ChapterList extends _$ChapterList {
       return;
     }
 
+    // initApi 失败不阻断章节加载：章节列表提取已完全走 HeadlessWebView +
+    // 本地 DB 缓存，不依赖后端 API。后端未配置时只记日志，继续加载。
     try {
       await chapterLoader.initApi();
-      await _loadChapters();
     } catch (e, stackTrace) {
-      final logger = ref.read(loggerServiceProvider);
-      logger.e(
-        '初始化API失败',
+      ref.read(loggerServiceProvider).w(
+        'API 初始化失败（非致命，章节列表走本地缓存 + HeadlessWebView）: $e',
         stackTrace: stackTrace.toString(),
         category: LogCategory.network,
-        tags: ['api', 'init', 'failed'],
-      );
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: _exceptionUserMessage(e),
+        tags: ['api', 'init', 'non-fatal'],
       );
     }
+    await _loadChapters();
   }
 
   /// 加载章节列表

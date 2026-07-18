@@ -6,15 +6,16 @@ void main() {
     test('替换 CODEPOINT 占位符', () {
       final js = buildOcrRenderJs(0xE3E8, 'MyFont');
       expect(js, contains('const cp = 0xE3E8;'));
-      // ctx.font 行：fontFamily 是 JS 变量名，buildOcrRenderJs 不替换它，
-      // 只替换 const fontFamily = "..." 那行的字符串字面量值。
-      expect(js, contains('const fontFamily = "MyFont";'));
+      // fontFamily 通过十六进制码点序列注入，JS 侧用 String.fromCodePoint 还原
+      // "MyFont" 的码点: 77,121,70,111,110,116
+      expect(js, contains('String.fromCodePoint(...[77,121,70,111,110,116])'));
       expect(js, contains("'80px ' + fontFamily"));
     });
 
     test('替换 FONT_FAMILY 占位符', () {
       final js = buildOcrRenderJs(0xE3E9, 'AntiCrawlFont');
-      expect(js, contains('const fontFamily = "AntiCrawlFont";'));
+      // "AntiCrawlFont" 的码点序列
+      expect(js, contains('String.fromCodePoint(...[65,110,116,105,67,114,97,119,108,70,111,110,116])'));
       expect(js, contains("'80px ' + fontFamily"));
     });
 

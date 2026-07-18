@@ -171,7 +171,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   @override
   void deactivate() {
     // 清除 Agent 阅读上下文（必须在 deactivate 中执行，此时 ref 仍有效）
-    ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    // 使用 Future.microtask 延迟执行，避免在 widget 树构建期间修改 provider
+    Future.microtask(() {
+      ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    });
     super.deactivate();
   }
 

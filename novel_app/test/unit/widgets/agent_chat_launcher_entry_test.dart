@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/providers/agent_chat_state.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
+import 'package:novel_app/services/dsl_engine/retry_signals.dart';
+import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/widgets/agent_chat/agent_chat_launcher_entry.dart';
 
 /// 测试辅助：用最小 ProviderScope 包裹测试用例。
@@ -28,6 +30,16 @@ Widget _wrap(Widget child) {
 }
 
 void main() {
+  // 避免 RetrySignals 全局单例残留影响测试（RetryBanner 订阅它并启动 Timer）
+  setUp(() {
+    RetrySignals.instance.resetForTest();
+    LoggerService.resetForTesting();
+  });
+  tearDown(() {
+    RetrySignals.instance.resetForTest();
+    LoggerService.resetForTesting();
+  });
+
   group('AgentChatLauncherEntry.open', () {
     testWidgets('调用后弹出 AgentChatDialog', (tester) async {
       await tester.pumpWidget(

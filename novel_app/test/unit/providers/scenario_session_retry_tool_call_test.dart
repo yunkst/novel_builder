@@ -95,6 +95,9 @@ class _MockNovelAgentService implements NovelAgentService {
 
   @override
   void dispose() => _controller.close();
+
+  @override
+  void injectUserMessage(String scenarioId, String text) {}
 }
 
 // ---------------------------------------------------------------------------

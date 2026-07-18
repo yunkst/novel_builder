@@ -64,7 +64,10 @@ class _ChapterListScreenRiverpodState
   @override
   void deactivate() {
     // 离开页面时清除阅读上下文
-    ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    // 使用 Future.microtask 延迟执行，避免在 widget 树构建期间修改 provider
+    Future.microtask(() {
+      ref.read(readingContextProvider.notifier).state = const ReadingContext();
+    });
     super.deactivate();
   }
 

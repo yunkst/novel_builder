@@ -89,11 +89,12 @@ class RetrySignals {
     notifier.value = null;
   }
 
-  /// 测试用复位(重建 ValueNotifier);release 代码不应调用
+  /// 测试用复位(清空当前值，避免影响后续测试);release 代码不应调用。
+  /// 注意：不 dispose 并重建 ValueNotifier，因为已挂载的 ValueListenableBuilder
+  /// 持有旧引用，重建会导致它监听一个已 dispose 的 notifier。仅清值即可。
   @visibleForTesting
   void resetForTest() {
-    notifier.dispose();
-    notifier = ValueNotifier<RetryState?>(null);
+    notifier.value = null;
   }
 }
 

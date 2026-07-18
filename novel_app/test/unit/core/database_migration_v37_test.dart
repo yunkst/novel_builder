@@ -43,7 +43,7 @@ void main() {
     await db.close();
   });
 
-  test('currentVersion == 37', () {
-    expect(DatabaseMigrations.currentVersion, 37);
+  test('currentVersion == 39', () {
+    expect(DatabaseMigrations.currentVersion, 39);
   });
 }

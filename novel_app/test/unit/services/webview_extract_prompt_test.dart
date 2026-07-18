@@ -60,8 +60,9 @@ void main() {
     // 旧版本第 4 步签名（list_run_id + content_run_id）必须已被替换
     expect(prompt, isNot(contains('save_script(domain, list_run_id, content_run_id)')));
     // 新流程引用
-    expect(prompt, contains('save_script 分两次落库'));
-    expect(prompt, contains('落库前自动验证'));
+    expect(prompt, contains('阶段一'));
+    expect(prompt, contains('阶段二'));
+    expect(prompt, contains('落库前强制试运行验证'));
   });
 
   test('prompt run_id 机制段已使用新 schema', () {

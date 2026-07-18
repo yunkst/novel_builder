@@ -36,8 +36,10 @@ class _ChapterSearchScreenState extends ConsumerState<ChapterSearchScreen> {
   void initState() {
     super.initState();
 
-    // 设置 Novel 参数
-    ref.read(novelParamProvider.notifier).setNovel(widget.novel);
+    // 设置 Novel 参数（延迟到帧构建完成后，避免在 widget 树构建期间修改 provider）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(novelParamProvider.notifier).setNovel(widget.novel);
+    });
 
     // 移除自动搜索监听器 - 改为仅在用户按回车时搜索
     // _searchController.addListener(_onSearchChanged);
