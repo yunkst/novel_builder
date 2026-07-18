@@ -18,6 +18,7 @@ import 'preferences_service.dart';
 /// 通过 GitHub Releases 获取版本信息和下载 APK
 class AppUpdateService {
   static const String _ignoreVersionKey = 'app_update_ignore_version';
+  static const String _previewChannelKey = 'app_update_preview_channel';
   static const _platformChannel =
       MethodChannel('com.example.novel_app/app_install');
 
@@ -44,10 +45,15 @@ class AppUpdateService {
   /// - [AppUpdateUpToDate]：请求成功，但远端无可用 release（404 / draft / prerelease / 无 APK）
   /// - [AppUpdateCheckFailed]：请求失败（限流 / 网络错误 / 解析异常），用户应重试
   ///
+  /// - [includePrerelease]：是否包含 prerelease（preview 通道）。
+  ///   默认 false（stable 通道），GitHub API 会跳过 prerelease 版本。
+  ///
   /// 与 [checkForUpdate] 的区别：后者把所有失败都归为 null（误报「无新版本」），
   /// 本方法把失败单独返回，调用方可据此提示用户「检查失败，请重试」。
-  Future<AppUpdateResult> checkForUpdateDetailed(
-      {bool forceCheck = false}) async {
+  Future<AppUpdateResult> checkForUpdateDetailed({
+    bool forceCheck = false,
+    bool includePrerelease = false,
+  }) async {
     try {
       // 频率控制
       if (!await _githubService.shouldCheck(forceCheck: forceCheck)) {
@@ -63,7 +69,9 @@ class AppUpdateService {
       await _githubService.recordCheckTime();
 
       // 先从 GitHub 获取最新 release（限流/网络错误在此步抛 AppUpdateCheckException）
-      final release = await _githubService.fetchLatestRelease();
+      final release = await _githubService.fetchLatestRelease(
+        includePrerelease: includePrerelease,
+      );
       if (release == null) {
         return const AppUpdateUpToDate();
       }
@@ -139,8 +147,14 @@ class AppUpdateService {
   /// 返回 null 表示没有新版本（或 API 错误/无可用 release）。
   /// 内部委托给 [checkForUpdateDetailed]：Available → 返回 AppVersion；
   /// UpToDate / CheckFailed → 返回 null（保持旧契约不破坏调用方）。
-  Future<AppVersion?> checkForUpdate({bool forceCheck = false}) async {
-    final result = await checkForUpdateDetailed(forceCheck: forceCheck);
+  Future<AppVersion?> checkForUpdate({
+    bool forceCheck = false,
+    bool includePrerelease = false,
+  }) async {
+    final result = await checkForUpdateDetailed(
+      forceCheck: forceCheck,
+      includePrerelease: includePrerelease,
+    );
     if (result is AppUpdateAvailable) {
       return result.version;
     }
@@ -319,5 +333,18 @@ class AppUpdateService {
   /// 清除忽略的版本
   Future<void> clearIgnoredVersion() async {
     await PreferencesService.instance.remove(_ignoreVersionKey);
+  }
+
+  /// 预览版通道开关是否启用
+  static Future<bool> isPreviewChannelEnabled() async {
+    return await PreferencesService.instance.getBool(
+      _previewChannelKey,
+      defaultValue: false,
+    );
+  }
+
+  /// 设置预览版通道开关
+  static Future<void> setPreviewChannelEnabled(bool enabled) async {
+    await PreferencesService.instance.setBool(_previewChannelKey, enabled);
   }
 }

@@ -33,6 +33,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   PackageInfo? _packageInfo;
   bool _isCheckingUpdate = false;
+  bool _isPreviewChannel = false;
   String? _lastBackupTime;
   bool _isRepairing = false;
 
@@ -41,6 +42,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _loadPackageInfo();
     _loadLastBackupTime();
+    _loadPreviewChannel();
+  }
+
+  Future<void> _loadPreviewChannel() async {
+    final enabled = await AppUpdateService.isPreviewChannelEnabled();
+    if (mounted) {
+      setState(() {
+        _isPreviewChannel = enabled;
+      });
+    }
   }
 
   Future<void> _loadPackageInfo() async {
@@ -70,9 +81,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       final updateService = AppUpdateService();
+      final previewEnabled =
+          await AppUpdateService.isPreviewChannelEnabled();
 
-      final latestVersion =
-          await updateService.checkForUpdate(forceCheck: true);
+      final latestVersion = await updateService.checkForUpdate(
+        forceCheck: true,
+        includePrerelease: previewEnabled,
+      );
 
       if (!mounted) return;
 
@@ -398,10 +413,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       )
                     : Icon(Icons.system_update_alt, color: appColors.neutral),
                 title: const Text('检查更新'),
-                subtitle: const Text('查看是否有新版本可用'),
+                subtitle: Text(
+                  _isPreviewChannel ? '当前通道：预览版' : '查看是否有新版本可用',
+                ),
                 trailing:
                     _isCheckingUpdate ? null : const Icon(Icons.arrow_forward_ios),
                 onTap: _isCheckingUpdate ? null : _checkForUpdate,
+              ),
+              SwitchListTile(
+                secondary: Icon(Icons.bug_report_outlined, color: appColors.neutral),
+                title: const Text('获取预览版'),
+                subtitle: const Text('开启后可收到最新的预览版本'),
+                value: _isPreviewChannel,
+                onChanged: (value) async {
+                  await AppUpdateService.setPreviewChannelEnabled(value);
+                  setState(() {
+                    _isPreviewChannel = value;
+                  });
+                },
               ),
             ],
           ),

@@ -25,26 +25,57 @@ class GithubReleaseService {
 
   /// 获取最新 Release 信息
   ///
-  /// 调用 GitHub API `/repos/{owner}/{repo}/releases/latest`
-  /// 返回 null 表示无可用 release 或网络错误
-  Future<GithubRelease?> fetchLatestRelease() async {
+  /// - [includePrerelease] 为 false（默认，stable 通道）时，调用
+  ///   `/repos/{owner}/{repo}/releases/latest`：GitHub API 原生会跳过所有
+  ///   prerelease，永远只返回最新的稳定版。
+  /// - [includePrerelease] 为 true（preview 通道）时，调用
+  ///   `/repos/{owner}/{repo}/releases?per_page=1`：返回按发布时间倒序的最新
+  ///   一条 release（可能是稳定版，也可能是预览版），从而让开启预览版的用户
+  ///   能收到最新的任何版本。
+  ///
+  /// 返回 null 表示无可用 release 或网络错误。
+  Future<GithubRelease?> fetchLatestRelease({
+    bool includePrerelease = false,
+  }) async {
     try {
-      final url = '$_apiBase/repos/$_repoOwner/$_repoName/releases/latest';
+      final path = includePrerelease
+          ? '/repos/$_repoOwner/$_repoName/releases?per_page=1'
+          : '/repos/$_repoOwner/$_repoName/releases/latest';
+      final url = '$_apiBase$path';
       LoggerService.instance.d(
         'GitHub API: $url',
         category: LogCategory.network,
-        tags: ['update', 'github'],
+        tags: ['update', 'github', includePrerelease ? 'preview' : 'stable'],
       );
 
-      final response = await _dio.get<Map<String, dynamic>>(url);
+      final response = await _dio.get<dynamic>(url);
 
       if (response.statusCode == 200 && response.data != null) {
-        final release = GithubRelease.fromJson(response.data!);
+        // latest 接口返回单个对象，列表接口返回数组（取第一条）
+        final dynamic data = response.data;
+        final Map<String, dynamic> releaseJson;
+        if (data is List) {
+          if (data.isEmpty) return null;
+          releaseJson = data.first as Map<String, dynamic>;
+        } else {
+          releaseJson = data as Map<String, dynamic>;
+        }
+        final release = GithubRelease.fromJson(releaseJson);
 
-        // 跳过 draft 和 prerelease
-        if (release.draft || release.prerelease) {
+        // draft 永远跳过（未发布的草稿）
+        if (release.draft) {
           LoggerService.instance.d(
-            '跳过 draft/prerelease: ${release.tagName}',
+            '跳过 draft: ${release.tagName}',
+            category: LogCategory.network,
+            tags: ['update', 'github'],
+          );
+          return null;
+        }
+
+        // prerelease：stable 通道跳过，preview 通道接受
+        if (release.prerelease && !includePrerelease) {
+          LoggerService.instance.d(
+            'stable 通道跳过 prerelease: ${release.tagName}',
             category: LogCategory.network,
             tags: ['update', 'github'],
           );

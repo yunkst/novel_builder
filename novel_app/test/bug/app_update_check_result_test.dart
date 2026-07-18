@@ -24,7 +24,10 @@ class _FakeGithubReleaseService implements GithubReleaseService {
   _FakeGithubReleaseService(this._fetchImpl);
 
   @override
-  Future<GithubRelease?> fetchLatestRelease() => _fetchImpl();
+  Future<GithubRelease?> fetchLatestRelease({
+    bool includePrerelease = false,
+  }) =>
+      _fetchImpl();
 
   // —— 以下接口测试不关心，空实现即可 ——
   @override
