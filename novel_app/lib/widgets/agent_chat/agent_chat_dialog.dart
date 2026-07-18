@@ -175,8 +175,10 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               Expanded(child: _buildMessageList(chatState)),
               if (chatState.error != null && !chatState.isLoading)
                 _buildErrorBar(chatState.error!, session),
+              if (chatState.isLoading)
+                _buildStopBar(session),
               if (chatState.isLoading && chatState.supplementaryCount > 0)
-                _buildSupplementBar(chatState.supplementaryCount, session),
+                _buildSupplementBar(chatState.supplementaryCount),
               const RetryBanner(),
               _buildContextTag(),
               _buildInputBar(chatState, session),
@@ -628,10 +630,44 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
     );
   }
 
+  /// 停止条：agent 运行时在输入栏上方始终显示，提供停止入口。
+  /// 与 [_buildSupplementBar] 独立，不依赖 supplementaryCount。
+  Widget _buildStopBar(ScenarioSession? session) {
+    final appColors = context.appColors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: appColors.error.withValues(alpha: 0.06),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 8, color: appColors.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '正在生成回复...',
+              style: TextStyle(fontSize: 12, color: appColors.error),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: session == null ? null : () => session.cancel(),
+            icon: const Icon(Icons.stop_rounded, size: 16),
+            label: const Text('停止', style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: appColors.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// A 方案：运行中补充消息状态条。
-  /// 显示"已补充 N 条，将在下一轮处理"+ 停止按钮（主动取消走 cancel 路径，
-  /// 队列内的补充消息也会被 cancelFor 一并清空）。
-  Widget _buildSupplementBar(int count, ScenarioSession? session) {
+  /// 仅显示"已补充 N 条，将在下一轮处理"信息，不提供停止入口
+  /// （停止操作已迁移至独立的 [_buildStopBar]）。
+  Widget _buildSupplementBar(int count) {
     final appColors = context.appColors;
     return Container(
       width: double.infinity,
@@ -645,17 +681,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             child: Text(
               '已补充 $count 条消息，将在下一轮处理',
               style: TextStyle(fontSize: 12, color: appColors.agentAccent),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: session == null ? null : () => session.cancel(),
-            icon: const Icon(Icons.stop_rounded, size: 14),
-            label: const Text('停止', style: TextStyle(fontSize: 12)),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-              minimumSize: const Size(0, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              foregroundColor: appColors.error,
             ),
           ),
         ],
@@ -868,7 +893,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 ),
               ),
             ),
-          // 输入区：输入框 + 右侧三态按钮（attach/send/stop）
+          // 输入区：输入框 + 右侧双态按钮（attach/send）
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -904,7 +929,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 isSupplementary: chatState.isLoading,
                 onAttach: _onAttachTap,
                 onSend: () => _sendMessage(session),
-                onStop: () => session?.cancel(),
               ),
             ],
           ),
@@ -994,7 +1018,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   ///
   /// A 方案下运行中不再让按钮变 stop —— 用户运行中点 send = 补充消息，
   /// 由 ScenarioSession 落库 + service.injectUserMessage 排队让下一轮 LLM 看到。
-  /// 主动取消按钮改由 [_buildSupplementBar] 顶部条提供（仅 isLoading 时显示）。
+  /// 主动取消按钮改由 [_buildStopBar] 顶部条提供（仅 isLoading 时显示）。
   _TrailingMode _trailingMode(AgentChatState chatState) {
     if (_hasText || _attachedMediaId != null) return _TrailingMode.send;
     return _TrailingMode.attach;
@@ -1078,14 +1102,14 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   }
 }
 
-/// 输入栏右侧按钮三态模式。
+/// 输入栏右侧按钮双态模式。
 ///
-/// 优先级：stop（运行中） > send（有文本或已挂图） > attach（完全空）。
-enum _TrailingMode { attach, send, stop }
+/// 优先级：send（有文本或已挂图） > attach（完全空）。
+enum _TrailingMode { attach, send }
 
-/// 输入栏右侧三态按钮（attach / send / stop）。
+/// 输入栏右侧双态按钮（attach / send）。
 ///
-/// 三种模式共用同一 40x40 圆形容器，切换时通过 [AnimatedSwitcher]
+/// 两种模式共用同一 40x40 圆形容器，切换时通过 [AnimatedSwitcher]
 /// 做淡入淡出 + 0.85→1.0 缩放过渡（~180ms）。attach 模式下支持
 /// [isPickingImage] 转圈态。
 class _AgentInputTrailingButton extends StatelessWidget {
@@ -1096,7 +1120,6 @@ class _AgentInputTrailingButton extends StatelessWidget {
   final bool isSupplementary;
   final VoidCallback? onAttach;
   final VoidCallback? onSend;
-  final VoidCallback? onStop;
 
   static final _scaleTween = Tween<double>(begin: 0.85, end: 1.0);
 
@@ -1106,7 +1129,6 @@ class _AgentInputTrailingButton extends StatelessWidget {
     this.isSupplementary = false,
     this.onAttach,
     this.onSend,
-    this.onStop,
   });
 
   @override
@@ -1185,15 +1207,7 @@ class _AgentInputTrailingButton extends StatelessWidget {
           onPressed: onSend,
           tooltip: isSupplementary ? '补充到下一轮' : '发送',
         );
-      case _TrailingMode.stop:
-        return _TrailingButtonConfig(
-          icon: Icons.stop_rounded,
-          bg: appColors.error,
-          fg: appColors.agentOnBrand,
-          onPressed: onStop,
-          tooltip: '停止',
-        );
-    }
+      }
   }
 }
 
