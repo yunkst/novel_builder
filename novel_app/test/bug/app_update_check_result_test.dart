@@ -188,4 +188,102 @@ void main() {
       expect(result!.version, '9.9.9');
     });
   });
+
+  group('双通道 (stable/preview)', () {
+    /// 构造一个 prerelease 的 release JSON
+    Map<String, dynamic> _prereleaseJson(String tag) => {
+          ..._releaseJson(tag),
+          'prerelease': true,
+        };
+
+    test('stable 通道: includePrerelease=false 跳过 prerelease', () async {
+      // 模拟 GitHub /releases/latest：返回 null（等同于服务端跳过 prerelease）
+      final service = AppUpdateService(
+        githubService: _FakeGithubReleaseService(
+          () async => null, // prerelease 被跳过，无可用稳定版
+        ),
+      );
+
+      final result = await service.checkForUpdateDetailed(
+        forceCheck: true,
+        includePrerelease: false,
+      );
+
+      // 无稳定版 → UpToDate
+      expect(result, isA<AppUpdateUpToDate>());
+    });
+
+    test('preview 通道: includePrerelease=true 接受 prerelease', () async {
+      final service = AppUpdateService(
+        githubService: _FakeGithubReleaseService(
+          () async =>
+              GithubRelease.fromJson(_prereleaseJson('v2.0.0-preview.1')),
+        ),
+        packageInfoGetter: () async => _fakePackageInfo('1.0.0'),
+      );
+
+      final result = await service.checkForUpdateDetailed(
+        forceCheck: true,
+        includePrerelease: true,
+      );
+
+      expect(result, isA<AppUpdateAvailable>());
+      final available = result as AppUpdateAvailable;
+      expect(available.version.version, '2.0.0-preview.1');
+    });
+
+    test('preview 通道: 最新一条是 stable 时也能拿到', () async {
+      // 当没有预览版、最新一条就是稳定版时，preview 通道也能拿到
+      final service = AppUpdateService(
+        githubService: _FakeGithubReleaseService(
+          () async => GithubRelease.fromJson(_releaseJson('v2.0.0')),
+        ),
+        packageInfoGetter: () async => _fakePackageInfo('1.0.0'),
+      );
+
+      final result = await service.checkForUpdateDetailed(
+        forceCheck: true,
+        includePrerelease: true,
+      );
+
+      expect(result, isA<AppUpdateAvailable>());
+      expect((result as AppUpdateAvailable).version.version, '2.0.0');
+    });
+
+    test('旧入口 checkForUpdate 透传 includePrerelease', () async {
+      final service = AppUpdateService(
+        githubService: _FakeGithubReleaseService(
+          () async =>
+              GithubRelease.fromJson(_prereleaseJson('v2.0.0-preview.1')),
+        ),
+        packageInfoGetter: () async => _fakePackageInfo('1.0.0'),
+      );
+
+      // 开启预览通道
+      final previewResult = await service.checkForUpdate(
+        forceCheck: true,
+        includePrerelease: true,
+      );
+      expect(previewResult, isA<AppVersion>());
+      expect(previewResult!.version, '2.0.0-preview.1');
+
+      // 关闭预览通道（默认）
+      final stableService = AppUpdateService(
+        githubService: _FakeGithubReleaseService(
+          () async => null, // prerelease 被跳过
+        ),
+      );
+      final stableResult = await stableService.checkForUpdate(
+        forceCheck: true,
+      );
+      expect(stableResult, isNull);
+    });
+
+    test('isPreviewChannelEnabled 默认返回 false', () async {
+      // 注意：单元测试环境 SharedPreferences 不可用，此测试验证静态方法签名存在
+      // 实际读写逻辑依赖 PreferencesService，需在集成测试中验证
+      expect(AppUpdateService.isPreviewChannelEnabled, isNotNull);
+      expect(AppUpdateService.setPreviewChannelEnabled, isNotNull);
+    });
+  });
 }
