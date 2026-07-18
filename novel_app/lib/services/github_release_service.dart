@@ -29,9 +29,10 @@ class GithubReleaseService {
   ///   `/repos/{owner}/{repo}/releases/latest`：GitHub API 原生会跳过所有
   ///   prerelease，永远只返回最新的稳定版。
   /// - [includePrerelease] 为 true（preview 通道）时，调用
-  ///   `/repos/{owner}/{repo}/releases?per_page=1`：返回按发布时间倒序的最新
-  ///   一条 release（可能是稳定版，也可能是预览版），从而让开启预览版的用户
-  ///   能收到最新的任何版本。
+  ///   `/repos/{owner}/{repo}/releases?per_page=10` 拉取最近 10 条，
+  ///   然后客户端按 `created_at` 降序取最新一条（排除 draft）。
+  ///   GitHub API 默认排序在 prerelease 存在时不可靠（讨论 #21901），
+  ///   所以客户端显式排序确保拿到发布时间最新的版本。
   ///
   /// 返回 null 表示无可用 release 或网络错误。
   Future<GithubRelease?> fetchLatestRelease({
@@ -39,7 +40,7 @@ class GithubReleaseService {
   }) async {
     try {
       final path = includePrerelease
-          ? '/repos/$_repoOwner/$_repoName/releases?per_page=1'
+          ? '/repos/$_repoOwner/$_repoName/releases?per_page=10'
           : '/repos/$_repoOwner/$_repoName/releases/latest';
       final url = '$_apiBase$path';
       LoggerService.instance.d(
@@ -51,18 +52,28 @@ class GithubReleaseService {
       final response = await _dio.get<dynamic>(url);
 
       if (response.statusCode == 200 && response.data != null) {
-        // latest 接口返回单个对象，列表接口返回数组（取第一条）
+        // latest 接口返回单个对象；列表接口返回数组。
+        // preview 通道需要客户端按 created_at desc 排序取最新一条，
+        // 因为 GitHub API 默认排序在 prerelease 存在时不可靠。
         final dynamic data = response.data;
-        final Map<String, dynamic> releaseJson;
+        final GithubRelease release;
         if (data is List) {
           if (data.isEmpty) return null;
-          releaseJson = data.first as Map<String, dynamic>;
+          final releases = data
+              .map((e) => GithubRelease.fromJson(e as Map<String, dynamic>))
+              .where((r) => !r.draft) // draft 永远跳过
+              .toList();
+          if (releases.isEmpty) return null;
+          // 按 created_at 降序取最新一条
+          // （publishedAt 是 String 类型，ISO 8601 格式直接按字符串排序即可）
+          releases.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+          release = releases.first;
         } else {
-          releaseJson = data as Map<String, dynamic>;
+          release = GithubRelease.fromJson(data as Map<String, dynamic>);
         }
-        final release = GithubRelease.fromJson(releaseJson);
 
-        // draft 永远跳过（未发布的草稿）
+        // draft 永远跳过（preview 通道已在列表筛选时跳过，
+        // stable 通道 /latest 不返回 draft，此处双保险）
         if (release.draft) {
           LoggerService.instance.d(
             '跳过 draft: ${release.tagName}',

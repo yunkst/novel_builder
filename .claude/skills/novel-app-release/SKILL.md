@@ -216,7 +216,9 @@ fi
 **App 端获取逻辑**(`github_release_service.dart`):
 
 - 用户**关闭**「获取预览版」(默认):请求 `/releases/latest`,GitHub API 原生跳过所有 prerelease,永远返回最新稳定版
-- 用户**开启**「获取预览版」:请求 `/releases?per_page=1`,返回最新一条 release(可能是稳定版也可能是预览版)
+- 用户**开启**「获取预览版」:请求 `/releases?per_page=10`,客户端按 `created_at` 降序取最新一条(排除 draft)。
+  > 不用 `per_page=1`:GitHub `/releases` 默认排序在 prerelease 存在时不可靠(社区讨论 #21901),
+  > 可能返回 semver 更高的稳定版而非时间最新的预览版。客户端显式排序确保拿到最新发布的版本。
 
 #### 发布预览版
 
