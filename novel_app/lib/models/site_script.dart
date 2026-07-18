@@ -13,7 +13,19 @@ class SiteScript {
   final int lastUsedAt;
   final int useCount;
   final int verified;
-  final bool ocr; // 是否需要 OCR 后处理（字体反爬）。v37 新增。
+
+  /// 目录提取脚本是否需要 OCR 后处理（字体反爬）。
+  ///
+  /// v39 拆列后独立标记——典型如番茄小说，目录页 title/chapter.title 是正常汉字
+  /// （无 PUA），所以此字段为 false；正文页有 PUA，chapterContentOcr 才为 true。
+  /// 两者互不覆盖。
+  final bool chapterListOcr;
+
+  /// 正文提取脚本是否需要 OCR 后处理（字体反爬）。
+  ///
+  /// v39 拆列后独立标记。多数普通站点两列均为 false；字体反爬站点（如番茄）
+  /// 一般 content_ocr=true、list_ocr=false。
+  final bool chapterContentOcr;
 
   const SiteScript({
     required this.id,
@@ -26,7 +38,8 @@ class SiteScript {
     required this.lastUsedAt,
     required this.useCount,
     required this.verified,
-    this.ocr = false,
+    this.chapterListOcr = false,
+    this.chapterContentOcr = false,
   });
 
   /// 从数据库 Map 构造
@@ -42,7 +55,9 @@ class SiteScript {
       lastUsedAt: map['last_used_at'] as int,
       useCount: (map['use_count'] as int?) ?? 0,
       verified: (map['verified'] as int?) ?? 0,
-      ocr: (map['ocr'] as int?) == 1,
+      chapterListOcr: (map['chapter_list_ocr'] as int?) == 1,
+      chapterContentOcr: (map['chapter_content_ocr'] as int?) == 1,
+      // 注：旧 'ocr' 列 v39 起不再读取，保留在 DB 仅作历史兼容。
     );
   }
 
@@ -59,7 +74,8 @@ class SiteScript {
       'last_used_at': lastUsedAt,
       'use_count': useCount,
       'verified': verified,
-      'ocr': ocr ? 1 : 0,
+      'chapter_list_ocr': chapterListOcr ? 1 : 0,
+      'chapter_content_ocr': chapterContentOcr ? 1 : 0,
     };
   }
 
@@ -71,9 +87,6 @@ class SiteScript {
 
   /// 是否已验证
   bool get isVerified => verified == 1;
-
-  /// 是否需要 OCR 后处理（字体反爬）
-  bool get needsOcr => ocr;
 
   /// 创建时间（DateTime）
   DateTime get createdAtDateTime =>
@@ -91,7 +104,8 @@ class SiteScript {
     int? lastUsedAt,
     int? useCount,
     int? verified,
-    bool? ocr,
+    bool? chapterListOcr,
+    bool? chapterContentOcr,
   }) {
     return SiteScript(
       id: id ?? this.id,
@@ -104,7 +118,8 @@ class SiteScript {
       lastUsedAt: lastUsedAt ?? this.lastUsedAt,
       useCount: useCount ?? this.useCount,
       verified: verified ?? this.verified,
-      ocr: ocr ?? this.ocr,
+      chapterListOcr: chapterListOcr ?? this.chapterListOcr,
+      chapterContentOcr: chapterContentOcr ?? this.chapterContentOcr,
     );
   }
 }

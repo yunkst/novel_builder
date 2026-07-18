@@ -70,8 +70,14 @@ class HeadlessWebViewPool {
       await _waitForUseRight();
       _isInUse = true;
       return _controller!;
-    } catch (e) {
+    } catch (e, stackTrace) {
       _refCount--;
+      LoggerService.instance.w(
+        'HeadlessWebViewPool.acquire 失败: $e refCount=$_refCount',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['headless-webview-pool', 'acquire', 'failed'],
+      );
       rethrow;
     }
   }
@@ -87,8 +93,14 @@ class HeadlessWebViewPool {
         _waitQueue.remove(waiter);
         throw TimeoutException('HeadlessWebViewPool acquire 排他等待超时');
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       _waitQueue.remove(waiter);
+      LoggerService.instance.w(
+        'HeadlessWebViewPool 排他等待失败: $e waitQueue=${_waitQueue.length}',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.cache,
+        tags: ['headless-webview-pool', 'acquire', 'timeout'],
+      );
       rethrow;
     }
   }

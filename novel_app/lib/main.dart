@@ -68,6 +68,21 @@ void main() async {
     );
   };
 
+  // 捕获 isolate / 平台层异步错误（绕过 runZonedGuarded 的最后一道网）
+  //
+  // FlutterError.onError 只接管框架抛出的同步错误，runZonedGuarded 只接管 zone 内的
+  // 未捕获异步错误；Dart VM / 平台通道 / isolate 抛出的部分错误会绕过这两者，需要在此兜底。
+  // 返回 true 表示已处理，避免再走默认崩溃处理器（直接 crash 退出）。
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    LoggerService.instance.e(
+      'Platform Error: $error',
+      stackTrace: stack.toString(),
+      category: LogCategory.general,
+      tags: ['platform', 'error', 'crash'],
+    );
+    return true;
+  };
+
   // 捕获未处理的异步错误
   runZonedGuarded(() async {
     // 初始化 API 服务 - 使用Provider容器

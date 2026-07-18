@@ -11,7 +11,7 @@ import '../../services/logger_service.dart';
 /// 设计原则：单一数据源，避免迁移逻辑重复维护
 class DatabaseMigrations {
   /// 当前数据库版本
-  static const int currentVersion = 38;
+  static const int currentVersion = 39;
 
   /// ========== v1 基础表创建 ==========
   /// 新安装时调用，与 _onUpgrade(1) 共同构建完整数据库
@@ -794,6 +794,20 @@ class DatabaseMigrations {
       case 38:
         await db.execute('DROP TABLE IF EXISTS model_download_tasks');
         _log('迁移 v37 → v38: 删除 model_download_tasks 表');
+        break;
+
+      // ========== 版本 39：site_scripts 拆 ocr 为两列 ==========
+      // 番茄等字体反爬站点，目录页 title/chapter.title 是正常汉字（无 PUA），
+      // 正文页 content 才有 PUA。单一 ocr 列被 save_script 分次保存时互相覆盖，
+      // 导致 ChapterListService 对正常目录页白跑 OCR、或 ContentService 漏跑 OCR。
+      // 拆成 chapter_list_ocr / chapter_content_ocr 两列，各自独立标记。
+      // 旧 ocr 列保留不读不写（SQLite < 3.35 不支持 DROP COLUMN，Android < 12 风险）。
+      case 39:
+        await _addColumnIfNotExists(
+            db, 'site_scripts', 'chapter_list_ocr', 'INTEGER NOT NULL DEFAULT 0');
+        await _addColumnIfNotExists(db, 'site_scripts', 'chapter_content_ocr',
+            'INTEGER NOT NULL DEFAULT 0');
+        _log('迁移 v38 → v39: site_scripts 加 chapter_list_ocr / chapter_content_ocr 两列');
         break;
     }
   }

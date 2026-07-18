@@ -178,13 +178,17 @@ class SiteScriptRepository extends BaseRepository {
   /// UPDATE 时保留 id / created_at / use_count，重置 verified=0，
   /// 更新脚本内容和 last_used_at。
   /// 返回 (id, isInsert) —— isInsert=true 表示首次插入。
+  ///
+  /// v39 拆列后，[chapterListOcr] / [chapterContentOcr] 分别写到对应列，
+  /// 互不覆盖。
   Future<({String id, bool isInsert})> upsertByDomain({
     required String domain,
     required String chapterListJs,
     required String chapterContentJs,
     String urlPattern = '',
     String sampleUrl = '',
-    bool ocr = false, // v37 新增，默认 false 向后兼容
+    bool chapterListOcr = false, // v39 拆列后独立标记
+    bool chapterContentOcr = false,
   }) async {
     try {
       final db = await database;
@@ -209,7 +213,8 @@ class SiteScriptRepository extends BaseRepository {
             'sample_url': sampleUrl,
             'last_used_at': now,
             'verified': 0, // 脚本内容变了，需要重新验证
-            'ocr': ocr ? 1 : 0,
+            'chapter_list_ocr': chapterListOcr ? 1 : 0,
+            'chapter_content_ocr': chapterContentOcr ? 1 : 0,
           },
           where: 'id = ?',
           whereArgs: [row['id']],
@@ -251,7 +256,8 @@ class SiteScriptRepository extends BaseRepository {
         'last_used_at': now,
         'use_count': 0,
         'verified': 0,
-        'ocr': ocr ? 1 : 0,
+        'chapter_list_ocr': chapterListOcr ? 1 : 0,
+        'chapter_content_ocr': chapterContentOcr ? 1 : 0,
       });
       LoggerService.instance.i(
         '新增域名脚本 (upsert): domain=$domain id=$id',
@@ -273,7 +279,8 @@ class SiteScriptRepository extends BaseRepository {
   /// 增量更新某域名某类型脚本（save_script 分次保存用）。
   ///
   /// - [scriptType] 为 `'chapter_list'` 或 `'chapter_content'`，决定更新哪列。
-  /// - 同时更新 [ocr] 列（保证两次保存的 ocr 标记一致）。
+  /// - v39 拆列后，[ocr] 写到与 [scriptType] 匹配的列（chapter_list_ocr / chapter_content_ocr），
+  ///   两者独立，互不覆盖。
   /// - 若 domain 不存在 → 返回 (success=false, reason='domain_not_found')，不自动
   ///   create（避免半截提取器：list 存了 content 没存）。
   /// - 更新后 verified 重置为 0（脚本内容变了需重新验证）。
@@ -297,17 +304,20 @@ class SiteScriptRepository extends BaseRepository {
         return (success: false, id: null, reason: 'domain_not_found');
       }
       final id = existing.first['id'] as String;
-      final column = scriptType == 'chapter_list'
-          ? 'chapter_list_js'
-          : 'chapter_content_js';
+      final Map<String, Object?> updateValues = scriptType == 'chapter_list'
+          ? {
+              'chapter_list_js': scriptJs,
+              'chapter_list_ocr': ocr ? 1 : 0,
+            }
+          : {
+              'chapter_content_js': scriptJs,
+              'chapter_content_ocr': ocr ? 1 : 0,
+            };
+      updateValues['last_used_at'] = DateTime.now().millisecondsSinceEpoch;
+      updateValues['verified'] = 0;
       await db.update(
         'site_scripts',
-        {
-          column: scriptJs,
-          'ocr': ocr ? 1 : 0,
-          'last_used_at': DateTime.now().millisecondsSinceEpoch,
-          'verified': 0,
-        },
+        updateValues,
         where: 'id = ?',
         whereArgs: [id],
       );
