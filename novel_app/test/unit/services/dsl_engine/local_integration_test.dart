@@ -59,8 +59,7 @@ class SimpleHttpClient {
     if (response.statusCode >= 400) {
       final errorBytes = await response.toList();
       final errorBody = utf8.decode(errorBytes.expand((x) => x).toList());
-      throw HttpException(
-          'HTTP ${response.statusCode}: $errorBody', uri: uri);
+      throw HttpException('HTTP ${response.statusCode}: $errorBody', uri: uri);
     }
     yield* response.transform(utf8.decoder);
   }
@@ -113,14 +112,8 @@ Future<void> testBlockingLlmCall(SimpleHttpClient client) async {
     final body = jsonEncode({
       'model': defaultModel,
       'messages': [
-        {
-          'role': 'system',
-          'content': '你是一个小说写作助手。请用中文回复。'
-        },
-        {
-          'role': 'user',
-          'content': '请用一句话描述一个日落场景。'
-        },
+        {'role': 'system', 'content': '你是一个小说写作助手。请用中文回复。'},
+        {'role': 'user', 'content': '请用一句话描述一个日落场景。'},
       ],
       'max_tokens': 200,
       'temperature': 0.7,
@@ -144,7 +137,8 @@ Future<void> testBlockingLlmCall(SimpleHttpClient client) async {
         print('   响应: $content');
         final usage = data['usage'];
         if (usage != null) {
-          print('   Token: prompt=${usage['prompt_tokens']}, completion=${usage['completion_tokens']}');
+          print(
+              '   Token: prompt=${usage['prompt_tokens']}, completion=${usage['completion_tokens']}');
         }
       }
     } else {
@@ -166,10 +160,7 @@ Future<void> testStreamingLlmCall(SimpleHttpClient client) async {
     final body = jsonEncode({
       'model': defaultModel,
       'messages': [
-        {
-          'role': 'user',
-          'content': '请用三句话描述一个古代王朝的宫殿。'
-        },
+        {'role': 'user', 'content': '请用三句话描述一个古代王朝的宫殿。'},
       ],
       'max_tokens': 300,
       'temperature': 0.7,
@@ -233,7 +224,8 @@ Future<void> testStructuredOutput(SimpleHttpClient client) async {
       'messages': [
         {
           'role': 'user',
-          'content': '请以JSON格式输出一个角色信息：{"name": "角色名", "title": "称号", "description": "简短描述"}'
+          'content':
+              '请以JSON格式输出一个角色信息：{"name": "角色名", "title": "称号", "description": "简短描述"}'
         },
       ],
       'max_tokens': 300,
@@ -285,7 +277,8 @@ Future<void> testWithFlutterDslEngine() async {
   print('   2. 开启 "DSL Engine" 开关');
   print('   3. 配置:');
   print('      - LLM API URL: $apiBaseUrl');
-  print('      - LLM API Key: ${apiKey.isNotEmpty ? apiKey.substring(0, 10) : "<未配置>"}...');
+  print(
+      '      - LLM API Key: ${apiKey.isNotEmpty ? apiKey.substring(0, 10) : "<未配置>"}...');
   print('      - 默认模型: $defaultModel (可选，留空则使用 DSL 中的模型)');
   print('   4. 进入任意小说章节，触发 AI 功能（特写/总结/聊天等）');
   print('   5. 观察是否正常生成内容');

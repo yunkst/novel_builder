@@ -120,8 +120,15 @@ void main() {
   group('StreamingResult.buildToolCalls 解析', () {
     test('聚合后合法 args 字符串 → 解析正常', () {
       final sr = StreamingResult(toolCallDeltas: [
-        {'index': 0, 'id': 'c1', 'function': {'name': 'list_novels'}},
-        {'index': 0, 'function': {'arguments': '{"limit":5}'}},
+        {
+          'index': 0,
+          'id': 'c1',
+          'function': {'name': 'list_novels'}
+        },
+        {
+          'index': 0,
+          'function': {'arguments': '{"limit":5}'}
+        },
       ]);
       final tcs = sr.buildToolCalls();
       expect(tcs, hasLength(1));
@@ -132,9 +139,19 @@ void main() {
     test('聚合后 args 拼接成不合法 JSON → 标记 __parse_error', () {
       // 模拟流式拼接：第 2 段末尾尾随逗号破坏 JSON 闭合
       final sr = StreamingResult(toolCallDeltas: [
-        {'index': 0, 'id': 'c1', 'function': {'name': 'create_chapter'}},
-        {'index': 0, 'function': {'arguments': '{"position":1,"instruction":"写'}},
-        {'index': 0, 'function': {'arguments': '一章主角修炼"},}'}},
+        {
+          'index': 0,
+          'id': 'c1',
+          'function': {'name': 'create_chapter'}
+        },
+        {
+          'index': 0,
+          'function': {'arguments': '{"position":1,"instruction":"写'}
+        },
+        {
+          'index': 0,
+          'function': {'arguments': '一章主角修炼"},}'}
+        },
       ]);
       final tcs = sr.buildToolCalls();
       expect(tcs, hasLength(1));
@@ -143,10 +160,24 @@ void main() {
 
     test('多 tool_calls 并行（index=0,1），各自独立聚合与解析', () {
       final sr = StreamingResult(toolCallDeltas: [
-        {'index': 0, 'id': 'c1', 'function': {'name': 'tool_a'}},
-        {'index': 1, 'id': 'c2', 'function': {'name': 'tool_b'}},
-        {'index': 0, 'function': {'arguments': '{"a":1}'}},
-        {'index': 1, 'function': {'arguments': '[bad json'}},
+        {
+          'index': 0,
+          'id': 'c1',
+          'function': {'name': 'tool_a'}
+        },
+        {
+          'index': 1,
+          'id': 'c2',
+          'function': {'name': 'tool_b'}
+        },
+        {
+          'index': 0,
+          'function': {'arguments': '{"a":1}'}
+        },
+        {
+          'index': 1,
+          'function': {'arguments': '[bad json'}
+        },
       ]);
       final tcs = sr.buildToolCalls();
       expect(tcs, hasLength(2));
