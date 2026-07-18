@@ -708,6 +708,7 @@ class ScenarioSession {
   Future<void> _resumeAgentRun() async {
     _lifecycle = SessionLifecycle.active;
     _isRunning = true;
+    _isTokenCancelled = false;
     _pendingSegments.clear();
 
     _state = _state.copyWith(

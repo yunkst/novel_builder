@@ -108,6 +108,7 @@ class NovelAgentService {
   void cancelFor(String scenarioId) {
     // 取消 = 用户撤回本回合，排队的补充消息一并丢弃（避免孤狼）
     _pendingInjectionsByScenario.remove(scenarioId);
+    _runningByScenario.remove(scenarioId);
     final token = _tokensByScenario[scenarioId];
     if (token != null) {
       LoggerService.instance.i(
@@ -117,7 +118,6 @@ class NovelAgentService {
       );
       token.cancel(reason: '用户主动取消 (scenario=$scenarioId)');
       _tokensByScenario.remove(scenarioId);
-      _runningByScenario.remove(scenarioId);
     }
   }
 
