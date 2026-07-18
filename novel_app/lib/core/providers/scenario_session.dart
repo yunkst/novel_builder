@@ -26,6 +26,7 @@ import '../../models/chat_session.dart';
 import '../../models/chat_message_record.dart';
 import '../../services/logger_service.dart';
 import '../../services/novel_agent/agent_event.dart';
+import '../../services/novel_agent/compaction_note_parser.dart';
 import '../../services/novel_agent/scenarios/writing_scenario.dart';
 import '../../services/novel_agent/tool_result_formatter.dart';
 import '../../services/novel_agent/agent_scenario.dart';
@@ -153,10 +154,15 @@ class ScenarioSession {
   /// 投影：agent ChatMessage 列表 → UI AgentChatMessage 列表
   ///
   /// 规则：
-  /// - system：跳过（含压缩提示，不展示）
+  /// - system：压缩提示（[上下文压缩|...]）→ AgentChatRole.marker；
+  ///   其余 system（sys_prompt 等）跳过。
   /// - user：直接转 AgentChatMessage.user
   /// - assistant：收集紧跟其后、toolCallId 匹配的 tool 消息作为 ToolCallSegment
   /// - tool：已被前一个 assistant 吸收，跳过
+  @visibleForTesting
+  static List<AgentChatMessage> projectUiMessagesForTest(List<ChatMessage> msgs) =>
+      _projectUiMessages(msgs);
+
   static List<AgentChatMessage> _projectUiMessages(
       List<ChatMessage> agentMsgs) {
     final ui = <AgentChatMessage>[];
@@ -164,6 +170,11 @@ class ScenarioSession {
       final m = agentMsgs[i];
       switch (m.role) {
         case 'system':
+          // 压缩提示 system → marker；其余 system（sys_prompt 等）仍 continue
+          final note = CompactionNoteParser.parse(m.content ?? '');
+          if (note != null) {
+            ui.add(AgentChatMessage.compactionMarker(note));
+          }
           continue;
         case 'user':
           ui.add(AgentChatMessage.userFromSegments(
