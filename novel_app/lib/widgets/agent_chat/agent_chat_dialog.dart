@@ -1102,14 +1102,14 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   }
 }
 
-/// 输入栏右侧按钮三态模式。
+/// 输入栏右侧按钮双态模式。
 ///
-/// 优先级：stop（运行中） > send（有文本或已挂图） > attach（完全空）。
+/// 优先级：send（有文本或已挂图） > attach（完全空）。
 enum _TrailingMode { attach, send }
 
-/// 输入栏右侧三态按钮（attach / send / stop）。
+/// 输入栏右侧双态按钮（attach / send）。
 ///
-/// 三种模式共用同一 40x40 圆形容器，切换时通过 [AnimatedSwitcher]
+/// 两种模式共用同一 40x40 圆形容器，切换时通过 [AnimatedSwitcher]
 /// 做淡入淡出 + 0.85→1.0 缩放过渡（~180ms）。attach 模式下支持
 /// [isPickingImage] 转圈态。
 class _AgentInputTrailingButton extends StatelessWidget {
