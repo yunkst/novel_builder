@@ -94,10 +94,13 @@ test('droppedAgentFromIndex 与不含 sys_prompt 的 history 索引对齐', () {
 - [ ] **步骤 4：运行并记录结论**
 
 运行：`flutter test test/unit/services/novel_agent/context_compactor_test.dart -p vm --plain-name "droppedAgentFromIndex"`
-预期：PASS 或 FAIL。
+预期：**FAIL**（已知结论）。
 
-**若 PASS** → `droppedAgentFromIndex` 已基于 history 基底，Task 4/5 直接用 cut。删除临时测试。
-**若 FAIL** → 存在 off-by-one。在 Task 4 实现 marker insert 时，插入位置 = `_agentMessages` 头部（`insert(0, ...)`），不依赖 cut 的精确值对齐尾部裁剪——marker 始终在头部，尾部裁剪的潜在 bug 是独立问题，不在本计划修。删除临时测试，但在 Task 4 注释中记录此发现。
+**确定的结论（无需再现场判断）：** `_selectSplitIndex`(`context_compactor.dart:205-243`) 返回的 splitIndex 基于 `pruned.messages`（含 sys_prompt 头部），而 `_agentMessages`（`scenario_session.dart`）不含 sys_prompt。因此 `droppedAgentFromIndex` 是「含 sys_prompt 基底」的索引，与 `_agentMessages` 基底存在 off-by-one。
+
+**对本计划的影响：**
+- **marker 插入不受影响**——Task 4 永远用 `_agentMessages.insert(0, ...)`，头部位置与 cut 索引无关。
+- **P1 改写平移（`newIdx = entry.index - cut`，`scenario_session.dart:1176`）可能也是 pre-existing bug**，但它是 2026-07-18 P1 提交引入的、与「压缩 UI」正交的问题。**本计划不修**（范围外），若 Task 9 回归测试发现改写错位，单独记 issue。删除临时测试，不 commit。
 
 - [ ] **步骤 5：记录结论到本计划 Task 4 注释**
 
@@ -645,7 +648,9 @@ test('_handleCompaction 后 _agentMessages 头部含压缩提示 system', () asy
 运行：`flutter test test/unit/core/providers/scenario_session_test.dart`
 预期：FAIL，压缩提示不在 _agentMessages 头部。
 
-- [ ] **步骤 3：改 `_handleCompaction`**
+- [ ] **步骤 3：在 `_handleCompaction` 前先读 `_deleteAgentMessagesBeforeDb` 实现**
+
+grep `scenario_session.dart:_deleteAgentMessagesBeforeDb`（约 1259 行附近），确认其实现是 `clearMessages + appendMessage(每条 _agentMessages 重写)` 的模式。**关键不变量** 依赖此实现：marker `insert(0, ...)` 后该函数会把 marker 作为 `agentMsgIndex=0` 整段重写落库。若实现不同（例如只按 id 删除不重写），则不变量 #1 失效，Task 4 需要调整落库策略。
 
 `scenario_session.dart:1155-1200`，在 `removeRange` 之后、apply rewrittenContent 之前，插入压缩提示：
 
@@ -798,7 +803,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 **文件：**
 - 测试：`novel_app/test/unit/core/providers/scenario_session_hydrate_test.dart`（扩充或新建）
 
-- [ ] **步骤 1：编写集成测试**
+- [ ] **步骤 1：前置核实 `ChatMessageRecord.toAgentMessage()` 保留 system role**
+
+读 `novel_app/lib/models/chat_message_record.dart:64-80`，确认 `toAgentMessage()` 把 `role` 字段原样赋给 `ChatMessage.role`（已核实 line 80 `role: role`，system role 不丢）。这是 hydrate 路径能出 marker 的前提。
 
 ```dart
 test('DB 含压缩提示 system → hydrate 后 _uiMessages 含 marker', () async {
@@ -890,7 +897,7 @@ void main() {
 
 - [ ] **步骤 3：实现 widget**
 
-`lib/widgets/agent_chat/compaction_marker_card.dart`：按规格 §5.1 的结构实现，**颜色用 `context.appColors`**（参考 `agent_message_bubble.dart` 的 `appColors` 用法，不写死十六进制）。关键点：
+`lib/widgets/agent_chat/compaction_marker_card.dart`：按规格 §5.1 的结构实现。**⚠️ 颜色字段核实（计划审查发现）**：`AppColors` 类（`core/theme/app_colors.dart`）**没有 `surface` 字段**，只有 `agentAccent / chatRoleBubble / ink / inkSoft`。背景色一律用 `Theme.of(context).colorScheme.surface`（与 `agent_message_bubble.dart` 内 tool 卡片一致，如 `theme.colorScheme.surface.withValues(alpha: 0.6)`），不要用 `context.appColors.surface`。边框/正文用 `context.appColors.inkSoft` / `context.appColors.ink`（这两个存在）。关键点：
 - `StatefulWidget` + `_expanded` 状态
 - 折叠态：居中 InkWell，`🗂 上下文已压缩 · 丢弃 N 条 ▾`
 - 展开态：`AnimatedSize` 过渡，4 格统计 + 压缩率 `LinearProgressIndicator` + 不可回溯文案
@@ -927,7 +934,7 @@ class _CompactionMarkerCardState extends State<CompactionMarkerCard> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: context.appColors.surface,
+                color: Theme.of(context).colorScheme.surface,
                 border: Border.all(color: context.appColors.inkSoft.withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -957,7 +964,7 @@ class _CompactionMarkerCardState extends State<CompactionMarkerCard> {
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: context.appColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         border: Border.all(color: context.appColors.inkSoft.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -979,7 +986,7 @@ class _CompactionMarkerCardState extends State<CompactionMarkerCard> {
               borderRadius: BorderRadius.circular(2),
               child: LinearProgressIndicator(
                 value: s.compressionRatio, minHeight: 4,
-                backgroundColor: context.appColors.surface,
+                backgroundColor: Theme.of(context).colorScheme.surface,
               ),
             )),
           ]),
@@ -1043,11 +1050,25 @@ testWidgets('CompactionEvent 触发 SnackBar', (tester) async {
 运行：`cd novel_app && flutter test test/unit/widgets/agent_chat/agent_chat_dialog_test.dart`
 预期：FAIL。
 
-- [ ] **步骤 3：核实 dialog 是 dialog 还是 page**
+- [ ] **步骤 3：核实事件订阅方式（计划审查发现的关键修正）**
 
-grep `agent_chat_dialog.dart` 的 `showDialog` / `Navigator.push` / `Scaffold`：
-- 若用 `Scaffold` 且有 messenger ancestor → 直接 `ScaffoldMessenger.of(context)`
-- 若是 dialog 弹层 → 用 `ScaffoldMessenger.maybeOf(context)` 兜底
+**⚠️ 关键：** agent 事件**不是 Riverpod provider**，是 `NovelAgentService.events` 的 **Stream**（`StreamController<AgentEvent>.broadcast()`）。dialog 现有用 `ref.listen(currentChatStateProvider, ...)`（`agent_chat_dialog.dart:120`）订阅 state，**没有现成的 agent 事件 StreamProvider**。
+
+SnackBar 需要响应 `CompactionEvent`（瞬时事件，不进 chatState），有两种实现：
+
+**(A) 推荐——加一个 StreamProvider 包装**：在 `core/providers/agent_chat_providers.dart` 加：
+```dart
+final agentEventsProvider = StreamProvider<AgentEvent>((ref) {
+  return ref.read(novelAgentServiceProvider).events;
+});
+```
+然后 dialog 用 `ref.listen<AsyncValue<AgentEvent>>(agentEventsProvider, (prev, next) { next.whenData((e) { if (e is CompactionEvent) ... }); })`。
+
+**(B) 直接订阅 Stream**：在 `initState` 里 `ref.read(novelAgentServiceProvider).events.listen(...)`，`dispose` 里 cancel `StreamSubscription`。
+
+**选 (A)**（声明式、与 RetryBanner 的订阅风格更接近、测试更易注入）。
+
+核实 `novelAgentServiceProvider` 的定义位置（grep `novelAgentServiceProvider =`），以及 `AgentEvent` 的 import 路径（`services/novel_agent/agent_event.dart`）。
 
 - [ ] **步骤 4：改 itemBuilder**
 
@@ -1064,6 +1085,7 @@ switch (message.role) {
     final canRollback = message.role == AgentChatRole.user;
     return AgentMessageBubble(
       message: message,
+      showTimestamp: true, // 默认显示，保留原 AgentMessageBubble 行为（计划审查发现原代码默认 true）
       onRollback: canRollback ? () => _handleRollback(index) : null,
     );
   case AgentChatRole.system:
@@ -1075,21 +1097,35 @@ switch (message.role) {
 
 - [ ] **步骤 5：加 ref.listen SnackBar**
 
-在 `_AgentChatDialogState.initState` 或 `build` 内（参考现有 `ref.listen` 模式）：
+按步骤 3 选 (A)：用 `agentEventsProvider`（StreamProvider 包装）。
+
+(a) 在 `core/providers/agent_chat_providers.dart` 顶部加 import + 新 provider：
 ```dart
-ref.listen<AgentEvent?>(agentServiceEventsProvider, (prev, next) {
-  if (next is CompactionEvent) {
+import '../../services/novel_agent/agent_event.dart';
+import 'chat_session_providers.dart';
+
+final agentEventsProvider = StreamProvider<AgentEvent>((ref) {
+  return ref.read(novelAgentServiceProvider).events;
+});
+```
+（核实 `novelAgentServiceProvider` 在该文件已 export；若不在，需加上。）
+
+(b) 在 `_AgentChatDialogState.build` 内加（参考 line 120 现有 `ref.listen(currentChatStateProvider, ...)` 模式）：
+```dart
+ref.listen<AsyncValue<AgentEvent>>(agentEventsProvider, (prev, next) {
+  next.whenData((event) {
+    if (event is! CompactionEvent) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(SnackBar(
-      content: Text('🗂 ${next.description}'),
+      content: Text('🗂 ${event.description}'),
       duration: const Duration(seconds: 3),
       behavior: SnackBarBehavior.floating,
     ));
-  }
+  });
 });
 ```
 
-> **核实：** 现有 dialog 如何订阅 agent 事件（grep `events.listen` / `ref.listen` in agent_chat_dialog.dart）。若已有订阅入口（如 retry_banner 的 `RetrySignals`），复用同一订阅点。provider 名 `agentServiceEventsProvider` / `agentService.eventsProvider` 需核实真实名（grep）。
+> dialog 若是 `showDialog` 弹层，`ScaffoldMessenger.maybeOf` 兜底（不崩）；若是 page（自有 Scaffold），直接 `ScaffoldMessenger.of(context)` 也行。按 Task 步骤 3 的核实结论选。
 
 - [ ] **步骤 6：运行测试验证通过**
 
