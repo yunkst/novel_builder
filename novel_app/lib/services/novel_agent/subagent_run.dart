@@ -41,8 +41,8 @@ class SubagentRun {
   /// 子 Agent 的 UI 状态（供详情页渲染 messages / streamingSegments）
   AgentChatState chatState;
 
-  /// 取消令牌源；SubagentRunner 启动时创建，cancel() 时触发
-  CancellationTokenSource? tokenSource;
+  /// 取消令牌；SubagentRunner 启动时创建，cancel() 时触发
+  CancellationToken? token;
 
   /// 运行终止信号：[SubagentRunner._runOne] 终态时 complete（成功/失败/取消均走）。
   ///

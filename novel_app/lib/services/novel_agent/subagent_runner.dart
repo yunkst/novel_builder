@@ -214,7 +214,7 @@ class SubagentRunner {
       return;
     }
     run.state = SubagentRunState.running;
-    run.tokenSource = CancellationTokenSource();
+    run.token = CancellationToken();
 
     try {
       final scenario = SubagentScenario(
@@ -243,11 +243,11 @@ class SubagentRunner {
           currentNovelId: parentCurrentNovelId,
         )),
         emit: (event) => _onSubagentEvent(event, run),
-        cancellationToken: run.tokenSource!.token,
+        cancellationToken: run.token,
       );
 
       run.finalSummary = _extractSummary(run.chatState);
-      run.state = run.tokenSource!.isCancelled
+      run.state = run.token?.isCancelled == true
           ? SubagentRunState.cancelled
           : SubagentRunState.completed;
     } catch (e, stack) {
@@ -380,7 +380,7 @@ class SubagentRunner {
     }
     for (final run in activeRuns) {
       if (run.state != SubagentRunState.cancelled) {
-        run.tokenSource?.cancel(reason: '主 Agent 取消');
+        run.token?.cancel(reason: '主 Agent 取消');
       }
     }
     // 清掉等待队列里未触发的 completer，避免测试或 session 关闭后泄漏
