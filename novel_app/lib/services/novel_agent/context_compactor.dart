@@ -204,23 +204,48 @@ class ContextCompactor {
     // 2. 边界选择：从后向前累加，找到保留的起始位置（含配对保护）
     final splitIndex = _selectSplitIndex(pruned.messages);
 
-    // 3. 构建压缩后的消息列表
+    // 3. 统计：原字符数在压缩提示之前就能算（messages 是入参，未变化）
+    final originalChars = _estimateTotalChars(messages);
+    final droppedCount = splitIndex;
+    final keptCount = pruned.messages.length - splitIndex;
+
+    // 4. 构造完整 compacted 列表（含占位压缩提示），用于测 compactedChars
+    //    占位值不影响最终长度差异（KV 数值宽度小于 20 字符，误差可忽略），
+    //    真实 KV 字段在第 5 步用最终 compactedChars/removedChars 覆写。
     final compacted = <ChatMessage>[
       // system prompt 始终保留
       ChatMessage(role: 'system', content: systemPrompt),
-      // 压缩提示（告知 LLM 上下文已被压缩）
+      // 压缩提示（告知 LLM 上下文已被压缩）— 含 KV 前缀供解析器还原
       ChatMessage(
         role: 'system',
-        content: _buildCompactionNote(splitIndex, pruned.messages.length),
+        content: _buildCompactionNote(
+          droppedCount: droppedCount,
+          keptCount: keptCount,
+          removedChars: 0, // 占位：先用占位值构造，下面用最终值覆写
+          originalChars: originalChars,
+          compactedChars: 0, // 占位
+          rewrittenCount: pruned.rewrittenContent.length,
+        ),
       ),
       // 保留尾部消息（splitIndex 已保证 tool_call/tool 配对完整）
       ...pruned.messages.sublist(splitIndex),
     ];
 
-    final originalChars = _estimateTotalChars(messages);
     final compactedChars = _estimateTotalChars(compacted);
-    final droppedCount = splitIndex;
-    final keptCount = pruned.messages.length - splitIndex;
+    final removedChars = originalChars - compactedChars;
+
+    // 5. 用真实统计覆写压缩提示内容（KV 字段精确）
+    compacted[1] = ChatMessage(
+      role: 'system',
+      content: _buildCompactionNote(
+        droppedCount: droppedCount,
+        keptCount: keptCount,
+        removedChars: removedChars,
+        originalChars: originalChars,
+        compactedChars: compactedChars,
+        rewrittenCount: pruned.rewrittenContent.length,
+      ),
+    );
 
     LoggerService.instance.i(
       '上下文压缩完成: $originalChars→$compactedChars 字 '
@@ -294,12 +319,24 @@ class ContextCompactor {
     return split;
   }
 
-  /// 构建压缩提示消息
+  /// 构建压缩提示消息（KV 前缀 + 自然语言）。
   ///
-  /// 告知 LLM 早期上下文已被压缩，帮助它理解当前状态。
-  String _buildCompactionNote(int droppedCount, int totalCount) {
-    return '[上下文压缩] 早期 $droppedCount 条消息已被压缩移除。'
-        '请基于保留的最近 ${totalCount - droppedCount} 条消息继续对话。'
+  /// KV 行供 [CompactionNoteParser] 解析还原 marker 统计；
+  /// 自然语言行继续给 LLM 看（业务语义不变）。
+  String _buildCompactionNote({
+    required int droppedCount,
+    required int keptCount,
+    required int removedChars,
+    required int originalChars,
+    required int compactedChars,
+    required int rewrittenCount,
+  }) {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    return '[上下文压缩|droppedCount=$droppedCount|keptCount=$keptCount|'
+        'removedChars=$removedChars|originalChars=$originalChars|'
+        'compactedChars=$compactedChars|rewrittenCount=$rewrittenCount|timestamp=$ts]\n'
+        '早期 $droppedCount 条消息已被压缩移除。'
+        '请基于保留的最近 $keptCount 条消息继续对话。'
         '如果缺少关键信息，请使用工具重新查询。';
   }
 

@@ -82,7 +82,7 @@ void main() {
 
       // 第二个消息应该是压缩提示
       expect(result.messages[1].role, 'system');
-      expect(result.messages[1].content, contains('[上下文压缩]'));
+      expect(result.messages[1].content, contains('[上下文压缩|'));
     });
 
     test('压缩后丢弃早期消息，保留尾部', () {
