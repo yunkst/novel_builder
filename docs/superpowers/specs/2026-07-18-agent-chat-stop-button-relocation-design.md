@@ -36,7 +36,7 @@
 
 ### Column 插入位置
 
-在 `build` 方法的 `Column` children 中（`agent_chat_dialog.dart` 第 156-163 行之间），停止条放在补充条**上方**：
+在 `build` 方法的 `Column` children 中，在 `_buildErrorBar` 条件渲染之后、`RetryBanner` 之前插入停止条（补充条保持原位置）：
 
 ```dart
 if (chatState.isLoading)
@@ -44,6 +44,8 @@ if (chatState.isLoading)
 if (chatState.isLoading && chatState.supplementaryCount > 0)
   _buildSupplementBar(chatState.supplementaryCount, session),
 ```
+
+补充条条件中的 `chatState.isLoading &&` 前缀是防御性守卫：虽然 `supplementaryCount` 仅在运行中递增，但保留双重条件确保极端边界下不会出现"非运行中却显示补充条"的 UI 异常。
 
 ### 停止条实现
 
@@ -121,6 +123,8 @@ Widget _buildSupplementBar(int count) {
 | `_AgentInputTrailingButton.onStop` 参数（第 1065 行） | 删除 |
 | `_AgentInputTrailingButton` 构造函数 `this.onStop`（第 1075 行） | 删除 |
 | `_buildInputBar` 中 `onStop: () => session?.cancel()`（第 873 行） | 删除 |
+| `_trailingMode` 方法注释（第 997 行） | 将 `[_buildSupplementBar]` 改为 `[_buildStopBar]` |
+| `_buildSupplementBar` 文档注释（第 631-633 行） | 更新为描述纯信息展示行为，注明停止已迁移至 `_buildStopBar` |
 
 ### 数据流（无新增状态）
 
@@ -139,8 +143,9 @@ ScenarioSession._state.isLoading == false  → 隐藏停止条
 | 快速连续点击停止 | `cancel()` 内部有幂等保护（`_isRunning == false` 时 return） |
 | 停止条 + 错误条共存 | 不会。`isLoading` 时错误条不渲染，`isLoading` 变 false 后停止条已隐藏 |
 | `isLoading == false && error != null` | 停止条隐藏，错误条显示 |
-| 补充消息队列清空 | `cancel()` 调用 `cancelFor()` 清空，行为不变 |
+| 补充消息队列清空 | `cancelFor()` 清空 service 层队列；`supplementaryCount` 不清零但由 `isLoading == false` 条件守卫隐藏补充条 |
 | 全屏模式 | 停止条随 Column 自适应宽度，无需特殊处理 |
+| 停止条颜色语义 | 使用 `error` 红色系：停止操作具有破坏性语义，红色在 UI 中强抓取注意力，符合"紧急操作"定位 |
 
 ### 改动范围
 
@@ -157,4 +162,8 @@ ScenarioSession._state.isLoading == false  → 隐藏停止条
 - 补充条仅显示信息文字，不含停止按钮
 - 停止条 + 补充条可同时显示且互不冲突（无冗余停止按钮）
 - 快速连续点击停止按钮，第二次 `cancel()` 安全返回（不抛异常）
-- 旧测试中针对 `_TrailingMode.stop` 的查找（tooltip '停止'）迁移为对停止条的查找
+- `isSupplementary` 参数保持不变（发送按钮在运行中仍需展示"补充到下一轮"语义）
+- 测试文件迁移策略：
+  - `tooltip '停止'` 查找在空状态断言中保持 `isNull`（空状态不渲染停止条）
+  - `tooltip '停止'` 查找在运行态测试中改为查找停止条内的 `TextButton.icon`（label '停止'），而非右下角 `IconButton`
+  - 确认 `_TrailingMode.stop` 枚举值被移除后无编译错误
