@@ -240,6 +240,13 @@ class _MessageBubble extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.outline),
           ),
         ),
+      CompactionMarkerSegment s => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Text(
+            '[上下文压缩: 删 ${s.droppedMessageCount} 条, 保留 ${s.keptMessageCount} 条]',
+            style: TextStyle(color: theme.colorScheme.outline),
+          ),
+        ),
     };
   }
 

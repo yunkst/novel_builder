@@ -8,6 +8,7 @@ enum AgentChatRole {
   system,
   user,
   assistant,
+  marker,
 }
 
 /// 消息内容片段（有序，保留时序关系）
@@ -35,6 +36,30 @@ class ToolCallSegment extends AgentChatSegment {
 class ImageSegment extends AgentChatSegment {
   final String mediaId;
   const ImageSegment({required this.mediaId});
+}
+
+/// 上下文压缩分隔条（UI 投影层引入，不进 LLM）。
+class CompactionMarkerSegment extends AgentChatSegment {
+  final int droppedMessageCount;
+  final int keptMessageCount;
+  final int removedChars;
+  final int originalChars;
+  final int compactedChars;
+  final int rewrittenCount;
+  final DateTime? timestamp;
+
+  const CompactionMarkerSegment({
+    required this.droppedMessageCount,
+    required this.keptMessageCount,
+    required this.removedChars,
+    required this.originalChars,
+    required this.compactedChars,
+    this.rewrittenCount = 0,
+    this.timestamp,
+  });
+
+  double get compressionRatio =>
+      originalChars > 0 ? removedChars / originalChars : 0;
 }
 
 /// Agent 聊天消息
@@ -103,6 +128,15 @@ class AgentChatMessage {
         segments: segments,
       );
 
+  /// 创建上下文压缩标记消息（仅用于 UI 投影层展示，不进 LLM 历史）
+  factory AgentChatMessage.compactionMarker(CompactionMarkerSegment seg) {
+    return AgentChatMessage(
+      role: AgentChatRole.marker,
+      segments: [seg],
+      timestamp: seg.timestamp ?? DateTime.now(),
+    );
+  }
+
   /// segments → JSON 字符串（持久化到 chat_messages.segmentsJson）
   ///
   /// 每条 segment 输出 `{type:'text', content}` 或
@@ -127,6 +161,19 @@ class AgentChatMessage {
         }
         if (s is ImageSegment) {
           return {'type': 'image', 'mediaId': s.mediaId};
+        }
+        if (s is CompactionMarkerSegment) {
+          return {
+            'type': 'marker',
+            'droppedCount': s.droppedMessageCount,
+            'keptCount': s.keptMessageCount,
+            'removedChars': s.removedChars,
+            'originalChars': s.originalChars,
+            'compactedChars': s.compactedChars,
+            'rewrittenCount': s.rewrittenCount,
+            if (s.timestamp != null)
+              'timestamp': s.timestamp!.millisecondsSinceEpoch,
+          };
         }
         // 未知子类降级为 text（防御未来扩展）
         return {'type': 'text', 'content': ''};
@@ -176,6 +223,19 @@ class AgentChatMessage {
           if (mediaId.isNotEmpty) {
             result.add(ImageSegment(mediaId: mediaId));
           }
+        } else if (type == 'marker') {
+          final ts = item['timestamp'];
+          result.add(CompactionMarkerSegment(
+            droppedMessageCount: item['droppedCount'] as int? ?? 0,
+            keptMessageCount: item['keptCount'] as int? ?? 0,
+            removedChars: item['removedChars'] as int? ?? 0,
+            originalChars: item['originalChars'] as int? ?? 0,
+            compactedChars: item['compactedChars'] as int? ?? 0,
+            rewrittenCount: item['rewrittenCount'] as int? ?? 0,
+            timestamp: ts is int
+                ? DateTime.fromMillisecondsSinceEpoch(ts)
+                : null,
+          ));
         }
         // 未知 type 跳过
       }
@@ -210,6 +270,9 @@ class AgentChatMessage {
         break;
       case 'assistant':
         role = AgentChatRole.assistant;
+        break;
+      case 'marker':
+        role = AgentChatRole.marker;
         break;
       default:
         role = AgentChatRole.user;
@@ -249,6 +312,9 @@ class AgentChatMessage {
         break;
       case 'assistant':
         role = AgentChatRole.assistant;
+        break;
+      case 'marker':
+        role = AgentChatRole.marker;
         break;
       default:
         role = AgentChatRole.user;

@@ -253,6 +253,8 @@ class AgentMessageBubble extends ConsumerWidget {
                 onTap: () => _showImageFullScreen(context, s.mediaId),
               ),
             ),
+          // CompactionMarkerSegment 在 assistant 流式气泡中不渲染（由独立 CompactionMarkerCard 负责，Task 7）
+          CompactionMarkerSegment _ => const SizedBox.shrink(),
         };
       }).toList(),
     );
