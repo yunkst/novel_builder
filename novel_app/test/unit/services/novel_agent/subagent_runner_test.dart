@@ -274,12 +274,12 @@ void main() {
       final r2 = registry.create(
           parentSessionId: 's1', task: 't2', allowedTools: const []);
       r1.state = SubagentRunState.running;
-      r1.tokenSource = CancellationTokenSource();
+      r1.token = CancellationToken();
       r2.state = SubagentRunState.completed; // 已终态，不应再取消
 
       await runner.cancelAllForSession('s1');
 
-      expect(r1.tokenSource!.isCancelled, isTrue);
+      expect(r1.token!.isCancelled, isTrue);
     });
 
     test('cancel 后 await 返回时所有活跃 run 已终止（done 已 complete）', () async {
@@ -290,9 +290,9 @@ void main() {
       final r2 = registry.create(
           parentSessionId: 's1', task: 't2', allowedTools: const []);
       r1.state = SubagentRunState.running;
-      r1.tokenSource = CancellationTokenSource();
+      r1.token = CancellationToken();
       r2.state = SubagentRunState.running;
-      r2.tokenSource = CancellationTokenSource();
+      r2.token = CancellationToken();
 
       // 模拟子 Agent 收到 cancel 后 done 完成
       Future<void>.delayed(const Duration(milliseconds: 10), () {
@@ -324,7 +324,7 @@ void main() {
       final r1 = registry.create(
           parentSessionId: 's1', task: 't1', allowedTools: const []);
       r1.state = SubagentRunState.running;
-      r1.tokenSource = CancellationTokenSource();
+      r1.token = CancellationToken();
       // 故意不调用 r1.completeDone()，模拟"工具执行卡死 / 路径异常"
       // 这里用 1s 短超时做测试，避免真等 15s
       // 实际兜底时间是常量 Duration(seconds: 15)
@@ -332,6 +332,21 @@ void main() {
       // 超时后 r1.isDone 仍为 false（未完成），但 cancelAllForSession 不抛错
       expect(r1.isDone, isFalse);
     }, timeout: const Timeout(Duration(seconds: 5)));
+
+    test('pending 子 Agent 在 cancelAllForSession 时被标记为 cancelled', () async {
+      final registry = SubagentRegistry();
+      final runner = SubagentRunner.forTest(registry: registry);
+      final r1 = registry.create(
+          parentSessionId: 's1', task: 't1', allowedTools: const []);
+      r1.state = SubagentRunState.pending;
+
+      await runner.cancelAllForSession('s1');
+
+      expect(r1.state, SubagentRunState.cancelled,
+          reason: 'pending 子 Agent 应被标记为 cancelled');
+      expect(r1.isDone, isTrue,
+          reason: 'cancelled 后 done 应立即完成');
+    });
   });
 
   group('SubagentRunner.dispatch 端到端（mock LLM）', () {
