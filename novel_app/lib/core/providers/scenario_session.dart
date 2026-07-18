@@ -18,7 +18,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/agent_chat_message.dart';
@@ -84,6 +84,10 @@ class ScenarioSession {
   /// 完整 ReAct 链：system(运行时注入不存)/user/assistant/tool。
   /// hydrate 时从 DB 1:1 还原；运行时由 agent 事件流增量更新。
   final List<ChatMessage> _agentMessages = [];
+
+  /// visibleForTesting：暴露内部 agent 消息列表供测试断言。
+  @visibleForTesting
+  List<ChatMessage> get agentMessages => List.unmodifiable(_agentMessages);
 
   // ===== 运行时状态 =====
   bool _isRunning = false;
@@ -1167,7 +1171,15 @@ class ScenarioSession {
     // 1) 先 removeRange 丢弃前缀
     _agentMessages.removeRange(0, removed);
 
-    // 2) apply P1 预剪枝改写：rewrittenContent 的 index 基于压缩前 messages，
+    // 2) 头部插入压缩提示 system 消息（_agentMessages 不含 sys_prompt，
+    //    压缩提示独占头部 index 0）。KV 文本由 ContextCompactor 生成、
+    //    CompactionEvent.compactionNote 透传；落库时该条落到 agentMsgIndex=0。
+    //    现有 rewrittenContent 平移逻辑继续：marker insert 把 _agentMessages
+    //    索引整体 +1，但 entry.index 基于压缩前 messages 索引，pre-existing
+    //    off-by-one 与本步无关（P1 范围外，不修）。
+    _agentMessages.insert(0, ChatMessage(role: 'system', content: e.compactionNote));
+
+    // 3) apply P1 预剪枝改写：rewrittenContent 的 index 基于压缩前 messages，
     //    平移到压缩后 index - cut 后写入 _agentMessages 对应项的 content。
     //    落在丢弃段（index < cut）的 entry 已随 removeRange 消失，无须处理。
     int appliedRewrite = 0;
@@ -1190,12 +1202,13 @@ class ScenarioSession {
     _state = _state.copyWith(messages: _uiMessages);
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 压缩裁剪: 移除前 $removed 条 agent 消息, '
-      '改写 $appliedRewrite 条 tool result, 剩余 ${_agentMessages.length} 条',
+      '头部插入压缩提示, 改写 $appliedRewrite 条 tool result, 剩余 ${_agentMessages.length} 条',
       category: LogCategory.ai,
       tags: ['session', 'compaction', 'trim', scenarioId],
     );
-    // 3) 重写 DB：_deleteAgentMessagesBeforeDb 内部 clearMessages + appendMessage
-    //    整段重写 _agentMessages（已含改写后的 content），故 1-liner 版自动落库。
+    // 4) 重写 DB：_deleteAgentMessagesBeforeDb 内部 clearMessages + appendMessage
+    //    整段重写 _agentMessages（已含 marker 头部 + 改写后的 content），故
+    //    marker 自然落到 agentMsgIndex = 0。
     unawaited(_deleteAgentMessagesBeforeDb(cut));
   }
 
