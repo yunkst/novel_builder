@@ -75,7 +75,7 @@
 |---|---|---|
 | 压缩触发与提示文本生成 | `services/novel_agent/context_compactor.dart` | **改**:`_buildCompactionNote` 改为「约定前缀 + KV + 自然语言」,被投影层与 LLM 双消费 |
 | Agent 事件流 | `services/novel_agent/agent_event.dart` | **改**:`CompactionEvent` 补 `compactedChars` + `rewrittenContent.length`(已存在);`description` getter 补「改写 K 条」 |
-| 内存处理 + 落库 | `core/providers/scenario_session.dart._handleCompaction` | **基本不动**:压缩提示已随 `compacted.messages` 进入 `_agentMessages`;现有 `removeRange + copyWith + _deleteAgentMessagesBeforeDb` 落库路径自动带上 |
+| 内存处理 + 落库 | `core/providers/scenario_session.dart._handleCompaction` | **改**:在 `removeRange(0, removed)` 之后、`apply rewrittenContent` 之前, `_agentMessages.insert(0, ChatMessage(role:'system', content: 压缩提示KV文本))` 把压缩提示插入 _agentMessages 头部。注意 `_agentMessages` **不含** sys_prompt(项目现状,见 `agent_loop.dart:119-122` agent_loop 本地 prepend),压缩提示独占头部 index 0。现有 `removeRange + _deleteAgentMessagesBeforeDb` 落库路径自动带上 |
 | 内存 ↔ UI 投影 | `core/providers/scenario_session.dart._projectUiMessages` | **改**:`case 'system'` 分流——识别压缩提示前缀 → 生成 marker 角色条目;其余 system 仍 `continue` |
 | 模型层 | `models/agent_chat_message.dart` | **改**:`AgentChatRole` 新增 `marker`;新增 `AgentChatMessage.compactionMarker(...)` 工厂;segmentsToJson/FromJson 新增 `type:'marker'` |
 | Segment 类型 | `models/agent_chat_message.dart`(`AgentChatSegment` sealed) | **新增**:`CompactionMarkerSegment` 携带统计字段 |
@@ -109,19 +109,26 @@ agent_loop emit CompactionEvent(..., rewrittenContent: [...])
   ├─ ref.listen<AgentEvent> 在 dialog 捕获 → showSnackBar(3s)
   │
   ▼
-ScenarioSession._handleCompaction(e)   ←【基本不动】
+ScenarioSession._handleCompaction(e)
   │  ① _agentMessages.removeRange(0, e.droppedAgentFromIndex)
-  │     (压缩提示 system 已在头部,不被移除)
-  │  ② (新语义)对 rewrittenContent 中 index>=cut 的 entry:
-  │     _agentMessages[index - cut].content = entry.newContent
-  │  ③ _state.copyWith(messages: _uiMessages)
+  │     (e.droppedAgentFromIndex = splitIndex,基于压缩前 _agentMessages 索引;
+  │      _agentMessages 不含 sys_prompt,索引对齐 splitIndex)
+  │  ② 【新】在 _agentMessages 头部 insert 压缩提示 system 消息:
+  │     _agentMessages.insert(0, ChatMessage(role:'system',
+  │       content: e.compactionNote))    ← 编译时常量 KV 文本
+  │     注: 压缩提示 KV 文本在 emit CompactionEvent 时由 ContextCompactor 一起带过来
+  │     (新加字段 compactionNote: String),不在 _handleCompaction 里构造,
+  │     保证 agent_loop 与 ScenarioSession 看到完全一致的内容
+  │  ③ apply rewrittenContent(已实现,plan 阶段复用现有代码)
+  │  ④ _state.copyWith(messages: _uiMessages)
   │     └─ _projectUiMessages(_agentMessages):
-  │        ├─ systemPrompt        → continue
-  │        ├─ 压缩提示system      → 解析前缀 → CompactionMarkerSegment → AgentChatRole.marker
-  │        └─ 尾部消息           → user/assistant/tool 正常渲染
-  │  ④ unawaited(_deleteAgentMessagesBeforeDb(cut))
+  │        ├─ 压缩提示system(头部 [0])  → 解析前缀 → CompactionMarkerSegment
+  │        └─ 其余 user/assistant/tool  → 正常渲染
+  │  ⑤ unawaited(_deleteAgentMessagesBeforeDb(cut))
   │     └─ clearMessages + 重写 _agentMessages
   │        压缩提示 + 改写后的 tool result 随重写一并落库 ✅
+  │        在重写循环 for(i, m) in _agentMessages.enumerated(): appendMessage(sid, i, m)
+  │        压缩提示 → agentMsgIndex = 0
 ```
 
 ### 3.4 hydrate 路径(同一条投影路径)
@@ -546,7 +553,7 @@ ref.listen<AgentEvent>(agentService.eventsProvider, (prev, next) {
 
 ### 7.2 关键不变量(测试锁定)
 
-1. 压缩提示的 `agentMsgIndex` 在 DB 重写后 = 1(紧随 systemPrompt)
+1. 压缩提示的 `agentMsgIndex` 在 DB 重写后 = 0(_agentMessages 不含 sys_prompt,压缩提示独占头部; 见 `agent_loop.dart:119-122` 与 `scenario_session.dart:267/406/1115` 全是 user/assistant/tool,无 system)
 2. `_selectSplitIndex` 跳过所有 system 消息(含压缩提示),不会把它计入 `preserveTailChars` 预算
 3. **marker 渲染不依赖 `CompactionEvent`** —— 删掉 emit 也能从 DB hydrate 出 marker
 4. 内存路径与 hydrate 路径走**同一个** `_projectUiMessages`
