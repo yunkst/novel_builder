@@ -209,6 +209,10 @@ class SubagentRunner {
     SubagentRun run, {
     int? parentCurrentNovelId,
   }) async {
+    if (run.state == SubagentRunState.cancelled) {
+      run.completeDone();
+      return;
+    }
     run.state = SubagentRunState.running;
     run.tokenSource = CancellationTokenSource();
 
@@ -367,8 +371,17 @@ class SubagentRunner {
         .listForSession(sessionId)
         .where((r) => !r.isTerminal)
         .toList();
+    // 标记 pending run 为 cancelled，避免唤醒后进入 _runOne
     for (final run in activeRuns) {
-      run.tokenSource?.cancel(reason: '主 Agent 取消');
+      if (run.state == SubagentRunState.pending) {
+        run.state = SubagentRunState.cancelled;
+        run.completeDone();
+      }
+    }
+    for (final run in activeRuns) {
+      if (run.state != SubagentRunState.cancelled) {
+        run.tokenSource?.cancel(reason: '主 Agent 取消');
+      }
     }
     // 清掉等待队列里未触发的 completer，避免测试或 session 关闭后泄漏
     final queue = _waitingQueues.remove(sessionId);
@@ -378,8 +391,10 @@ class SubagentRunner {
       }
     }
     if (activeRuns.isEmpty) return;
+    final notDone = activeRuns.where((r) => !r.isDone).toList();
+    if (notDone.isEmpty) return;
     try {
-      await Future.wait(activeRuns.map((r) => r.done)).timeout(doneTimeout);
+      await Future.wait(notDone.map((r) => r.done)).timeout(doneTimeout);
     } on TimeoutException {
       LoggerService.instance.w(
         'cancelAllForSession 等子 Agent done 超时 ${doneTimeout.inSeconds}s '
