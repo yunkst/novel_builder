@@ -32,12 +32,26 @@ IconButton? _findIconButtonByTooltip(WidgetTester tester, String tooltip) {
   return null;
 }
 
+/// 在 dialog 内查找包含指定文本的 TextButton（适用于 TextButton.icon）。
+/// 注意：find.byType(TextButton) 匹配的是 runtimeType，TextButton.icon 的
+/// runtimeType 是 _TextButtonWithIcon（extends TextButton），byType 无法匹配。
+/// 必须使用 byWidgetPredicate + is 检查 + ancestor 查找子文本。
+TextButton? _findTextButtonByText(WidgetTester tester, String text) {
+  final finder = find.ancestor(
+    of: find.text(text),
+    matching: find.byWidgetPredicate((w) => w is TextButton),
+  );
+  final elements = finder.evaluate().toList();
+  if (elements.isEmpty) return null;
+  return elements.first.widget as TextButton;
+}
+
 void main() {
-  // 输入栏重构（2026-07-16）后右侧三态按钮的状态机：
-  //   isLoading (运行中)  -> 停止
-  //   有文本 OR 有图     -> 发送
+  // 输入栏右侧二态按钮（A 方案，2026-07-18）：
+  //   有文本 OR 有图     -> 发送（运行中为"补充到下一轮"）
   //   完全空 (无文无图)  -> 添加图片
-  group('AgentChatDialog 输入栏三态按钮', () {
+  // 停止操作已迁移至输入栏上方的独立停止条 _buildStopBar。
+  group('AgentChatDialog 输入栏二态按钮 + 停止条', () {
     testWidgets('完全空时显示「添加图片」按钮，可点击', (tester) async {
       await tester.pumpWidget(_wrap());
       await tester.pump();
@@ -64,24 +78,68 @@ void main() {
       expect(_findIconButtonByTooltip(tester, '添加图片'), isNull);
     });
 
-    testWidgets('LLM 运行时显示「停止」按钮，运行态覆盖文本/图片态',
-        (tester) async {
+    testWidgets('LLM 运行时显示停止条（_buildStopBar），不在右下角', (tester) async {
       await tester.pumpWidget(
         _wrap(state: const AgentChatState(isLoading: true)),
       );
       await tester.pump();
-      final stopBtn = _findIconButtonByTooltip(tester, '停止');
-      expect(stopBtn, isNotNull, reason: '运行中右侧应显示停止按钮');
-      expect(stopBtn!.onPressed, isNotNull, reason: '停止按钮应可点击');
-      expect(_findIconButtonByTooltip(tester, '发送'), isNull);
-      expect(_findIconButtonByTooltip(tester, '添加图片'), isNull);
 
-      // 运行中输入文字也不应让按钮切到发送态（运行态最高优先级）
+      // 停止条存在：_buildStopBar 内有一个 TextButton.icon 标签为「停止」
+      expect(_findTextButtonByText(tester, '停止'), isNotNull,
+          reason: '运行中应显示停止条，包含一个 TextButton「停止」');
+
+      // 右下角不再有停止按钮（_TrailingMode.stop 已移除）
+      expect(_findIconButtonByTooltip(tester, '停止'), isNull,
+          reason: '右下角不应再有停止 IconButton');
+
+      // 右下角空状态应显示添加图片按钮（A 方案二态）
+      expect(_findIconButtonByTooltip(tester, '添加图片'), isNotNull);
+
+      // 运行中输入文字后：右下角切为发送（补充到下一轮），停止条仍在
       await tester.enterText(find.byType(TextField), '排队等待的消息');
       await tester.pump();
-      expect(_findIconButtonByTooltip(tester, '停止'), isNotNull,
-          reason: '运行态期间即便有文本仍应是停止按钮');
-      expect(_findIconButtonByTooltip(tester, '发送'), isNull);
+      expect(_findTextButtonByText(tester, '停止'), isNotNull,
+          reason: '停止条在输入文字后仍应存在');
+      expect(_findIconButtonByTooltip(tester, '补充到下一轮'), isNotNull,
+          reason: '运行中有文本时右下角应显示补充到下一轮');
+    });
+
+    testWidgets('session 为 null 时停止条仍渲染但停止按钮禁用', (tester) async {
+      // 通过 override currentSessionProvider 返回 null 模拟无 session
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentSessionProvider.overrideWith((ref) => null),
+          ],
+          child: _wrap(state: const AgentChatState(isLoading: true)),
+        ),
+      );
+      await tester.pump();
+
+      // 停止条存在
+      final stopBtn = _findTextButtonByText(tester, '停止');
+      expect(stopBtn, isNotNull);
+      // onPressed 为 null → 按钮禁用
+      expect(stopBtn!.onPressed, isNull,
+          reason: 'session 为 null 时停止按钮应被禁用');
+    });
+
+    testWidgets('运行中 + 补充计数 > 0 时，停止条和补充条同时显示且补充条无停止按钮',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(state: const AgentChatState(
+          isLoading: true,
+          supplementaryCount: 3,
+        )),
+      );
+      await tester.pump();
+
+      // 停止条存在（仅停止条中有一个 TextButton「停止」）
+      expect(_findTextButtonByText(tester, '停止'), isNotNull,
+          reason: '仅停止条中有停止按钮，补充条已移除停止按钮');
+
+      // 补充条文字可见
+      expect(find.text('已补充 3 条消息，将在下一轮处理'), findsOneWidget);
     });
 
     testWidgets('运行中文本框可输入（enabled=true）', (tester) async {
