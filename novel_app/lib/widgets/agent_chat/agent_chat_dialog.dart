@@ -178,7 +178,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
               if (chatState.isLoading)
                 _buildStopBar(session),
               if (chatState.isLoading && chatState.supplementaryCount > 0)
-                _buildSupplementBar(chatState.supplementaryCount, session),
+                _buildSupplementBar(chatState.supplementaryCount),
               const RetryBanner(),
               _buildContextTag(),
               _buildInputBar(chatState, session),
@@ -665,9 +665,9 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   }
 
   /// A 方案：运行中补充消息状态条。
-  /// 显示"已补充 N 条，将在下一轮处理"+ 停止按钮（主动取消走 cancel 路径，
-  /// 队列内的补充消息也会被 cancelFor 一并清空）。
-  Widget _buildSupplementBar(int count, ScenarioSession? session) {
+  /// 仅显示"已补充 N 条，将在下一轮处理"信息，不提供停止入口
+  /// （停止操作已迁移至独立的 [_buildStopBar]）。
+  Widget _buildSupplementBar(int count) {
     final appColors = context.appColors;
     return Container(
       width: double.infinity,
@@ -681,17 +681,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             child: Text(
               '已补充 $count 条消息，将在下一轮处理',
               style: TextStyle(fontSize: 12, color: appColors.agentAccent),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: session == null ? null : () => session.cancel(),
-            icon: const Icon(Icons.stop_rounded, size: 14),
-            label: const Text('停止', style: TextStyle(fontSize: 12)),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-              minimumSize: const Size(0, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              foregroundColor: appColors.error,
             ),
           ),
         ],
