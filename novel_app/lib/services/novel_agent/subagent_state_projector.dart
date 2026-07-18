@@ -68,6 +68,19 @@ class EventTagger {
           droppedAgentFromIndex: droppedAgentFromIndex,
           runId: runId,
         ),
+      RetryEvent(
+        attempt: final attempt,
+        maxAttempts: final maxAttempts,
+        delayMs: final delayMs,
+        errorCategory: final errorCategory
+      ) =>
+        RetryEvent(
+          attempt: attempt,
+          maxAttempts: maxAttempts,
+          delayMs: delayMs,
+          errorCategory: errorCategory,
+          runId: runId,
+        ),
     };
   }
 }
@@ -96,11 +109,7 @@ class SubagentStateProjector {
         run.lastThought = _currentStreamingText(segments);
         return;
 
-      case ToolCallStartEvent(
-          :final name,
-          :final args,
-          :final toolCallId
-        ):
+      case ToolCallStartEvent(:final name, :final args, :final toolCallId):
         // 工具段始终是独立的新段（不合并相邻工具）
         final newSegment = ToolCallSegment(AgentToolCall(
           id: toolCallId,
@@ -121,11 +130,7 @@ class SubagentStateProjector {
         run.chatState = state.copyWith(streamingSegments: segments);
         return;
 
-      case ToolCallEndEvent(
-          :final toolCallId,
-          :final result,
-          :final success
-        ):
+      case ToolCallEndEvent(:final toolCallId, :final result, :final success):
         final segments = _updateToolSegment(
           state.streamingSegments,
           toolCallId,
@@ -161,8 +166,7 @@ class SubagentStateProjector {
           if (state.streamingSegments.isNotEmpty)
             AgentChatMessage(
               role: AgentChatRole.assistant,
-              segments:
-                  List<AgentChatSegment>.from(state.streamingSegments),
+              segments: List<AgentChatSegment>.from(state.streamingSegments),
             ),
           AgentChatMessage.user('[Agent 错误] $error'),
         ];
@@ -179,6 +183,11 @@ class SubagentStateProjector {
       case InjectedUserInputEvent():
         // No-op: 主 session 行为（运行中补充消息），子 Agent 不处理
         return;
+
+      case RetryEvent():
+        // No-op:UI 横幅走 RetrySignals(由 agent_loop 直接调,
+        // 不经事件流)。本 case 仅为 exhaustive 完整性。
+        return;
     }
   }
 
@@ -187,7 +196,10 @@ class SubagentStateProjector {
       List<AgentChatSegment> segs, String text) {
     if (segs.isNotEmpty && segs.last is TextSegment) {
       final last = segs.last as TextSegment;
-      return [...segs.sublist(0, segs.length - 1), TextSegment(last.content + text)];
+      return [
+        ...segs.sublist(0, segs.length - 1),
+        TextSegment(last.content + text)
+      ];
     }
     return [...segs, TextSegment(text)];
   }

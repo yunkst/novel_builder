@@ -17,6 +17,7 @@ import 'dart:io' as io;
 import 'dart:math';
 
 import 'package:novel_app/services/llm_logger/llm_logger.dart';
+import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/utils/json_utils.dart';
 import 'package:novel_app/utils/retry_helper.dart';
@@ -78,9 +79,8 @@ Map<String, dynamic> _markParseError({
   return {
     kArgsParseErrorKey: true,
     kArgsParseErrorDetailKey: detail,
-    kArgsRawPreviewKey: raw.length > 500
-        ? '${raw.substring(0, 500)}...(truncated)'
-        : raw,
+    kArgsRawPreviewKey:
+        raw.length > 500 ? '${raw.substring(0, 500)}...(truncated)' : raw,
   };
 }
 
@@ -123,8 +123,7 @@ class ToolCall {
       }
     } else if (rawArgs is Map<String, dynamic>) {
       args = rawArgs;
-    } else if (rawArgs != null &&
-        !(rawArgs is String && rawArgs.isEmpty)) {
+    } else if (rawArgs != null && !(rawArgs is String && rawArgs.isEmpty)) {
       // 数字、bool 等异常类型 → 标记
       // 空字符串保持空 args（正常情况：某些工具无参）
       args = _markParseError(
@@ -230,7 +229,8 @@ class StreamingResult {
     final aggregated = <int, _ToolCallDelta>{};
     for (final delta in toolCallDeltas) {
       final idx = (delta['index'] as int?) ?? 0;
-      final entry = aggregated.putIfAbsent(idx, () => _ToolCallDelta(index: idx));
+      final entry =
+          aggregated.putIfAbsent(idx, () => _ToolCallDelta(index: idx));
 
       final id = delta['id'] as String?;
       if (id != null) entry.id = id;
@@ -244,9 +244,7 @@ class StreamingResult {
       }
     }
 
-    return aggregated.values
-        .where((d) => d.name != null)
-        .map((d) {
+    return aggregated.values.where((d) => d.name != null).map((d) {
       var args = <String, dynamic>{};
       final argsStr = d.argumentsBuffer.toString();
       if (argsStr.isNotEmpty) {
@@ -715,6 +713,7 @@ class LlmProvider {
     }
     return null;
   }
+
   Stream<String> chatStream({
     required List<ChatMessage> messages,
     String? model,
@@ -860,7 +859,8 @@ class LlmProvider {
         );
         return const LlmStreamChunk();
       }
-    }).where((chunk) => chunk.isContent || chunk.isToolCallDelta || chunk.isFinished);
+    }).where((chunk) =>
+            chunk.isContent || chunk.isToolCallDelta || chunk.isFinished);
   }
 }
 
@@ -930,6 +930,18 @@ class IoLlmHttpClient implements LlmHttpClient {
     return withRetry(
       () => _postJsonOnce(url, headers, body),
       label: 'llm_post',
+      onRetry: (a, m, d, e) {
+        try {
+          RetrySignals.instance.reportTransport(
+            attempt: a,
+            maxAttempts: m,
+            delayMs: d,
+            error: e,
+          );
+        } catch (_) {
+          // report 失败不影响重试
+        }
+      },
     );
   }
 
@@ -989,6 +1001,7 @@ class IoLlmHttpClient implements LlmHttpClient {
         retryAfterMs: retryAfterMs,
       );
     }
+    RetrySignals.instance.clear();
     return responseBody;
   }
 
@@ -1003,6 +1016,18 @@ class IoLlmHttpClient implements LlmHttpClient {
       () => _postJsonStreamHandshake(url, headers, body),
       config: const RetryConfig(maxAttempts: 3),
       label: 'llm_stream_establish',
+      onRetry: (a, m, d, e) {
+        try {
+          RetrySignals.instance.reportTransport(
+            attempt: a,
+            maxAttempts: m,
+            delayMs: d,
+            error: e,
+          );
+        } catch (_) {
+          // report 失败不影响重试
+        }
+      },
     );
 
     yield* _wrapStreamWithLogging(
@@ -1067,6 +1092,7 @@ class IoLlmHttpClient implements LlmHttpClient {
         retryAfterMs: retryAfterMs,
       );
     }
+    RetrySignals.instance.clear();
     return _StreamHandshake(
       bodyStream: response.transform(utf8.decoder),
       logId: logId,
@@ -1193,8 +1219,8 @@ class IoLlmHttpClient implements LlmHttpClient {
   ///
   /// 记录：请求 URL、模型、消息数、请求体大小、以及 LLM 返回的错误响应体。
   /// 不记录 apiKey 与完整 messages 内容，避免泄露敏感信息与日志膨胀。
-  static String _buildHttpErrorContext(
-      String url, Map<String, String> headers, String body, String responseBody) {
+  static String _buildHttpErrorContext(String url, Map<String, String> headers,
+      String body, String responseBody) {
     String model = 'unknown';
     int messageCount = -1;
     try {

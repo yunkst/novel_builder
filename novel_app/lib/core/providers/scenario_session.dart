@@ -153,7 +153,8 @@ class ScenarioSession {
   /// - user：直接转 AgentChatMessage.user
   /// - assistant：收集紧跟其后、toolCallId 匹配的 tool 消息作为 ToolCallSegment
   /// - tool：已被前一个 assistant 吸收，跳过
-  static List<AgentChatMessage> _projectUiMessages(List<ChatMessage> agentMsgs) {
+  static List<AgentChatMessage> _projectUiMessages(
+      List<ChatMessage> agentMsgs) {
     final ui = <AgentChatMessage>[];
     for (var i = 0; i < agentMsgs.length; i++) {
       final m = agentMsgs[i];
@@ -686,7 +687,6 @@ class ScenarioSession {
     }
   }
 
-
   /// 续跑 Agent —— 与 [_runAgent] 区别：不 append user、不调 sendMessage、走 resumeFromMessages。
   ///
   /// 调用前置条件：调用方已砍除失败轮残留，[_agentMessages] 末尾是 user（含）或 tool
@@ -957,7 +957,8 @@ class ScenarioSession {
           _pendingSegments.add(TextSegment(e.text));
         }
         _state = _state.copyWith(
-          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
+          streamingSegments:
+              List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case ToolCallStartEvent e:
@@ -969,12 +970,13 @@ class ScenarioSession {
         );
         _pendingSegments.add(ToolCallSegment(call));
         _state = _state.copyWith(
-          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
+          streamingSegments:
+              List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case ToolCallEndEvent e:
         final idx = _pendingSegments.indexWhere(
-            (s) => s is ToolCallSegment && s.call.id == e.toolCallId,
+          (s) => s is ToolCallSegment && s.call.id == e.toolCallId,
         );
         if (idx >= 0) {
           final old = (_pendingSegments[idx] as ToolCallSegment).call;
@@ -987,11 +989,13 @@ class ScenarioSession {
             clearProgress: true,
           ));
         }
-        if (e.success && (e.name == 'select_novel' || e.name == 'create_novel')) {
+        if (e.success &&
+            (e.name == 'select_novel' || e.name == 'create_novel')) {
           _handleSelectNovelFromResult(e.result);
         }
         _state = _state.copyWith(
-          streamingSegments: List<AgentChatSegment>.unmodifiable(_pendingSegments),
+          streamingSegments:
+              List<AgentChatSegment>.unmodifiable(_pendingSegments),
         );
 
       case ToolProgressEvent e:
@@ -1034,6 +1038,11 @@ class ScenarioSession {
         _state = _state.copyWith(
           supplementaryCount: _state.supplementaryCount + 1,
         );
+
+      case RetryEvent _:
+        // No-op:主 Agent RetryEvent 由 agent_loop 直接调 RetrySignals,
+        // 这里不再投影(spec §3.1.1 方案 B);仅 exhaustive 兜底。
+        break;
     }
     _notifyStateChanged();
   }
@@ -1246,7 +1255,12 @@ class ScenarioSession {
         'ScenarioSession [$scenarioId] 落库 ${msgs.length} 条 agent 消息 '
         'partial=$partial sessionId=$sid startIdx=$startIdx',
         category: LogCategory.ai,
-        tags: ['session', 'persist_turn', partial ? 'partial' : 'ok', scenarioId],
+        tags: [
+          'session',
+          'persist_turn',
+          partial ? 'partial' : 'ok',
+          scenarioId
+        ],
       );
     } catch (e, st) {
       LoggerService.instance.e(

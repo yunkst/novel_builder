@@ -44,8 +44,7 @@ void main() {
           'data: {"choices":[{"delta":{"content":"!"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks =
-          SseParser.parseSseStreamWithReasoning(sseData).content;
+      final chunks = SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Hello', ' world', '!']);
     });
 
@@ -54,8 +53,7 @@ void main() {
           'data: {"choices":[{"delta":{"content":"B"}}]}\n\n'
           'data: [DONE]\n\n';
 
-      final chunks =
-          SseParser.parseSseStreamWithReasoning(sseData).content;
+      final chunks = SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['A', 'B']);
     });
 
@@ -65,8 +63,7 @@ void main() {
           ': comment line\n'
           'data: [DONE]\n';
 
-      final chunks =
-          SseParser.parseSseStreamWithReasoning(sseData).content;
+      final chunks = SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['X']);
     });
 
@@ -75,8 +72,7 @@ void main() {
           'data: {"choices":[{"delta":{"content":"Y"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks =
-          SseParser.parseSseStreamWithReasoning(sseData).content;
+      final chunks = SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Y']);
     });
 
@@ -85,13 +81,13 @@ void main() {
           'data: {"choices":[{"delta":{"content":"Z"}}]}\n'
           'data: [DONE]\n';
 
-      final chunks =
-          SseParser.parseSseStreamWithReasoning(sseData).content;
+      final chunks = SseParser.parseSseStreamWithReasoning(sseData).content;
       expect(chunks, ['Z']);
     });
 
     test('reasoning_content 分离（Dify thinking 格式）', () {
-      const sseData = 'data: {"choices":[{"delta":{"reasoning_content":"thinking..."}}]}\n'
+      const sseData =
+          'data: {"choices":[{"delta":{"reasoning_content":"thinking..."}}]}\n'
           'data: {"choices":[{"delta":{"content":"answer"}}]}\n'
           'data: [DONE]\n';
 
@@ -121,11 +117,13 @@ void main() {
 
   group('LlmProvider request building', () {
     test('阻塞式请求体构建', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [
@@ -143,11 +141,13 @@ void main() {
     });
 
     test('流式请求体构建', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Hello')],
@@ -158,11 +158,13 @@ void main() {
     });
 
     test('覆盖 model 和参数', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Hello')],
@@ -178,11 +180,13 @@ void main() {
     });
 
     test('structured_output: response_format JSON 模式', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Generate character')],
@@ -199,11 +203,13 @@ void main() {
       // 报 400 "null is not of type \"array\""。
       // webview_extract 场景的无参工具（get_page_info 等）恰好缺 required 字段，
       // 必须在请求体构造层统一补全。
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       final tools = <Map<String, dynamic>>[
         {
@@ -256,22 +262,26 @@ void main() {
 
   group('LlmProvider URL construction', () {
     test('chat completions endpoint', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       expect(provider.chatCompletionsUrl,
           'https://api.deepseek.com/v1/chat/completions');
     });
 
     test('baseUrl 末尾有 / 时去掉冗余', () {
-      final provider = LlmProvider(LlmConfig(
-        baseUrl: 'https://api.deepseek.com/v1/',
-        apiKey: 'sk-test',
-        defaultModel: 'deepseek-chat',
-      ), httpClient: _FakeHttpClient());
+      final provider = LlmProvider(
+          LlmConfig(
+            baseUrl: 'https://api.deepseek.com/v1/',
+            apiKey: 'sk-test',
+            defaultModel: 'deepseek-chat',
+          ),
+          httpClient: _FakeHttpClient());
 
       expect(provider.chatCompletionsUrl,
           'https://api.deepseek.com/v1/chat/completions');
