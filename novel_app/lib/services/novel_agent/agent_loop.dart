@@ -176,9 +176,11 @@ class AgentLoop {
           emit(CompactionEvent(
             removedChars: result.removedChars,
             originalChars: result.originalChars,
+            compactedChars: result.compactedChars,
             keptMessageCount: result.keptMessageCount,
             droppedMessageCount: result.droppedMessageCount,
             droppedAgentFromIndex: result.droppedAgentFromIndex,
+            compactionNote: result.messages[1].content ?? '',
             rewrittenContent: result.rewrittenContent,
           ));
         }

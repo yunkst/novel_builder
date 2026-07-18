@@ -56,16 +56,20 @@ class EventTagger {
       CompactionEvent(
         removedChars: final removedChars,
         originalChars: final originalChars,
+        compactedChars: final compactedChars,
         keptMessageCount: final keptMessageCount,
         droppedMessageCount: final droppedMessageCount,
-        droppedAgentFromIndex: final droppedAgentFromIndex
+        droppedAgentFromIndex: final droppedAgentFromIndex,
+        compactionNote: final compactionNote,
       ) =>
         CompactionEvent(
           removedChars: removedChars,
           originalChars: originalChars,
+          compactedChars: compactedChars,
           keptMessageCount: keptMessageCount,
           droppedMessageCount: droppedMessageCount,
           droppedAgentFromIndex: droppedAgentFromIndex,
+          compactionNote: compactionNote,
           runId: runId,
         ),
       RetryEvent(

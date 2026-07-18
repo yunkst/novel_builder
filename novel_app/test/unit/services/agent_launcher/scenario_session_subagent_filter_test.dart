@@ -96,9 +96,11 @@ void main() {
           const CompactionEvent(
             removedChars: 10,
             originalChars: 100,
+            compactedChars: 90,
             keptMessageCount: 5,
             droppedMessageCount: 2,
             droppedAgentFromIndex: 2,
+            compactionNote: '[上下文压缩|removedChars=10|originalChars=100|compactedChars=90|rewrittenCount=0|timestamp=0]\n早期 2 条消息已被压缩移除。',
           ),
           mainSessionId,
         ),

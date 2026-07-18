@@ -99,9 +99,11 @@ void main() {
           const CompactionEvent(
             removedChars: 1,
             originalChars: 2,
+            compactedChars: 1,
             keptMessageCount: 3,
             droppedMessageCount: 4,
             droppedAgentFromIndex: 0,
+            compactionNote: '[上下文压缩|removedChars=1|originalChars=2|compactedChars=1|rewrittenCount=0|timestamp=0]\n早期 4 条消息已被压缩移除。',
           ),
           runId) as CompactionEvent;
       expect(tagged7.runId, runId);
@@ -202,9 +204,11 @@ void main() {
           const CompactionEvent(
             removedChars: 1,
             originalChars: 2,
+            compactedChars: 1,
             keptMessageCount: 1,
             droppedMessageCount: 1,
             droppedAgentFromIndex: 0,
+            compactionNote: '[上下文压缩|removedChars=1|originalChars=2|compactedChars=1|rewrittenCount=0|timestamp=0]\n早期 1 条消息已被压缩移除。',
           ),
           run);
       // streamingSegments 保持不变

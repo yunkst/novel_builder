@@ -153,6 +153,11 @@ class CompactionEvent extends AgentEvent {
   /// 原始字符数
   final int originalChars;
 
+  /// 压缩后字符数（[CompactionResult.compactedChars]）
+  ///
+  /// UI 可据此展示「$originalChars → $compactedChars 字」。
+  final int compactedChars;
+
   /// 保留的消息条数
   final int keptMessageCount;
 
@@ -169,6 +174,14 @@ class CompactionEvent extends AgentEvent {
   /// 内存与 DB 同步裁剪 + 改写，跨会话不再"复活"已压缩内容。
   final int droppedAgentFromIndex;
 
+  /// 压缩提示 KV 文本（[CompactionResult.messages[1].content]）
+  ///
+  /// 形如 `[上下文压缩|removedChars=...|originalChars=...|compactedChars=...|
+  /// rewrittenCount=...|timestamp=...]\n早期 N 条消息已被压缩移除...`。
+  /// 由 [CompactionNoteParser] 解析后落库到 chat_messages marker 段，
+  /// UI 据此渲染压缩提示卡片。
+  final String compactionNote;
+
   /// P1 预剪枝改写记录（透传给 ScenarioSession 同步落库）
   ///
   /// 索引语义与 [droppedAgentFromIndex] 一致（基于压缩前 messages）。
@@ -178,9 +191,11 @@ class CompactionEvent extends AgentEvent {
   const CompactionEvent({
     required this.removedChars,
     required this.originalChars,
+    required this.compactedChars,
     required this.keptMessageCount,
     required this.droppedMessageCount,
     required this.droppedAgentFromIndex,
+    required this.compactionNote,
     this.rewrittenContent = const [],
     super.runId,
   });
@@ -189,9 +204,10 @@ class CompactionEvent extends AgentEvent {
   double get compressionRatio =>
       originalChars > 0 ? removedChars / originalChars : 0;
 
-  /// 友好描述
-  String get description => '已压缩上下文：$removedChars 字符'
-      '（保留 $keptMessageCount 条，丢弃 $droppedMessageCount 条）';
+  /// 友好描述（含改写条数，仅在 [rewrittenContent] 非空时展示）
+  String get description => '已压缩上下文：${removedChars ~/ 1000}K 字符'
+      '（保留 $keptMessageCount 条，丢弃 $droppedMessageCount 条'
+      '${rewrittenContent.isEmpty ? "" : "，改写 ${rewrittenContent.length} 条"}）';
 }
 
 /// LLM 重试事件(传输层/回合层中段桥接,UI 横幅走 RetrySignals)

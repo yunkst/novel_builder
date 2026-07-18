@@ -30,9 +30,11 @@ void main() {
       const event = CompactionEvent(
         removedChars: 100,
         originalChars: 200,
+        compactedChars: 100,
         keptMessageCount: 2,
         droppedMessageCount: 1,
         droppedAgentFromIndex: 0,
+        compactionNote: '[上下文压缩|removedChars=100|originalChars=200|compactedChars=100|rewrittenCount=0|timestamp=0]\n早期 1 条消息已被压缩移除。',
         runId: 'sub-abc',
       );
       expect(event.runId, 'sub-abc');
