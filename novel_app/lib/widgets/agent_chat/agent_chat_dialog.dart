@@ -893,7 +893,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 ),
               ),
             ),
-          // 输入区：输入框 + 右侧三态按钮（attach/send/stop）
+          // 输入区：输入框 + 右侧双态按钮（attach/send）
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
