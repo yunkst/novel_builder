@@ -3,6 +3,8 @@
 /// Phase 2: ReAct 循环产生的事件流（用 sealed class + Dart 3 模式匹配）
 library;
 
+import 'context_compactor.dart' show RewrittenEntry;
+
 /// 工具调用展示信息（供 UI 渲染）
 class AgentToolCall {
   final String id;
@@ -162,9 +164,17 @@ class CompactionEvent extends AgentEvent {
   ///
   /// v32 起 DB 也存 agent 消息，ScenarioSession 收到本事件后：
   /// 1. 内存 _agentMessages.removeRange(0, droppedAgentFromIndex)
-  /// 2. DB deleteMessagesBefore(sessionId, droppedAgentFromIndex)
-  /// 内存与 DB 同步裁剪，跨会话不再"复活"已压缩内容。
+  /// 2. 对 rewrittenContent 中 index>=droppedAgentFromIndex 的 entry，
+  ///    把 _agentMessages[index-droppedAgentFromIndex].content 改成 newContent
+  /// 3. DB deleteMessagesBefore(sessionId, droppedAgentFromIndex) 后重写保留段
+  /// 内存与 DB 同步裁剪 + 改写，跨会话不再"复活"已压缩内容。
   final int droppedAgentFromIndex;
+
+  /// P1 预剪枝改写记录（透传给 ScenarioSession 同步落库）
+  ///
+  /// 索引语义与 [droppedAgentFromIndex] 一致（基于压缩前 messages）。
+  /// 落在丢弃段内的 entry 已被整条丢弃，ScenarioSession 无须处理。
+  final List<RewrittenEntry> rewrittenContent;
 
   const CompactionEvent({
     required this.removedChars,
@@ -172,6 +182,7 @@ class CompactionEvent extends AgentEvent {
     required this.keptMessageCount,
     required this.droppedMessageCount,
     required this.droppedAgentFromIndex,
+    this.rewrittenContent = const [],
     super.runId,
   });
 

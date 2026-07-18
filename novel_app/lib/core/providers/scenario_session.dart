@@ -1142,7 +1142,7 @@ class ScenarioSession {
     }
   }
 
-  /// 处理上下文压缩事件 — 同步裁剪内存 + 删 DB
+  /// 处理上下文压缩事件 — 同步裁剪内存 + apply 预剪枝改写 + 删/重写 DB
   void _handleCompaction(CompactionEvent e) {
     final cut = e.droppedAgentFromIndex;
     if (cut <= 0) {
@@ -1154,14 +1154,39 @@ class ScenarioSession {
       return;
     }
     final removed = cut.clamp(0, _agentMessages.length);
+
+    // 1) 先 removeRange 丢弃前缀
     _agentMessages.removeRange(0, removed);
+
+    // 2) apply P1 预剪枝改写：rewrittenContent 的 index 基于压缩前 messages，
+    //    平移到压缩后 index - cut 后写入 _agentMessages 对应项的 content。
+    //    落在丢弃段（index < cut）的 entry 已随 removeRange 消失，无须处理。
+    int appliedRewrite = 0;
+    for (final entry in e.rewrittenContent) {
+      if (entry.index < cut) continue;
+      final newIdx = entry.index - cut;
+      if (newIdx < 0 || newIdx >= _agentMessages.length) continue;
+      final old = _agentMessages[newIdx];
+      if (old.role != 'tool') continue; // 防御性：仅改 tool result
+      _agentMessages[newIdx] = ChatMessage(
+        role: old.role,
+        content: entry.newContent,
+        name: old.name,
+        toolCallId: old.toolCallId,
+        toolCalls: old.toolCalls,
+      );
+      appliedRewrite++;
+    }
+
     _state = _state.copyWith(messages: _uiMessages);
     LoggerService.instance.i(
       'ScenarioSession [$scenarioId] 压缩裁剪: 移除前 $removed 条 agent 消息, '
-      '剩余 ${_agentMessages.length} 条',
+      '改写 $appliedRewrite 条 tool result, 剩余 ${_agentMessages.length} 条',
       category: LogCategory.ai,
       tags: ['session', 'compaction', 'trim', scenarioId],
     );
+    // 3) 重写 DB：_deleteAgentMessagesBeforeDb 内部 clearMessages + appendMessage
+    //    整段重写 _agentMessages（已含改写后的 content），故 1-liner 版自动落库。
     unawaited(_deleteAgentMessagesBeforeDb(cut));
   }
 
