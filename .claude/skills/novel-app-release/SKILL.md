@@ -22,6 +22,9 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 
 - 用户请求发布新版本应用
 - 用户说"发布 APP"、"publish new version"、"deploy app update"
+- 用户说"发预览版"、"发 preview" → 走预览版通道(tag 含 `-preview.N`,见下方「发布通道」)
+
+> **预览版 vs 稳定版选择**:平时迭代默认发预览版(只推送给愿意尝鲜的用户);经过验证后再发同名稳定版推送给所有用户。详见「版本管理 → 发布通道」。
 
 ## 环境要求
 
@@ -185,6 +188,71 @@ SKIP_PREFLIGHT=1 python .claude/skills/novel-app-release/scripts/build_and_uploa
 
 - `1.9.3` — 版本名称
 - `76` — 版本代码,必须递增
+
+### 发布通道(stable / preview)
+
+支持两个发布通道,通过 tag 命名自动区分,**无需手动设置 prerelease 标志**:
+
+| 通道 | Tag 格式 | 示例 | GitHub prerelease | 谁能收到 |
+|------|---------|------|-------------------|---------|
+| 稳定版 | `vX.Y.Z` | `v2.0.0` | `false` | 所有用户 |
+| 预览版 | `vX.Y.Z-preview.N` | `v2.0.0-preview.1` | `true` | 仅在 APP 中开启「获取预览版」开关的用户 |
+
+**CI 自动判定逻辑**(`flutter-release.yml` 的 `Detect prerelease` 步骤):
+
+```bash
+# tag 含 '-' → prerelease=true(预览版)
+# tag 不含 '-' → prerelease=false(稳定版)
+if [[ "${{ steps.tag.outputs.name }}" == *-* ]]; then
+  echo "flag=true" >> $GITHUB_OUTPUT
+else
+  echo "flag=false" >> $GITHUB_OUTPUT
+fi
+```
+
+> 判定依据是 tag 是否含 `-`,而非具体后缀(如 `-preview` / `-alpha` / `-beta`)。
+> 纯语义化版本号 `v2.0.0` 一定不含 `-`,所以稳定版判定可靠。
+
+**App 端获取逻辑**(`github_release_service.dart`):
+
+- 用户**关闭**「获取预览版」(默认):请求 `/releases/latest`,GitHub API 原生跳过所有 prerelease,永远返回最新稳定版
+- 用户**开启**「获取预览版」:请求 `/releases?per_page=1`,返回最新一条 release(可能是稳定版也可能是预览版)
+
+#### 发布预览版
+
+平时迭代优先发预览版,验证无误后再发同名稳定版:
+
+```yaml
+# pubspec.yaml
+version: 2.0.0+108  # → 预览版改为 2.0.0-preview.1+108
+```
+
+```bash
+# 发预览版:tag = v2.0.0-preview.1
+# changelog 写入方式与稳定版完全一致
+CHANGELOG="..." python .claude/skills/novel-app-release/scripts/build_and_upload.py
+```
+
+脚本会创建 `v2.0.0-preview.1` tag,CI 自动标记为 prerelease,只有开启预览版的用户能收到。
+
+#### 预览版转稳定版
+
+验证预览版无误后,去掉 `-preview.N` 后缀发同名稳定版:
+
+```yaml
+# pubspec.yaml
+version: 2.0.0-preview.1+108  →  version: 2.0.0+109  # version_code 递增
+```
+
+```bash
+# 发稳定版:tag = v2.0.0
+CHANGELOG="..." python .claude/skills/novel-app-release/scripts/build_and_upload.py
+```
+
+> 同一版本号(如 `2.0.0`)的预览版和稳定版可以共存:
+> `v2.0.0-preview.3`(prerelease=true)→ 预览通道
+> `v2.0.0`(prerelease=false)→ 稳定通道
+> 这两个 tag 指向不同 commit,互不干扰。
 
 ## GitHub Actions 流程
 
