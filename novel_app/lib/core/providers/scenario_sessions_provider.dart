@@ -14,6 +14,8 @@
 /// 切换 session 时清空 in-memory messages，让 ScenarioSession 主动从 DB 加载。
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/chat_session.dart';
@@ -70,11 +72,15 @@ class ScenarioSessionsNotifier
     session.setOnStateChanged(() => _syncState(scenarioId));
     _sessions[scenarioId] = session;
 
-    // LRU 淘汰
-    _evictIfNeeded();
-
-    // 初始同步
-    _syncState(scenarioId);
+    // LRU 淘汰 + 初始同步。
+    // 注意：get() 可能被某个 Provider 的 build 周期调用（例如 currentSessionProvider），
+    // 此时直接写 state 会触发 Riverpod 断言
+    // "Providers are not allowed to modify other providers during their initialization"。
+    // 故把 state 写入推迟到当前微任务之后，保证不在任何 provider 的构建阶段执行。
+    _scheduleSync(() {
+      _evictIfNeeded();
+      _syncState(scenarioId);
+    });
 
     // 冷启动自动 hydrate：如果已经选了 sessionId（或 DB 里有该 scenario 的历史），
     // 主动加载 messages，让 UI 一打开就能看到上次的对话。
@@ -167,6 +173,12 @@ class ScenarioSessionsNotifier
   }
 
   // ===== 内部方法 =====
+
+  /// 把一段「会改 state」的副作用推迟到当前微任务之后执行，
+  /// 避免在某个 Provider 的 build 周期内触发 state 写入断言。
+  void _scheduleSync(void Function() action) {
+    scheduleMicrotask(action);
+  }
 
   /// 把 session 状态同步到 Riverpod state
   void _syncState(String scenarioId) {
