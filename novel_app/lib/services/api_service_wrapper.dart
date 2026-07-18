@@ -484,18 +484,20 @@ class ApiServiceWrapper {
         return ((response.data as Uint8List?) ?? Uint8List(0), 200);
       }
       return (null, response.statusCode ?? 0);
-    } on DioException catch (e) {
+    } on DioException catch (e, st) {
       // validateStatus 放行的非 2xx 已在上面处理；这里仅网络层错误
       final code = e.response?.statusCode ?? 0;
-      LoggerService.instance.d(
+      LoggerService.instance.w(
         '拉取文生图失败: taskId=$taskId code=$code - ${e.message}',
+        stackTrace: st.toString(),
         category: LogCategory.network,
         tags: ['text2img', 'image', 'fetch', 'failed'],
       );
       return (null, code);
-    } catch (e) {
+    } catch (e, st) {
       LoggerService.instance.e(
-        '拉取文生图异常: taskId=$taskId',
+        '拉取文生图异常: taskId=$taskId - $e',
+        stackTrace: st.toString(),
         category: LogCategory.network,
         tags: ['text2img', 'image', 'fetch', 'error'],
       );
@@ -571,17 +573,19 @@ class ApiServiceWrapper {
         return ((response.data as Uint8List?) ?? Uint8List(0), 200);
       }
       return (null, response.statusCode ?? 0);
-    } on DioException catch (e) {
+    } on DioException catch (e, st) {
       final code = e.response?.statusCode ?? 0;
-      LoggerService.instance.d(
+      LoggerService.instance.w(
         '拉取图生视频失败: taskId=$taskId code=$code - ${e.message}',
+        stackTrace: st.toString(),
         category: LogCategory.network,
         tags: ['image_to_video', 'video', 'fetch', 'failed'],
       );
       return (null, code);
-    } catch (e) {
+    } catch (e, st) {
       LoggerService.instance.e(
-        '拉取图生视频异常: taskId=$taskId',
+        '拉取图生视频异常: taskId=$taskId - $e',
+        stackTrace: st.toString(),
         category: LogCategory.network,
         tags: ['image_to_video', 'video', 'fetch', 'error'],
       );

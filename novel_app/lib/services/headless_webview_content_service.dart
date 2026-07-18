@@ -237,10 +237,10 @@ class HeadlessWebViewContentService {
         tags: ['headless-webview', 'success'],
       );
 
-      // 7. OCR 还原（needsOcr 时对 PUA 反爬文本走 PP-OCRv6）
+      // 7. OCR 还原（正文脚本标记 chapter_content_ocr 时对 PUA 反爬文本走 PP-OCRv6）
       String finalContent = result.content;
       final fontFamily = result.fontFamily;
-      if (script.needsOcr) {
+      if (script.chapterContentOcr) {
         finalContent = await restoreContentIfNeeded(
           needsOcr: true,
           content: finalContent,

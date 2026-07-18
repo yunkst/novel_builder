@@ -446,16 +446,17 @@ void main() {
   // ===== updateScriptPart（分次增量更新） =====
 
   group('updateScriptPart', () {
-    test('分次写 list/content 不互相覆盖', () async {
+    test('分次写 list/content 不互相覆盖；各自 ocr 写到对应列；domain 不存在自动 create', () async {
       // 先插一条种子记录（两列都有值，验证 update 不覆盖未触及列）
       await repo.upsertByDomain(
         domain: 'fanqienovel.com',
         chapterListJs: 'LIST_SEED',
         chapterContentJs: 'CONTENT_SEED',
-        ocr: false,
+        chapterListOcr: false,
+        chapterContentOcr: false,
       );
 
-      // 第一次：只写 chapter_list_js
+      // 第一次：只写 chapter_list_js（番茄场景：目录页无 PUA，ocr=false）
       await repo.updateScriptPart(
         domain: 'fanqienovel.com',
         scriptType: 'chapter_list',
@@ -465,10 +466,11 @@ void main() {
       final after1 = await repo.getByDomain('fanqienovel.com');
       expect(after1!.chapterListJs, 'LIST_NEW');
       expect(after1.chapterContentJs, 'CONTENT_SEED', reason: '未触及列应保持原值');
-      expect(after1.ocr, isFalse);
+      expect(after1.chapterListOcr, isFalse);
+      expect(after1.chapterContentOcr, isFalse);
       expect(after1.verified, 0, reason: '脚本内容变了，verified 应重置为 0');
 
-      // 第二次：只写 chapter_content_js + ocr=true
+      // 第二次：只写 chapter_content_js（番茄场景：正文页有 PUA，ocr=true）
       await repo.updateScriptPart(
         domain: 'fanqienovel.com',
         scriptType: 'chapter_content',
@@ -478,7 +480,10 @@ void main() {
       final after2 = await repo.getByDomain('fanqienovel.com');
       expect(after2!.chapterListJs, 'LIST_NEW', reason: '第一次写入的不应丢失');
       expect(after2.chapterContentJs, 'CONTENT_NEW');
-      expect(after2.ocr, isTrue);
+      // 关键：list 的 ocr 不被 content 的写入覆盖
+      expect(after2.chapterListOcr, isFalse,
+          reason: 'list 的 ocr 不应被 content 写入覆盖');
+      expect(after2.chapterContentOcr, isTrue);
     });
 
     test('domain 不存在时自动 INSERT 新记录，本列写脚本另一列留空', () async {
@@ -498,7 +503,10 @@ void main() {
       expect(row.chapterContentJs, '',
           reason: '未保存的另一半应留空，由后续 save_script 补齐');
       expect(row.verified, 0);
-      expect(row.ocr, isFalse);
+      expect(row.chapterListOcr, isFalse,
+          reason: 'chapter_list 类型 + ocr=false → 该列写 false');
+      expect(row.chapterContentOcr, isFalse,
+          reason: '未保存的另一半 ocr 应保持默认 false');
     });
 
     test('domain 不存在时 chapter_content 第一次也能直接落库', () async {
@@ -512,7 +520,10 @@ void main() {
       final row = await repo.getByDomain('a.com');
       expect(row!.chapterListJs, '');
       expect(row.chapterContentJs, 'CONTENT_FIRST');
-      expect(row.ocr, isTrue);
+      expect(row.chapterContentOcr, isTrue,
+          reason: 'chapter_content 类型 + ocr=true → 该列写 true');
+      expect(row.chapterListOcr, isFalse,
+          reason: '未保存的另一半 ocr 应保持默认 false');
       expect(row.verified, 0);
     });
 
@@ -536,26 +547,31 @@ void main() {
     });
   });
 
-  // ===== upsertByDomain ocr 参数 =====
+  // ===== upsertByDomain 两列 ocr 参数（v39 拆列后） =====
 
-  group('upsertByDomain ocr', () {
-    test('ocr=true 落库后读回 needsOcr', () async {
+  group('upsertByDomain 两列 ocr', () {
+    test('番茄场景：chapterListOcr=false, chapterContentOcr=true 各自落库', () async {
       await repo.upsertByDomain(
         domain: 'a.com',
         chapterListJs: 'L',
         chapterContentJs: 'C',
-        ocr: true,
+        chapterListOcr: false,
+        chapterContentOcr: true,
       );
-      expect((await repo.getByDomain('a.com'))!.needsOcr, isTrue);
+      final s = (await repo.getByDomain('a.com'))!;
+      expect(s.chapterListOcr, isFalse);
+      expect(s.chapterContentOcr, isTrue);
     });
 
-    test('ocr 默认 false（向后兼容）', () async {
+    test('两列 ocr 默认 false（向后兼容）', () async {
       await repo.upsertByDomain(
         domain: 'b.com',
         chapterListJs: 'L',
         chapterContentJs: 'C',
       );
-      expect((await repo.getByDomain('b.com'))!.ocr, isFalse);
+      final s = (await repo.getByDomain('b.com'))!;
+      expect(s.chapterListOcr, isFalse);
+      expect(s.chapterContentOcr, isFalse);
     });
   });
 }

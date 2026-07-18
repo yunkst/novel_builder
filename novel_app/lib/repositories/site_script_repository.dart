@@ -178,13 +178,17 @@ class SiteScriptRepository extends BaseRepository {
   /// UPDATE 时保留 id / created_at / use_count，重置 verified=0，
   /// 更新脚本内容和 last_used_at。
   /// 返回 (id, isInsert) —— isInsert=true 表示首次插入。
+  ///
+  /// v39 拆列后，[chapterListOcr] / [chapterContentOcr] 分别写到对应列，
+  /// 互不覆盖。
   Future<({String id, bool isInsert})> upsertByDomain({
     required String domain,
     required String chapterListJs,
     required String chapterContentJs,
     String urlPattern = '',
     String sampleUrl = '',
-    bool ocr = false, // v37 新增，默认 false 向后兼容
+    bool chapterListOcr = false, // v39 拆列后独立标记
+    bool chapterContentOcr = false,
   }) async {
     try {
       final db = await database;
@@ -209,7 +213,8 @@ class SiteScriptRepository extends BaseRepository {
             'sample_url': sampleUrl,
             'last_used_at': now,
             'verified': 0, // 脚本内容变了，需要重新验证
-            'ocr': ocr ? 1 : 0,
+            'chapter_list_ocr': chapterListOcr ? 1 : 0,
+            'chapter_content_ocr': chapterContentOcr ? 1 : 0,
           },
           where: 'id = ?',
           whereArgs: [row['id']],
@@ -251,7 +256,8 @@ class SiteScriptRepository extends BaseRepository {
         'last_used_at': now,
         'use_count': 0,
         'verified': 0,
-        'ocr': ocr ? 1 : 0,
+        'chapter_list_ocr': chapterListOcr ? 1 : 0,
+        'chapter_content_ocr': chapterContentOcr ? 1 : 0,
       });
       LoggerService.instance.i(
         '新增域名脚本 (upsert): domain=$domain id=$id',
@@ -273,12 +279,12 @@ class SiteScriptRepository extends BaseRepository {
   /// 增量更新某域名某类型脚本（save_script 分次保存用）。
   ///
   /// - [scriptType] 为 `'chapter_list'` 或 `'chapter_content'`，决定更新哪列。
-  /// - 同时更新 [ocr] 列（保证两次保存的 ocr 标记一致）。
+  /// - v39 拆列后，[ocr] 写到与 [scriptType] 匹配的列（chapter_list_ocr /
+  ///   chapter_content_ocr），两者独立，互不覆盖。
   /// - **若 domain 不存在会自动 INSERT** 一条新记录：本次 [scriptType] 列写
-  ///   [scriptJs]，另一段（list/content）留空串；`verified=0` 标识尚未完成
-  ///   另一半，下游启用前会要求两段都验证通过（参见 HeadlessWebView 系列
-  ///   service 的 completed 判定）。这样无论 agent 第一次调的是 `chapter_list`
-  ///   还是 `chapter_content`，都能直接落库，不会卡在"必须先存另一种"。
+  ///   [scriptJs] + 对应 ocr 列，另一段（list/content）留空串、ocr 为 0；
+  ///   `verified=0` 标识尚未完成另一半。这样无论 agent 第一次调的是
+  ///   `chapter_list` 还是 `chapter_content`，都能直接落库。
   /// - 已存在的行：更新对应列 + ocr + last_used_at，verified 重置为 0。
   /// - url_pattern / sample_url 不写（save_script 不再产出该字段，DB 列保留
   ///   历史值不动；新记录时给空串占位）。
@@ -291,9 +297,6 @@ class SiteScriptRepository extends BaseRepository {
     try {
       final db = await database;
       final now = DateTime.now().millisecondsSinceEpoch;
-      final column = scriptType == 'chapter_list'
-          ? 'chapter_list_js'
-          : 'chapter_content_js';
 
       final existing = await db.query(
         'site_scripts',
@@ -304,40 +307,47 @@ class SiteScriptRepository extends BaseRepository {
       );
 
       if (existing.isEmpty) {
-        // 首次保存：INSERT 一条新记录，本次列写脚本，另一列填空串占位。
+        // 首次保存：INSERT 一条新记录，本次列写脚本 + ocr，另一列填空串占位。
         // 另一半由后续 save_script 调同样的方法补齐，无需前置工具。
-        final id = now.toString();
+        final insertId = now.toString();
         await db.insert('site_scripts', {
-          'id': id,
+          'id': insertId,
           'domain': domain,
           'url_pattern': '',
           'chapter_list_js': scriptType == 'chapter_list' ? scriptJs : '',
           'chapter_content_js': scriptType == 'chapter_content' ? scriptJs : '',
+          'chapter_list_ocr': scriptType == 'chapter_list' ? (ocr ? 1 : 0) : 0,
+          'chapter_content_ocr': scriptType == 'chapter_content' ? (ocr ? 1 : 0) : 0,
           'sample_url': '',
           'created_at': now,
           'last_used_at': now,
           'use_count': 0,
           'verified': 0,
-          'ocr': ocr ? 1 : 0,
         });
         LoggerService.instance.i(
-          'updateScriptPart (insert): domain=$domain type=$scriptType ocr=$ocr id=$id',
+          'updateScriptPart (insert): domain=$domain type=$scriptType ocr=$ocr id=$insertId',
           category: LogCategory.database,
           tags: ['site_script', 'update_part', 'insert'],
         );
-        return (success: true, id: id, reason: null);
+        return (success: true, id: insertId, reason: null);
       }
 
-      // 已存在：UPDATE 对应列 + ocr + last_used_at，verified 重置为 0。
+      // 已存在：UPDATE 对应列 + 对应 ocr 列 + last_used_at，verified 重置为 0。
       final id = existing.first['id'] as String;
+      final Map<String, Object?> updateValues = scriptType == 'chapter_list'
+          ? {
+              'chapter_list_js': scriptJs,
+              'chapter_list_ocr': ocr ? 1 : 0,
+            }
+          : {
+              'chapter_content_js': scriptJs,
+              'chapter_content_ocr': ocr ? 1 : 0,
+            };
+      updateValues['last_used_at'] = DateTime.now().millisecondsSinceEpoch;
+      updateValues['verified'] = 0;
       await db.update(
         'site_scripts',
-        {
-          column: scriptJs,
-          'ocr': ocr ? 1 : 0,
-          'last_used_at': now,
-          'verified': 0,
-        },
+        updateValues,
         where: 'id = ?',
         whereArgs: [id],
       );

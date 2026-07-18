@@ -702,9 +702,10 @@ class LlmProvider {
           tags: ['dsl', 'llm', 'chatForJson', 'parse_error'],
         );
         if (attempt == retryOnParseError) rethrow;
-      } catch (e) {
+      } catch (e, stackTrace) {
         LoggerService.instance.e(
           'chatForJson: 调用失败 (attempt $attempt): $e',
+          stackTrace: stackTrace.toString(),
           category: LogCategory.ai,
           tags: ['dsl', 'llm', 'chatForJson', 'error'],
         );

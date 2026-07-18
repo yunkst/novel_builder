@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../logger_service.dart';
 import 'agent_scenario.dart';
 import '../headless_webview_pool.dart';
 import 'scenarios/writing_scenario.dart';
@@ -40,9 +41,15 @@ class AgentScenarioFactory {
             // 注入清理钩子：场景结束时释放 pool 使用权
             scenario.setCleanupTask(() async => pool.release());
             return scenario;
-          } catch (e) {
+          } catch (e, stackTrace) {
             // 构造失败也要释放，避免阻塞后续 acquire
             pool.release();
+            LoggerService.instance.e(
+              'WebViewExtractScenario.headless 构造失败: $e',
+              stackTrace: stackTrace.toString(),
+              category: LogCategory.ai,
+              tags: ['agent', 'scenario', 'headless', 'init', 'failed'],
+            );
             rethrow;
           }
         }

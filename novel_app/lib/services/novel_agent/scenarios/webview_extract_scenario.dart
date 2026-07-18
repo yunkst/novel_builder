@@ -144,7 +144,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('2. navigate_to(url=<该章节URL>) 跳转到内容页，等待加载完成');
     buf.writeln('3. execute_js(script=...) 反复调试 chapter_content 脚本，确认返回 {title, content, font_family}');
     buf.writeln('4. 拿到 __meta.run_id 后立刻调用：');
-    buf.writeln('   save_script(domain, run_id, script_type="chapter_content", test_url=<该章节URL>, ocr=<同上>)');
+    buf.writeln('   save_script(domain, run_id, script_type="chapter_content", test_url=<该章节URL>, ocr=<独立判定：正文页 content 有 PUA 才传 true>)');
     buf.writeln('5. save_script 返回 success=false 仍按诊断修 JS 重试，直到成功');
     buf.writeln();
     buf.writeln('### 字体反爬检测（ocr 判定）');
@@ -155,7 +155,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln('OCR 模式下：');
     buf.writeln('- chapter_content_js 必须额外返回 font_family（用 getComputedStyle(正文元素).fontFamily）');
     buf.writeln('- content 保留原始 PUA 文本（不要在 JS 里尝试解码）');
-    buf.writeln('- 同一站点的两次 save_script（list + content）必须传相同的 ocr 值');
+    buf.writeln('- chapter_list 与 chapter_content 的 ocr 各自独立判定，按各自页面是否真有 PUA 传值，不必一致');
+    buf.writeln('  （典型如番茄小说：目录页 title/chapter.title 是正常汉字传 false，正文页 content 有 PUA 传 true）');
     buf.writeln();
     buf.writeln('不要在 JS 里做 PUA 到真字的替换（你拿不到字体映射），交给运行时 OCR。');
     buf.writeln();
@@ -285,7 +286,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     // onProgress 在本场景不使用：webview_extract 的工具均为 WebView/DB 操作，
     // 没有内部走 LLM 流式的工具。参数仅为对齐 AgentScenario 接口签名。
 
-    LoggerService.instance.d(
+    LoggerService.instance.i(
       'WebViewExtractScenario 执行工具: $name',
       category: LogCategory.ai,
       tags: ['agent', 'scenario', 'webview-extract', name],
@@ -533,7 +534,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
         }
       } catch (e) {
         // 轮询错误继续等待
-        LoggerService.instance.d(
+        LoggerService.instance.i(
           '轮询 getUrl 失败: $e',
           category: LogCategory.ai,
           tags: ['agent', 'webview-extract', 'poll_url'],
@@ -629,7 +630,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
 
     final modeLabel = runId != null ? 'run_id=$runId' : 'script(len=${script?.length ?? 0})';
-    LoggerService.instance.d(
+    LoggerService.instance.i(
       '执行 JS ($modeLabel): {{URL}} → $testUrl (resolvedLen=${resolvedScript.length})',
       category: LogCategory.ai,
       tags: ['agent', 'webview-extract', 'execute_js', runId != null ? 'run_id' : 'script'],
@@ -679,7 +680,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
         final preview = resultStr.length > 200
             ? '${resultStr.substring(0, 200)}...'
             : resultStr;
-        LoggerService.instance.d(
+        LoggerService.instance.i(
           'JS 结果非 JSON: $preview',
           category: LogCategory.ai,
           tags: ['agent', 'webview-extract', 'execute_js', 'non_json'],
@@ -1262,7 +1263,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   ///    → 后端加载 test_url → 跑脚本 → 结构校验 → （ocr=true 时）OCR 验证 →
   ///    `updateScriptPart(domain, script_type=chapter_list, ...)` 落库
   /// 3. 同理 chapter_content 走第二步
-  /// 4. 同一 domain 的两次 save_script ocr 值必须一致（ToolSchema 语义约束）
+  /// 4. list 与 content 的 ocr 各自独立判定，落库到 site_scripts 对应列
+  ///    （chapter_list_ocr / chapter_content_ocr），互不覆盖
   ///
   /// ## 测试入口
   ///
@@ -1332,15 +1334,37 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     final controller = _webviewController;
     try {
       // 加载 test_url（_webviewController 无 onLoadStop 注册，用 URL 轮询等待）
+      LoggerService.instance.i(
+        'save_script: loadUrl(test_url=$testUrl)',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'loadurl'],
+      );
+      final tLoad = DateTime.now();
       await controller.loadUrl(urlRequest: URLRequest(url: WebUri(testUrl)));
       await _waitControllerForUrl(controller, testUrl);
+      LoggerService.instance.i(
+        'save_script: loadUrl 完成 耗时=${DateTime.now().difference(tLoad).inMilliseconds}ms',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'loadurl-done'],
+      );
 
       // 替换 {{URL}} → test_url（提取脚本约定含 {{URL}}）
       final resolved = scriptJs.replaceAll('{{URL}}', testUrl);
       final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(resolved);
+      LoggerService.instance.i(
+        'save_script: 执行提取脚本 scriptLen=${resolved.length} bodyLen=${functionBody.length}',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'extract-begin'],
+      );
+      final tExtract = DateTime.now();
       final result = await controller
           .callAsyncJavaScript(functionBody: functionBody)
           .timeout(const Duration(seconds: 120));
+      LoggerService.instance.i(
+        'save_script: 提取脚本完成 耗时=${DateTime.now().difference(tExtract).inMilliseconds}ms error=${result?.error}',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'extract-done'],
+      );
       if (result == null || result.error != null) {
         return jsonEncode({
           'success': false,
@@ -1362,6 +1386,11 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           : null;
 
       // 委托静态校验 + 落库（可单测）
+      LoggerService.instance.i(
+        'save_script: 开始 validateAndPersistScript domain=$domain scriptType=$scriptType ocr=$ocr',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'validate-begin'],
+      );
       final outcome = await validateAndPersistScript(
         domain: domain,
         scriptType: scriptType,
@@ -1449,17 +1478,78 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   ) async {
     final js = buildOcrRenderJs(codepoint, fontFamily);
     final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
-    final result = await controller
-        .callAsyncJavaScript(functionBody: functionBody)
-        .timeout(const Duration(seconds: 30));
-    if (result == null || result.error != null) {
-      throw Exception(
-        'OCR 渲染失败 cp=0x${codepoint.toRadixString(16)}: ${result?.error}',
-      );
+    final t0 = DateTime.now();
+    // 关键诊断：渲染前先探测 WebView 当前 URL + 一个最简单的 JS 调用耗时
+    String? preProbeUrl;
+    int? preProbeMs;
+    try {
+      preProbeUrl = (await controller.getUrl())?.toString();
+      final tp = DateTime.now();
+      await controller
+          .callAsyncJavaScript(functionBody: 'return 1;')
+          .timeout(const Duration(seconds: 5));
+      preProbeMs = DateTime.now().difference(tp).inMilliseconds;
+    } catch (e) {
+      preProbeMs = -1;
+      preProbeUrl = 'probe_err: $e';
     }
-    final value = result.value;
-    if (value is String) return value; // base64 字符串，原样返回
-    throw Exception('OCR 渲染返回非字符串: $value');
+    LoggerService.instance.i(
+      'OCR 渲染开始 cp=0x${codepoint.toRadixString(16)} fontFamily=$fontFamily | '
+      '渲染前探测: url=$preProbeUrl, callAsyncJS(1)耗时=${preProbeMs}ms',
+      category: LogCategory.ai,
+      tags: ['agent', 'webview-extract', 'save_script', 'ocr-render', 'begin'],
+    );
+    try {
+      final result = await controller
+          .callAsyncJavaScript(functionBody: functionBody)
+          .timeout(const Duration(seconds: 30));
+      final ms = DateTime.now().difference(t0).inMilliseconds;
+      LoggerService.instance.i(
+        'OCR 渲染完成 cp=0x${codepoint.toRadixString(16)} 耗时=${ms}ms '
+        'error=${result?.error} valueType=${result?.value.runtimeType}',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'ocr-render', 'end'],
+      );
+      if (result == null || result.error != null) {
+        throw Exception(
+          'OCR 渲染失败 cp=0x${codepoint.toRadixString(16)}: ${result?.error}',
+        );
+      }
+      final value = result.value;
+      if (value is String) return value; // base64 字符串，原样返回
+      throw Exception('OCR 渲染返回非字符串: $value');
+    } on TimeoutException {
+      final ms = DateTime.now().difference(t0).inMilliseconds;
+      // 诊断：超时后立即测一个简单的 callAsyncJavaScript，判断 WebView 通道是否还活着
+      String? probeResult;
+      int? probeMs;
+      try {
+        final tp = DateTime.now();
+        final probe = await controller
+            .callAsyncJavaScript(functionBody: 'return 1;')
+            .timeout(const Duration(seconds: 5));
+        probeMs = DateTime.now().difference(tp).inMilliseconds;
+        probeResult = probe?.error ?? probe?.value?.toString();
+      } catch (e) {
+        probeMs = -1;
+        probeResult = 'PROBE_FAILED: $e';
+      }
+      // 超时后再查一次 URL，判断页面是否被导航走了
+      String? postUrl;
+      try {
+        postUrl = (await controller.getUrl())?.toString();
+      } catch (_) {
+        postUrl = 'getUrl_failed';
+      }
+      LoggerService.instance.e(
+        '【OCR超时诊断】cp=0x${codepoint.toRadixString(16)} 渲染耗时=${ms}ms fontFamily=$fontFamily | '
+        '渲染前探测: url=$preProbeUrl callAsyncJS(1)=${preProbeMs}ms | '
+        '超时后探测: url=$postUrl callAsyncJS(1)=${probeMs}ms → $probeResult',
+        category: LogCategory.ai,
+        tags: ['agent', 'webview-extract', 'save_script', 'ocr-render', 'timeout'],
+      );
+      rethrow;
+    }
   }
 
   /// 验证脚本结果并落库（可单测，绕开 WebView 平台依赖）。
@@ -2097,8 +2187,10 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
                 '传 true 时，save_script 会先扫描文本中是否存在 PUA 码点；若无则直接拒绝落库并返回 reason=ocr_no_pua。\n'
                 '判定方法：在脚本探测阶段留意 execute_js 返回值里是否含 PUA 或乱码方块；可用 JS 码点扫描 console.log([...text].some(c => c >= 0xE000 && c <= 0xF8FF))。\n'
                 '对 chapter_content：还原 content 里的 PUA；'
-                '对 chapter_list：还原 title 字段里的 PUA（小说名 + 章名）。'
-                '同一站点的两次 save_script（list + content）必须传相同的 ocr 值。',
+                '对 chapter_list：还原 title 字段里的 PUA（小说名 + 章名）。\n'
+                'chapter_list 与 chapter_content 的 ocr 各自独立判定，按各自页面是否真有 PUA 传值，'
+                '不必一致（典型如番茄小说：目录页 title/chapter.title 是正常汉字传 false，正文页 content 有 PUA 才传 true）。'
+                '落库后分别存为该 script_type 的 ocr 标记，互不覆盖。',
           },
         },
         'required': ['domain', 'run_id', 'script_type', 'test_url', 'ocr'],

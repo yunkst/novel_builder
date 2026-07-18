@@ -138,8 +138,8 @@ class HeadlessWebViewChapterListService {
       String? fontFamily = result.fontFamily;
       List<Chapter> chapters = result.chapters;
 
-      // 5. OCR 还原（needsOcr 时对 PUA 反爬文本走 PP-OCRv6）
-      if (script.needsOcr) {
+      // 5. OCR 还原（目录脚本标记 chapter_list_ocr 时对 PUA 反爬文本走 PP-OCRv6）
+      if (script.chapterListOcr) {
         try {
           final restored = await restoreChapterListIfNeeded(
             needsOcr: true,
