@@ -432,7 +432,10 @@ class ScenarioSession {
     // 运行中：把 user 消息投到 service 队列，由 loop 下一轮 drain。
     // 不调 _beginAgentRun（已有 loop 在跑）。queue 立即返回 + emit 反馈事件，
     // 用户在 UI 上看到"已补充"的 supplementaryCount +1。
-    if (isRunningNow) {
+    //
+    // 此处直接读 _isRunning（不缓存 _persistAgentMessage 之前的快照），
+    // 避免 AgentDoneEvent 在异步落库期间翻转标志导致的窄窗口竞态。
+    if (_isRunning) {
       _ref.read(novelAgentServiceProvider).injectUserMessage(
             scenarioId,
             agentContent,
