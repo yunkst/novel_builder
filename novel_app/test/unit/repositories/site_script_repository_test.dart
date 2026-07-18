@@ -447,7 +447,7 @@ void main() {
 
   group('updateScriptPart', () {
     test('分次写 list/content 不互相覆盖', () async {
-      // 先插一条种子记录（updateScriptPart 不自动 create）
+      // 先插一条种子记录（两列都有值，验证 update 不覆盖未触及列）
       await repo.upsertByDomain(
         domain: 'fanqienovel.com',
         chapterListJs: 'LIST_SEED',
@@ -481,16 +481,58 @@ void main() {
       expect(after2.ocr, isTrue);
     });
 
-    test('domain 不存在时返回错误，不自动 create', () async {
+    test('domain 不存在时自动 INSERT 新记录，本列写脚本另一列留空', () async {
       final result = await repo.updateScriptPart(
         domain: 'not.exist',
         scriptType: 'chapter_list',
-        scriptJs: 'X',
+        scriptJs: 'LIST_FIRST',
         ocr: false,
       );
-      expect(result.success, isFalse);
-      expect(result.reason, 'domain_not_found');
-      expect(await repo.getByDomain('not.exist'), isNull);
+      expect(result.success, isTrue);
+      expect(result.reason, isNull);
+      expect(result.id, isNotNull);
+
+      final row = await repo.getByDomain('not.exist');
+      expect(row, isNotNull);
+      expect(row!.chapterListJs, 'LIST_FIRST');
+      expect(row.chapterContentJs, '',
+          reason: '未保存的另一半应留空，由后续 save_script 补齐');
+      expect(row.verified, 0);
+      expect(row.ocr, isFalse);
+    });
+
+    test('domain 不存在时 chapter_content 第一次也能直接落库', () async {
+      final result = await repo.updateScriptPart(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        scriptJs: 'CONTENT_FIRST',
+        ocr: true,
+      );
+      expect(result.success, isTrue);
+      final row = await repo.getByDomain('a.com');
+      expect(row!.chapterListJs, '');
+      expect(row.chapterContentJs, 'CONTENT_FIRST');
+      expect(row.ocr, isTrue);
+      expect(row.verified, 0);
+    });
+
+    test('首次 INSERT 后第二次 update：覆盖本列、保持另一列、verified 仍为 0', () async {
+      await repo.updateScriptPart(
+        domain: 'a.com',
+        scriptType: 'chapter_list',
+        scriptJs: 'LIST_V1',
+        ocr: false,
+      );
+      await repo.updateScriptPart(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        scriptJs: 'CONTENT_V1',
+        ocr: false,
+      );
+      final row = await repo.getByDomain('a.com');
+      expect(row!.chapterListJs, 'LIST_V1');
+      expect(row.chapterContentJs, 'CONTENT_V1');
+      expect(row.verified, 0);
     });
   });
 

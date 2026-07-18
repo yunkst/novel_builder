@@ -1550,12 +1550,14 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       ocr: ocr,
     );
     if (!saveResult.success) {
+      // 防御性兜底：updateScriptPart 现在不再返回 domain_not_found（domain 不存在
+      // 会自动 INSERT）。理论上 success 恒为 true（异常已在外层 _saveScript catch），
+      // 此分支仅留作 repo 未来引入新失败 reason 时的透传。
       return {
         'success': false,
         'reason': saveResult.reason ?? 'unknown',
         'domain': domain,
-        'suggestion': '先调用 save_script(script_type=chapter_list) 建立该 domain 记录，'
-            '再调 chapter_content（updateScriptPart 不自动 create）',
+        'suggestion': '脚本落库失败，请检查 domain 是否正确后重试',
       };
     }
 

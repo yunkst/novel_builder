@@ -274,10 +274,14 @@ class SiteScriptRepository extends BaseRepository {
   ///
   /// - [scriptType] 为 `'chapter_list'` 或 `'chapter_content'`，决定更新哪列。
   /// - 同时更新 [ocr] 列（保证两次保存的 ocr 标记一致）。
-  /// - 若 domain 不存在 → 返回 (success=false, reason='domain_not_found')，不自动
-  ///   create（避免半截提取器：list 存了 content 没存）。
-  /// - 更新后 verified 重置为 0（脚本内容变了需重新验证）。
-  /// - url_pattern 不写（save_script 不再产出该字段，DB 列保留历史值不动）。
+  /// - **若 domain 不存在会自动 INSERT** 一条新记录：本次 [scriptType] 列写
+  ///   [scriptJs]，另一段（list/content）留空串；`verified=0` 标识尚未完成
+  ///   另一半，下游启用前会要求两段都验证通过（参见 HeadlessWebView 系列
+  ///   service 的 completed 判定）。这样无论 agent 第一次调的是 `chapter_list`
+  ///   还是 `chapter_content`，都能直接落库，不会卡在"必须先存另一种"。
+  /// - 已存在的行：更新对应列 + ocr + last_used_at，verified 重置为 0。
+  /// - url_pattern / sample_url 不写（save_script 不再产出该字段，DB 列保留
+  ///   历史值不动；新记录时给空串占位）。
   Future<({bool success, String? id, String? reason})> updateScriptPart({
     required String domain,
     required String scriptType,
@@ -286,6 +290,11 @@ class SiteScriptRepository extends BaseRepository {
   }) async {
     try {
       final db = await database;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final column = scriptType == 'chapter_list'
+          ? 'chapter_list_js'
+          : 'chapter_content_js';
+
       final existing = await db.query(
         'site_scripts',
         where: 'domain = ?',
@@ -293,28 +302,49 @@ class SiteScriptRepository extends BaseRepository {
         orderBy: 'last_used_at DESC',
         limit: 1,
       );
+
       if (existing.isEmpty) {
-        return (success: false, id: null, reason: 'domain_not_found');
+        // 首次保存：INSERT 一条新记录，本次列写脚本，另一列填空串占位。
+        // 另一半由后续 save_script 调同样的方法补齐，无需前置工具。
+        final id = now.toString();
+        await db.insert('site_scripts', {
+          'id': id,
+          'domain': domain,
+          'url_pattern': '',
+          'chapter_list_js': scriptType == 'chapter_list' ? scriptJs : '',
+          'chapter_content_js': scriptType == 'chapter_content' ? scriptJs : '',
+          'sample_url': '',
+          'created_at': now,
+          'last_used_at': now,
+          'use_count': 0,
+          'verified': 0,
+          'ocr': ocr ? 1 : 0,
+        });
+        LoggerService.instance.i(
+          'updateScriptPart (insert): domain=$domain type=$scriptType ocr=$ocr id=$id',
+          category: LogCategory.database,
+          tags: ['site_script', 'update_part', 'insert'],
+        );
+        return (success: true, id: id, reason: null);
       }
+
+      // 已存在：UPDATE 对应列 + ocr + last_used_at，verified 重置为 0。
       final id = existing.first['id'] as String;
-      final column = scriptType == 'chapter_list'
-          ? 'chapter_list_js'
-          : 'chapter_content_js';
       await db.update(
         'site_scripts',
         {
           column: scriptJs,
           'ocr': ocr ? 1 : 0,
-          'last_used_at': DateTime.now().millisecondsSinceEpoch,
+          'last_used_at': now,
           'verified': 0,
         },
         where: 'id = ?',
         whereArgs: [id],
       );
       LoggerService.instance.i(
-        'updateScriptPart: domain=$domain type=$scriptType ocr=$ocr id=$id',
+        'updateScriptPart (update): domain=$domain type=$scriptType ocr=$ocr id=$id',
         category: LogCategory.database,
-        tags: ['site_script', 'update_part'],
+        tags: ['site_script', 'update_part', 'update'],
       );
       return (success: true, id: id, reason: null);
     } catch (e, stackTrace) {

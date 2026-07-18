@@ -437,7 +437,7 @@ void main() {
       expect(captured[3], false);
     });
 
-    test('domain 不存在 → save 失败返回，不抛', () async {
+    test('repo 返回失败 reason → 透传失败，不抛', () async {
       final repo = MockSiteScriptRepository();
       when(repo.updateScriptPart(
         domain: anyNamed('domain'),
@@ -445,7 +445,7 @@ void main() {
         scriptJs: anyNamed('scriptJs'),
         ocr: anyNamed('ocr'),
       )).thenAnswer((_) async =>
-          (success: false, id: null, reason: 'domain_not_found'));
+          (success: false, id: null, reason: 'persistence_error'));
 
       final result = await WebViewExtractScenario.validateAndPersistScript(
         domain: 'not.exist',
@@ -456,9 +456,11 @@ void main() {
         repo: repo,
       );
       expect(result['success'], false);
-      expect(result['reason'], 'domain_not_found');
+      expect(result['reason'], 'persistence_error');
       expect(result['domain'], 'not.exist');
-      expect(result['suggestion'], contains('chapter_list'));
+      // domain_not_found 已不再返回（updateScriptPart 自动 INSERT），
+      // suggestion 文案不再暗示"必须先调 chapter_list"。
+      expect(result['suggestion'], isNot(contains('chapter_list')));
     });
   });
 }
