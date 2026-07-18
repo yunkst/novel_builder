@@ -117,6 +117,7 @@ class NovelAgentService {
       );
       token.cancel(reason: '用户主动取消 (scenario=$scenarioId)');
       _tokensByScenario.remove(scenarioId);
+      _runningByScenario.remove(scenarioId);
     }
   }
 

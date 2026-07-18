@@ -33,7 +33,6 @@ import '../../services/novel_agent/agent_scenario.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
 import '../../services/novel_agent/novel_agent_service.dart';
 import '../../services/dsl_engine/llm_provider.dart' show ChatMessage, ToolCall;
-import '../../utils/cancellation_token.dart';
 import 'chat_session_providers.dart';
 import 'current_novel_provider.dart';
 import 'database_providers.dart';
@@ -92,7 +91,7 @@ class ScenarioSession {
 
   // ===== 运行时状态 =====
   bool _isRunning = false;
-  CancellationToken? _currentToken;
+  bool _isTokenCancelled = false;
   final List<AgentChatSegment> _pendingSegments = [];
   StreamSubscription<AgentEvent>? _agentSub;
 
@@ -446,9 +445,9 @@ class ScenarioSession {
 
   /// 启动一轮 Agent 回合
   Future<void> _beginAgentRun(String userInput) async {
+    _isTokenCancelled = false;
     _lifecycle = SessionLifecycle.active;
     _isRunning = true;
-    _currentToken = CancellationToken();
     _pendingSegments.clear();
 
     _state = _state.copyWith(
@@ -709,7 +708,6 @@ class ScenarioSession {
   Future<void> _resumeAgentRun() async {
     _lifecycle = SessionLifecycle.active;
     _isRunning = true;
-    _currentToken = CancellationToken();
     _pendingSegments.clear();
 
     _state = _state.copyWith(
@@ -765,10 +763,9 @@ class ScenarioSession {
       await _ref.read(subagentRunnerProvider).cancelAllForSession(sessionIdStr);
     }
 
-    if (_currentToken != null) {
-      _currentToken!.cancel(reason: '用户主动取消 / 写操作中断');
-      _currentToken = null;
-    }
+    // 通过 service 层取消 agent_loop 正在检查的 token
+    _ref.read(novelAgentServiceProvider).cancelFor(scenarioId);
+    _isTokenCancelled = true;
     _agentSub?.cancel();
     _agentSub = null;
 
@@ -923,7 +920,6 @@ class ScenarioSession {
   void dispose() {
     _agentSub?.cancel();
     _agentSub = null;
-    _currentToken = null;
     _lifecycle = SessionLifecycle.disposed;
   }
 
@@ -1035,7 +1031,12 @@ class ScenarioSession {
 
       case AgentDoneEvent _:
         _failedRoundStartIndex = null;
-        _finalizeAgentResponse();
+        if (_isTokenCancelled && _pendingSegments.isNotEmpty) {
+          _finalizeAgentResponse(partial: true);
+        } else {
+          _finalizeAgentResponse();
+        }
+        _isTokenCancelled = false;
 
       case AgentErrorEvent e:
         _finalizeAgentResponse(error: e.error);
@@ -1137,7 +1138,6 @@ class ScenarioSession {
     );
     _pendingSegments.clear();
     _isRunning = false;
-    _currentToken = null;
     _agentSub?.cancel();
     _agentSub = null;
     _lifecycle = SessionLifecycle.idle;
