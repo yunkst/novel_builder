@@ -16,10 +16,10 @@ class WebViewAddressBar extends ConsumerStatefulWidget {
   const WebViewAddressBar({super.key, this.onFocusChanged});
 
   @override
-  ConsumerState<WebViewAddressBar> createState() => _WebViewAddressBarState();
+  ConsumerState<WebViewAddressBar> createState() => WebViewAddressBarState();
 }
 
-class _WebViewAddressBarState extends ConsumerState<WebViewAddressBar> {
+class WebViewAddressBarState extends ConsumerState<WebViewAddressBar> {
   late final TextEditingController _textController;
   late final FocusNode _focusNode;
 
@@ -34,6 +34,14 @@ class _WebViewAddressBarState extends ConsumerState<WebViewAddressBar> {
 
   void _handleFocusChange() {
     widget.onFocusChanged?.call(_focusNode.hasFocus);
+  }
+
+  /// 取消地址栏焦点并收起键盘
+  ///
+  /// 供外部（如父级 WebViewBrowserScreen）在用户点击网页内容时调用，
+  /// 让地址栏退出编辑状态。
+  void unfocus() {
+    _focusNode.unfocus();
   }
 
   @override

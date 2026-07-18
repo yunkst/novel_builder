@@ -6,6 +6,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../services/browser_settings_service.dart';
+import '../services/logger_service.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
 import '../widgets/site_script_panel.dart';
@@ -35,6 +36,25 @@ class WebViewBrowserScreen extends ConsumerStatefulWidget {
 
 class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
   bool _addressBarFocused = false;
+  final _addressBarKey = GlobalKey<WebViewAddressBarState>();
+
+  /// 在网页 document 上安装 touchstart/mousedown 监听器，
+  /// 用户点击网页任何内容时通过 JS handler 通知 Flutter 取消地址栏焦点。
+  static const String _installWebViewTapHandlerJs = '''
+(function() {
+  if (window.__webViewTapInstalled) return;
+  window.__webViewTapInstalled = true;
+
+  function notifyWebViewTapped() {
+    if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+      window.flutter_inappwebview.callHandler('onWebViewTouched');
+    }
+  }
+
+  document.addEventListener('touchstart', notifyWebViewTapped, { passive: true });
+  document.addEventListener('mousedown', notifyWebViewTapped, { passive: true });
+})();
+''';
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +110,7 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
           title: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: WebViewAddressBar(
+              key: _addressBarKey,
               onFocusChanged: (focused) {
                 setState(() => _addressBarFocused = focused);
               },
@@ -182,35 +203,75 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     initialUrlRequest:
                         URLRequest(url: WebUri('https://so.com')),
                     initialSettings: desktopModeSettings(desktopMode),
-                    // 桌面模式：AT_DOCUMENT_END 注入 viewport 覆盖脚本，时机早于
-                    // onLoadStop，能赶在响应式断点首次判断前拨正为桌面宽。
-                    // 脚本内自带 UA 自适配，手机 UA 直接 return，不破坏手机布局。
+                    // 桌面模式：viewport 覆盖脚本经 initialUserScripts 在
+                    // AT_DOCUMENT_START 注入，对每次导航（含 reload）都会重新执行
+                    // （flutter_inappwebview 文档：initial page load and any
+                    // subsequent navigations），早于站点 JS，赶在响应式断点首次
+                    // 判断前拨正为桌面宽。脚本内自带 UA 自适配，手机 UA 直接 return。
                     initialUserScripts: UnmodifiableListView<UserScript>([
                       UserScript(
                         source: BrowserSettingsService
                             .desktopViewportOverrideJs,
+                        // AT_DOCUMENT_START：navigator 覆盖必须早于站点 JS 执行，
+                        // 否则站点读取时机已过，覆盖无效。viewport meta 改写内部
+                        // 监听了 DOMContentLoaded 兜底。
                         injectionTime:
-                            UserScriptInjectionTime.AT_DOCUMENT_END,
+                            UserScriptInjectionTime.AT_DOCUMENT_START,
+                      ),
+                      // 监听网页区域 touchstart/mousedown，回调 Flutter 取消地址栏焦点
+                      UserScript(
+                        source: _installWebViewTapHandlerJs,
+                        injectionTime:
+                            UserScriptInjectionTime.AT_DOCUMENT_START,
                       ),
                     ]),
                     onWebViewCreated: (controller) {
                       notifier.setController(controller);
+                      // 注册 JS handler：用户点击网页时由网页端调起此 handler，
+                      // Flutter 收到后取消地址栏焦点。
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onWebViewTouched',
+                        callback: (arguments) {
+                          _unfocusAddressBar();
+                          return null;
+                        },
+                      );
                     },
                     onLoadStart: (controller, url) {
                       notifier.handleLoadStart(url);
                     },
                     onLoadStop: (controller, url) {
                       notifier.handleLoadStop(url);
-                      // 桌面模式兜底：initialUserScripts 已在 AT_DOCUMENT_END 注入，
-                      // 此处再执行一次防 SPA 延迟渲染（initialUserScripts 未生效时）。
-                      // 仅改 viewport，不影响 UA / 缩放配置。
+                      // 桌面模式诊断：读站点实际看到的 UA / platform / viewport / width，
+                      // 写 flutter log。验证 initialUserScripts（AT_DOCUMENT_START）是否
+                      // 让站点在首次布局前就按桌面宽渲染：width≈1200 即生效；若不是，说明
+                      // document-start 注入在该 Android 版本未生效（另查 androidx.webkit 支持）。
+                      // 注：onLoadStop 已晚于首次布局，故不再在此重跑 viewport 覆盖兜底——
+                      // initialUserScripts 对每次导航都会重新注入（flutter_inappwebview 文档）。
                       final isDesktop =
                           ref.read(browserDesktopModeProvider).value ?? false;
                       if (isDesktop) {
-                        controller.evaluateJavascript(
-                          source: BrowserSettingsService
-                              .desktopViewportOverrideJs,
-                        );
+                        controller.evaluateJavascript(source: r'''
+(function(){
+  var m = document.querySelector('meta[name="viewport"]');
+  window.__desktopDiag = JSON.stringify({
+    ua: navigator.userAgent,
+    platform: navigator.platform,
+    maxTouch: navigator.maxTouchPoints,
+    viewport: m ? m.content : '(none)',
+    width: window.innerWidth,
+    url: location.href
+  });
+  return window.__desktopDiag;
+})();
+''').then((value) {
+                          // evaluateJavascript 返回值已自动 jsonDecode（Android WebView2 行为）
+                          LoggerService.instance.d(
+                            'WebView 桌面化诊断: $value',
+                            category: LogCategory.network,
+                            tags: ['webview', 'desktop-mode', 'diag'],
+                          );
+                        });
                       }
                     },
                     onProgressChanged: (controller, progress) {
@@ -234,6 +295,11 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
         ),
       ),
     );
+  }
+
+  /// 取消地址栏焦点（用户在网页内点击时由 JS handler 触发）
+  void _unfocusAddressBar() {
+    _addressBarKey.currentState?.unfocus();
   }
 
   /// 弹出收藏夹面板

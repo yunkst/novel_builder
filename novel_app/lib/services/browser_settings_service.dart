@@ -21,13 +21,16 @@ class BrowserSettingsService {
   static const bool _defaultDesktopMode = false;
 
   // ========== 桌面模式 User-Agent ==========
-  /// 桌面模式使用的 User-Agent（Windows Chrome 120）。
-  /// 版本号不必追最新，服务器只看 Windows + Chrome 关键字。
+  /// 桌面模式使用的 User-Agent（Edge 131，模拟桌面 Edge：番茄小说对 Windows
+  /// 字样敏感，但对 Edge 也认；若失败可换 Chrome 字串）。
+  /// 版本号不必追最新，服务器主要看 Windows + 浏览器关键字。
   static const String desktopUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 '
+      'Edg/131.0.0.0';
 
-  /// 桌面模式注入 JS：覆盖 viewport meta 为桌面宽度，让响应式站点切 PC 布局。
+  /// 桌面模式注入 JS：覆盖 viewport meta 为桌面宽度 + 遮蔽 navigator 字段，
+  /// 让响应式站点切 PC 布局。
   ///
   /// 设计要点：
   /// 1. **UA 自适配**：仅当 UA 含 `Windows NT`（桌面 UA）时执行；手机 UA（空串=
@@ -35,11 +38,14 @@ class BrowserSettingsService {
   ///    UA + reload，reload 后本脚本重新执行并按新 UA 自适配，无需重建 WebView。
   /// 2. **复用 meta**：querySelector 找到现有 viewport meta 改其 content，找不到
   ///    才创建。不删除重建，避免站点 JS 缓存的 meta 引用失效。
-  /// 3. **时机**：通过 initialUserScripts 在 `AT_DOCUMENT_END` 注入（DOM 解析完成、
-  ///    资源未加载完），早于 onLoadStop，能赶在首次渲染前拨正响应式断点。
-  ///    onLoadStop 再兜底执行一次，防延迟渲染的 SPA。
+  /// 3. **时机**：通过 initialUserScripts 在 `AT_DOCUMENT_START` 注入（DOMContentLoaded
+  ///    之前），早于 onLoadStop + 站点 JS，能赶在响应式断点首次判断前拨正为桌面宽。
   /// 4. **允许缩放**：PC 页在手机屏字小，`user-scalable=yes` + `maximum-scale`
   ///    让用户双指放大。
+  /// 5. **Navigator 遮蔽**：番茄小说等站点前端 JS 会读 `navigator.userAgent` /
+  ///    `platform` / `maxTouchPoints` 二次判断设备类型。仅改 UA header 不够，
+  ///    必须用 Object.defineProperty 覆盖这三个 getter，让 JS 看到与 UA 一致
+  ///    的桌面值（Win64 / Win32 / 0）。
   ///
   /// 背景：Android WebView 的 layout viewport 宽度由页面 viewport meta 决定。
   /// 移动端站点多用 `width=device-width`，导致 layout viewport 等于 WebView
@@ -49,6 +55,22 @@ class BrowserSettingsService {
   static const String desktopViewportOverrideJs = r'''
 (function() {
   if (!/Windows NT/.test(navigator.userAgent)) return;
+
+  // 遮蔽 navigator：让站点 JS 读到的 UA / platform / maxTouchPoints 与桌面 UA 一致。
+  // 否则番茄小说等站点即便收到桌面 UA header，JS 读 navigator 仍命中手机分支。
+  var fakeUA = navigator.userAgent;
+  try {
+    Object.defineProperty(navigator, 'userAgent', {
+      get: function() { return fakeUA; }
+    });
+    Object.defineProperty(navigator, 'platform', {
+      get: function() { return 'Win32'; }
+    });
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      get: function() { return 0; }
+    });
+  } catch (e) {}
+
   function setDesktopViewport() {
     var meta = document.querySelector('meta[name="viewport"]');
     if (!meta) {
