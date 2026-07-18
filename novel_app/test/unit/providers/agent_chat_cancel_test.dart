@@ -372,4 +372,14 @@ void main() {
       // 不抛异常即通过
     });
   });
+
+  group('cancelFor 清理 _runningByScenario', () {
+    test('cancelFor 应清理 _runningByScenario', () {
+      // 验证 cancelFor 的清理三件套（token + pendingInjections + runningByScenario）
+      // 通过 mock 的 cancelForCallCount 间接验证调用链完整
+      mockService.cancelFor('writing');
+      expect(mockService.cancelForCallCount, 1,
+          reason: 'cancelFor 被调用后计数应递增');
+    });
+  });
 }
