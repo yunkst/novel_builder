@@ -235,7 +235,6 @@ class DatabaseMigrations {
             tableInfo.any((column) => column['name'] == 'task_id');
 
         if (!hasTaskId) {
-          await db.query('scene_illustrations');
           await db.execute('DROP TABLE IF EXISTS scene_illustrations');
           await db.execute('''
           CREATE TABLE scene_illustrations (
@@ -674,7 +673,7 @@ class DatabaseMigrations {
       //   toolCalls / toolCallId / agentMsgIndex），hydrate 时 1:1 还原，不再从 UI 视角重建。
       // 解决：跨会话续聊工具结果丢失、压缩后无法重建、_buildHistoryAndOwners 对齐漂移。
       case 32:
-        await db.execute('PRAGMA foreign_keys = ON');
+        // foreign_keys 由 v31 的 PRAGMA（同连接内已开启）或 _onConfigure 负责开启。
         // 旧表结构不兼容（缺 toolCallsJson/toolCallId/agentMsgIndex，多 segmentsJson/orderIndex），
         // 直接 DROP + CREATE 重建。旧会话消息全部清空，chat_sessions 行保留。
         await db.execute('DROP TABLE IF EXISTS chat_messages');
@@ -699,6 +698,8 @@ class DatabaseMigrations {
             db, 'idx_chat_messages_session_order', 'chat_messages', 'sessionId, agentMsgIndex ASC');
         _log('迁移 v31 → v32: 重建 chat_messages 表（存完整 agent message，旧消息清空）');
         break;
+
+      // ========== 版本 33：无 schema 变更，有意跳过 ==========
 
       // ========== 版本 34：统一媒体代理器 ==========
       // 新建 media_items 表（统一管理 AI 生成图/视频 + 用户上传的本地映射）：
@@ -814,7 +815,7 @@ class DatabaseMigrations {
 
   // ========== 辅助方法 ==========
 
-  /// 修复数据库：重新执行 v1→v21 所有迁移
+  /// 修复数据库：重新执行 v1→currentVersion 所有迁移
   ///
   /// 非破坏性操作，仅补全缺失的表/列/索引，不会删除现有数据。
   /// 适用于数据库损坏、缺少表或列的修复场景。
@@ -874,6 +875,9 @@ class DatabaseMigrations {
   /// 安全重命名字段（如果旧字段存在且新字段不存在）
   ///
   /// SQLite 不支持直接重命名列，使用重建表的方式实现。
+  /// 重建时通过 `PRAGMA table_info` 还原每列的类型 / NOT NULL / 默认值 /
+  /// 主键约束，避免旧实现只取列名导致约束丢失（PRIMARY KEY、NOT NULL、
+  /// UNIQUE、DEFAULT 全部丢失，重建后的表是"裸列"）。
   static Future<void> _renameColumnIfExists(
     Database db,
     String table,
@@ -887,36 +891,41 @@ class DatabaseMigrations {
       final hasOldColumn = tableInfo.any((c) => c['name'] == oldColumn);
       final hasNewColumn = tableInfo.any((c) => c['name'] == newColumn);
 
-      if (hasOldColumn && !hasNewColumn) {
-        // 获取当前表的完整列名列表
-        final columns = tableInfo.map((c) => c['name'] as String).toList();
+      if (!hasOldColumn || hasNewColumn) return;
 
-        // 构建新列名列表（替换旧列为新列）
-        final newColumns = columns.map((col) {
-          if (col == oldColumn) return '$newColumn $newColumnType';
-          return col;
-        }).toList();
-
-        // 重建表
-        final columnList = columns.join(', ');
-        final newColumnList = newColumns.join(', ');
-
-        await db.execute('''
-          CREATE TABLE ${table}_new (
-            $newColumnList
-          )
-        ''');
-
-        await db.execute('''
-          INSERT INTO ${table}_new ($columnList)
-          SELECT * FROM $table
-        ''');
-
-        await db.execute('DROP TABLE $table');
-        await db.execute('ALTER TABLE ${table}_new RENAME TO $table');
-
-        _log('数据库迁移: 重命名 $table.$oldColumn → $newColumn');
+      // 还原每列的完整定义（列名 + 类型 + 约束），其中目标列替换为新名/新类型。
+      final newColumnDefs = <String>[];
+      for (final col in tableInfo) {
+        final name = col['name'] as String;
+        if (name == oldColumn) {
+          newColumnDefs.add(_buildColumnDef(newColumn, newColumnType));
+        } else {
+          newColumnDefs.add(_buildColumnDef(
+            name,
+            _reconstructColumnDef(col),
+          ));
+        }
       }
+
+      // 旧列名顺序用于 INSERT ... SELECT * 的列对齐
+      final oldColumnList =
+          tableInfo.map((c) => c['name'] as String).join(', ');
+
+      await db.execute('''
+        CREATE TABLE ${table}_new (
+          ${newColumnDefs.join(',\n          ')}
+        )
+      ''');
+
+      await db.execute('''
+        INSERT INTO ${table}_new ($oldColumnList)
+        SELECT $oldColumnList FROM $table
+      ''');
+
+      await db.execute('DROP TABLE $table');
+      await db.execute('ALTER TABLE ${table}_new RENAME TO $table');
+
+      _log('数据库迁移: 重命名 $table.$oldColumn → $newColumn');
     } catch (e, stackTrace) {
       LoggerService.instance.w(
         '重命名字段失败: $table.$oldColumn → $newColumn - $e',
@@ -926,6 +935,34 @@ class DatabaseMigrations {
       );
       rethrow;
     }
+  }
+
+  /// 从 `PRAGMA table_info` 单行还原列定义字符串（类型 + 约束）。
+  ///
+  /// `PRAGMA table_info` 每行含 cid/name/type/notnull/dflt_value/pk。
+  /// 注意：UNIQUE / 外键等表级约束不在 table_info 中，重建表会丢失它们，
+  /// 因此本方法仅还原 PRIMARY KEY / NOT NULL / DEFAULT —— 对内部迁移
+  /// 够用；涉及复杂约束的表不应走列重命名路径。
+  static String _reconstructColumnDef(Map<String, Object?> col) {
+    final type = (col['type'] as String?)?.trim();
+    final typePart = (type == null || type.isEmpty) ? '' : type;
+    final notNull = (col['notnull'] as int?) == 1;
+    final dflt = col['dflt_value'] as String?;
+    final pk = (col['pk'] as int?) ?? 0;
+
+    final parts = <String>[typePart];
+    if (pk > 0) parts.add('PRIMARY KEY AUTOINCREMENT');
+    if (notNull) parts.add('NOT NULL');
+    if (dflt != null) parts.add('DEFAULT $dflt');
+
+    // parts[0] 可能是空串（无类型列），过滤后 join
+    final def = parts.where((s) => s.isNotEmpty).join(' ');
+    return def.isEmpty ? '' : def;
+  }
+
+  /// 拼接 "列名 列定义"，空定义时仅返回列名。
+  static String _buildColumnDef(String name, String def) {
+    return def.isEmpty ? name : '$name $def';
   }
 
   /// 记录日志（统一使用 LoggerService）

@@ -99,13 +99,10 @@ class DatabaseConnection implements IDatabaseConnection {
       final db = await openDatabase(
         path,
         version: DatabaseMigrations.currentVersion,
+        onConfigure: _onConfigure,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
-      // SQLite 默认关闭 foreign_keys，PRAGMA 是 per-connection 的；
-      // sqflite 没有 onConfigure hook，统一在连接初始化末尾开一次，
-      // 让 chat_messages → chat_sessions 的 ON DELETE CASCADE 生效。
-      await db.execute('PRAGMA foreign_keys = ON');
       return db;
     } catch (e, stackTrace) {
       LoggerService.instance.e(
@@ -116,6 +113,16 @@ class DatabaseConnection implements IDatabaseConnection {
       );
       rethrow;
     }
+  }
+
+  /// 数据库配置回调
+  ///
+  /// sqflite 在打开连接（且在 onCreate/onUpgrade 之前）调用一次，
+  /// 是设置 per-connection PRAGMA 的标准位置。SQLite 默认关闭
+  /// foreign_keys，这里统一开启，让 chat_messages → chat_sessions 等
+  /// 表的 ON DELETE CASCADE 生效。与测试侧 [setupInMemoryDb] 保持一致。
+  Future<void> _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   /// 数据库创建回调
