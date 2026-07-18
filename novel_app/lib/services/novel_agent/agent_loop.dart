@@ -178,6 +178,7 @@ class AgentLoop {
             keptMessageCount: result.keptMessageCount,
             droppedMessageCount: result.droppedMessageCount,
             droppedAgentFromIndex: result.droppedAgentFromIndex,
+            rewrittenContent: result.rewrittenContent,
           ));
         }
 
