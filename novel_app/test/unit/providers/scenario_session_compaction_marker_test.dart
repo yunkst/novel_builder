@@ -127,7 +127,7 @@ void main() {
     String? note,
   }) {
     final compactionNote = note ??
-        '[上下文压缩|removedChars=420000|originalChars=580000|'
+        '[上下文压缩|droppedCount=$droppedAgentFromIndex|keptCount=15|removedChars=420000|originalChars=580000|'
             'compactedChars=160000|rewrittenCount=0|timestamp=1706000101]\n'
             '后续。';
     return CompactionEvent(
