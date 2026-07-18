@@ -929,7 +929,6 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 isSupplementary: chatState.isLoading,
                 onAttach: _onAttachTap,
                 onSend: () => _sendMessage(session),
-                onStop: () => session?.cancel(),
               ),
             ],
           ),
@@ -1019,7 +1018,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
   ///
   /// A 方案下运行中不再让按钮变 stop —— 用户运行中点 send = 补充消息，
   /// 由 ScenarioSession 落库 + service.injectUserMessage 排队让下一轮 LLM 看到。
-  /// 主动取消按钮改由 [_buildSupplementBar] 顶部条提供（仅 isLoading 时显示）。
+  /// 主动取消按钮改由 [_buildStopBar] 顶部条提供（仅 isLoading 时显示）。
   _TrailingMode _trailingMode(AgentChatState chatState) {
     if (_hasText || _attachedMediaId != null) return _TrailingMode.send;
     return _TrailingMode.attach;
@@ -1106,7 +1105,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
 /// 输入栏右侧按钮三态模式。
 ///
 /// 优先级：stop（运行中） > send（有文本或已挂图） > attach（完全空）。
-enum _TrailingMode { attach, send, stop }
+enum _TrailingMode { attach, send }
 
 /// 输入栏右侧三态按钮（attach / send / stop）。
 ///
@@ -1121,7 +1120,6 @@ class _AgentInputTrailingButton extends StatelessWidget {
   final bool isSupplementary;
   final VoidCallback? onAttach;
   final VoidCallback? onSend;
-  final VoidCallback? onStop;
 
   static final _scaleTween = Tween<double>(begin: 0.85, end: 1.0);
 
@@ -1131,7 +1129,6 @@ class _AgentInputTrailingButton extends StatelessWidget {
     this.isSupplementary = false,
     this.onAttach,
     this.onSend,
-    this.onStop,
   });
 
   @override
@@ -1210,15 +1207,7 @@ class _AgentInputTrailingButton extends StatelessWidget {
           onPressed: onSend,
           tooltip: isSupplementary ? '补充到下一轮' : '发送',
         );
-      case _TrailingMode.stop:
-        return _TrailingButtonConfig(
-          icon: Icons.stop_rounded,
-          bg: appColors.error,
-          fg: appColors.agentOnBrand,
-          onPressed: onStop,
-          tooltip: '停止',
-        );
-    }
+      }
   }
 }
 
