@@ -2,6 +2,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-07-17**: **LLM HTTP 错误统一重试**。`retry_helper` 删除 `NonRetryableHttpException` 类，`isRetryableStatus` 改为 `>= 400`（所有 4xx/5xx 一律重试）；`llm_provider` 的 `_postJsonOnce`/`_postJsonStreamHandshake` 移除 4xx 分支，统一抛 `RetryableHttpException`；`chatForJson` 应用层 `retryOnParseError` 默认值 1→0（彻底交给传输层 8 次/60s 重试）。瞬态 4xx（代理网关偶发 400/401 等）不再直接打断会话。同步反转 `retry_helper_test`/`agent_loop_retry_test` 断言并新增 400/401 round-level 重试用例。
 - **2026-07-15**: OCR 提取器产品化。site_scripts 加 ocr 列（v37）；OcrPredictor 改 recognizeImage(base64Png)；新增 OcrRestoreService（restorePuaInText/verifyFontFamily/readableRatio）+ 系统 OCR-JS 模板；HeadlessWebViewContentService/ChapterListService 加 OCR 还原钩子；save_script 重写为分次保存+落库前验证（domain/run_id/script_type/test_url/ocr）；prompt 加提取器创建流程。番茄字体反爬正文可读。
 - **2026-07-17**: **移除 webview 模型下载链路**。Webview 浏览器不再支持下载模型到后端 `/app/models`：删除 `model_download_manager_screen` / `model_save_location_dialog` / `model_download_service` / `model_download_repository` / `model_download_task` 模型 / `model_download_providers` 共 6 文件；移除 `webview_providers.handleDownloadStart` + `InAppWebView.onDownloadStartRequest` 入口；删除 `ApiServiceWrapper` 中 `listModelDirs` / `initModelUpload` / `uploadModelChunk` / `getModelUploadStatus` / `completeModelUpload` / `cancelModelUpload` 6 个方法；DB v37→v38 migration drop `model_download_tasks` 表；pubspec 移除 `background_downloader` 依赖、Manifest 同步删除 `Background Downloader Service`；原本器自带的模型文件可通过 `docker compose cp` / `scp` 直传，不再需要 APP 内导。
 - **2025-11-13**: AI上下文初始化，重新设计架构文档，添加模块化结构
