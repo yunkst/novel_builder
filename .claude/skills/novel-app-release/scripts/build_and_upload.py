@@ -72,8 +72,14 @@ def get_flutter_version(project_root: Path) -> tuple[str, int]:
 
     content = pubspec_path.read_text(encoding="utf-8")
 
-    # 解析版本行，格式: version: 1.0.1+2
-    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)', content, re.MULTILINE)
+    # 解析版本行，格式: version: X.Y.Z+code 或 version: X.Y.Z-preview.N+code
+    # version_name 含可选的 SemVer prerelease 后缀（-preview.1 / -alpha / -beta 等），
+    # 用于区分发布通道（tag 含 '-' → CI 标记为 prerelease）。
+    match = re.search(
+        r'^version:\s*(\d+\.\d+\.\d+(?:-\S+)?)\+(\d+)',
+        content,
+        re.MULTILINE,
+    )
     if not match:
         raise ValueError("无法从 pubspec.yaml 解析版本号")
 
