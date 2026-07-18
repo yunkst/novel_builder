@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novel_app/core/providers/agent_chat_state.dart';
+import 'package:novel_app/core/providers/agent_events_provider.dart';
 import 'package:novel_app/core/providers/agent_scenario_provider.dart';
 import 'package:novel_app/core/providers/chat_session_providers.dart';
 import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
@@ -21,6 +22,7 @@ import 'package:novel_app/services/llm_config_service.dart';
 import 'package:novel_app/widgets/agent_chat/chat_history_sheet.dart';
 import 'package:novel_app/widgets/agent_chat/agent_message_bubble.dart';
 import 'package:novel_app/widgets/agent_chat/agent_novel_picker_dialog.dart';
+import 'package:novel_app/widgets/agent_chat/compaction_marker_card.dart';
 import 'package:novel_app/widgets/agent_chat/agent_scenario_config_dialog.dart';
 import 'package:novel_app/widgets/agent_chat/retry_banner.dart';
 import 'package:novel_app/widgets/media/media_view.dart';
@@ -127,6 +129,23 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
       if (!_isAtBottom) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
+      });
+    });
+
+    // 监听 agent 全局事件流（Task 8）：CompactionEvent 弹一次性 SnackBar 提示。
+    // ref.listen 只在事件从无到有 / 数据变化时触发；用 maybeOf 防御 dialog 关闭
+    // 后 ScaffoldMessenger 不可达的场景。
+    ref.listen<AsyncValue<AgentEvent>>(agentEventsProvider, (prev, next) {
+      next.whenData((event) {
+        if (event is! CompactionEvent) return;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text('🗂 ${event.description}'),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       });
     });
 
@@ -327,12 +346,27 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             }
 
             final message = chatState.messages[index];
-            // 仅 user 消息提供回滚入口；运行中点击由 ScenarioSession.rollbackToMessage 内部 cancel 兜底
-            final canRollback = message.role == AgentChatRole.user;
-            return AgentMessageBubble(
-              message: message,
-              onRollback: canRollback ? () => _handleRollback(index) : null,
-            );
+            // role 分流：marker 走 CompactionMarkerCard，
+            // user/assistant 走 AgentMessageBubble（user 才显示回滚入口），
+            // system 走 SizedBox.shrink（保留原有 system 抑制行为）。
+            switch (message.role) {
+              case AgentChatRole.marker:
+                final seg = message.segments.single;
+                if (seg is! CompactionMarkerSegment) {
+                  return const SizedBox.shrink();
+                }
+                return CompactionMarkerCard(segment: seg);
+              case AgentChatRole.user:
+              case AgentChatRole.assistant:
+                final canRollback = message.role == AgentChatRole.user;
+                return AgentMessageBubble(
+                  message: message,
+                  showTimestamp: true,
+                  onRollback: canRollback ? () => _handleRollback(index) : null,
+                );
+              case AgentChatRole.system:
+                return const SizedBox.shrink();
+            }
           },
         ),
         // 回到底部浮动按钮:仅当用户向上浏览离开底部时淡入
