@@ -34,7 +34,8 @@ void main() {
       expect(state.attempt, 3);
       expect(state.maxAttempts, 8);
       expect(state.delayMs, 2000);
-      expect(state.errorCategory, '限流');
+      expect(state.errorCategory, RetryErrorCategory.rateLimited);
+      expect(state.httpStatusCode, 429);
       expect(notified, hasLength(1));
       expect(notified.last, state);
     });
@@ -51,7 +52,7 @@ void main() {
       expect(state.level, RetryLevel.round);
       expect(state.attempt, 1);
       expect(state.maxAttempts, 2);
-      expect(state.errorCategory, '网络断开');
+      expect(state.errorCategory, RetryErrorCategory.networkDisconnected);
     });
 
     test('clear → notifier.value == null', () {
@@ -87,55 +88,65 @@ void main() {
   });
 
   group('categorizeRetryError', () {
-    test('429 → 限流', () {
+    test('429 → rateLimited', () {
       expect(
         categorizeRetryError(const RetryableHttpException(429, '', '')),
-        '限流',
+        RetryErrorCategory.rateLimited,
       );
     });
-    test('408 → 请求超时', () {
+    test('408 → requestTimeout', () {
       expect(
         categorizeRetryError(const RetryableHttpException(408, '', '')),
-        '请求超时',
+        RetryErrorCategory.requestTimeout,
       );
     });
-    test('4xx 其他 → 请求错误 {code}', () {
+    test('4xx 其他 → requestError', () {
       expect(
         categorizeRetryError(const RetryableHttpException(400, '', '')),
-        '请求错误 400',
+        RetryErrorCategory.requestError,
       );
       expect(
         categorizeRetryError(const RetryableHttpException(401, '', '')),
-        '请求错误 401',
+        RetryErrorCategory.requestError,
       );
     });
-    test('5xx → 服务端 {code}', () {
+    test('5xx → serverError', () {
       expect(
         categorizeRetryError(const RetryableHttpException(500, '', '')),
-        '服务端 500',
+        RetryErrorCategory.serverError,
       );
       expect(
         categorizeRetryError(const RetryableHttpException(503, '', '')),
-        '服务端 503',
+        RetryErrorCategory.serverError,
       );
     });
-    test('SocketException/HandshakeException → 网络断开', () {
+    test('SocketException/HandshakeException → networkDisconnected', () {
       expect(
         categorizeRetryError(const SocketException('x')),
-        '网络断开',
+        RetryErrorCategory.networkDisconnected,
       );
-      expect(categorizeRetryError(const HandshakeException()), '网络断开');
+      expect(
+        categorizeRetryError(const HandshakeException()),
+        RetryErrorCategory.networkDisconnected,
+      );
     });
-    test('TimeoutException → 响应超时', () {
+    test('TimeoutException → responseTimeout', () {
       expect(
         categorizeRetryError(
           TimeoutException('x', const Duration(milliseconds: 1)),
         ),
-        '响应超时',
+        RetryErrorCategory.responseTimeout,
       );
     });
-    test('其它 → 重试中', () {
-      expect(categorizeRetryError(StateError('x')), '重试中');
+    test('其它 → retrying', () {
+      expect(categorizeRetryError(StateError('x')), RetryErrorCategory.retrying);
+    });
+
+    test('RetryErrorCategory.label 文案映射', () {
+      expect(RetryErrorCategory.rateLimited.label, '限流');
+      expect(RetryErrorCategory.requestTimeout.label, '请求超时');
+      expect(RetryErrorCategory.serverError.label, '服务端错误');
+      expect(RetryErrorCategory.networkDisconnected.label, '网络断开');
     });
   });
 }

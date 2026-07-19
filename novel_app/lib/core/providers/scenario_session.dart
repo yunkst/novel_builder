@@ -1058,11 +1058,6 @@ class ScenarioSession {
         _state = _state.copyWith(
           supplementaryCount: _state.supplementaryCount + 1,
         );
-
-      case RetryEvent _:
-        // No-op:主 Agent RetryEvent 由 agent_loop 直接调 RetrySignals,
-        // 这里不再投影(spec §3.1.1 方案 B);仅 exhaustive 兜底。
-        break;
     }
     _notifyStateChanged();
   }

@@ -454,10 +454,8 @@ class AgentLoop {
             stackTrace: stack.toString(),
             tags: ['agent', 'loop', 'round_retry', _scenario.id],
           );
-          // 同一行:emit 事件(供未来 subagent 详情页)+ 直接调
-          // RetrySignals(走 UI 横幅,绕开事件流过滤 — spec §3.1.1 方案 B)。
-          // 顺序:先 reportRound → 后 emit RetryEvent,以便 emit 回调
-          // (如 EventTagger 子 Agent 详情)读到一致的 RetryState。
+          // 直接调 RetrySignals 走 UI 横幅(绕开 shouldMainSessionHandleEvent
+          // 过滤,子 Agent 重试也能显示 — spec §3.1.1 方案 B)。
           try {
             RetrySignals.instance.reportRound(
               attempt: roundRetryCount,
@@ -468,12 +466,6 @@ class AgentLoop {
           } catch (_) {
             // report 失败不影响重试主流程
           }
-          emit(RetryEvent(
-            attempt: roundRetryCount,
-            maxAttempts: _config.networkRetryPerRound,
-            delayMs: delayMs,
-            errorCategory: categorizeRetryError(e),
-          ));
           await Future<void>.delayed(delay);
           // 退避期间收到取消 → 优雅结束，不再重试
           if (cancellationToken?.isCancelled == true) {
