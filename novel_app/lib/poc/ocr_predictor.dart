@@ -64,13 +64,18 @@ class OcrPredictor {
     _session = await ort.createSessionFromAsset(modelAsset);
   }
 
+  /// 确保模型已加载，否则抛 [StateError]（防御 _session 空指针 → native crash）。
+  void _ensureLoaded() {
+    if (_session == null) {
+      throw StateError('OCR 模型尚未加载完成，请稍后重试');
+    }
+  }
+
   /// 识别单个字符（PUA 码点或真字都可用）。
   /// 返回 (decodedText, rawIndexSequence)。
   @Deprecated('PoC 用，产品路径用 recognizeImage(base64Png)。Task 15 清理时移除。')
   Future<(String, List<int>)> recognizeGlyph(int codepoint) async {
-    if (_session == null) {
-      throw StateError('OCR 模型尚未加载完成，请稍后重试');
-    }
+    _ensureLoaded();
     final img = await _render(codepoint);
     if (img == null) return ('', <int>[]);
 
@@ -96,9 +101,7 @@ class OcrPredictor {
   ///
   /// 抛出 [StateError] 如果模型尚未加载（防御 _session 空指针崩溃）。
   Future<String> recognizeImage(String base64Png) async {
-    if (_session == null) {
-      throw StateError('OCR 模型尚未加载完成，请稍后重试');
-    }
+    _ensureLoaded();
     final bytes = base64Decode(base64Png);
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();

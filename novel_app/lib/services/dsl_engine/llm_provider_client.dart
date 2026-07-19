@@ -63,7 +63,14 @@ class IoLlmHttpClient implements LlmHttpClient {
             delayMs: d,
             error: e,
           );
-        } catch (_) {}
+        } catch (ex, st) {
+          LoggerService.instance.w(
+            '重试信号上报(transport)失败: $ex',
+            category: LogCategory.ai,
+            tags: ['retry-signal', 'report-failed'],
+            stackTrace: st.toString(),
+          );
+        }
       },
     );
   }
@@ -116,7 +123,14 @@ class IoLlmHttpClient implements LlmHttpClient {
           RetrySignals.instance.reportTransport(
             attempt: a, maxAttempts: m, delayMs: d, error: e,
           );
-        } catch (_) {}
+        } catch (ex, st) {
+          LoggerService.instance.w(
+            '重试信号上报(stream transport)失败: $ex',
+            category: LogCategory.ai,
+            tags: ['retry-signal', 'report-failed'],
+            stackTrace: st.toString(),
+          );
+        }
       },
     );
 
@@ -205,7 +219,14 @@ class IoLlmHttpClient implements LlmHttpClient {
           final fr = (choices.first as Map<String, dynamic>)['finish_reason'];
           if (fr is String) finishReason = fr;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        LoggerService.instance.w(
+          'SSE finish_reason/token-usage 解析失败: $e',
+          category: LogCategory.ai,
+          tags: ['sse-parse', 'parse-err'],
+          stackTrace: st.toString(),
+        );
+      }
     }
     final content = result.fullContent;
     final reasoning = result.reasoningChunks.join();
@@ -248,7 +269,14 @@ class IoLlmHttpClient implements LlmHttpClient {
       model = decoded['model']?.toString() ?? 'unknown';
       final messages = decoded['messages'];
       if (messages is List) messageCount = messages.length;
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM请求body model字段提取失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-provider-client', 'parse-err'],
+        stackTrace: st.toString(),
+      );
+    }
     final hasApiKey = headers['Authorization']?.isNotEmpty == true ||
         headers['authorization']?.isNotEmpty == true;
     final errorSnippet = responseBody.length > 1000

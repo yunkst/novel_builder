@@ -36,6 +36,7 @@ import 'package:flutter/foundation.dart'
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../logger_service.dart';
 import 'llm_call_record.dart';
 
 class LlmLogger extends ChangeNotifier {
@@ -141,7 +142,14 @@ class LlmLogger extends ChangeNotifier {
     try {
       final body = jsonDecode(requestBody) as Map<String, dynamic>;
       model = body['model'] as String?;
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM日志: 解析请求body model字段失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-logger', 'parse-err'],
+        stackTrace: st.toString(),
+      );
+    }
 
     final record = LlmCallRecord(
       id: id,
@@ -183,7 +191,14 @@ class LlmLogger extends ChangeNotifier {
         completionTokens = usage['completion_tokens'] as int?;
         totalTokens = usage['total_tokens'] as int?;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM日志: 解析响应body token用量失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-logger', 'parse-err'],
+        stackTrace: st.toString(),
+      );
+    }
 
     // 从缓存中找到原始请求记录，合并写入完整记录
     final cachedIndex = _recentCache.indexWhere((r) => r.id == id);
@@ -307,7 +322,14 @@ class LlmLogger extends ChangeNotifier {
           totalSize += await entity.length();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM日志: 计算日志目录大小失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-logger', 'fs-err'],
+        stackTrace: st.toString(),
+      );
+    }
     return totalSize;
   }
 
@@ -436,11 +458,32 @@ class LlmLogger extends ChangeNotifier {
             try {
               final json = jsonDecode(line) as Map<String, dynamic>;
               records.add(LlmCallRecord.fromJson(json));
-            } catch (_) {}
+            } catch (e, st) {
+              LoggerService.instance.w(
+                'LLM日志: 解析单行调用记录失败: $e',
+                category: LogCategory.ai,
+                tags: ['llm-logger', 'parse-err'],
+                stackTrace: st.toString(),
+              );
+            }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          LoggerService.instance.w(
+            'LLM日志: 读取日志文件失败: $e',
+            category: LogCategory.ai,
+            tags: ['llm-logger', 'fs-err'],
+            stackTrace: st.toString(),
+          );
+        }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM日志: 扫描日志目录失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-logger', 'fs-err'],
+        stackTrace: st.toString(),
+      );
+    }
 
     return records;
   }
@@ -465,11 +508,32 @@ class LlmLogger extends ChangeNotifier {
               if (json['id'] == id) {
                 return LlmCallRecord.fromJson(json);
               }
-            } catch (_) {}
+            } catch (e, st) {
+              LoggerService.instance.w(
+                'LLM日志: 按ID查找记录JSON解析失败: $e',
+                category: LogCategory.ai,
+                tags: ['llm-logger', 'parse-err'],
+                stackTrace: st.toString(),
+              );
+            }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          LoggerService.instance.w(
+            'LLM日志: 按ID查找记录文件读取失败: $e',
+            category: LogCategory.ai,
+            tags: ['llm-logger', 'fs-err'],
+            stackTrace: st.toString(),
+          );
+        }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      LoggerService.instance.w(
+        'LLM日志: 按ID查找记录目录扫描失败: $e',
+        category: LogCategory.ai,
+        tags: ['llm-logger', 'fs-err'],
+        stackTrace: st.toString(),
+      );
+    }
 
     return null;
   }

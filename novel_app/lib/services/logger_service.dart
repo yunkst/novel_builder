@@ -98,7 +98,9 @@ class LogStatistics {
 
 /// 日志条目模型
 ///
-/// 用于存储单条日志记录，包含时间戳、级别、消息和堆栈信息
+/// 用于存储单条日志记录，包含时间戳、级别、消息和堆栈信息。
+/// [traceId] 为请求级追踪 ID，通过 [LoggerService.withTraceId] 注入的 Zone
+/// 自动附着，用于将同一逻辑请求跨多个异步操作的日志关联起来。
 class LogEntry {
   /// 时间戳
   final DateTime timestamp;
@@ -118,6 +120,9 @@ class LogEntry {
   /// 日志标签
   final List<String> tags;
 
+  /// 请求级追踪 ID（可选），通过 [LoggerService.withTraceId] 自动附着
+  final String? traceId;
+
   const LogEntry({
     required this.timestamp,
     required this.level,
@@ -125,6 +130,7 @@ class LogEntry {
     this.stackTrace,
     this.category = LogCategory.general,
     this.tags = const [],
+    this.traceId,
   });
 
   /// 转换为Map用于序列化
@@ -136,6 +142,7 @@ class LogEntry {
       'stackTrace': stackTrace,
       'category': category.index,
       'tags': tags,
+      if (traceId != null) 'traceId': traceId,
     };
   }
 
@@ -154,6 +161,8 @@ class LogEntry {
       tags: map.containsKey('tags')
           ? (map['tags'] as List<dynamic>).cast<String>()
           : const [],
+      // 向后兼容：旧日志无 traceId
+      traceId: map['traceId'] as String?,
     );
   }
 
@@ -167,10 +176,15 @@ class LogEntry {
 ///
 /// 负责管理应用日志的收集、存储和持久化。
 /// 使用内存队列存储最新1000条日志，超过限制时自动清理旧日志。
-/// 所有日志会在添加时自动持久化到SharedPreferences，确保APP重启后不丢失。
+/// 所有日志会在添加时自动持久化：SharedPreferences 优先，失败时回退到文件存储。
 /// 使用批量写入优化，减少频繁IO操作。
 ///
-/// 使用方式：
+/// ## traceId 追踪
+///
+/// 通过 [withTraceId] 在 Zone 中注入请求级追踪 ID，该 Zone 内所有日志
+/// 自动携带此 ID，用于将同一逻辑请求跨异步操作的日志关联起来。
+///
+/// ## 使用方式：
 /// ```dart
 /// // 初始化（在main.dart中调用一次）
 /// await LoggerService.instance.init();
@@ -184,6 +198,13 @@ class LogEntry {
 /// // 重要日志后强制刷新
 /// LoggerService.instance.e('严重错误', stackTrace: stackTrace);
 /// await LoggerService.instance.flush();
+///
+/// // traceId 追踪——Zone 内所有日志自动附着 request-xxx
+/// await LoggerService.withTraceId('request-xxx', () async {
+///   LoggerService.instance.i('开始处理');   // traceId=request-xxx
+///   await someAsyncWork();
+///   LoggerService.instance.i('处理完成');   // traceId=request-xxx
+/// });
 ///
 /// // 获取所有日志
 /// final logs = LoggerService.instance.getLogs();
@@ -234,6 +255,16 @@ class LoggerService {
     _instance = null;
   }
 
+  /// 持久化是否健康（供测试和调试面板检查）。
+  ///
+  /// 返回 false 表示 SP 和文件两端都写入失败，日志可能丢失。
+  @visibleForTesting
+  static bool get isPersistHealthyForTest => instance._lastPersistSuccess;
+
+  /// 自启动以来的持久化失败次数（供测试和调试面板检查）。
+  @visibleForTesting
+  static int get persistErrorCountForTest => instance._persistErrorCount;
+
   // ========== 常量定义 ==========
   /// 最大日志条数
   static const int _maxLogs = 1000;
@@ -243,6 +274,12 @@ class LoggerService {
 
   /// 导出文件名
   static const String _exportFileName = 'app_logs.txt';
+
+  /// 文件回退存储文件名（SP 写入失败时的回退方案）
+  static const String _fallbackFileName = 'app_logs_fallback.json';
+
+  /// traceId 在 Zone 中的键
+  static const Symbol _traceIdKey = #_logTraceId;
 
   // ========== 状态管理 ==========
   /// 内存日志队列
@@ -276,6 +313,45 @@ class LoggerService {
 
   /// 获取日志变化通知器
   static ValueNotifier<int> get logChangeNotifier => _logChangeNotifier;
+
+  /// 最近一次持久化是否成功（供测试和调试面板检查）
+  bool _lastPersistSuccess = true;
+
+  /// 累计持久化失败次数（自启动以来）
+  int _persistErrorCount = 0;
+
+  // ========== traceId Zone 传播 ==========
+
+  /// 读取当前 Zone 中注入的 traceId。
+  ///
+  /// 通过 [withTraceId] 创建的 Zone 会自动设置此值；
+  /// 未在 withTraceId 内调用时返回 null（对现有代码完全透明）。
+  static String? get currentTraceId {
+    try {
+      return Zone.current[_traceIdKey] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 在 [action] 执行期间注入 [traceId]，该 Zone 内所有日志自动携带此 ID。
+  ///
+  /// 用于将同一逻辑请求（如一次 LLM 调用）跨多个异步操作的日志关联起来。
+  ///
+  /// 示例：
+  /// ```dart
+  /// await LoggerService.withTraceId('llm-req-001', () async {
+  ///   LoggerService.instance.i('开始请求');  // 自动带 traceId=llm-req-001
+  ///   await doWork();
+  ///   LoggerService.instance.i('请求完成');  // 自动带 traceId=llm-req-001
+  /// });
+  /// ```
+  static Future<T> withTraceId<T>(
+    String traceId,
+    Future<T> Function() action,
+  ) {
+    return runZoned(action, zoneValues: {_traceIdKey: traceId});
+  }
 
   // ========== 公开方法 ==========
 
@@ -342,6 +418,7 @@ class LoggerService {
   /// 记录日志（内部方法）
   ///
   /// 添加一条新日志到内存队列，如果超过最大限制则删除最旧的日志（FIFO）。
+  /// 自动从当前 Zone 读取 traceId（通过 [withTraceId] 注入），无需调用方显式传递。
   /// 添加后会触发持久化、状态通知和上报服务回调。
   void _log(String message, LogLevel level,
       [String? stackTrace,
@@ -354,6 +431,7 @@ class LoggerService {
       stackTrace: stackTrace,
       category: category,
       tags: tags,
+      traceId: currentTraceId, // 从 Zone 自动读取，无则 null
     );
 
     _logs.add(entry);
@@ -599,38 +677,69 @@ class LoggerService {
 
   // ========== 私有方法 ==========
 
-  /// 从SharedPreferences加载已保存的日志
+  /// 从 SharedPreferences 加载已保存的日志；SP 失败时回退到文件。
   Future<void> _loadLogs() async {
+    // 优先从 SP 加载
     try {
       final logsJson = await PreferencesService.instance.getString(_prefsKey);
-
       if (logsJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(logsJson) as List<dynamic>;
         _logs.addAll(
           decoded.map((e) => LogEntry.fromMap(e as Map<String, dynamic>)),
         );
+        return;
       }
     } catch (e) {
-      // 加载失败不影响应用运行，仅打印错误
-      // 注意：此处不能用 LoggerService.instance（自指递归），用 debugPrint
-      debugPrint('LoggerService: 加载日志失败: $e');
-      _logs.clear();
+      debugPrint('LoggerService: 从 SP 加载日志失败: $e');
     }
+
+    // 回退：从文件加载
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$_fallbackFileName');
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        if (content.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(content) as List<dynamic>;
+          _logs.addAll(
+            decoded.map((e) => LogEntry.fromMap(e as Map<String, dynamic>)),
+          );
+          debugPrint('LoggerService: 从回退文件加载日志成功（${_logs.length} 条）');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('LoggerService: 从回退文件加载日志也失败: $e');
+    }
+
+    _logs.clear();
   }
 
-  /// 持久化日志到SharedPreferences
-  ///
-  /// 将当前内存队列中的所有日志序列化为JSON并保存到SharedPreferences。
+  /// 持久化日志：SharedPreferences 优先，失败时回退到文件存储。
   Future<void> _persistLogs() async {
+    final data = jsonEncode(_logs.map((e) => e.toMap()).toList());
+
+    // 优先写 SP
     try {
-      final logsJson = jsonEncode(
-        _logs.map((e) => e.toMap()).toList(),
-      );
-      await PreferencesService.instance.setString(_prefsKey, logsJson);
-    } catch (e) {
-      // 持久化失败不影响应用运行
-      // 注意：此处不能用 LoggerService.instance（自指递归），用 debugPrint
-      debugPrint('LoggerService: 持久化日志失败: $e');
+      await PreferencesService.instance.setString(_prefsKey, data);
+      _lastPersistSuccess = true;
+      return;
+    } catch (e1) {
+      debugPrint('LoggerService: SP 持久化失败，回退到文件: $e1');
+    }
+
+    // 回退：写文件
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/$_fallbackFileName');
+      await file.writeAsString(data, flush: true);
+      _lastPersistSuccess = true;
+      _persistErrorCount++;
+      debugPrint('LoggerService: 回退文件保存成功 (SP失败次数=$_persistErrorCount)');
+    } catch (e2) {
+      _lastPersistSuccess = false;
+      _persistErrorCount++;
+      debugPrint('LoggerService: SP 和文件持久化均失败');
     }
   }
 

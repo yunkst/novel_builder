@@ -67,21 +67,28 @@ class OcrRestoreService {
     }
 
     final puaToChar = <int, String>{};
+    final failedCodepoints = <int>[]; // 聚合失败码点，循环后一条日志
     for (final cp in puaCodepoints) {
       try {
         final imageBase64 = await _renderPua(cp, fontFamily ?? '');
         final decoded = await _recognizeImage(imageBase64);
         puaToChar[cp] = decoded;
-      } catch (e, stackTrace) {
-        // 单字符失败，留 □。记录日志用于诊断闪退根因（ONNX native crash 不可捕获，
-        // 但 Dart 层异常如 StateError / PlatformException / TimeoutException 在此记录）。
-        LoggerService.instance.w(
-          'OCR 单字还原失败 cp=0x${cp.toRadixString(16)} fontFamily=$fontFamily: $e',
-          category: LogCategory.ai,
-          tags: ['ocr', 'restore-pua', 'char-failed'],
-        );
+} catch (e, _) {
+        // 单字符失败，留 □。累积失败码点，循环结束后输出一条聚合日志
+        // （避免 200+ 个 PUA 码点产生 200 条日志触发 FIFO 淘汰）。
+        failedCodepoints.add(cp);
         puaToChar[cp] = ''; // 单字符失败，留 □
       }
+    }
+    if (failedCodepoints.isNotEmpty) {
+      LoggerService.instance.w(
+        'OCR 单字还原失败 ${failedCodepoints.length} 个码点: '
+        '${failedCodepoints.take(10).map((c) => "0x${c.toRadixString(16)}").join(", ")}'
+        '${failedCodepoints.length > 10 ? " ... 等" : ""} '
+        'fontFamily=$fontFamily',
+        category: LogCategory.ai,
+        tags: ['ocr', 'restore-pua', 'char-failed'],
+      );
     }
 
     final sb = StringBuffer();

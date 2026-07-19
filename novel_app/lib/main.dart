@@ -20,6 +20,32 @@ import 'services/native_crash_reporter.dart';
 import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/agent_chat/agent_floating_button.dart';
 
+/// 最近记录的全局异常签名（前 200 字符 hash），用于去重。
+/// 同一异常在多层捕获中只记录第一条。
+final _recentGlobalErrorSigs = <int>{};
+
+/// 记录全局异常（带去重）。
+///
+/// 4 层全局异常捕获可能对同一条异常触发多次回调，
+/// 此函数对签名去重避免日志中重复 2-3 次。
+void _logGlobalError(String source, Object error, StackTrace? stack,
+    {LogCategory category = LogCategory.general}) {
+  final raw = error.toString();
+  final sig = raw.length > 200 ? raw.substring(0, 200).hashCode : raw.hashCode;
+  if (_recentGlobalErrorSigs.contains(sig)) return;
+  _recentGlobalErrorSigs.add(sig);
+  if (_recentGlobalErrorSigs.length > 8) {
+    _recentGlobalErrorSigs.remove(_recentGlobalErrorSigs.first);
+  }
+
+  LoggerService.instance.e(
+    '[$source] $error',
+    stackTrace: stack?.toString(),
+    category: category,
+    tags: [source, 'crash'],
+  );
+}
+
 void main() async {
   // 确保 Flutter 初始化完成
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,16 +83,10 @@ void main() async {
     );
   }
 
-  // 启用详细的错误日志 - 全局错误处理器
+  // 启用详细的错误日志 - 全局错误处理器（带去重）
   FlutterError.onError = (FlutterErrorDetails details) {
-    final stackTrace = details.stack?.toString() ?? '';
-    final error = 'Flutter Error: ${details.exception}';
-    LoggerService.instance.e(
-      error,
-      stackTrace: stackTrace,
-      category: LogCategory.general,
-      tags: ['flutter-error', 'crash'],
-    );
+    _logGlobalError('flutter-error', details.exception, details.stack,
+        category: LogCategory.general);
   };
 
   // 捕获 isolate / 平台层异步错误（绕过 runZonedGuarded 的最后一道网）
@@ -75,12 +95,7 @@ void main() async {
   // 未捕获异步错误；Dart VM / 平台通道 / isolate 抛出的部分错误会绕过这两者，需要在此兜底。
   // 返回 true 表示已处理，避免再走默认崩溃处理器（直接 crash 退出）。
   WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
-    LoggerService.instance.e(
-      'Platform Error: $error',
-      stackTrace: stack.toString(),
-      category: LogCategory.general,
-      tags: ['platform', 'error', 'crash'],
-    );
+    _logGlobalError('platform', error, stack, category: LogCategory.general);
     return true;
   };
 
@@ -106,12 +121,8 @@ void main() async {
       child: const NovelReaderApp(),
     ));
   }, (error, stackTrace) {
-    LoggerService.instance.e(
-      'Unhandled Async Error: $error',
-      stackTrace: stackTrace.toString(),
-      category: LogCategory.general,
-      tags: ['async', 'unhandled', 'error'],
-    );
+    _logGlobalError('async-unhandled', error, stackTrace,
+        category: LogCategory.general);
   });
 }
 
@@ -159,15 +170,11 @@ class NovelReaderApp extends ConsumerWidget {
           home: const _AppRoot(),
           debugShowCheckedModeBanner: true,
           builder: (context, child) {
-            // 捕获并记录所有Widget错误
+            // 捕获并记录所有Widget错误（带去重）
             ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
-              final stackTrace = errorDetails.stack?.toString() ?? '';
-              LoggerService.instance.e(
-                'Widget Error: ${errorDetails.exception}',
-                stackTrace: stackTrace,
-                category: LogCategory.ui,
-                tags: ['widget', 'error', 'crash'],
-              );
+              _logGlobalError('widget-error', errorDetails.exception,
+                  errorDetails.stack,
+                  category: LogCategory.ui);
               final theme = Theme.of(context);
               return MaterialApp(
                 home: Scaffold(
