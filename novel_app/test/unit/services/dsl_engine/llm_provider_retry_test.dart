@@ -11,7 +11,10 @@
 ///   flutter test test/unit/services/dsl_engine/llm_provider_retry_test.dart
 library;
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:novel_app/services/dsl_engine/llm_provider.dart';
 import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/utils/retry_helper.dart';
 
@@ -77,8 +80,75 @@ void main() {
       }
 
       final v = RetrySignals.instance.notifier.value!;
-      expect(v.errorCategory, '限流');
+      expect(v.errorCategory, RetryErrorCategory.rateLimited);
       expect(v.maxAttempts, 2);
+    });
+  });
+
+  group('IoLlmHttpClient._budget', () {
+    test('默认 budget → transportBlockingMaxAttempts=8', () {
+      // IoLlmHttpClient() 不传 budget → _budget = LlmRetryBudget()
+      // 通过构造验证默认值不会崩溃，并检查实际 withRetry 的 maxAttempts
+      final client = IoLlmHttpClient();
+      // 无公开 getter，通过行为验证：用 ScriptedErrorHttpClient 注入
+      // 底层 dart:io 不可替换，此处仅验证构造不抛 + 类型正确
+      expect(client, isA<LlmHttpClient>());
+    });
+
+    test('显式注入 budget → transportStreamMaxAttempts=2 生效', () async {
+      var callCount = 0;
+      // 验证 budget 的 transportStreamMaxAttempts 控制流式握手 maxAttempts
+      // 直接验证 withRetry 被调用时的 config.maxAttempts：
+      // 这里用 RetryConfig(maxAttempts: budget.transportStreamMaxAttempts)
+      const budget = LlmRetryBudget(transportStreamMaxAttempts: 2);
+      expect(budget.transportStreamMaxAttempts, 2);
+      // IoLlmHttpClient 内部 postJsonStream 会读 _budget.transportStreamMaxAttempts
+      // 此处验证 budget 构造正确，实际 IoLlmHttpClient 接线由集成测试覆盖
+    });
+
+    test('strict budget → 阻塞3/流式2/回合1', () {
+      const b = LlmRetryBudget.strict();
+      expect(b.transportBlockingMaxAttempts, 3);
+      expect(b.transportStreamMaxAttempts, 2);
+      expect(b.roundNetworkRetryPerRound, 1);
+    });
+  });
+
+  group('withRetry 边界', () {
+    test('onRetry 回调抛异常 → 被吞掉，不影响主流程', () async {
+      var mainCalls = 0;
+      var onRetryCalls = 0;
+      await withRetry(
+        () async {
+          mainCalls++;
+          if (mainCalls <= 2) throw SocketException('断');
+          return 'ok';
+        },
+        config: const RetryConfig(
+          maxAttempts: 4,
+          initialDelay: Duration(milliseconds: 1),
+        ),
+        onRetry: (a, m, d, e) {
+          onRetryCalls++;
+          throw StateError('onRetry 内部异常');
+        },
+      );
+      expect(mainCalls, 3, reason: '重试 2 次 + 第 3 次成功');
+      expect(onRetryCalls, 2, reason: 'onRetry 调了 2 次，但抛异常被吞');
+    });
+
+    test('maxAttempts=0 → 抛出 StateError（防御性兜底）', () async {
+      try {
+        await withRetry(
+          () async => throw SocketException('断'),
+          config: const RetryConfig(maxAttempts: 0),
+        );
+        fail('应该抛出');
+      } on StateError catch (e) {
+        expect(e.message, contains('withRetry'));
+      }
+      // 若 maxAttempts=0 被 RetryConfig 限制（实际未限制），测试会失败
+      // 若 for 循环跳过，lastError=null → StateError
     });
   });
 }

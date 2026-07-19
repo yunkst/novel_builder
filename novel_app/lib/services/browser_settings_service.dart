@@ -29,59 +29,78 @@ class BrowserSettingsService {
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 '
       'Edg/131.0.0.0';
 
-  /// 桌面模式注入 JS：覆盖 viewport meta 为桌面宽度 + 遮蔽 navigator 字段，
-  /// 让响应式站点切 PC 布局。
+  /// 桌面模式注入 JS：把 viewport meta 锁死为桌面宽，让响应式站点走 PC 布局。
   ///
-  /// 设计要点：
-  /// 1. **UA 自适配**：仅当 UA 含 `Windows NT`（桌面 UA）时执行；手机 UA（空串=
-  ///    系统默认）直接 return，不破坏手机布局。运行时切换桌面/手机会 setSettings
-  ///    UA + reload，reload 后本脚本重新执行并按新 UA 自适配，无需重建 WebView。
-  /// 2. **复用 meta**：querySelector 找到现有 viewport meta 改其 content，找不到
-  ///    才创建。不删除重建，避免站点 JS 缓存的 meta 引用失效。
-  /// 3. **时机**：通过 initialUserScripts 在 `AT_DOCUMENT_START` 注入（DOMContentLoaded
-  ///    之前），早于 onLoadStop + 站点 JS，能赶在响应式断点首次判断前拨正为桌面宽。
-  /// 4. **允许缩放**：PC 页在手机屏字小，`user-scalable=yes` + `maximum-scale`
-  ///    让用户双指放大。
-  /// 5. **Navigator 遮蔽**：番茄小说等站点前端 JS 会读 `navigator.userAgent` /
-  ///    `platform` / `maxTouchPoints` 二次判断设备类型。仅改 UA header 不够，
-  ///    必须用 Object.defineProperty 覆盖这三个 getter，让 JS 看到与 UA 一致
-  ///    的桌面值（Win64 / Win32 / 0）。
+  /// 三层防护（应对站点 HTML/JS 篡改 viewport）：
+  /// 1. **立即改写**：forceViewport 立刻执行一次，把 meta content 改成桌面宽；
+  ///    找不到 meta 则创建并 prepend 到 head 最前，确保早于站点可能声明的
+  ///    viewport meta 生效。
+  /// 2. **MutationObserver 锁死**：监听 documentElement 的 childList/subtree/
+  ///    attributes(content,name)，站点一旦把宽度改回 device-width（或动态
+  ///    新建 viewport meta、SPA 路由切换重建 head），瞬间改回 1200。解决旧版
+  ///    只在 DOMContentLoaded 兜底一次、被站点后续 JS 覆盖的问题。
+  /// 3. **innerWidth/outerWidth 劫持**：对付不看 meta、纯靠 JS 算宽度的站点
+  ///    （window.matchMedia / innerWidth 断点判断）。
   ///
-  /// 背景：Android WebView 的 layout viewport 宽度由页面 viewport meta 决定。
-  /// 移动端站点多用 `width=device-width`，导致 layout viewport 等于 WebView
-  /// 物理像素宽，响应式断点（如 min-width: 1280）命中手机分支。仅在 onLoadStop
-  /// 改 viewport 太晚（布局已渲染），必须在文档解析阶段提前覆盖。iOS 上
-  /// `preferredContentMode: DESKTOP` 已能处理，但本脚本靠 UA 自适配，跨平台无害。
+  /// UA 自适配守卫：仅当 UA 含 `Windows NT`（桌面 UA）时执行；手机 UA（空串=
+  /// 系统默认）直接 return。**注**：initialUserScripts 对所有导航无条件注入，
+  /// 此守卫是手机/桌面共用同一份脚本的关键——运行时切换桌面/手机会 setSettings
+  /// UA + reload，reload 后按新 UA 自适配，无需重建 WebView。
+  ///
+  /// 配套 settings：useWideViewPort + loadWithOverviewMode（见 desktopModeSettings）
+  /// 让 1200px 宽页面等比缩放到手机屏宽显示，无需横向滚动；maximum-scale=3.0
+  /// 允许双指放大看小字。
+  ///
+  /// 背景：Android WebView 的 layout viewport 宽度由 viewport meta 决定。移动端
+  /// 站点多用 `width=device-width`，layout viewport ≈ 物理屏宽（约 390px），
+  /// 响应式断点命中手机分支。仅靠桌面 UA header 让服务器返回 PC 版 HTML 不够——
+  /// 响应式站点的前端 JS/CSS 还会按实际 viewport 宽度二次渲染，必须从 JS 层
+  /// 把 viewport 锁宽（并防止被站点改回）。
   static const String desktopViewportOverrideJs = r'''
 (function() {
+  // UA 自适配：仅桌面 UA 执行；手机 UA（空串=系统默认）直接 return 不破坏手机布局
   if (!/Windows NT/.test(navigator.userAgent)) return;
 
-  // 遮蔽 navigator：让站点 JS 读到的 UA / platform / maxTouchPoints 与桌面 UA 一致。
-  // 否则番茄小说等站点即便收到桌面 UA header，JS 读 navigator 仍命中手机分支。
-  var fakeUA = navigator.userAgent;
-  try {
-    Object.defineProperty(navigator, 'userAgent', {
-      get: function() { return fakeUA; }
-    });
-    Object.defineProperty(navigator, 'platform', {
-      get: function() { return 'Win32'; }
-    });
-    Object.defineProperty(navigator, 'maxTouchPoints', {
-      get: function() { return 0; }
-    });
-  } catch (e) {}
+  const DESKTOP_WIDTH = 'width=1200, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
 
-  function setDesktopViewport() {
-    var meta = document.querySelector('meta[name="viewport"]');
-    if (!meta) {
+  // 改写/创建 viewport meta 为桌面宽；创建时 prepend 到 head 最前，确保最先生效
+  function forceViewport() {
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (meta) {
+      if (meta.getAttribute('content') !== DESKTOP_WIDTH) {
+        meta.setAttribute('content', DESKTOP_WIDTH);
+      }
+    } else {
       meta = document.createElement('meta');
       meta.name = 'viewport';
-      document.head.appendChild(meta);
+      meta.content = DESKTOP_WIDTH;
+      if (document.head) {
+        document.head.prepend(meta);
+      } else {
+        const head = document.createElement('head');
+        document.documentElement.prepend(head);
+        head.appendChild(meta);
+      }
     }
-    meta.content = 'width=1200, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
   }
-  setDesktopViewport();
-  document.addEventListener('DOMContentLoaded', setDesktopViewport);
+
+  // 1. 立即改写一次
+  forceViewport();
+
+  // 2. MutationObserver 锁死：站点篡改 viewport（含 SPA 路由重建 head）瞬间改回
+  const observer = new MutationObserver(function() {
+    forceViewport();
+  });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['content', 'name']
+  });
+
+  // 3. 劫持窗口宽度：对付纯靠 JS（matchMedia/innerWidth）判断断点的站点
+  Object.defineProperty(window, 'innerWidth', { get: function() { return 1200; } });
+  Object.defineProperty(window, 'outerWidth', { get: function() { return 1200; } });
 })();
 ''';
 

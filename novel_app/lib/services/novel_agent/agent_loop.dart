@@ -6,11 +6,11 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HandshakeException, SocketException;
 
 import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
-import 'package:novel_app/utils/retry_helper.dart' show RetryableHttpException;
+import 'package:novel_app/utils/retry_helper.dart'
+    show RetryPolicy, RetryableHttpException, isTransientNetworkError;
 
 import '../dsl_engine/llm_provider.dart';
 import '../dsl_engine/retry_signals.dart';
@@ -46,16 +46,24 @@ class AgentLoopConfig {
   /// 单轮 LLM 流式调用总耗时上限
   ///
   /// 流式响应无事件到达此上限即触发 [TimeoutException]，
-  /// 由 [_isTransientNetworkError] 判定为瞬态错误，触发 round 重试。
+  /// 由 [isTransientNetworkError] 判定为瞬态错误，触发 round 重试。
   /// 默认 5min，覆盖单章正文生成（3000-8000 字约 30s-2min）。
   final Duration llmStreamTimeout;
 
   /// 单轮内网络错误最大重试次数
   ///
-  /// 仅当异常是瞬态网络错误（[_isTransientNetworkError] 返回 true）时触发；
+  /// 仅当异常是瞬态网络错误（[isTransientNetworkError] 返回 true）时触发；
   /// JSON 解析失败、空响应等逻辑错误不重试，立即终止。
   /// 重试计数与外层 round 独立：成功后 [roundRetryCount] 重置。
   final int networkRetryPerRound;
+
+  /// 重试退避策略（可注入用于测试）。
+  ///
+  /// 回合层退避复用 [RetryPolicy]（与传输层 [withRetry] 同一退避算法），
+  /// 含 jitter + Retry-After 感知，避免两套退避漂移。
+  /// 默认 [RetryPolicy] 与传输层行为一致（maxDelay=60s, initialDelay=500ms,
+  /// multiplier=2.0, jitterFactor=0.25）。
+  final RetryPolicy retryPolicy;
 
   /// 收到取消信号后的行为（主 Agent 默认 gentle，子 Agent 传 immediate）。
   final AgentLoopCancelBehavior cancelBehavior;
@@ -66,6 +74,7 @@ class AgentLoopConfig {
     this.compaction = const CompactorConfig(),
     this.llmStreamTimeout = const Duration(minutes: 5),
     this.networkRetryPerRound = 2,
+    this.retryPolicy = const RetryPolicy(),
     this.cancelBehavior = AgentLoopCancelBehavior.graceful,
   });
 }
@@ -399,12 +408,11 @@ class AgentLoop {
             continue;
           }
 
-          await _executeSingleTool(call, emit, messages, cancellationToken);
+          messages.add(await _executeSingleTool(call, emit, cancellationToken));
         }
 
         // 子 Agent 并行派发：同一轮内多个 dispatch_subagent 互不阻塞。
-        // 每个 _executeSingleTool 返回它构造的 tool 消息，并行结束后按原序
-        // append 到 messages（保持顺序可预测，避免并发 modify 同一列表）。
+        // 并行结束后按原序 append 到 messages（保持顺序可预测）。
         if (subagentCalls.isNotEmpty) {
           // 检查点 C（再次）：派发子 Agent 前再确认未被取消
           if (cancellationToken?.isCancelled == true) {
@@ -416,12 +424,9 @@ class AgentLoop {
             return;
           }
           final parallelMessages = await Future.wait(subagentCalls.map(
-            (call) =>
-                _executeSingleTool(call, emit, const [], cancellationToken),
+            (call) => _executeSingleTool(call, emit, cancellationToken),
           ));
-          for (final msg in parallelMessages) {
-            if (msg != null) messages.add(msg);
-          }
+          messages.addAll(parallelMessages);
         }
 
         // 本轮成功执行（含工具调用）→ 进入下一轮，重置重试计数
@@ -430,13 +435,18 @@ class AgentLoop {
       } catch (e, stack) {
         // 瞬态网络错误（SocketException / TimeoutException / 5xx 等）
         // → round 级整体重试，保留 messages 上下文，避免多轮 ReAct 白跑
-        if (_isTransientNetworkError(e) &&
+        if (isTransientNetworkError(e) &&
             roundRetryCount < _config.networkRetryPerRound) {
           roundRetryCount++;
-          // 指数退避：1s → 2s → 4s（上限 4s）
-          final delay = Duration(
-            milliseconds: (1000 * (1 << (roundRetryCount - 1))).clamp(0, 4000),
+          // 统一退避策略（与传输层 withRetry 同一 RetryPolicy）：
+          // 含 jitter（防雷鸣群）+ Retry-After 感知（服务端权威指示优先）。
+          final retryAfterMs =
+              e is RetryableHttpException ? e.retryAfterMs : null;
+          final delayMs = _config.retryPolicy.computeDelayMs(
+            attempt: roundRetryCount,
+            retryAfterMs: retryAfterMs,
           );
+          final delay = Duration(milliseconds: delayMs);
           LoggerService.instance.w(
             'Agent 轮级网络重试 (round=$round, $roundRetryCount/${_config.networkRetryPerRound}, '
             '${delay.inMilliseconds}ms, ${e.runtimeType}: $e)',
@@ -444,26 +454,18 @@ class AgentLoop {
             stackTrace: stack.toString(),
             tags: ['agent', 'loop', 'round_retry', _scenario.id],
           );
-          // 同一行:emit 事件(供未来 subagent 详情页)+ 直接调
-          // RetrySignals(走 UI 横幅,绕开事件流过滤 — spec §3.1.1 方案 B)。
-          // 顺序:先 reportRound → 后 emit RetryEvent,以便 emit 回调
-          // (如 EventTagger 子 Agent 详情)读到一致的 RetryState。
+          // 直接调 RetrySignals 走 UI 横幅(绕开 shouldMainSessionHandleEvent
+          // 过滤,子 Agent 重试也能显示 — spec §3.1.1 方案 B)。
           try {
             RetrySignals.instance.reportRound(
               attempt: roundRetryCount,
               maxAttempts: _config.networkRetryPerRound,
-              delayMs: delay.inMilliseconds,
+              delayMs: delayMs,
               error: e,
             );
           } catch (_) {
             // report 失败不影响重试主流程
           }
-          emit(RetryEvent(
-            attempt: roundRetryCount,
-            maxAttempts: _config.networkRetryPerRound,
-            delayMs: delay.inMilliseconds,
-            errorCategory: categorizeRetryError(e),
-          ));
           await Future<void>.delayed(delay);
           // 退避期间收到取消 → 优雅结束，不再重试
           if (cancellationToken?.isCancelled == true) {
@@ -524,37 +526,18 @@ class AgentLoop {
         category: LogCategory.ai, tags: ['agent', 'loop_end', _scenario.id]);
   }
 
-  /// 判定异常是否是"瞬态网络错误"——值得 round 整体重试
-  ///
-  /// 决策：
-  /// - [SocketException] / [HandshakeException] → true（TCP/TLS 层断开）
-  /// - [TimeoutException] → true（来自 [chatStreamWithTools] 的 [Duration] 超时
-  ///   或 dart:io HttpClient 超时）
-  /// - [RetryableHttpException]（4xx/5xx）→ true（传输层 withRetry 已重试，
-  ///   此处为 round-level 兜底；自 2026-07-17 起 4xx 也统一可重试）
-  /// - [FormatException] / [StateError] → false（逻辑错误，重复执行无意义）
-  bool _isTransientNetworkError(Object e) {
-    if (e is SocketException) return true;
-    if (e is HandshakeException) return true;
-    if (e is TimeoutException) return true;
-    if (e is RetryableHttpException) return true;
-    return false;
-  }
-
-  /// 执行单个工具调用（emit 事件 + 格式化结果 + append tool 消息）
+  /// 执行单个工具调用（emit 事件 + 格式化结果 + 返回 tool 消息）。
   ///
   /// 任务 7：从原「第 5 步 for 循环体」抽出，使普通串行与 dispatch_subagent 并行
   /// 共用同一段逻辑。**保持与原循环体 100% 一致行为**（含 onProgress 节流、
   /// JSON 解析容错、截断日志、toolSuccess 判断）。
   ///
-  /// [messagesToAppend] 串行路径直接传入 `messages`（原地 add）；
-  /// 并行路径传入 `const []` 以避免并发 modify 原列表——函数返回构造好的
-  /// tool ChatMessage，由调用方按原序追加到 messages。
-  /// 返回 null 表示当前不应修改 messages（目前未使用，预留）。
-  Future<ChatMessage?> _executeSingleTool(
+  /// 统一返回构造好的 [ChatMessage]（role: tool）。串行与并行路径都由
+  /// 调用方 append 到 messages（串行原地 add、并行收集后顺序 add），
+  /// 消除原 nullable 返回值 + `messagesToAppend` 双重语义的混乱。
+  Future<ChatMessage> _executeSingleTool(
     ToolCall call,
     void Function(AgentEvent) emit,
-    List<ChatMessage> messagesToAppend,
     CancellationToken? cancellationToken,
   ) async {
     LoggerService.instance.d('工具调度: ${call.name} (scenario=${_scenario.id})',
@@ -620,12 +603,6 @@ class AgentLoop {
       toolCallId: call.id,
     );
 
-    if (messagesToAppend.isNotEmpty) {
-      // 串行路径：原地 add
-      messagesToAppend.add(toolMessage);
-    }
-    // 并行路径：返回构造好的消息，调用方稍后顺序追加
-
     final toolSuccess = !result.containsKey('error');
     emit(ToolCallEndEvent(
       call.name,
@@ -645,6 +622,6 @@ class AgentLoop {
           _scenario.id
         ]);
 
-    return messagesToAppend.isEmpty ? toolMessage : null;
+    return toolMessage;
   }
 }

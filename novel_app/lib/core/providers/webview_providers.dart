@@ -10,16 +10,18 @@ import 'database_providers.dart';
 /// 构造桌面/手机模式的 InAppWebViewSettings
 ///
 /// 把配置构造抽成纯函数以便单测（InAppWebViewController 是平台类无法 mock）。
-/// - 桌面: 桌面 UA + DESKTOP contentMode + overview 缩放 + 开启缩放控件机制
-/// - 手机: 空 UA(系统默认) + MOBILE contentMode + 关闭桌面缩放按钮
+/// - 桌面: 桌面 UA + loadWithOverviewMode（1200px 页面等比缩到屏宽）+ 缩放控件
+/// - 手机: 空 UA(系统默认) + overview=false + 关闭缩放控件
+///
+/// 桌面布局的真正落地靠 [BrowserSettingsService.desktopViewportOverrideJs]
+/// （锁死 viewport 为 1200 宽 + MutationObserver 防篡改 + innerWidth 劫持），
+/// 不再依赖 preferredContentMode——实测该字段在 Android WebView 上对响应式
+/// 断点无实质作用，仅影响默认 viewport 行为，已被 JS 层 viewport 锁死覆盖。
 /// useWideViewPort 两种模式都 true（允许宽视口，避免挤压）。
 /// 缩放相关字段在两种模式都显式设置，避免运行时 setSettings 切换残留。
 InAppWebViewSettings desktopModeSettings(bool isDesktop) {
   return InAppWebViewSettings(
     javaScriptEnabled: true,
-    preferredContentMode: isDesktop
-        ? UserPreferredContentMode.DESKTOP
-        : UserPreferredContentMode.MOBILE,
     userAgent: isDesktop ? BrowserSettingsService.desktopUserAgent : '',
     useWideViewPort: true,
     loadWithOverviewMode: isDesktop,
@@ -93,8 +95,7 @@ final webviewControllerProvider =
 );
 
 /// WebView Controller 状态管理
-class WebViewControllerNotifier
-    extends StateNotifier<InAppWebViewController?> {
+class WebViewControllerNotifier extends StateNotifier<InAppWebViewController?> {
   final Ref _ref;
 
   WebViewControllerNotifier(this._ref) : super(null);
@@ -111,23 +112,20 @@ class WebViewControllerNotifier
 
   /// 页面开始加载
   void handleLoadStart(WebUri? url) {
-    _ref.read(webviewCurrentUrlProvider.notifier).state =
-        url?.toString() ?? '';
+    _ref.read(webviewCurrentUrlProvider.notifier).state = url?.toString() ?? '';
     _ref.read(webviewIsLoadingProvider.notifier).state = true;
   }
 
   /// 页面加载完成
   void handleLoadStop(WebUri? url) {
-    _ref.read(webviewCurrentUrlProvider.notifier).state =
-        url?.toString() ?? '';
+    _ref.read(webviewCurrentUrlProvider.notifier).state = url?.toString() ?? '';
     _ref.read(webviewIsLoadingProvider.notifier).state = false;
     _ref.read(webviewLoadingProgressProvider.notifier).state = 1.0;
   }
 
   /// 加载进度变化
   void handleProgress(int progress) {
-    _ref.read(webviewLoadingProgressProvider.notifier).state =
-        progress / 100.0;
+    _ref.read(webviewLoadingProgressProvider.notifier).state = progress / 100.0;
   }
 
   /// 资源加载错误
@@ -223,8 +221,8 @@ final bookmarkListProvider =
 );
 
 /// 收藏分组列表 Provider
-final bookmarkGroupListProvider = StateNotifierProvider<BookmarkGroupListNotifier,
-    AsyncValue<List<BookmarkGroup>>>(
+final bookmarkGroupListProvider = StateNotifierProvider<
+    BookmarkGroupListNotifier, AsyncValue<List<BookmarkGroup>>>(
   (ref) => BookmarkGroupListNotifier(ref),
 );
 
@@ -376,8 +374,7 @@ class BookmarkGroupListNotifier
     extends StateNotifier<AsyncValue<List<BookmarkGroup>>> {
   final Ref _ref;
 
-  BookmarkGroupListNotifier(this._ref)
-      : super(const AsyncValue.loading()) {
+  BookmarkGroupListNotifier(this._ref) : super(const AsyncValue.loading()) {
     _loadGroups();
   }
 
@@ -478,8 +475,8 @@ class BookmarkGroupListNotifier
 // ============================================================
 
 /// 脚本列表 Provider
-final siteScriptListProvider = StateNotifierProvider<SiteScriptListNotifier,
-    AsyncValue<List<SiteScript>>>(
+final siteScriptListProvider =
+    StateNotifierProvider<SiteScriptListNotifier, AsyncValue<List<SiteScript>>>(
   (ref) => SiteScriptListNotifier(ref),
 );
 

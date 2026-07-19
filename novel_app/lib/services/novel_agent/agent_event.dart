@@ -210,27 +210,3 @@ class CompactionEvent extends AgentEvent {
       '${rewrittenContent.isEmpty ? "" : "，改写 ${rewrittenContent.length} 条"}）';
 }
 
-/// LLM 重试事件(传输层/回合层中段桥接,UI 横幅走 RetrySignals)
-///
-/// 主 Agent 重试横幅**不依赖**此事件(由 agent_loop.dart 直接调
-/// RetrySignals.reportRound,绕开 shouldMainSessionHandleEvent 过滤)。
-/// 本事件仍 emit 到事件流,用于:
-/// - EventTagger 打标(子 Agent 未来详情页扩展)
-/// - Future:subagent 详情页内显示重试
-///
-/// **必须** 转发 super.runId,否则 EventTagger.tag 的 exhaustive switch
-/// 编译失败,且 AgentEvent sealed class 契约违反(spec §3.1.1)。
-class RetryEvent extends AgentEvent {
-  final int attempt;
-  final int maxAttempts;
-  final int delayMs;
-  final String errorCategory;
-
-  const RetryEvent({
-    required this.attempt,
-    required this.maxAttempts,
-    required this.delayMs,
-    required this.errorCategory,
-    super.runId,
-  });
-}

@@ -72,19 +72,6 @@ class EventTagger {
           compactionNote: compactionNote,
           runId: runId,
         ),
-      RetryEvent(
-        attempt: final attempt,
-        maxAttempts: final maxAttempts,
-        delayMs: final delayMs,
-        errorCategory: final errorCategory
-      ) =>
-        RetryEvent(
-          attempt: attempt,
-          maxAttempts: maxAttempts,
-          delayMs: delayMs,
-          errorCategory: errorCategory,
-          runId: runId,
-        ),
     };
   }
 }
@@ -186,11 +173,6 @@ class SubagentStateProjector {
 
       case InjectedUserInputEvent():
         // No-op: 主 session 行为（运行中补充消息），子 Agent 不处理
-        return;
-
-      case RetryEvent():
-        // No-op:UI 横幅走 RetrySignals(由 agent_loop 直接调,
-        // 不经事件流)。本 case 仅为 exhaustive 完整性。
         return;
     }
   }
