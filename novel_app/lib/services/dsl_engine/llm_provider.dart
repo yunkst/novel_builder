@@ -204,7 +204,7 @@ class SseParseResult {
 /// 流式响应累积结果（Phase 1: 支持 tool_calls 收集）
 ///
 /// 注意：默认构造函数创建的是**可变**空列表，便于在流式消费中
-/// 逐 chunk add/addAll。如果需要不可变实例请使用 `StreamingResult.withData()`。
+/// 逐 chunk add/addAll。
 class StreamingResult {
   final List<String> contentChunks;
   final List<String> reasoningChunks;
@@ -540,11 +540,6 @@ class LlmProvider {
     return LlmResponse(content: content, toolCalls: toolCalls);
   }
 
-  /// 解析阻塞响应（仅文本，向后兼容旧代码）
-  static String parseBlockingResponseText(String rawBody) {
-    return parseBlockingResponse(rawBody).content;
-  }
-
   /// 阻塞式调用：完整返回 LLM 响应（Phase 1: 返回 LlmResponse）
   Future<LlmResponse> chat({
     required List<ChatMessage> messages,
@@ -598,24 +593,6 @@ class LlmProvider {
     }
   }
 
-  /// 阻塞式调用（仅返回文本，向后兼容旧代码）
-  Future<String> chatRaw({
-    required List<ChatMessage> messages,
-    String? model,
-    int? maxTokens,
-    double? temperature,
-    Map<String, dynamic>? responseFormat,
-  }) async {
-    final response = await chat(
-      messages: messages,
-      model: model,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      responseFormat: responseFormat,
-    );
-    return response.content;
-  }
-
   /// 结构化 JSON 调用 — 自动启用 json_object 模式 + 解析
   ///
   /// 适用于需要 LLM 返回结构化 JSON 的场景（如角色提取、关系提取等）。
@@ -632,14 +609,14 @@ class LlmProvider {
   ///
   /// [fromJson] — 从 `Map<String, dynamic>` 构造目标类型
   /// [schemaDescription] — JSON 结构描述（如 '格式: {"roles": [...], "background": "..."}'）
-  /// [retryOnParseError] — JSON 解析失败时应用层重试次数（默认 0 次，
-  ///   彻底交给 [withRetry] 的传输层重试；JSON 内容质量问题不应靠重试修复）
+  /// [retryOnParseError] — 保留参数以向后兼容；应用层重试已完全委托给
+  ///   传输层 [withRetry]（自 2026-07-17 起 retryOnParseError 默认 0）。
   /// [temperature] — 默认 0.3（低温度更确定性）
   Future<T?> chatForJson<T>({
     required List<ChatMessage> messages,
     required T Function(Map<String, dynamic>) fromJson,
     String schemaDescription = '',
-    int retryOnParseError = 0,
+    @Deprecated('应用层重试已委托传输层') int retryOnParseError = 0,
     String? model,
     int? maxTokens,
     double? temperature,
@@ -664,55 +641,25 @@ class LlmProvider {
       );
     }
 
-    for (var attempt = 0; attempt <= retryOnParseError; attempt++) {
-      try {
-        final response = await chat(
-          messages: enrichedMessages,
-          model: model,
-          maxTokens: maxTokens,
-          temperature: temperature ?? 0.3,
-          responseFormat: const {'type': 'json_object'},
-        );
+    final response = await chat(
+      messages: enrichedMessages,
+      model: model,
+      maxTokens: maxTokens,
+      temperature: temperature ?? 0.3,
+      responseFormat: const {'type': 'json_object'},
+    );
 
-        if (response.content.trim().isEmpty) {
-          LoggerService.instance.w(
-            'chatForJson: LLM 返回空内容 (attempt $attempt)',
-            category: LogCategory.ai,
-            tags: ['dsl', 'llm', 'chatForJson', 'empty'],
-          );
-          continue;
-        }
-
-        // safeJsonDecode 已处理 markdown 包裹
-        final json = safeJsonDecode(response.content);
-        if (json is! Map<String, dynamic>) {
-          LoggerService.instance.w(
-            'chatForJson: JSON 不是对象 (attempt $attempt, type=${json.runtimeType})',
-            category: LogCategory.ai,
-            tags: ['dsl', 'llm', 'chatForJson', 'not_object'],
-          );
-          continue;
-        }
-
-        return fromJson(json);
-      } on FormatException catch (e) {
-        LoggerService.instance.w(
-          'chatForJson: JSON 解析失败 (attempt $attempt): $e',
-          category: LogCategory.ai,
-          tags: ['dsl', 'llm', 'chatForJson', 'parse_error'],
-        );
-        if (attempt == retryOnParseError) rethrow;
-      } catch (e, stackTrace) {
-        LoggerService.instance.e(
-          'chatForJson: 调用失败 (attempt $attempt): $e',
-          stackTrace: stackTrace.toString(),
-          category: LogCategory.ai,
-          tags: ['dsl', 'llm', 'chatForJson', 'error'],
-        );
-        if (attempt == retryOnParseError) rethrow;
-      }
+    if (response.content.trim().isEmpty) {
+      throw FormatException('LLM 返回空内容');
     }
-    return null;
+
+    // safeJsonDecode 已处理 markdown 包裹
+    final json = safeJsonDecode(response.content);
+    if (json is! Map<String, dynamic>) {
+      throw FormatException('JSON 不是对象: ${json.runtimeType}');
+    }
+
+    return fromJson(json);
   }
 
   Stream<String> chatStream({
@@ -921,15 +868,20 @@ class IoLlmHttpClient implements LlmHttpClient {
     ..connectionTimeout = const Duration(seconds: 15)
     ..idleTimeout = const Duration(seconds: 60);
 
-  IoLlmHttpClient();
+  /// 重试预算（传输层 maxAttempts 单一真理源，可由 [AiServiceFactory] 注入）
+  final LlmRetryBudget _budget;
+
+  IoLlmHttpClient({LlmRetryBudget? budget})
+      : _budget = budget ?? const LlmRetryBudget();
 
   @override
   Future<String> postJson(
       String url, Map<String, String> headers, String body) async {
-    // 不传 config → 用 RetryConfig 默认值（maxAttempts=8, maxDelay=60s, initialDelay=500ms）。
-    // 流式握手 postJsonStream 显式传 maxAttempts:3，与阻塞保持区分。
+    // 阻塞调用用 budget.transportBlockingMaxAttempts（默认 8）；
+    // 流式握手用 budget.transportStreamMaxAttempts（默认 3）。
     return withRetry(
       () => _postJsonOnce(url, headers, body),
+      config: RetryConfig(maxAttempts: _budget.transportBlockingMaxAttempts),
       label: 'llm_post',
       onRetry: (a, m, d, e) {
         try {
@@ -982,24 +934,15 @@ class IoLlmHttpClient implements LlmHttpClient {
     );
 
     if (statusCode >= 400) {
-      // 所有 4xx/5xx 统一重试（用户策略：瞬态 4xx 也尽量自愈，避免直接打断会话）
-      // 读 Retry-After 头（429/503 通常带）；解析失败返回 null 走指数退避
-      final retryAfterMs = parseRetryAfterMs(
-        response.headers.value('retry-after'),
-      );
-      LoggerService.instance.w(
-        'LLM HTTP $statusCode (retryable): '
-        '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
-        'url=$url',
-        category: LogCategory.ai,
-        stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
-        tags: ['dsl', 'llm', 'http', 'post_json', 'retryable'],
-      );
-      throw RetryableHttpException(
-        statusCode,
-        responseBody,
-        url,
-        retryAfterMs: retryAfterMs,
+      _handleHttpFailure(
+        response: response,
+        responseBody: responseBody,
+        url: url,
+        headers: headers,
+        body: body,
+        logId: logId,
+        stopwatch: stopwatch,
+        isStreaming: false,
       );
     }
     RetrySignals.instance.clear();
@@ -1015,7 +958,7 @@ class IoLlmHttpClient implements LlmHttpClient {
     // 交给 agent_loop 的 round-level 重试处理。
     final handshake = await withRetry(
       () => _postJsonStreamHandshake(url, headers, body),
-      config: const RetryConfig(maxAttempts: 3),
+      config: RetryConfig(maxAttempts: _budget.transportStreamMaxAttempts),
       label: 'llm_stream_establish',
       onRetry: (a, m, d, e) {
         try {
@@ -1072,25 +1015,15 @@ class IoLlmHttpClient implements LlmHttpClient {
         isSuccess: false,
         errorMessage: 'HTTP $statusCode',
       );
-      final ctx = _buildHttpErrorContext(url, headers, body, errorBody);
-      // 读 Retry-After 头（429/503 通常带）；解析失败返回 null 走指数退避
-      final retryAfterMs = parseRetryAfterMs(
-        response.headers.value('retry-after'),
-      );
-      // 所有 4xx/5xx 统一重试（用户策略：瞬态 4xx 也尽量自愈）
-      LoggerService.instance.w(
-        'LLM HTTP $statusCode (stream, retryable): '
-        '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
-        'url=$url',
-        category: LogCategory.ai,
-        stackTrace: ctx,
-        tags: ['dsl', 'llm', 'http', 'stream_establish', 'retryable'],
-      );
-      throw RetryableHttpException(
-        statusCode,
-        errorBody,
-        url,
-        retryAfterMs: retryAfterMs,
+      _handleHttpFailure(
+        response: response,
+        responseBody: errorBody,
+        url: url,
+        headers: headers,
+        body: body,
+        logId: logId,
+        stopwatch: stopwatch,
+        isStreaming: true,
       );
     }
     RetrySignals.instance.clear();
@@ -1247,6 +1180,47 @@ class IoLlmHttpClient implements LlmHttpClient {
       '  apiKeyConfigured: $hasApiKey',
       '  responseBody: $errorSnippet',
     ].join('\n');
+  }
+
+  /// 统一处理 HTTP >=400 失败：读 Retry-After、记录告警、抛 [RetryableHttpException]。
+  ///
+  /// [_postJsonOnce]（阻塞）与 [_postJsonStreamHandshake]（流式握手）共用，
+  /// 避免两处错误处理逻辑漂移。日志落盘由调用方按需完成（阻塞路径在调用前已落盘，
+  /// 流式路径在本方法调用前单独 `LlmLogger.logResponse`）。
+  ///
+  /// [isStreaming] 仅影响告警 message 与 log tag（post_json vs stream_establish）。
+  static Never _handleHttpFailure({
+    required io.HttpClientResponse response,
+    required String responseBody,
+    required String url,
+    required Map<String, String> headers,
+    required String body,
+    required String logId,
+    required Stopwatch stopwatch,
+    required bool isStreaming,
+  }) {
+    final statusCode = response.statusCode;
+    final tag = isStreaming ? 'stream_establish' : 'post_json';
+    final label = isStreaming ? ' (stream)' : '';
+    // 读 Retry-After 头（429/503 通常带）；解析失败返回 null 走指数退避
+    final retryAfterMs = parseRetryAfterMs(
+      response.headers.value('retry-after'),
+    );
+    // 所有 4xx/5xx 统一重试（用户策略：瞬态 4xx 也尽量自愈，避免直接打断会话）
+    LoggerService.instance.w(
+      'LLM HTTP $statusCode$label (retryable): '
+      '${retryAfterMs != null ? 'retryAfter=${retryAfterMs}ms, ' : ''}'
+      'url=$url',
+      category: LogCategory.ai,
+      stackTrace: _buildHttpErrorContext(url, headers, body, responseBody),
+      tags: ['dsl', 'llm', 'http', tag, 'retryable'],
+    );
+    throw RetryableHttpException(
+      statusCode,
+      responseBody,
+      url,
+      retryAfterMs: retryAfterMs,
+    );
   }
 }
 

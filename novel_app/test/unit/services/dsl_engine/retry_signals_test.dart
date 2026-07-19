@@ -35,7 +35,6 @@ void main() {
       expect(state.maxAttempts, 8);
       expect(state.delayMs, 2000);
       expect(state.errorCategory, '限流');
-      expect(state.receivedAt, isA<DateTime>());
       expect(notified, hasLength(1));
       expect(notified.last, state);
     });

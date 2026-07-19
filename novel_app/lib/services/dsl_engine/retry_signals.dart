@@ -30,7 +30,6 @@ class RetryState {
   final int maxAttempts;
   final int delayMs;
   final String errorCategory;
-  final DateTime receivedAt;
 
   const RetryState({
     required this.level,
@@ -38,7 +37,6 @@ class RetryState {
     required this.maxAttempts,
     required this.delayMs,
     required this.errorCategory,
-    required this.receivedAt,
   });
 }
 
@@ -56,16 +54,8 @@ class RetrySignals {
     required int maxAttempts,
     required int delayMs,
     required Object error,
-  }) {
-    notifier.value = RetryState(
-      level: RetryLevel.transport,
-      attempt: attempt,
-      maxAttempts: maxAttempts,
-      delayMs: delayMs,
-      errorCategory: categorizeRetryError(error),
-      receivedAt: DateTime.now(),
-    );
-  }
+  }) =>
+      _report(RetryLevel.transport, attempt, maxAttempts, delayMs, error);
 
   /// 回合层 agent_loop 报告一次重试
   void reportRound({
@@ -73,14 +63,24 @@ class RetrySignals {
     required int maxAttempts,
     required int delayMs,
     required Object error,
-  }) {
+  }) =>
+      _report(RetryLevel.round, attempt, maxAttempts, delayMs, error);
+
+  /// 报告一次重试 — [reportTransport]/[reportRound] 的共用实现,
+  /// 仅 [RetryLevel] 不同,合并避免字段漂移。
+  void _report(
+    RetryLevel level,
+    int attempt,
+    int maxAttempts,
+    int delayMs,
+    Object error,
+  ) {
     notifier.value = RetryState(
-      level: RetryLevel.round,
+      level: level,
       attempt: attempt,
       maxAttempts: maxAttempts,
       delayMs: delayMs,
       errorCategory: categorizeRetryError(error),
-      receivedAt: DateTime.now(),
     );
   }
 

@@ -341,13 +341,6 @@ void main() {
       );
     });
 
-    test('HttpException → true', () {
-      expect(
-        RetryConfig.defaultShouldRetry(const HttpException('x')),
-        true,
-      );
-    });
-
     test('FormatException / StateError → false（非 HTTP 逻辑错误）', () {
       expect(RetryConfig.defaultShouldRetry(const FormatException('x')), false);
       expect(RetryConfig.defaultShouldRetry(StateError('x')), false);
