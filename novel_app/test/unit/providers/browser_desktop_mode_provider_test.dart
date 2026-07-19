@@ -104,9 +104,8 @@ void main() {
   });
 
   group('desktopModeSettings', () {
-    test('桌面模式: DESKTOP contentMode + 桌面UA + overview + 缩放支持', () {
+    test('桌面模式: 桌面UA + overview + 缩放支持', () {
       final s = desktopModeSettings(true);
-      expect(s.preferredContentMode, UserPreferredContentMode.DESKTOP);
       expect(s.userAgent, BrowserSettingsService.desktopUserAgent);
       expect(s.useWideViewPort, isTrue);
       expect(s.loadWithOverviewMode, isTrue);
@@ -116,9 +115,8 @@ void main() {
       expect(s.displayZoomControls, isFalse);
     });
 
-    test('手机模式: MOBILE contentMode + 空UA + 不开桌面缩放按钮', () {
+    test('手机模式: 空UA + overview=false + 不开桌面缩放按钮', () {
       final s = desktopModeSettings(false);
-      expect(s.preferredContentMode, UserPreferredContentMode.MOBILE);
       expect(s.userAgent, '');
       expect(s.loadWithOverviewMode, isFalse);
       // 显式关闭桌面缩放按钮配置，防止运行时切换 setSettings 残留

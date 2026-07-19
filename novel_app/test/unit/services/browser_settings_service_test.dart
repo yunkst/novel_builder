@@ -52,5 +52,17 @@ void main() {
       // 允许用户双指缩放（PC 页在手机屏字小）
       expect(js, contains('user-scalable=yes'));
     });
+
+    test('desktopViewportOverrideJs 锁死 viewport 防篡改', () {
+      final js = BrowserSettingsService.desktopViewportOverrideJs;
+      // MutationObserver 监听 DOM 变化，站点改回 device-width 时瞬间改回 1200
+      expect(js, contains('MutationObserver'));
+      expect(js, contains('attributeFilter'));
+      // 劫持窗口宽度，对付纯靠 JS 算宽度的站点
+      expect(js, contains('innerWidth'));
+      expect(js, contains('outerWidth'));
+      // prepend 到 head 最前，确保最先生效
+      expect(js, contains('prepend'));
+    });
   });
 }

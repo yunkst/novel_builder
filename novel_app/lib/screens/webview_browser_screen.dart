@@ -210,8 +210,8 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     // 判断前拨正为桌面宽。脚本内自带 UA 自适配，手机 UA 直接 return。
                     initialUserScripts: UnmodifiableListView<UserScript>([
                       UserScript(
-                        source: BrowserSettingsService
-                            .desktopViewportOverrideJs,
+                        source:
+                            BrowserSettingsService.desktopViewportOverrideJs,
                         // AT_DOCUMENT_START：navigator 覆盖必须早于站点 JS 执行，
                         // 否则站点读取时机已过，覆盖无效。viewport meta 改写内部
                         // 监听了 DOMContentLoaded 兜底。
