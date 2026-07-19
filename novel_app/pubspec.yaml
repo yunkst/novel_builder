@@ -94,6 +94,8 @@ dependencies:
   # AppUpdateService 通过 Dio.download 通道使用，如未来彻底切换可继续瘦身）
   permission_handler: ^11.0.0
   package_info_plus: ^8.0.0
+  # 打开外部链接（崩溃弹框引导跳 GitHub issue 页）
+  url_launcher: ^6.2.0
   # 设备信息（用于按 CPU 架构选择 APK）
   device_info_plus: ^11.0.0
 

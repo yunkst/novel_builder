@@ -51,6 +51,15 @@ android {
         noCompress += listOf("onnx")
     }
 
+    // Native crash handler：CMake 编译 libcrash_handler.so（ARM64 / ARMv7 / x86_64）。
+    // 不设 ndk.abiFilters，与 CI --split-per-abi 无冲突；CMake 默认编译所有目标 ABI。
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     signingConfigs {
         create("release") {
             // 仅当 key.properties 存在且字段完整时启用，否则降级为 debug 签名

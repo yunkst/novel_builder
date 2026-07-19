@@ -18,6 +18,12 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // Native Crash Channel：供 Flutter 侧读取/删除上次崩溃的 dump 文件。
+        CrashReporter.registerChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            this,
+        )
+
         // App Install Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "installApk") {
@@ -69,6 +75,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ★ 必须在 super.onCreate 之后、任何 Flutter/业务初始化之前注册 NDK signal handler。
+        // 尽早注册，最大化覆盖 native crash（包括 flutter_onnxruntime 推理路径）。
+        CrashReporter.install(this)
 
         // 创建下载任务的通知渠道（Android 8.0+ 需要）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
