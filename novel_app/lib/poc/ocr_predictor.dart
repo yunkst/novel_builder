@@ -104,20 +104,31 @@ class OcrPredictor {
     _ensureLoaded();
     final bytes = base64Decode(base64Png);
     final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-
-    final (tensor, w) = await _preprocess(image);
-    final outputs = await _session!.run({
-      'x': await OrtValue.fromList(tensor, [1, 3, 48, w]),
-    });
-    final value = outputs.values.first;
-    final nested = await value.asList();
-    final logits = (nested[0] as List)
-        .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
-        .toList();
-    final (text, _) = _ctcDecode(logits);
-    return text;
+    // 用 try/finally 释放 GPU 资源：codec 持有解码器状态，frame.image 持有
+    // GPU 纹理（Dart GC 不回收 GPU 纹理，必须显式 dispose）。否则每章 200+ PUA
+    // 字符累积 ~11MB 不可回收 GPU 内存，低内存设备可能 OOM。
+    // toByteData 返回的是拷贝，dispose image 不影响 _preprocess 已读出的字节。
+    try {
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      try {
+        final (tensor, w) = await _preprocess(image);
+        final outputs = await _session!.run({
+          'x': await OrtValue.fromList(tensor, [1, 3, 48, w]),
+        });
+        final value = outputs.values.first;
+        final nested = await value.asList();
+        final logits = (nested[0] as List)
+            .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
+            .toList();
+        final (text, _) = _ctcDecode(logits);
+        return text;
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      codec.dispose();
+    }
   }
 
   /// 释放 session。

@@ -134,10 +134,10 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       final functionBody =
           WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
 
-      // 执行脚本
+      // 执行脚本（超时 120s，与 agent execute_js/save_script 对齐）
       final jsResult = await controller
           .callAsyncJavaScript(functionBody: functionBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
 
       // 解析返回值
       if (jsResult == null) {
@@ -274,14 +274,14 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       }
     } on TimeoutException {
       LoggerService.instance.w(
-        'FAB添加小说: 提取超时(>60s) domain=${script.domain} url=$currentUrl',
+        'FAB添加小说: 提取超时(>120s) domain=${script.domain} url=$currentUrl',
         category: LogCategory.ai,
         tags: ['headless-webview', 'fab-add-novel', 'timeout'],
       );
       // 超时 -> 降级修复
       await _launchAgent(context, currentUrl, domain, script.chapterListJs,
           FabFailureReason.scriptError,
-          errorMessage: '提取超时(>60s)');
+          errorMessage: '提取超时(>120s)');
     } catch (e) {
       LoggerService.instance.e(
         'FAB添加小说: 提取异常 domain=${script.domain} error=$e',

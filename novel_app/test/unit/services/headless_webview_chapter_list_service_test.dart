@@ -136,5 +136,51 @@ void main() {
       expect(out.chapters.first.title, originalChapterTitle);
       expect(out.chapters.first.url, 'https://a.com/1');
     });
+
+    test('fontFamily=null 降级返回原 record 不调 restoreService', () async {
+      final restore = MockOcrRestoreService();
+      final originalTitle = '小${String.fromCharCode(0xE3E8)}说';
+      final chapters = [
+        Chapter(
+          title: '第${String.fromCharCode(0xE3E9)}章',
+          url: 'https://a.com/1',
+          chapterIndex: 0,
+        ),
+      ];
+      final out =
+          await HeadlessWebViewChapterListService.restoreChapterListIfNeeded(
+        needsOcr: true,
+        title: originalTitle,
+        chapters: chapters,
+        fontFamily: null,
+        restoreService: restore,
+      );
+      expect(out.title, originalTitle);
+      expect(out.chapters.first.title, chapters.first.title);
+      verifyNever(restore.restorePuaInText(originalTitle, null));
+    });
+
+    test('fontFamily="" 降级返回原 record 不调 restoreService', () async {
+      final restore = MockOcrRestoreService();
+      final originalTitle = '小${String.fromCharCode(0xE3E8)}说';
+      final chapters = [
+        Chapter(
+          title: '第${String.fromCharCode(0xE3E9)}章',
+          url: 'https://a.com/1',
+          chapterIndex: 0,
+        ),
+      ];
+      final out =
+          await HeadlessWebViewChapterListService.restoreChapterListIfNeeded(
+        needsOcr: true,
+        title: originalTitle,
+        chapters: chapters,
+        fontFamily: '',
+        restoreService: restore,
+      );
+      expect(out.title, originalTitle);
+      expect(out.chapters.first.title, chapters.first.title);
+      verifyNever(restore.restorePuaInText(originalTitle, null));
+    });
   });
 }

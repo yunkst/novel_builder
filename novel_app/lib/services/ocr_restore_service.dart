@@ -38,10 +38,17 @@ class OcrRestoreResult {
 /// 让本 service 不耦合具体 WebView 实例，运行时钩子和 save_script 验证共用。
 class OcrRestoreService {
   /// 产品构造：通过 Riverpod ref 在需要时读取 [ocrPredictorProvider]。
+  /// 适用于 service / scenario 等能直接拿到 [Ref] 的场景。
   OcrRestoreService(this._ref, this._renderPua) : _recognizeFn = null;
 
-  /// 测试构造：绕开 Riverpod，直接注入识别函数。
-  /// 产品代码勿用。
+  /// 注入构造：直接注入识别函数，绕开 Riverpod [Ref]。
+  ///
+  /// 适用场景：
+  /// - **测试**：单测里没有 ProviderContainer，直接注入 mock/fake 识别函数。
+  /// - **Widget 层**：[ConsumerWidget.build] 只能拿到 [WidgetRef]（非 [Ref]），
+  ///   无法用上面的产品构造。此构造让 widget 也能复用本 service 的编排逻辑。
+  ///
+  /// 名字保留 `forTesting` 历史兼容；行为上产品/测试皆可用。
   OcrRestoreService.forTesting({
     required Future<String> Function(int, String) renderPua,
     required Future<String> Function(String) recognizeImageFn,

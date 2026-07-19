@@ -640,7 +640,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     try {
       final result = await _webviewController
           .callAsyncJavaScript(functionBody: functionBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
 
       // callAsyncJavaScript 返回 CallAsyncJavaScriptResult?
       if (result == null) {
@@ -735,13 +735,13 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       return jsonEncode(response);
     } on TimeoutException {
       LoggerService.instance.w(
-        '执行 JS 超时 (>60s)',
+        '执行 JS 超时 (>120s)',
         category: LogCategory.ai,
         tags: ['agent', 'webview-extract', 'execute_js', 'timeout'],
       );
       return jsonEncode({
         'error': 'JS_TIMEOUT',
-        'message': '脚本执行超过 60 秒未返回',
+        'message': '脚本执行超过 120 秒未返回',
         'script_length': effectiveScript.length,
         'suggestion':
             '检查脚本中是否有死循环、长时间 setTimeout，或在循环中加 await new Promise(r => setTimeout(r, 100)) 让出主线程',
@@ -1786,12 +1786,13 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     return v.trim();
   }
 
-  /// 检查文本中是否含 PUA 私用区码点（U+E000..U+F8FF）。阈值 ≥1 即视为存在字体反爬特征。
+  /// 检查文本中是否含 PUA 私用区码点。阈值 ≥1 即视为存在字体反爬特征。
   ///
-  /// 用 text.runes 逐码点比较，避免在源码字面量里嵌入 PUA 字符（OCR 测试不友好），
-  /// 也避免 RegExp 字符类对 Unicode 转义的解析行为差异。
+  /// 委托给 [isPua]（ocr_restore_service.dart），覆盖 PUA-A/B/C 三段，
+  /// 与运行时 OCR 管道对齐。避免本文件旧实现仅检查 PUA-A 导致 PUA-B/C 误判。
+  /// 用 text.runes 逐码点比较，避免在源码字面量里嵌入 PUA 字符（OCR 测试不友好）。
   static bool _containsPrivateUseArea(String text) {
-    return text.runes.any((r) => r >= 0xE000 && r <= 0xF8FF);
+    return text.runes.any(isPua);
   }
 
   /// 从 jsResult 提取 OCR 模式需要扫描 PUA 的目标文本。
@@ -2084,7 +2085,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           '  2. **重跑模式**（传 run_id）：从 RunStore 加载已注册的脚本执行，零重抄。'
           'run_id 来源：execute_js 的 __meta.run_id、get_cached_script 的 list_run_id/content_run_id。\n'
           '返回值：业务字段平铺到顶层（title/chapters/...），工具元数据在 __meta 内。\n'
-          '脚本超时 60 秒会被自动终止（返回 JS_TIMEOUT）。'
+          '脚本超时 120 秒会被自动终止（返回 JS_TIMEOUT）。'
           '常见错误码: JS_SYNTAX_ERROR / JS_REFERENCE_ERROR / JS_TYPE_ERROR / SCRIPT_VALIDATION_FAILED / RUN_ID_NOT_FOUND。'
           '请根据返回的 suggestion 字段修正。',
       'parameters': {

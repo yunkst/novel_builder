@@ -19,7 +19,7 @@
 /// // 4. 执行
 /// final result = await controller.callAsyncJavaScript(
 ///   functionBody: functionBody,
-/// ).timeout(Duration(seconds: 60));
+/// ).timeout(Duration(seconds: 120));
 ///
 /// // 5. 解析返回值
 /// final jsonStr = WebViewJsExecutor.stringifyJsResult(result?.value);

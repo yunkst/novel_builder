@@ -302,6 +302,36 @@ void main() {
       expect(result['success'], true);
       expect(result['reason'], isNot('ocr_no_pua'));
     });
+
+    // PUA-B (U+F0000-FFFFD) 也视为 PUA，不被 ocr_no_pua 闸误杀。
+    // 验证 F4 修复：_containsPrivateUseArea → isPua（覆盖全部 3 段 PUA 范围）。
+    test('ocr=true chapter_list 标题含 PUA-B (U+0xF0000) → 通过闸（不返回 ocr_no_pua）', () async {
+      final repo = MockSiteScriptRepository();
+      when(repo.updateScriptPart(
+        domain: anyNamed('domain'),
+        scriptType: anyNamed('scriptType'),
+        scriptJs: anyNamed('scriptJs'),
+        ocr: anyNamed('ocr'),
+      )).thenAnswer((_) async => (success: true, id: 'site_list_pua_b', reason: null));
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_list',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: {
+          'title': '书名${String.fromCharCode(0xF0000)}',
+          'chapters': [
+            {'title': '第一\u{D800}章', 'url': 'https://a.com/c1'},
+          ],
+        },
+        repo: repo,
+        restoreService: goodRestore(),
+      );
+
+      expect(result['success'], true);
+      expect(result['reason'], isNot('ocr_no_pua'));
+    });
   });
 
   group('validateAndPersistScript - OCR 验证异常', () {

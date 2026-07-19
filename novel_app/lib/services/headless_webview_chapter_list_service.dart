@@ -46,7 +46,7 @@ import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import '../services/ocr_restore_service.dart';
 import 'headless_webview_errors.dart';
-import 'ocr_render_js.dart';
+import 'ocr_pua_renderer.dart';
 import 'webview_page_loader.dart';
 
 class HeadlessWebViewChapterListService {
@@ -331,15 +331,15 @@ class HeadlessWebViewChapterListService {
     final functionBody =
         WebViewJsExecutor.extractAsyncFunctionBody(resolvedScript);
 
-    // 执行
+    // 执行（超时 120s，与 agent execute_js/save_script 对齐）
     dynamic result;
     try {
       result = await controller
           .callAsyncJavaScript(functionBody: functionBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
     } on TimeoutException {
       LoggerService.instance.w(
-        'HeadlessWebViewChapterList: 脚本执行超时（60s） pageUrl=$pageUrl',
+        'HeadlessWebViewChapterList: 脚本执行超时（120s） pageUrl=$pageUrl',
         category: LogCategory.cache,
         tags: ['headless-webview', 'chapter-list', 'execute_timeout'],
       );
@@ -420,6 +420,16 @@ class HeadlessWebViewChapterListService {
     required OcrRestoreService restoreService,
   }) async {
     if (!needsOcr) return (title: title, chapters: chapters);
+    // 空字体预检：避免 ctx.font='80px ' 导致所有 PUA 渲染成相同占位框 →
+    // ONNX 解码乱码（与 restoreContentIfNeeded 同理，详见 ContentService 注释）。
+    if (fontFamily == null || fontFamily.isEmpty) {
+      LoggerService.instance.w(
+        'HeadlessWebViewChapterList OCR 跳过：fontFamily 为空，降级返回原文',
+        category: LogCategory.cache,
+        tags: ['headless-webview', 'chapter-list', 'ocr', 'skip-empty-font'],
+      );
+      return (title: title, chapters: chapters);
+    }
     try {
       final newTitle =
           (await restoreService.restorePuaInText(title, fontFamily)).text;
@@ -452,27 +462,13 @@ class HeadlessWebViewChapterListService {
 
   /// 渲染单个 PUA 码点为 base64 PNG（供 [OcrRestoreService] 用）。
   ///
-  /// 在已加载反爬字体的页面上跑系统 OCR-JS（[buildOcrRenderJs]）。
-  /// OCR-JS 是合法 async IIFE，[WebViewJsExecutor.extractAsyncFunctionBody]
-  /// 只剥 IIFE 外壳、不校验 `{{URL}}`，可直接用。
-  ///
-  /// 返回值是 base64 字符串（非 JSON），故直接取 [JsResult.value]，
-  /// 不走 `stringifyJsResult` + `jsonDecode`（base64 不是合法 JSON 会抛 FormatException）。
+  /// 委托给共享实现 [renderPuaViaController]，消除跨服务重复。
+  /// 返回值是 base64 字符串（非 JSON），故不走 stringifyJsResult + jsonDecode。
   Future<String> _renderPua(int codepoint, String fontFamily) async {
     if (_controller == null) {
       throw StateError('WebView 未就绪，无法渲染 PUA');
     }
-    final js = buildOcrRenderJs(codepoint, fontFamily);
-    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
-    final result = await _controller!
-        .callAsyncJavaScript(functionBody: functionBody)
-        .timeout(const Duration(seconds: 30));
-    if (result == null || result.error != null) {
-      throw Exception('OCR 渲染失败 cp=$codepoint: ${result?.error}');
-    }
-    final value = result.value;
-    if (value is String) return value;
-    throw Exception('OCR 渲染返回非字符串: $value');
+    return renderPuaViaController(_controller!, codepoint, fontFamily);
   }
 
   // ===== 脚本健康度 =====

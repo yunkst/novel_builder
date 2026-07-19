@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../core/providers/webview_providers.dart';
@@ -17,7 +18,7 @@ import '../core/theme/app_typography.dart';
 import '../models/site_script.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
-import '../services/ocr_render_js.dart';
+import '../services/ocr_pua_renderer.dart';
 import '../services/ocr_restore_service.dart';
 import 'common/bottom_sheet_header.dart';
 import 'empty_states/empty_state_view.dart';
@@ -465,7 +466,7 @@ class _ScriptCard extends ConsumerWidget {
     try {
       final result = await controller
           .callAsyncJavaScript(functionBody: functionBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
 
       if (result == null) {
         resultStr = WebViewJsExecutor.stringifyJsResult(null);
@@ -476,7 +477,7 @@ class _ScriptCard extends ConsumerWidget {
         resultStr = WebViewJsExecutor.stringifyJsResult(result.value);
       }
     } on TimeoutException {
-      errorMsg = '脚本执行超时（>60秒）';
+      errorMsg = '脚本执行超时（>120秒）';
     } catch (e) {
       errorMsg = e.toString();
     }
@@ -828,22 +829,13 @@ class _ScriptCard extends ConsumerWidget {
   }
 
   /// 在当前浏览器 WebView 中渲染单个 PUA 码点 → 返回 base64 PNG。
+  /// 委托给共享实现 [renderPuaViaController]，消除跨模块重复。
   static Future<String> _renderPuaViaController(
     dynamic controller,
     int codepoint,
     String fontFamily,
   ) async {
-    final js = buildOcrRenderJs(codepoint, fontFamily);
-    final functionBody = WebViewJsExecutor.extractAsyncFunctionBody(js);
-    final result = await controller
-        .callAsyncJavaScript(functionBody: functionBody)
-        .timeout(const Duration(seconds: 30));
-    if (result == null || result.error != null) {
-      throw Exception('OCR 渲染失败 cp=$codepoint: ${result?.error}');
-    }
-    final value = result.value;
-    if (value is String) return value;
-    throw Exception('OCR 渲染返回非字符串: $value');
+    return renderPuaViaController(controller as InAppWebViewController, codepoint, fontFamily);
   }
 }
 

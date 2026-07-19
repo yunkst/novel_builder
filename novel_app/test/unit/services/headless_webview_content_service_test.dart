@@ -376,5 +376,31 @@ void main() {
       expect(out, original); // 降级
       verify(restore.restorePuaInText(original, 'F')).called(1);
     });
+
+    test('fontFamily=null 降级返回原文不调 restoreService', () async {
+      final restore = MockOcrRestoreService();
+      final original = '前${String.fromCharCode(0xE3E8)}后';
+      final out = await HeadlessWebViewContentService.restoreContentIfNeeded(
+        needsOcr: true,
+        content: original,
+        fontFamily: null,
+        restoreService: restore,
+      );
+      expect(out, original);
+      verifyNever(restore.restorePuaInText(original, null));
+    });
+
+    test('fontFamily="" 降级返回原文不调 restoreService', () async {
+      final restore = MockOcrRestoreService();
+      final original = '前${String.fromCharCode(0xE3E8)}后';
+      final out = await HeadlessWebViewContentService.restoreContentIfNeeded(
+        needsOcr: true,
+        content: original,
+        fontFamily: '',
+        restoreService: restore,
+      );
+      expect(out, original);
+      verifyNever(restore.restorePuaInText(original, null));
+    });
   });
 }
