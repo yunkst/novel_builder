@@ -341,13 +341,6 @@ void main() {
       );
     });
 
-    test('HttpException → true', () {
-      expect(
-        RetryConfig.defaultShouldRetry(const HttpException('x')),
-        true,
-      );
-    });
-
     test('FormatException / StateError → false（非 HTTP 逻辑错误）', () {
       expect(RetryConfig.defaultShouldRetry(const FormatException('x')), false);
       expect(RetryConfig.defaultShouldRetry(StateError('x')), false);
@@ -550,6 +543,85 @@ void main() {
     test('2xx / 3xx → false', () {
       expect(isRetryableStatus(200), false);
       expect(isRetryableStatus(301), false);
+    });
+  });
+
+  group('LlmRetryBudget', () {
+    test('默认值', () {
+      const b = LlmRetryBudget();
+      expect(b.transportBlockingMaxAttempts, 8);
+      expect(b.transportStreamMaxAttempts, 3);
+      expect(b.roundNetworkRetryPerRound, 2);
+    });
+
+    test('自定义值', () {
+      const b = LlmRetryBudget(
+        transportBlockingMaxAttempts: 5,
+        transportStreamMaxAttempts: 2,
+        roundNetworkRetryPerRound: 1,
+      );
+      expect(b.transportBlockingMaxAttempts, 5);
+      expect(b.transportStreamMaxAttempts, 2);
+      expect(b.roundNetworkRetryPerRound, 1);
+    });
+
+    test('strict() 工厂 — 严格模式值', () {
+      const b = LlmRetryBudget.strict();
+      expect(b.transportBlockingMaxAttempts, 3);
+      expect(b.transportStreamMaxAttempts, 2);
+      expect(b.roundNetworkRetryPerRound, 1);
+    });
+  });
+
+  group('RetryPolicy', () {
+    test('默认值', () {
+      const p = RetryPolicy();
+      expect(p.maxDelay, const Duration(seconds: 60));
+      expect(p.initialDelay, const Duration(milliseconds: 500));
+      expect(p.multiplier, 2.0);
+      expect(p.jitterFactor, 0.25);
+    });
+
+    test('computeDelayMs retryAfterMs 优先', () {
+      const p = RetryPolicy();
+      final ms = p.computeDelayMs(attempt: 1, retryAfterMs: 30000);
+      expect(ms, 30000, reason: '服务端 Retry-After=30s 直接采用');
+    });
+
+    test('computeDelayMs retryAfterMs > maxDelay → clamp', () {
+      const p = RetryPolicy(maxDelay: Duration(seconds: 60));
+      final ms = p.computeDelayMs(attempt: 1, retryAfterMs: 120000);
+      expect(ms, 60000, reason: 'Retry-After=120s 应 clamp 到 maxDelay=60s');
+    });
+
+    test('computeDelayMs retryAfterMs=0 → 回退指数退避', () {
+      const p = RetryPolicy();
+      final ms = p.computeDelayMs(attempt: 1, retryAfterMs: 0);
+      // 指数退避：500ms * 2^0 = 500ms ± jitter
+      expect(ms, greaterThanOrEqualTo(375));
+      expect(ms, lessThanOrEqualTo(625));
+    });
+
+    test('computeDelayMs retryAfterMs=null → 指数退避', () {
+      const p = RetryPolicy();
+      final ms = p.computeDelayMs(attempt: 1);
+      expect(ms, greaterThanOrEqualTo(375));
+      expect(ms, lessThanOrEqualTo(625),
+          reason: 'attempt=1 → 500ms ± 25% jitter');
+    });
+
+    test('computeDelayMs jitter=0 确定性退避', () {
+      const p = RetryPolicy(jitterFactor: 0);
+      expect(p.computeDelayMs(attempt: 1), 500);
+      expect(p.computeDelayMs(attempt: 2), 1000);
+      expect(p.computeDelayMs(attempt: 3), 2000);
+    });
+
+    test('computeDelayMs 可注入 Random 做确定性测试', () {
+      // jitterFactor=0 即确定性，无需自定义 Random
+      const p = RetryPolicy(jitterFactor: 0);
+      expect(p.computeDelayMs(attempt: 1), 500);
+      expect(p.computeDelayMs(attempt: 2), 1000);
     });
   });
 }

@@ -83,18 +83,95 @@ class RetryConfig {
     this.shouldRetry,
   });
 
-  /// 默认重试判定：网络/超时/5xx 重试，4xx / 解析错误不重试
+  /// 默认重试判定：瞬态网络错误（含所有 HTTP 4xx/5xx）重试，逻辑错误不重试。
+  ///
+  /// 自 2026-07-17 起所有 HTTP 错误由 [RetryableHttpException] 统一承载
+  /// （传输层 `_postJsonOnce`/`_postJsonStreamHandshake` 一律抛此类型），
+  /// 故此处不再单独判 `HttpException`（该分支不可达）。
   static bool defaultShouldRetry(Object error) {
     if (error is SocketException) return true;
     if (error is HandshakeException) return true;
     if (error is TimeoutException) return true;
-    if (error is HttpException) return true;
     if (error is RetryableHttpException) return true;
     return false;
   }
 }
 
 final _rand = Random();
+
+/// 统一退避策略 — 合并传输层原有的指数退避 + jitter + Retry-After 感知。
+///
+/// 供 [withRetry] 传输层与 [AgentLoop] 回合层共同使用，避免两套退避算法
+/// 漂移。值类型，不可变，随机数每次调用时从注入的 [random] 读取。
+///
+/// [maxDelay] 单次退避上限，默认 60s。
+/// [initialDelay] 首次重试前等待，默认 500ms。
+/// [multiplier] 退避倍数，默认 2.0。
+/// [jitterFactor] 抖动比例 0..1，默认 0.25（±25%），防雷鸣群。
+class RetryPolicy {
+  final Duration maxDelay;
+  final Duration initialDelay;
+  final double multiplier;
+  final double jitterFactor;
+  final Random? random;
+
+  const RetryPolicy({
+    this.maxDelay = const Duration(seconds: 60),
+    this.initialDelay = const Duration(milliseconds: 500),
+    this.multiplier = 2.0,
+    this.jitterFactor = 0.25,
+    this.random,
+  });
+
+  /// 计算本次重试的退避延迟（毫秒）。
+  ///
+  /// [attempt] 1-based（第 1 次为首次失败、即将第一次重试）。
+  /// [retryAfterMs] 可选：服务端 Retry-After 指示，优先于指数退避；
+  ///   0 或 null 回退指数退避。
+  int computeDelayMs({required int attempt, int? retryAfterMs}) {
+    // 服务端 Retry-After 优先（权威指示）。clamp 到 maxDelay 防恶意大值。
+    // 0 视为无指导意义，回退指数退避（防雷鸣群）。
+    if (retryAfterMs != null && retryAfterMs > 0) {
+      return retryAfterMs.clamp(0, maxDelay.inMilliseconds).toInt();
+    }
+    // 否则指数退避 + 抖动
+    final rng = random ?? _rand;
+    final raw =
+        initialDelay.inMilliseconds * pow(multiplier, attempt - 1);
+    final capped = raw.clamp(0, maxDelay.inMilliseconds).toInt();
+    final jitterRange = (capped * jitterFactor).toInt();
+    final jitter =
+        jitterRange == 0 ? 0 : rng.nextInt(2 * jitterRange) - jitterRange;
+    return (capped + jitter).clamp(0, maxDelay.inMilliseconds).toInt();
+  }
+}
+
+/// LLM 重试预算 — 集中管理传输层/回合层的 maxAttempts。
+///
+/// 替代散落在 [RetryConfig] 默认值、[IoLlmHttpClient] 内联构造、
+/// [AgentLoopConfig] 默认值三处的硬编码数字，单一真理源。
+class LlmRetryBudget {
+  /// 传输层阻塞调用（postJson）最大尝试次数，默认 8
+  final int transportBlockingMaxAttempts;
+
+  /// 传输层流式握手（postJsonStream）最大尝试次数，默认 3
+  final int transportStreamMaxAttempts;
+
+  /// 回合层网络错误重试最大次数，默认 2
+  final int roundNetworkRetryPerRound;
+
+  const LlmRetryBudget({
+    this.transportBlockingMaxAttempts = 8,
+    this.transportStreamMaxAttempts = 3,
+    this.roundNetworkRetryPerRound = 2,
+  });
+
+  /// 快捷构造：严格模式（少重试，快速失败）
+  const LlmRetryBudget.strict()
+    : transportBlockingMaxAttempts = 3,
+      transportStreamMaxAttempts = 2,
+      roundNetworkRetryPerRound = 1;
+}
 
 /// 用 [config] 包裹 [fn] 的执行，失败时按指数退避 + 抖动重试
 ///
@@ -153,19 +230,12 @@ int _computeDelayMs({
   required RetryConfig config,
   int? retryAfterMs,
 }) {
-  // 服务端 Retry-After 优先（权威指示）。clamp 到 maxDelay 防恶意大值。
-  // 0 视为无指导意义，回退指数退避（防雷鸣群）。
-  if (retryAfterMs != null && retryAfterMs > 0) {
-    return retryAfterMs.clamp(0, config.maxDelay.inMilliseconds).toInt();
-  }
-  // 否则指数退避 + 抖动
-  final raw =
-      config.initialDelay.inMilliseconds * pow(config.multiplier, attempt - 1);
-  final capped = raw.clamp(0, config.maxDelay.inMilliseconds).toInt();
-  final jitterRange = (capped * config.jitterFactor).toInt();
-  final jitter =
-      jitterRange == 0 ? 0 : _rand.nextInt(2 * jitterRange) - jitterRange;
-  return (capped + jitter).clamp(0, config.maxDelay.inMilliseconds).toInt();
+  return RetryPolicy(
+    maxDelay: config.maxDelay,
+    initialDelay: config.initialDelay,
+    multiplier: config.multiplier,
+    jitterFactor: config.jitterFactor,
+  ).computeDelayMs(attempt: attempt, retryAfterMs: retryAfterMs);
 }
 
 /// 解析 HTTP Retry-After 头。返回毫秒数；失败返回 null。
@@ -203,4 +273,22 @@ int? parseRetryAfterMs(String? headerValue) {
 /// 2xx/3xx 成功响应不进入此判断（调用方仅在 statusCode >= 400 时调用）。
 bool isRetryableStatus(int statusCode) {
   return statusCode >= 400;
+}
+
+/// 判定异常是否是「瞬态网络错误」——值得重试。
+///
+/// 单一真理源：传输层 [RetryConfig.defaultShouldRetry]、回合层 AgentLoop
+/// 重试判定、UI 分类 [categorizeRetryError] 三处的判定表都应基于此函数，
+/// 避免同一套异常类型表散落多处导致漂移。
+///
+/// - [SocketException] / [HandshakeException] → TCP/TLS 层断开
+/// - [TimeoutException] → 超时
+/// - [RetryableHttpException] → HTTP 4xx/5xx（含 429 限流）
+/// - 其他（FormatException / StateError 等）→ false（逻辑错误不应重试）
+bool isTransientNetworkError(Object e) {
+  if (e is SocketException) return true;
+  if (e is HandshakeException) return true;
+  if (e is TimeoutException) return true;
+  if (e is RetryableHttpException) return true;
+  return false;
 }

@@ -87,7 +87,9 @@ class _RetryBannerState extends State<RetryBanner> {
               Expanded(
                 child: Text(
                   '$prefix ${state.attempt}/${state.maxAttempts}'
-                  ' · ${state.errorCategory}$tail',
+                  ' · ${state.errorCategory.label}'
+                  '${state.httpStatusCode != null ? ' ${state.httpStatusCode}' : ''}'
+                  '$tail',
                   style: TextStyle(color: color, fontSize: 12),
                 ),
               ),

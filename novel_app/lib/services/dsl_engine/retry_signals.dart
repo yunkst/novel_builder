@@ -22,6 +22,20 @@ import 'package:novel_app/utils/retry_helper.dart';
 /// 重试层级
 enum RetryLevel { transport, round }
 
+/// 重试错误类别 — 替代原 [categorizeRetryError] 的字符串返回值。
+///
+/// 展示文案（中文标签）由 [RetryErrorCategoryLabel] extension 在
+/// UI 层（[RetryBanner]）提供，实现 enum → 文案的本地化解耦。
+enum RetryErrorCategory {
+  rateLimited,       // 429 限流
+  requestTimeout,    // 408 请求超时
+  requestError,      // 4xx 其他
+  serverError,       // 5xx
+  networkDisconnected, // Socket/HandshakeException
+  responseTimeout,   // TimeoutException
+  retrying,          // 其他
+}
+
 /// 当前活跃的重试状态
 @immutable
 class RetryState {
@@ -29,8 +43,11 @@ class RetryState {
   final int attempt;
   final int maxAttempts;
   final int delayMs;
-  final String errorCategory;
-  final DateTime receivedAt;
+  final RetryErrorCategory errorCategory;
+
+  /// 可选：HTTP 状态码，仅在 [RetryErrorCategory.requestError]/[serverError]
+  /// 时有值，便于 UI 层拼接 "请求错误 400" 等完整文案。
+  final int? httpStatusCode;
 
   const RetryState({
     required this.level,
@@ -38,7 +55,7 @@ class RetryState {
     required this.maxAttempts,
     required this.delayMs,
     required this.errorCategory,
-    required this.receivedAt,
+    this.httpStatusCode,
   });
 }
 
@@ -56,16 +73,8 @@ class RetrySignals {
     required int maxAttempts,
     required int delayMs,
     required Object error,
-  }) {
-    notifier.value = RetryState(
-      level: RetryLevel.transport,
-      attempt: attempt,
-      maxAttempts: maxAttempts,
-      delayMs: delayMs,
-      errorCategory: categorizeRetryError(error),
-      receivedAt: DateTime.now(),
-    );
-  }
+  }) =>
+      _report(RetryLevel.transport, attempt, maxAttempts, delayMs, error);
 
   /// 回合层 agent_loop 报告一次重试
   void reportRound({
@@ -73,14 +82,26 @@ class RetrySignals {
     required int maxAttempts,
     required int delayMs,
     required Object error,
-  }) {
+  }) =>
+      _report(RetryLevel.round, attempt, maxAttempts, delayMs, error);
+
+  /// 报告一次重试 — [reportTransport]/[reportRound] 的共用实现,
+  /// 仅 [RetryLevel] 不同,合并避免字段漂移。
+  void _report(
+    RetryLevel level,
+    int attempt,
+    int maxAttempts,
+    int delayMs,
+    Object error,
+  ) {
     notifier.value = RetryState(
-      level: RetryLevel.round,
+      level: level,
       attempt: attempt,
       maxAttempts: maxAttempts,
       delayMs: delayMs,
       errorCategory: categorizeRetryError(error),
-      receivedAt: DateTime.now(),
+      httpStatusCode:
+          error is RetryableHttpException ? error.statusCode : null,
     );
   }
 
@@ -98,26 +119,54 @@ class RetrySignals {
   }
 }
 
-/// 共享错误分类工具 — 传输层与回合层共用,避免映射逻辑重复
+/// 共享错误分类工具 — 传输层与回合层共用，避免映射逻辑重复。
 ///
-/// 429 → 限流
-/// 408 → 请求超时
-/// 4xx 其他 → 请求错误 {code}
-/// 5xx → 服务端 {code}
-/// Socket/HandshakeException → 网络断开
-/// TimeoutException → 响应超时
-/// 其它 → 重试中
-String categorizeRetryError(Object error) {
+/// 返回 [RetryErrorCategory] enum（非字符串），展示文案由
+/// [RetryErrorCategoryLabel] 在 UI 层映射，实现解耦。
+///
+/// - 429 → [RetryErrorCategory.rateLimited]
+/// - 408 → [RetryErrorCategory.requestTimeout]
+/// - 4xx 其他 → [RetryErrorCategory.requestError]
+/// - 5xx → [RetryErrorCategory.serverError]
+/// - Socket/HandshakeException → [RetryErrorCategory.networkDisconnected]
+/// - TimeoutException → [RetryErrorCategory.responseTimeout]
+/// - 其它 → [RetryErrorCategory.retrying]
+RetryErrorCategory categorizeRetryError(Object error) {
   if (error is RetryableHttpException) {
     final code = error.statusCode;
-    if (code == 429) return '限流';
-    if (code == 408) return '请求超时';
-    if (code >= 500) return '服务端 $code';
-    return '请求错误 $code';
+    if (code == 429) return RetryErrorCategory.rateLimited;
+    if (code == 408) return RetryErrorCategory.requestTimeout;
+    if (code >= 500) return RetryErrorCategory.serverError;
+    return RetryErrorCategory.requestError;
   }
   if (error is SocketException || error is HandshakeException) {
-    return '网络断开';
+    return RetryErrorCategory.networkDisconnected;
   }
-  if (error is TimeoutException) return '响应超时';
-  return '重试中';
+  if (error is TimeoutException) return RetryErrorCategory.responseTimeout;
+  return RetryErrorCategory.retrying;
+}
+
+/// [RetryErrorCategory] → 中文展示文案的 UI 层映射。
+///
+/// 放在 [RetryBanner] 之外、与 enum 同文件，便于集中维护文案；
+/// i18n 未来可在此扩展多语言。
+extension RetryErrorCategoryLabel on RetryErrorCategory {
+  String get label {
+    switch (this) {
+      case RetryErrorCategory.rateLimited:
+        return '限流';
+      case RetryErrorCategory.requestTimeout:
+        return '请求超时';
+      case RetryErrorCategory.requestError:
+        return '请求错误';
+      case RetryErrorCategory.serverError:
+        return '服务端错误';
+      case RetryErrorCategory.networkDisconnected:
+        return '网络断开';
+      case RetryErrorCategory.responseTimeout:
+        return '响应超时';
+      case RetryErrorCategory.retrying:
+        return '重试中';
+    }
+  }
 }
