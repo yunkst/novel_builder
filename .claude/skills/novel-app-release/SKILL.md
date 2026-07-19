@@ -9,11 +9,14 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 
 此技能用于自动化 Novel Flutter 应用的发布流程。**由 Claude 执行时,changelog 由 AI 分析代码变更后撰写**(高质量、语义化);脚本本身保留规则生成作为 CI / 纯手动运行的兜底。
 
+**⚠️ 默认发布预览版**。除非用户明确说"发稳定版"、"发正式版"、"stable release",否则一律按预览版发布(tag 含 `-preview.N` 后缀,只有开启「获取预览版」开关的用户能收到)。
+
 发布流程:
 1. **确认版本号** — `pubspec.yaml` 的 `version` 已递增
-2. **生成更新日志** — Claude 分析 git diff/log,撰写面向用户的 changelog
-3. **运行发布脚本** — 预检(analyze + test + build)→ commit → tag → push → 等 CI
-4. **报告结果** — CI 成功即发布完成
+2. **确定发布类型** — 默认预览版,除非用户明确要求稳定版
+3. **生成更新日志** — Claude 分析 git diff/log,撰写面向用户的 changelog
+4. **运行发布脚本** — 预检(analyze + test + build)→ commit → tag → push → 等 CI
+5. **报告结果** — CI 成功即发布完成
 
 > 推送 tag 后,**GitHub Actions**(`.github/workflows/flutter-release.yml`)自动构建 Release APK 并创建 GitHub Release。
 > **CI 检查**:push 后等待约 10 分钟(释放构建时间),通过 `gh run list` 确认成功。
@@ -22,9 +25,9 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 
 - 用户请求发布新版本应用
 - 用户说"发布 APP"、"publish new version"、"deploy app update"
-- 用户说"发预览版"、"发 preview" → 走预览版通道(tag 含 `-preview.N`,见下方「发布通道」)
 
-> **预览版 vs 稳定版选择**:平时迭代默认发预览版(只推送给愿意尝鲜的用户);经过验证后再发同名稳定版推送给所有用户。详见「版本管理 → 发布通道」。
+> **默认预览版**:上述任一触发,**默认按预览版发布**(tag `vX.Y.Z-preview.N`),只推送给开启「获取预览版」开关的用户。
+> 仅当用户**明确**说"发稳定版"、"发正式版"、"发 stable"、"给所有用户更新"时,才走稳定版通道(tag `vX.Y.Z`,推送给所有用户)。
 
 ## 环境要求
 
@@ -33,6 +36,26 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 - **Flutter SDK 3.x (stable)** — 预检需要(analyze + test + build apk)
 
 ## 执行流程
+
+### 第零步:确定发布类型(预览版 / 稳定版)
+
+| 用户表述 | 发布类型 | 版本号示例 | 推送范围 |
+|---------|---------|-----------|---------|
+| "发布"、"发个新版"、"发 APP"(默认) | **预览版** | `2.0.0-preview.1+108` | 仅开启开关的用户 |
+| "发预览版"、"发 preview" | **预览版** | `2.0.0-preview.1+108` | 仅开启开关的用户 |
+| "发稳定版"、"发正式版"、"发 stable" | 稳定版 | `2.0.0+108` | 所有用户 |
+
+**预览版版本号推导**(默认路径):
+- 查看上一个 tag(`git describe --tags --abbrev=0`)
+- 若上个是稳定版 `vX.Y.Z` → 本次预览版 `vX.Y.Z-preview.1`
+- 若上个是预览版 `vX.Y.Z-preview.N` → 本次 `vX.Y.Z-preview.{N+1}`(同版本继续迭代)
+- version_code 始终递增
+
+**稳定版版本号推导**(仅用户明确要求):
+- 取当前预览版基线 `vX.Y.Z-preview.N`,去掉后缀 → 稳定版 `vX.Y.Z`
+- version_code 始终递增
+
+> 判定不准时直接问用户,不要猜。尤其"发稳定版"会推送给所有用户,影响面大,务必确认。
 
 ### 第一步:确认版本号已更新
 
@@ -220,13 +243,17 @@ fi
   > 不用 `per_page=1`:GitHub `/releases` 默认排序在 prerelease 存在时不可靠(社区讨论 #21901),
   > 可能返回 semver 更高的稳定版而非时间最新的预览版。客户端显式排序确保拿到最新发布的版本。
 
-#### 发布预览版
+#### 发布预览版(默认)
 
-平时迭代优先发预览版,验证无误后再发同名稳定版:
+**除非用户明确要求稳定版,否则一律发预览版。** 预览版只推送给开启「获取预览版」开关的用户,适合平时迭代快速验证。
+
+版本号推导(见「第零步」):
+- 上个稳定版 `vX.Y.Z` → 本次 `vX.Y.Z-preview.1`
+- 上个预览版 `vX.Y.Z-preview.N` → 本次 `vX.Y.Z-preview.{N+1}`
 
 ```yaml
-# pubspec.yaml
-version: 2.0.0+108  # → 预览版改为 2.0.0-preview.1+108
+# pubspec.yaml 示例(从 2.0.0+107 发首个预览版)
+version: 2.0.0-preview.1+108
 ```
 
 ```bash
@@ -237,9 +264,9 @@ CHANGELOG="..." python .claude/skills/novel-app-release/scripts/build_and_upload
 
 脚本会创建 `v2.0.0-preview.1` tag,CI 自动标记为 prerelease,只有开启预览版的用户能收到。
 
-#### 预览版转稳定版
+#### 预览版转稳定版(用户明确要求时)
 
-验证预览版无误后,去掉 `-preview.N` 后缀发同名稳定版:
+当用户明确说"发稳定版"时,去掉 `-preview.N` 后缀发同名稳定版,推送给所有用户:
 
 ```yaml
 # pubspec.yaml
