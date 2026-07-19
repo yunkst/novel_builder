@@ -31,7 +31,7 @@ class BrowserSettingsService {
 
   /// 桌面模式注入 JS：把 viewport meta 锁死为桌面宽，让响应式站点走 PC 布局。
   ///
-  /// 三层防护（应对站点 HTML/JS 篡改 viewport）：
+  /// 双层防护（应对站点 HTML/JS 篡改 viewport）：
   /// 1. **立即改写**：forceViewport 立刻执行一次，把 meta content 改成桌面宽；
   ///    找不到 meta 则创建并 prepend 到 head 最前，确保早于站点可能声明的
   ///    viewport meta 生效。
@@ -39,8 +39,6 @@ class BrowserSettingsService {
   ///    attributes(content,name)，站点一旦把宽度改回 device-width（或动态
   ///    新建 viewport meta、SPA 路由切换重建 head），瞬间改回 1200。解决旧版
   ///    只在 DOMContentLoaded 兜底一次、被站点后续 JS 覆盖的问题。
-  /// 3. **innerWidth/outerWidth 劫持**：对付不看 meta、纯靠 JS 算宽度的站点
-  ///    （window.matchMedia / innerWidth 断点判断）。
   ///
   /// UA 自适配守卫：仅当 UA 含 `Windows NT`（桌面 UA）时执行；手机 UA（空串=
   /// 系统默认）直接 return。**注**：initialUserScripts 对所有导航无条件注入，
@@ -61,7 +59,7 @@ class BrowserSettingsService {
   // UA 自适配：仅桌面 UA 执行；手机 UA（空串=系统默认）直接 return 不破坏手机布局
   if (!/Windows NT/.test(navigator.userAgent)) return;
 
-  const DESKTOP_WIDTH = 'width=1200, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+  const DESKTOP_WIDTH = 'width=1200, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
 
   // 改写/创建 viewport meta 为桌面宽；创建时 prepend 到 head 最前，确保最先生效
   function forceViewport() {
@@ -97,10 +95,6 @@ class BrowserSettingsService {
     attributes: true,
     attributeFilter: ['content', 'name']
   });
-
-  // 3. 劫持窗口宽度：对付纯靠 JS（matchMedia/innerWidth）判断断点的站点
-  Object.defineProperty(window, 'innerWidth', { get: function() { return 1200; } });
-  Object.defineProperty(window, 'outerWidth', { get: function() { return 1200; } });
 })();
 ''';
 

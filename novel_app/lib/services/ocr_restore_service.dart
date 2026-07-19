@@ -9,6 +9,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/ocr_providers.dart';
+import 'logger_service.dart';
 
 /// 判断码点是否落在 PUA（私用区）三段之一。
 /// - U+E000-F8FF   PUA-A
@@ -71,7 +72,14 @@ class OcrRestoreService {
         final imageBase64 = await _renderPua(cp, fontFamily ?? '');
         final decoded = await _recognizeImage(imageBase64);
         puaToChar[cp] = decoded;
-      } catch (_) {
+      } catch (e, stackTrace) {
+        // 单字符失败，留 □。记录日志用于诊断闪退根因（ONNX native crash 不可捕获，
+        // 但 Dart 层异常如 StateError / PlatformException / TimeoutException 在此记录）。
+        LoggerService.instance.w(
+          'OCR 单字还原失败 cp=0x${cp.toRadixString(16)} fontFamily=$fontFamily: $e',
+          category: LogCategory.ai,
+          tags: ['ocr', 'restore-pua', 'char-failed'],
+        );
         puaToChar[cp] = ''; // 单字符失败，留 □
       }
     }

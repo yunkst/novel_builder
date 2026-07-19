@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/theme/app_colors.dart';
-import '../services/browser_settings_service.dart';
 import '../services/logger_service.dart';
 import '../widgets/webview_address_bar.dart';
 import '../widgets/bookmark_panel.dart';
@@ -38,6 +37,18 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
   bool _addressBarFocused = false;
   final _addressBarKey = GlobalKey<WebViewAddressBarState>();
 
+  // ============================================================
+  // InteractiveViewer 桌面模式验证状态
+  // ============================================================
+
+  /// InteractiveViewer 的 TransformationController
+  final TransformationController _transformController =
+      TransformationController();
+
+  /// 桌面模式 WebView 的估计高度。设为屏宽比例对应的高度。
+  /// 1200px 宽对应 content，高度随内容自然增长。
+  static const double _desktopWebViewWidth = 1200.0;
+
   /// 在网页 document 上安装 touchstart/mousedown 监听器，
   /// 用户点击网页任何内容时通过 JS handler 通知 Flutter 取消地址栏焦点。
   static const String _installWebViewTapHandlerJs = '''
@@ -56,6 +67,25 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
 })();
 ''';
 
+  /// 单拍诊断 JS：输出当前 innerWidth / innerHeight / viewport / UA
+  static const String _diagnosticJs = r'''
+(function(){
+  var m = document.querySelector('meta[name="viewport"]');
+  window.__desktopDiag = JSON.stringify({
+    ua: navigator.userAgent,
+    platform: navigator.platform,
+    maxTouch: navigator.maxTouchPoints,
+    viewport: m ? m.content : '(none)',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    screenW: screen.width,
+    screenH: screen.height,
+    url: location.href
+  });
+  return window.__desktopDiag;
+})();
+''';
+
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(webviewIsLoadingProvider);
@@ -63,9 +93,10 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
     final notifier = ref.read(webviewControllerProvider.notifier);
     final desktopMode = ref.watch(browserDesktopModeProvider).value ?? false;
 
-    // 桌面模式变化（含首次 loading->data 与手动 toggle）-> 运行时切换 WebView
+    // 桌面模式变化（仅手动 toggle）-> 运行时切换 WebView 设置
+    // 跳过首次 loading->data 转换（prev == null），避免启动时不必要的 reload
     ref.listen<AsyncValue<bool>>(browserDesktopModeProvider, (prev, next) {
-      if (next is AsyncData<bool>) {
+      if (prev != null && next is AsyncData<bool>) {
         ref
             .read(webviewControllerProvider.notifier)
             .applyDesktopMode(next.value);
@@ -77,16 +108,12 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
       canPop: !widget.active,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        // WebView 有浏览历史 → 后退；没有历史 → 退出浏览器页面
-        // 添加超时保护：canGoBack() 是 platform channel 异步调用，
-        // 在 Android 某些 WebView 版本上，无历史时可能永久挂起导致 APP 卡死
         bool canBack;
         try {
           canBack = await notifier.canGoBack().timeout(
                 const Duration(milliseconds: 500),
               );
         } catch (_) {
-          // 超时或异常时，默认认为不能后退，直接退出浏览器页面
           canBack = false;
         }
         if (canBack) {
@@ -95,7 +122,6 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                   const Duration(seconds: 3),
                 );
           } catch (_) {
-            // goBack() 超时，直接退出浏览器页面
             if (context.mounted) {
               Navigator.of(context).pop();
             }
@@ -197,95 +223,13 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
                     backgroundColor:
                         context.appColors.agentAccent.withValues(alpha: 0.15),
                   ),
-                // WebView 主体
+                // WebView 主体：桌面模式走 InteractiveViewer 验证分支
                 Expanded(
-                  child: InAppWebView(
-                    initialUrlRequest:
-                        URLRequest(url: WebUri('https://so.com')),
-                    initialSettings: desktopModeSettings(desktopMode),
-                    // 桌面模式：viewport 覆盖脚本经 initialUserScripts 在
-                    // AT_DOCUMENT_START 注入，对每次导航（含 reload）都会重新执行
-                    // （flutter_inappwebview 文档：initial page load and any
-                    // subsequent navigations），早于站点 JS，赶在响应式断点首次
-                    // 判断前拨正为桌面宽。脚本内自带 UA 自适配，手机 UA 直接 return。
-                    initialUserScripts: UnmodifiableListView<UserScript>([
-                      UserScript(
-                        source:
-                            BrowserSettingsService.desktopViewportOverrideJs,
-                        // AT_DOCUMENT_START：navigator 覆盖必须早于站点 JS 执行，
-                        // 否则站点读取时机已过，覆盖无效。viewport meta 改写内部
-                        // 监听了 DOMContentLoaded 兜底。
-                        injectionTime:
-                            UserScriptInjectionTime.AT_DOCUMENT_START,
-                      ),
-                      // 监听网页区域 touchstart/mousedown，回调 Flutter 取消地址栏焦点
-                      UserScript(
-                        source: _installWebViewTapHandlerJs,
-                        injectionTime:
-                            UserScriptInjectionTime.AT_DOCUMENT_START,
-                      ),
-                    ]),
-                    onWebViewCreated: (controller) {
-                      notifier.setController(controller);
-                      // 注册 JS handler：用户点击网页时由网页端调起此 handler，
-                      // Flutter 收到后取消地址栏焦点。
-                      controller.addJavaScriptHandler(
-                        handlerName: 'onWebViewTouched',
-                        callback: (arguments) {
-                          _unfocusAddressBar();
-                          return null;
-                        },
-                      );
-                    },
-                    onLoadStart: (controller, url) {
-                      notifier.handleLoadStart(url);
-                    },
-                    onLoadStop: (controller, url) {
-                      notifier.handleLoadStop(url);
-                      // 桌面模式诊断：读站点实际看到的 UA / platform / viewport / width，
-                      // 写 flutter log。验证 initialUserScripts（AT_DOCUMENT_START）是否
-                      // 让站点在首次布局前就按桌面宽渲染：width≈1200 即生效；若不是，说明
-                      // document-start 注入在该 Android 版本未生效（另查 androidx.webkit 支持）。
-                      // 注：onLoadStop 已晚于首次布局，故不再在此重跑 viewport 覆盖兜底——
-                      // initialUserScripts 对每次导航都会重新注入（flutter_inappwebview 文档）。
-                      final isDesktop =
-                          ref.read(browserDesktopModeProvider).value ?? false;
-                      if (isDesktop) {
-                        controller.evaluateJavascript(source: r'''
-(function(){
-  var m = document.querySelector('meta[name="viewport"]');
-  window.__desktopDiag = JSON.stringify({
-    ua: navigator.userAgent,
-    platform: navigator.platform,
-    maxTouch: navigator.maxTouchPoints,
-    viewport: m ? m.content : '(none)',
-    width: window.innerWidth,
-    url: location.href
-  });
-  return window.__desktopDiag;
-})();
-''').then((value) {
-                          // evaluateJavascript 返回值已自动 jsonDecode（Android WebView2 行为）
-                          LoggerService.instance.d(
-                            'WebView 桌面化诊断: $value',
-                            category: LogCategory.network,
-                            tags: ['webview', 'desktop-mode', 'diag'],
-                          );
-                        });
-                      }
-                    },
-                    onProgressChanged: (controller, progress) {
-                      notifier.handleProgress(progress);
-                    },
-                    onReceivedError: (controller, request, error) {
-                      notifier.handleError(error);
-                    },
-                  ),
+                  child: _buildWebView(desktopMode, notifier),
                 ),
               ],
             ),
             // 右下角「添加小说」悬浮按钮
-            // 仅在当前域名有提取脚本时显示
             const Positioned(
               right: 16,
               bottom: 16,
@@ -295,6 +239,112 @@ class _WebViewBrowserScreenState extends ConsumerState<WebViewBrowserScreen> {
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // WebView 构建
+  // ============================================================
+
+  /// 根据桌面/手机模式构建 WebView
+  ///
+  /// 桌面模式（InteractiveViewer 验证分支）：
+  /// - WebView 放在 [SizedBox(width: 1200)] 中，物理宽度 = 1200px
+  /// - 外层 [InteractiveViewer] 负责双指缩放（panEnabled=false，单指不拦截）
+  /// - **验证目的**：确认单指手势能否穿透 InteractiveViewer 到达 WebView
+  /// - 不再注入 viewportOverrideJs（不需要了，物理宽度已足够）
+  /// - UA 仍设为桌面 UA
+  ///
+  /// 手机模式：保持原有实现不变。
+  ///
+  /// **关键**：InAppWebView 本身始终挂载在树中（key 不变），只是外层是否包裹
+  /// InteractiveViewer + SizedBox 会随 [desktopMode] 变化。这样切换桌面模式时
+  /// Flutter 只重建外层 wrapper 而不销毁 WebView，保持页面状态和浏览历史。
+  Widget _buildWebView(bool desktopMode, WebViewControllerNotifier notifier) {
+    // InAppWebView 本体：两种模式共用同一个 widget 实例
+    final webView = InAppWebView(
+      initialUrlRequest: URLRequest(url: WebUri('https://so.com')),
+      initialSettings: desktopModeSettings(desktopMode),
+      initialUserScripts: UnmodifiableListView<UserScript>([
+        UserScript(
+          source: _installWebViewTapHandlerJs,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      ]),
+      onWebViewCreated: (controller) {
+        notifier.setController(controller);
+        controller.addJavaScriptHandler(
+          handlerName: 'onWebViewTouched',
+          callback: (arguments) {
+            _unfocusAddressBar();
+            return null;
+          },
+        );
+      },
+      onLoadStart: (controller, url) {
+        notifier.handleLoadStart(url);
+      },
+      onLoadStop: (controller, url) {
+        notifier.handleLoadStop(url);
+        if (desktopMode) {
+          controller.evaluateJavascript(source: _diagnosticJs).then((value) {
+            LoggerService.instance.d(
+              'WebView 桌面化诊断: $value',
+              category: LogCategory.network,
+              tags: ['webview', 'desktop-mode', 'diag'],
+            );
+          });
+        }
+      },
+      onProgressChanged: (controller, progress) {
+        notifier.handleProgress(progress);
+      },
+      onReceivedError: (controller, request, error) {
+        notifier.handleError(error);
+      },
+    );
+
+    // 桌面模式：用 InteractiveViewer 包裹，物理宽 1200px
+    //
+    // InteractiveViewer(constrained: false) 让子组件可以有自己的"世界尺寸"
+    // （1200px 宽），再由 Matrix4 初始缩放缩到屏宽。这是方案的核心——
+    // WebView 在 Android 上拿到真实的 1200px 物理宽度，CSS 断点命中桌面分支。
+    //
+    // 已知问题：Platform View（WebView）在 constrained:false 的 InteractiveViewer
+    // 中可能渲染不全。这是 Android TextureView/VirtualDisplay 的固有行为——
+    // 系统只给 Platform View 分配屏幕可见区域的纹理大小。
+    if (desktopMode) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final initialScale = screenWidth / _desktopWebViewWidth;
+
+      // 在 Matrix4 中设初始缩放
+      _transformController.value =
+          Matrix4.diagonal3Values(initialScale, initialScale, 1.0);
+
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final availableHeight = constraints.maxHeight;
+
+          return InteractiveViewer(
+            transformationController: _transformController,
+            panEnabled: false,
+            scaleEnabled: true,
+            minScale: 0.5,
+            maxScale: 3.0,
+            constrained: false,
+            child: SizedBox(
+              width: _desktopWebViewWidth,
+              // 高度按反算：缩放后应填满 availableHeight
+              // 世界高度 = availableHeight / initialScale
+              height: availableHeight / initialScale,
+              child: webView,
+            ),
+          );
+        },
+      );
+    }
+
+    // 手机模式：直接返回 WebView，不包裹
+    return webView;
   }
 
   /// 取消地址栏焦点（用户在网页内点击时由 JS handler 触发）

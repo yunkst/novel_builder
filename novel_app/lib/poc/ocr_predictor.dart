@@ -68,6 +68,9 @@ class OcrPredictor {
   /// 返回 (decodedText, rawIndexSequence)。
   @Deprecated('PoC 用，产品路径用 recognizeImage(base64Png)。Task 15 清理时移除。')
   Future<(String, List<int>)> recognizeGlyph(int codepoint) async {
+    if (_session == null) {
+      throw StateError('OCR 模型尚未加载完成，请稍后重试');
+    }
     final img = await _render(codepoint);
     if (img == null) return ('', <int>[]);
 
@@ -90,7 +93,12 @@ class OcrPredictor {
   /// 与 recognizeGlyph 的区别：本方法不自己渲染（渲染在 WebView canvas），
   /// 只做 base64 → ui.Image → 预处理 → onnx 推理 → CTC 解码。
   /// 预处理 / CTC 解码完全复用 PoC 已验证的 [_preprocess] / [_ctcDecode]。
+  ///
+  /// 抛出 [StateError] 如果模型尚未加载（防御 _session 空指针崩溃）。
   Future<String> recognizeImage(String base64Png) async {
+    if (_session == null) {
+      throw StateError('OCR 模型尚未加载完成，请稍后重试');
+    }
     final bytes = base64Decode(base64Png);
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();

@@ -363,6 +363,33 @@ void main() {
         ocr: anyNamed('ocr'),
       ));
     });
+
+    test('restorePuaInText 抛 StateError（模型未加载）→ 转 internal_error 不闪退', () async {
+      // 模拟 OcrPredictor._session 为 null 时 recognizeImage 抛 StateError，
+      // 在 restorePuaInText 内 catch 后 decodedCount=0 → decodedRatio=0 < 0.8
+      // → decoded_ratio_below_threshold，不会冒泡到外层。
+      final repo = MockSiteScriptRepository();
+      final svc = MockOcrRestoreService();
+      when(svc.verifyFontFamily(any)).thenAnswer((_) async => true);
+      // 模拟：所有 PUA 都渲染/识别失败，返回 decodedCount=0
+      when(svc.restorePuaInText(any, any))
+          .thenAnswer((_) async => OcrRestoreResult('□□□□', 0, 4));
+      when(svc.readableRatio('□□□□')).thenReturn(0.0);
+
+      final result = await WebViewExtractScenario.validateAndPersistScript(
+        domain: 'a.com',
+        scriptType: 'chapter_content',
+        ocr: true,
+        scriptJs: 'js',
+        jsResult: contentResult(),
+        repo: repo,
+        restoreService: svc,
+      );
+
+      // 不应闪退，应优雅返回 readable_ratio_below_threshold
+      expect(result['success'], false);
+      expect(result['reason'], anyOf('readable_ratio_below_threshold', 'decoded_ratio_below_threshold'));
+    });
   });
 
   group('validateAndPersistScript - 落库', () {

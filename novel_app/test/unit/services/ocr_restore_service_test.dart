@@ -52,6 +52,19 @@ void main() {
       expect(r.decodedCount, 1);
     });
 
+    test('recognizeImage 抛 StateError（模型未加载）该字符留 □ 不闪退', () async {
+      final svc = _buildService(
+        renderPua: (cp, _) async => 'mock_b64_$cp',
+        recognizeImage: (_) async => throw StateError('OCR 模型尚未加载完成'),
+      );
+      final text = '${String.fromCharCode(0xE3E8)}${String.fromCharCode(0xE3E9)}';
+      final r = await svc.restorePuaInText(text, 'F');
+      // 不应闪退：两个 PUA 都失败留 □，decodedCount=0
+      expect(r.text, '□□');
+      expect(r.decodedCount, 0);
+      expect(r.totalPuaCount, 2);
+    });
+
     test('重复 PUA：decodedCount 按码点去重，decodedRatio 不超 1.0', () async {
       final svc = _buildService(
         renderPua: (cp, _) async => 'mock_$cp',

@@ -47,6 +47,15 @@ void main() {
       final src = await File('lib/poc/ocr_predictor.dart').readAsString();
       expect(src, contains('@Deprecated'));
     });
+
+    test('recognizeImage _session=null 时抛 StateError 而非 NPE', () async {
+      final ocr = OcrPredictor();
+      // 不调 load()，_session 为 null
+      expect(
+        () => ocr.recognizeImage('iVBORw0KGgo='), // 随意 base64
+        throwsA(isA<StateError>()),
+      );
+    });
   });
 
   // ── 真实推理测试（需 onnxruntime 原生库，不可用则跳过）──
