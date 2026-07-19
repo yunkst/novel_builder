@@ -426,9 +426,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: const Text('开启后可收到最新的预览版本'),
                 value: _isPreviewChannel,
                 onChanged: (value) async {
-                  await AppUpdateService.setPreviewChannelEnabled(value);
+                  // 关闭预览版通道不需要确认，直接关闭
+                  if (!value) {
+                    await AppUpdateService.setPreviewChannelEnabled(false);
+                    setState(() {
+                      _isPreviewChannel = false;
+                    });
+                    return;
+                  }
+
+                  // 开启预览版通道需要确认
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('⚠️ 开启预览版通道'),
+                      content: const Text(
+                        '预览版极不稳定，可能存在崩溃、数据丢失等问题，强烈不建议开启。\n\n'
+                        '仅建议开发者和测试人员在专用设备上使用。\n\n'
+                        '确定要继续开启吗？',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('确认开启', style: TextStyle(color: Colors.orange)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirmed != true) return;
+
+                  await AppUpdateService.setPreviewChannelEnabled(true);
                   setState(() {
-                    _isPreviewChannel = value;
+                    _isPreviewChannel = true;
                   });
                 },
               ),
