@@ -276,6 +276,7 @@ nul
 !LICENSE*
 !TODO*
 !.gitkeep
+!**/cpp/CMakeLists.txt
 
 # 主题预览产物（设计稿/截图，非源码）
 design_preview/
