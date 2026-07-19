@@ -32,8 +32,9 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Hero), findsOneWidget);
-    // 点击任意位置应触发 pop
-    await tester.tap(find.byType(ColoredBox));
+    // 点击任意位置应触发 pop。MaterialApp 也有一个 ColoredBox（scaffoldBackground），
+    // 故用 .at(0) 取 imageBuilder 注入的全屏 ColoredBox 进行点击。
+    await tester.tap(find.byType(ColoredBox).at(0));
     await tester.pump();
 
     expect(observer.popped, isTrue);
