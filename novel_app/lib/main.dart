@@ -16,6 +16,7 @@ import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/llm_logger/llm_logger.dart';
 import 'services/log_reporter_service.dart';
+import 'services/native_crash_reporter.dart';
 import 'services/novel_agent/agent_scenario.dart';
 import 'widgets/agent_chat/agent_floating_button.dart';
 
@@ -301,6 +302,12 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       category: LogCategory.ui,
       tags: ['lifecycle', 'init'],
     );
+    // 检测上次 native crash：post-frame 后弹框（需要 BuildContext）。
+    // 只弹一次（_HomePageState 在 app 生命周期内只 initState 一次）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      NativeCrashReporter.checkAndReport(context);
+    });
   }
 
   @override
