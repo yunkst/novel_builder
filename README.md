@@ -19,7 +19,7 @@
 
 ## ✨ 功能特性
 
-### 📱 Flutter 移动应用（Flutter 3.0+，App 版本 2.0.2-preview.1+110）
+### 📱 Flutter 移动应用（Flutter 3.0+）
 - **离线优先**：本地 SQLite（v39）做唯一权威存储
 - **Headless WebView 章节提取**：前端 JS 提取脚本（`site_scripts` 表），不依赖服务端爬虫
 - **PP-OCRv6 字体反爬还原**：番茄小说等 PUA 编码正文可读
@@ -31,7 +31,7 @@
 - **模型管理**：列出工作流 + 模型目录浏览 + 模型分块上传（init/chunk/status/complete/cancel）
 - **数据库备份**：客户端 .db 上传/列表/下载/删除
 - **客户端日志**：批量 1–50 条/次持久化
-- **Docker 部署**：docker-compose 一键启动后端 + PostgreSQL（容器内不暴露）
+- **Docker 部署**：docker compose 一键启动后端 + PostgreSQL（容器内不暴露）
 
 ### 🤖 AI 集成（DSL Engine + Agent Chat + ComfyUI）
 - **DSL Engine**：本地 LLM 工作流引擎（OpenAI 兼容 API；2026-06-09 已与 Dify 完全解耦）
@@ -143,7 +143,7 @@ novel_builder/
 │   │   ├── screens/       # 页面组件（24+）
 │   │   ├── widgets/       # 可复用组件（50+，含 agent_chat/reader/character 等）
 │   │   ├── services/      # 业务服务（DSL Engine / Agent / Headless WebView / OCR 等）
-│   │   ├── repositories/  # 数据仓库层（15 个 Repository）
+│   │   ├── repositories/  # 数据仓库层（12 个 Repository）
 │   │   ├── models/        # 数据模型（25 个 Model）
 │   │   └── utils/         # 工具函数
 │   ├── android/           # Android 平台配置
