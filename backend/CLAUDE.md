@@ -25,8 +25,10 @@ Python 后端是 Novel Builder 平台的 AI 与配套服务，提供 FastAPI 驱
 
 - **主入口**: `app/main.py`
 - **应用类**: `FastAPI`
-- **版本**: 0.2.0
+- **版本**: 0.2.0（FastAPI 实例；详见§版本号不一致说明）
 - **端口**: 8000（Docker 映射 3800）
+
+> **版本号不一致说明**（scope 之外，待后续 PR）：仓库存在三处 Python 版本号，分别为 `pyproject.toml` 的 `0.1.0` / `app/main.py` 的 FastAPI `version="0.2.0"` / `app/__init__.py` 的 `__version__="1.0.0"`。本模块文档以 FastAPI 实例 `0.2.0` 为基准；建议统一到单一来源（如 `app.__version__` 单点 + hatch dynamic version）。
 
 ### 启动流程
 
@@ -223,9 +225,11 @@ asyncio_mode = "auto"
 
 ### Docker 部署
 
-- 基础镜像: Python 3.11-slim（多阶段构建）
+- 基础镜像: Python 3.11-slim（多阶段构建，`backend/Dockerfile`）
 - 健康检查: `/health` 端点
-- 已移除 Playwright / Scrapling 系统库与浏览器安装，镜像显著瘦身
+- 已移除 Playwright / Scrapling 系统库与浏览器安装，镜像显著瘦身（**仅对生产 `Dockerfile` 属实**）
+
+> **Dockerfile 残留提醒**（scope 之外）：`backend/Dockerfile.debug` 仍 `python -m playwright install chromium`，`backend/Dockerfile.test` 仍装 `scrapling[fetchers]` 与 `scrapling[core]`，`backend/Dockerfile.simple` 仍装 `beautifulsoup4 lxml`。根 `docker-compose.yml` 当前引用的就是 `Dockerfile.debug`，构建会失败。修复方式见根 CLAUDE.md「已知问题」节。
 
 ### 环境配置
 
