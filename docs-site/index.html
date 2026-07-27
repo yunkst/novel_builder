@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Novel Builder · 现代化的全栈小说阅读平台</title>
-<meta name="description" content="Novel Builder 是一个现代化的全栈小说阅读平台，整合 11 个小说站点，提供跨平台搜索、阅读、缓存与 AI 增强功能。" />
+<title>Novel Builder · AI 原生小说阅读平台</title>
+<meta name="description" content="Novel Builder 是一个 AI 原生小说阅读平台：读喜欢的小说，用 AI 改写剧情与设定，或从零创作一本。本地书架 + Headless WebView + Agent Chat + ComfyUI + OCR 反爬。" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet" />
@@ -217,18 +217,44 @@
   .chips { display: flex; flex-wrap: wrap; gap: 9px; }
   .chip { font-size: 13px; padding: 6px 12px; border-radius: 7px; background: var(--bg-alt); border: 1px solid var(--line); color: var(--ink-soft); }
 
-  /* ============ 快速开始 ============ */
+  /* ============ 快速开始（双轨） ============ */
   .quick { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .quick-card { max-width: 760px; margin: 0 auto; background: var(--code-bg); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .quick-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; max-width: 1000px; margin: 0 auto; align-items: stretch; }
+  .quick-track {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 32px 28px; box-shadow: var(--shadow); display: flex; flex-direction: column;
+  }
+  .quick-apk { border-top: 3px solid var(--accent); }
+  .quick-src { border-top: 3px solid var(--ink); }
+  .track-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .track-head .track-ico { font-size: 32px; }
+  .track-head h3 { font-family: var(--serif); color: var(--ink); font-size: 20px; }
+  .track-head .track-sub { font-size: 13px; color: var(--ink-faint); margin-top: 2px; }
+  .btn-apk {
+    display: flex; flex-direction: column; gap: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff;
+    padding: 18px 22px; border-radius: 12px; box-shadow: 0 8px 20px rgba(160,82,45,.28);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .btn-apk:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(160,82,45,.36); }
+  .apk-main { font-size: 17px; font-weight: 700; }
+  .apk-meta { font-size: 13px; opacity: .85; }
+  .apk-alts { margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .apk-alts a { color: var(--accent-deep); border-bottom: 1px dashed var(--accent-soft); padding-bottom: 1px; }
+  .apk-alts a:hover { color: var(--accent); }
+  .apk-sha { display: inline-block; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
+  .apk-sha:hover { color: var(--accent); }
+  .track-note { margin-top: 16px; font-size: 13px; color: var(--ink-faint); }
+  .track-note a { color: var(--accent-deep); }
+  /* 源码运行终端卡片 */
+  .quick-card { background: var(--code-bg); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
   .quick-bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; background: #211d18; }
   .quick-bar .d { width: 12px; height: 12px; border-radius: 50%; }
   .quick-bar .d1 { background: #ff5f57; } .quick-bar .d2 { background: #febc2e; } .quick-bar .d3 { background: #28c840; }
   .quick-bar .fn { margin-left: 12px; color: #9a9186; font-size: 12.5px; }
-  pre.code { padding: 22px 24px; overflow-x: auto; color: #e7ddcc; font-size: 14px; line-height: 1.85; }
+  pre.code { padding: 22px 24px; overflow-x: auto; color: #e7ddcc; font-size: 13.5px; line-height: 1.85; }
   pre.code .c { color: #8a8174; }   /* comment */
   pre.code .k { color: #d4a06a; }   /* keyword/cmd */
-  pre.code .s { color: #c8b48a; }   /* string-ish */
-  .quick-note { text-align: center; margin-top: 22px; font-size: 13.5px; color: var(--ink-soft); }
 
   /* ============ 页脚 ============ */
   footer { background: var(--ink); color: #c9bfae; padding: 60px 0 36px; }
@@ -253,6 +279,7 @@
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; }
     .feat-grid, .stack-wrap { grid-template-columns: 1fr; }
     .gallery { grid-template-columns: 1fr; }
+    .quick-dual { grid-template-columns: 1fr; gap: 22px; }
     .foot-grid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px) {
@@ -290,21 +317,22 @@
     <div class="wrap hero-grid">
       <div class="hero-text">
         <span class="eyebrow"><span class="dot"></span> 开源 · 全栈 · AI 增强</span>
-        <h1 class="title">把 11 个书源，<br />收进 <em>一个</em> 阅读器。</h1>
+        <h1 class="title">读喜欢的，<br />改不爽的，<em>写</em>自己的。</h1>
         <p class="lead">
-          Novel Builder 是一个现代化的全栈小说阅读平台，整合多个小说站点资源，
-          提供跨平台搜索、离线缓存、AI 场景插图与角色关系分析，
-          让追书体验从「找书」到「沉浸」一气呵成。
+          读一本喜欢的小说，用 AI 改写不爽的剧情与设定，或从零开始创作一本属于你的。
+          离线优先的本地书架 + Headless WebView 章节提取 + Agent Chat + ComfyUI，
+          让阅读从「被动读」到「主动创」。
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">查看 GitHub →</a>
-          <a class="btn btn-outline" href="#quick">快速开始</a>
+          <a class="btn btn-outline" href="#quick">⬇ 立即下载</a>
         </div>
         <div class="badges">
           <span class="badge">Flutter 3.0+</span>
-          <span class="badge">FastAPI</span>
-          <span class="badge">PostgreSQL</span>
-          <span class="badge">Docker</span>
+          <span class="badge">Riverpod</span>
+          <span class="badge">Agent Chat</span>
+          <span class="badge">ComfyUI</span>
+          <span class="badge">PP-OCRv6</span>
           <span class="badge">MIT License</span>
         </div>
       </div>
@@ -341,10 +369,10 @@
   <!-- ===================== 亮点条 ===================== -->
   <section class="stats">
     <div class="wrap stats-grid">
-      <div class="stat reveal"><div class="num"><em>11</em></div><div class="lbl">整合小说站点</div></div>
-      <div class="stat reveal"><div class="num">AI</div><div class="lbl">工作流 + 智能对话</div></div>
+      <div class="stat reveal"><div class="num">读</div><div class="lbl">离线书架 · 断网畅读</div></div>
+      <div class="stat reveal"><div class="num">改</div><div class="lbl">AI 重写剧情与设定</div></div>
+      <div class="stat reveal"><div class="num">创</div><div class="lbl">AI 创作一本新书</div></div>
       <div class="stat reveal"><div class="num">3</div><div class="lbl">跨平台（Android / iOS / Windows）</div></div>
-      <div class="stat reveal"><div class="num">∞</div><div class="lbl">离线缓存，断网畅读</div></div>
     </div>
   </section>
 
@@ -363,14 +391,14 @@
           <p>本地收藏与阅读进度跟踪，多端一致的私人书库，打开即续读。</p>
         </div>
         <div class="feat reveal">
-          <div class="ico">🔍</div>
-          <h3>跨站统一搜索</h3>
-          <p>聚合 11 个小说站点，一次搜索，横向比价章节来源与更新进度。</p>
+          <div class="ico">✏️</div>
+          <h3>AI 改写剧情</h3>
+          <p>不爽原著走向？用 AI 重写章节、调整设定，把故事掰回你想要的样子。</p>
         </div>
         <div class="feat reveal">
-          <div class="ico">💾</div>
-          <h3>离线缓存阅读</h3>
-          <p>章节内容本地 SQLite 缓存，断网也能流畅翻页，节省流量。</p>
+          <div class="ico">✨</div>
+          <h3>AI 创作新书</h3>
+          <p>从零开始写一本属于你的：大纲、角色、章节，Agent Chat 全程协助。</p>
         </div>
         <div class="feat reveal">
           <div class="ico">🤖</div>
@@ -471,7 +499,7 @@
       <div class="sec-head reveal">
         <div class="sec-kicker">TECH STACK</div>
         <h2 class="sec-title">现代而务实的技术选型</h2>
-        <p class="sec-sub">Flutter 客户端 + FastAPI 后端 + PostgreSQL 缓存，容器化一键部署。</p>
+        <p class="sec-sub">Flutter 客户端 + FastAPI 后端 + ComfyUI 文生图，容器化一键部署。</p>
       </div>
       <div class="stack-wrap">
         <div class="stack-col reveal">
@@ -490,8 +518,8 @@
             <span class="chip">FastAPI</span>
             <span class="chip">PostgreSQL</span>
             <span class="chip">SQLAlchemy</span>
-            <span class="chip">Scrapling</span>
-            <span class="chip">Playwright</span>
+            <span class="chip">Alembic</span>
+            <span class="chip">ComfyUI 客户端</span>
           </div>
         </div>
         <div class="stack-col reveal">
@@ -508,32 +536,65 @@
     </div>
   </section>
 
-  <!-- ===================== 快速开始 ===================== -->
+  <!-- ===================== 快速开始（双轨） ===================== -->
   <section class="block quick" id="quick">
     <div class="wrap">
       <div class="sec-head reveal">
-        <div class="sec-kicker">QUICK START</div>
-        <h2 class="sec-title">三分钟跑起来</h2>
-        <p class="sec-sub">使用 Docker Compose，一键拉起后端 API、数据库与爬虫服务。</p>
+        <div class="sec-kicker">GET STARTED</div>
+        <h2 class="sec-title">两种方式，开始体验</h2>
+        <p class="sec-sub">下载 APK 即可体验，或从源码运行参与开发。</p>
       </div>
-      <div class="quick-card reveal">
-        <div class="quick-bar">
-          <span class="d d1"></span><span class="d d2"></span><span class="d d3"></span>
-          <span class="fn">bash</span>
+      <div class="quick-dual reveal">
+        <!-- 左：APK 下载（普通用户） -->
+        <div class="quick-track quick-apk">
+          <div class="track-head">
+            <span class="track-ico">📱</span>
+            <div>
+              <h3>下载体验</h3>
+              <p class="track-sub">正式版 v2.0.1 · 2026-07-19 · Android</p>
+            </div>
+          </div>
+          <a class="btn-apk" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-arm64-v8a-release.apk" target="_blank" rel="noopener">
+            <span class="apk-main">⬇ 下载 APK（arm64-v8a）</span>
+            <span class="apk-meta">98 MB · 主流手机推荐</span>
+          </a>
+          <div class="apk-alts">
+            <span>其他架构：</span>
+            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-armeabi-v7a-release.apk" target="_blank" rel="noopener">armv7a（老设备）</a>
+            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-x86_64-release.apk" target="_blank" rel="noopener">x86_64（模拟器）</a>
+          </div>
+          <a class="apk-sha" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/SHA256SUMS.txt" target="_blank" rel="noopener">🔏 SHA256SUMS 校验</a>
+          <p class="track-note">首次安装请允许「未知来源」。iOS 暂需自行编译。</p>
         </div>
-<pre class="code"><span class="c"># 1. 克隆项目</span>
+
+        <!-- 右：源码运行（开发者） -->
+        <div class="quick-track quick-src">
+          <div class="track-head">
+            <span class="track-ico">💻</span>
+            <div>
+              <h3>源码运行</h3>
+              <p class="track-sub">面向开发者 · Flutter 3.0+ / Python 3.11+</p>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-bar">
+              <span class="d d1"></span><span class="d d2"></span><span class="d d3"></span>
+              <span class="fn">bash</span>
+            </div>
+<pre class="code"><span class="c"># 后端：docker compose 一键起</span>
 <span class="k">git</span> clone https://github.com/yunkst/novel_builder.git
 <span class="k">cd</span> novel_builder
-
-<span class="c"># 2. 配置环境变量</span>
 <span class="k">cp</span> .env.example .env
+<span class="k">docker</span> compose up -d
 
-<span class="c"># 3. 一键启动所有服务</span>
-<span class="k">docker-compose</span> up -d
-
-<span class="c"># 后端 API 文档 → http://localhost:3800/docs</span></pre>
+<span class="c"># 前端：Flutter 跑起来</span>
+<span class="k">cd</span> novel_app
+<span class="k">flutter</span> pub get
+<span class="k">flutter</span> run</pre>
+          </div>
+          <p class="track-note">详细步骤见 <a href="https://github.com/yunkst/novel_builder#-快速开始" target="_blank" rel="noopener">README →</a></p>
+        </div>
       </div>
-      <p class="quick-note">移动应用：进入 <code style="color:var(--accent)">novel_app/</code> 执行 <code style="color:var(--accent)">flutter pub get &amp;&amp; flutter run</code></p>
     </div>
   </section>
 </main>
@@ -544,7 +605,7 @@
     <div class="foot-grid">
       <div>
         <div class="foot-brand">📖 Novel Builder</div>
-        <p>现代化的全栈小说阅读平台，整合多站点资源，融合 AI 增强，让阅读更专注。</p>
+        <p>AI 原生小说阅读平台 —— 读喜欢的，改不爽的，写自己的。</p>
       </div>
       <div>
         <h4>项目</h4>
