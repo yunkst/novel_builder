@@ -17,8 +17,11 @@
 ### 运维文档
 - [🐳 部署指南](deployment.md) - 生产环境部署说明
 
-### 架构图表
+### 架构资产
 - [🖼️ Flutter 架构图](diagrams/flutter_architecture_diagram.png) - 架构可视化
+- [📜 章节获取流程图](chapter-fetch-flow.html) - 浏览器提取链路
+- [🌐 章节提取架构](architecture/react-agent-web-extract.html) - React-Agent WebView 提取设计
+- [🗂️ superpowers/](superpowers/) - 内部设计与实施计划（决策追溯资产，非对外展示文档）
 
 ## 🚀 快速开始
 
@@ -41,19 +44,25 @@
 
 ```
 docs/
-├── README.md                  # 文档索引（本文件）
-├── user-guide.md              # 用户使用指南
-├── APP功能介绍.md              # APP 功能介绍
-├── developer-guide.md         # 开发者指南
-├── deployment.md              # 部署指南
-├── logging-guidelines.md      # 日志系统使用指南
-├── diagrams/                  # 架构图
+├── README.md                              # 文档索引（本文件）
+├── user-guide.md                          # 用户使用指南
+├── APP功能介绍.md                          # APP 功能介绍
+├── developer-guide.md                     # 开发者指南
+├── deployment.md                          # 部署指南
+├── logging-guidelines.md                  # 日志系统使用指南
+├── architecture/                          # 浏览器/章节提取架构
+│   └── react-agent-web-extract.html
+├── chapter-fetch-flow.html                # 章节获取流程图
+├── diagrams/                              # 架构图
 │   ├── flutter_architecture_diagram.png
 │   ├── flutter_architecture_diagram.pdf
 │   └── flutter_architecture_diagram_4k.png
-└── plans/                     # 历史设计计划
-    ├── 2025-01-25-logger-service-enhancement.md
-    └── 2026-01-26-enhanced-relationship-graph-design.md
+├── plans/                                 # 历史设计计划
+│   ├── 2025-01-25-logger-service-enhancement.md
+│   └── 2026-01-26-enhanced-relationship-graph-design.md
+└── superpowers/                           # 内部设计与实施计划（决策追溯）
+    ├── specs/
+    └── plans/
 ```
 
 ## 📖 文档规范
@@ -91,11 +100,10 @@ docs/
 
 如果您在使用文档过程中遇到问题：
 
-1. 📧 邮件支持：kfeb4@outlook.com
-2. 💬 GitHub Issues：报告文档问题或建议
-3. 📖 GitHub Discussions：参与社区讨论
+1. 💬 [GitHub Issues](https://github.com/yunkst/novel_builder/issues/new/choose) - 报告文档问题或建议
+2. 📖 [GitHub Discussions](https://github.com/yunkst/novel_builder/discussions) - 参与社区讨论
 
 ---
 
-**最后更新**：2026-06-11
-**文档版本**：v1.7.6
+**最后更新**：2026-07-27
+**文档版本**：v1.8.0

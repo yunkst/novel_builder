@@ -12,19 +12,18 @@ Novel Builder 采用 monorepo 架构，包含两个主要模块：
 │   (novel_app)   │     │    (backend)    │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         │                       │
-        │                       ├── Scrapling 爬虫 (9 站点)
         │                       ├── ComfyUI (图片/视频生成)
-        │                       └── Agent (LLM 对话)
+        │                       └── 客户端本地 AI（DSL Engine + Agent Chat）
         │
-        └── SQLite 本地缓存
+        └── SQLite 本地缓存（含 site_scripts / chapter_cache）
 ```
 
 ### 数据流
 
-1. **用户搜索** → Flutter App → FastAPI → 多个 Scrapling 爬虫 → 聚合结果
-2. **阅读章节** → Flutter App → FastAPI → 爬虫/缓存 → 内容返回
-3. **AI 功能** → Flutter App (DSL Engine 本地执行) → OpenAI 兼容 LLM API
-4. **场景插图** → Flutter App → FastAPI → ComfyUI → 图片下载/缓存
+1. **章节获取** → Flutter App → Headless WebView + 本地 JS 提取脚本 → 写入 `chapter_cache` 表
+2. **AI 功能** → Flutter App（DSL Engine 本地执行） → OpenAI 兼容 LLM API
+3. **场景插图** → Flutter App → FastAPI → ComfyUI → 图片下载/缓存
+4. **数据备份** → 客户端 → FastAPI `/api/backup/upload`
 
 ---
 
@@ -144,11 +143,12 @@ novel_app/
 │   │   ├── interfaces/         # 抽象接口
 │   │   └── providers/          # Riverpod Provider（50+）
 │   ├── controllers/            # 控制器层
-│   ├── repositories/           # 数据仓库层（9 个）
+│   ├── repositories/           # 数据仓库层
 │   ├── services/               # 业务服务
 │   │   ├── dsl_engine/         # DSL Engine 核心
-│   │   ├── dify/               # Dify Facade
 │   │   ├── novel_agent/        # Agent Chat 引擎
+│   │   ├── headless_webview_*.dart  # Headless WebView 提取
+│   │   ├── ocr_restore_service.dart # OCR 还原（PP-OCRv6）
 │   │   └── api_service_*.dart  # API 客户端
 │   ├── screens/                # 页面组件
 │   ├── widgets/                # 可复用组件
@@ -182,18 +182,15 @@ backend/
 │   │   └── routes/             # 路由模块
 │   │       ├── backup.py       # 备份 API
 │   │       ├── novel_sync.py   # 小说同步
-│   │       └── logs.py         # 日志查询
+│   │       ├── text2img.py     # 文生图（ComfyUI）
+│   │       ├── image_to_video.py  # 图生视频（ComfyUI）
+│   │       └── logs.py         # 日志查询/上报
 │   ├── deps/                   # FastAPI 依赖
 │   ├── models/                 # SQLAlchemy 模型
 │   ├── schemas/                # Pydantic 模式
 │   └── services/               # 业务服务
-│       ├── crawler_factory.py  # 爬虫工厂
-│       ├── base_crawler.py     # 爬虫基类
-│       ├── scrapling_*.py      # Scrapling 引擎
-│       ├── *_crawler.py        # 9 个站点爬虫
-│       ├── cache_*.py          # 缓存系统
-│       ├── dify_client.py      # Dify 客户端
 │       ├── comfyui_*.py        # ComfyUI 客户端
+│       ├── backup_*.py         # 备份/恢复
 │       └── *.py                # 其他服务
 ├── alembic/                    # 数据库迁移
 ├── tests/                      # 测试
@@ -227,8 +224,8 @@ class BookshelfState extends _$BookshelfState {
 ```
 
 **Provider 分类**：
-- **Service Providers** (14+) - 服务层单例
-- **Repository Providers** (9) - 数据仓库
+- **Service Providers** (20+) - 服务层单例
+- **Repository Providers** - 数据仓库
 - **StateNotifierProviders** (30+) - 业务状态
 - **FutureProvider / StreamProvider** - 异步数据流
 
@@ -264,65 +261,17 @@ Future<List<Novel>> searchNovels(
 
 ## 🌐 后端架构
 
-### 爬虫系统
+### 章节提取（前端本地完成）
 
-#### 爬虫基类
+Novel Builder 不再依赖服务端爬虫：章节列表与正文由 **Flutter 端 Headless WebView + 本地 JS 提取脚本**（`lib/services/headless_webview_*.dart` + `site_scripts` 表）直接获取；对字体反爬站点（如番茄）走 OCR 还原（`OcrRestoreService` + 系统 OCR-JS 模板，PP-OCRv6）。
 
-所有爬虫继承自 `BaseCrawler`：
+- 客户端实现：见 [lib/services/headless_webview_*.dart](../novel_app/lib/services/)
+- 站点脚本：`site_scripts` 表（v39，含 `chapter_list_ocr` / `chapter_content_ocr` 独立列）
+- 架构细节：[chapter-fetch-flow.html](chapter-fetch-flow.html)、[architecture/react-agent-web-extract.html](architecture/react-agent-web-extract.html)
 
-```python
-class BaseCrawler:
-    site_id: str
-    site_name: str
-    base_url: str
+### 缓存
 
-    async def search_novels(self, keyword: str) -> list[dict]:
-        """搜索小说"""
-        raise NotImplementedError
-
-    async def get_chapter_list(self, novel_url: str) -> list[dict]:
-        """获取章节列表"""
-        raise NotImplementedError
-
-    async def get_chapter_content(self, chapter_url: str) -> dict:
-        """获取章节内容"""
-        raise NotImplementedError
-```
-
-#### 网络层：Scrapling
-
-使用 [Scrapling](https://github.com/D4Vinci/Scrapling) 作为统一爬取引擎：
-
-```python
-from app.services.scrapling_fetcher import ScraplingFetcher, RequestStrategy
-
-fetcher = ScraplingFetcher(strategy=RequestStrategy.STEALTH)
-response = await fetcher.get(url, headers={...})
-
-# Scrapling Selector 解析（比 BeautifulSoup 快 784x）
-title = response.soup.css_first('h1.title::text').get()
-```
-
-**请求策略**：
-- `SIMPLE` - 普通 HTTP 请求
-- `STEALTH` - 反爬绕过
-
-#### 缓存装饰器
-
-使用声明式装饰器统一缓存逻辑：
-
-```python
-@cached(ttl=3600, key="chapter:{url}")
-async def get_chapter_content(self, chapter_url: str) -> dict:
-    return await self._fetch_chapter_content(chapter_url)
-```
-
-### 缓存系统
-
-- **内容缓存** - PostgreSQL 存储章节内容
-- **任务管理** - 后台任务跟踪
-- **WebSocket 推送** - 实时进度更新
-- **装饰器缓存** - 自动缓存方法调用
+仅客户端本地缓存（`chapter_cache` 表），服务端 PostgreSQL 不再缓存章节内容（2026-07-08 已删 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache` 三表）。
 
 ### AI 服务集成
 
@@ -346,7 +295,7 @@ result = await client.text_to_image(
 
 ### DSL Engine（前端本地执行）
 
-Novel App 内置客户端 Dify 工作流复刻，无需后端协作即可执行 AI 工作流。
+Novel App 内置客户端 DSL 工作流引擎（**与 Dify 解耦**，本地 YAML 解析），无需后端协作即可执行 AI 工作流。
 
 **核心组件**：
 
@@ -414,103 +363,40 @@ workflow:
 ### 前端：SQLite
 
 - 数据库文件：`novel_reader.db`
-- 版本：v21
-- 主要表：bookshelf, chapter_cache, novel_chapters, characters, character_relationships, scene_illustrations, outlines, chat_scenes
+- 版本：v39
+- 主要表：bookshelf, chapter_cache, novel_chapters, characters, character_relationships, scene_illustrations, outlines, chat_sessions, chat_scenes, site_scripts, llm_configs, agent_memories
 - 通过 Riverpod Provider 访问
 
 ### 后端：PostgreSQL
 
-- 表：chapter_cache, cache_tasks, app_versions, novel_sync_data
 - ORM：SQLAlchemy 2.0+
-- 迁移工具：Alembic
+- 迁移工具：Alembic（head: `20260708_drop_cache_tables`）
+- 主要表：text2img_task, image_to_video_task, client_logs, backup_files, novel_sync_data
+- 注：缓存类表（`novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache`）已于 2026-07-08 删除
 
 ---
 
-## 🕷️ 添加新爬虫
+## 🕷️ 添加新站点提取脚本
 
-### 步骤 1：创建爬虫类
+Novel Builder 已不使用服务端爬虫。要支持新站点，**在前端编写 site_script**：
 
-```python
-# app/services/example_crawler.py
-from app.services.base_crawler import BaseCrawler
-from app.services.scrapling_fetcher import ScraplingFetcher, RequestStrategy
+### 步骤 1：在 APP 内通过 Agent Chat 引导创建
 
-class ExampleCrawler(BaseCrawler):
-    site_id = "example"
-    site_name = "示例站点"
-    base_url = "https://example.com"
+1. 打开 APP → Agent Chat
+2. 让 Agent 访问目标站点，自动生成 chapter_list / chapter_content 提取脚本
+3. Agent 通过 `save_script` 工具落库到 `site_scripts` 表
 
-    def __init__(self):
-        super().__init__()
-        self.fetcher = ScraplingFetcher(strategy=RequestStrategy.SIMPLE)
+### 步骤 2：手工编辑（可选）
 
-    async def search_novels(self, keyword: str) -> list[dict]:
-        response = await self.fetcher.get(
-            f"{self.base_url}/search",
-            params={"q": keyword},
-        )
-        # 解析搜索结果
-        return [...]
+直接编辑 `site_scripts` 表中对应行的 `chapter_list_script` / `chapter_content_script`（JS 字符串）。
 
-    async def get_chapter_list(self, novel_url: str) -> list[dict]:
-        response = await self.fetcher.get(novel_url)
-        # 解析章节列表
-        return [...]
+### 步骤 3：OCR 还原（字体反爬站点）
 
-    async def get_chapter_content(self, chapter_url: str) -> dict:
-        response = await self.fetcher.get(chapter_url)
-        # 解析章节内容
-        return {...}
-```
+对 PUA 字体反爬站点（如番茄），在 `site_scripts` 表将 `chapter_list_ocr` / `chapter_content_ocr` 置为 1，并创建对应 OCR 提取器（详见根 CLAUDE.md 2026-07-15 OCR 条目）。
 
-### 步骤 2：注册到爬虫工厂
+### 步骤 4：测试
 
-```python
-# app/services/crawler_factory.py
-from app.services.example_crawler import ExampleCrawler
-
-def _register_crawlers():
-    crawlers = {
-        "example": ExampleCrawler,
-        # ...
-    }
-```
-
-### 步骤 3：更新站点元数据
-
-```python
-SOURCE_SITES_METADATA = [
-    {
-        "id": "example",
-        "name": "示例站点",
-        "base_url": "https://example.com",
-        "description": "站点描述",
-        "enabled": True,
-        "search_enabled": True,
-    },
-    # ...
-]
-```
-
-### 步骤 4：更新环境变量
-
-```env
-NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543,example
-```
-
-### 步骤 5：编写测试
-
-```python
-# tests/test_example_crawler.py
-import pytest
-from app.services.example_crawler import ExampleCrawler
-
-@pytest.mark.asyncio
-async def test_search():
-    crawler = ExampleCrawler()
-    results = await crawler.search_novels("测试")
-    assert isinstance(results, list)
-```
+在 Agent Chat 中调用 `read_chapter_content` / `list_chapters` 工具验证提取结果。
 
 ---
 
@@ -653,19 +539,18 @@ git push origin master --tags
 
 ## 🔐 环境变量
 
-完整环境变量参考 `.env.example`。关键变量：
+完整环境变量参考 `.env.example`。核心变量（v2.0.x）：
 
 | 变量名 | 必需 | 用途 |
 |--------|------|------|
-| `NOVEL_API_TOKEN` | ✅ | API 认证 Token |
-| `NOVEL_ENABLED_SITES` | ✅ | 启用的爬虫站点列表 |
+| `NOVEL_API_TOKEN` | ✅ | API 认证 Token（X-API-TOKEN） |
 | `DATABASE_URL` | ✅ | PostgreSQL 连接字符串 |
-| `COMFYUI_API_URL` | ⚠️ | ComfyUI 服务（插图功能必需） |
-| `SECRET_KEY` | ✅ | JWT 密钥 |
+| `COMFYUI_API_URL` | ⚠️ | ComfyUI 服务（文生图/图生视频） |
 | `DEBUG` | ❌ | 调试模式 |
-| `LOG_LEVEL` | ❌ | 日志级别 |
 | `CORS_ORIGINS` | ❌ | CORS 允许的源 |
 | `HTTP_PROXY` / `HTTPS_PROXY` | ❌ | 网络代理 |
+
+> 注：早期文档提到的 `NOVEL_ENABLED_SITES` / `SECRET_KEY` / `LOG_LEVEL` / `MAX_UPLOAD_SIZE` / `UPLOAD_DIR` / `VIDEO_GENERATION_TIMEOUT` / `HOST` / `PORT` 字段已在 v2.0.x 移除（爬虫功能 2026-07-08 整体下线）。
 
 ---
 

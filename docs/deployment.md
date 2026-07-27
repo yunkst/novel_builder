@@ -72,11 +72,10 @@ DATABASE_URL=postgresql://novel_user:your_password@postgres:5432/novel_db
 # API 访问令牌
 NOVEL_API_TOKEN=your_secure_api_token_here
 
-# 启用的爬虫站点
-NOVEL_ENABLED_SITES=alice_sw,ddxsmf,shukuge,wdscw,wodeshucheng,wfxs,biquge543
-
 COMFYUI_API_URL=http://your-comfyui-server:8188
 ```
+
+> 注：`NOVEL_ENABLED_SITES` 等爬虫站点列表已于 v2.0.x 移除（爬虫 2026-07-08 整体下线，章节由前端 Headless WebView 提取）。
 
 #### 4. 配置反向代理（Nginx）
 
@@ -131,8 +130,8 @@ server {
 #### 5. 启动服务
 
 ```bash
-# 构建并启动服务
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# 构建并启动服务（本仓库仅 docker-compose.yml，backend + postgres）
+docker-compose up -d --build
 
 # 查看服务状态
 docker-compose ps
@@ -208,79 +207,16 @@ flutter run -d <device_id>
 
 ## Docker 部署
 
-### 生产环境 Compose 文件
+### 生产化说明
 
-创建 `docker-compose.prod.yml`：
+本仓库仅提供 `docker-compose.yml`（backend + postgres 容器）。**生产化所需组件由各运维团队按场景自行配置**，常见选项：
 
-```yaml
-version: '3.8'
+- **反向代理 + HTTPS**：Nginx / Caddy / Traefik（自行签发或 Let's Encrypt）
+- **进程守护**：`systemd` / Docker restart policy / K8s
+- **数据库高可用**：PostgreSQL 主从、备份策略
+- **对象存储**：备份文件、模型权重落 OSS / MinIO
 
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
-      - NOVEL_ENABLED_SITES=${NOVEL_ENABLED_SITES}
-    volumes:
-      - backend_logs:/app/logs
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - novel_network
-
-  postgres:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - novel_network
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    networks:
-      - novel_network
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/sites-available:/etc/nginx/sites-available
-      - ./ssl:/etc/nginx/ssl
-      - web_build:/usr/share/nginx/html
-    depends_on:
-      - backend
-    networks:
-      - novel_network
-
-volumes:
-  postgres_data:
-  redis_data:
-  backend_logs:
-  web_build:
-
-networks:
-  novel_network:
-    driver: bridge
-```
+> 仓库不再提供 `docker-compose.prod.yml`、`docker-compose.monitoring.yml` 等编排模板（早期含 redis/nginx/prometheus/grafana 的版本于 2026-07-08 移除），如需请参照团队现有规范。
 
 ### 健康检查配置
 
@@ -319,31 +255,19 @@ POSTGRES_PASSWORD=secure_password
 
 # API 配置
 NOVEL_API_TOKEN=your_api_token_here
-NOVEL_ENABLED_SITES=alice_sw,shukuge,xspsw,wdscw
 
 # 服务配置
 DEBUG=false
-LOG_LEVEL=INFO
 CORS_ORIGINS=["https://your-domain.com"]
-
-# 缓存配置
-REDIS_URL=redis://redis:6379/0
-CACHE_TTL=3600
 
 COMFYUI_API_URL=http://your-comfyui-server:8188
 
 # 代理配置（可选）
 HTTP_PROXY=http://proxy.example.com:8080
 HTTPS_PROXY=http://proxy.example.com:8080
-
-# 安全配置
-SECRET_KEY=your_secret_key_here
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# 文件上传配置
-MAX_UPLOAD_SIZE=10485760  # 10MB
-UPLOAD_DIR=/app/uploads
 ```
+
+> 注：早期文档中提及的 `REDIS_URL` / `CACHE_TTL` / `SECRET_KEY` / `ACCESS_TOKEN_EXPIRE_MINUTES` / `MAX_UPLOAD_SIZE` / `UPLOAD_DIR` / `LOG_LEVEL` / `HOST` / `PORT` 字段已对齐到 v2.0.x（爬虫/缓存表 2026-07-08 下线后简化），请以 `.env.example` 为准。
 
 ### 安全配置
 
@@ -419,30 +343,13 @@ echo "Backup completed: $DATE"
 
 ### 性能监控
 
-```yaml
-# docker-compose.monitoring.yml
-version: '3.8'
+本仓库不内置 Prometheus/Grafana 模板（2026-07-08 移除 `docker-compose.monitoring.yml`）。如需指标采集，建议：
 
-services:
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+- **后端指标**：FastAPI `prometheus-fastapi-instrumentator`（需自行加）
+- **数据库指标**：`postgres_exporter`
+- **可视化**：Grafana 接入团队现有 Prometheus 实例
 
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-
-volumes:
-  grafana_data:
-```
+也可用 hosted APM（如 OpenObserve / Grafana Cloud），不强制绑定具体方案。
 
 ### 更新部署
 
@@ -454,15 +361,15 @@ echo "Starting update process..."
 
 # 拉取最新代码
 git fetch origin
-git checkout main
-git pull origin main
+git checkout master
+git pull origin master
 
 # 备份当前数据
 ./backup.sh
 
 # 构建并重启服务
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker-compose pull
+docker-compose up -d --build
 
 # 运行数据库迁移
 docker-compose exec backend alembic upgrade head
@@ -516,9 +423,9 @@ docker system prune -a
 - 定期清理日志
 
 2. **应用优化**
-- 使用 Redis 缓存
-- 优化爬虫并发数
-- 压缩静态文件
+- 优化 WebView 提取脚本预加载策略
+- 合理控制 ComfyUI 并发请求数
+- 启用静态文件压缩（gzip / brotli）
 
 3. **系统优化**
 - 调整 Docker 资源限制
@@ -529,6 +436,5 @@ docker system prune -a
 
 如果在部署过程中遇到问题，请通过以下方式获取帮助：
 
-- GitHub Issues：https://github.com/yunkst/novel_builder/issues
-- 邮件支持：kfeb4@outlook.com
+- GitHub Issues：https://github.com/yunkst/novel_builder/issues/new/choose
 - 文档：https://novel-builder.readthedocs.io

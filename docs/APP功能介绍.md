@@ -29,8 +29,8 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 │                 │    │                 │    │                 │
 │ • Material UI   │    │ • RESTful API   │    │ • DSL Engine    │
 │ • SQLite 本地库 │    │ • PostgreSQL    │    │ • AI Agent  │
-│ • 多媒体缓存    │    │ • Scrapling 爬虫│    │ • ComfyUI 图片  │
-│ • 离线支持      │    │ • WebSocket     │    │ • LLM 对话      │
+│ • Headless WebView │  │ • 备份/日志 API │    │ • ComfyUI 图片  │
+│ • 多媒体缓存    │    │                 │    │ • LLM 对话      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -50,7 +50,7 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 - **📂 多书架分类**: 支持创建多个书架（如「我的收藏」「玄幻小说」等），通过顶部下拉菜单切换
 - **➕ 一键添加小说**: 通过顶部 + 按钮或左下角紫色快捷入口快速添加
 - **🔄 自动获取元数据**: 一键添加后自动获取封面、作者、简介、分类等信息
-- **💾 本地存储**: SQLite数据库 v21 版本，离线访问无忧
+- **💾 本地存储**: SQLite数据库 v39 版本，离线访问无忧
 
 **用户体验**：
 ```
@@ -60,31 +60,27 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 💾 本地存储 → SQLite数据库，快速访问
 ```
 
-### 🔍 智能搜索系统
+### 🔍 本地书架搜索
+
+> ⚠️ 以下截图反映**旧版 UI**（含已移除的跨站点搜索入口）。v2.0.x 起前端已无跨站点搜索功能，改为本地书架内搜索；新版本 UI 截图待重生成。
 
 **界面展示**：
 ![搜索界面](../novel_app/docs/images/interfaces/02-search.png)
 
-**强大搜索能力**：
+**本地搜索能力**：
 
-- **🌐 跨站点统一搜索**: 同时搜索多个小说站点，一次获取全面结果
-- **🎯 智能结果聚合**: 自动去重，按相关度排序
-- **🔎 源站过滤**: 可选择特定站点进行精准搜索
-- **⚡ 实时反馈**: 搜索结果即时显示，包含详细信息
+- **🔎 书架内搜索**：在已收藏的小说中按关键词匹配书名/作者/简介
+- **📚 章节内搜索**：在已缓存的章节内容中匹配关键词（`search_in_chapters`）
+- **⚡ 本地索引**：直接读 SQLite，无网络请求
+- **🧠 Agent Chat 协同**：Agent 可调用 `search_in_chapters` / `list_chapters` 等工具完成更复杂的查找
 
-**支持的站点**：
-
-- 📚 **书库 (Shukuge)** - 综合性小说书库
-- 📱 **顶点小说 (Ddxsmf)** - 外部搜索引擎
-- 🏛️ **我的书城 (Wdscw)** - 精品小说免费阅读
-- 🌬️ **微风小说 (Wfxs)** - 搜索支持
-- 📖 **笔趣阁543 (Biquge543)** - 搜索限流
-- 更多站点持续添加中...
-
-**搜索流程**：
+**章节获取流程（替代旧爬虫）**：
 ```
-输入关键词 → 并行请求多站点 → 结果聚合去重 → 展示搜索结果 → 一键添加/阅读
+用户添加小说 URL → Headless WebView 加载页面 → 本地 JS 提取脚本（site_scripts 表）
+→ 章节列表/正文落 chapter_cache 表 → 字体反爬站点走 OCR 还原（PP-OCRv6）
 ```
+
+详见 [章节获取流程图](chapter-fetch-flow.html) 和 [React-Agent WebView 提取架构](architecture/react-agent-web-extract.html)。
 
 ### 📖 沉浸式阅读器
 
@@ -185,7 +181,7 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 
 **核心特性**：
 
-- **🔧 Dify 工作流复刻**: 客户端实现 Dify 工作流核心能力
+- **🔧 YAML 工作流引擎**: 客户端实现的 DSL 工作流引擎（**与 Dify 解耦**，本地 YAML 解析执行）
 - **📝 结构化信息提取**: 自动从章节内容提取角色、关系、背景等结构化信息
 - **✍️ 创意写作支持**: 段落重写、全文重写、续写等
 - **📊 摘要生成**: 章节摘要、背景摘要、剧情摘要
@@ -316,21 +312,23 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 - **ℹ️ 关于应用**: 显示当前应用版本信息
 - **🔄 检查更新**: 一键检查是否有新版本可用
 - **🔌 后端服务配置**: 配置 FastAPI 后端地址和 Token
-- **🤖 Dify 配置**: 配置 DSL Engine 的 API URL 和 Token
+- **🤖 AI 配置**: 配置 LLM API URL 和 Token（驱动 DSL Engine + Agent Chat）
 - **🎨 主题模式**: 切换亮色/暗色/跟随系统
 - **📋 应用日志**: 查看、筛选、搜索、复制、删除应用日志
 - **📦 预加载队列**: 查看和管理预加载任务
 - **☁️ 数据备份**: 一键备份本地数据到文件
 - **🛠️ 修复数据库**: 补全缺失的表和列，保障数据完整性
 
-### 🤖 Dify / AI 配置
+### 🤖 AI / LLM 配置
+
+> ⚠️ 以下截图反映**旧版 UI**（含 Dify 命名），v2.0.x 起已统一为「AI 配置」/「LLM 配置」入口；新版本 UI 截图待重生成。
 
 **界面展示**：
-![Dify 配置](../novel_app/docs/images/interfaces/11-dify-settings.png)
+![AI 配置](../novel_app/docs/images/interfaces/11-dify-settings.png)
 
 **配置项**：
 
-- **Dify URL**: DSL Engine 服务的 API 地址（如 `http://192.168.31.24/v1`）
+- **LLM API URL**: OpenAI 兼容 API 地址（如 `https://api.deepseek.com/v1`）
 - **Flow Token (流式响应)**: 用于所有 AI 功能的鉴权 token
 - **Struct Token (结构化响应)**: 为未来功能预留的可选 token
 - **AI 作家设定**: 自定义 AI 写作的人设 prompt（如「专业的网络小说家」）
@@ -415,9 +413,9 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 1. 欢迎页面 → 介绍应用特色功能
 2. 权限请求 → 存储权限、网络权限
 3. 服务器配置 → 设置后端 API 地址和 Token
-4. AI 配置 → 配置 Dify / DSL Engine API
+4. AI 配置 → 配置 LLM API（驱动 DSL Engine + Agent Chat）
 5. 功能导览 → 各个功能模块的简单介绍
-6. 开始使用 → 进入搜索页面，开始阅读之旅
+6. 开始使用 → 进入书架页（v2.0.x 已无独立搜索 Tab，改为本地书架内搜索 + Agent Chat 协同）
 ```
 
 ### 📚 核心功能操作路径
@@ -566,7 +564,7 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 | 截图 | 功能模块 | 描述 |
 |------|---------|------|
 | `01-bookshelf.png` | 书架管理 | 个人书架主界面 |
-| `02-search.png` | 搜索功能 | 小说搜索主界面 |
+| `02-search.png` | 搜索功能 | 旧版搜索界面（v2.0.x 已简化为本地书架搜索） |
 | `03-settings.png` | 设置 | 应用设置主界面 |
 | `04-chapter-list.png` | 章节列表 | 章节列表与导航 |
 | `05-reader.png` | 阅读器 | 沉浸式阅读界面 |
@@ -574,7 +572,7 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 | `07-ai-accompaniment.png` | 大纲管理 | 大纲管理空状态 |
 | `09-character-management.png` | 角色管理 | 角色列表（空状态） |
 | `10-character-edit.png` | 角色编辑 | 角色信息编辑表单 |
-| `11-dify-settings.png` | AI 配置 | Dify / DSL Engine 配置 |
+| `11-dify-settings.png` | AI 配置 | 旧版 Dify / DSL Engine 配置（v2.0.x 已统一为 AI 配置） |
 | `12-backend-settings.png` | 后端配置 | 后端服务地址配置 |
 | `13-log-viewer.png` | 日志查看 | 应用日志查看器 |
 | `14-preload-queue.png` | 预加载队列 | 预加载任务队列调试 |
@@ -583,6 +581,8 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 | `17-settings-scrolled.png` | 设置（底部） | 设置页底部功能 |
 | `18-add-novel.png` | 书架分类 | 新建书架分类对话框 |
 | `20-ai-assistant.png` | AI 助手 | 智能对话助手浮窗 |
+
+> 上述截图反映**旧版 UI**（含已移除的搜索 / Dify 配置入口）。v2.0.x 起 UI 已简化，截图待重生成。
 
 ---
 
@@ -596,4 +596,4 @@ Novel Builder 是一款革命性的 **AI增强型小说阅读应用**，它彻�
 
 > **Novel Builder** - 重新定义阅读体验，让每一个故事都活起来！
 
-*最后更新: 2026-06-12*
+*最后更新: 2026-07-27*

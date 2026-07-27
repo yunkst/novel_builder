@@ -109,7 +109,7 @@ LoggerService.instance.i(
 LoggerService.instance.i(
   'AI内容生成完成，字数: ${content.length}',
   category: LogCategory.ai,
-  tags: ['dify', 'generation-complete'],
+  tags: ['llm', 'generation-complete'],
 );
 ```
 
@@ -151,7 +151,7 @@ LoggerService.instance.w(
 LoggerService.instance.w(
   'AI返回数据格式异常，使用降级方案',
   category: LogCategory.ai,
-  tags: ['dify', 'parse-error', 'fallback'],
+  tags: ['llm', 'parse-error', 'fallback'],
 );
 
 // 网络超时
@@ -208,13 +208,13 @@ try {
 
 // AI调用失败
 try {
-  await difyService.generateContent();
+  await llmService.generateContent();
 } catch (e, stackTrace) {
   LoggerService.instance.e(
-    'Dify内容生成失败',
+    'AI 内容生成失败',
     stackTrace: stackTrace.toString(),
     category: LogCategory.ai,
-    tags: ['dify', 'generation-failed'],
+    tags: ['llm', 'generation-failed'],
   );
   await LoggerService.instance.flush(); // 确保错误日志写入
 }
@@ -247,8 +247,8 @@ try {
 | 分类 | 枚举值 | 标签 | 使用场景 |
 |-----|--------|------|---------|
 | 数据库 | `LogCategory.database` | 数据库 | 数据库操作、查询、迁移、连接 |
-| 网络 | `LogCategory.network` | 网络 | API请求、响应、超时、WebSocket |
-| AI | `LogCategory.ai` | AI | Dify调用、内容生成、流式响应 |
+| 网络 | `LogCategory.network` | 网络 | API请求、响应、超时、HTTP |
+| AI | `LogCategory.ai` | AI | DSL Engine 工作流、LLM 调用、内容生成、流式响应 |
 | 界面 | `LogCategory.ui` | 界面 | 页面跳转、交互事件、用户操作 |
 | 缓存 | `LogCategory.cache` | 缓存 | 缓存读写、清理、命中/未命中 |
 | 语音 | `LogCategory.tts` | 语音 | TTS播放、状态变更、暂停/恢复 |
@@ -320,33 +320,33 @@ LoggerService.instance.e(
 
 #### 3. AI分类 (LogCategory.ai)
 ```dart
-// Dify调用开始
+// DSL 工作流调用开始
 LoggerService.instance.i(
-  '开始Dify工作流: ${workflowConfig.name}',
+  '开始 DSL 工作流: ${workflowConfig.name}',
   category: LogCategory.ai,
-  tags: ['dify', 'workflow-start'],
+  tags: ['dsl', 'workflow-start'],
 );
 
 // 流式响应接收
 LoggerService.instance.d(
   '接收SSE数据块: ${dataChunk.length} 字节',
   category: LogCategory.ai,
-  tags: ['dify', 'stream', 'sse'],
+  tags: ['dsl', 'stream', 'sse'],
 );
 
 // 生成完成
 LoggerService.instance.i(
-  'AI内容生成完成，字数: ${content.length}',
+  'AI 内容生成完成，字数: ${content.length}',
   category: LogCategory.ai,
-  tags: ['dify', 'complete'],
+  tags: ['dsl', 'complete'],
 );
 
-// AI调用失败
+// AI 调用失败
 LoggerService.instance.e(
-  'Dify API返回错误: ${statusCode}',
+  'LLM API 返回错误: ${statusCode}',
   stackTrace: stackTrace.toString(),
   category: LogCategory.ai,
-  tags: ['dify', 'api-error'],
+  tags: ['llm', 'api-error'],
 );
 ```
 
@@ -507,7 +507,8 @@ LoggerService.instance.d(
 - `post` / `get` / `put` / `delete` - HTTP方法
 
 #### AI相关标签
-- `dify` - Dify工作流
+- `dsl` - DSL Engine 工作流
+- `llm` - LLM 调用
 - `generation` - 内容生成
 - `stream` - 流式响应
 - `sse` - Server-Sent Events
@@ -556,9 +557,9 @@ LoggerService.instance.d(
 #### 示例1: 组合多个标签
 ```dart
 LoggerService.instance.w(
-  'Dify API超时，正在第2次重试',
+  'LLM API 超时，正在第2次重试',
   category: LogCategory.ai,
-  tags: ['dify', 'timeout', 'retry', 'attempt-2'],
+  tags: ['llm', 'timeout', 'retry', 'attempt-2'],
 );
 ```
 
@@ -586,7 +587,7 @@ LoggerService.instance.e(
   'JSON解析失败',
   stackTrace: stackTrace.toString(),
   category: LogCategory.ai,
-  tags: ['dify', 'parse-error', 'json'],
+  tags: ['llm', 'parse-error', 'json'],
 );
 
 // 网络错误
@@ -895,7 +896,7 @@ final networkErrors = LoggerService.instance.searchLogs(
   category: LogCategory.network,
 ).where((log) => log.level == LogLevel.error).toList();
 
-// 搜索包含"Dify"的AI日志
+// 搜索包含"Dify"的AI日志（历史标签，建议改为 'dsl' / 'llm'）
 final difyLogs = LoggerService.instance.searchLogs(
   'Dify',
   category: LogCategory.ai,
@@ -1078,7 +1079,7 @@ try {
 **需要迁移的位置**:
 - 数据库操作（初始化、迁移、查询）
 - 网络请求（API调用、响应处理）
-- AI功能（Dify调用、内容生成）
+- AI功能（LLM调用、内容生成）
 - 用户操作（页面跳转、设置变更）
 
 **示例**:
@@ -2383,16 +2384,16 @@ LoggerService.instance.w('请求超时: ${timeout}ms', category: LogCategory.net
 #### AI功能
 ```dart
 // 工作流开始
-LoggerService.instance.i('工作流开始: ${workflowName}', category: LogCategory.ai, tags: ['dify', 'workflow-start']);
+LoggerService.instance.i('工作流开始: ${workflowName}', category: LogCategory.ai, tags: ['dsl', 'workflow-start']);
 
 // 流式响应
-LoggerService.instance.d('接收数据块: ${bytes}字节', category: LogCategory.ai, tags: ['dify', 'stream', 'sse']);
+LoggerService.instance.d('接收数据块: ${bytes}字节', category: LogCategory.ai, tags: ['dsl', 'stream', 'sse']);
 
 // 生成完成
-LoggerService.instance.i('生成完成: ${charCount}字', category: LogCategory.ai, tags: ['dify', 'complete']);
+LoggerService.instance.i('生成完成: ${charCount}字', category: LogCategory.ai, tags: ['dsl', 'complete']);
 
 // 生成失败
-LoggerService.instance.e('生成失败', stackTrace: stackTrace, category: LogCategory.ai, tags: ['dify', 'error']);
+LoggerService.instance.e('生成失败', stackTrace: stackTrace, category: LogCategory.ai, tags: ['llm', 'error']);
 ```
 
 ---
@@ -2411,18 +2412,20 @@ LoggerService.instance.e('生成失败', stackTrace: stackTrace, category: LogCa
 #### 相关服务
 - [DatabaseService](../novel_app/lib/services/database_service.dart)
 - [ApiService](../novel_app/lib/services/backend_api_service.dart)
-- [DifyService](../novel_app/lib/services/dify_service.dart)
+- `LlmService` / DSL Engine (替代旧 DifyService)
 
 ---
 
 ## 更新日志
 
-- **2025-01-25**: 初始版本，完整的日志系统使用指南
+- **2026-07-17**: 配合根 CLAUDE.md traceId + 文件回退重构，统一「AI 调用」「DSL 工作流」术语，移除 Dify 历史命名（已下线）；标签建议由 `dify` → `dsl` / `llm`
   - 概述和核心特性
   - 日志级别和分类规范
   - 最佳实践和禁止做法
   - 迁移指南和故障排查
   - 完整API参考
+
+- **2025-01-25**: 初始版本，完整的日志系统使用指南
 
 ---
 
@@ -2442,6 +2445,6 @@ MIT License - 与项目主许可证一致
 
 ---
 
-**文档版本**: 1.0.0
-**最后更新**: 2025-01-25
+**文档版本**: 1.1.0
+**最后更新**: 2026-07-27
 **维护者**: Novel Builder Team
