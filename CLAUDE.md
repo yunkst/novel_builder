@@ -2,6 +2,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-07-27**: **文档系统同步现状**。根 CLAUDE.md 同步到 v39 / 17 端点 / 3 Tab / 24+ screens / 已知问题；项目愿景改为"AI 原生小说阅读平台"；移除"多站点/全文搜索/9 个小说站点"等过期措辞。详见 `docs/superpowers/specs/2026-07-27-github-display-optimization-design.md` + `docs/superpowers/plans/2026-07-27-github-display-optimization.md`。
 - **2026-07-18**: **LLM 重试 UI 展示**。Agent Chat 底部输入栏上方浮动横幅(变体 2:错误码类别 + 倒计时,传输层橙/回合层蓝)。`withRetry` 加可选 `onRetry(attempt, maxAttempts, delayMs, error)` 回调(默认 null 向后兼容);新建模块级单例 `RetrySignals`(`ValueNotifier<RetryState?>` + `RetryLevel` + `RetryState` + `categorizeRetryError` 共享工具 + `resetForTest`);`IoLlmHttpClient.postJson/postJsonStream` 注入 onRetry → `reportTransport`,成功 return 单点 `clear()`(rethrow 不 clear,避免与 round-level 竞争空白闪烁);`agent_loop` round-level catch 块在 `await Future.delayed` 前 `emit RetryEvent` + `RetrySignals.reportRound(maxAttempts: _config.networkRetryPerRound)` 同一处(走方案 B 绕开 `shouldMainSessionHandleEvent` 过滤,子 Agent 重试也能显示),`AgentErrorEvent`/`AgentDoneEvent`(取消 + 无工具调用 + max_rounds 四个退出分支)emit 时 clear;`RetryEvent extends AgentEvent` 必带 `super.runId` 转发(否则 `EventTagger.tag`/`SubagentStateProjector.project`/`scenario_session._handleAgentEvent` 三个 exhaustive switch 编译失败);新建 `RetryBanner` widget(`Timer.periodic` 倒计时,delayMs≤1s 或到 0 切「重试中…」)。无取消按钮(spec §1.3)。多 session 串号限制接受(YAGNI)。详见 `docs/superpowers/specs/2026-07-17-llm-retry-ui-design.md` + `docs/superpowers/plans/2026-07-17-llm-retry-ui.md`。
 - **2026-07-18**: **ContextCompactor 预剪枝层（P1 cheap pre-pruning）**。`context_compactor.dart` 的 `compact()` 第一步新增 `_pruneOldToolResults`，对压缩候选区间（`[0, protectEnd)`，默认保护最近 6 条 tool result）内的老 tool result 做 Pass 1 MD5 去重（`dedupThresholdChars=200`，保留最新一条，前面重复替换为 `[toolName dup of idx#md5]`）+ Pass 2 按工具类型 1-liner 改写（`longFieldChars=500`，覆盖 read_chapter_content / list_chapters / search_in_chapters / execute_js 四个高频工具 + 通用 fallback，错误分支保留 `{error, message}`）。只改 tool result 的 content，不动 assistant.toolCalls / system / user / toolCallId / 消息顺序；改写后 content 仍是合法 JSON（read_chapter 纯文本特例除外）。新增 `CompactionResult.rewrittenContent` / `CompactionEvent.rewrittenContent` 携带改写记录透传给 `ScenarioSession._handleCompaction`，复用现有 `_deleteAgentMessagesBeforeDb`（clearMessages + 重写）自动把 1-liner 版落库，hydrate 续聊时 LLM 看精简版。新增 `CompactorConfig.{prePruneEnabled, dedupThresholdChars, longFieldChars, protectRecentToolResults}` 配置项，`prePruneEnabled=false` 退化为 v32 行为。改写后同样 `preserveTailChars` 预算能装下更多消息，减少丢消息数。新增 20 个单测覆盖模板/去重/保护/契约。借鉴 `hermes-agent/agent/context_compressor.py` 的 `_prune_old_tool_results`。
 - **2026-07-17**: **LLM HTTP 错误统一重试**。`retry_helper` 删除 `NonRetryableHttpException` 类，`isRetryableStatus` 改为 `>= 400`（所有 4xx/5xx 一律重试）；`llm_provider` 的 `_postJsonOnce`/`_postJsonStreamHandshake` 移除 4xx 分支，统一抛 `RetryableHttpException`；`chatForJson` 应用层 `retryOnParseError` 默认值 1→0（彻底交给传输层 8 次/60s 重试）。瞬态 4xx（代理网关偶发 400/401 等）不再直接打断会话。同步反转 `retry_helper_test`/`agent_loop_retry_test` 断言并新增 400/401 round-level 重试用例。
@@ -16,7 +17,7 @@
 
 ## 项目愿景
 
-Novel Builder 是一个现代化的全栈小说阅读平台，采用微服务架构，提供跨平台的小说搜索、阅读、缓存和AI增强功能。平台整合多个小说站点资源，通过统一的API接口为用户提供无缝的阅读体验。
+Novel Builder 是一个 **AI 原生小说阅读平台**。前端 Flutter 离线优先（本地书架 + Headless WebView 章节提取 + PP-OCRv6 字体反爬还原），AI 层由 DSL Engine + Agent Chat + Subagent 驱动，后端 FastAPI 仅承担 ComfyUI 文生图/图生视频、AI 结果轮询、客户端备份、客户端日志上报 等轻量职责。
 
 ## 架构总览
 
@@ -40,7 +41,7 @@ graph TD
 
     H --> O["AI文生图/图生视频API"];
     H --> P["备份/日志API"];
-    H --> Q["模型管理API"];
+    H --> Q["ComfyUI 模型分块上传 API"];
 
     click B "./novel_app/CLAUDE.md" "查看 Flutter 移动应用模块"
     click C "./backend/CLAUDE.md" "查看 Python 后端模块"
@@ -87,12 +88,11 @@ graph TD
 - **提纲管理**: 小说结构和章节规划
 
 ### 🌐 后端服务功能
-- **AI 文生图 / 图生视频**: ComfyUI 任务提交与结果轮询，支持负向提示词
-- **ComfyUI 客户端**: 工作流占位符替换、模型目录浏览、分块上传
-- **数据备份**: 客户端数据库备份文件上传、列表、下载
-- **客户端日志上报**: 接收并持久化客户端日志
-- **实时API**: RESTful API with OpenAPI文档
-- **数据同步**: 备份导入/导出
+- **ComfyUI 文生图 / 图生视频**: 任务提交与结果轮询，支持负向提示词
+- **ComfyUI 模型分块上传**: 分块 init / chunk / status / complete / cancel 五段式
+- **客户端数据库备份**: 上传 / 列表 / 下载 / 删除（4 端点）
+- **客户端日志上报**: 批量 1–50 条/次持久化
+- **ComfyUI 健康检查**: `/text2img/health`（注意：无 `/api` 前缀，与业务前缀不一致）
 
 > 注：**多站点爬虫、搜索/章节接口、章节缓存已移除**（前端改用 headless WebView + 本地 JS 提取脚本 + 本地书架搜索，2026-07-08）。
 
@@ -125,10 +125,10 @@ docker-compose ps
 ```
 
 ### 端口映射
-- **后端API**: 3800 → 8000 (FastAPI)
-- **调试端口**: 6678 → 5678 (debugpy)
-- **数据库**: 5432 (PostgreSQL，仅容器内部，不对宿主机暴露)
-- **ComfyUI**: 8188 (宿主机本地，文生图后端)
+- **后端 API**: 3800 → 8000 (FastAPI)
+- **debugpy**: 6678 → 5678 (Dockerfile.debug)
+- **PostgreSQL**: 5432 (Docker 内部，不对宿主机暴露)
+- **ComfyUI**: 8188 (宿主机本地，文生图后端 —— 通过 `host.docker.internal` 引用)
 
 ### 开发环境配置
 
@@ -213,25 +213,28 @@ docker-compose logs -f
 ## 数据库设计
 
 ### 主要表结构
-- **bookshelf**: 小说元数据（历史命名，含阅读进度）
-- **chapter_cache**: 章节内容缓存（前端 SQLite 本地缓存）
-- **novel_chapters**: 章节列表元数据
-- **chapter_versions**: 章节历史版本（AI 编辑/重写留档）
-- **characters / character_relationships**: 角色与关系图
-- **outlines**: 大纲数据
-- **chat_sessions / chat_scenes**: Agent 对话会话与场景
-- **prompt_tags / prompt_tag_categories**: 写作标签库
-- **agent_memories**: Agent 经验记忆
-- **llm_configs**: LLM 配置
-- **site_scripts**: 站点提取脚本（v37 加 ocr 列，标识字体反爬 OCR 提取器）
-- **text2img_task**: 文生图任务（ComfyUI prompt_id 为 task_id，1.9.21 起含 negative_prompt）
-- **image_to_video_task**: 图生视频任务（ComfyUI prompt_id 为 task_id）
-- **client_logs**: 客户端日志（后端）
+- **bookshelf**: 小说元数据（历史命名，含阅读进度，v36 加 coverMediaId 走 MediaView 渲染封面）
+- **bookshelves / novel_bookshelves**: 多书架分类（v16）
+- **novel_chapters**: 章节列表元数据（v2 `is_user_inserted`，v11 `read_at`，v18 `is_accompanied`）
+- **chapter_cache**: 章节内容缓存（前端 SQLite 本地；用户插入章节保护）
+- **chapter_versions**: 章节历史版本（v30，AI 编辑/重写留档）
+- **characters / character_relationships**: 角色与关系图（v34 `avatar_media_id`，v35 first_appearance_chapter，关系区间模型 v35）
+- **scene_illustrations**: ~~v34 已删，由 media_items 统一承载~~
+- **media_items**: 统一媒体代理（v34；mediaId / kind / source / local_only）
+- **outlines**: 大纲（v9）
+- **chat_sessions / chat_messages**: Agent Chat 会话与消息（v31-32）
+- **prompt_tags / prompt_tag_categories / prompt_history / prompt_tag_history**: 写作标签库（v22-28）
+- **agent_memory**: Agent 经验记忆（v27）
+- **llm_configs**: LLM 配置 CRUD（v29）
+- **site_scripts**: 站点提取脚本（v25+；v37 加 ocr 列；v39 加 `chapter_list_ocr` 与 `chapter_content_ocr` 两列，番茄场景互不覆盖）
+- **text2img_task**: ComfyUI 文生图任务（prompt_id=task_id；v2026-07-10 加 negative_prompt）
+- **image_to_video_task**: ComfyUI 图生视频任务
+- **client_logs**: 客户端日志（后端 PostgreSQL）
 
-> 后端 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache` 三张缓存表已于 2026-07-08 由 `20260708_drop_cache_tables` 迁移移除。
+**已移除**（2026-07-08 by `20260708_drop_cache_tables`）：`novel_cache_tasks`、`novel_chapters_cache`、`chapter_list_cache`、`model_download_tasks`（v38 删）。
 
 ### 数据库版本
-- **前端SQLite**: v38 (novel_reader.db) — v37→v38 删除 `model_download_tasks` 表（2026-07-17）
+- **前端SQLite**: v39 (novel_reader.db) — v38→v39 加 `chapter_list_ocr` + `chapter_content_ocr` 两列（2026-07-17 site_scripts 拆 OCR 列）
 - **后端PostgreSQL**: Alembic 管理（head: `20260708_drop_cache_tables`）
 - **迁移工具**: Alembic (后端) + 数据库升级服务 (前端)
 
@@ -243,17 +246,51 @@ docker-compose logs -f
 - **认证方式**: X-API-TOKEN header
 
 ### 主要端点
-- `POST /api/text2img/generate`: 提交文生图任务（支持 negative_prompt 负向提示词），返回 task_id
-- `GET /api/text2img/image/{task_id}`: 按 task_id 取文生图结果（202 pending / 200 png / 404 失败）
-- `POST /api/image-to-video/generate`: 上传图片+提示词，提交图生视频任务，返回 task_id
-- `GET /api/image-to-video/video/{task_id}`: 按 task_id 取视频结果（202 pending / 200 mp4 / 404 失败）
-- `GET /api/models`: 获取可用文生图/图生视频模型列表
-- `POST /api/backup/upload`: 上传数据库备份文件
-- `GET /api/backup/list`: 列出已上传备份
-- `GET /api/backup/download/{backup_id}`: 下载备份文件
-- `POST /api/logs/upload`: 上报客户端日志
+**AI 接口**（ComfyUI 任务）：
+- `POST /api/text2img/generate` - 提交文生图任务（含 negative_prompt）
+- `GET  /api/text2img/image/{task_id}` - 按 task_id 取文生图结果（202 / 200 png / 404）
+- `GET  /text2img/health` - ComfyUI 健康检查（**注意**：无 `/api` 前缀）
+- `POST /api/image-to-video/generate` - 上传图片 + prompt，提交图生视频任务
+- `GET  /api/image-to-video/video/{task_id}` - 按 task_id 取视频结果（202 / 200 mp4 / 404）
+
+**ComfyUI 模型管理**：
+- `GET  /api/models` - 列出 T2I / I2V 工作流
+- `GET  /api/models/dirs` - 列出 ComfyUI 模型一级子目录（容器内）
+- `POST /api/models/upload/init` - 初始化模型分块上传任务
+- `POST /api/models/upload/{upload_id}/chunk/{index}` - 上传单个分块
+- `GET  /api/models/upload/{upload_id}/status` - 查询分块上传进度
+- `POST /api/models/upload/{upload_id}/complete` - 合并分块到最终路径
+- `DELETE /api/models/upload/{upload_id}` - 取消并清理分块临时目录
+
+**备份接口**：
+- `POST   /api/backup/upload` - 上传 .db/.zip 备份
+- `GET    /api/backup/list` - 列出已上传备份
+- `GET    /api/backup/download/{backup_id:path}` - 下载备份
+- `DELETE /api/backup/delete/{backup_id:path}` - 删除备份
+
+**日志接口**：
+- `POST /api/logs/upload` - 批量上报客户端日志（1-50 条/次）
+
+**杂项**：
+- `GET /` - 服务信息 + 端点清单
+- `GET /health` - 服务自身健康检查
+- `GET /security-check` - 安全配置自检（仅 DEBUG）
 
 > 已移除：`/search`、`/chapters`、`/chapter-content`、`/novel-by-url`、`/source-sites`、`/api/cache/*`、`/ws/cache/*`、`/api/app-version/*`（版本管理迁移到 GitHub Releases，前端 `github_release_service.dart` 直接调 GitHub API）（2026-07-08）。
+
+## 已知问题（不在本次 PR 范围）
+
+下列问题已识别但属"展示层 + 仓库卫生"scope 之外，需后续 PR 处理：
+
+- `backend/openapi.json` 严重过期：仍记录 2026-07-08 删除前的爬虫/缓存端点（10039 字节），不含任何现行端点。前端若依赖其做客户端生成会全错。**修复方式**：重生成后端运行后 `python -m openapi-spec-validator` 并重新导出。
+- `backend/Dockerfile.debug` 仍 `playwright install chromium`：因 `pyproject.toml` 已删 playwright，镜像构建会失败。**修复方式**：删除 Dockerfile.debug 的 playwright 段，或新建 Dockerfile.dev 取代。
+- `backend/Dockerfile.test` 仍装 `scrapling[fetchers]` 与 `scrapling[core]`、`backend/Dockerfile.simple` 装 `beautifulsoup4 lxml`。**修复方式**：删除这两个文件或合并。
+- `backend/tests/unit/test_crawlers.py.disabled` 仍在仓库。**修复方式**：删除。
+- `backend/app/exceptions.py` 残留 `CrawlerError` / `ParseError` / `CacheError` 死类。**修复方式**：删除。
+- `backend/.ruff.toml` 仍为 `*_crawler.py` / `scene_illustration_service.py` / `role_card_service.py` / `search_service.py` 配 per-file ignore，对应文件已不存在。**修复方式**：删除这些 per-file override 段。
+- `backend/alembic/env.py` autogenerate 仅 `import Text2ImgTask, ImageToVideoTask`，漏 `import ClientLog`。**修复方式**：补 import。
+- 后端版本号三处不一致：pyproject=`0.1.0` / FastAPI 实例=`0.2.0` / `__init__.py`=`1.0.0`。**修复方式**：统一到单一版本来源。
+- `novel_app/CLAUDE.md` 列 `novel_context_service.dart` 待二次确认（plan 阶段）。
 
 ## 故障排除
 
