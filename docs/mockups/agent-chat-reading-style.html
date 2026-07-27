@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晨读书馆 · Agent Chat 重做 Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FFFDF8;
+    --paper-soft:#F7F0E1;
+    --paper-deep:#EFE6D2;
+    --ink:#2B2620;
+    --ink-soft:#5C544A;
+    --ink-faint:#9A9081;
+    --amber:#B8843A;
+    --amber-deep:#9A6A28;
+    --amber-wash:rgba(184,132,58,.10);
+    --amber-wash-2:rgba(184,132,58,.16);
+    --error:#B23A2B;
+    --line:rgba(43,38,32,.10);
+    --line-2:rgba(43,38,32,.18);
+    --desk:#E4DCC9;
+    --desk-deep:#D6CBB2;
+    --serif:'Noto Serif SC', Georgia, 'Songti SC', serif;
+    --sans:'Noto Sans SC', system-ui, -apple-system, sans-serif;
+    --mono:'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+  }
+  /* ===== 暗夜书馆（忠于 app_colors.dart dark） ===== */
+  [data-theme="dark"]{
+    --paper:#241F16; --paper-soft:#2E2820; --paper-deep:#1A1610;
+    --ink:#E8DCC4; --ink-soft:#B5A482; --ink-faint:#7A6B52;
+    --amber:#D9A05B; --amber-deep:#B8843A;
+    --amber-wash:rgba(217,160,91,.14); --amber-wash-2:rgba(217,160,91,.24);
+    --error:#D9685A;
+    --line:rgba(232,220,196,.10); --line-2:rgba(232,220,196,.20);
+    --desk:#14110C; --desk-deep:#0B0907;
+  }
+  [data-theme="dark"] body{
+    background:radial-gradient(120% 80% at 50% -10%, #1E1A12 0%, var(--desk) 45%, var(--desk-deep) 100%);
+  }
+  [data-theme="dark"] body::before{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.75 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode:screen; opacity:.5;
+  }
+  [data-theme="dark"] .screen::before{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.75 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode:screen;
+  }
+  [data-theme="dark"] .device{background:#0a0805;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 30px 50px -18px rgba(0,0,0,.7),0 8px 18px -10px rgba(0,0,0,.6)}
+  /* theme toggle */
+  .theme-toggle{
+    position:fixed;top:18px;right:18px;z-index:50;
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);background:var(--paper);
+    border:1px solid var(--line-2);padding:8px 13px;border-radius:999px;cursor:pointer;
+    box-shadow:0 6px 16px -8px rgba(43,38,32,.35);transition:.2s;
+  }
+  .theme-toggle:hover{border-color:var(--amber);color:var(--amber-deep)}
+  .theme-toggle .ico{width:14px;height:14px;display:inline-flex}
+  .theme-toggle .ico svg{width:14px;height:14px}
+  .theme-toggle .ico .moon{display:none}
+  [data-theme="dark"] .theme-toggle .ico .sun{display:none}
+  [data-theme="dark"] .theme-toggle .ico .moon{display:inline-flex}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--desk);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #ECE3CE 0%, var(--desk) 45%, var(--desk-deep) 100%);
+    padding:48px 24px 80px;
+    position:relative;
+  }
+  /* desk grain */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.17 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode:multiply;
+  }
+  .wrap{max-width:780px;margin:0 auto;position:relative;z-index:1}
+
+  /* ---------- page intro ---------- */
+  .intro{text-align:center;margin-bottom:40px;animation:rise .6s ease both}
+  .intro .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:10px}
+  .intro h1{font-family:var(--serif);font-weight:600;font-size:34px;letter-spacing:.04em;color:var(--ink)}
+  .intro .sub{margin-top:10px;font-size:13px;color:var(--ink-soft);line-height:1.7;max-width:520px;margin-left:auto;margin-right:auto}
+  .fleuron{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px auto 0;color:var(--amber);max-width:260px}
+  .fleuron::before,.fleuron::after{content:"";height:1px;background:var(--line-2);flex:1}
+  .fleuron svg{width:18px;height:18px;flex:none}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:22px}
+  .swatch{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-soft);background:var(--paper);border:1px solid var(--line);padding:5px 11px;border-radius:999px}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.06)}
+  .legend .note{font-family:var(--mono);font-size:10px;color:var(--ink-faint);padding:5px 11px}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:34px;align-items:start}
+  @media(max-width:760px){.grid{grid-template-columns:1fr;max-width:380px;margin:0 auto}}
+  .stage{display:flex;flex-direction:column;align-items:center;animation:rise .6s ease both}
+  .stage:nth-child(1){animation-delay:.05s}
+  .stage:nth-child(2){animation-delay:.15s}
+  .stage:nth-child(3){animation-delay:.25s}
+  .stage:nth-child(4){animation-delay:.35s}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+  .caption{text-align:center;margin-top:16px;max-width:340px}
+  .caption .name{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink);letter-spacing:.04em}
+  .caption .desc{font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.6}
+
+  /* ---------- phone device ---------- */
+  .device{
+    width:340px;height:660px;
+    background:#1c1814;
+    border-radius:42px;padding:9px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 30px 50px -18px rgba(43,38,32,.45),
+      0 8px 18px -10px rgba(43,38,32,.4);
+    position:relative;
+  }
+  .device::after{ /* side button */
+    content:"";position:absolute;right:-2px;top:130px;width:3px;height:60px;background:#2a241e;border-radius:0 2px 2px 0
+  }
+  .screen{
+    width:100%;height:100%;border-radius:34px;overflow:hidden;
+    background:var(--paper);position:relative;display:flex;flex-direction:column;
+  }
+  /* paper grain inside screen */
+  .screen::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.6;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.17 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode:multiply;
+  }
+  .screen > *{position:relative;z-index:1}
+
+  /* status bar (iOS-like, kept minimal) */
+  .osbar{display:flex;justify-content:space-between;align-items:center;padding:9px 22px 4px;font-size:11px;font-weight:600;color:var(--ink);font-family:var(--sans)}
+  .osbar .dots{display:flex;gap:4px}
+  .osbar .dots i{width:4px;height:4px;border-radius:50%;background:var(--ink);display:inline-block}
+
+  /* ---------- chat header ---------- */
+  .chat-head{padding:6px 14px 10px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--paper) 0%,rgba(255,253,248,0) 100%)}
+  .chat-head .row1{display:flex;align-items:center;gap:7px}
+  .chat-head .crest{
+    width:22px;height:22px;border-radius:6px;display:grid;place-items:center;
+    background:var(--amber-wash);border:1px solid var(--amber-wash-2);color:var(--amber-deep)
+  }
+  .chat-head .crest svg{width:13px;height:13px}
+  .chat-head .title{font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:.05em;color:var(--ink);line-height:1.2}
+  .chat-head .actions{display:flex;align-items:center;gap:2px}
+  .iconbtn{
+    width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    color:var(--ink-soft);background:transparent;border:none;cursor:pointer;transition:.15s
+  }
+  .iconbtn:hover{background:var(--paper-deep);color:var(--ink)}
+  .iconbtn svg{width:17px;height:17px}
+  .chat-head .row2{display:flex;align-items:center;gap:6px;margin-top:5px;padding-left:1px}
+  .chat-head .ctx{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-soft)}
+  .chat-head .ctx svg{width:12px;height:12px;color:var(--amber)}
+  .chat-head .ctx b{font-weight:500;color:var(--ink-soft)}
+  .chat-head .ctx .sep{color:var(--ink-faint)}
+
+  /* ---------- status strip (consolidated) ---------- */
+  .strip{
+    margin:10px 12px 0;padding:8px 11px;border-radius:8px;
+    background:var(--amber-wash);border:1px solid var(--amber-wash-2);
+    border-left:3px solid var(--amber);
+    display:flex;align-items:center;gap:9px;
+    animation:stripIn .4s ease both;
+  }
+  @keyframes stripIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .strip.err{background:rgba(178,58,43,.08);border-color:rgba(178,58,43,.18);border-left-color:var(--error)}
+  .strip .spin{width:14px;height:14px;flex:none;border-radius:50%;border:2px solid var(--amber-wash-2);border-top-color:var(--amber-deep);animation:spin .9s linear infinite}
+  .strip.err .spin{border-color:rgba(178,58,43,.2);border-top-color:var(--error)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .strip .txt{font-size:11.5px;color:var(--ink);line-height:1.4}
+  .strip .txt .muted{color:var(--ink-faint);font-family:var(--mono);font-size:10.5px}
+  .strip .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--amber-deep);font-weight:500}
+  .strip.err .count{color:var(--error)}
+
+  /* ---------- messages ---------- */
+  .msgs{flex:1;overflow:auto;padding:12px 12px 8px;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+  .msgs::-webkit-scrollbar{display:none}
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:6px}
+  .empty .seal{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;margin-bottom:8px;color:var(--amber);background:var(--amber-wash);border:1px solid var(--amber-wash-2)}
+  .empty .seal svg{width:30px;height:30px}
+  .empty h3{font-family:var(--serif);font-weight:600;font-size:17px;color:var(--ink);letter-spacing:.05em}
+  .empty p{font-size:12px;color:var(--ink-faint);line-height:1.7;max-width:220px;margin-top:2px}
+  .empty .orn{margin-top:12px;display:flex;align-items:center;gap:8px;color:var(--ink-faint);max-width:160px}
+  .empty .orn::before,.empty .orn::after{content:"";height:1px;background:var(--line);flex:1}
+  .empty .orn svg{width:13px;height:13px;color:var(--amber)}
+
+  /* bubbles */
+  .turn{display:flex;flex-direction:column;gap:6px}
+  .turn.user{align-items:flex-end}
+  .turn.bot{align-items:flex-start}
+  .who{display:flex;align-items:center;gap:6px;padding:0 2px}
+  .who .av{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;background:var(--amber-wash);color:var(--amber-deep);border:1px solid var(--amber-wash-2)}
+  .who .av svg{width:11px;height:11px}
+  .who .name{font-family:var(--serif);font-weight:500;font-size:11px;color:var(--ink-soft);letter-spacing:.06em}
+  .who .time{font-size:9.5px;color:var(--ink-faint);font-family:var(--mono)}
+
+  .bubble{max-width:84%;padding:9px 12px;font-size:13px;line-height:1.65;border-radius:12px;position:relative}
+  .turn.user .bubble{
+    background:var(--amber-wash);border:1px solid var(--amber-wash-2);color:var(--ink);
+    border-top-right-radius:5px;
+  }
+  .turn.bot .bubble{
+    background:var(--paper-soft);border:1px solid var(--line);color:var(--ink);
+    border-top-left-radius:5px;
+  }
+  .turn.bot .bubble{font-family:var(--serif);font-weight:400}
+  .bubble .cursor{display:inline-block;width:7px;height:14px;background:var(--amber);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* tool call card */
+  .tool{max-width:84%;border:1px dashed var(--line-2);border-radius:10px;background:rgba(255,253,248,.6);overflow:hidden}
+  .tool .th{display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px dashed var(--line);background:var(--paper-deep)}
+  .tool .th svg{width:13px;height:13px;color:var(--amber-deep)}
+  .tool .th .fn{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);font-weight:500}
+  .tool .th .ok{margin-left:auto;font-size:10px;color:var(--amber-deep);font-family:var(--mono)}
+  .tool .tb{padding:8px 11px}
+  .tool .tb .res{font-size:12px;color:var(--ink);line-height:1.5}
+  .tool .tb .cta{display:inline-flex;align-items:center;gap:4px;margin-top:7px;font-size:11.5px;color:var(--amber-deep);font-weight:500;border:none;background:none;cursor:pointer;padding:0}
+  .tool .tb .cta svg{width:12px;height:12px}
+  .tool .tb .cta:hover{text-decoration:underline}
+
+  /* compaction marker */
+  .marker{
+    border:1px solid var(--line-2);border-radius:10px;background:var(--paper);
+    box-shadow:0 1px 0 rgba(43,38,32,.03);
+  }
+  .marker .mh{display:flex;align-items:center;gap:8px;padding:8px 11px;cursor:pointer;user-select:none}
+  .marker .mh svg.ico{width:14px;height:14px;color:var(--amber)}
+  .marker .mh .t{font-family:var(--serif);font-size:12px;color:var(--ink);font-weight:500;letter-spacing:.04em}
+  .marker .mh .meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-faint)}
+  .marker .mh .chev{width:12px;height:12px;color:var(--ink-faint);transition:.2s}
+  .marker.open .mh .chev{transform:rotate(180deg)}
+  .marker .mb{display:none;padding:0 11px 10px;font-size:11.5px;color:var(--ink-soft);line-height:1.7}
+  .marker.open .mb{display:block}
+  .marker .mb ul{margin:6px 0 0;padding-left:16px}
+  .marker .mb li{margin:2px 0}
+
+  /* ---------- composer ---------- */
+  .composer{border-top:1px solid var(--line);background:var(--paper);padding:8px 10px 10px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-soft);
+    background:var(--paper-soft);border:1px solid var(--line);padding:4px 9px;border-radius:999px;cursor:pointer;transition:.15s
+  }
+  .chip:hover{border-color:var(--amber-wash-2);color:var(--amber-deep);background:var(--amber-wash)}
+  .chip svg{width:11px;height:11px;color:var(--amber)}
+  .composer .inputrow{display:flex;align-items:flex-end;gap:8px;background:var(--paper-soft);border:1px solid var(--line);border-radius:14px;padding:4px 4px 4px 10px;transition:.15s}
+  .composer .inputrow:focus-within{border-color:var(--amber-wash-2);box-shadow:0 0 0 3px var(--amber-wash)}
+  .composer .field{flex:1;border:none;background:none;resize:none;font-family:var(--sans);font-size:13px;color:var(--ink);line-height:1.5;padding:7px 0;max-height:84px;outline:none}
+  .composer .field::placeholder{color:var(--ink-faint)}
+  .sendcol{display:flex;flex-direction:column;gap:3px;align-items:center}
+  .attach{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--ink-faint);background:transparent;border:none;cursor:pointer}
+  .attach:hover{color:var(--ink-soft);background:var(--paper-deep)}
+  .attach svg{width:17px;height:17px}
+  .send{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--amber);color:#fff;border:none;cursor:pointer;transition:.15s;box-shadow:0 2px 6px -2px rgba(184,132,58,.6)}
+  .send:hover{background:var(--amber-deep)}
+  .send svg{width:17px;height:17px}
+  .send:disabled{background:var(--paper-deep);color:var(--ink-faint);box-shadow:none}
+  .hint{font-size:9.5px;color:var(--ink-faint);text-align:center;margin-top:6px;font-family:var(--mono)}
+
+  .screen.dim .composer{opacity:.55;pointer-events:none}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+  <span class="ico"><svg class="sun"><use href="#i-sun"/></svg><svg class="moon"><use href="#i-moon"/></svg></span>
+  <span id="themeLabel">晨读</span>
+</button>
+<div class="wrap">
+
+  <header class="intro">
+    <div class="kicker">Agent Chat · Redesign Proposal</div>
+    <h1>晨读书馆</h1>
+    <p class="sub">把 Agent 对话窗口从「indigo 渐变 + emoji 图标 + 多色 status bar」拉回到与阅读器同源的纸卷气质——纸底、墨字、琥珀点缀，serif 标题与正文。</p>
+    <div class="fleuron">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 7c2 2 4 2 7 0M19 7c-2 2-4 2-7 0M5 12c2 2 4 2 7 0M19 12c-2 2-4 2-7 0M5 17c2 2 4 2 7 0M19 17c-2 2-4 2-7 0"/></svg>
+    </div>
+    <div class="legend">
+      <span class="swatch"><span class="dot" style="background:#FFFDF8"></span>纸 #FFFDF8</span>
+      <span class="swatch"><span class="dot" style="background:#2B2620"></span>墨 #2B2620</span>
+      <span class="swatch"><span class="dot" style="background:#B8843A"></span>琥 #B8843A</span>
+      <span class="note">serif 标题 · sans chrome · 一条 status strip</span>
+    </div>
+  </header>
+
+  <main class="grid" id="grid"></main>
+</div>
+
+<!-- icon library -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-quill" viewBox="0 0 24 24"><path d="M3 21c3-1 6-3 9-6 3-3 6-7 9-12-2 1-5 2-8 5-3 3-5 6-6 9l-2 1-2 3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6 18l2-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v13c-3-1-6-1-8 1-2-2-5-2-8-1V5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 6v14" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-7-7 16-2-7-7-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 13l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M9 15a3.5 3.5 0 010-5l3-3a3.5 3.5 0 015 5l-1.5 1.5M15 9a3.5 3.5 0 010 5l-3 3a3.5 3.5 0 01-5-5l1.5-1.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="M5 19L16 8l-1-1L4 18l1 1zM14 6l1 1M17 4l.5 1.5L19 6l-1.5.5L17 8l-.5-1.5L15 6l1.5-.5L17 4zM7 13l.5 1L9 14.5l-1.5.5L7 16l-.5-1L5 14.5l1.5-.5L7 13z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M19.4 4.6l-1.8 1.8M6.4 17.6l-1.8 1.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 119.5 4 6.5 6.5 0 0020 14.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<script>
+const SVG = id => `<svg><use href="#${id}"/></svg>`;
+
+// ---- header (shared) ----
+function head(subtitle){
+  return `
+  <div class="osbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+  <div class="chat-head">
+    <div class="row1">
+      <span class="crest">${SVG('i-quill')}</span>
+      <span class="title">写作助手</span>
+      <span class="actions" style="margin-left:auto">
+        <button class="iconbtn" title="会话历史">${SVG('i-clock')}</button>
+        <button class="iconbtn" title="切换场景 / 设置">${SVG('i-dots')}</button>
+        <button class="iconbtn" title="关闭">${SVG('i-close')}</button>
+      </span>
+    </div>
+    <div class="row2"><span class="ctx">${SVG('i-book')}<b>${subtitle}</b></span></div>
+  </div>`;
+}
+
+// ---- composer (shared) ----
+function composer(disabled){
+  return `
+  <div class="composer">
+    <div class="chips">
+      <span class="chip">${SVG('i-wand')}续写本章</span>
+      <span class="chip">${SVG('i-book')}人物卡</span>
+      <span class="chip">${SVG('i-wand')}场景插图</span>
+    </div>
+    <div class="inputrow">
+      <textarea class="field" rows="1" placeholder="和写作助手说点什么…" ${disabled?'disabled':''}></textarea>
+      <div class="sendcol">
+        <button class="attach" title="添加图片">${SVG('i-plus')}</button>
+        <button class="send" ${disabled?'disabled':''} title="发送">${SVG('i-send')}</button>
+      </div>
+    </div>
+    <div class="hint">Enter 发送 · Shift+Enter 换行</div>
+  </div>`;
+}
+
+// ---- bubbles helpers ----
+function userTurn(text, time){
+  return `<div class="turn user">
+    <div class="bubble">${text}</div>
+    <div class="who"><span class="time">${time||'刚刚'}</span></div>
+  </div>`;
+}
+function botTurn(html, time){
+  return `<div class="turn bot">
+    <div class="who">
+      <span class="av">${SVG('i-quill')}</span>
+      <span class="name">写作助手</span>
+      <span class="time">${time||'刚刚'}</span>
+    </div>
+    <div class="bubble">${html}</div>
+  </div>`;
+}
+function toolCard(fn, result, cta){
+  return `<div class="tool">
+    <div class="th">${SVG('i-edit')}<span class="fn">${fn}</span><span class="ok">✓ done</span></div>
+    <div class="tb">
+      <div class="res">${result}</div>
+      ${cta?`<button class="cta">${SVG('i-arrow')}${cta}</button>`:''}
+    </div>
+  </div>`;
+}
+
+// =================== STATE 1 : EMPTY ===================
+const stateEmpty = `
+  <div class="screen">
+    ${head('阅读《某某》 · 第 23 章')}
+    <div class="msgs">
+      <div class="empty">
+        <div class="seal">${SVG('i-quill')}</div>
+        <h3>开始今天的写作</h3>
+        <p>告诉我你想写什么，或从下方提示开始一段新的章节。</p>
+        <div class="orn">${SVG('i-wand')}</div>
+      </div>
+    </div>
+    ${composer(false)}
+  </div>`;
+
+// =================== STATE 2 : NORMAL CHAT ===================
+const stateChat = `
+  <div class="screen">
+    ${head('阅读《某某》 · 第 23 章')}
+    <div class="msgs">
+      ${userTurn('把第 23 章结尾改得悬疑一点。','14:02')}
+      ${botTurn('已为你重写结尾——主角发现信纸背面的字迹，竟与三年前那封未寄出的信一模一样。<br><br>保留了你原有的呼吸感，只在末段轻轻一转。','14:02')}
+      ${toolCard('update_chapter_content','已写入第 23 章 · 2,184 字','查看章节')}
+      ${botTurn('需要我为这个悬念配一张插图吗？<span class="cursor"></span>','')}
+    </div>
+    ${composer(false)}
+  </div>`;
+
+// =================== STATE 3 : RETRY ===================
+const stateRetry = `
+  <div class="screen dim">
+    ${head('阅读《某某》 · 第 23 章')}
+    <div class="strip">
+      <span class="spin"></span>
+      <span class="txt">网络波动 · 正在重试 <span class="muted">2 / 8</span><br><span class="muted">HTTP 429 · 传输层</span></span>
+      <span class="count" id="cnt">7s</span>
+    </div>
+    <div class="msgs">
+      ${userTurn('再帮我把这段场景写得冷一点。','14:05')}
+      ${botTurn('<span class="cursor"></span>')}
+    </div>
+    ${composer(true)}
+  </div>`;
+
+// =================== STATE 4 : COMPACTED ===================
+const stateCompact = `
+  <div class="screen">
+    ${head('阅读《某某》 · 第 23 章')}
+    <div class="msgs">
+      ${userTurn('前面那两章的伏笔记得吗？','14:10')}
+      <div class="marker open" data-marker>
+        <div class="mh">
+          ${SVG('i-layers')}
+          <span class="t">上下文已压缩</span>
+          <span class="meta">节省 8.4k</span>
+          <span class="chev">${SVG('i-chevron')}</span>
+        </div>
+        <div class="mb">
+          为保留长对话的连贯性，较早的消息已被归纳摘要：
+          <ul>
+            <li>第 21–22 章：主角收到匿名信件，提及旧友"沈"的失踪</li>
+            <li>已生成 2 张场景插图、1 张人物卡</li>
+            <li>保留最近 12 条原始消息</li>
+          </ul>
+        </div>
+      </div>
+      ${botTurn('记得。第 21 章那封匿名信里提到的"沈"，正好可以接上现在的悬念——要不要我把他写进这一段的回忆里？','14:10')}
+    </div>
+    ${composer(false)}
+  </div>`;
+
+// ---- render ----
+const stages = [
+  {html:stateEmpty, name:'空状态', desc:'serif 标题 + 琥珀印章式图标，替代当前散乱的 auto_awesome 大图标。'},
+  {html:stateChat,  name:'正常对话', desc:'assistant 气泡用 serif 正文 + 纸色卡片；user 用琥珀浅底；工具卡虚线描边 + 等宽工具名。'},
+  {html:stateRetry, name:'运行中 · 重试', desc:'4 个手写 status bar 合并为流顶一条；RetryBanner 不再用 raw orange/blue，改走琥珀/砖红 token。'},
+  {html:stateCompact,name:'压缩后', desc:'压缩标记作为消息流内嵌的可展开卡片，落库后重启仍可见，与现有 CompactionMarkerCard 一致。'},
+];
+const grid = document.getElementById('grid');
+stages.forEach(s=>{
+  const fig = document.createElement('figure'); fig.className='stage';
+  fig.innerHTML = `<div class="device">${s.html}</div>
+    <figcaption class="caption"><div class="name">${s.name}</div><div class="desc">${s.desc}</div></figcaption>`;
+  grid.appendChild(fig);
+});
+
+// retry countdown
+const cnt = document.getElementById('cnt');
+let n = 7;
+const tick = () => {
+  n = n>1 ? n-1 : 8;
+  if(cnt) cnt.textContent = n+'s';
+};
+setInterval(tick, 1000);
+
+// marker toggle
+document.querySelectorAll('[data-marker] .mh').forEach(mh=>{
+  mh.addEventListener('click', ()=>mh.parentElement.classList.toggle('open'));
+});
+
+// theme toggle (晨读 ⇄ 夜读)
+(function(){
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const lbl = document.getElementById('themeLabel');
+  btn.addEventListener('click', ()=>{
+    const toDark = root.dataset.theme !== 'dark';
+    root.dataset.theme = toDark ? 'dark' : 'light';
+    lbl.textContent = toDark ? '夜读' : '晨读';
+  });
+})();
+</script>
+</body>
+</html>
