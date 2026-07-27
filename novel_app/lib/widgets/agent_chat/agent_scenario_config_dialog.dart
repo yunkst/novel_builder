@@ -8,8 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/services/ai_service_providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/llm_config.dart';
 import '../../services/novel_agent/agent_scenario_factory.dart';
+import 'agent_icons.dart';
 
 class AgentScenarioConfigDialog extends ConsumerStatefulWidget {
   final String scenarioId;
@@ -65,7 +67,8 @@ class _AgentScenarioConfigDialogState
     return AlertDialog(
       title: Row(
         children: [
-          Text(scenarioInfo?.icon ?? '⚙️', style: const TextStyle(fontSize: 20)),
+          Icon(AgentIcons.quill,
+              size: 22, color: context.appColors.chatButtonPrimary),
           const SizedBox(width: 8),
           Text('${scenarioInfo?.displayName ?? widget.scenarioId} 配置'),
         ],

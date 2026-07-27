@@ -124,13 +124,11 @@ class _AgentStatusStripState extends ConsumerState<AgentStatusStrip> {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: isError ? 0.08 : 0.14),
         borderRadius: BorderRadius.circular(8),
+        color: accent.withValues(alpha: isError ? 0.08 : 0.14),
+        // 左侧 accent 条用 border 实现（borderRadius 与 uniform color 才合法）
         border: Border(
           left: BorderSide(width: 3, color: accent),
-          top: BorderSide(color: accent.withValues(alpha: 0.2)),
-          bottom: BorderSide(color: accent.withValues(alpha: 0.2)),
-          right: BorderSide(color: accent.withValues(alpha: 0.2)),
         ),
       ),
       child: Row(
