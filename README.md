@@ -9,9 +9,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-red.svg)
 ![CI](https://github.com/yunkst/novel_builder/actions/workflows/flutter-ci.yml/badge.svg)
 
-**现代化的全栈小说阅读平台**
+**AI 原生小说阅读平台**
 
-提供跨平台的小说搜索、阅读、缓存和AI增强功能
+本地书架 + Headless WebView 章节提取 + Agent Chat + ComfyUI 文生图/图生视频 + 字体反爬 OCR 还原
 
 [快速开始](#-快速开始) • [功能特性](#-功能特性) • [文档](#-文档) • [贡献](#-贡献)
 
@@ -19,25 +19,25 @@
 
 ## ✨ 功能特性
 
-### 📱 跨平台移动应用
-- **Flutter 构建**：支持 Android、iOS、Windows
-- **Material Design 3**：现代化 UI 设计
-- **离线阅读**：本地 SQLite 缓存
-- **智能搜索**：跨 9 个小说站点统一搜索
-- **AI 增强**：DSL Engine 本地工作流 + Hermes Agent 智能对话
+### 📱 Flutter 移动应用（Flutter 3.0+，App 版本 2.0.2-preview.1+110）
+- **离线优先**：本地 SQLite（v39）做唯一权威存储
+- **Headless WebView 章节提取**：前端 JS 提取脚本（`site_scripts` 表），不依赖服务端爬虫
+- **PP-OCRv6 字体反爬还原**：番茄小说等 PUA 编码正文可读
+- **本地搜索**：章节内容全文搜索（`chapter_search_service.dart`）
+- **AI 增强**：DSL Engine + Agent Chat + Subagent + 上下文压缩 + LLM 重试横幅
 
-### 🌐 强大的后端服务
-- **FastAPI 驱动**：高性能异步 API
-- **多站点爬虫**：支持 9 个小说站点（7 个活跃 + 2 个禁用）
-- **智能缓存**：PostgreSQL + 本地缓存双重策略
-- **实时通信**：WebSocket 进度推送
-- **Docker 部署**：一键容器化部署
+### 🌐 FastAPI 后端（17 个端点）
+- **AI 接口**：ComfyUI 文生图 / 图生视频（提交 + 单接口轮询；支持 negative_prompt）
+- **模型管理**：列出工作流 + 模型目录浏览 + 模型分块上传（init/chunk/status/complete/cancel）
+- **数据库备份**：客户端 .db 上传/列表/下载/删除
+- **客户端日志**：批量 1–50 条/次持久化
+- **Docker 部署**：docker-compose 一键启动后端 + PostgreSQL（容器内不暴露）
 
-### 🤖 AI 集成功能
-- **DSL Engine**：客户端 Dify 工作流复刻，支持结构化信息提取、创意写作等
-- **Hermes Agent**：基于 OpenAI 兼容 API 的智能对话助手
-- **场景插图**：AI 生成的场景插图功能（ComfyUI 后端）
-- **角色卡提取**：智能识别和分析章节角色
+### 🤖 AI 集成（DSL Engine + Agent Chat + ComfyUI）
+- **DSL Engine**：本地 LLM 工作流引擎（OpenAI 兼容 API；2026-06-09 已与 Dify 完全解耦）
+- **Agent Chat**：写作 / 浏览器 / 多角色场景 + Subagent + 上下文压缩（`novel_agent/`）
+- **ComfyUI 文生图 / 图生视频**：场景插图 + 角色配图，`create_images` / `create_image_to_video` 工具
+- **角色卡管理**：智能识别 + 人物关系图（`flutter_force_directed_graph`）
 
 ## 🚀 快速开始
 
@@ -56,13 +56,17 @@ cd novel_builder
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env 文件，设置必要的环境变量
+# 编辑 .env，至少设置 NOVEL_API_TOKEN
 
-# 启动所有服务
-docker-compose up -d
+# 启动所有服务（默认不含个人机挂载）
+docker compose up -d
 
 # 查看服务状态
-docker-compose ps
+docker compose ps
+
+# 可选：挂载本机 ComfyUI 模型目录 / novel_sync 目录
+# cp docker-compose.override.yml.example docker-compose.override.yml
+# 编辑 .env 填入 COMFYUI_MODELS_HOST_DIR / NOVEL_SYNC_HOST_DIR，或直接在 override 里硬编码
 ```
 
 ### 手动安装
@@ -82,24 +86,28 @@ flutter run
 ```
 
 ### 端口映射
-- **移动应用**：3154 (开发调试)
-- **后端API**：3800 → 8000 (FastAPI)
-- **数据库**：5432 (PostgreSQL)
-- **API文档**：http://localhost:3800/docs
+- **后端 API**：3800 → 8000（FastAPI）
+- **debugpy**：6678 → 5678（Dockerfile.debug；生产部署不需要）
+- **PostgreSQL**：5432（仅 Docker 容器内部，不对宿主机暴露）
+- **ComfyUI**：8188（宿主机本地，文生图后端，通过 `host.docker.internal` 引用）
+- **API 文档（Swagger UI）**：http://localhost:3800/docs
+
+> 移动应用不使用固定端口，由 `flutter run` 决定。
 
 ## 📖 文档
 
 ### 用户文档
 - [使用指南](docs/user-guide.md)
-- [功能介绍](docs/APP功能介绍.md)
+- [功能介绍](docs/APP功能介绍.md)（截图反映旧版 UI，待重生成）
 
 ### 开发者文档
 - [开发者指南](docs/developer-guide.md)
-- [API 文档](http://localhost:3800/docs)
 - [部署指南](docs/deployment.md)
-- [Flutter 模块](novel_app/CLAUDE.md)
+- [后端 API 文档（Swagger UI）](http://localhost:3800/docs)
+- [Flutter 模块](novel_app/CLAUDE.md)（模块 CLAUDE.md）
 - [后端模块](backend/CLAUDE.md)
 - [日志指南](docs/logging-guidelines.md)
+- [内部决策追溯](docs/superpowers/)（AI 上下文，不对外展示）
 
 ### 文档索引
 - [文档中心](docs/README.md)
@@ -114,11 +122,10 @@ flutter run
 - **Material Design 3**：UI设计系统
 
 ### 后端技术
-- **FastAPI**：Python Web框架
-- **PostgreSQL**：主数据库
-- **SQLAlchemy**：ORM框架
-- **Scrapling**：现代网页爬虫库
-- **Playwright**：高级网页自动化
+- **FastAPI**：Python Web 框架（17 端点；alembic head `20260708_drop_cache_tables`）
+- **SQLAlchemy + Alembic**：ORM + 迁移（head = `20260708_drop_cache_tables`）
+- **PostgreSQL 15**（生产）/**SQLite**（本地 dev 默认）：通过 `DATABASE_URL` 切换
+- **ComfyUI 客户端**：工作流占位符递归替换 + HTTP 提交 / 轮询
 
 ### 基础设施
 - **Docker & Docker Compose**：容器化部署
@@ -130,31 +137,31 @@ flutter run
 
 ```
 novel_builder/
-├── 📱 novel_app/          # Flutter 移动应用
+├── 📱 novel_app/          # Flutter 移动应用（v39 SQLite，24+ screens，48+ services）
 │   ├── lib/               # 应用源代码
-│   │   ├── core/          # 核心基础设施（DI、数据库、Provider）
-│   │   ├── screens/       # 页面组件
-│   │   ├── widgets/       # 可复用组件
-│   │   ├── services/      # 业务服务（DSL Engine、爬虫适配等）
-│   │   ├── repositories/  # 数据仓库层
-│   │   ├── models/        # 数据模型
+│   │   ├── core/          # 核心基础设施（database + interfaces + providers）
+│   │   ├── screens/       # 页面组件（24+）
+│   │   ├── widgets/       # 可复用组件（50+，含 agent_chat/reader/character 等）
+│   │   ├── services/      # 业务服务（DSL Engine / Agent / Headless WebView / OCR 等）
+│   │   ├── repositories/  # 数据仓库层（15 个 Repository）
+│   │   ├── models/        # 数据模型（25 个 Model）
 │   │   └── utils/         # 工具函数
 │   ├── android/           # Android 平台配置
 │   ├── ios/               # iOS 平台配置
-│   ├── assets/            # 静态资源（DSL 工作流定义）
+│   ├── assets/            # 字体（Noto SC）+ OCR 模型（inference.onnx + dict）
 │   └── CLAUDE.md          # 模块文档
-├── 🌐 backend/            # Python 后端服务
+├── 🌐 backend/            # Python FastAPI 后端（17 端点）
 │   ├── app/               # API 源代码
-│   │   ├── api/routes/    # API 路由（备份、Hermes、同步、日志）
-│   │   ├── services/      # 业务服务（爬虫、缓存、AI客户端）
-│   │   └── models/        # 数据模型
+│   │   ├── api/routes/    # API 路由（backup / logs / models）
+│   │   ├── services/      # 业务服务（comfyui_client / text2img / image_to_video）
+│   │   └── models/        # ORM 模型（text2img_task / image_to_video_task / client_logs）
 │   ├── tests/             # 测试文件
-│   ├── alembic/           # 数据库迁移
+│   ├── alembic/           # 数据库迁移（head = 20260708_drop_cache_tables）
 │   └── CLAUDE.md          # 模块文档
-├── 📚 docs/               # 项目文档
-├── 🐳 docker-compose.yml  # Docker 编排文件
+├── 📚 docs/               # 项目文档（含 user-guide / deployment / APP功能介绍 / superpowers/ 等）
+├── 🐳 docker-compose.yml  # Docker 编排（后端 + PostgreSQL；个人挂载见 override）
 ├── 📄 README.md           # 项目说明
-├── 📜 LICENSE             # 开源许可证
+├── 📜 LICENSE             # MIT 许可证
 └── 🤝 CONTRIBUTING.md     # 贡献指南
 ```
 
