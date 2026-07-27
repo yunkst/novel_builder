@@ -102,9 +102,6 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 头像/沉浸式半透明阴影（30% 黑）
   final Color avatarShadow;
 
-  /// 旧版 Material 错误红
-  final Color errorAccent;
-
   const AppColors({
     required this.agentBrandStart,
     required this.agentBrandEnd,
@@ -142,7 +139,6 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.inkSoft,
     required this.divider,
     required this.avatarShadow,
-    required this.errorAccent,
   });
 
   /// 亮色主题配色 · 晨读书馆
@@ -161,6 +157,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: Color(0xFF3A6A9E),
     neutral: Color(0xFF6B5D48),
     onSemantic: Colors.white,
+    // chatRoleBubble/chatUserBubble/chatUserBubbleBorder/chatButtonDisabled:
+    // Dify 时代冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
+    // 与晨读书馆琥珀暖纸主题冲突，agent_chat 重做不启用，待后续独立 commit 清理。
     // 容器色 · 米白纸感
     errorContainer: Color(0xFFF3DAD5),
     onErrorContainer: Color(0xFF5C1A12),
@@ -189,7 +188,6 @@ class AppColors extends ThemeExtension<AppColors> {
     inkSoft: Color(0xFF6B6358),
     divider: Color(0xFFE5DDCC),
     avatarShadow: Color(0x2A000000),
-    errorAccent: Color(0xFFB23A2E),
   );
 
   /// 暗色主题配色 · 暗夜书馆
@@ -207,6 +205,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: Color(0xFF6E9FD6),
     neutral: Color(0xFF8A7C66),
     onSemantic: Color(0xFF1A1610),
+    // chatRoleBubble/chatUserBubble/chatUserBubbleBorder/chatButtonDisabled:
+    // Dify 时代冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
+    // 与晨读书馆琥珀暖纸主题冲突，agent_chat 重做不启用，待后续独立 commit 清理。
     // 容器色 · 深炭低饱和
     errorContainer: Color(0xFF4A1A14),
     onErrorContainer: Color(0xFFF3DAD5),
@@ -235,7 +236,6 @@ class AppColors extends ThemeExtension<AppColors> {
     inkSoft: Color(0xFFB5A482),
     divider: Color(0xFF3A3128),
     avatarShadow: Color(0x4D000000),
-    errorAccent: Color(0xFFD9685A),
   );
 
   @override
@@ -276,7 +276,6 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? inkSoft,
     Color? divider,
     Color? avatarShadow,
-    Color? errorAccent,
   }) {
     return AppColors(
       agentBrandStart: agentBrandStart ?? this.agentBrandStart,
@@ -316,7 +315,6 @@ class AppColors extends ThemeExtension<AppColors> {
       inkSoft: inkSoft ?? this.inkSoft,
       divider: divider ?? this.divider,
       avatarShadow: avatarShadow ?? this.avatarShadow,
-      errorAccent: errorAccent ?? this.errorAccent,
     );
   }
 
@@ -372,7 +370,6 @@ class AppColors extends ThemeExtension<AppColors> {
     inkSoft: Color.lerp(inkSoft, other.inkSoft, t)!,
     divider: Color.lerp(divider, other.divider, t)!,
     avatarShadow: Color.lerp(avatarShadow, other.avatarShadow, t)!,
-      errorAccent: Color.lerp(errorAccent, other.errorAccent, t)!,
     );
   }
 }
