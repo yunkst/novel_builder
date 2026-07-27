@@ -4,6 +4,7 @@
 
 ## 变更记录 (Changelog)
 
+- **2026-07-27**: **文档同步现状**。App 版本 2.0.2-preview.2+111，DB v39，3 Tab（书架 / 浏览器 / 设置，删除"生图调试"），Repository 12 个（按 `ls novel_app/lib/repositories/` 实际结果，剔除 `base_repository.dart`；plan 写的 15 是粗估），Screen 24+，Service 48+，Widget 50+，Provider 40+，Model 25；删除 `core/di/`（实际不存在）、`illustration_repository` / `chat_scene_repository` / `novel_export_repository` / `prompt_history_repository` 等幽灵 module 引用；`chapter_cache` 服务端 PostgreSQL 段删除（2026-07-08 后端已删 `/api/cache/*`）；DSL Engine 段去"本地 Dify 工作流复刻"措辞，标 2026-06-09 已彻底解耦。详见 `docs/superpowers/specs/2026-07-27-github-display-optimization-design.md` + `docs/superpowers/plans/2026-07-27-github-display-optimization.md`。
 - **2026-07-18**: **LLM 重试 UI 展示**。Agent Chat 底部输入栏上方浮动横幅(变体 2:错误码类别 + 倒计时,传输层橙/回合层蓝)。新建 `retry_signals.dart`(模块级单例 + `categorizeRetryError` 共享工具);`withRetry` 加可选 `onRetry` 回调(向后兼容);`IoLlmHttpClient` 接入 `RetrySignals.reportTransport` + 成功 `clear()`(rethrow 不 clear 避免与 round-level race);`agent_loop` round-level `emit RetryEvent` + `reportRound` 同一处(绕开事件流过滤);新建 `RetryBanner` widget(订阅 `RetrySignals.instance.notifier`,Timer.periodic 倒计时)。完整方案见 `docs/superpowers/specs/2026-07-17-llm-retry-ui-design.md` + `docs/superpowers/plans/2026-07-17-llm-retry-ui.md`。
 - **2026-07-18**: **上下文压缩 UI 展示**。Agent Chat 消息流内嵌可展开分隔条(M3) + 一次性 SnackBar + 持久落 DB 重启可见。压缩提示以 `role:'system'` 约定 KV 消息(`[上下文压缩|...]`)为唯一真理源,运行时与 hydrate 走同一 `_projectUiMessages` 投影层,marker 渲染不依赖 `CompactionEvent`。新建 `CompactionMarkerSegment`(AgentChatSegment sealed 子类) + `AgentChatRole.marker` + `CompactionNoteParser`(KV 解析器) + `CompactionMarkerCard`(可展开卡片) + `agentEventsProvider`(StreamProvider)。改 `context_compactor._buildCompactionNote`(加 KV) + `CompactionEvent`(补 `compactedChars`/`compactionNote`) + `_handleCompaction`(insert 压缩提示) + `_projectUiMessages`(system 分流) + `agent_chat_dialog`(itemBuilder marker 分支 + ref.listen SnackBar)。新增 69 个测试(模型序列化/解析器/投影/hydrate/marker 卡片/dialog 集成/SnackBar/回归)。不改 DB schema。完整设计与实现计划见 `docs/superpowers/specs/2026-07-18-context-compaction-ui-design.md` + `docs/superpowers/plans/2026-07-18-context-compaction-ui.md`。
 - **2026-07-18**: **ContextCompactor P1 预剪枝层**。`context_compactor.dart` `compact()` 第一步新增 `_pruneOldToolResults`：Pass 1 MD5 去重（200 字符阈值，保留最新一条，前面重复替换为 `[toolName dup of idx#md5]`）+ Pass 2 按工具类型 1-liner 改写（500 字符阈值，覆盖 read_chapter_content / list_chapters / search_in_chapters / execute_js 四个高频工具 + 通用 fallback，错误分支保留 `{error, message}`）。默认保护最近 6 条 tool result 不动（`protectRecentToolResults`）。只改 tool result 的 content（改写后仍是合法 JSON，read_chapter 纯文本特例除外），assistant.toolCalls / system / user / toolCallId / 消息顺序不变。改写后同样 `preserveTailChars` 预算能装下更多消息，减少丢消息数。`CompactionResult.rewrittenContent` + `CompactionEvent.rewrittenContent` 携带改写记录透传给 `ScenarioSession._handleCompaction`，复用现有 `_deleteAgentMessagesBeforeDb`（clearMessages + 重写 `_agentMessages`）自动把 1-liner 版落库，hydrate 续聊时 LLM 看精简版。新增 `CompactorConfig.{prePruneEnabled, dedupThresholdChars, longFieldChars, protectRecentToolResults}` 4 个配置项，`prePruneEnabled=false` 退化为 v32 行为。借鉴 `hermes-agent/agent/context_compressor.py` 的 `_prune_old_tool_results`。agent_loop emit / scenario_session `_handleCompaction` 同步更新。新增 20 个单测（4 group：1-liner 模板 / 去重 / 保护区间 / 契约）。
@@ -42,9 +43,10 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
 ### 应用启动流程
 1. **初始化Flutter绑定**: `WidgetsFlutterBinding.ensureInitialized()`
 2. **API服务初始化**: `ApiServiceWrapper().init()`
-3. **Provider容器初始化**: `ProviderContainer` 创建 Riverpod 容器
+3. **Provider容器初始化**: `UncontrolledProviderScope` 创建 Riverpod 容器
 4. **Material3主题设置**: 默认暗色主题
-5. **底部导航**: 书架、生图调试、浏览器、设置四个标签页
+5. **Onboarding 状态分支**: `_AppRoot` 检查 `onboardingNotifierProvider.onboardingCompleted`；首次启动进入 `OnboardingScreen`，完成后进入 `HomePage`（后续可从设置复看 onboarding）
+6. **底部导航**（HomePage）: **3 个 Tab** —— 书架（`BookshelfScreen`）/ 浏览器（`WebViewBrowserScreen`）/ 设置（`SettingsScreen`）。**注意**：不存在独立的"生图调试"Tab，相关入口在书架内或通过 debug 屏幕访问。
 
 ## 项目架构
 
@@ -83,18 +85,15 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
 
 **核心架构目录**:
 - `core/` - 核心架构组件
-  - `di/` - 依赖注入（API服务Provider）
-  - `database/` - 数据库连接和初始化
-  - `interfaces/` - 接口定义（IDatabaseConnection等）
-  - `providers/` - Riverpod状态管理Providers（30+个文件）
-    - `service_providers.dart` - 服务层Provider
-    - `database_providers.dart` - 数据库连接 + 全部 Repository Provider（统一入口）
-    - `bookshelf_providers.dart` - 书架状态Provider
-    - `chapter_list_providers.dart` - 章节列表状态Provider
-    - `services/` - 各类服务Provider
+  - `database/` - 数据库连接与迁移（v1→v39，inline 在 `database_migrations.dart`）
+  - `interfaces/` - 接口定义（IDatabaseConnection、I*Repository）
+  - `providers/` - Riverpod 状态管理 Providers（40+ 个文件，含 `.g.dart` 派生）
+    - `services/` - 服务层 Provider 分类（AI service / core / database / network）
+    - `*_providers.dart` - 各业务域 Provider（bookshelf / chapter_list / chapter_search / character / chat_session / agent_chat / agent_scenario / ocr / onboarding / reader_* / relationship_graph / prompt_tag 等）
+    - `database_providers.dart` - 数据库连接 + Repository Provider 统一入口
 
 **业务逻辑层**:
-- `controllers/` - 控制器层（5个文件）
+- `controllers/` - 控制器层（`lib/controllers/` 下 reader_content + chapter_list/ 子控制器；具体计数以代码为准）
   - `reader_content_controller.dart` - 阅读器内容控制器
   - `reader_interaction_controller.dart` - 阅读器交互控制器
   - `chapter_list/` - 章节列表相关控制器
@@ -102,26 +101,23 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
     - `chapter_reorder_controller.dart` - 章节重排控制器
     - `chapter_loader.dart` - 章节加载器
 
-- `repositories/` - 数据访问层（17个Repository类）
-  - `base_repository.dart` - Repository基类
-  - `novel_repository.dart` - 小说数据访问
-  - `chapter_repository.dart` - 章节数据访问
-  - `character_repository.dart` - 角色数据访问
-  - `character_relation_repository.dart` - 角色关系数据访问
-  - `illustration_repository.dart` - 插图数据访问
-  - `outline_repository.dart` - 大纲数据访问
-  - `chat_scene_repository.dart` - 聊天场景数据访问
-  - `bookshelf_repository.dart` - 书架分类数据访问
-  - `llm_config_repository.dart` - LLM配置数据访问
-  - `prompt_history_repository.dart` - 提示词历史数据访问
-  - `prompt_tag_repository.dart` - 提示词标签数据访问
-  - `prompt_tag_category_repository.dart` - 标签分类数据访问
-  - `prompt_tag_history_repository.dart` - 标签历史数据访问
-  - `agent_memory_repository.dart` - Agent记忆数据访问
-  - `novel_export_repository.dart` - 小说导出数据访问
-  - `site_script_repository.dart` - 站点脚本数据访问
+- `repositories/` - 数据访问层（按 `ls` 实际文件计 13 个 .dart，剔除 `base_repository.dart` 后 12 个 Repository；多用途 Repository 用括号说明合并的实体）
+  - `base_repository.dart` - Repository 基类
+  - `agent_memory_repository.dart` - Agent 经验记忆数据访问
+  - `bookshelf_repository.dart` - 书架分类数据访问（书架 CRUD + 小说-书架多对多）
+  - `chapter_repository.dart` - 章节缓存与章节列表元数据访问
+  - `chapter_version_repository.dart` - 章节版本历史访问（AI 编辑/重写留档）
+  - `character_relation_repository.dart` - 角色关系访问
+  - `character_repository.dart` - 角色数据访问（含 v34 `avatar_media_id` / v35 `first_appearance_chapter`）
+  - `chat_session_repository.dart` - Agent Chat 会话 / 聊天场景访问（v31，含 `scenarioId` / `currentNovelId`，承接旧 `chat_scenes` 用途）
+  - `llm_config_repository.dart` - LLM 配置 CRUD（v29）
+  - `novel_repository.dart` - 小说数据访问（含 v36 `coverMediaId`）
+  - `outline_repository.dart` - 大纲数据访问（v9）
+  - `prompt_tag_category_repository.dart` - 标签分类数据访问（v23）
+  - `prompt_tag_repository.dart` - 标签数据访问（v23）
+  - `site_script_repository.dart` - 站点提取脚本数据访问（v25+，含 v37 `ocr` / v39 `chapter_list_ocr` + `chapter_content_ocr`）
 
-- `services/` - 业务服务层（42+个文件）
+- `services/` - 业务服务层（48+ 个文件）
   - `chapter_history_service.dart` - 章节历史服务
   - `chapter_search_service.dart` - 章节搜索服务
   - `backup_service.dart` - 备份服务
@@ -135,12 +131,12 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
   - `llm_logger/` - LLM调用日志
 
 **UI层**:
-- `screens/` - 完整页面界面（16个Screen）
-- `widgets/` - 可复用UI组件（44+个Widget）
+- `screens/` - 完整页面界面（24+ 个 Screen）
+- `widgets/` - 可复用 UI 组件（50+ 个 Widget）
 - `dialogs/` - 对话框组件（1个对话框）
 
 **辅助层**:
-- `models/` - 数据模型（23个Model类）
+- `models/` - 数据模型（25 个 Model 类）
 - `utils/` - 工具类（13个工具类）
 - `constants/` - 常量定义
 - `config/` - 配置文件
@@ -485,9 +481,10 @@ AI Agent 对话消息模型。
 ### 本地数据库
 
 - **类型**: SQLite
-- **版本**: v36
+- **版本**: v39
 - **文件名**: novel_reader.db
 - **位置**: 应用私有目录（通过`path_provider`获取）
+- **迁移工具**: inline `_migrateToVersion(int oldVersion, int newVersion)` 在 `lib/core/database/database_migrations.dart`；`currentVersion` 常量统一在同文件 `DatabaseMigrations.currentVersion`（v39）
 
 ### 表结构
 
@@ -500,49 +497,80 @@ AI Agent 对话消息模型。
 
 #### 物理表列表
 
-1. **bookshelf** (小说表)
+1. **bookshelf** (小说表，v1+ ; v3 `background_setting` ; v36 `coverMediaId`)
    - 存储小说元数据、阅读进度
    - 字段：id, title, author, url, coverUrl, coverMediaId, description, background_setting
    - 索引：url（唯一）、last_read_at、is_in_bookshelf
    - coverMediaId（v36 新增）存 set_novel_cover 工具写入的 mediaId，NovelCover 命中走 MediaView 渲染（图/视频，BoxFit.cover 不拉伸）
 
-2. **bookshelves** (书架分类表)
+2. **bookshelves** (书架分类表，v16)
    - 书架分类功能（如"我的收藏"、"玄幻小说"）
    - 字段：id, name, icon, color, created_at
 
-3. **novel_bookshelves** (小说-书架关联表)
+3. **novel_bookshelves** (小说-书架关联表，v16)
    - 多对多关系表
    - 字段：novel_url, bookshelf_id
    - 支持一本小说属于多个书架
 
-4. **chapter_cache** (章节内容缓存)
+4. **chapter_cache** (章节内容缓存，v1+ ; v18 `isAccompanied`)
    - 章节内容、索引、缓存时间
    - 字段：id, novel_url, chapter_url, title, content, chapter_index, cached_at
-   - 特性：支持 `isUserInserted` 章节保护
+   - 特性：支持 `isUserInserted` 章节保护、`isAccompanied` 标记是否带 AI 特写
 
-5. **novel_chapters** (章节列表元数据)
+5. **novel_chapters** (章节列表元数据，v1+ ; v2 `is_user_inserted` ; v11 `read_at` ; v18 `is_accompanied`)
    - 章节索引自动管理
    - 字段：id, novel_url, title, url, chapter_index, is_user_inserted, read_at, is_accompanied
 
-6. **characters** (角色表)
+6. **characters** (角色表，v1+ ; v5 `face_prompts` ; v6 `cached_image_url` ; v12 `aliases` ; v34 `avatar_media_id` ; v35 `first_appearance_chapter`)
    - 角色基本信息和头像
-   - 字段：id, novel_url, name, avatar_url, description
+   - 字段：id, novel_url, name, avatar_url, avatar_media_id, description, face_prompts, aliases, first_appearance_chapter
 
-7. **character_relationships** (角色关系表)
+7. **character_relationships** (角色关系表，v13+ ; v35 区间模型重建)
    - 人物关系图数据
    - 字段：id, novel_url, character1_name, character2_name, relationship_type
 
-8. **scene_illustrations** (场景插图表)
-   - AI生成的场景插图
-   - 字段：id, novel_url, chapter_url, scene_description, image_url, created_at
-
-9. **outlines** (大纲表)
+8. **outlines** (大纲表，v9)
    - 小说全书大纲
    - 字段：id, novel_url, title, content, created_at, updated_at
 
-10. **chat_scenes** (聊天场景表)
-    - 角色对话场景
-    - 字段：id, title, characters_json, created_at
+9. **chat_scenes** (聊天场景表，v10 — 与 chat_sessions 不同)
+   - 角色对话场景
+   - 字段：id, title, characters_json, created_at
+
+10. **chat_sessions** (Agent Chat 会话表，v31)
+    - 字段含 `scenarioId` / `currentNovelId`，区分 scenario 与 novel 上下文
+
+11. **chat_messages** (Agent Chat 消息表，v31-32)
+    - 字段含 `toolCallsJson` / `toolCallId` / `agentMsgIndex`
+
+12. **media_items** (统一媒体代理表，v34)
+    - mediaId / kind / source / local_only
+    - 承接旧 `scene_illustrations` 与角色头像二进制，统一走 MediaProxy + MediaView
+
+13. **prompt_history** (提示词历史表，v22 ; v26 `tag_group_ids`)
+
+14. **prompt_tag_categories** (标签分类表，v23)
+
+15. **prompt_tags** (标签表，v23 ; v24 约束重建 ; v28 `reason`)
+
+16. **agent_memory** (Agent 经验记忆表，v27)
+
+17. **prompt_tag_history** (标签变更历史表，v28)
+
+18. **llm_configs** (LLM 配置表，v29)
+    - API URL / Key / 模型名称 CRUD
+
+19. **chapter_versions** (章节版本历史表，v30)
+    - AI 编辑/重写留档
+
+20. **site_scripts** (站点提取脚本表，v25+ ; v37 `ocr` ; v39 加 `chapter_list_ocr` + `chapter_content_ocr` 两列)
+    - 番茄字体反爬场景：目录页正常汉字 → `chapterListOcr=false`、正文页 PUA → `chapterContentOcr=true`，分次保存互不覆盖
+    - 旧 `ocr` 列保留不读不写（SQLite < 3.35 不支持 DROP COLUMN，避免 Android < 12 风险）
+
+**已删除表**:
+- `scene_illustrations`（v34 删除，由 `media_items` 替代）
+- `model_download_tasks`（v38 删除，webview 不再下载模型，2026-07-17）
+- 后端 `novel_cache_tasks` / `novel_chapters_cache` / `chapter_list_cache`（2026-07-08 由后端迁移删除，前端不再相关）
 
 #### 逻辑视图
 
@@ -561,9 +589,9 @@ class DatabaseConnection implements IDatabaseConnection {
   @override
   Future<Database> get database async {
     // 单例模式，返回SQLite实例
-    // 版本: v36
+    // 版本: v39（DatabaseMigrations.currentVersion）
     // onCreate: 创建所有表
-    // onUpgrade: 执行数据库迁移
+    // onUpgrade: 委托 DatabaseMigrations._migrateToVersion
   }
 }
 ```
@@ -576,7 +604,7 @@ class DatabaseConnection implements IDatabaseConnection {
 
 #### Repository层列表
 
-**文件**: `lib/repositories/`
+**文件**: `lib/repositories/`（按 `ls` 实际文件；详见上文目录结构中的清单）
 
 1. **base_repository.dart** - Repository基类
    - 定义通用数据库操作接口
@@ -585,36 +613,47 @@ class DatabaseConnection implements IDatabaseConnection {
 2. **novel_repository.dart** - 小说Repository
    - CRUD操作
    - 阅读进度更新
-   - 书架状态管理
+   - 书架状态管理（v36 `coverMediaId` 写入由 set_novel_cover 工具触发）
 
 3. **chapter_repository.dart** - 章节Repository
    - 章节缓存管理
    - 章节列表维护
-   - 用户插入章节保护
+   - 用户插入章节保护（`is_user_inserted`）
 
 4. **character_repository.dart** - 角色Repository
    - 角色信息管理
-   - 角色头像存储
+   - 角色头像存储（v34 `avatar_media_id` 走 MediaProxy）
 
 5. **character_relation_repository.dart** - 角色关系Repository
-   - 关系图数据管理
+   - 关系图数据管理（v35 区间模型重建）
    - 关系查询和更新
 
-6. **illustration_repository.dart** - 插图Repository
-   - 场景插图缓存
-   - 图片URL管理
-
-7. **outline_repository.dart** - 大纲Repository
+6. **outline_repository.dart** - 大纲Repository
    - 全书大纲CRUD
    - 大纲版本管理
 
-8. **chat_scene_repository.dart** - 聊天场景Repository
-   - 对话场景管理
-   - 多角色对话历史
-
-9. **bookshelf_repository.dart** - 书架分类Repository
+7. **bookshelf_repository.dart** - 书架分类Repository
    - 书架分类CRUD
    - 小说-书架关联管理
+
+8. **chat_session_repository.dart** - Agent Chat 会话/聊天场景 Repository（v31）
+   - 会话与场景管理（`scenarioId` / `currentNovelId`）
+   - 承接旧 `chat_scenes` 用途
+
+9. **llm_config_repository.dart** - LLM 配置 Repository（v29）
+   - API URL / Key / 模型名称 CRUD
+
+10. **agent_memory_repository.dart** - Agent 经验记忆 Repository（v27）
+    - 跨会话记忆持久化
+
+11. **chapter_version_repository.dart** - 章节版本历史 Repository（v30）
+    - AI 编辑/重写留档
+
+12. **prompt_tag_repository.dart** / **prompt_tag_category_repository.dart** - 标签 + 分类 Repository（v23/24/28）
+    - 写作标签库 CRUD
+
+13. **site_script_repository.dart** - 站点提取脚本 Repository（v25+ → v39）
+    - `chapterListOcr` / `chapterContentOcr` 两列独立判定（2026-07-17）
 
 #### 使用方式
 
@@ -732,8 +771,7 @@ class NovelListScreen extends ConsumerWidget {
 
 **子页面**:
 - `backend_settings_screen.dart` - 后端API配置
-- `llm_config_management_screen.dart` - LLM配置管理
-- `dify_settings_screen.dart` - AI配置页面（已改为 DSL Engine / LLM 配置入口）
+- `llm_config_management_screen.dart` - LLM配置管理（DSL Engine + AI Agent 统一入口；旧 `dify_settings_screen` 已删除，2026-06-09 移除 Dify 云端依赖）
 
 **存储**: SharedPreferences
 
@@ -745,12 +783,12 @@ class NovelListScreen extends ConsumerWidget {
 
 ### 8. 插图管理
 
-**Repository**: `illustration_repository.dart`
+**说明**: 旧 `illustration_repository.dart` 与 `scene_illustrations` 表已于 v34（media_items 引入时）移除，现统一走 `MediaProxy` + `media_items` 表 + `NovelCover` / `MediaView` 渲染。
 
 **功能**:
-- AI场景插图数据管理
-- 插图缓存
-- 插图与章节关联
+- AI 文生图（Agent 工具 `create_images`，走后端 ComfyUI 出图）
+- 小说封面媒体化（v36 `coverMediaId`，`NovelCover` 命中走 `MediaView`）
+- 角色头像镜像媒体化（v34 `avatar_media_id`）
 
 ### 9. 备份与恢复
 
@@ -766,20 +804,18 @@ class NovelListScreen extends ConsumerWidget {
 ### 章节内容缓存
 
 **本地SQLite**:
-- 表：`chapter_cache`, `novel_chapters`
+- 表：`chapter_cache` / `novel_chapters`
 - Repository: `ChapterRepository`
-- 特性：支持用户插入章节保护
+- 特性：用户插入章节保护（`is_user_inserted`）、`is_accompanied` 标记是否带 AI 特写
 
-**服务端PostgreSQL**:
-- API: `POST /api/cache/create`
-- 查询: `GET /api/cache/status/{task_id}`
+**后端兜底已移除**（2026-07-08）：`/api/cache/*` 等服务端接口已删除，前端不再依赖服务端缓存。如需重新跨设备同步，使用备份（`lib/services/backup_service.dart`）+ 后端 `/api/backup/upload|list|download` 链路。
 
 ### 缓存策略
 
-- **章节内容**: 本地SQLite + 服务端PostgreSQL双缓存
+- **章节内容**: 本地 SQLite（`chapter_cache` 表，无服务端兜底）
 - **搜索结果**: 内存缓存
-- **图片资源**: 文件系统缓存（`utils/image_cache_manager.dart`）
-- **视频资源**: 文件系统缓存（`utils/video_cache_manager.dart`）
+- **图片资源**: 文件系统缓存（`utils/image_cache_manager.dart`，写穿 `media_items`）
+- **视频资源**: 文件系统缓存（`utils/video_cache_manager.dart`，写穿 `media_items`）
 
 ### 缓存相关服务
 
@@ -788,17 +824,19 @@ class NovelListScreen extends ConsumerWidget {
 
 ## AI集成功能
 
-### DSL Engine（本地 Dify 工作流复刻）
+### DSL Engine（本地 LLM 工作流引擎）
 
 **核心组件** (`lib/services/dsl_engine/`):
-- `llm_provider.dart` - OpenAI 兼容的 LLM 调用（含 ChatMessage 模型）
+- `llm_provider.dart` / `llm_provider_client.dart` / `llm_provider_config.dart` / `llm_provider_core.dart` / `llm_provider_sse.dart` - OpenAI 兼容的 LLM 调用
+- `retry_signals.dart` - LLM 重试 UI 信号（2026-07-18 重构：`RetrySignals` 模块级单例 + `categorizeRetryError` 共享工具）
 
-**说明**: DSL Engine 已大幅精简，仅保留 LLM 调用核心；结构化工作流能力迁移至 AI Agent（`lib/services/novel_agent/`）。
+**说明**: DSL Engine 已与 Dify 完全解耦（2026-06-09 移除 Dify 云端依赖；2026-06-29 清理 Dify 残留引用）。当前仅保留 LLM 调用核心；结构化工作流能力迁移至 AI Agent（`lib/services/novel_agent/`）。
 
 **用途**:
 - 创意写作（段落重写、全文重写）
 - 章节/背景摘要生成
 - 场景插图提示词生成
+- 统一错误重试（`withRetry` / `RetrySignals`）
 
 **配置** (设置 → AI 配置):
 - LLM API URL（OpenAI 兼容地址）
@@ -991,7 +1029,7 @@ flutter build web                              # Web应用
 
 ### 版本管理
 
-**当前版本**: 1.3.9+28
+**当前版本**: 2.0.2-preview.2+111
 
 **版本号规则**: `major.minor.patch+build`
 
@@ -1060,18 +1098,18 @@ flutter analyze lib/generated/api/
 - `lib/main.dart` - 应用入口
 
 **架构层**:
-- `lib/core/providers/` - Riverpod状态管理（30+个文件）
-- `lib/repositories/` - 数据访问层（17个Repository）
-- `lib/controllers/` - 控制器层（5个Controller）
-- `lib/services/` - 业务服务层（42+个Service）
+- `lib/core/providers/` - Riverpod 状态管理（40+ 个文件，含派生）
+- `lib/repositories/` - 数据访问层（12 个 Repository + base_repository；按 `ls` 实际文件）
+- `lib/controllers/` - 控制器层（`lib/controllers/` 下 reader_content + chapter_list/ 子控制器；具体计数以代码为准）
+- `lib/services/` - 业务服务层（48+ 个 Service）
 
 **UI层**:
-- `lib/screens/` - 完整页面（16个Screen）
-- `lib/widgets/` - UI组件（44+个Widget）
-- `lib/dialogs/` - 对话框（1个Dialog）
+- `lib/screens/` - 完整页面（24+ 个 Screen）
+- `lib/widgets/` - UI 组件（50+ 个 Widget）
+- `lib/dialogs/` - 对话框（1 个 Dialog）
 
 **数据层**:
-- `lib/models/` - 数据模型（23个Model）
+- `lib/models/` - 数据模型（25 个 Model）
 - `lib/core/database/` - 数据库连接
 - `lib/core/interfaces/` - 接口定义
 
@@ -1389,5 +1427,5 @@ flutter analyze lib/generated/api/
 ---
 
 **文档维护**: 本文档应随代码变更同步更新
-**最后更新**: 2026-06-29
-**文档状态**: ✅ 已验证
+**最后更新**: 2026-07-27
+**文档状态**: 🔄 已同步现状（2026-07-27 文档系统梳理）
