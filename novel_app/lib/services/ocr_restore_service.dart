@@ -75,10 +75,28 @@ class OcrRestoreService {
 
     final puaToChar = <int, String>{};
     final failedCodepoints = <int>[]; // 聚合失败码点，循环后一条日志
+    var loopIdx = 0;
+    final totalPua = puaCodepoints.length;
     for (final cp in puaCodepoints) {
+      loopIdx++;
       try {
+        LoggerService.instance.i(
+          'OCR restorePua 循环 [$loopIdx/$totalPua] cp=0x${cp.toRadixString(16)} 渲染开始',
+          category: LogCategory.ai,
+          tags: ['ocr', 'restore-pua', 'loop-render-begin'],
+        );
         final imageBase64 = await _renderPua(cp, fontFamily ?? '');
+        LoggerService.instance.i(
+          'OCR restorePua 循环 [$loopIdx/$totalPua] cp=0x${cp.toRadixString(16)} 渲染完成 → 识别开始',
+          category: LogCategory.ai,
+          tags: ['ocr', 'restore-pua', 'loop-render-done'],
+        );
         final decoded = await _recognizeImage(imageBase64);
+        LoggerService.instance.i(
+          'OCR restorePua 循环 [$loopIdx/$totalPua] cp=0x${cp.toRadixString(16)} 识别完成 → "$decoded"',
+          category: LogCategory.ai,
+          tags: ['ocr', 'restore-pua', 'loop-recognize-done'],
+        );
         puaToChar[cp] = decoded;
 } catch (e, _) {
         // 单字符失败，留 □。累积失败码点，循环结束后输出一条聚合日志

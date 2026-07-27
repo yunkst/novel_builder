@@ -8,6 +8,8 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:image/image.dart' as img;
 
+import '../services/logger_service.dart';
+
 /// PP-OCRv6 rec 离线识别器（仅用于番茄字体反爬 PoC）。
 ///
 /// 模型：assets/models/inference.onnx — 番茄字体反爬 PUA 单字识别
@@ -102,8 +104,51 @@ class OcrPredictor {
   /// 抛出 [StateError] 如果模型尚未加载（防御 _session 空指针崩溃）。
   Future<String> recognizeImage(String base64Png) async {
     _ensureLoaded();
-    final bytes = base64Decode(base64Png);
-    final codec = await ui.instantiateImageCodec(bytes);
+
+    // 诊断日志：确认崩溃发生在哪个阶段
+    final t0 = DateTime.now();
+    final pngLen = base64Png.length;
+    LoggerService.instance.i(
+      'OCR recognizeImage 开始 pngLen=$pngLen',
+      category: LogCategory.ai,
+      tags: ['ocr', 'onnx', 'recognize-begin'],
+    );
+
+    Uint8List bytes;
+    try {
+      bytes = base64Decode(base64Png);
+      LoggerService.instance.i(
+        'OCR base64Decode 完成 byteLen=${bytes.length} 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'base64-ok'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'OCR base64Decode 崩溃: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'base64-crash'],
+      );
+      rethrow;
+    }
+
+    ui.Codec codec;
+    try {
+      codec = await ui.instantiateImageCodec(bytes);
+      LoggerService.instance.i(
+        'OCR instantiateImageCodec 完成 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'codec-ok'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'OCR instantiateImageCodec 崩溃: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'codec-crash'],
+      );
+      rethrow;
+    }
     // 用 try/finally 释放 GPU 资源：codec 持有解码器状态，frame.image 持有
     // GPU 纹理（Dart GC 不回收 GPU 纹理，必须显式 dispose）。否则每章 200+ PUA
     // 字符累积 ~11MB 不可回收 GPU 内存，低内存设备可能 OOM。
@@ -113,16 +158,41 @@ class OcrPredictor {
       final image = frame.image;
       try {
         final (tensor, w) = await _preprocess(image);
+      try {
+        LoggerService.instance.i(
+          'OCR ONNX 推理开始 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'session-run-begin'],
+        );
         final outputs = await _session!.run({
           'x': await OrtValue.fromList(tensor, [1, 3, 48, w]),
         });
+        LoggerService.instance.i(
+          'OCR ONNX 推理完成 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'session-run-ok'],
+        );
         final value = outputs.values.first;
         final nested = await value.asList();
         final logits = (nested[0] as List)
             .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
             .toList();
         final (text, _) = _ctcDecode(logits);
+        LoggerService.instance.i(
+          'OCR CTC 解码完成 result="$text" 总耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'recognize-done'],
+        );
         return text;
+      } catch (e, st) {
+        LoggerService.instance.e(
+          'OCR ONNX 推理崩溃: $e',
+          stackTrace: st.toString(),
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'session-run-crash'],
+        );
+        rethrow;
+      }
       } finally {
         image.dispose();
       }
