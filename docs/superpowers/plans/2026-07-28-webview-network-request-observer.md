@@ -887,7 +887,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 **3. Type consistency:** `NetworkRequestRecorder.add` 签名(`url: String, method: String?, headers: Map?, isForMainFrame: bool`)在 Task 1 定义、Task 2 `_recordRequest` 调用一致;`snapshot` 返回 `Map<String,dynamic>` 在 Task 1 定义、Task 3 `_listNetworkRequests` 消费一致;`networkRecorder` getter / `disposeNetworkRecorder()` 在 Task 3 Step 1 定义、Step 7 消费一致(Task 3 内闭环,不跨 Task)。✓
 
 **未覆盖项(已知,接受):**
-- §4.3 AJAX 启发式过滤——**本期决定不实现**:Task 2 的 `_recordRequest` 记录所有请求(含 img/css/js 噪音),靠工具的 `url_contains` 让 Agent 自行过滤。原因:启发式判定(`initiatorType` 不可用、靠扩展名)不可靠且增加复杂度,Agent 用 `url_contains="api"` 之类过滤更准。**计划里去掉了 spec §4.3 的启发式**,这偏离 spec——需在实现前与用户确认或在 Task 2 补一个简单的扩展名过滤。**决策**:保留简单扩展名黑名单过滤(见 Task 2 Step 5 补充说明),避免噪音淹没。
+- §4.3 AJAX 启发式过滤——**已确认不实现(用户选 A)**:Task 2 的 `_recordRequest` 记录所有请求(含 img/css/js 噪音),靠工具的 `url_contains` 让 Agent 自行过滤。原因:`WebResourceRequest` 无 `initiatorType`,扩展名启发式不可靠;Agent 用 `url_contains="api"` 过滤更准更灵活。spec §4.3 / §12 已同步更新为"记录所有 + Agent 过滤"。
 
 ---
 

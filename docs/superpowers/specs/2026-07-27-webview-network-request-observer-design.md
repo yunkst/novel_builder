@@ -101,15 +101,13 @@ shouldInterceptRequest: (controller, request) async {
 | content-type | ❌ | 同上 |
 | 响应头 / 响应体 | ❌ | 同上 |
 
-### 4.3 过滤策略
+### 4.3 采集范围决策:记录所有子资源,不启发式过滤
 
-`shouldInterceptRequest` 会触发**所有**子资源（img/css/js/font/xhr/fetch/...）。本工具的目标是"接口模式"，所以 recorder 入库前过滤：
+`shouldInterceptRequest` 的 `WebResourceRequest` **无 `initiatorType` 字段**(v6 API 限制),无法精确区分 xhr/fetch vs img/css/js。启发式判定(扩展名黑名单)不可靠(很多 API URL 无扩展名,如 `/api/chapter/list`),且增加复杂度。
 
-- **只保留 XHR/fetch 类 AJAX**：通过 URL 的 path / 文件扩展名 + content-type 启发式判断（无 `.js/.css/.png/.jpg/.gif/.svg/.woff/.ico` 后缀，且非同源静态资源路径）。
-- **降级**：启发式不准时（无扩展名的 API 也可能误判），靠工具的 `url_contains` 过滤参数让 Agent 自己筛。
-- **不抓主文档**：`isForMainFrame == true` 的请求不记（主文档导航由 `get_page_info` 负责）。
+**决策:本工具记录所有请求**(含 img/css/js/字体等子资源),由 Agent 通过工具的 `url_contains` 参数(如 `"api"`、`"chapter"`)自行过滤。Agent 拿到原始全量数据更灵活,过滤责任在调用方。
 
-> 注：`shouldInterceptRequest` 的 `WebResourceRequest` **不带 initiatorType 字段**（不像 `onLoadResource` 的 `LoadedResource` 有 `initiatorType`），所以无法直接区分 xhr/fetch vs img。只能用启发式。这是该 API 的已知限制，记录在此。
+> 已知噪音影响:页面静态资源多时 `total` 可能上百条,但 `limit` 默认 50 + `url_contains` 即可精准拉到 API 请求。Buffer cap 500 FIFO 兜底防内存膨胀。
 
 ### 4.4 清空时机：页面跳转即清空
 
@@ -266,7 +264,7 @@ list_network_requests:
 1. **iOS 不支持**：工具仅在 Android 提供，iOS Agent 回退 `execute_js`
 2. **POST body 采不到**：`flutter_inappwebview` v6 的 `WebResourceRequest` 无 body 字段（Android 平台 API 限制）；POST 章节接口只能看 URL + 请求头，看不到请求体
 3. **无 status / content-type**：观察模式拿不到响应侧信息；后续可加 `onLoadResource` 补齐（YAGNI）
-4. **AJAX 识别靠启发式**：`shouldInterceptRequest` 的 `WebResourceRequest` 无 `initiatorType`，无法精确区分 xhr/fetch vs img，靠扩展名 + path 启发式过滤，可能漏判/误判；Agent 用 `url_contains` 二次过滤兜底
+4. **不预过滤 AJAX,记录所有子资源**:`shouldInterceptRequest` 的 `WebResourceRequest` 无 `initiatorType`,启发式过滤不可靠;改为记录全部(img/css/js/xhr/fetch),Agent 用 `url_contains` 自行过滤。静态资源多的页面 `total` 可能上百,靠 `limit` + `url_contains` 精准拉取
 5. **SPA 路由不清空**：`history.pushState` 不触发 `onLoadStart`，buffer 不清；`cap 500` FIFO 兜底
 6. **跨域请求头受限**：浏览器对跨域请求的某些头（如 Cookie）可能不暴露给 `shouldInterceptRequest`，取决于 webview 实现
 7. **Android < 21 字段退化**：`method` / `headers` 字段仅 Android 21+ 可用，旧版会得到 null/默认值
