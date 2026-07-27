@@ -981,9 +981,10 @@ EOF
 - Modify: `docs/deployment.md`
 - Modify: `docs/APP功能介绍.md`
 - Modify: `docs/logging-guidelines.md`
+- Modify: `docs/user-guide.md`
 - Modify: `docs-site/assets/README.md`
 
-**Goal:** 修正 docs/ 过期处；docs/README.md 补 superpowers/architecture/chapter-fetch-flow/diagrams 索引。
+**Goal:** 修正 docs/ 过期处；docs/README.md 补 superpowers/architecture/chapter-fetch-flow/diagrams 索引；邮箱脱敏（修复 Task 1 残留：`docs/README.md:94` / `docs/deployment.md:533` / `docs/user-guide.md:216` 三处 `kfeb4@outlook.com`），确保全局 V1 `kfeb4 → 0` 通过。
 
 **Depends on:** Task 4
 
@@ -1009,6 +1010,10 @@ old（仅示例，需 Read 当前文档确认完整结构）。定位 `最后更
 
 如有 `diagrams/` 也加（agent 报告有 `docs/diagrams/`，但 docs/README.md 当前是否已索引？先 Read 确认）。
 
+**邮箱脱敏**（修复 Task 1 残留，确保全局 V1 `kfeb4 → 0` 通过）：
+- old = `kfeb4@outlook.com`（docs/README.md 邮件支持章节，约 line 94）
+- new = `[GitHub Issues](https://github.com/yunkst/novel_builder/issues/new/choose)`
+
 - [ ] **Step 3: 改 `docs/developer-guide.md` 关键词扫描**
 
 Read 全文。逐段 Edit：
@@ -1031,6 +1036,10 @@ Read 全文。逐段 Edit：
 | "SSL/CDN/Redis 缓存策略" 段 | 整段删或缩到"Nginx 反代 + HTTPS 自行配置" |
 | 环境变量段对齐新 `.env.example` | 删 `SECRET_KEY` / `MAX_UPLOAD_SIZE` / `UPLOAD_DIR` / `VIDEO_GENERATION_TIMEOUT` / `LOG_LEVEL` / `HOST` / `PORT`；保留核心 8 项 |
 
+**邮箱脱敏**：
+- old = `kfeb4@outlook.com`（line 533 邮件支持章节）
+- new = `[GitHub Issues](https://github.com/yunkst/novel_builder/issues/new/choose)`
+
 - [ ] **Step 5: 改 `docs/APP功能介绍.md`**
 
 | 旧 | 新 |
@@ -1043,6 +1052,14 @@ Read 全文。逐段 Edit：
 - [ ] **Step 6: 改 `docs/logging-guidelines.md`**
 
 Read 全文。删 Dify 时代术语（如 "Dify 工作流日志"）。保留 LoggerService 4 级 × 8 分类 × 标签规范。在末尾或开头加注："自 2026-07-17 traceId + 文件回退重构，详见根 CLAUDE.md Changelog 对应条目。"
+
+- [ ] **Step 6a: 改 `docs/user-guide.md` 邮箱脱敏**
+
+**邮箱脱敏**（line 216 联系维护者章节）：
+- old = `kfeb4@outlook.com`
+- new = `[GitHub Issues](https://github.com/yunkst/novel_builder/issues/new/choose)`
+
+如该文件还存在 `Dify` / `Scrapling` / `9 站点` / `v21` 等过期关键词，一并清理（与 Step 3-Step 6 同口径）。
 
 - [ ] **Step 7: 改 `docs-site/assets/README.md`**
 
