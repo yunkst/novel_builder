@@ -95,7 +95,6 @@ Flutter移动应用是Novel Builder平台的前端客户端，提供跨平台的
 **业务逻辑层**:
 - `controllers/` - 控制器层（`lib/controllers/` 下 reader_content + chapter_list/ 子控制器；具体计数以代码为准）
   - `reader_content_controller.dart` - 阅读器内容控制器
-  - `reader_interaction_controller.dart` - 阅读器交互控制器
   - `chapter_list/` - 章节列表相关控制器
     - `chapter_action_handler.dart` - 章节操作处理器
     - `chapter_reorder_controller.dart` - 章节重排控制器
@@ -422,10 +421,8 @@ class Chapter {
 
 角色数据模型，支持角色管理和多角色聊天。
 
-### SceneIllustration模型
-**文件**: `lib/models/scene_illustration.dart`
-
-场景插图模型，用于AI生成的场景图片管理。
+### ~~SceneIllustration 模型~~（v34 已删）
+**状态**: v34 起移除，AI 生成的场景插图统一由 `media_items` 媒体代理承载（见"8. 插图管理"段）。
 
 ### Outline模型
 **文件**: `lib/models/outline.dart`
@@ -728,7 +725,6 @@ class NovelListScreen extends ConsumerWidget {
 
 **Controller**:
 - `reader_content_controller.dart` - 内容管理
-- `reader_interaction_controller.dart` - 交互处理
 
 **Provider**: `core/providers/reader_state_providers.dart`、`core/providers/reader_settings_state.dart`
 
@@ -771,7 +767,7 @@ class NovelListScreen extends ConsumerWidget {
 
 **子页面**:
 - `backend_settings_screen.dart` - 后端API配置
-- `llm_config_management_screen.dart` - LLM配置管理（DSL Engine + AI Agent 统一入口；旧 `dify_settings_screen` 已删除，2026-06-09 移除 Dify 云端依赖）
+- `llm_config_management_screen.dart` - LLM配置管理（DSL Engine + AI Agent 统一入口）
 
 **存储**: SharedPreferences
 
@@ -883,20 +879,15 @@ Controller负责协调业务逻辑，连接UI层和数据层。
    - 段落渲染控制
    - 编辑模式切换
 
-2. **reader_interaction_controller.dart** - 阅读器交互控制器
-   - 用户交互处理
-   - AI功能触发
-   - 手势控制
-
-3. **chapter_list/chapter_action_handler.dart** - 章节操作处理器
+2. **chapter_list/chapter_action_handler.dart** - 章节操作处理器
    - 章节删除、缓存等操作
    - 批量操作支持
 
-4. **chapter_list/chapter_reorder_controller.dart** - 章节重排控制器
+3. **chapter_list/chapter_reorder_controller.dart** - 章节重排控制器
    - 拖拽重排序
    - 重排序状态管理
 
-5. **chapter_list/chapter_loader.dart** - 章节加载器
+4. **chapter_list/chapter_loader.dart** - 章节加载器
    - 章节列表加载
    - 最后阅读位置加载
 
