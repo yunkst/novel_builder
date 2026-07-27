@@ -13,7 +13,7 @@
 
 本地书架 + Headless WebView 章节提取 + Agent Chat + ComfyUI 文生图/图生视频 + 字体反爬 OCR 还原
 
-[快速开始](#-快速开始) • [功能特性](#-功能特性) • [文档](#-文档) • [贡献](#-贡献)
+[快速开始](#-快速开始) • [功能特性](#-功能特性) • [文档](#-文档) • [在线演示](https://yunkst.github.io/novel_builder/) • [贡献](#-贡献)
 
 </div>
 
@@ -99,6 +99,7 @@ flutter run
 ### 用户文档
 - [使用指南](docs/user-guide.md)
 - [功能介绍](docs/APP功能介绍.md)（截图反映旧版 UI，待重生成）
+- [🌐 在线介绍页](https://yunkst.github.io/novel_builder/)（GitHub Pages，含 APK 下载）
 
 ### 开发者文档
 - [开发者指南](docs/developer-guide.md)
