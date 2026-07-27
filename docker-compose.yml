@@ -8,12 +8,11 @@ services:
       - "3800:8000"
       - "6678:5678"   # Debugpy debugger port
     volumes:
-      # 添加这行，把本地 backend 目录挂载到容器中
+      # 本地 backend 源码热挂载（开发时改代码即时生效）
       - ./backend:/app
-      # 小说同步目录映射
-      - D:/myspace/nov:/app/novel_sync
-      # ComfyUI 模型目录挂载
-      - D:/Comfyui/ComfyUI_windows_portable/ComfyUI/models:/app/models
+      # ComfyUI 模型目录与 novel_sync 同步目录为个人机可选配置，
+      # 默认不挂载。需要时新建 docker-compose.override.yml.example 同名 override，
+      # 参考 docs/docker-compose.override.yml.example（如有创建）。
     environment:
       - NOVEL_API_TOKEN=${NOVEL_API_TOKEN}
       - DATABASE_URL=postgresql://novel_user:novel_pass@postgres:5432/novel_db

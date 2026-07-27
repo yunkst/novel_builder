@@ -110,6 +110,7 @@ playwright/.cache/
 # Docker
 .dockerignore
 *.log
+docker-compose.override.yml
 
 # Database
 *.db

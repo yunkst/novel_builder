@@ -1,0 +1,18 @@
+# Docker Compose override 示例
+# 使用方法：
+#   1. 复制本文件为 docker-compose.override.yml
+#      cp docker-compose.override.yml.example docker-compose.override.yml
+#   2. 修改下方变量为你的实际本机路径
+#   3. docker-compose up -d 会自动合并 override
+#
+# 注意：docker-compose.override.yml 在 .gitignore 中，不会入库。
+
+services:
+  backend:
+    volumes:
+      # ComfyUI 模型目录（容器内路径固定为 /app/models）
+      # Windows 示例：D:/Comfyui/ComfyUI_windows_portable/ComfyUI/models
+      # Linux 示例：/home/yourname/comfyui/models
+      - "${COMFYUI_MODELS_HOST_DIR}:/app/models"
+      # 小说同步目录
+      - "${NOVEL_SYNC_HOST_DIR}:/app/novel_sync"

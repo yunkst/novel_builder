@@ -1,5 +1,5 @@
 name: novel_app
-description: "A new Flutter project."
+description: "Novel Builder — AI 原生小说阅读平台前端（书架 / 阅读 / Agent Chat / 角色 / 关系图 / OCR 反爬）"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -17,6 +17,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 version: 2.0.2-preview.1+110
+
+repository: https://github.com/yunkst/novel_builder
+homepage: https://github.com/yunkst/novel_builder
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

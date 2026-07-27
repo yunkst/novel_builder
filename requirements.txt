@@ -1,13 +1,15 @@
 # Novel Builder - Legacy Requirements File
-# This file is maintained for compatibility with old deployment scripts
-# For new development, please use backend/pyproject.toml
+# This file is maintained for compatibility with old deployment scripts.
+# For new development, please use backend/pyproject.toml.
+# Scraper-related packages (playwright / beautifulsoup4 / lxml) and aiofiles
+# have been removed because the backend no longer hosts crawlers (see
+# docs/superpowers/specs/2026-07-27-github-display-optimization-design.md
+# §3.1 / §5 P1).
 
 # Core dependencies - minimal set for basic functionality
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 requests>=2.31.0
-beautifulsoup4>=4.12.0
-lxml>=4.9.0
 pydantic>=2.4.0
 python-multipart>=0.0.6
 
@@ -17,11 +19,7 @@ psycopg2-binary>=2.9.0
 alembic>=1.12.0
 
 # App version management
-aiofiles>=23.0.0
 packaging>=23.0.0
-
-# Web scraping
-playwright>=1.55.0
 
 # Development tools (optional)
 pytest>=7.4.0

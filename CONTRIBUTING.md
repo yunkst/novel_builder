@@ -196,7 +196,7 @@ git push origin feature/your-feature-name
 - 最小可重现示例（如有）
 
 ### 安全漏洞
-如发现安全漏洞，请不要在公开 Issue 中报告，请发送邮件至：kfeb4@outlook.com
+如发现安全漏洞，请不要在公开 Issue 中报告，请通过 [Security Advisories](https://github.com/yunkst/novel_builder/security/advisories/new) 私下报告。
 
 ## 💡 功能请求
 
@@ -244,7 +244,6 @@ git push origin feature/your-feature-name
 
 如果您在贡献过程中遇到问题：
 
-- 📧 邮件：kfeb4@outlook.com
 - 💬 GitHub Discussions：https://github.com/yunkst/novel_builder/discussions
 - 🐛 Issues：https://github.com/yunkst/novel_builder/issues
 
