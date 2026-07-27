@@ -14,14 +14,22 @@ class EmptyStateView extends StatelessWidget {
     this.subtitle,
     this.actionText,
     this.onAction,
+    this.iconWidget,
+    this.titleStyle,
     this.padding = const EdgeInsets.symmetric(horizontal: 32),
   });
 
   /// 空状态图标，size 80，颜色 onSurface alpha 0.25。
   final IconData icon;
 
+  /// 自定义图标 widget（如印章式 SVG 风格）。传则覆盖 [icon]；不传走原 [Icon(icon)]。
+  final Widget? iconWidget;
+
   /// 标题，headlineSmall bold + onSurface alpha 0.7。
   final String title;
+
+  /// 自定义标题样式（如 serif）。传则覆盖默认 headlineSmall；不传走原逻辑。
+  final TextStyle? titleStyle;
 
   /// 描述文字，bodyMedium + onSurface alpha 0.5，居中。
   final String? subtitle;
@@ -42,18 +50,20 @@ class EmptyStateView extends StatelessWidget {
     final onSurface = colorScheme.onSurface;
 
     final children = <Widget>[
-      Icon(
-        icon,
-        size: 80,
-        color: onSurface.withValues(alpha: 0.25),
-      ),
+      iconWidget ??
+          Icon(
+            icon,
+            size: 80,
+            color: onSurface.withValues(alpha: 0.25),
+          ),
       const SizedBox(height: 24),
       Text(
         title,
-        style: theme.textTheme.headlineSmall?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: onSurface.withValues(alpha: 0.7),
-        ),
+        style: titleStyle ??
+            theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: onSurface.withValues(alpha: 0.7),
+            ),
       ),
     ];
 
