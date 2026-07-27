@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/agent_chat_message.dart';
+import 'agent_icons.dart';
 
 /// 上下文压缩标记卡片（M3 可展开分隔条）
 ///
@@ -62,7 +63,8 @@ class _CompactionMarkerCardState extends State<CompactionMarkerCard> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('🗂', style: TextStyle(fontSize: 13)),
+                  Icon(AgentIcons.layers,
+                      size: 13, color: context.appColors.chatButtonPrimary),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
