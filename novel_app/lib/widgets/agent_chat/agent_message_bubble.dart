@@ -54,15 +54,22 @@ class AgentMessageBubble extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: _getBubbleColor(context),
+              border: Border.all(
+                color: isUser
+                    ? context.appColors.chatButtonPrimary
+                        .withValues(alpha: 0.20)
+                    : context.appColors.divider,
+              ),
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isUser ? 16 : 4),
-                bottomRight: Radius.circular(isUser ? 4 : 16),
+                topLeft: Radius.circular(isUser ? 16 : 4),
+                topRight: Radius.circular(isUser ? 4 : 16),
+                bottomLeft: const Radius.circular(16),
+                bottomRight: const Radius.circular(16),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: context.appColors.avatarShadow.withValues(alpha: 0.05),
+                  color: context.appColors.avatarShadow
+                      .withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -98,11 +105,13 @@ class AgentMessageBubble extends ConsumerWidget {
   }
 
   Color _getBubbleColor(BuildContext context) {
-    final isUser = message.role == AgentChatRole.user;
-    if (isUser) {
-      return context.appColors.agentAccent;
+    final c = context.appColors;
+    if (message.role == AgentChatRole.user) {
+      // 琥珀 wash（用户气泡），不再误用冷蓝 agentAccent
+      return c.chatButtonPrimary.withValues(alpha: 0.10);
     }
-    return context.appColors.chatRoleBubble;
+    // assistant 纸底，不用冷调 chatRoleBubble
+    return c.paper;
   }
 
   /// 回滚按钮（小图标 + tooltip）,仅 user 消息 + onRollback != null 时渲染
@@ -133,8 +142,8 @@ class AgentMessageBubble extends ConsumerWidget {
       return Text(
         message.content,
         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: context.appColors.agentOnBrand,
-              height: 1.4,
+              color: context.appColors.chatPrimaryText,
+              height: 1.5,
             ),
       );
     }
@@ -161,10 +170,11 @@ class AgentMessageBubble extends ConsumerWidget {
           else if (seg is TextSegment)
             Text(
               seg.content,
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: context.appColors.agentOnBrand,
-                    height: 1.4,
-                  ),
+              style: AppTypography.bodyProse.copyWith(
+                fontSize: 13,
+                height: 1.65,
+                color: context.appColors.chatPrimaryText,
+              ),
             ),
       ],
     );
