@@ -17,8 +17,8 @@ abstract interface class IBookshelfWriter {
   Future<Novel> createNovel({
     required String title,
     required String author,
-    String? coverUrl,
     String? description,
+    String? coverUrl,
     String? backgroundSetting,
   });
 }
