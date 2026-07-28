@@ -218,7 +218,7 @@ git push origin feature/your-feature-name
 
 ### 文档类型
 - **API 文档**：接口说明和示例
-- **用户指南**：功能使用教程（docs/user-guide.md）
+- **用户指南**：功能使用教程见根 [README.md](README.md) 与 [在线介绍页](https://yunkst.github.io/novel_builder/)
 - **开发文档**：架构和实现说明（docs/developer-guide.md）
 - **部署文档**：安装和配置指南（docs/deployment.md）
 

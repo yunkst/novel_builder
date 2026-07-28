@@ -267,7 +267,6 @@ Novel Builder 不再依赖服务端爬虫：章节列表与正文由 **Flutter �
 
 - 客户端实现：见 [lib/services/headless_webview_*.dart](../novel_app/lib/services/)
 - 站点脚本：`site_scripts` 表（v39，含 `chapter_list_ocr` / `chapter_content_ocr` 独立列）
-- 架构细节：[chapter-fetch-flow.html](chapter-fetch-flow.html)、[architecture/react-agent-web-extract.html](architecture/react-agent-web-extract.html)
 
 ### 缓存
 
@@ -560,7 +559,6 @@ git push origin master --tags
 - **API 文档** - http://localhost:3800/docs
 - **后端模块文档** - [backend/CLAUDE.md](../backend/CLAUDE.md)
 - **前端模块文档** - [novel_app/CLAUDE.md](../novel_app/CLAUDE.md)
-- **用户使用指南** - [user-guide.md](user-guide.md)
 - **部署指南** - [deployment.md](deployment.md)
 - **日志使用指南** - [logging-guidelines.md](logging-guidelines.md)
 
