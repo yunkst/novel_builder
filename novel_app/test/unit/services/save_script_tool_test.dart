@@ -193,7 +193,7 @@ void main() {
       ));
     });
 
-    test('ocr=true readable_ratio<0.85 → readable_ratio_below_threshold', () async {
+    test('ocr=true readable_ratio<阈值(0.75) → readable_ratio_below_threshold', () async {
       final repo = MockSiteScriptRepository();
       final svc = MockOcrRestoreService();
       when(svc.verifyFontFamily(any)).thenAnswer((_) async => true);

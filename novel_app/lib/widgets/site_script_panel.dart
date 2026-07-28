@@ -659,7 +659,7 @@ class _ScriptCard extends ConsumerWidget {
                   'PUA 解码率: ${(decodedRatio! * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 11,
-                    color: readableRatio >= 0.85
+                    color: readableRatio >= 0.75
                         ? context.appColors.success
                         : context.appColors.warning,
                   ),
