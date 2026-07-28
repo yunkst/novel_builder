@@ -59,7 +59,42 @@
 
 </details>
 
-<!-- ===== Task 4-6 段落占位 ===== -->
+## 🖋️ 写 · 从 0 创作一本自己的小说
+
+读完别人的故事，想写自己的——不用懂写作技巧，AI 全程陪你。
+
+**怎么开始（三步）：**
+
+1. 💬 **跟 AI 说一句**："帮我写一本赛博朋克悬疑，主角是个失忆黑客"——AI 会帮你建好书、定世界观、列出角色
+2. 📋 **先定骨架**：AI 帮你写全书大纲和章节细纲，故事不散、节奏有人帮你把控
+3. 🎬 **逐章生成**：每章说一句你这章想写什么（"主角在酒馆遇到神秘老人，获得关键线索"），AI 结合人物设定 + 你定的风格写出整章正文
+
+**AI 是真"陪写"，不是模板填空：**
+
+- 🎭 **人设不漂**：每个角色的外貌、性格、背景独立建档，写章节时按角色注入上下文，前后一致
+- 🎨 **风格随你定**：`赛博朋克` `暗黑` `轻松日常` 这些标签自由组合，每章套用；还能自定义「AI 作家设定」（比如"参考烽火戏诸侯的文风"）
+- 🧠 **越用越懂你**：你改过的地方、强调过的偏好，AI 会沉淀下来（可随时改、可清空），换次会话也不用重新交代——它记得你
+- 🖼️ **顺手配图**：按场景描述生成封面或插图，文字+画面一起出（需后端 ComfyUI）
+- 📚 **全部本地、永远属于你**：你的书、章节、角色都存在本地，导出备份随你带走
+
+> 不知道第一句怎么起？直接问 AI："我想写一本 XX 题材的小说，但不知道从哪开始"——它会帮你出点子、定大纲、起人名。
+
+<details>
+<summary>🔧 技术细节</summary>
+
+- **创作引导机制**：AI 在 system prompt 里被设定为「Novel Builder 的小说写作助手」+ 「专业的小说写作助手，只输出小说正文」（`agent_system_prompt.dart:31` / `chapter_write_executor.dart:549`）；工作原则第 4 条指令 AI 在用户说"新建一本小说"时直接 `create_novel`（`agent_system_prompt.dart:42-43`）
+- `create_novel`：建空白书并自动切为当前工作小说（`agent_tools.dart:132`）
+- `create_chapter`：position + instruction + `characterNames` + `tagNames` → 调 LLM 生成正文插入（`agent_tools.dart:240`）；前一章正文作为衔接上下文注入（`chapter_write_executor.dart:90`）
+- `write_outline` / `update_outline` / `get_outline`：大纲 CRUD（`agent_tools.dart:625+`）
+- 人物卡：`characters` 表（v35 `first_appearance_chapter` / v34 `avatar_media_id`），写章节按 `characterNames` 注入
+- 风格：`prompt_tags` / `prompt_tag_categories` 表 + 用户自定义 `ai_writer_prompt`（SharedPreferences `ai_writer_prompt`，`chapter_write_executor.dart:400`）
+- `agent_memory` 表（v27）：跨会话持久化写作偏好，`WritingScenario.getMemories()` 回灌；`patch_memory` 可增改——**可手改的经验笔记**，非自动学习你行为的推荐算法
+- 生图：`create_images` / `create_image_to_video` → 后端 ComfyUI（`agent_tools.dart:838+`）
+- 本地存储：`bookshelf` / `novel_chapters` / `chapter_cache` 表，`backup_service.dart` 可导出
+
+</details>
+
+<!-- ===== Task 5-6 段落占位 ===== -->
 
 ---
 
