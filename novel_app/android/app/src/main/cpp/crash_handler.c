@@ -200,32 +200,78 @@ static void crash_handler(int signo, siginfo_t *info, void *ucontext) {
                 write_str(fd, "\n");
             }
 
-            // ---- /proc/self/maps 输出 ----
+            // ---- /proc/self/maps 输出（只保留含 ".so" 的行）----
             //
-            // 目的：拿到各 .so 的加载基址（如 79c3e4d000-79c4100000 r--p ... libonnxruntime.so）。
-            // backtrace 里只有裸 PC，减去对应库的基址后可用 addr2line/llvm-symbolizer
-            // 还原出函数名，定位崩溃落在 ORT 内部 / NNAPI 驱动 / 插件 FFI 哪一层。
+            // 目的：拿到各 .so 的加载基址（如 79c3e4d000-79c4100000 r--p ...
+            // libonnxruntime.so）。backtrace 里只有裸 PC，减去对应库的基址后可用
+            // addr2line/llvm-symbolizer 还原出函数名，定位崩溃落在 ORT 内部 /
+            // NNAPI 驱动 / 插件 FFI 哪一层。
             //
-            // ★ 严格 async-signal-safe：open + 循环 read + write，无 malloc/stdio/snprintf。
-            // 栈上 8KB buffer 分块读写；限总写入 96KB 避免极端机器 maps 巨大撑爆独立信号栈。
-            write_str(fd, "=== maps ===\n");
+            // ★ 只保留含 ".so" 的行：/proc/self/maps 上 Android 进程 maps 通常
+            // 几百 KB，绝大多数是 [anon:partition_alloc] / [anon:scudo:*] /
+            // /dmabuf:* / /kgsl-3d0 / boot-*.oat 等"噪声行"，真正需要看的 .so 行
+            // 只有几十条、几 KB。若全量输出，96KB 上限会被噪声塞满，关键 .so
+            // 基址（特别是高地址段的 libonnxruntime.so / libflutter.so）被截断
+            // 丢失。改成按行过滤只写 ".so" 行后，几十行 .so 总计几 KB，上限绰绰
+            // 有余，所有 .so 基址必现。
+            //
+            // ★ 严格 async-signal-safe：open + 循环 read + write，无 malloc/stdio。
+            // 行缓冲 line_buf 在栈上，逐字符扫描跨块边界（残留 prefix 带到下一块
+            // 续扫）。
+            write_str(fd, "=== maps (.so only) ===\n");
             const int maps_fd = open("/proc/self/maps", O_RDONLY);
             if (maps_fd >= 0) {
                 char maps_buf[8192];
-                ssize_t total_written = 0;
-                const long maps_cap = 96 * 1024; // 总写入上限，防止 maps 异常巨大
+                char line_buf[512];   // 单行缓冲，maps 行极少超 200 字符
+                int line_len = 0;     // line_buf 当前已累积长度（跨块续接）
+                const char dot_so[4] = {'.', 's', 'o', '\0'};
                 for (;;) {
                     const ssize_t r = read(maps_fd, maps_buf, sizeof(maps_buf));
                     if (r <= 0) break; // EOF 或出错
-                    // 接近上限时截断本块，写入分隔标记后跳出
-                    if (total_written + r > maps_cap) {
-                        const ssize_t remain = maps_cap - total_written;
-                        if (remain > 0) write_all(fd, maps_buf, (int)remain);
-                        write_str(fd, "... maps truncated ...\n");
-                        break;
+                    for (ssize_t i = 0; i < r; i++) {
+                        const char c = maps_buf[i];
+                        if (line_len < (int)sizeof(line_buf) - 1) {
+                            line_buf[line_len++] = c;
+                        } else {
+                            // 行超长，截断：丢弃本行剩余直到换行
+                            line_len = (int)sizeof(line_buf) - 1;
+                        }
+                        if (c == '\n') {
+                            line_buf[line_len] = '\0';
+                            // 仅当行含 ".so" 才输出（避开 anon/dmabuf/oat/kgsl 噪声）
+                            // 简单线性扫描，async-signal-safe
+                            int has_so = 0;
+                            for (int j = 0; j + 2 < line_len; j++) {
+                                if (line_buf[j] == dot_so[0] &&
+                                    line_buf[j+1] == dot_so[1] &&
+                                    line_buf[j+2] == dot_so[2]) {
+                                    has_so = 1;
+                                    break;
+                                }
+                            }
+                            if (has_so) {
+                                write_all(fd, line_buf, line_len);
+                            }
+                            line_len = 0;
+                        }
                     }
-                    write_all(fd, maps_buf, (int)r);
-                    total_written += r;
+                }
+                // flush 最后一行（无尾换行的兜底）
+                if (line_len > 0) {
+                    line_buf[line_len] = '\0';
+                    int has_so = 0;
+                    for (int j = 0; j + 3 < line_len; j++) {
+                        if (line_buf[j] == dot_so[0] &&
+                            line_buf[j+1] == dot_so[1] &&
+                            line_buf[j+2] == dot_so[2]) {
+                            has_so = 1;
+                            break;
+                        }
+                    }
+                    if (has_so) {
+                        write_all(fd, line_buf, line_len);
+                        write_str(fd, "\n");
+                    }
                 }
                 close(maps_fd);
             } else {

@@ -539,6 +539,14 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   static const _domStabilizeDelay = Duration(milliseconds: 500);
   static const _headlessTrustDelay = Duration(seconds: 2);
 
+  /// OCR 还原后 CJK 占比通过阈值。
+  ///
+  /// readableRatio 分母含中文标点/数字/空白（只数 0x4E00-0x9FFF 基本区汉字），
+  /// 正常中文小说正文标点占 15-20%，"完美还原"的天花板约 0.80-0.85。原 0.85
+  /// 阈值卡在天花板上，导致番茄等标点密集站点反复卡在 save_script 校验。
+  /// 0.75 既能放行正常还原（实测 0.81-0.83），又能拦住识别真差（<0.7 乱码）。
+  static const _readableRatioThreshold = 0.75;
+
   /// 等待 WebView 加载完成（URL 匹配 targetUrl）
   ///
   /// 返回 `true` 表示成功等到 URL 匹配；`false` 表示超时。
@@ -1755,7 +1763,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   /// 返回 null 表示通过；否则返回含 reason 的诊断 map（均带 ocr_applied=true）。
   ///
   /// 1. `verifyFontFamily` 失败 → `font_family_invalid`
-  /// 2. `restorePuaInText` 后 `readableRatio < 0.85` → `readable_ratio_below_threshold`
+  /// 2. `restorePuaInText` 后 `readableRatio < _readableRatioThreshold(0.75)` → `readable_ratio_below_threshold`
   /// 3. 有 PUA 但 `decodedRatio < 0.8` → `decoded_ratio_below_threshold`
   static Future<Map<String, dynamic>?> _validateOcr(
     OcrRestoreService svc,
@@ -1780,7 +1788,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
 
     final restored = await svc.restorePuaInText(textToRestore, fontFamily);
     final ratio = svc.readableRatio(restored.text);
-    if (ratio < 0.85) {
+    if (ratio < _readableRatioThreshold) {
       return {
         'reason': 'readable_ratio_below_threshold',
         'ocr_applied': true,

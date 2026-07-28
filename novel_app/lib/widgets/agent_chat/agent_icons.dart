@@ -13,14 +13,20 @@ abstract final class AgentIcons {
   /// 书 / 当前小说（替代 emoji 📖）
   static const IconData book = Icons.menu_book;
 
-  /// 会话历史
-  static const IconData history = Icons.history;
-
-  /// 时钟（测试要求，与 history 区分；可用于重试倒计时等时间语义）
+  /// 时钟（重试倒计时等时间语义）
   static const IconData clock = Icons.access_time;
 
-  /// 菜单（场景切换/配置/全屏）
+  /// 菜单（场景切换/配置/历史）
   static const IconData dots = Icons.more_vert;
+
+  /// 全屏
+  static const IconData fullscreen = Icons.fullscreen;
+
+  /// 退出全屏
+  static const IconData fullscreenExit = Icons.fullscreen_exit;
+
+  /// 停止 / 中断生成
+  static const IconData stop = Icons.stop_rounded;
 
   /// 关闭
   static const IconData close = Icons.close;

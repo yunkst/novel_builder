@@ -7,9 +7,10 @@ import '../../core/providers/agent_chat_state.dart';
 import '../../core/providers/scenario_sessions_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/dsl_engine/retry_signals.dart';
+import 'agent_icons.dart';
 
 /// 状态条种类
-enum AgentStatusKind { error, retry, supplement }
+enum AgentStatusKind { error, retry, supplement, running }
 
 /// 单条状态（同一时刻最多 1 条）
 @immutable
@@ -55,14 +56,25 @@ AgentStatus? selectStatus(AgentChatState chatState, RetryState? retry) {
       detail: '将在下一轮处理',
     );
   }
+  // running 兜底：纯运行态（非重试 / 无补充）——消息流顶部渲染
+  // 「正在生成…」+ 停止按钮入口（按钮回调由 AgentStatusStrip.onStop 注入）。
+  if (chatState.isLoading) {
+    return const AgentStatus(AgentStatusKind.running, '正在生成…');
+  }
   return null;
 }
 
-/// 统一状态条：error/retry/supplement 3 选 1，消息流顶部。
-/// 自包含 retry 倒计时（订阅 RetrySignals + Timer.periodic），
+/// 统一状态条：error/retry/supplement/running 4 选 1，消息流顶部。
+/// 自包含 retry 倒计时（订阅 RetrySignals + Timer.periodic）。
+/// running/supplement/retry 三种运行态右侧带「停止」按钮（[onStop] 注入），
+/// error（非运行态）不带。
 /// 取代原 RetryBanner + _buildErrorBar + _buildStopBar + _buildSupplementBar。
 class AgentStatusStrip extends ConsumerStatefulWidget {
-  const AgentStatusStrip({super.key});
+  /// 停止当前生成。运行态（retry/supplement/running）时渲染停止按钮；
+  /// null 时不渲染（向后兼容，如纯函数单测）。
+  final VoidCallback? onStop;
+
+  const AgentStatusStrip({super.key, this.onStop});
   @override
   ConsumerState<AgentStatusStrip> createState() => _AgentStatusStripState();
 }
@@ -133,7 +145,8 @@ class _AgentStatusStripState extends ConsumerState<AgentStatusStrip> {
       ),
       child: Row(
         children: [
-          if (status.kind == AgentStatusKind.retry)
+          if (status.kind == AgentStatusKind.retry ||
+              status.kind == AgentStatusKind.running)
             SizedBox(
               width: 14,
               height: 14,
@@ -171,6 +184,36 @@ class _AgentStatusStripState extends ConsumerState<AgentStatusStrip> {
                     color: accent,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'JetBrainsMono')),
+          if (widget.onStop != null &&
+              status.kind != AgentStatusKind.error) ...[
+            const SizedBox(width: 8),
+            Tooltip(
+              message: '停止生成',
+              child: GestureDetector(
+                onTap: widget.onStop,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colors.error.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(AgentIcons.stop, size: 11, color: colors.error),
+                      const SizedBox(width: 3),
+                      Text('停止',
+                          style: TextStyle(
+                              fontSize: 10.5,
+                              color: colors.error,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

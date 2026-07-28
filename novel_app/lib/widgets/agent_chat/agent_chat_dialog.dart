@@ -121,13 +121,15 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
                 onHistory: () => _showHistorySheet(),
                 onConfig: () => _showScenarioConfigDialog(),
                 onToggleFullscreen: () => setState(() => _isFullscreen = !_isFullscreen),
+                isFullscreen: _isFullscreen,
                 onClose: () => Navigator.of(context).maybePop(),
               ),
               // StatusStrip retry 订阅兜底（Task 4 修复：外层 ValueListenableBuilder
               // 监听 RetrySignals，触发时 rebuild 并传给 AgentStatusStrip 读最新值）。
               ValueListenableBuilder<RetryState?>(
                 valueListenable: RetrySignals.instance.notifier,
-                builder: (context, _, child) => const AgentStatusStrip(),
+                builder: (context, _, child) =>
+                    AgentStatusStrip(onStop: _stopGeneration),
               ),
               Expanded(
                 child: AgentChatMessages(onRollback: _handleRollback),
@@ -146,6 +148,12 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
         ),
       ),
     );
+  }
+
+  /// 停止当前 agent 生成 — 委托给当前场景的 [ScenarioSession.cancel]
+  /// （含子 Agent 级联取消 + 当前轮 partial 落库 + token cancel）。
+  void _stopGeneration() {
+    ref.read(currentSessionProvider)?.cancel();
   }
 
   /// 弹出会话历史底部抽屉（当前 scenario 下的会话列表）

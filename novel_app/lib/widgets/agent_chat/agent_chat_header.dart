@@ -19,6 +19,7 @@ class AgentChatHeader extends ConsumerWidget {
   final VoidCallback? onConfig;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onClose;
+  final bool isFullscreen;
 
   const AgentChatHeader({
     super.key,
@@ -26,6 +27,7 @@ class AgentChatHeader extends ConsumerWidget {
     this.onConfig,
     this.onToggleFullscreen,
     this.onClose,
+    this.isFullscreen = false,
   });
 
   @override
@@ -67,13 +69,18 @@ class AgentChatHeader extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              _ScenarioMenu(onConfig: onConfig, onHistory: onHistory),
               IconButton(
-                tooltip: '会话历史',
-                icon: Icon(AgentIcons.history, size: 19),
+                tooltip: isFullscreen ? '退出全屏' : '全屏',
+                icon: Icon(
+                  isFullscreen
+                      ? AgentIcons.fullscreenExit
+                      : AgentIcons.fullscreen,
+                  size: 19,
+                ),
                 color: colors.inkSoft,
-                onPressed: onHistory,
+                onPressed: onToggleFullscreen,
               ),
-              _ScenarioMenu(onConfig: onConfig, onToggleFullscreen: onToggleFullscreen),
               IconButton(
                 tooltip: '关闭',
                 icon: Icon(AgentIcons.close, size: 19),
@@ -92,8 +99,8 @@ class AgentChatHeader extends ConsumerWidget {
 
 class _ScenarioMenu extends ConsumerWidget {
   final VoidCallback? onConfig;
-  final VoidCallback? onToggleFullscreen;
-  const _ScenarioMenu({this.onConfig, this.onToggleFullscreen});
+  final VoidCallback? onHistory;
+  const _ScenarioMenu({this.onConfig, this.onHistory});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -108,8 +115,8 @@ class _ScenarioMenu extends ConsumerWidget {
           onConfig?.call();
           return;
         }
-        if (value == 'fullscreen') {
-          onToggleFullscreen?.call();
+        if (value == 'history') {
+          onHistory?.call();
           return;
         }
         // scenarioId -> 切场景（沿用现有 agent_chat_dialog 切换逻辑）
@@ -131,7 +138,7 @@ class _ScenarioMenu extends ConsumerWidget {
           ),
         const PopupMenuDivider(),
         const PopupMenuItem(value: 'config', child: Text('场景配置')),
-        const PopupMenuItem(value: 'fullscreen', child: Text('全屏切换')),
+        const PopupMenuItem(value: 'history', child: Text('会话历史')),
       ],
     );
   }
