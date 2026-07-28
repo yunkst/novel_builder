@@ -106,4 +106,45 @@ void main() {
       expect(await StarPromptService.instance.shouldShow(), isTrue);
     });
   });
+
+  test('onStarClicked 写 dismissed=true', () async {
+    final beforeMs = DateTime.now().millisecondsSinceEpoch;
+    await StarPromptService.instance.onStarClicked();
+
+    final dismissed = await PreferencesService.instance.getBool(
+      'star_prompt_dismissed',
+    );
+    expect(dismissed, isTrue);
+
+    // 验证后续 shouldShow 永远 false（即使其他条件满足）
+    SharedPreferences.setMockInitialValues({
+      'star_prompt_install_time': beforeMs - 4 * 86400000,
+      'star_prompt_launch_count': 7,
+      'star_prompt_dismissed': true,
+      'star_prompt_next_show_time': 0,
+    });
+    expect(await StarPromptService.instance.shouldShow(), isFalse);
+  });
+
+  test('onDismissed 写 next_show_time = now + 7 天，冷却期内不弹，7 天后恢复', () async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await StarPromptService.instance.onDismissed();
+
+    final nextShow = await PreferencesService.instance.getInt(
+      'star_prompt_next_show_time',
+    );
+    final sevenDaysLater = now + 7 * 86400000;
+    // 允许 ±1000ms 时序误差
+    expect(nextShow, greaterThanOrEqualTo(sevenDaysLater - 1000));
+    expect(nextShow, lessThanOrEqualTo(sevenDaysLater + 1000));
+
+    // 验证冷却期内不弹
+    SharedPreferences.setMockInitialValues({
+      'star_prompt_install_time': now - 4 * 86400000,
+      'star_prompt_launch_count': 7,
+      'star_prompt_dismissed': false,
+      'star_prompt_next_show_time': now + 5 * 86400000, // 5 天后到期
+    });
+    expect(await StarPromptService.instance.shouldShow(), isFalse);
+  });
 }

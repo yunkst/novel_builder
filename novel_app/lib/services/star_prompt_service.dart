@@ -85,4 +85,18 @@ class StarPromptService {
       return false;
     }
   }
+
+  /// 主按钮「⭐ 去 GitHub 点 Star」触发：标记永久关闭。
+  ///
+  /// 调用方负责 launchUrl（service 不依赖 url_launcher，方便单测）。
+  Future<void> onStarClicked() async {
+    await PreferencesService.instance.setBool(_kDismissed, true);
+  }
+
+  /// 关闭按钮触发：写冷却期，下次可弹时间 = now + 7 天。
+  Future<void> onDismissed() async {
+    final nextShow =
+        DateTime.now().millisecondsSinceEpoch + _cooldownDays * _msPerDay;
+    await PreferencesService.instance.setInt(_kNextShowTime, nextShow);
+  }
 }
