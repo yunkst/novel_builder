@@ -120,7 +120,10 @@ dependencies:
   jinja: ^0.6.6
 
   # OCR PoC：PP-OCRv6 离线识别（仅 main_ppocr_demo.dart 使用）
-  flutter_onnxruntime: ^1.6.0
+  # 2026-07-28 升级 ^1.6.0 → ^1.8.3：底层 ORT 1.22.0 → 1.23.0，排查 vivo Android 16
+  # 真机 SIGABRT（libonnxruntime.so 内 ORT native abort）。changelog 无针对该 bug
+  # 的直接修复，升级属版本试探，非定向补丁。
+  flutter_onnxruntime: ^1.8.3
   image: ^4.3.0
 dev_dependencies:
   flutter_test:

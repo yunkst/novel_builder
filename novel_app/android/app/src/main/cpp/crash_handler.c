@@ -1,8 +1,12 @@
 // Native crash signal handler —— Android SIGSEGV/SIGABRT 等崩溃捕获
 //
 // 设计目标：进程被 OS kill 之前，把崩溃信息（信号号、fault addr、tid、
-// 时间戳、backtrace 地址）写到 filesDir/crash/crash_<tid>_<ts>.txt，
+// 时间戳、backtrace 地址、/proc/self/maps）写到 filesDir/crash/crash_<tid>_<ts>.txt，
 // 供下次启动时 Flutter 侧读取并引导用户提 GitHub issue。
+//
+// maps 用于符号化裸 PC：11 帧裸 PC 减去对应 .so 的加载基址后，
+// 可用 NDK addr2line / llvm-symbolizer 还原出函数名，定位崩溃落在
+// ORT 内部 / NNAPI 驱动 / 插件 FFI 哪一层。
 //
 // ★ async-signal-safe 约束（POSIX）：signal handler 里只能调用
 //   open/write/close/syscall/clock_gettime 等明确列为 async-signal-safe
@@ -194,6 +198,38 @@ static void crash_handler(int signo, siginfo_t *info, void *ucontext) {
                 len = u64_to_hex((uint64_t)(uintptr_t)addrs[i], buf);
                 write_all(fd, buf, len);
                 write_str(fd, "\n");
+            }
+
+            // ---- /proc/self/maps 输出 ----
+            //
+            // 目的：拿到各 .so 的加载基址（如 79c3e4d000-79c4100000 r--p ... libonnxruntime.so）。
+            // backtrace 里只有裸 PC，减去对应库的基址后可用 addr2line/llvm-symbolizer
+            // 还原出函数名，定位崩溃落在 ORT 内部 / NNAPI 驱动 / 插件 FFI 哪一层。
+            //
+            // ★ 严格 async-signal-safe：open + 循环 read + write，无 malloc/stdio/snprintf。
+            // 栈上 8KB buffer 分块读写；限总写入 96KB 避免极端机器 maps 巨大撑爆独立信号栈。
+            write_str(fd, "=== maps ===\n");
+            const int maps_fd = open("/proc/self/maps", O_RDONLY);
+            if (maps_fd >= 0) {
+                char maps_buf[8192];
+                ssize_t total_written = 0;
+                const long maps_cap = 96 * 1024; // 总写入上限，防止 maps 异常巨大
+                for (;;) {
+                    const ssize_t r = read(maps_fd, maps_buf, sizeof(maps_buf));
+                    if (r <= 0) break; // EOF 或出错
+                    // 接近上限时截断本块，写入分隔标记后跳出
+                    if (total_written + r > maps_cap) {
+                        const ssize_t remain = maps_cap - total_written;
+                        if (remain > 0) write_all(fd, maps_buf, (int)remain);
+                        write_str(fd, "... maps truncated ...\n");
+                        break;
+                    }
+                    write_all(fd, maps_buf, (int)r);
+                    total_written += r;
+                }
+                close(maps_fd);
+            } else {
+                write_str(fd, "(failed to open /proc/self/maps)\n");
             }
 
             write_str(fd, "=== END ===\n");

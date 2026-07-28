@@ -62,8 +62,72 @@ class OcrPredictor {
     }
 
     // 加载模型并创建 session
+    //
+    // 显式锁定 CPU EP（providers: [OrtProvider.CPU]）：
+    // - ORT 默认本就是 CPU EP，硬件加速必须显式注册才生效；
+    // - 这里显式锁定的目的不是"开启 CPU"，而是**干净排除 NNAPI/XNNPACK 嫌疑**——
+    //   真机 100% SIGABRT + 模拟器不崩，最大嫌疑是厂商 NNAPI 驱动对动态 shape
+    //   算子（Reshape/Slice/Squeeze，本模型各有 8 个）兼容失败。
+    //   若锁定 CPU 后真机仍崩，则排除 EP 假设，箭头转向 Android 16 内存安全层
+    //   / 插件 FFI 异常逃逸。
+    // - 同时打印 getAvailableProviders() 与 getInputInfo()/getOutputInfo() 作为
+    //   运行时探针：前者确认本机有哪些 EP，后者让包自报输入签名（与 Python
+    //   onnx 包读到的 [DynamicDimension.0, 3, 48, DynamicDimension.1] 对比，
+    //   验证 w=64 是否真是包支持的宽度）。
     final ort = OnnxRuntime();
-    _session = await ort.createSessionFromAsset(modelAsset);
+
+    // 诊断 1：本机可用 EP 清单
+    try {
+      final providers = await ort.getAvailableProviders();
+      LoggerService.instance.i(
+        'ORT 可用 EP: $providers',
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'ep-available'],
+      );
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ORT getAvailableProviders 失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'ep-available-fail'],
+      );
+    }
+
+    // 显式锁定 CPU EP
+    final options = OrtSessionOptions(
+      providers: [OrtProvider.CPU],
+      intraOpNumThreads: 4,
+      interOpNumThreads: 1,
+      useArena: true,
+    );
+    _session = await ort.createSessionFromAsset(modelAsset, options: options);
+
+    // 诊断 2：模型输入/输出签名（包自报，与 Python onnx 签名对比）
+    try {
+      final inputs = await _session!.getInputInfo();
+      for (final i in inputs) {
+        LoggerService.instance.i(
+          'ORT input info: ${i.entries.map((e) => "${e.key}=${e.value}").join(", ")}',
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'input-info'],
+        );
+      }
+      final outputs = await _session!.getOutputInfo();
+      for (final o in outputs) {
+        LoggerService.instance.i(
+          'ORT output info: ${o.entries.map((e) => "${e.key}=${e.value}").join(", ")}',
+          category: LogCategory.ai,
+          tags: ['ocr', 'onnx', 'output-info'],
+        );
+      }
+    } catch (e, st) {
+      LoggerService.instance.e(
+        'ORT getInputInfo/getOutputInfo 失败: $e',
+        stackTrace: st.toString(),
+        category: LogCategory.ai,
+        tags: ['ocr', 'onnx', 'info-fail'],
+      );
+    }
   }
 
   /// 确保模型已加载，否则抛 [StateError]（防御 _session 空指针 → native crash）。
