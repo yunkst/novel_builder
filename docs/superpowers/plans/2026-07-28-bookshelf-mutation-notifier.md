@@ -265,7 +265,7 @@ void main() {
   });
 
   test('addNovel 调 writer.addToBookshelf + invalidate bookshelfNovelsProvider', () async {
-    // 调 container.read(bookshelfMutationProvider).addNovel(novel)
+    // 调 container.read(bookshelfMutationProvider.notifier).addNovel(novel)
     // verify writer.addToBookshelf called once
     // verify bookshelfNovelsProvider 被 invalidate(可通过监听其状态变化判断)
   });
@@ -336,7 +336,7 @@ else await novelRepository.addToBookshelf(novel);
 ```
 改为:
 ```dart
-await ref.read(bookshelfMutationProvider).toggleBookshelf(novel);
+await ref.read(bookshelfMutationProvider.notifier).toggleBookshelf(novel);
 ```
 (toggleBookshelf 内部封装了 isInBookshelf 判断 + add/remove + invalidate,调用方逻辑简化)
 
@@ -345,11 +345,11 @@ import 加 `bookshelf_mutation_provider.dart`。
 - [ ] **Step 2: 迁移 `bookshelf_screen.dart` 5 处**
 
 逐行迁移(精确行号实现期再核对):
-- 行 51 `removeFromBookshelf` → `ref.read(bookshelfMutationProvider).removeNovel(novel.url)`
-- 行 79 `updateTitle` → `ref.read(bookshelfMutationProvider).updateTitle(...)`
-- 行 134 `updateCoverMediaIdByUrl(..., mediaId)` → `ref.read(bookshelfMutationProvider).updateCoverMediaId(..., mediaId)`
-- 行 167 `updateCoverMediaIdByUrl(..., null)` → `ref.read(bookshelfMutationProvider).removeCoverMediaId(...)`
-- 行 362 `bookshelfRepository.moveNovelToBookshelf(...)` → `ref.read(bookshelfMutationProvider).moveToBookshelf(novel.url, currentBookshelfId, toBookshelfId)`
+- 行 51 `removeFromBookshelf` → `ref.read(bookshelfMutationProvider.notifier).removeNovel(novel.url)`
+- 行 79 `updateTitle` → `ref.read(bookshelfMutationProvider.notifier).updateTitle(...)`
+- 行 134 `updateCoverMediaIdByUrl(..., mediaId)` → `ref.read(bookshelfMutationProvider.notifier).updateCoverMediaId(..., mediaId)`
+- 行 167 `updateCoverMediaIdByUrl(..., null)` → `ref.read(bookshelfMutationProvider.notifier).removeCoverMediaId(...)`
+- 行 362 `bookshelfRepository.moveNovelToBookshelf(...)` → `ref.read(bookshelfMutationProvider.notifier).moveToBookshelf(novel.url, currentBookshelfId, toBookshelfId)`
 
 import 加 `bookshelf_mutation_provider.dart`。
 
@@ -395,7 +395,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 Read 行 80-90 上下文。把 `final id = await novelRepository.addToBookshelf(novel);` 改为:
 ```dart
-await ref.read(bookshelfMutationProvider).addNovel(novel);
+await ref.read(bookshelfMutationProvider.notifier).addNovel(novel);
 // 注:addNovel 不返回 id;若调用方需要 id,Notifier.addNovel 也应返回 Future<int>(实现期决定)
 ```
 **注意**: `addToBookshelf` 返回 `Future<int>`(插入的 id),Agent 工具可能用到这个 id。若需要,Notifier.addNovel 改为 `Future<int>` 返回 writer 的返回值(spec 里是 `Future<void>`,实施期按需调整签名)。
@@ -404,11 +404,11 @@ await ref.read(bookshelfMutationProvider).addNovel(novel);
 
 - [ ] **Step 2: 迁移 `tool_executor.dart:91`**
 
-Read 上下文。`_novelNav.createNovel(args)` → `ref.read(bookshelfMutationProvider).createNovel(...)`(透传 args)。同样确认 Ref 可用性。
+Read 上下文。`_novelNav.createNovel(args)` → `ref.read(bookshelfMutationProvider.notifier).createNovel(...)`(透传 args)。同样确认 Ref 可用性。
 
 - [ ] **Step 3: 迁移 `webview_add_novel_button.dart:251`**
 
-`await novelRepo.addToBookshelf(Novel(...))` → `await ref.read(bookshelfMutationProvider).addNovel(Novel(...))`。该 widget 已用 `ref.read`(行 210 `ref.read(novelRepositoryProvider)`),所以 ref 可用。
+`await novelRepo.addToBookshelf(Novel(...))` → `await ref.read(bookshelfMutationProvider.notifier).addNovel(Novel(...))`。该 widget 已用 `ref.read`(行 210 `ref.read(novelRepositoryProvider)`),所以 ref 可用。
 
 - [ ] **Step 4: analyze 全项目 + 跑全套相关测试**
 

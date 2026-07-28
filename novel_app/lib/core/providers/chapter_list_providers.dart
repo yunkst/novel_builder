@@ -15,6 +15,7 @@ import '../../utils/toast_utils.dart';
 import '../../constants/chapter_constants.dart';
 import 'service_providers.dart';
 import 'database_providers.dart';
+import 'bookshelf_mutation_provider.dart';
 
 import 'package:flutter/material.dart';
 
@@ -393,14 +394,13 @@ class ChapterList extends _$ChapterList {
   }
 
   /// 切换书架状态
+  ///
+  /// 写路径走 [BookshelfMutationNotifier.toggleBookshelf]（统一 invalidate
+  /// bookshelfNovelsProvider）。本 Notifier 仍需随后调用 [_checkBookshelfStatus]
+  /// 刷新 `state.isInBookshelf`——ChapterList 的 UI 按钮依赖此字段，
+  /// 而 BookshelfMutationNotifier 只负责书架列表的失效，不会回写本 state。
   Future<void> toggleBookshelf() async {
-    final novelRepository = ref.read(novelRepositoryProvider);
-
-    if (state.isInBookshelf) {
-      await novelRepository.removeFromBookshelf(novel.url);
-    } else {
-      await novelRepository.addToBookshelf(novel);
-    }
+    await ref.read(bookshelfMutationProvider.notifier).toggleBookshelf(novel);
 
     LoggerService.instance.i(
       '切换书架状态: novel=${novel.title} → isInBookshelf=${!state.isInBookshelf}',

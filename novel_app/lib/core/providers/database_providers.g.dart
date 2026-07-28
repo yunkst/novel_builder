@@ -50,6 +50,28 @@ final novelRepositoryProvider = AutoDisposeProvider<INovelRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NovelRepositoryRef = AutoDisposeProviderRef<INovelRepository>;
+String _$bookshelfWriterHash() => r'd835af567ddd692990eb138d82b46aa9b27841ae';
+
+/// 书架写操作 Provider（仅 [BookshelfMutationNotifier] 用）。
+///
+/// 通过 cast 拿到 [NovelRepository] 的 IBookshelfWriter 能力。
+/// 普通调用方应使用 [bookshelfMutationProvider] 走收口路径。
+///
+/// Copied from [bookshelfWriter].
+@ProviderFor(bookshelfWriter)
+final bookshelfWriterProvider = AutoDisposeProvider<IBookshelfWriter>.internal(
+  bookshelfWriter,
+  name: r'bookshelfWriterProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$bookshelfWriterHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef BookshelfWriterRef = AutoDisposeProviderRef<IBookshelfWriter>;
 String _$chapterRepositoryHash() => r'8c82f427c1be5f67323bf3e5b5e79a1bf3860b8d';
 
 /// ChapterRepository Provider
@@ -232,5 +254,27 @@ final bookshelfRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef BookshelfRepositoryRef = AutoDisposeProviderRef<IBookshelfRepository>;
+String _$bookshelfAssociationWriterHash() =>
+    r'09345db27ed53474c8e208719c8ef82a530bd5dc';
+
+/// 书架关联表写操作 Provider（仅 [BookshelfMutationNotifier] 用）。
+///
+/// Copied from [bookshelfAssociationWriter].
+@ProviderFor(bookshelfAssociationWriter)
+final bookshelfAssociationWriterProvider =
+    AutoDisposeProvider<IBookshelfAssociationWriter>.internal(
+  bookshelfAssociationWriter,
+  name: r'bookshelfAssociationWriterProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$bookshelfAssociationWriterHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef BookshelfAssociationWriterRef
+    = AutoDisposeProviderRef<IBookshelfAssociationWriter>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

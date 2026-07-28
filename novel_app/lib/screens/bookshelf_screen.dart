@@ -19,6 +19,7 @@ import '../core/theme/app_typography.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
 import '../screens/reader_screen.dart';
 import '../core/providers/bookshelf_providers.dart';
+import '../core/providers/bookshelf_mutation_provider.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/service_providers.dart';
 import '../dialogs/novel_edit_dialog.dart';
@@ -47,13 +48,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     if (confirmed == true) {
       try {
         // 从数据库中删除小说（这会删除bookshelf表中的记录）
-        final novelRepository = ref.read(novelRepositoryProvider);
-        await novelRepository.removeFromBookshelf(novel.url);
+        // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
+        await ref
+            .read(bookshelfMutationProvider.notifier)
+            .removeNovel(novel.url);
         if (mounted) {
           ToastUtils.showSuccess('已从书架移除', context: context);
         }
-        // 刷新书架列表
-        ref.invalidate(bookshelfNovelsProvider);
       } catch (e, stackTrace) {
         if (!mounted) return;
         ErrorHelper.showErrorWithLog(
@@ -75,13 +76,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
       originalTitle: novel.title,
       onConfirm: (newTitle) async {
         try {
-          final novelRepository = ref.read(novelRepositoryProvider);
-          await novelRepository.updateTitle(novel.url, newTitle);
+          // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
+          await ref
+              .read(bookshelfMutationProvider.notifier)
+              .updateTitle(novel.url, newTitle);
           if (mounted) {
             ToastUtils.showSuccess('书名修改成功', context: context);
           }
-          // 刷新书架列表
-          ref.invalidate(bookshelfNovelsProvider);
         } catch (e, stackTrace) {
           if (!mounted) return;
           ErrorHelper.showErrorWithLog(
@@ -129,10 +130,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     try {
       final mediaId =
           await ref.read(mediaProxyProvider).upload(bytes, MediaKind.image);
+      // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
       await ref
-          .read(novelRepositoryProvider)
-          .updateCoverMediaIdByUrl(novel.url, mediaId);
-      ref.invalidate(bookshelfNovelsProvider);
+          .read(bookshelfMutationProvider.notifier)
+          .updateCoverMediaId(novel.url, mediaId);
       if (mounted) {
         ToastUtils.showSuccess('封面已设置', context: context);
       }
@@ -162,10 +163,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// 用 url 定位（书架页 Novel 不含 id，避免 novelId==null 静默失败）。
   Future<void> _removeNovelCover(Novel novel) async {
     try {
+      // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
       await ref
-          .read(novelRepositoryProvider)
-          .updateCoverMediaIdByUrl(novel.url, null);
-      ref.invalidate(bookshelfNovelsProvider);
+          .read(bookshelfMutationProvider.notifier)
+          .removeCoverMediaId(novel.url);
       if (mounted) {
         ToastUtils.showSuccess('封面已删除', context: context);
       }
@@ -350,21 +351,16 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// 移动小说到指定书架
   Future<void> _moveNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
-      // 获取当前书架ID和Repository
+      // 获取当前书架ID
       final currentBookshelfId = ref.read(currentBookshelfIdProvider);
-      final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
 
-      // 使用Repository移动小说
-      await bookshelfRepository.moveNovelToBookshelf(
-        novel.url,
-        currentBookshelfId,
-        toBookshelfId,
-      );
+      // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
+      await ref
+          .read(bookshelfMutationProvider.notifier)
+          .moveToBookshelf(novel.url, currentBookshelfId, toBookshelfId);
 
       if (mounted) {
         ToastUtils.showSuccess('已移动到目标书架', context: context);
-        // 刷新当前书架
-        ref.invalidate(bookshelfNovelsProvider);
       }
     } catch (e, stackTrace) {
       if (!mounted) return;
@@ -381,13 +377,15 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// 复制小说到指定书架
   Future<void> _copyNovelToBookshelf(Novel novel, int toBookshelfId) async {
     try {
-      // 使用Repository复制小说
-      final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
-      await bookshelfRepository.addNovelToBookshelf(novel.url, toBookshelfId);
+      // 写路径经 BookshelfMutationNotifier，自动 invalidate bookshelfNovelsProvider
+      await ref
+          .read(bookshelfMutationProvider.notifier)
+          .copyToBookshelf(novel.url, toBookshelfId);
 
       if (mounted) {
         ToastUtils.showSuccess('已复制到目标书架', context: context);
-        // 不刷新当前书架，因为小说还在原书架
+        // 不主动刷新当前书架：复制只追加关联表行，原书架列表不变；
+        // Notifier 内部 invalidate 是无副作用的重新查询，目标书架视图切换时会自动刷新。
       }
     } catch (e, stackTrace) {
       if (!mounted) return;
