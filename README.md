@@ -129,7 +129,46 @@
 
 > 录好后这里会替换成视频封面 + 链接。
 
-<!-- ===== Task 6 占位 ===== -->
+## 🔧 面向开发者
+
+<details>
+<summary>点开看技术栈与构建</summary>
+
+**技术栈**
+
+- 前端：Flutter 3.0+ / Dart / Riverpod / SQLite (v39) / Material 3
+- AI 层：OpenAI 兼容 LLM + Agent Chat（多 Subagent 协作）+ 端侧 PP-OCRv6 (onnxruntime)
+- 章节：Headless WebView + 本地 JS 提取脚本（`site_scripts` 表）
+- 后端（可选）：FastAPI + ComfyUI（文生图/图生视频）+ 备份/日志上报
+
+**源码运行**
+
+```bash
+git clone https://github.com/yunkst/novel_builder.git
+cd novel_builder/novel_app
+flutter pub get
+flutter run
+```
+
+> App 默认离线可用，本地书架/阅读/Agent Chat/角色卡均无需后端。后端只在需要 AI 生图/备份/日志时才启动。
+
+**深入文档**
+
+- [开发者指南](docs/developer-guide.md) · [部署指南](docs/deployment.md) · [前端模块](novel_app/CLAUDE.md) · [后端模块](backend/CLAUDE.md)
+
+**贡献**
+
+欢迎提 Issue / PR，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+</details>
+
+---
+
+<div align="center">
+
+**觉得这个 APP 有用？给个 ⭐ 支持一下独立开发 🙏**
+
+</div>
 
 ---
 
