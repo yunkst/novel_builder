@@ -25,7 +25,7 @@ Riverpod 是 Flutter 的响应式状态管理和依赖注入框架。本项目�
 
 ```
 lib/core/providers/
-├── service_providers.dart              # 服务层 Providers（Logger, API, Dify 等）
+├── service_providers.dart              # 服务层 Providers（Logger, API, AI 等）
 ├── database_provider.dart              # 数据库和 Repository Providers
 ├── database_providers.dart             # 旧版数据库 Provider（兼容性保留）
 ├── repository_providers.dart           # Repository Providers 重新导出

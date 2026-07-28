@@ -158,7 +158,7 @@ class AppColors extends ThemeExtension<AppColors> {
     neutral: Color(0xFF6B5D48),
     onSemantic: Colors.white,
     // chatRoleBubble/chatUserBubble/chatUserBubbleBorder/chatButtonDisabled:
-    // Dify 时代冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
+    // 旧版冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
     // 与晨读书馆琥珀暖纸主题冲突，agent_chat 重做不启用，待后续独立 commit 清理。
     // 容器色 · 米白纸感
     errorContainer: Color(0xFFF3DAD5),
@@ -206,7 +206,7 @@ class AppColors extends ThemeExtension<AppColors> {
     neutral: Color(0xFF8A7C66),
     onSemantic: Color(0xFF1A1610),
     // chatRoleBubble/chatUserBubble/chatUserBubbleBorder/chatButtonDisabled:
-    // Dify 时代冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
+    // 旧版冷调遗留（亮 chatRoleBubble #DCE6F0 冷蓝 / chatUserBubble #E0E8CF 绿黄），
     // 与晨读书馆琥珀暖纸主题冲突，agent_chat 重做不启用，待后续独立 commit 清理。
     // 容器色 · 深炭低饱和
     errorContainer: Color(0xFF4A1A14),

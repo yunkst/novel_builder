@@ -4,7 +4,7 @@
 ///
 /// **功能域**:
 /// - [core_service_providers.dart] - 核心基础服务 (Logger, Preferences)
-/// - [ai_service_providers.dart] - AI相关服务 (Dify, CharacterCard, etc.)
+/// - [ai_service_providers.dart] - AI相关服务 (LlmConfig, CharacterCard, etc.)
 /// - [network_service_providers.dart] - 网络相关服务 (Api, Preload, etc.)
 /// - [database_service_providers.dart] - 数据库相关服务 (Chapter, Search, etc.)
 /// - [cache_service_providers.dart] - 缓存相关服务 (RoleGallery, Avatar, etc.)

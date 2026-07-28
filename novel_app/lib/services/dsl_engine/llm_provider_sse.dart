@@ -103,7 +103,7 @@ class _ToolCallDelta {
 class SseParser {
   /// 解析单行 SSE `data:` 帧，提取 (contentChunk, reasoningChunk)。
   ///
-  /// 抽出来的共用骨架，供 [parseSseStreamWithReasoning]（Dify reasoning）
+  /// 抽出来的共用骨架，供 [parseSseStreamWithReasoning]（DeepSeek reasoning）
   /// 与 [parseStreamingResult]（OpenAI tool_calls）复用：
   /// - 跳过非 data 行、空 payload、[DONE] 哨兵
   /// - 解析失败只 warn 一次，不影响后续帧
@@ -126,7 +126,7 @@ class SseParser {
         final delta = first['delta'] as Map<String, dynamic>?;
         if (delta == null) continue;
 
-        // reasoning_content（Dify deepseek 扩展）
+        // reasoning_content（DeepSeek thinking 扩展）
         final rc = delta['reasoning_content'];
         if (rc is String && rc.isNotEmpty) {
           reasoning.add(rc);
@@ -150,7 +150,7 @@ class SseParser {
     return (content, reasoning);
   }
 
-  /// 解析带 reasoning_content 的 SSE 流（Dify deepseek thinking 格式）
+  /// 解析带 reasoning_content 的 SSE 流（DeepSeek thinking 格式）
   static SseParseResult parseSseStreamWithReasoning(String raw) {
     final (content, reasoning) = _parseDataPayload(raw);
     return SseParseResult(content: content, reasoning: reasoning);
