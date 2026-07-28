@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/native_crash_reporter.dart' show kGitHubRepo;
 import 'ai_settings_screen.dart';
 import 'prompt_tag_management_screen.dart';
 import 'agent_memory_management_screen.dart';
@@ -464,6 +466,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   setState(() {
                     _isPreviewChannel = true;
                   });
+                },
+              ),
+            ],
+          ),
+
+          // ── 支持项目组 ────────────────────────────────────────
+          _SettingsSection(
+            icon: Icons.star_outline,
+            title: '支持项目',
+            accentColor: appColors.warning,
+            subtitle: '去 GitHub 点 Star',
+            children: [
+              ListTile(
+                leading: Icon(Icons.star_outline, color: appColors.warning),
+                title: const Text('支持项目 · 去 GitHub 点 Star'),
+                subtitle: const Text('「随心阅读」是开源免费项目，欢迎点 Star 支持'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: () async {
+                  try {
+                    await launchUrl(Uri.parse(kGitHubRepo),
+                        mode: LaunchMode.externalApplication);
+                  } catch (_) {
+                    // 异常吞掉（无浏览器等）
+                  }
                 },
               ),
             ],
