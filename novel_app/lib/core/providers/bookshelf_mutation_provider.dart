@@ -26,9 +26,9 @@ part 'bookshelf_mutation_provider.g.dart';
 
 /// 书架写操作聚合 Notifier（无状态）。
 ///
-/// 8 个公共方法：addNovel / removeNovel / toggleBookshelf /
+/// 9 个公共方法：addNovel / removeNovel / toggleBookshelf /
 /// updateTitle / updateCoverMediaId / removeCoverMediaId /
-/// moveToBookshelf / createNovel。
+/// moveToBookshelf / copyToBookshelf / createNovel。
 @riverpod
 class BookshelfMutation extends _$BookshelfMutation {
   @override
@@ -80,6 +80,15 @@ class BookshelfMutation extends _$BookshelfMutation {
             fromBookshelfId,
             toBookshelfId,
           ));
+
+  /// 把小说复制到指定书架分类（不影响原书架归属）。
+  ///
+  /// 与 [moveToBookshelf] 的差别：复制只向 `novel_bookshelves` 关联表追加一行，
+  /// 不删除原书架的关联。复制成功后 invalidate `bookshelfNovelsProvider`——
+  /// 若用户当前停留在目标书架，列表会立即显示这本小说；若停留在原书架，
+  /// 小说仍在原列表（复制不影响原书架行），invalidate 只是无副作用的重新查询。
+  Future<void> copyToBookshelf(String novelUrl, int toBookshelfId) =>
+      _wrap(() => _associationWriter.addNovelToBookshelf(novelUrl, toBookshelfId));
 
   /// 创建新小说（不依赖浏览器 URL，由 Agent 工具或独立入口调用）。
   ///
