@@ -15,11 +15,12 @@ import '../../widgets/onboarding/ai_capabilities_section.dart';
 ///
 /// 全屏分步向导，引导新用户认识核心能力并完成 AI 配置：
 /// 1. 欢迎页（APP 定位）
-/// 2. 后端服务（**可选**，用于多站点搜索/缓存）
-/// 3. 🌟 配置 AI 引擎（关键步骤：填一个 LLM 地址 + Key 即可解锁大部分 AI 能力）
-/// 4. 找书方式介绍（浏览器浏览 → 添加小说）
-/// 5. 阅读增强亮点（AI 特写 / 插图 / 改写）
-/// 6. 完成
+/// 2. 🌟 配置 AI 引擎（关键步骤：填一个 LLM 地址 + Key 即可解锁大部分 AI 能力）
+/// 3. 找书方式介绍（浏览器浏览 → 添加小说）
+/// 4. 阅读增强亮点（AI 特写 / 插图 / 改写），含一行进阶功能提示
+/// 5. 完成
+///
+/// 「进阶功能」入口在后续设置页 → 「进阶服务」→ 「后端服务配置」（本引导不再单设一步）。
 ///
 /// 触发时机：首次安装后未标记 `onboarding_completed` 时，由 main.dart 路由到此页面。
 /// 完成或跳过后调用 [OnboardingNotifier.completeOnboarding]，状态变更会触发
@@ -39,15 +40,12 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   /// 向导步骤总数
-  static const int _stepCount = 6;
+  static const int _stepCount = 5;
 
   /// 各步骤索引（与 PageView 顺序一致）
-  static const int _indexBackend = 1;
-  static const int _indexAi = 2;
+  static const int _indexAi = 1;
 
   final PageController _pageController = PageController();
-  final TextEditingController _backendHostController = TextEditingController();
-  final TextEditingController _backendTokenController = TextEditingController();
   final TextEditingController _aiApiUrlController =
       TextEditingController(text: 'https://api.deepseek.com');
   final TextEditingController _aiApiKeyController = TextEditingController();
@@ -60,8 +58,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   void dispose() {
     _pageController.dispose();
-    _backendHostController.dispose();
-    _backendTokenController.dispose();
     _aiApiUrlController.dispose();
     _aiApiKeyController.dispose();
     _aiModelController.dispose();
@@ -96,50 +92,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ref
         .read(homeTabIndexNotifierProvider.notifier)
         .switchTo(HomeTabIndex.settings);
-  }
-
-  /// 保存后端配置并前进（后端为可选，留空直接前进）
-  Future<void> _saveBackendAndContinue() async {
-    final host = _backendHostController.text.trim();
-
-    if (host.isEmpty) {
-      _goToNextPage();
-      return;
-    }
-
-    if (!host.startsWith('http://') && !host.startsWith('https://')) {
-      ToastUtils.showWarning('地址应以 http:// 或 https:// 开头',
-          context: context);
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      final token = _backendTokenController.text.trim();
-      final apiService = ref.read(apiServiceWrapperProvider);
-      await apiService.setConfig(host: host, token: token);
-      LoggerService.instance.i(
-        '新手引导：已保存后端配置 host=$host',
-        category: LogCategory.network,
-        tags: ['onboarding', 'backend', 'config'],
-      );
-      if (mounted) {
-        ToastUtils.showSuccess('后端配置已保存', context: context);
-        _goToNextPage();
-      }
-    } catch (e, stackTrace) {
-      LoggerService.instance.e(
-        '新手引导：保存后端配置失败: $e',
-        stackTrace: stackTrace.toString(),
-        category: LogCategory.network,
-        tags: ['onboarding', 'backend', 'config', 'error'],
-      );
-      if (mounted) {
-        ToastUtils.showError('保存失败: $e', context: context);
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
   }
 
   /// 保存 AI 引擎配置并前进
@@ -254,11 +206,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     description: '聚合多个小说站点资源，离线缓存随时阅读，'
                         '更有 AI 阅读增强让阅读体验更沉浸。',
                   ),
-                  // 1 - 后端服务（可选）
-                  _buildBackendConfigPage(context),
-                  // 2 - AI 引擎（关键）
+                  // 1 - AI 引擎（关键）
                   _buildAiConfigPage(context),
-                  // 3 - 找书
+                  // 2 - 找书
                   _buildInfoPage(
                     icon: Icons.travel_explore,
                     iconColor: colorScheme.tertiary,
@@ -271,7 +221,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       '加入后离线缓存章节，随时畅读',
                     ],
                   ),
-                  // 4 - 阅读增强亮点
+                  // 3 - 阅读增强亮点（底部含进阶功能入口提示）
                   _buildInfoPage(
                     icon: Icons.auto_awesome,
                     iconColor: context.appColors.agentAccent,
@@ -285,7 +235,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       '角色对话：和书中角色直接聊天',
                     ],
                   ),
-                  // 5 - 完成
+                  const _AdvancedHintBanner(),
+                  // 4 - 完成
                   _buildInfoPage(
                     icon: Icons.rocket_launch,
                     iconColor: colorScheme.primary,
@@ -391,96 +342,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               text,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建后端服务配置页（可选）
-  Widget _buildBackendConfigPage(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: colorScheme.outline.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.cloud_outlined,
-                  size: 50, color: colorScheme.outline),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 「可选」标签
-          Center(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: colorScheme.outline.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '可选',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '后端服务',
-              style: AppTypography.onboardingTitle.copyWith(
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '后端用于多站点搜索和章节缓存加速。如果你已经有自建/共享的后端，'
-            '可在此填入；没有也完全不影响使用 AI 功能。',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _backendHostController,
-            decoration: const InputDecoration(
-              labelText: '后端地址（可留空）',
-              hintText: 'http://your-server:3800',
-              prefixIcon: Icon(Icons.link),
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _backendTokenController,
-            decoration: const InputDecoration(
-              labelText: 'API Token（可选）',
-              hintText: '留空表示不使用 Token',
-              prefixIcon: Icon(Icons.key_outlined),
-              border: OutlineInputBorder(),
-            ),
-            autocorrect: false,
           ),
         ],
       ),
@@ -599,7 +460,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget _buildBottomBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isLastPage = _currentPage == _stepCount - 1;
-    final isBackendPage = _currentPage == _indexBackend;
     final isAiPage = _currentPage == _indexAi;
 
     // 主按钮文案与行为
@@ -607,8 +467,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (isLastPage) {
       primaryLabel = widget.isReviewMode ? '完成' : '开始使用';
     } else if (isAiPage) {
-      primaryLabel = '保存并继续';
-    } else if (isBackendPage) {
       primaryLabel = '保存并继续';
     } else {
       primaryLabel = '下一步';
@@ -650,8 +508,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         _finishOnboarding();
                       } else if (isAiPage) {
                         _saveAiAndContinue();
-                      } else if (isBackendPage) {
-                        _saveBackendAndContinue();
                       } else {
                         _goToNextPage();
                       }
@@ -668,32 +524,54 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   : Text(primaryLabel),
             ),
           ),
-          // 配置页提供"稍后配置"
-          if (isBackendPage || isAiPage) ...[
+          // AI 配置页提供"稍后配置 / 去设置页详细配置"
+          if (isAiPage) ...[
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton(
                   onPressed: _isSaving ? null : _goToNextPage,
-                  child: Text(
-                    isAiPage ? '稍后配置' : '跳过此步',
-                  ),
+                  child: const Text('稍后配置'),
                 ),
-                if (isAiPage) ...[
-                  Text(
-                    '·',
-                    style: TextStyle(color: colorScheme.outline),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving ? null : _goToSettings,
-                    child: const Text('去设置页详细配置'),
-                  ),
-                ],
+                Text(
+                  '·',
+                  style: TextStyle(color: colorScheme.outline),
+                ),
+                TextButton(
+                  onPressed: _isSaving ? null : _goToSettings,
+                  child: const Text('去设置页详细配置'),
+                ),
               ],
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 「阅读增强亮点」页底部的轻提示：一行引导新手知道还有进阶功能入口
+///
+/// 居中、次级色、不喧宾夺主；路径「设置 → 进阶服务 → 后端服务配置」
+/// 与 Task 2 设置页的分组标题、Tile 标题字字对应。
+class _AdvancedHintBanner extends StatelessWidget {
+  const _AdvancedHintBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
+      child: Text(
+        '还有 AI 出图、数据备份等进阶功能，'
+        '可在「设置 → 进阶服务」中按需开启。',
+        style: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+          height: 1.5,
+        ),
+        textAlign: TextAlign.center,
       ),
     );
   }
