@@ -277,8 +277,9 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
       _getScriptLogsTool,
       patchMemoryToolDefinition,
     ];
-    // 网络请求观察仅 Android 支持（iOS 无 shouldInterceptRequest）
-    if (Platform.isAndroid) {
+    // 网络请求观察仅 Headless + Android 支持
+    // （Headless 模式才挂 shouldInterceptRequest 回调；iOS 无 shouldInterceptRequest）
+    if (_isHeadless && Platform.isAndroid) {
       base.add(_listNetworkRequestsTool);
     }
     return base;

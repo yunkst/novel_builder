@@ -141,7 +141,7 @@ class NetworkRequestRecord {
 
 ### 5.3 query_params 解析
 
-`Uri.parse(url).queryParameters` 直接拿到 `{key: value}` map。多值 key 取首个。
+`Uri.parse(url).queryParameters` 直接拿到 `{key: value}` map。多值 key 取末个（`Uri.queryParameters` 标准行为）。
 
 ## 6. 工具：`list_network_requests`
 
