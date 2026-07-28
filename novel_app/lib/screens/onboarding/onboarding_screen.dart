@@ -222,20 +222,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ],
                   ),
                   // 3 - 阅读增强亮点（底部含进阶功能入口提示）
-                  _buildInfoPage(
-                    icon: Icons.auto_awesome,
-                    iconColor: context.appColors.agentAccent,
-                    title: 'AI 让阅读更有趣',
-                    description: '配置好 AI 引擎后，阅读时即可调用这些能力，'
-                        '为文字补充画面感，或改写不满意的段落。',
-                    bullets: const [
-                      'AI 特写：为情节生成沉浸式扩写',
-                      '场景插图：用文字生成配图',
-                      '段落改写：一键优化文笔',
-                      '角色对话：和书中角色直接聊天',
-                    ],
-                  ),
-                  const _AdvancedHintBanner(),
+                  _buildHighlightPageWithHint(context),
                   // 4 - 完成
                   _buildInfoPage(
                     icon: Icons.rocket_launch,
@@ -326,6 +313,38 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// 构建「阅读增强亮点」整页：顶部信息页 + 底部 _AdvancedHintBanner
+  ///
+  /// 把 hint 作为页内元素（不是独立的 PageView child），保持
+  /// `PageView.children.length == _stepCount`（5 == 5）。
+  /// `_buildInfoPage` 已自带 horizontal: 32 padding，hint 自带 32 padding，
+  /// 所以这里只需 Column 垂直堆叠 + SizedBox 间距。
+  Widget _buildHighlightPageWithHint(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: _buildInfoPage(
+            icon: Icons.auto_awesome,
+            iconColor: context.appColors.agentAccent,
+            title: 'AI 让阅读更有趣',
+            description: '配置好 AI 引擎后，阅读时即可调用这些能力，'
+                '为文字补充画面感，或改写不满意的段落。',
+            bullets: const [
+              'AI 特写：为情节生成沉浸式扩写',
+              '场景插图：用文字生成配图',
+              '段落改写：一键优化文笔',
+              '角色对话：和书中角色直接聊天',
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        const _AdvancedHintBanner(),
+      ],
     );
   }
 
