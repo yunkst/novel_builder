@@ -48,4 +48,62 @@ void main() {
     expect(installTime, yesterday);
     expect(count, 4);
   });
+
+  group('shouldShow 四门槛判定', () {
+    /// 辅助：构造「四门槛全满足」的初始 prefs（now=基准时间，count=7，install=4天前，无 dismiss，无 next_show）
+    Future<void> setupAllMet() async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      SharedPreferences.setMockInitialValues({
+        'star_prompt_install_time': now - 4 * 86400000,
+        'star_prompt_launch_count': 7,
+        'star_prompt_dismissed': false,
+        'star_prompt_next_show_time': 0,
+      });
+    }
+
+    test('门槛 1: launch_count < 7 → false', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      SharedPreferences.setMockInitialValues({
+        'star_prompt_install_time': now - 4 * 86400000,
+        'star_prompt_launch_count': 6,
+      });
+
+      expect(await StarPromptService.instance.shouldShow(), isFalse);
+    });
+
+    test('门槛 2: install_time 距今 < 3 天 → false', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      SharedPreferences.setMockInitialValues({
+        'star_prompt_install_time': now - 2 * 86400000,
+        'star_prompt_launch_count': 7,
+      });
+
+      expect(await StarPromptService.instance.shouldShow(), isFalse);
+    });
+
+    test('门槛 3: dismissed = true → false（永久关闭）', () async {
+      await setupAllMet();
+      await PreferencesService.instance.setBool('star_prompt_dismissed', true);
+
+      expect(await StarPromptService.instance.shouldShow(), isFalse);
+    });
+
+    test('门槛 4: now < next_show_time → false（关闭冷却期内）', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      SharedPreferences.setMockInitialValues({
+        'star_prompt_install_time': now - 4 * 86400000,
+        'star_prompt_launch_count': 7,
+        'star_prompt_dismissed': false,
+        'star_prompt_next_show_time': now + 5 * 86400000, // 5 天后
+      });
+
+      expect(await StarPromptService.instance.shouldShow(), isFalse);
+    });
+
+    test('四门槛全满足 → true', () async {
+      await setupAllMet();
+
+      expect(await StarPromptService.instance.shouldShow(), isTrue);
+    });
+  });
 }

@@ -52,4 +52,37 @@ class StarPromptService {
     final current = await PreferencesService.instance.getInt(_kLaunchCount);
     await PreferencesService.instance.setInt(_kLaunchCount, current + 1);
   }
+
+  /// 是否应该弹窗（四门槛全满足）。
+  ///
+  /// 1. dismissed != true
+  /// 2. launch_count >= 7
+  /// 3. now - install_time >= 3 天
+  /// 4. now >= next_show_time
+  Future<bool> shouldShow() async {
+    try {
+      final dismissed =
+          await PreferencesService.instance.getBool(_kDismissed);
+      if (dismissed) return false;
+
+      final count = await PreferencesService.instance.getInt(_kLaunchCount);
+      if (count < _launchThreshold) return false;
+
+      final installTime =
+          await PreferencesService.instance.getInt(_kInstallTime);
+      if (installTime == 0) return false;
+      final daysSinceInstall =
+          (DateTime.now().millisecondsSinceEpoch - installTime) ~/ _msPerDay;
+      if (daysSinceInstall < _installDaysThreshold) return false;
+
+      final nextShowTime =
+          await PreferencesService.instance.getInt(_kNextShowTime);
+      if (DateTime.now().millisecondsSinceEpoch < nextShowTime) return false;
+
+      return true;
+    } catch (_) {
+      // 任何异常默认不弹，绝不阻塞启动。
+      return false;
+    }
+  }
 }
