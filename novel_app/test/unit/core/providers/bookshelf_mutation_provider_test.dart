@@ -1,9 +1,9 @@
-/// BookshelfMutationNotifier 单元测试（Task 3）
+/// BookshelfMutationNotifier 单元测试（Task 3 + Task 1）
 ///
 /// 收口所有书架表写路径的 Notifier 测试：
-/// - 8 个公共方法（addNovel / removeNovel / toggleBookshelf /
+/// - 10 个公共方法（addNovel / removeNovel / toggleBookshelf /
 ///   updateTitle / updateCoverMediaId / removeCoverMediaId /
-///   moveToBookshelf / createNovel）
+///   updateReadProgress / moveToBookshelf / copyToBookshelf / createNovel）
 /// - 每次成功 → 对应 writer 方法被调一次 + `bookshelfNovelsProvider` 被 invalidate
 /// - writer 抛异常 → 异常向上抛 + **不** invalidate（避免半真半假 UI）
 /// - toggleBookshelf 双分支：isInBookshelf=true → remove / false → add
@@ -36,6 +36,7 @@ class _FakeBookshelfWriter implements IBookshelfWriter {
   int removeFromBookshelfCalls = 0;
   int updateTitleCalls = 0;
   int updateCoverMediaIdByUrlCalls = 0;
+  int updateLastReadChapterCalls = 0;
   int moveToBookshelfCalls = 0;
   int createNovelCalls = 0;
   int nextInsertId = 1;
@@ -44,10 +45,12 @@ class _FakeBookshelfWriter implements IBookshelfWriter {
   String? lastRemovedUrl;
   ({String url, String title})? lastTitleUpdate;
   ({String url, String? mediaId})? lastCoverUpdate;
+  ({String url, int chapterIndex})? lastProgressUpdate;
   Novel? createdNovel;
 
   // 可选:让测试塞入一次性的抛异常
   Object? throwOnce;
+  Object? progressThrowOnce;
 
   @override
   Future<int> addToBookshelf(Novel novel) async {
@@ -94,6 +97,18 @@ class _FakeBookshelfWriter implements IBookshelfWriter {
     }
     updateCoverMediaIdByUrlCalls++;
     lastCoverUpdate = (url: novelUrl, mediaId: mediaId);
+    return 1;
+  }
+
+  @override
+  Future<int> updateLastReadChapter(String novelUrl, int chapterIndex) async {
+    if (progressThrowOnce != null) {
+      final e = progressThrowOnce!;
+      progressThrowOnce = null;
+      throw e;
+    }
+    updateLastReadChapterCalls++;
+    lastProgressUpdate = (url: novelUrl, chapterIndex: chapterIndex);
     return 1;
   }
 
@@ -430,6 +445,45 @@ void main() {
       expect(fakeWriter.lastCoverUpdate?.url, 'u1');
       expect(fakeWriter.lastCoverUpdate?.mediaId, isNull);
       expect(novelsReloadCount, greaterThan(before));
+    });
+  });
+
+  // ============================================================
+  // updateReadProgress —— Task 1 新增
+  // 修"阅读完返回书架看不到进度更新" bug 的核心收口点。
+  // ============================================================
+  group('updateReadProgress', () {
+    test('调 writer.updateLastReadChapter + invalidate', () async {
+      final before = novelsReloadCount;
+
+      await container
+          .read(bookshelfMutationProvider.notifier)
+          .updateReadProgress('u1', 5);
+
+      await container.read(bookshelfNovelsProvider.future);
+
+      expect(fakeWriter.updateLastReadChapterCalls, 1);
+      expect(fakeWriter.lastProgressUpdate?.url, 'u1');
+      expect(fakeWriter.lastProgressUpdate?.chapterIndex, 5);
+      expect(novelsReloadCount, greaterThan(before),
+          reason: 'updateReadProgress 成功后书架列表应 invalidate,'
+              ' 修复"返回书架看不到进度"bug');
+    });
+
+    test('writer 抛异常 → 上抛 + 不 invalidate', () async {
+      fakeWriter.progressThrowOnce = StateError('db error');
+
+      final before = novelsReloadCount;
+
+      await expectLater(
+        container
+            .read(bookshelfMutationProvider.notifier)
+            .updateReadProgress('u1', 5),
+        throwsA(isA<StateError>()),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(novelsReloadCount, equals(before),
+          reason: '失败路径必须不 invalidate，避免半真半假 UI');
     });
   });
 
