@@ -7,6 +7,9 @@ void main() {
     expect(AgentIcons.book, isNotNull);
     expect(AgentIcons.clock, isNotNull);
     expect(AgentIcons.dots, isNotNull);
+    expect(AgentIcons.fullscreen, isNotNull);
+    expect(AgentIcons.fullscreenExit, isNotNull);
+    expect(AgentIcons.stop, isNotNull);
     expect(AgentIcons.close, isNotNull);
     expect(AgentIcons.send, isNotNull);
     expect(AgentIcons.plus, isNotNull);
@@ -15,6 +18,5 @@ void main() {
     expect(AgentIcons.arrow, isNotNull);
     expect(AgentIcons.link, isNotNull);
     expect(AgentIcons.wand, isNotNull);
-    expect(AgentIcons.history, isNotNull);
   });
 }
