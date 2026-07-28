@@ -6,13 +6,13 @@ part of 'bookshelf_mutation_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$bookshelfMutationHash() => r'ad4472f7d6f3b95544911ab8786d2037a1e0e76b';
+String _$bookshelfMutationHash() => r'54cd3215338015958a90b51ce8d51be848ee08eb';
 
 /// 书架写操作聚合 Notifier（无状态）。
 ///
-/// 8 个公共方法：addNovel / removeNovel / toggleBookshelf /
+/// 10 个公共方法：addNovel / removeNovel / toggleBookshelf /
 /// updateTitle / updateCoverMediaId / removeCoverMediaId /
-/// moveToBookshelf / createNovel。
+/// updateReadProgress / moveToBookshelf / copyToBookshelf / createNovel。
 ///
 /// Copied from [BookshelfMutation].
 @ProviderFor(BookshelfMutation)

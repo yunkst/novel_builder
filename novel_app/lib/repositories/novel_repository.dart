@@ -9,11 +9,17 @@ import 'base_repository.dart';
 /// 仅 [BookshelfMutationNotifier] 通过 `bookshelfWriterProvider` 持有此类型引用。
 /// 设计意图：写方法从 [INovelRepository] 移除后，普通调用方拿不到这些方法，
 /// 编译期阻止"直接写库忘 invalidate"。
+///
+/// 注意：`updateLastReadChapter` 同时存在于 [INovelRepository]（只读侧 controller
+/// 仍在用，待 Task 2 迁移到 Notifier 后可收敛）。本接口保留此方法让
+/// [BookshelfMutationNotifier.updateReadProgress] 走与其他写方法相同的
+/// `_writer` 收口路径。
 abstract interface class IBookshelfWriter {
   Future<int> addToBookshelf(Novel novel);
   Future<int> removeFromBookshelf(String novelUrl);
   Future<int> updateTitle(String novelUrl, String newTitle);
   Future<int> updateCoverMediaIdByUrl(String novelUrl, String? mediaId);
+  Future<int> updateLastReadChapter(String novelUrl, int chapterIndex);
   Future<Novel> createNovel({
     required String title,
     required String author,

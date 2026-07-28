@@ -26,9 +26,9 @@ part 'bookshelf_mutation_provider.g.dart';
 
 /// 书架写操作聚合 Notifier（无状态）。
 ///
-/// 9 个公共方法：addNovel / removeNovel / toggleBookshelf /
+/// 10 个公共方法：addNovel / removeNovel / toggleBookshelf /
 /// updateTitle / updateCoverMediaId / removeCoverMediaId /
-/// moveToBookshelf / copyToBookshelf / createNovel。
+/// updateReadProgress / moveToBookshelf / copyToBookshelf / createNovel。
 @riverpod
 class BookshelfMutation extends _$BookshelfMutation {
   @override
@@ -71,6 +71,18 @@ class BookshelfMutation extends _$BookshelfMutation {
   /// 清空小说封面媒体 ID（回到程序化占位）。
   Future<void> removeCoverMediaId(String novelUrl) =>
       _wrap(() => _writer.updateCoverMediaIdByUrl(novelUrl, null));
+
+  /// 更新阅读进度（最近阅读章节索引）。
+  ///
+  /// 内部走 `_writer.updateLastReadChapter`，与其他写方法一样经 [_wrap]：
+  /// 成功 → invalidate `bookshelfNovelsProvider`，书架页"最近阅读"立即刷新；
+  /// 失败 → 异常上抛，**不** invalidate（避免半真半假 UI）。
+  ///
+  /// 这是修复"阅读完返回书架看不到进度更新"bug 的核心收口点：之前
+  /// [ReaderContentController] 直接调 `INovelRepository.updateLastReadChapter`
+  /// 绕过 Notifier，写库成功但书架列表 Provider 无从得知，导致 UI 不刷新。
+  Future<void> updateReadProgress(String novelUrl, int chapterIndex) =>
+      _wrap(() => _writer.updateLastReadChapter(novelUrl, chapterIndex));
 
   /// 把小说从一个书架分类移动到另一个。
   Future<void> moveToBookshelf(
