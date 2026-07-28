@@ -94,7 +94,42 @@
 
 </details>
 
-<!-- ===== Task 5-6 段落占位 ===== -->
+## 🧩 还能做这些
+
+除了读/改/写三大核心，还有些顺手就能用的能力：
+
+| 能力 | 说明 |
+|---|---|
+| 👥 **角色卡 & 关系图** | 手动建/AI 帮你建角色卡（姓名/外貌/性格/背景），人物关系用力导向图可视化 |
+| 🎨 **场景配图 & 动态图** | 按段落描述生成插图，或把静态图变成动态视频（需后端 ComfyUI） |
+| 💬 **让 AI 扮演角色** | 在 Agent Chat 里说"扮演 XX 角色跟我聊"，AI 按角色设定和你对话 |
+| 📔 **多书架分类** | 「我的收藏」「玄幻」「待看」随便分，一本书可属于多个书架 |
+| 🌗 **阅读风主题** | 护眼纸张色 + 衬线字体，长时间看也不累；亮/暗/跟随系统三档 |
+| 📤 **本地备份导出** | 书架、进度、章节、角色全在本地 SQLite，随时导出备份带走 |
+
+<details>
+<summary>🔧 技术细节</summary>
+
+- 角色卡：`characters` 表 v35（`first_appearance_chapter`）+ `character_list/detail/edit_screen.dart`；AI 创建角色走 `create_character` / `update_character` 工具（`agent_tools.dart:481-537`）
+- 关系图：`character_relationships` 表（v35 区间模型）+ `relationship_graph_screen.dart` + `flutter_force_directed_graph`
+- 场景配图 & 动态图：`create_images`（文生图）+ `create_image_to_video`（图生视频，依赖后端 ComfyUI）+ `media_proxy.dart` 媒体代理 + `media_cache_screen.dart`
+- AI 扮演角色：Agent Chat 调用 + 角色设定 prompt（由用户在角色卡里编辑）注入
+- 多书架：`bookshelves` / `novel_bookshelves` 多对多表（v16）
+- 主题：阅读风令牌 paper/ink/赭石/金，`app_colors.dart`
+- 备份：`backup_service.dart` 导出本地 SQLite → 后端 `/api/backup/*`（4 端点）
+
+</details>
+
+## 🎬 正在录制介绍视频
+
+第一次见这个 APP 长什么样？看视频比看文档更快。
+
+📺 **B 站长视频正在录制中**，预计月底上线。  
+想第一时间收到提醒？给项目点个 ⭐ 或 Watch 这个仓库就行。
+
+> 录好后这里会替换成视频封面 + 链接。
+
+<!-- ===== Task 6 占位 ===== -->
 
 ---
 
