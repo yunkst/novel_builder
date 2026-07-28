@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +22,7 @@ import 'package:novel_app/services/ocr_restore_service.dart';
 
 import '../agent_scenario.dart';
 import '../tool_arg_parser.dart';
+import 'network_request_recorder.dart';
 import 'run_store.dart';
 import 'webview_js_executor.dart';
 
@@ -71,6 +73,18 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   /// 本次会话是否已成功保存脚本（save_script 成功时置 true）
   bool _scriptSavedThisSession = false;
 
+  /// 当前场景的网络请求观察器。
+  ///
+  /// 仅 Android Headless 模式下由工厂绑定到 HeadlessWebViewPool；
+  /// 工具 list_network_requests 从此读取本页面的 AJAX 请求历史。
+  final NetworkRequestRecorder _networkRecorder = NetworkRequestRecorder();
+
+  /// 供 AgentScenarioFactory 在 Headless 模式下绑定到 pool（回调委托到此）。
+  NetworkRequestRecorder get networkRecorder => _networkRecorder;
+
+  /// 释放网络请求观察器（由 AgentScenarioFactory 在 cleanup 时调用）。
+  void disposeNetworkRecorder() => _networkRecorder.dispose();
+
   /// 普通 WebView 模式构造函数（向后兼容）
   WebViewExtractScenario(this._ref, this._webviewController, this._currentUrl)
     : _isHeadless = false;
@@ -106,6 +120,7 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     buf.writeln();
 
     buf.writeln('## 工作流程');
+    buf.writeln('0. (可选) list_network_requests → 看当前页面发了哪些 AJAX 请求（URL/参数/请求头），用于推断章节接口模式，辅助编写提取脚本。注意：响应体与 POST body 不采集。');
     buf.writeln('1. get_page_info → 获取 DOM 结构和页面类型');
     buf.writeln('2. get_cached_script → 看 present/missing 列表：已有项 execute_js(run_id=...) 重跑验证，缺失项只补缺失的那一种（save_script(script_type=...)），无缓存则新生成');
     buf.writeln('3. 阶段一：目录页 execute_js 测试 chapter_list 脚本 → 成功立刻 save_script 落库');
@@ -249,18 +264,26 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
   }
 
   @override
-  List<Map<String, dynamic>> get tools => [
-        _getPageInfoTool,
-        _executeJsTool,
-        _navigateToTool,
-        _getCurrentUrlTool,
-        _getCachedScriptTool,
-        _saveScriptTool,
-        _listCachedScriptsTool,
-        _inspectScriptTool,
-        _getScriptLogsTool,
-        patchMemoryToolDefinition,
-      ];
+  List<Map<String, dynamic>> get tools {
+    final base = <Map<String, dynamic>>[
+      _getPageInfoTool,
+      _executeJsTool,
+      _navigateToTool,
+      _getCurrentUrlTool,
+      _getCachedScriptTool,
+      _saveScriptTool,
+      _listCachedScriptsTool,
+      _inspectScriptTool,
+      _getScriptLogsTool,
+      patchMemoryToolDefinition,
+    ];
+    // 网络请求观察仅 Headless + Android 支持
+    // （Headless 模式才挂 shouldInterceptRequest 回调；iOS 无 shouldInterceptRequest）
+    if (_isHeadless && Platform.isAndroid) {
+      base.add(_listNetworkRequestsTool);
+    }
+    return base;
+  }
 
   /// 记忆缓存（由 AgentMemoryPatchMixin 提供，本类复用 mixin 的实现）
   @override
@@ -332,6 +355,8 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           result = await _inspectScript(args);
         case 'get_script_logs':
           result = await _getScriptLogs(args);
+        case 'list_network_requests':
+          result = await _listNetworkRequests(args);
         default:
           result = jsonEncode({
             'error': 'unknown_tool',
@@ -1885,6 +1910,31 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
     });
   }
 
+  /// 列出当前 WebView 捕获的 AJAX 请求（URL / 参数 / 请求头）。
+  ///
+  /// 用于分析网页接口模式、辅助编写章节提取脚本。
+  /// 不采集响应体；POST body 因平台限制也不采集。
+  /// 页面跳转后历史自动清空。
+  Future<String> _listNetworkRequests(Map<String, dynamic> args) async {
+    final parser = ToolArgParser(args);
+    final (urlContains, urlErr) = parser.optionalString('url_contains');
+    if (urlErr != null) return urlErr;
+    final (method, methodErr) = parser.optionalString('method');
+    if (methodErr != null) return methodErr;
+    final (sinceIndex, sinceErr) = parser.optionalInt('since_index');
+    if (sinceErr != null) return sinceErr;
+    final (limit, limitErr) = parser.optionalInt('limit');
+    if (limitErr != null) return limitErr;
+
+    final snap = _networkRecorder.snapshot(
+      urlContains: urlContains,
+      method: method,
+      sinceIndex: sinceIndex,
+      limit: limit ?? 50,
+    );
+    return jsonEncode(snap);
+  }
+
   /// 查询指定域名的提取脚本在实际使用中的运行日志
   ///
   /// AI 在对话中用 execute_js 测试脚本时，脚本能跑通不代表真实使用也能成功。
@@ -2219,6 +2269,41 @@ class WebViewExtractScenario with AgentScenarioCleanupMixin, AgentMemoryPatchMix
           },
         },
         'required': ['run_id'],
+      },
+    },
+  };
+
+  static const _listNetworkRequestsTool = {
+    'type': 'function',
+    'function': {
+      'name': 'list_network_requests',
+      'description':
+          '列出当前页面自加载以来捕获的 AJAX 请求（XHR/fetch），'
+          '用于分析网页接口模式、辅助编写章节提取脚本。'
+          '返回每条请求的 URL / method / 请求参数（query_params）/ 请求头。'
+          '⚠️ 响应体与 POST body 均不采集：若需看返回内容，用 execute_js 读 DOM 或重发请求。'
+          '页面跳转后历史自动清空。',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'url_contains': {
+            'type': 'string',
+            'description': 'URL 子串过滤（大小写敏感）。如 "chapter"、"/api/"。',
+          },
+          'method': {
+            'type': 'string',
+            'description': 'HTTP method 过滤（GET/POST，大小写不敏感）。',
+          },
+          'since_index': {
+            'type': 'integer',
+            'description': '只返回 index 大于此值的记录（用于翻页/查增量）。',
+          },
+          'limit': {
+            'type': 'integer',
+            'description': '最多返回条数，默认 50，上限 100。',
+          },
+        },
+        'required': <String>[],
       },
     },
   };

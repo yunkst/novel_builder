@@ -367,13 +367,13 @@ Expected: PASS。
     expect((headers['cookie'] as String).endsWith('...'), isTrue);
   });
 
-  test('query_params 多值取首个', () {
+  test('query_params 多值取末个', () {
     final r = NetworkRequestRecorder();
     r.add(method: 'GET', url: 'https://x.com/?a=1&a=2', headers: const {});
     final snap = r.snapshot(limit: 100);
     final qp = (((snap['requests'] as List).single
         as Map<String, dynamic>)['query_params']) as Map;
-    expect(qp['a'], '1');  // Uri.queryParameters 多值取首个
+    expect(qp['a'], '2');  // Uri.queryParameters 多值取末个（标准行为）
   });
 
   test('clear 清空记录 + 重置 index', () {
