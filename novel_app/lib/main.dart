@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'screens/bookshelf_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/webview_browser_screen.dart';
@@ -16,9 +17,11 @@ import 'utils/toast_utils.dart';
 import 'services/logger_service.dart';
 import 'services/llm_logger/llm_logger.dart';
 import 'services/log_reporter_service.dart';
-import 'services/native_crash_reporter.dart';
+import 'services/native_crash_reporter.dart' show kGitHubRepo, NativeCrashReporter;
 import 'services/novel_agent/agent_scenario.dart';
+import 'services/star_prompt_service.dart';
 import 'widgets/agent_chat/agent_floating_button.dart';
+import 'widgets/star_prompt_dialog.dart';
 
 /// 最近记录的全局异常签名（前 200 字符 hash），用于去重。
 /// 同一异常在多层捕获中只记录第一条。
@@ -309,11 +312,35 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       category: LogCategory.ui,
       tags: ['lifecycle', 'init'],
     );
-    // 检测上次 native crash：post-frame 后弹框（需要 BuildContext）。
-    // 只弹一次（_HomePageState 在 app 生命周期内只 initState 一次）。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // post-frame 后检查（crash 优先，star 其后；互不干扰）。
+    // 只检查一次（_HomePageState 在 app 生命周期内只 initState 一次）。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      NativeCrashReporter.checkAndReport(context);
+
+      // 1. 上次 native crash 报告
+      await NativeCrashReporter.checkAndReport(context);
+      if (!mounted) return;
+
+      // 2. GitHub star 引导
+      try {
+        await StarPromptService.instance.recordLaunch();
+        if (!mounted) return;
+        final shouldShow = await StarPromptService.instance.shouldShow();
+        if (!shouldShow || !mounted) return;
+        final goStar = await showDialog<bool>(
+          context: context,
+          builder: (_) => const StarPromptDialog(),
+        );
+        if (goStar == true) {
+          await StarPromptService.instance.onStarClicked();
+          await launchUrl(Uri.parse(kGitHubRepo),
+              mode: LaunchMode.externalApplication);
+        } else {
+          await StarPromptService.instance.onDismissed();
+        }
+      } catch (_) {
+        // 任何异常吞掉，绝不阻塞启动。
+      }
     });
   }
 
