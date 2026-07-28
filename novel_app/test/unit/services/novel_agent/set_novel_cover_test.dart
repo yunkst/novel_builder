@@ -7,6 +7,7 @@ import 'package:sqflite_common/sqflite.dart';
 
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart';
+import 'package:novel_app/core/providers/bookshelf_mutation_provider.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/models/novel.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
@@ -36,9 +37,11 @@ void main() {
     ]);
     executor = container.read(toolExecutorProvider);
     novelRepo = container.read(novelRepositoryProvider);
-    novelId = await novelRepo.addToBookshelf(
-      Novel(title: '封面测试书', author: '作者', url: 'custom://cover-test'),
-    );
+    novelId = await container
+        .read(bookshelfMutationProvider.notifier)
+        .addNovel(
+          Novel(title: '封面测试书', author: '作者', url: 'custom://cover-test'),
+        );
   });
 
   tearDown(() async {

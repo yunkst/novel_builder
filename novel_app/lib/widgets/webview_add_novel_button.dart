@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/agent_launcher_providers.dart';
+import '../core/providers/bookshelf_mutation_provider.dart';
 import '../core/providers/webview_add_novel_providers.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/providers/database_providers.dart';
@@ -248,7 +249,9 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       final finalTitle = (previewResult['title'] as String?) ?? extractedTitle;
 
       // 8. 写入数据库
-      await novelRepo.addToBookshelf(Novel(
+      // 走 Notifier 收口：写库 + invalidate(bookshelfNovelsProvider)，
+      // 浏览器添加小说后书架 UI 立即刷新（修这一类"写了但没刷干净"的根因）。
+      await ref.read(bookshelfMutationProvider.notifier).addNovel(Novel(
         title: finalTitle,
         author: '',
         url: currentUrl,

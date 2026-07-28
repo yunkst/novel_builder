@@ -37,7 +37,10 @@ class BookshelfMutation extends _$BookshelfMutation {
   }
 
   /// 把小说加入书架。
-  Future<void> addNovel(Novel novel) =>
+  ///
+  /// 透传 [IBookshelfWriter.addToBookshelf] 返回的插入行 id，
+  /// Agent 工具（如 create_novel）需要这个 id 作为响应字段。
+  Future<int> addNovel(Novel novel) =>
       _wrap(() => _writer.addToBookshelf(novel));
 
   /// 把小说从书架移除。

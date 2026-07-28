@@ -22,6 +22,7 @@ import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart
 import 'package:novel_app/core/interfaces/repositories/i_character_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_outline_repository.dart';
+import 'package:novel_app/core/providers/bookshelf_mutation_provider.dart';
 import 'package:novel_app/core/providers/database_providers.dart';
 import 'package:novel_app/models/chapter.dart';
 import 'package:novel_app/models/character.dart';
@@ -95,7 +96,7 @@ void main() {
       description: description,
       backgroundSetting: backgroundSetting,
     );
-    await novelRepo.addToBookshelf(novel);
+    await container.read(bookshelfMutationProvider.notifier).addNovel(novel);
     final novels = await novelRepo.getNovels();
     return novels.firstWhere((n) => n.url == url).id!;
   }
@@ -1574,7 +1575,7 @@ void main() {
         author: '作者',
         url: novelUrl,
       );
-      await novelRepo.addToBookshelf(novel);
+      await container.read(bookshelfMutationProvider.notifier).addNovel(novel);
       final novelId = (await novelRepo.getNovels())
           .firstWhere((n) => n.url == novelUrl)
           .id!;

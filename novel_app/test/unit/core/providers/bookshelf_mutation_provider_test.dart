@@ -129,10 +129,18 @@ class _FakeAssocWriter implements IBookshelfAssociationWriter {
   int removeCalls = 0;
   int moveCalls = 0;
   Object? throwOnce;
+  Object? addThrowOnce;
+  ({String url, int bookshelfId})? lastAdd;
 
   @override
   Future<void> addNovelToBookshelf(String novelUrl, int bookshelfId) async {
+    if (addThrowOnce != null) {
+      final e = addThrowOnce!;
+      addThrowOnce = null;
+      throw e;
+    }
     addCalls++;
+    lastAdd = (url: novelUrl, bookshelfId: bookshelfId);
   }
 
   @override
@@ -212,18 +220,23 @@ void main() {
   // addNovel
   // ============================================================
   group('addNovel', () {
-    test('调 writer.addToBookshelf + invalidate bookshelfNovelsProvider',
+    test('调 writer.addToBookshelf + 返回插入 id + invalidate bookshelfNovelsProvider',
         () async {
       final before = novelsReloadCount;
+      fakeWriter.nextInsertId = 42;
 
       final novel = makeNovel();
-      await container.read(bookshelfMutationProvider.notifier).addNovel(novel);
+      final id = await container
+          .read(bookshelfMutationProvider.notifier)
+          .addNovel(novel);
 
       // 强制等待 invalidate 触发的 rebuild 落地
       await container.read(bookshelfNovelsProvider.future);
 
       expect(fakeWriter.addToBookshelfCalls, 1);
       expect(fakeWriter.lastAddedNovel, equals(novel));
+      expect(id, 42,
+          reason: 'addNovel 应把 writer.addToBookshelf 返回的插入 id 透传给调用方');
       expect(novelsReloadCount, greaterThan(before),
           reason: 'addNovel 成功后 bookshelfNovelsProvider 应被 invalidate');
     });
@@ -446,6 +459,42 @@ void main() {
         container
             .read(bookshelfMutationProvider.notifier)
             .moveToBookshelf('u1', 2, 3),
+        throwsA(isA<StateError>()),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(novelsReloadCount, equals(before));
+    });
+  });
+
+  // ============================================================
+  // copyToBookshelf —— 走 association writer.addNovelToBookshelf
+  // （Task 4 reviewer 建议 deferred 补的 2 个 case）
+  // ============================================================
+  group('copyToBookshelf', () {
+    test('调 assocWriter.addNovelToBookshelf + invalidate', () async {
+      final before = novelsReloadCount;
+
+      await container
+          .read(bookshelfMutationProvider.notifier)
+          .copyToBookshelf('u1', 7);
+
+      await container.read(bookshelfNovelsProvider.future);
+
+      expect(fakeAssocWriter.addCalls, 1);
+      expect(fakeAssocWriter.lastAdd?.url, 'u1');
+      expect(fakeAssocWriter.lastAdd?.bookshelfId, 7);
+      expect(novelsReloadCount, greaterThan(before));
+    });
+
+    test('writer 抛异常 → 上抛 + 不 invalidate', () async {
+      fakeAssocWriter.addThrowOnce = StateError('db error');
+
+      final before = novelsReloadCount;
+
+      await expectLater(
+        container
+            .read(bookshelfMutationProvider.notifier)
+            .copyToBookshelf('u1', 7),
         throwsA(isA<StateError>()),
       );
       await Future<void>.delayed(Duration.zero);
