@@ -32,17 +32,26 @@ class AgentScenarioFactory {
           // Headless 模式：从池获取 controller（排他占用）
           final pool = _ref.read(headlessWebViewPoolProvider);
           final controller = await pool.acquire();
+          WebViewExtractScenario? scenario;
           try {
-            final scenario = WebViewExtractScenario.headless(
+            scenario = WebViewExtractScenario.headless(
               _ref,
               controller,
               context.currentUrl ?? '',
             );
-            // 注入清理钩子：场景结束时释放 pool 使用权
-            scenario.setCleanupTask(() async => pool.release());
+            // 绑定网络请求观察器到 pool（构造时回调委托到此 recorder）
+            pool.networkRecorder = scenario.networkRecorder;
+            // 注入清理钩子：先解绑 recorder，再释放 pool 使用权
+            scenario.setCleanupTask(() async {
+              pool.networkRecorder = null;
+              final s = scenario;
+              s?.disposeNetworkRecorder();
+              pool.release();
+            });
             return scenario;
           } catch (e, stackTrace) {
             // 构造失败也要释放，避免阻塞后续 acquire
+            pool.networkRecorder = null;
             pool.release();
             LoggerService.instance.e(
               'WebViewExtractScenario.headless 构造失败: $e',
