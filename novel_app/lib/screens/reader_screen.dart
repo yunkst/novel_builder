@@ -128,7 +128,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       ref: ref,
       apiService: _apiService,
       chapterRepository: ref.read(chapterRepositoryProvider),
-      novelRepository: ref.read(novelRepositoryProvider),
       headlessService: ref.read(headlessWebViewContentServiceProvider),
     );
 

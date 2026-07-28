@@ -5,7 +5,7 @@ import '../services/api_service_wrapper.dart';
 import '../services/headless_webview_content_service.dart';
 import '../services/headless_webview_errors.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
-import '../core/interfaces/repositories/i_novel_repository.dart';
+import '../core/providers/bookshelf_mutation_provider.dart';
 import '../core/providers/reader_state_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -30,11 +30,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// ```
 ///
 /// 状态变化通过Provider自动通知UI更新
+///
+/// 注意：阅读进度更新已迁移至 [BookshelfMutationNotifier.updateReadProgress]，
+/// 故构造函数不再需要 `novelRepository` 参数——所有"写库 + invalidate"统一经
+/// Notifier 收口，避免 [reading progress bug] 重演。
+///
+/// [reading progress bug]: 阅读完返回书架看不到进度更新，原因为直接调用
+/// `INovelRepository.updateLastReadChapter` 绕过了 Notifier 的 invalidate。
 class ReaderContentController {
   // ========== 依赖服务 ==========
   final ApiServiceWrapper _apiService;
   final IChapterRepository _chapterRepository;
-  final INovelRepository _novelRepository;
   final WidgetRef _ref;
   final HeadlessWebViewContentService? _headlessService;
 
@@ -44,12 +50,10 @@ class ReaderContentController {
     required WidgetRef ref,
     required ApiServiceWrapper apiService,
     required IChapterRepository chapterRepository,
-    required INovelRepository novelRepository,
     HeadlessWebViewContentService? headlessService,
   })  : _ref = ref,
         _apiService = apiService,
         _chapterRepository = chapterRepository,
-        _novelRepository = novelRepository,
         _headlessService = headlessService;
 
   // ========== 公开方法 ==========
@@ -205,10 +209,17 @@ class ReaderContentController {
   ///
   /// [novelUrl] 小说URL
   /// [chapter] 当前章节
+  ///
+  /// 走 [BookshelfMutationNotifier.updateReadProgress] 统一收口：
+  /// 写库成功后自动 invalidate `bookshelfNovelsProvider`，书架页"最近阅读"
+  /// 立即刷新；以前直接调 `INovelRepository.updateLastReadChapter` 会绕过
+  /// Notifier，导致阅读完返回书架看不到进度更新。
   Future<void> updateReadingProgress(String novelUrl, Chapter chapter) async {
     try {
       final chapterIndex = chapter.chapterIndex ?? 0;
-      await _novelRepository.updateLastReadChapter(novelUrl, chapterIndex);
+      await _ref
+          .read(bookshelfMutationProvider.notifier)
+          .updateReadProgress(novelUrl, chapterIndex);
       LoggerService.instance.d(
         'ReaderContentController: 已更新阅读进度 - 章节$chapterIndex',
         category: LogCategory.ui,

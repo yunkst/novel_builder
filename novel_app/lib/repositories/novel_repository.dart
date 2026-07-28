@@ -10,8 +10,9 @@ import 'base_repository.dart';
 /// 设计意图：写方法从 [INovelRepository] 移除后，普通调用方拿不到这些方法，
 /// 编译期阻止"直接写库忘 invalidate"。
 ///
-/// 注意：`updateLastReadChapter` 同时存在于 [INovelRepository]（只读侧 controller
-/// 仍在用，待 Task 2 迁移到 Notifier 后可收敛）。本接口保留此方法让
+/// 注意：`updateLastReadChapter` 同时存在于 [INovelRepository]（仅历史查询/兜底
+/// 路径仍可能直接调用，但书架表写操作须经 Notifier）。书架写路径已收敛至
+/// [BookshelfMutationNotifier.updateReadProgress]，本接口保留此方法让
 /// [BookshelfMutationNotifier.updateReadProgress] 走与其他写方法相同的
 /// `_writer` 收口路径。
 abstract interface class IBookshelfWriter {
