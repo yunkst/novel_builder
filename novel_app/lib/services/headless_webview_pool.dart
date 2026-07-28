@@ -24,11 +24,13 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'logger_service.dart';
+import 'novel_agent/scenarios/network_request_recorder.dart';
 
 /// Headless WebView 池：单例懒初始化，复用同一 WebView 实例
 class HeadlessWebViewPool {
@@ -41,6 +43,13 @@ class HeadlessWebViewPool {
 
   /// controller 是否正被某个调用方占用
   bool _isInUse = false;
+
+  /// 当前绑定的网络请求观察器（可空）。
+  ///
+  /// 由 WebViewExtractScenario 在 acquire 前设置、cleanup 时置 null。
+  /// 构造时的 shouldInterceptRequest / onLoadStart 回调在调用时读取本字段，
+  /// 始终命中当前场景的 recorder（无需重建 webview）。
+  NetworkRequestRecorder? networkRecorder;
 
   /// 等待获取使用权的调用方队列
   final List<Completer<void>> _waitQueue = [];
@@ -188,7 +197,18 @@ class HeadlessWebViewPool {
           loadsImagesAutomatically: false,
           // 禁用不需要的功能
           mediaPlaybackRequiresUserGesture: true,
+          // 启用网络请求观察（Android 专属；iOS 该 setting 为 no-op）
+          useShouldInterceptRequest: Platform.isAndroid,
         ),
+        // 页面跳转即清空 recorder（仅 Android 有意义）
+        onLoadStart: (controller, url) {
+          networkRecorder?.clear();
+        },
+        // 观察所有请求，return null 放行不打断页面
+        shouldInterceptRequest: (controller, request) async {
+          _recordRequest(request);
+          return null;
+        },
       );
 
       await _headlessWebView!.run();
@@ -216,6 +236,29 @@ class HeadlessWebViewPool {
       rethrow;
     }
     _isInitializing = false;
+  }
+
+  /// 把一条 WebResourceRequest 记入 networkRecorder（观察模式，return null 放行）。
+  ///
+  /// 异常时丢弃该条 + 打日志，不阻断页面加载（回调仍返回 null）。
+  void _recordRequest(WebResourceRequest request) {
+    final recorder = networkRecorder;
+    if (recorder == null) return;
+    try {
+      recorder.add(
+        url: request.url.toString(),
+        method: request.method,
+        headers: request.headers,
+        isForMainFrame: request.isForMainFrame ?? false,
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.w(
+        'HeadlessWebViewPool 网络请求记录失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.network,
+        tags: ['headless-webview-pool', 'network-record', 'failed'],
+      );
+    }
   }
 }
 
