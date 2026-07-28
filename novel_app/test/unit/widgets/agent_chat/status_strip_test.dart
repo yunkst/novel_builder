@@ -1,5 +1,9 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novel_app/core/providers/agent_chat_state.dart';
+import 'package:novel_app/core/providers/scenario_sessions_provider.dart';
+import 'package:novel_app/services/novel_agent/agent_scenario.dart';
 import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/widgets/agent_chat/agent_status_strip.dart';
 
@@ -68,4 +72,60 @@ void main() {
     final s = selectStatus(const AgentChatState(), r);
     expect(s?.detail, contains('回合层'));
   });
+
+  // ---- running 兜底态（停止按钮入口）----
+
+  test('isLoading 无 supplement 无 retry -> running', () {
+    final s = selectStatus(const AgentChatState(isLoading: true), null);
+    expect(s?.kind, AgentStatusKind.running);
+    expect(s?.message, '正在生成…');
+  });
+
+  test('retry 压 running（isLoading=true + retry -> retry 非 running）', () {
+    final s = selectStatus(const AgentChatState(isLoading: true), _retry);
+    expect(s?.kind, AgentStatusKind.retry);
+  });
+
+  test('supplement 压 running（isLoading + supplementaryCount>0 -> supplement）',
+      () {
+    final s = selectStatus(
+        const AgentChatState(isLoading: true, supplementaryCount: 1), null);
+    expect(s?.kind, AgentStatusKind.supplement);
+  });
+
+  // ---- widget：停止按钮渲染与点击 ----
+
+  testWidgets('running 态渲染「停止」按钮且点击触发 onStop', (tester) async {
+    var stopped = false;
+    await tester.pumpWidget(
+        _wrapRunning(AgentStatusStrip(onStop: () => stopped = true)));
+    await tester.pump(); // running 态用 CircularProgressIndicator，pumpAndSettle 永不收敛
+    expect(find.text('正在生成…'), findsOneWidget);
+    expect(find.text('停止'), findsOneWidget);
+    await tester.tap(find.text('停止'));
+    await tester.pump();
+    expect(stopped, isTrue);
+  });
+
+  testWidgets('onStop 为 null 时不渲染停止按钮（向后兼容）', (tester) async {
+    await tester.pumpWidget(_wrapRunning(const AgentStatusStrip()));
+    await tester.pump();
+    expect(find.text('正在生成…'), findsOneWidget);
+    expect(find.text('停止'), findsNothing);
+  });
 }
+
+Widget _wrapRunning(Widget child, {bool isLoading = true}) => MaterialApp(
+      home: Scaffold(
+        body: ProviderScope(
+          overrides: [
+            currentChatStateProvider.overrideWith((ref) => AgentChatState(
+                  scenarioId: ScenarioIds.writing,
+                  scenarioDisplayName: '小说写作助手',
+                  isLoading: isLoading,
+                )),
+          ],
+          child: child,
+        ),
+      ),
+    );

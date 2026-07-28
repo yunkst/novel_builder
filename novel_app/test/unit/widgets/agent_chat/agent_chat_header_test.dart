@@ -24,11 +24,13 @@ void main() {
     expect(find.textContaining('尚未选择小说'), findsOneWidget);
   });
 
-  testWidgets('Header 含 历史/场景菜单/关闭 三按钮', (tester) async {
+  testWidgets('Header 含 场景菜单/全屏/关闭 三按钮（历史收入菜单）', (tester) async {
     await tester.pumpWidget(_wrap(const AgentChatHeader()));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('会话历史'), findsOneWidget);
     expect(find.byTooltip('场景与设置'), findsOneWidget);
+    expect(find.byTooltip('全屏'), findsOneWidget);
     expect(find.byTooltip('关闭'), findsOneWidget);
+    // 历史不再是独立按钮，已收入 dots 场景菜单
+    expect(find.byTooltip('会话历史'), findsNothing);
   });
 }

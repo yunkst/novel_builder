@@ -51,8 +51,8 @@ void main() {
   //   - 「+」按钮在 isPickingImage 时禁用
   //
   // 旧的 _buildStopBar + _buildSupplementBar + _buildErrorBar 5 个手写 bar
-  // 已合并为 AgentStatusStrip（Task 4 selectStatus 优先级: error > retry > supplement），
-  // 无独立「停止」按钮。停止操作通过 session.cancel() 由 AgentChatHeader 或 ScenarioSession 自行触发。
+  // 已合并为 AgentStatusStrip（selectStatus 优先级: error > retry > supplement > running）。
+  // running/supplement/retry 三种运行态右侧带「停止」按钮（onStop -> ScenarioSession.cancel）。
   group('AgentChatDialog Composer 输入栏按钮 + StatusStrip', () {
     testWidgets('完全空时「+」按钮可点击，发送按钮 disabled', (tester) async {
       await tester.pumpWidget(_wrap());
@@ -79,7 +79,8 @@ void main() {
       expect(_findIconButtonByTooltip(tester, '添加图片'), isNotNull);
     });
 
-    testWidgets('LLM 运行时无错误/重试/补充时 StatusStrip 不渲染', (tester) async {
+    testWidgets('LLM 运行时无错误/重试/补充时 StatusStrip 渲染 running 条 + 停止按钮',
+        (tester) async {
       await tester.pumpWidget(
         _wrap(state: const AgentChatState(
           isLoading: true,
@@ -88,13 +89,11 @@ void main() {
       );
       await tester.pump();
 
-      // 普通运行态无 error/retry/supplement，StatusStrip 不渲染任何条
-      // 但 Header / Messages / Composer 仍渲染（dialog 仍是完整 shell）
-      // 关键断言：整个 dialog 内不再有「停止」TextButton / IconButton
-      expect(find.text('停止'), findsNothing,
-          reason: '停止操作已迁出 StatusStrip 与 Composer，不再有 TextButton「停止」');
-      expect(_findIconButtonByTooltip(tester, '停止'), isNull,
-          reason: '不再有停止 IconButton');
+      // 普通运行态（running 兜底）：StatusStrip 渲染「正在生成…」+「停止」按钮
+      expect(find.text('正在生成…'), findsOneWidget,
+          reason: 'running 态应渲染「正在生成…」文案');
+      expect(find.text('停止'), findsOneWidget,
+          reason: 'running 态 StatusStrip 应带「停止」按钮');
 
       // 输入栏 Composer 仍然渲染（添加图片 + 发送）
       expect(_findIconButtonByTooltip(tester, '添加图片'), isNotNull);
@@ -133,8 +132,8 @@ void main() {
       expect(find.textContaining('下一轮'), findsOneWidget,
           reason: 'detail 行应包含「下一轮」说明');
 
-      // 无停止按钮
-      expect(find.text('停止'), findsNothing);
+      // supplement 也是运行态，带停止按钮
+      expect(find.text('停止'), findsOneWidget);
     });
 
     testWidgets('运行中文本框可输入（enabled=true）', (tester) async {

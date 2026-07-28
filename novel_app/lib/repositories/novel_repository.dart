@@ -4,10 +4,30 @@ import '../services/logger_service.dart';
 import '../core/interfaces/repositories/i_novel_repository.dart';
 import 'base_repository.dart';
 
+/// 书架写操作能力接口（[NovelRepository] 实现，不导出）。
+///
+/// 仅 [BookshelfMutationNotifier] 通过 `bookshelfWriterProvider` 持有此类型引用。
+/// 设计意图：写方法从 [INovelRepository] 移除后，普通调用方拿不到这些方法，
+/// 编译期阻止"直接写库忘 invalidate"。
+abstract interface class IBookshelfWriter {
+  Future<int> addToBookshelf(Novel novel);
+  Future<int> removeFromBookshelf(String novelUrl);
+  Future<int> updateTitle(String novelUrl, String newTitle);
+  Future<int> updateCoverMediaIdByUrl(String novelUrl, String? mediaId);
+  Future<Novel> createNovel({
+    required String title,
+    required String author,
+    String? description,
+    String? coverUrl,
+    String? backgroundSetting,
+  });
+}
+
 /// 小说数据仓库
 ///
 /// 负责小说元数据和阅读进度的数据库操作
-class NovelRepository extends BaseRepository implements INovelRepository {
+class NovelRepository extends BaseRepository
+    implements INovelRepository, IBookshelfWriter {
   /// 构造函数 - 接受数据库连接实例
   NovelRepository({required super.dbConnection});
 

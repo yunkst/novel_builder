@@ -11,6 +11,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/providers/bookshelf_mutation_provider.dart';
 import '../../../core/providers/database_providers.dart';
 import '../../../models/novel.dart';
 import '../../logger_service.dart';
@@ -73,7 +74,6 @@ class NovelNavigationExecutor with ToolExecutorHelpers {
     if (titleErr != null) return titleErr;
     final (description, _) = parser.nullableString('description');
 
-    final novelRepository = ref.read(novelRepositoryProvider);
     final novel = Novel(
       title: title,
       author: '原创',
@@ -82,7 +82,9 @@ class NovelNavigationExecutor with ToolExecutorHelpers {
       description: description,
       backgroundSetting: null,
     );
-    final id = await novelRepository.addToBookshelf(novel);
+    // 走 Notifier 收口：写库 + invalidate(bookshelfNovelsProvider)，
+    // 避免直接调 Repository 写完忘刷新书架 UI。
+    final id = await ref.read(bookshelfMutationProvider.notifier).addNovel(novel);
 
     LoggerService.instance.i('create_novel: "$title" (id=$id)',
         category: LogCategory.ai, tags: ['agent', 'tool', 'create_novel']);

@@ -8,6 +8,10 @@ import '../../../models/novel.dart';
 /// - 书架与小说的多对多关系管理
 /// - 书架排序和分组
 /// - 书架统计信息
+///
+/// 关联表写操作（addNovelToBookshelf / removeNovelFromBookshelf /
+/// moveNovelToBookshelf）已移至内部 `IBookshelfAssociationWriter` 接口，
+/// 仅 [BookshelfRepository] 实现，调用方须经 BookshelfMutationNotifier 走统一写入路径。
 abstract class IBookshelfRepository {
   // ==================== 书架CRUD操作 ====================
 
@@ -58,49 +62,6 @@ abstract class IBookshelfRepository {
   ///
   /// Web平台返回空列表
   Future<List<Novel>> getNovelsByBookshelf(int bookshelfId);
-
-  /// 添加小说到指定书架
-  ///
-  /// [novelUrl] 小说URL
-  /// [bookshelfId] 书架ID
-  ///
-  /// 特殊处理：
-  /// - bookshelfId=1（全部小说）：虚拟书架，不需要添加关联
-  /// - 其他书架：在novel_bookshelves表中创建关联记录
-  ///
-  /// Web平台抛出UnsupportedError异常
-  Future<void> addNovelToBookshelf(String novelUrl, int bookshelfId);
-
-  /// 从指定书架移除小说
-  ///
-  /// [novelUrl] 小说URL
-  /// [bookshelfId] 书架ID
-  ///
-  /// 返回是否移除成功
-  ///
-  /// 特殊处理：
-  /// - bookshelfId=1（全部小说）：虚拟书架，不能移除
-  /// - 其他书架：从novel_bookshelves表中删除关联记录
-  ///
-  /// Web平台抛出UnsupportedError异常
-  Future<bool> removeNovelFromBookshelf(String novelUrl, int bookshelfId);
-
-  /// 将小说从一个书架移动到另一个书架
-  ///
-  /// [novelUrl] 小说URL
-  /// [fromBookshelfId] 原书架ID
-  /// [toBookshelfId] 目标书架ID
-  ///
-  /// 限制：
-  /// - 不能从/到"全部小说"书架（ID=1）移动
-  /// - 源书架和目标书架相同时无操作
-  ///
-  /// Web平台抛出UnsupportedError异常
-  Future<void> moveNovelToBookshelf(
-    String novelUrl,
-    int fromBookshelfId,
-    int toBookshelfId,
-  );
 
   // ==================== 书架统计和查询 ====================
 
