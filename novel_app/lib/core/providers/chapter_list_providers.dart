@@ -13,6 +13,8 @@ import '../../services/logger_service.dart';
 import '../../services/headless_webview_errors.dart';
 import '../../utils/toast_utils.dart';
 import '../../constants/chapter_constants.dart';
+import 'chapter_mutation_provider.dart';
+import 'chapter_mutation_signal_provider.dart';
 import 'service_providers.dart';
 import 'database_providers.dart';
 import 'bookshelf_mutation_provider.dart';
@@ -90,6 +92,15 @@ class ChapterListState {
 class ChapterList extends _$ChapterList {
   @override
   ChapterListState build(Novel novel) {
+    // 监听章节变更信号（ChapterMutationNotifier 写库后 bump）：触发软刷新，
+    // 只重读 chapters 替换 state，保留分页/loading/重排状态。
+    //
+    // 必须在 build 同步阶段注册（与下方 microtask 同级），不能放在异步回调里——
+    // 否则第一次 bump 若发生在 listen 注册前会丢失。
+    ref.listen(chapterMutationSignalProvider(novel.url), (_, __) {
+      softReload();
+    });
+
     // 使用 Future.microtask 确保 build() 返回后再执行异步操作
     // 避免 "Tried to read the state of an uninitialized provider" 错误
     Future.microtask(() => _initializeData());
@@ -413,11 +424,12 @@ class ChapterList extends _$ChapterList {
 
   /// 清除缓存
   Future<void> clearCache() async {
-    final chapterRepository = ref.read(chapterRepositoryProvider);
     try {
-      await chapterRepository.deleteCachedChapters(novel.url);
-      // 重新加载章节列表，getCachedNovelChapters 的 LEFT JOIN 会返回 isCached=false
-      await _loadChapters();
+      // 走 ChapterMutationNotifier 收口：写库 + bump signal 触发 softReload
+      // （getCachedNovelChapters 的 LEFT JOIN 会返回 isCached=false）
+      await ref
+          .read(chapterMutationProvider.notifier)
+          .deleteCachedChapters(novel.url);
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '清除缓存失败: $e',
@@ -485,16 +497,12 @@ class ChapterList extends _$ChapterList {
 
   /// 保存重排后的章节顺序
   Future<void> _saveReorderedChapters() async {
-    final reorderController = ref.watch(chapterReorderControllerProvider);
-
     try {
-      await reorderController.saveReorderedChapters(
-        novelUrl: novel.url,
-        chapters: state.chapters,
-      );
-
-      // 重新加载章节列表以确保数据一致性
-      await _loadChapters();
+      // 走 ChapterMutationNotifier 收口：写库 + bump signal 触发 softReload
+      // （softReload 重读 chapters 替换 state，无需再手动 _loadChapters）
+      await ref
+          .read(chapterMutationProvider.notifier)
+          .updateChaptersOrder(novel.url, state.chapters);
     } catch (e, stackTrace) {
       LoggerService.instance.e(
         '保存章节顺序失败: $e',
@@ -522,6 +530,40 @@ class ChapterList extends _$ChapterList {
         stackTrace: stackTrace.toString(),
         category: LogCategory.ui,
         tags: ['chapter-list', 'refresh-cache-status'],
+      );
+    }
+  }
+
+  /// 软刷新：重读 chapters 替换 state.chapters，不动其它 UI 状态。
+  ///
+  /// 由 [chapterMutationSignalProvider] 的 listen 回调触发——
+  /// [ChapterMutationNotifier] 写库成功后 bump tick，本方法重读本地 DB
+  /// 拿到最新章节列表替换 state.chapters，重算 totalPages（章节增删后变化）。
+  ///
+  /// **保留**：`currentPage`（除非超出新 totalPages，回退到末页）、`isLoading`
+  /// （避免闪 loading）、`isReorderingMode`（不打断排序）、`isInBookshelf`
+  /// （走 bookshelfMutation 自己的 invalidate 路径）、`lastReadChapterIndex`。
+  ///
+  /// 不用 `ref.invalidate(chapterListProvider)`：family by Novel + Novel 无 ==
+  /// 会导致全 family rebuild，重置 currentPage=1 / 退出重排模式（UX 跳页）。
+  ///
+  /// 静默失败：异常仅记日志，不打断用户当前操作，下次 bump 再试。
+  Future<void> softReload() async {
+    final chapterLoader = ref.read(chapterLoaderProvider);
+    try {
+      final fresh = await chapterLoader.loadChapters(novel.url);
+      state = state.copyWith(chapters: fresh);
+      _updateTotalPages();
+      // 章节删光或总数减少导致当前页越界时，回退到末页
+      if (state.currentPage > state.totalPages) {
+        state = state.copyWith(currentPage: state.totalPages);
+      }
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '软刷新章节列表失败: $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.ui,
+        tags: ['chapter-list', 'soft-reload', 'failed'],
       );
     }
   }
