@@ -110,7 +110,7 @@ class AgentMessageBubble extends ConsumerWidget {
       // 琥珀 wash（用户气泡），不再误用冷蓝 agentAccent
       return c.chatButtonPrimary.withValues(alpha: 0.10);
     }
-    // assistant 纸底，不用冷调 chatRoleBubble
+    // assistant 气泡用纸感底色
     return c.paper;
   }
 
@@ -142,7 +142,7 @@ class AgentMessageBubble extends ConsumerWidget {
       return Text(
         message.content,
         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: context.appColors.chatPrimaryText,
+              color: context.appColors.ink,
               height: 1.5,
             ),
       );
@@ -173,7 +173,7 @@ class AgentMessageBubble extends ConsumerWidget {
               style: AppTypography.bodyProse.copyWith(
                 fontSize: 13,
                 height: 1.65,
-                color: context.appColors.chatPrimaryText,
+                color: context.appColors.ink,
               ),
             ),
       ],

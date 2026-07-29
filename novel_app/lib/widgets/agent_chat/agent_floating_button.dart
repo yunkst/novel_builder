@@ -74,8 +74,8 @@ class _AgentFloatingButtonState extends ConsumerState<AgentFloatingButton> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    appColors.agentBrandStart,
-                    appColors.agentBrandEnd,
+                    appColors.agentAccent,
+                    appColors.chatButtonPrimary,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -83,7 +83,7 @@ class _AgentFloatingButtonState extends ConsumerState<AgentFloatingButton> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: appColors.agentBrandStart.withValues(alpha: 0.3),
+                    color: appColors.agentAccent.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

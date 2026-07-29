@@ -169,7 +169,7 @@ class _AgentChatComposerState extends ConsumerState<AgentChatComposer> {
                       focusNode: _focus,
                       maxLines: 5,
                       minLines: 1,
-                      style: TextStyle(fontSize: 13, color: colors.chatPrimaryText),
+                      style: TextStyle(fontSize: 13, color: colors.ink),
                       decoration: InputDecoration(
                         hintText: '和写作助手说点什么…',
                         hintStyle: TextStyle(color: colors.chatHintText),
@@ -198,12 +198,6 @@ class _AgentChatComposerState extends ConsumerState<AgentChatComposer> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text('Enter 发送 · Shift+Enter 换行',
-              style: TextStyle(
-                  fontSize: 9.5,
-                  color: colors.chatHintText,
-                  fontFamily: 'JetBrainsMono')),
         ],
       ),
     );
@@ -224,7 +218,7 @@ class _SendButton extends StatelessWidget {
         ? (isSupplementary
             ? colors.chatButtonPrimary.withValues(alpha: 0.5)
             : colors.chatButtonPrimary)
-        : colors.chatDivider;
+        : colors.divider;
     return Container(
       width: 34,
       height: 34,

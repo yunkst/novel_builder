@@ -418,7 +418,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                     '《${novel.title}》',
                     style: AppTypography.novelTitle.copyWith(
                       fontSize: 16,
-                      color: colors.chatPrimaryText,
+                      color: colors.ink,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
