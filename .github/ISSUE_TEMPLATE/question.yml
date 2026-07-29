@@ -1,0 +1,19 @@
+name: 提问 / 讨论
+description: 使用疑问、配置求助、功能咨询(非 bug 报告)
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 你的疑问
+      description: 把问题说清楚,附上 App 版本与平台会更易得到解答
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已经试过什么
+      description: 你查阅了哪些文档/尝试了哪些操作
+    validations:
+      required: false
