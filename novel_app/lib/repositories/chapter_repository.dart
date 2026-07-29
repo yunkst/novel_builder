@@ -8,10 +8,60 @@ import 'base_repository.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/interfaces/repositories/i_chapter_version_repository.dart';
 
+/// 章节写操作接口（仅 [ChapterMutationNotifier] 持有）。
+///
+/// 与 `IBookshelfWriter` 同构：把 [IChapterRepository] 的写方法迁到本内部接口，
+/// 普通 provider 通过 `IChapterRepository` 类型拿不到写能力 → 编译期阻止绕过
+/// Notifier 直接写库（正是「agent 写完章节列表不刷新」bug 的根因）。
+///
+/// 12 个原写方法 + 2 个事务方法（[createCustomChapterWithShift] /
+/// [deleteChapterAndReindex]），事务方法把多次独立 DB 调用合并为单个
+/// `db.transaction`，修原子性缺陷。
+abstract interface class IChapterWriter {
+  // ===== chapter_cache 表 =====
+  Future<int> cacheChapter(String novelUrl, Chapter chapter, String content);
+  Future<int> updateChapterContent(String chapterUrl, String content,
+      {String source = 'edit'});
+  Future<int> updateChapterContentById(int id, String content);
+  Future<int> deleteChapterCache(String chapterUrl);
+  Future<int> deleteCachedChapters(String novelUrl);
+
+  // ===== novel_chapters 表（部分跨两表）=====
+  Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters);
+  Future<int> createCustomChapter(String novelUrl, String title, String content,
+      [int? index]);
+  Future<void> updateCustomChapter(
+      String chapterUrl, String title, String content);
+  Future<void> deleteCustomChapter(String chapterUrl);
+  Future<void> shiftChapterIndicesFrom(String novelUrl, int fromIndex);
+  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters);
+  Future<void> markChapterAsRead(String novelUrl, String chapterUrl);
+
+  // ===== 事务方法（合并多次独立 DB 调用，原子化）=====
+  /// 在 [insertIndex] 位置插入新章节：单事务内先 shift 后续索引 +1 再 insert 两表。
+  ///
+  /// 替代调用方「shiftChapterIndicesFrom + createCustomChapter」两次独立事务
+  /// ——后者若 shift 成功后 insert 失败会留下 chapterIndex 空洞。
+  /// [insertIndex] 为 null 时追加到末尾（内部走 MAX+1，无需 shift）。
+  Future<int> createCustomChapterWithShift(
+    String novelUrl,
+    String title,
+    String content, [
+    int? insertIndex,
+  ]);
+
+  /// 删除章节并把剩余章节的 chapterIndex 连续化：单事务内 delete 两表 + reindex。
+  ///
+  /// 替代调用方「deleteCustomChapter + getCachedNovelChapters + cacheNovelChapters
+  /// (remaining)」三步——原子化，避免删除后未重排留下索引缺口。
+  Future<void> deleteChapterAndReindex(String novelUrl, String chapterUrl);
+}
+
 /// 章节数据仓库
 ///
 /// 负责章节内容缓存、章节列表管理和用户自定义章节的数据库操作
-class ChapterRepository extends BaseRepository implements IChapterRepository {
+class ChapterRepository extends BaseRepository
+    implements IChapterRepository, IChapterWriter {
   final IChapterVersionRepository _versionRepo;
 
   /// 构造函数 - 通过依赖注入接收数据库连接和版本仓库
@@ -847,6 +897,159 @@ class ChapterRepository extends BaseRepository implements IChapterRepository {
     final chapterUrl = await getChapterUrlById(id);
     if (chapterUrl == null) return 0;
     return updateChapterContent(chapterUrl, content);
+  }
+
+  /// 事务：shift 后续索引 + insert 两表。
+  ///
+  /// [insertIndex] 为 null 时追加到末尾（MAX+1，无需 shift）；
+  /// 非 null 时单事务内先 UPDATE 两表 `chapterIndex >= insertIndex` 的行 +1，
+  /// 再 INSERT 两表新章节。修「shift 成功 + insert 失败留 chapterIndex 空洞」
+  /// 的原子性缺陷（原本是两次独立事务）。
+  @override
+  Future<int> createCustomChapterWithShift(
+    String novelUrl,
+    String title,
+    String content, [
+    int? insertIndex,
+  ]) async {
+    final db = await database;
+
+    late final int chapterIndex;
+    if (insertIndex != null) {
+      chapterIndex = insertIndex;
+    } else {
+      final result = await db.rawQuery(
+        'SELECT MAX(chapterIndex) as maxIndex FROM novel_chapters WHERE novelUrl = ?',
+        [novelUrl],
+      );
+      chapterIndex =
+          result.isNotEmpty ? (result.first['maxIndex'] as int? ?? 0) : 0;
+    }
+
+    final chapterUrl =
+        'custom://chapter/${DateTime.now().millisecondsSinceEpoch}';
+
+    late final int ncId;
+    try {
+      await db.transaction((txn) async {
+        if (insertIndex != null) {
+          // 仅显式插入位置时需要腾位（追加到末尾 MAX+1 不与任何现有 index 冲突）
+          await txn.rawUpdate(
+            'UPDATE novel_chapters SET chapterIndex = chapterIndex + 1 '
+            'WHERE novelUrl = ? AND chapterIndex >= ?',
+            [novelUrl, insertIndex],
+          );
+          await txn.rawUpdate(
+            'UPDATE chapter_cache SET chapterIndex = chapterIndex + 1 '
+            'WHERE novelUrl = ? AND chapterIndex >= ?',
+            [novelUrl, insertIndex],
+          );
+        }
+
+        ncId = await txn.insert(
+          'novel_chapters',
+          {
+            'novelUrl': novelUrl,
+            'chapterUrl': chapterUrl,
+            'title': title,
+            'chapterIndex': chapterIndex,
+            'isUserInserted': 1,
+            'insertedAt': DateTime.now().millisecondsSinceEpoch,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        await txn.insert(
+          'chapter_cache',
+          {
+            'novelUrl': novelUrl,
+            'chapterUrl': chapterUrl,
+            'title': title,
+            'content': content,
+            'chapterIndex': chapterIndex,
+            'cachedAt': DateTime.now().millisecondsSinceEpoch,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '事务创建自定义章节失败: novelUrl=$novelUrl title=$title - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter', 'custom', 'create_with_shift', 'failed'],
+      );
+      rethrow;
+    }
+
+    _addCachedInMemory(chapterUrl);
+    LoggerService.instance.i(
+      '事务创建自定义章节: $chapterUrl (index=$chapterIndex)',
+      category: LogCategory.database,
+      tags: ['chapter', 'custom', 'create_with_shift', 'success'],
+    );
+    return ncId;
+  }
+
+  /// 事务：delete 两表 + 剩余章节 chapterIndex 连续化。
+  ///
+  /// 单事务内先 delete 两表，再 query 剩余章节按 chapterIndex ASC，
+  /// batch update 把 chapterIndex 连续化为 0..N-1。修原 executor
+  /// 「delete + getCachedNovelChapters + cacheNovelChapters(remaining)」
+  /// 三步非原子的缺陷。
+  @override
+  Future<void> deleteChapterAndReindex(
+      String novelUrl, String chapterUrl) async {
+    final db = await database;
+    try {
+      await db.transaction((txn) async {
+        await txn.delete(
+          'novel_chapters',
+          where: 'chapterUrl = ?',
+          whereArgs: [chapterUrl],
+        );
+        await txn.delete(
+          'chapter_cache',
+          where: 'chapterUrl = ?',
+          whereArgs: [chapterUrl],
+        );
+
+        // 重排必须在 delete 之后查，避免包含已删行
+        final chapters = await txn.query(
+          'novel_chapters',
+          columns: ['id'],
+          where: 'novelUrl = ?',
+          whereArgs: [novelUrl],
+          orderBy: 'chapterIndex ASC',
+        );
+
+        final batch = txn.batch();
+        for (var i = 0; i < chapters.length; i++) {
+          batch.update(
+            'novel_chapters',
+            {'chapterIndex': i},
+            where: 'id = ?',
+            whereArgs: [chapters[i]['id']],
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+
+      _removeFromMemoryCache(chapterUrl);
+      LoggerService.instance.i(
+        '事务删除章节+重排: novelUrl=$novelUrl chapterUrl=$chapterUrl',
+        category: LogCategory.database,
+        tags: ['chapter', 'custom', 'delete_reindex', 'success'],
+      );
+    } catch (e, stackTrace) {
+      LoggerService.instance.e(
+        '事务删除章节+重排失败: novelUrl=$novelUrl chapterUrl=$chapterUrl - $e',
+        stackTrace: stackTrace.toString(),
+        category: LogCategory.database,
+        tags: ['chapter', 'custom', 'delete_reindex', 'failed'],
+      );
+      rethrow;
+    }
   }
 
   /// 根据 URL 获取章节 ID（搜索结果用）
