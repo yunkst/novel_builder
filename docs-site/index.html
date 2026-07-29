@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Novel Builder · AI 原生小说阅读平台</title>
+<title>随心阅读 · Novel Builder · AI 原生小说阅读平台</title>
 <meta name="description" content="Novel Builder 是一个 AI 原生小说阅读平台：读喜欢的小说，用 AI 改写剧情与设定，或从零创作一本。本地书架 + Headless WebView + Agent Chat + ComfyUI + OCR 反爬。" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -103,6 +103,14 @@
   }
   h1.title em { font-style: normal; color: var(--accent); }
   .lead { margin: 22px 0 30px; font-size: 17.5px; color: var(--ink-soft); max-width: 540px; }
+  .lead-subname {
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--accent);
+    font-weight: 600;
+    margin: -10px 0 14px;
+    letter-spacing: 1px;
+  }
   .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
   .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
   .badge { font-size: 12.5px; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line); padding: 5px 11px; border-radius: 6px; }
@@ -306,6 +314,7 @@
       <a href="#stack">技术栈</a>
       <a href="#quick">快速开始</a>
       <a class="btn btn-gh" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">★ GitHub</a>
+      <a href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">⭐ Star</a>
     </nav>
     <button class="menu-toggle" id="menuToggle" aria-label="菜单">☰</button>
   </div>
@@ -317,7 +326,8 @@
     <div class="wrap hero-grid">
       <div class="hero-text">
         <span class="eyebrow"><span class="dot"></span> 开源 · 全栈 · AI 增强</span>
-        <h1 class="title">读喜欢的，<br />改不爽的，<em>写</em>自己的。</h1>
+        <h1 class="title">随心阅读 <em style="font-size:0.5em;color:var(--ink-soft);font-weight:600">Novel Builder</em></h1>
+        <p class="lead-subname">读喜欢的 · 改不爽的 · 写自己的</p>
         <p class="lead">
           读一本喜欢的小说，用 AI 改写不爽的剧情与设定，或从零开始创作一本属于你的。
           离线优先的本地书架 + Headless WebView 章节提取 + Agent Chat + ComfyUI，
@@ -326,6 +336,7 @@
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">查看 GitHub →</a>
           <a class="btn btn-outline" href="#quick">⬇ 立即下载</a>
+          <a class="btn btn-gh" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener" aria-label="GitHub Star">⭐ Star</a>
         </div>
         <div class="badges">
           <span class="badge">Flutter 3.0+</span>
@@ -618,7 +629,7 @@
       <div>
         <h4>文档</h4>
         <ul>
-          <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/user-guide.md" target="_blank" rel="noopener">使用指南</a></li>
+          <li><a href="https://github.com/yunkst/novel_builder/blob/master/README.md" target="_blank" rel="noopener">使用指南</a></li>
           <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/developer-guide.md" target="_blank" rel="noopener">开发者指南</a></li>
           <li><a href="https://github.com/yunkst/novel_builder/blob/master/docs/deployment.md" target="_blank" rel="noopener">部署指南</a></li>
         </ul>

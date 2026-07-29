@@ -17,6 +17,26 @@ import '../../media/media_types.dart';
 import '../tool_arg_parser.dart' show ToolArgParser;
 import '../tool_executor_helpers.dart';
 
+/// 后端 HOST 未配置时的标准错误文案（引导用户去设置）
+const String _kBackendUnconfiguredMsg = 'AI 出图是进阶功能，需要本地部署后端服务（含 ComfyUI）。'
+    '如已部署，请在「设置 → 进阶服务 → 后端服务配置」填入地址；'
+    '未部署可暂时跳过，不影响阅读与 AI 写作。';
+
+/// 后端 HOST 已配置但调用失败时的标准错误文案（前缀带异常细节）
+String _kBackendUnreachableMsg(Object e) =>
+    '无法连接到后端服务：$e。AI 出图是进阶功能，需要本地部署后端服务（含 ComfyUI）。'
+    '请在「设置 → 进阶服务 → 后端服务配置」检查地址，或确认后端与 ComfyUI 已启动。';
+
+/// 三处 catch 共用的错误响应构造：先读 host 决定走哪个分支文案
+Future<Map<String, dynamic>> _buildBackendError(Ref ref, Object e) async {
+  final host = await ref.read(apiServiceWrapperProvider).getHost();
+  final isUnconfigured = host == null || host.isEmpty;
+  return {
+    'error': 'backend_unavailable',
+    'message': isUnconfigured ? _kBackendUnconfiguredMsg : _kBackendUnreachableMsg(e),
+  };
+}
+
 class MediaExecutor with ToolExecutorHelpers {
   MediaExecutor(this.ref);
   @override
@@ -45,10 +65,7 @@ class MediaExecutor with ToolExecutorHelpers {
       LoggerService.instance.e('列出文生图模型失败: $e',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'list_text2img_models', 'error']);
-      return jsonEncode({
-        'error': 'backend_unavailable',
-        'message': '无法获取文生图模型列表：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
-      });
+      return jsonEncode(await _buildBackendError(ref, e));
     }
   }
 
@@ -119,10 +136,7 @@ class MediaExecutor with ToolExecutorHelpers {
       LoggerService.instance.e('提交文生图任务失败: $e',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'create_images', 'error']);
-      return jsonEncode({
-        'error': 'backend_unavailable',
-        'message': '提交文生图任务失败：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
-      });
+      return jsonEncode(await _buildBackendError(ref, e));
     }
   }
 
@@ -210,10 +224,7 @@ class MediaExecutor with ToolExecutorHelpers {
       LoggerService.instance.e('提交图生视频任务失败: $e',
           category: LogCategory.ai,
           tags: ['agent', 'tool', 'create_image_to_video', 'error']);
-      return jsonEncode({
-        'error': 'backend_unavailable',
-        'message': '提交图生视频任务失败：$e。请告知用户检查后端服务与 ComfyUI 是否正常运行。',
-      });
+      return jsonEncode(await _buildBackendError(ref, e));
     }
   }
 }

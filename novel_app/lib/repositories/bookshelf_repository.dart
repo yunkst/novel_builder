@@ -5,6 +5,19 @@ import '../services/logger_service.dart';
 import 'base_repository.dart';
 import '../core/interfaces/repositories/i_bookshelf_repository.dart';
 
+/// 书架关联表写操作能力接口（[BookshelfRepository] 实现，不导出）。
+///
+/// 仅 [BookshelfMutationNotifier] 通过
+/// `bookshelfAssociationWriterProvider` 持有此类型引用。
+/// 设计意图：关联表写方法从 [IBookshelfRepository] 移除后，
+/// 普通调用方拿不到这些方法，编译期阻止"直接写关联表忘 invalidate"。
+abstract interface class IBookshelfAssociationWriter {
+  Future<void> addNovelToBookshelf(String novelUrl, int bookshelfId);
+  Future<bool> removeNovelFromBookshelf(String novelUrl, int bookshelfId);
+  Future<void> moveNovelToBookshelf(
+      String novelUrl, int fromBookshelfId, int toBookshelfId);
+}
+
 /// 书架数据仓库
 ///
 /// 负责书架分类的数据库操作，包括：
@@ -25,7 +38,7 @@ import '../core/interfaces/repositories/i_bookshelf_repository.dart';
 /// - ID=1: "全部小说" - 虚拟书架，显示所有小说，不可编辑
 /// - ID=2: "我的收藏" - 默认收藏书架，不可删除
 class BookshelfRepository extends BaseRepository
-    implements IBookshelfRepository {
+    implements IBookshelfRepository, IBookshelfAssociationWriter {
   /// 构造函数 - 接受数据库连接实例
   BookshelfRepository({required super.dbConnection});
 

@@ -143,12 +143,16 @@ void main() {
     });
 
     test('backend 抛错时返回 backend_unavailable 引导', () async {
+      // 配置 host → 走 _kBackendUnreachableMsg 分支（异常细节透传 + 含进阶提示）
+      SharedPreferences.setMockInitialValues({'backend_host': 'http://test:3800'});
       fakeApi.modelsError = Exception('connection refused');
 
       final json = decode(await executor.execute('list_text2img_models', {}));
 
       expect(json['error'], 'backend_unavailable');
       expect(json['message'], contains('connection refused'));
+      expect(json['message'], contains('进阶功能'));
+      expect(json['message'], contains('设置 → 进阶服务 → 后端服务配置'));
     });
   });
 
@@ -252,6 +256,8 @@ void main() {
 
   group('create_images - backend 失败', () {
     test('submit 抛错时返回 backend_unavailable', () async {
+      // 配置 host → 走 _kBackendUnreachableMsg 分支（异常细节透传 + 含进阶提示）
+      SharedPreferences.setMockInitialValues({'backend_host': 'http://test:3800'});
       fakeApi.submitError = Exception('ComfyUI offline');
 
       final json = decode(await executor.execute('create_images', {
@@ -263,6 +269,43 @@ void main() {
       expect(json['message'], contains('ComfyUI offline'));
       expect(json.containsKey('success'), false,
           reason: '失败时不应伪装成功');
+      expect(json['message'], contains('进阶功能'));
+      expect(json['message'], contains('设置 → 进阶服务 → 后端服务配置'));
+    });
+  });
+
+  // =========================================================================
+  // 进阶功能文案（按 host 是否配置分两支）
+  // =========================================================================
+  group('create_images - 进阶功能文案', () {
+    test('backend 抛错且 host 未配置时，文案含"进阶功能"和配置路径', () async {
+      fakeApi.submitError = Exception('connection refused');
+      // 默认 SharedPreferences mock 为空 → getHost() 返回 null
+
+      final json = decode(await executor.execute('create_images', {
+        'prompt': 'p',
+      }));
+
+      expect(json['error'], 'backend_unavailable');
+      final msg = json['message'] as String;
+      expect(msg, contains('进阶功能'));
+      expect(msg, contains('设置 → 进阶服务 → 后端服务配置'));
+      expect(msg, contains('本地部署'));
+    });
+
+    test('backend 抛错且 host 已配置时，文案前缀带错误细节 + 同样含进阶提示', () async {
+      SharedPreferences.setMockInitialValues({'backend_host': 'http://my-host:3800'});
+      fakeApi.submitError = Exception('Connection timed out');
+
+      final json = decode(await executor.execute('create_images', {
+        'prompt': 'p',
+      }));
+
+      expect(json['error'], 'backend_unavailable');
+      final msg = json['message'] as String;
+      expect(msg, contains('Connection timed out'));
+      expect(msg, contains('进阶功能'));
+      expect(msg, contains('设置 → 进阶服务 → 后端服务配置'));
     });
   });
 }

@@ -2,20 +2,12 @@ import '../../../models/novel.dart';
 
 /// 小说数据仓库接口
 ///
-/// 负责小说元数据和阅读进度的数据访问操作
+/// 负责小说元数据和阅读进度的数据访问操作。
+///
+/// 写操作（addToBookshelf / removeFromBookshelf / updateTitle /
+/// updateCoverMediaIdByUrl / createNovel）已移至内部 `IBookshelfWriter` 接口，
+/// 仅 [NovelRepository] 实现，调用方须经 BookshelfMutationNotifier 走统一写入路径。
 abstract class INovelRepository {
-  /// 添加小说到书架
-  ///
-  /// [novel] 要添加的小说对象
-  /// 返回新插入记录的ID
-  Future<int> addToBookshelf(Novel novel);
-
-  /// 从书架移除小说
-  ///
-  /// [novelUrl] 小说的URL
-  /// 返回受影响的行数
-  Future<int> removeFromBookshelf(String novelUrl);
-
   /// 获取所有小说
   ///
   /// 返回小说列表，按最后阅读时间和添加时间降序排列
@@ -33,13 +25,6 @@ abstract class INovelRepository {
   /// [chapterIndex] 章节索引
   /// 返回受影响的行数
   Future<int> updateLastReadChapter(String novelUrl, int chapterIndex);
-
-  /// 更新小说书名
-  ///
-  /// [novelUrl] 小说的URL
-  /// [newTitle] 新的书名
-  /// 返回受影响的行数
-  Future<int> updateTitle(String novelUrl, String newTitle);
 
   /// 更新小说背景设定
   ///
@@ -73,17 +58,6 @@ abstract class INovelRepository {
   /// 返回小说对象，如果不存在则返回null
   Future<Novel?> getNovelByUrl(String novelUrl);
 
-  /// 创建新小说（用于同步下载时创建不存在的书）
-  ///
-  /// 返回创建后的小说对象
-  Future<Novel> createNovel({
-    required String title,
-    required String author,
-    String? description,
-    String? coverUrl,
-    String? backgroundSetting,
-  });
-
   // ========== ID-based 查询方法（Agent 工具用） ==========
 
   /// 根据 ID 查询小说
@@ -112,13 +86,4 @@ abstract class INovelRepository {
   ///   传 null 表示清空封面（回到程序化占位）
   /// 返回受影响的行数，ID 不存在则返回 0
   Future<int> updateCoverMediaIdById(int id, String? mediaId);
-
-  /// 根据 URL 更新小说封面媒体 ID
-  ///
-  /// 与 [updateCoverMediaIdById] 等价，但以 URL 定位。书架页 UI 用本方法
-  /// （`getNovelsByBookshelf` 返回的 Novel 不含 id，UI 侧只能拿到 url）。
-  /// [novelUrl] 小说 URL（唯一标识）
-  /// [mediaId] 媒体资源 ID，传 null 表示清空封面（回到程序化占位）
-  /// 返回受影响的行数，URL 不存在则返回 0
-  Future<int> updateCoverMediaIdByUrl(String novelUrl, String? mediaId);
 }

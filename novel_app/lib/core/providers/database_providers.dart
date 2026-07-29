@@ -47,6 +47,15 @@ INovelRepository novelRepository(Ref ref) {
   return NovelRepository(dbConnection: dbConnection);
 }
 
+/// 书架写操作 Provider（仅 [BookshelfMutationNotifier] 用）。
+///
+/// 通过 cast 拿到 [NovelRepository] 的 IBookshelfWriter 能力。
+/// 普通调用方应使用 [bookshelfMutationProvider] 走收口路径。
+@riverpod
+IBookshelfWriter bookshelfWriter(Ref ref) {
+  return ref.watch(novelRepositoryProvider) as NovelRepository;
+}
+
 /// ChapterRepository Provider
 ///
 /// 使用IDatabaseConnection接口注入，支持测试和依赖替换
@@ -115,6 +124,12 @@ IPromptTagRepository promptTagRepository(Ref ref) {
 IBookshelfRepository bookshelfRepository(Ref ref) {
   final dbConnection = ref.watch(databaseConnectionProvider);
   return BookshelfRepository(dbConnection: dbConnection);
+}
+
+/// 书架关联表写操作 Provider（仅 [BookshelfMutationNotifier] 用）。
+@riverpod
+IBookshelfAssociationWriter bookshelfAssociationWriter(Ref ref) {
+  return ref.watch(bookshelfRepositoryProvider) as BookshelfRepository;
 }
 
 /// SiteScriptRepository Provider
