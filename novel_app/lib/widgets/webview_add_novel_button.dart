@@ -32,6 +32,7 @@ import '../core/providers/database_providers.dart';
 import '../core/theme/app_colors.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
+import '../models/site_script.dart';
 import '../services/logger_service.dart';
 import '../services/novel_agent/scenarios/webview_js_executor.dart';
 import '../screens/chapter_list_screen_riverpod.dart';
@@ -89,8 +90,20 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
       return;
     }
 
-    // 2. 取脚本（可能为 null -> 无脚本降级）
-    final script = ref.read(webviewCurrentSiteScriptProvider).valueOrNull;
+    // 2. 取脚本（await future 等 DB 查询完成，避免同步 valueOrNull
+    //    在 Future 未预热时返回 null 导致误判"无脚本"→ 必然降级 agent；
+    //    即使脚本已在 site_scripts 表里缓存。修"首次添加必然走 agent"bug）
+    SiteScript? script;
+    try {
+      script = await ref.read(webviewCurrentSiteScriptProvider.future);
+    } catch (e) {
+      LoggerService.instance.w(
+        'FAB添加小说: 脚本查询异常, 降级 agent domain=$domain error=$e',
+        category: LogCategory.ai,
+        tags: ['headless-webview', 'fab-add-novel', 'script-query-error'],
+      );
+      script = null;
+    }
 
     // 3. 取 WebView 控制器
     final controller = ref.read(webviewControllerProvider);

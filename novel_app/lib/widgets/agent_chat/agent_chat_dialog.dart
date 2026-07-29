@@ -119,6 +119,7 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
             children: [
               AgentChatHeader(
                 onHistory: () => _showHistorySheet(),
+                onNewSession: () => _startNewSession(),
                 onConfig: () => _showScenarioConfigDialog(),
                 onToggleFullscreen: () => setState(() => _isFullscreen = !_isFullscreen),
                 isFullscreen: _isFullscreen,
@@ -168,6 +169,16 @@ class _AgentChatDialogState extends ConsumerState<AgentChatDialog> {
       ),
       builder: (_) => ChatHistorySheet(scenarioId: scenarioId),
     );
+  }
+
+  /// 新建一条空白会话并切换过去（旧会话保留在历史列表）。
+  ///
+  /// 与「会话历史 → 新建会话」共用 ScenarioSessionsNotifier.startNewSession，
+  /// 运行中新建会话时由 adoptSession 内部 cancel 老 agent 兜底，避免流式 segment
+  /// 污染新 session。
+  Future<void> _startNewSession() async {
+    final scenarioId = ref.read(currentAgentScenarioProvider);
+    await ref.read(scenarioSessionsProvider.notifier).startNewSession(scenarioId);
   }
 
   /// 弹出场景级 LLM 配置对话框

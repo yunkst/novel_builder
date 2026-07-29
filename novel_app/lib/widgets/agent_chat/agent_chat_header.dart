@@ -16,6 +16,7 @@ import 'agent_novel_picker_dialog.dart';
 
 class AgentChatHeader extends ConsumerWidget {
   final VoidCallback? onHistory;
+  final VoidCallback? onNewSession;
   final VoidCallback? onConfig;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onClose;
@@ -24,6 +25,7 @@ class AgentChatHeader extends ConsumerWidget {
   const AgentChatHeader({
     super.key,
     this.onHistory,
+    this.onNewSession,
     this.onConfig,
     this.onToggleFullscreen,
     this.onClose,
@@ -80,6 +82,12 @@ class AgentChatHeader extends ConsumerWidget {
                 ),
                 color: colors.inkSoft,
                 onPressed: onToggleFullscreen,
+              ),
+              IconButton(
+                tooltip: '新建会话',
+                icon: Icon(AgentIcons.plus, size: 19),
+                color: colors.inkSoft,
+                onPressed: onNewSession,
               ),
               IconButton(
                 tooltip: '关闭',
@@ -189,7 +197,8 @@ class _ContextLine extends ConsumerWidget {
       label.write('尚未选择小说 · 点击选择');
     }
     return InkWell(
-      onTap: hasNovel ? null : () => _showNovelPicker(context),
+      // 未选小说时显示"点击选择"提示；已选小说时仍可点开换书（picker 既可选也可切换）。
+      onTap: () => _showNovelPicker(context, ref),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(children: [
@@ -210,10 +219,16 @@ class _ContextLine extends ConsumerWidget {
     );
   }
 
-  void _showNovelPicker(BuildContext context) {
-    showDialog(
+  /// 弹出小说选择对话框，并把用户选中的 novelId 走 ScenarioSession.selectNovel
+  /// 写入当前会话（与 select_novel 工具路径同一入口，UI 即时刷新 + 落库）。
+  ///
+  /// 注：picker 仅返回 novel.id，selectNovel 内部会用 getNovelById 装配 title/url。
+  Future<void> _showNovelPicker(BuildContext context, WidgetRef ref) async {
+    final novelId = await showDialog<int>(
       context: context,
       builder: (_) => const AgentNovelPickerDialog(),
     );
+    if (novelId == null) return; // 用户取消
+    await ref.read(currentSessionProvider)?.selectNovel(novelId);
   }
 }

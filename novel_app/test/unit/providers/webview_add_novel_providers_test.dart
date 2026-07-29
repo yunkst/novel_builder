@@ -193,6 +193,62 @@ void main() {
       );
       expect(script, isNull);
     });
+
+    /// 回归保护："首次添加书架必然触发 agent" bug 的根因文档。
+    ///
+    /// 场景：DB 里有该 domain 的脚本缓存，但 [webviewCurrentSiteScriptProvider]
+    /// 未被任何 widget watch 预热（与 _WebViewAddNovelFabState 只 watch
+    /// `webviewHasAddNovelButtonProvider`、点击时 read `valueOrNull` 的当前实现
+    /// 完全对应）。此时同步 `.valueOrNull` 必为 null → 误判无脚本 → agent 降级。
+    ///
+    /// 修复方式（webview_add_novel_button.dart）：点击处改用
+    /// `await ref.read(webviewCurrentSiteScriptProvider.future)`
+    /// 等待 Future 完成，再判断是否为 null。
+    ///
+    /// 本测试固化两点契约：
+    /// 1. 同步 `.valueOrNull` 在 Future 未预热时确实返回 null（bug 存在证明）
+    /// 2. `await .future` 必能拿到 DB 里的真实脚本（修复方向正确证明）
+    ///
+    /// 防止以后把 FAB 点击逻辑改回 `valueOrNull` 再次踩坑。
+    test(
+        '回归: 有脚本未预热时, 同步 valueOrNull 为 null; await future 拿到真实脚本',
+        () async {
+      // 预插入脚本
+      final db = container.read(databaseConnectionProvider).database;
+      await db.then((d) => d.insert('site_scripts', {
+            'id': 'warm-fix-script',
+            'domain': 'www.alicesw.com',
+            'url_pattern': '',
+            'chapter_list_js': '(async function(){})()',
+            'chapter_content_js': '',
+            'sample_url': 'https://www.alicesw.com/book/123',
+            'created_at': DateTime.now().millisecondsSinceEpoch,
+            'last_used_at': DateTime.now().millisecondsSinceEpoch,
+            'use_count': 0,
+            'verified': 0,
+          }));
+
+      // 设置 URL（domain 同步就绪，但 FutureProvider 未被任何 widget watch 预热）
+      container.read(webviewCurrentUrlProvider.notifier).state =
+          'https://www.alicesw.com/book/123';
+
+      // ❌ bug 路径：同步读 .valueOrNull —— Future 此刻在 loading，valueOrNull 为 null
+      //    即使 DB 里有该 domain 的脚本
+      final buggyValue =
+          container.read(webviewCurrentSiteScriptProvider).valueOrNull;
+      expect(
+        buggyValue,
+        isNull,
+        reason:
+            'Future 未预热/未完成时同步 valueOrNull 必为 null（首次点击误判无脚本的根因）',
+      );
+
+      // ✅ 修复路径：await .future 等 Future 跑完，拿 DB 真实结果
+      final fixedValue =
+          await container.read(webviewCurrentSiteScriptProvider.future);
+      expect(fixedValue, isNotNull);
+      expect(fixedValue!.domain, equals('www.alicesw.com'));
+    });
   });
 
   // ===================================================================
