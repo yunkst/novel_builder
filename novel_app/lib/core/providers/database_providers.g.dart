@@ -95,6 +95,31 @@ final chapterRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChapterRepositoryRef = AutoDisposeProviderRef<IChapterRepository>;
+String _$chapterWriterHash() => r'ee446e537a0a387f3e4ce2812f6a59bdd581ee9c';
+
+/// 章节写操作 Provider（仅 [ChapterMutationNotifier] 用）。
+///
+/// 通过 cast 拿到 [ChapterRepository] 的 [IChapterWriter] 能力（含 12 个原写方法
+/// + 2 个事务方法 `createCustomChapterWithShift` / `deleteChapterAndReindex`）。
+/// 普通调用方应使用 `chapterMutationProvider` 走收口路径——通过
+/// `IChapterRepository` 类型拿不到写能力，编译期阻止绕过 Notifier 直接写库
+/// （正是「agent 写完章节列表不刷新」bug 的根因）。
+///
+/// Copied from [chapterWriter].
+@ProviderFor(chapterWriter)
+final chapterWriterProvider = AutoDisposeProvider<IChapterWriter>.internal(
+  chapterWriter,
+  name: r'chapterWriterProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$chapterWriterHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ChapterWriterRef = AutoDisposeProviderRef<IChapterWriter>;
 String _$chapterVersionRepositoryHash() =>
     r'0f200a89492b11e16cebb073e68273bf82039277';
 

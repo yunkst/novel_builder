@@ -67,6 +67,18 @@ IChapterRepository chapterRepository(Ref ref) {
   return ChapterRepository(dbConnection: dbConnection, versionRepo: versionRepo);
 }
 
+/// 章节写操作 Provider（仅 [ChapterMutationNotifier] 用）。
+///
+/// 通过 cast 拿到 [ChapterRepository] 的 [IChapterWriter] 能力（含 12 个原写方法
+/// + 2 个事务方法 `createCustomChapterWithShift` / `deleteChapterAndReindex`）。
+/// 普通调用方应使用 `chapterMutationProvider` 走收口路径——通过
+/// `IChapterRepository` 类型拿不到写能力，编译期阻止绕过 Notifier 直接写库
+/// （正是「agent 写完章节列表不刷新」bug 的根因）。
+@riverpod
+IChapterWriter chapterWriter(Ref ref) {
+  return ref.watch(chapterRepositoryProvider) as ChapterRepository;
+}
+
 /// ChapterVersionRepository Provider
 ///
 /// 章节历史版本的持久化操作
