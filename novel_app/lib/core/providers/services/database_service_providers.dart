@@ -61,6 +61,7 @@ ChapterLoader chapterLoader(Ref ref) {
   final novelRepository = ref.watch(novelRepositoryProvider);
   final chapterListHeadlessService = ref.watch(headlessWebViewChapterListServiceProvider);
   return ChapterLoader(
+    ref: ref,
     api: apiService,
     chapterRepository: chapterRepository,
     novelRepository: novelRepository,
@@ -127,10 +128,7 @@ ChapterActionHandler chapterActionHandler(Ref ref) {
 /// - 保存操作会持久化到数据库
 @riverpod
 ChapterReorderController chapterReorderController(Ref ref) {
-  final chapterRepository = ref.watch(chapterRepositoryProvider);
-  return ChapterReorderController(
-    chapterRepository: chapterRepository,
-  );
+  return ChapterReorderController();
 }
 
 /// ChapterSearchService Provider

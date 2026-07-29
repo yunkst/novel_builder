@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../core/providers/chapter_list_providers.dart';
+import '../core/providers/chapter_mutation_provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../widgets/agent_chat/agent_floating_button.dart';
-import '../core/providers/service_providers.dart';
 import '../widgets/chapter_list/chapter_list_header.dart';
 import '../widgets/chapter_list/chapter_list_item.dart';
 import '../widgets/chapter_list/reorderable_chapter_item.dart';
@@ -697,14 +697,14 @@ class _ChapterListScreenRiverpodState
     final insertIndex = state.chapters.isEmpty ? 0 : afterIndex + 1;
 
     try {
-      final chapterActionHandler = ref.read(chapterActionHandlerProvider);
-
-      await chapterActionHandler.insertChapter(
-        novelUrl: widget.novel.url,
-        title: title,
-        content: content,
-        insertIndex: insertIndex,
-      );
+      // 走 ChapterMutationNotifier 收口：单事务 shift+insert + bump signal
+      // 触发章节列表软刷新
+      await ref.read(chapterMutationProvider.notifier).createChapter(
+            novelUrl: widget.novel.url,
+            title: title,
+            content: content,
+            insertIndex: insertIndex,
+          );
 
       // 刷新章节列表
       if (mounted) {
@@ -782,15 +782,16 @@ class _ChapterListScreenRiverpodState
   /// 删除章节
   Future<void> _deleteChapter(Chapter chapter) async {
     try {
-      final chapterActionHandler = ref.read(chapterActionHandlerProvider);
-
       // 显示加载提示
       if (mounted) {
         ToastUtils.show('正在删除章节...');
       }
 
-      // 调用数据库删除方法
-      await chapterActionHandler.deleteChapter(chapter.url);
+      // 走 ChapterMutationNotifier 收口：单事务 delete+reindex + bump signal
+      // 触发章节列表软刷新
+      await ref
+          .read(chapterMutationProvider.notifier)
+          .deleteChapter(widget.novel.url, chapter.url);
 
       // 重新加载章节列表
       if (mounted) {

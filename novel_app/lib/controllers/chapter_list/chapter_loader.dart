@@ -1,3 +1,6 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/chapter_mutation_provider.dart';
 import '../../models/chapter.dart';
 import '../../services/api_service_wrapper.dart';
 import '../../services/headless_webview_chapter_list_service.dart';
@@ -8,7 +11,11 @@ import '../../core/interfaces/repositories/i_novel_repository.dart';
 
 /// 章节加载器
 /// 负责章节列表的加载、刷新和缓存管理
+///
+/// 写路径（cacheNovelChapters）走 [ChapterMutationNotifier] 收口：
+/// 持有 `Ref` 调 `chapterMutationProvider`，写库 + bump signal 触发章节列表软刷新。
 class ChapterLoader {
+  final Ref _ref;
   final ApiServiceWrapper _api;
   final IChapterRepository _chapterRepo;
   final INovelRepository _novelRepo;
@@ -16,11 +23,13 @@ class ChapterLoader {
   final _log = LoggerService.instance;
 
   ChapterLoader({
+    required Ref ref,
     required ApiServiceWrapper api,
     required IChapterRepository chapterRepository,
     required INovelRepository novelRepository,
     required HeadlessWebViewChapterListService chapterListHeadlessService,
-  })  : _api = api,
+  })  : _ref = ref,
+        _api = api,
         _chapterRepo = chapterRepository,
         _novelRepo = novelRepository,
         _chapterListHeadlessService = chapterListHeadlessService;
@@ -121,8 +130,11 @@ class ChapterLoader {
 
       if (result.isSuccess) {
         final chapters = result.chapters;
-        // 缓存章节列表
-        await _chapterRepo.cacheNovelChapters(novelUrl, chapters);
+        // 缓存章节列表：走 ChapterMutationNotifier 收口（写库 + bump signal
+        // 触发章节列表软刷新）
+        await _ref
+            .read(chapterMutationProvider.notifier)
+            .cacheNovelChapters(novelUrl, chapters);
         _log.i(
           '章节列表缓存在数据库: ${chapters.length}章',
           category: LogCategory.database,

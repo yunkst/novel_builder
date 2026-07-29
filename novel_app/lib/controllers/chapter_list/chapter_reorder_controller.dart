@@ -1,16 +1,13 @@
 import '../../models/chapter.dart';
-import '../../core/interfaces/repositories/i_chapter_repository.dart';
 import '../../services/logger_service.dart';
 
-/// 章节重排控制器
-/// 负责章节重排逻辑和保存
+/// 章节重排控制器（纯逻辑，无 DB 依赖）
+///
+/// 仅保留 [onReorder] 内存重排逻辑。持久化 [saveReorderedChapters] 已迁出，
+/// 由 [ChapterMutationNotifier.updateChaptersOrder] 统一收口（写库 + bump signal）。
+/// 调用方在 Notifier 层先 onReorder 得到重排列表，再调 updateChaptersOrder 持久化。
 class ChapterReorderController {
-  final IChapterRepository _chapterRepo;
-  final _log = LoggerService.instance;
-
-  ChapterReorderController({
-    required IChapterRepository chapterRepository,
-  }) : _chapterRepo = chapterRepository;
+  ChapterReorderController();
 
   /// 处理章节重排
   /// [oldIndex] 原始索引
@@ -30,42 +27,12 @@ class ChapterReorderController {
     final Chapter item = chapters.removeAt(oldIndex);
     chapters.insert(adjustedIndex, item);
 
-    _log.i(
+    LoggerService.instance.i(
       '章节重排: "${item.title}" 从 $oldIndex 移动到 $adjustedIndex',
       category: LogCategory.ui,
       tags: ['chapter-list', 'reorder'],
     );
 
     return chapters;
-  }
-
-  /// 保存重排后的章节顺序
-  /// [novelUrl] 小说URL
-  /// [chapters] 重排后的章节列表
-  Future<void> saveReorderedChapters({
-    required String novelUrl,
-    required List<Chapter> chapters,
-  }) async {
-    _log.d(
-      '保存重排后的章节顺序: ${chapters.length}章',
-      category: LogCategory.database,
-      tags: ['chapter', 'reorder'],
-    );
-    try {
-      await _chapterRepo.updateChaptersOrder(novelUrl, chapters);
-      _log.i(
-        '章节重排保存成功: ${chapters.length}章',
-        category: LogCategory.ui,
-        tags: ['chapter-list', 'reorder'],
-      );
-    } catch (e, st) {
-      _log.e(
-        '章节重排保存失败: $novelUrl - $e',
-        stackTrace: st.toString(),
-        category: LogCategory.database,
-        tags: ['chapter', 'reorder'],
-      );
-      rethrow;
-    }
   }
 }
