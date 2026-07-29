@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
@@ -18,24 +19,34 @@ import 'package:novel_app/services/headless_webview_chapter_list_service.dart';
 ])
 import 'custom_novel_init_failure_test.mocks.dart';
 
+/// 测试用：从 ProviderContainer 取 Ref 注入 ChapterLoader。
+/// 本测试只覆盖 custom:// 小说的只读 loadChapters/refreshFromBackend 路径，
+/// 不触达 chapterMutationProvider（custom 分支直接 return getCachedNovelChapters）。
+final _testRefProvider = Provider<Ref>((ref) => ref);
+
 void main() {
   group('自定义小说初始化失败Bug测试', () {
     late MockApiServiceWrapper mockApi;
     late MockIChapterRepository mockChapterRepo;
     late MockINovelRepository mockNovelRepo;
     late ChapterLoader chapterLoader;
+    late ProviderContainer container;
 
     setUp(() {
       mockApi = MockApiServiceWrapper();
       mockChapterRepo = MockIChapterRepository();
       mockNovelRepo = MockINovelRepository();
+      container = ProviderContainer();
       chapterLoader = ChapterLoader(
+        ref: container.read(_testRefProvider),
         api: mockApi,
         chapterRepository: mockChapterRepo,
         novelRepository: mockNovelRepo,
         chapterListHeadlessService: MockHeadlessWebViewChapterListService(),
       );
     });
+
+    tearDown(() => container.dispose());
 
     test('场景1: 自定义小说应该从数据库加载章节，不需要API初始化', () async {
       // Arrange
