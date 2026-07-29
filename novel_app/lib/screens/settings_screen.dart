@@ -423,6 +423,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   });
                 },
               ),
+              ListTile(
+                leading:
+                    Icon(Icons.feedback_outlined, color: appColors.neutral),
+                title: const Text('问题反馈'),
+                subtitle: const Text('报告 Bug 或提出功能建议'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: _openFeedback,
+              ),
             ],
           ),
 
@@ -508,6 +516,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// 打开 GitHub issues/new 页,GitHub 会显示 3 个 Issue Forms 模板选择器
+  /// (Bug 报告 / 功能建议 / 提问),由用户自行选择。
+  ///
+  /// 异常吞掉(无浏览器等),与「支持项目 → 去 GitHub 点 Star」入口范式一致。
+  Future<void> _openFeedback() async {
+    try {
+      await launchUrl(
+        Uri.parse('$kGitHubRepo/issues/new'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      // 静默
+    }
   }
 
   /// 获取主题模式显示文本
