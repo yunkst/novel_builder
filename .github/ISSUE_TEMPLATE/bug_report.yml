@@ -1,0 +1,65 @@
+name: Bug 报告
+description: 报告 App 崩溃、功能异常、提取脚本问题等
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 触发该问题的具体步骤(编号列出)
+      placeholder: |
+        1. 打开「xxx」页面
+        2. 点击「xxx」按钮
+        3. 输入「xxx」内容
+        4. 实际结果与期望不符
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 你认为应该发生什么
+    validations:
+      required: false
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么,包含错误信息、截图描述等
+    validations:
+      required: true
+  - type: input
+    id: app_version
+    attributes:
+      label: App 版本
+      description: "设置 → 关于应用 里的版本号,如 2.0.2-preview.5+114"
+      placeholder: "2.0.2-preview.5+114"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - Android
+        - iOS
+        - Windows
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: site_url
+    attributes:
+      label: 涉及的小说站点 URL
+      description: 如果是站点提取/OCR 问题,填对应小说目录页 URL;否则留空
+      placeholder: "https://example.com/book/123"
+    validations:
+      required: false
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 截图 / 日志
+      description: 可拖图,可贴 LLM 调用日志(设置 → LLM 调用日志)
+    validations:
+      required: false

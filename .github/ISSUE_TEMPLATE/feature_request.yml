@@ -1,0 +1,26 @@
+name: 功能建议
+description: 提出新功能或对现有功能的改进建议
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决的问题 / 场景
+      description: 你在什么场景下遇到不便?为什么想做这个?
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: 期望的效果
+      description: 描述你希望的新行为或界面
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在的临时办法
+      description: 你目前是怎么绕过这个问题的?
+    validations:
+      required: false
