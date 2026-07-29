@@ -3,7 +3,18 @@ import '../../../models/search_result.dart';
 
 /// 章节数据仓库接口
 ///
-/// 负责章节内容缓存、章节列表管理和用户自定义章节的数据访问操作
+/// 负责章节内容缓存、章节列表管理和用户自定义章节的数据访问操作。
+///
+/// ## 写方法脱钩说明（2026-07-29 章节写入收口重构）
+///
+/// 12 个写方法已从本接口迁出到内部 `IChapterWriter`（定义在
+/// `lib/repositories/chapter_repository.dart`），仅 [ChapterMutationNotifier]
+/// 通过 `chapterWriterProvider` 持有写能力。普通调用方持有 `IChapterRepository`
+/// 类型拿不到写方法，编译期阻止绕过 Notifier 直接写库——正是「agent 写完章节
+/// 列表不刷新」bug 的根因。
+///
+/// 所有调用点必须改走 `chapterMutationProvider` 收口路径（参见 plan
+/// `docs/superpowers/plans/2026-07-29-chapter-mutation-notifier.md`）。
 abstract class IChapterRepository {
   // ========== 章节缓存管理 ==========
 
@@ -31,32 +42,7 @@ abstract class IChapterRepository {
   /// 清理内存状态
   void clearMemoryState();
 
-  // ========== 章节内容CRUD ==========
-
-  /// 缓存章节内容
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapter] 章节对象
-  /// [content] 章节内容
-  /// 返回新插入记录的ID
-  Future<int> cacheChapter(String novelUrl, Chapter chapter, String content);
-
-  /// 更新章节内容
-  ///
-  /// 在覆盖之前自动将旧内容保存为历史版本（最多保留5个版本）。
-  ///
-  /// [chapterUrl] 章节的URL
-  /// [content] 新的章节内容
-  /// [source] 版本来源：'edit'（用户编辑）| 'ai_rewrite'（AI改写）| 'restore'（还原操作）
-  /// 返回受影响的行数
-  Future<int> updateChapterContent(String chapterUrl, String content,
-      {String source = 'edit'});
-
-  /// 删除章节缓存
-  ///
-  /// [chapterUrl] 章节的URL
-  /// 返回受影响的行数
-  Future<int> deleteChapterCache(String chapterUrl);
+  // ========== 章节内容查询 ==========
 
   /// 获取缓存的章节内容
   ///
@@ -70,19 +56,7 @@ abstract class IChapterRepository {
   /// 返回章节列表，按章节索引升序排列
   Future<List<Chapter>> getCachedChapters(String novelUrl);
 
-  /// 删除小说的所有缓存章节
-  ///
-  /// [novelUrl] 小说的URL
-  /// 返回受影响的行数
-  Future<int> deleteCachedChapters(String novelUrl);
-
-  // ========== 章节列表管理 ==========
-
-  /// 缓存小说章节列表
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapters] 章节列表
-  Future<void> cacheNovelChapters(String novelUrl, List<Chapter> chapters);
+  // ========== 章节列表查询 ==========
 
   /// 获取缓存的章节列表
   ///
@@ -90,7 +64,7 @@ abstract class IChapterRepository {
   /// 返回章节列表，按章节索引升序排列
   Future<List<Chapter>> getCachedNovelChapters(String novelUrl);
 
-  // ========== 用户自定义章节 ==========
+  // ========== 用户自定义章节判定 ==========
 
   /// 判断是否为本地章节
   ///
@@ -101,42 +75,7 @@ abstract class IChapterRepository {
         chapterUrl.startsWith('user_chapter_');
   }
 
-  /// 创建用户自定义章节
-  ///
-  /// [novelUrl] 小说的URL
-  /// [title] 章节标题
-  /// [content] 章节内容
-  /// [index] 可选的章节索引，如果未提供则使用最大索引+1
-  /// 返回新创建章节的索引
-  Future<int> createCustomChapter(String novelUrl, String title, String content,
-      [int? index]);
-
-  /// 更新用户创建的章节内容
-  ///
-  /// [chapterUrl] 章节的URL
-  /// [title] 新的章节标题
-  /// [content] 新的章节内容
-  Future<void> updateCustomChapter(
-      String chapterUrl, String title, String content);
-
-  /// 删除用户创建的章节
-  ///
-  /// [chapterUrl] 章节的URL
-  Future<void> deleteCustomChapter(String chapterUrl);
-
-  /// 将指定小说中 chapterIndex >= [fromIndex] 的所有章节的 chapterIndex +1
-  ///
-  /// 用于在指定位置插入新章节时，为新章节腾出 chapterIndex 空间。
-  /// 同时更新 novel_chapters 和 chapter_cache 两张表。
-  Future<void> shiftChapterIndicesFrom(String novelUrl, int fromIndex);
-
-  // ========== 阅读状态 ==========
-
-  /// 标记章节为已读
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapterUrl] 章节的URL
-  Future<void> markChapterAsRead(String novelUrl, String chapterUrl);
+  // ========== 阅读状态查询 ==========
 
   /// 获取已缓存的章节数量（实际有内容的章节）
   ///
@@ -149,16 +88,6 @@ abstract class IChapterRepository {
   /// [novelUrl] 小说的URL
   /// 返回 novel_chapters 表中的章节总数
   Future<int> getTotalChaptersCount(String novelUrl);
-
-  // ========== 章节排序 ==========
-
-  /// 更新章节顺序
-  ///
-  /// [novelUrl] 小说的URL
-  /// [chapters] 要排序的章节列表
-  ///
-  /// 批量更新章节的索引值，用于章节重排序功能
-  Future<void> updateChaptersOrder(String novelUrl, List<Chapter> chapters);
 
   // ========== 章节内容搜索 ==========
 
@@ -191,13 +120,6 @@ abstract class IChapterRepository {
   /// [id] novel_chapters.id
   /// 返回是否存在的布尔值
   Future<bool> chapterExistsById(int id);
-
-  /// 根据 ID 更新章节内容（解析 URL 后委托 updateChapterContent）
-  ///
-  /// [id] novel_chapters.id
-  /// [content] 新的章节内容
-  /// 返回受影响的行数，ID 不存在则返回 0
-  Future<int> updateChapterContentById(int id, String content);
 
   /// 根据 URL 获取章节 ID（搜索结果用）
   ///

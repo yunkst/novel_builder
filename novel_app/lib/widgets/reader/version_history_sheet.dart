@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/chapter_mutation_provider.dart';
 import '../../core/providers/database_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/chapter_version.dart';
@@ -14,12 +15,14 @@ import '../empty_states/empty_state_view.dart';
 class VersionHistorySheet extends ConsumerStatefulWidget {
   final String chapterUrl;
   final String chapterTitle;
+  final String novelUrl; // 章节所属小说 URL（还原走 ChapterMutationNotifier 收口）
   final VoidCallback onRestored; // 还原后刷新阅读器的回调
 
   const VersionHistorySheet({
     super.key,
     required this.chapterUrl,
     required this.chapterTitle,
+    required this.novelUrl,
     required this.onRestored,
   });
 
@@ -28,6 +31,7 @@ class VersionHistorySheet extends ConsumerStatefulWidget {
     BuildContext context, {
     required String chapterUrl,
     required String chapterTitle,
+    required String novelUrl,
     required VoidCallback onRestored,
   }) {
     return showModalBottomSheet(
@@ -36,6 +40,7 @@ class VersionHistorySheet extends ConsumerStatefulWidget {
       builder: (context) => VersionHistorySheet(
         chapterUrl: chapterUrl,
         chapterTitle: chapterTitle,
+        novelUrl: novelUrl,
         onRestored: onRestored,
       ),
     );
@@ -294,12 +299,12 @@ class _VersionHistorySheetState extends ConsumerState<VersionHistorySheet> {
     if (confirmed != true || !mounted) return;
 
     try {
-      // updateChapterContent 会自动保存旧当前版本（source='restore'）
-      final chapterRepo = ref.read(chapterRepositoryProvider);
-      await chapterRepo.updateChapterContent(
+      // 走 ChapterMutationNotifier 收口：写库 + bump signal 触发章节列表软刷新。
+      await ref.read(chapterMutationProvider.notifier).updateChapterContent(
         widget.chapterUrl,
         version.content,
         source: 'restore',
+        novelUrl: widget.novelUrl,
       );
 
       if (mounted) {

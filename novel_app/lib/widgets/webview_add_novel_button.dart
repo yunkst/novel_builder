@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/agent_launcher_providers.dart';
 import '../core/providers/bookshelf_mutation_provider.dart';
+import '../core/providers/chapter_mutation_provider.dart';
 import '../core/providers/webview_add_novel_providers.dart';
 import '../core/providers/webview_providers.dart';
 import '../core/providers/database_providers.dart';
@@ -342,11 +343,12 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
   // ===================================================================
 
   /// 将章节列表持久化到 novel_chapters 表
+  ///
+  /// 走 ChapterMutationNotifier 收口：写库 + bump signal 触发章节列表软刷新。
   Future<void> _saveChapters(
     String novelUrl,
     List<Map<String, String>> chaptersData,
   ) async {
-    final chapterRepo = ref.read(chapterRepositoryProvider);
     final chapters = chaptersData.asMap().entries.map((e) {
       return Chapter(
         title: e.value['title']!,
@@ -354,7 +356,10 @@ class _WebViewAddNovelFabState extends ConsumerState<WebViewAddNovelFab> {
         chapterIndex: e.key,
       );
     }).toList();
-    await chapterRepo.cacheNovelChapters(novelUrl, chapters);
+    await ref.read(chapterMutationProvider.notifier).cacheNovelChapters(
+          novelUrl,
+          chapters,
+        );
   }
 
   /// 标记脚本已使用（use_count + 1）
