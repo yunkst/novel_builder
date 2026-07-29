@@ -29,7 +29,6 @@ import '../models/novel.dart';
 import '../models/chapter.dart';
 import '../models/search_result.dart';
 import '../services/api_service_wrapper.dart';
-import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../mixins/reader/auto_scroll_mixin.dart';
 import '../widgets/reader_settings_dialog.dart'; // 阅读设置合并对话框（字体大小/文字亮度/滚动速度）
 import '../widgets/reader_action_buttons.dart'; // 新增导入
@@ -43,6 +42,7 @@ import '../services/logger_service.dart';
 import '../utils/error_helper.dart';
 // Riverpod Providers
 import '../core/providers/services/network_service_providers.dart';
+import '../core/providers/chapter_mutation_provider.dart';
 import '../core/providers/database_providers.dart';
 import '../core/providers/reader_settings_state.dart';
 import '../core/providers/reader_edit_mode_provider.dart';
@@ -78,9 +78,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         TickerProviderStateMixin,
         AutoScrollMixin {
   late final ApiServiceWrapper _apiService;
-
-  // ========== Repository Getters (替代 DatabaseService) ==========
-  IChapterRepository get _chapterRepo => ref.read(chapterRepositoryProvider);
 
   final ScrollController _scrollController = ScrollController();
 
@@ -203,11 +200,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       preloadService.resume();
     }
 
-    // 标记章节为已读
-    await _chapterRepo.markChapterAsRead(
-      widget.novel.url,
-      _currentChapter.url,
-    );
+    // 标记章节为已读（走 ChapterMutationNotifier 收口：写库 + bump signal
+    // 触发章节列表已读高亮软刷新）
+    await ref.read(chapterMutationProvider.notifier).markChapterAsRead(
+          widget.novel.url,
+          _currentChapter.url,
+        );
 
     // 处理滚动位置（保留在 reader_screen 中，因为这涉及到 ScrollController）
     _handleScrollPosition(resetScrollPosition);
@@ -469,6 +467,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       context,
       chapterUrl: _currentChapter.url,
       chapterTitle: _currentChapter.title,
+      novelUrl: widget.novel.url,
       onRestored: () {
         // 还原后重新加载章节内容
         _loadChapterContent(resetScrollPosition: false);
@@ -550,8 +549,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 // ============ Content Editing ============
   Future<void> _saveEditedContent() async {
     try {
-      await _chapterRepo.updateChapterContent(
-          _currentChapter.url, _contentController.content);
+      // 走 ChapterMutationNotifier 收口：写库 + bump signal 触发章节列表软刷新
+      await ref.read(chapterMutationProvider.notifier).updateChapterContent(
+        _currentChapter.url,
+        _contentController.content,
+        source: 'edit',
+        novelUrl: widget.novel.url,
+      );
 
       if (mounted) {
         ToastUtils.showSuccess('章节内容已保存', context: context);

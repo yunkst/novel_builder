@@ -10,6 +10,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/providers/chapter_mutation_provider.dart';
 import '../../../core/providers/database_providers.dart';
 import '../../../core/providers/services/ai_service_providers.dart';
 import '../../../models/character.dart';
@@ -113,16 +114,18 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
     }
     final newContent = ContentSanitizer.sanitize(generateResult.content!);
 
-    // 插入章节：先腾出位置，再创建
+    // 插入章节：走 ChapterMutationNotifier 收口（单事务 shift+insert + bump signal
+    // 触发章节列表软刷新）。insertIndex = position - 1（0-based）。
     final insertIndex = position - 1; // 0-based
     try {
-      await chapterRepo.shiftChapterIndicesFrom(novelUrl, insertIndex);
-      await chapterRepo.createCustomChapter(
-        novelUrl,
-        chapterTitle,
-        newContent,
-        insertIndex,
-      );
+      await ref
+          .read(chapterMutationProvider.notifier)
+          .createChapter(
+            novelUrl: novelUrl,
+            title: chapterTitle,
+            content: newContent,
+            insertIndex: insertIndex,
+          );
     } catch (e, stack) {
       LoggerService.instance.e('创建章节入库失败: $e',
           stackTrace: stack.toString(),
@@ -182,6 +185,7 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
       return jsonEncode(resolveResult.errorJson);
     }
     final chapterUrl = resolveResult.chapterUrl!;
+    final novelUrl = resolveResult.novelUrl!;
 
     final chapterRepo = ref.read(chapterRepositoryProvider);
     final originalContent = await chapterRepo.getCachedChapter(chapterUrl);
@@ -213,11 +217,14 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
       return jsonEncode({'error': errorCode, 'message': e.message});
     }
 
-    final affected = await chapterRepo.updateChapterContent(
-      chapterUrl,
-      newContent,
-      source: 'ai_edit',
-    );
+    final affected = await ref
+        .read(chapterMutationProvider.notifier)
+        .updateChapterContent(
+          chapterUrl,
+          newContent,
+          source: 'ai_edit',
+          novelUrl: novelUrl,
+        );
     if (affected == 0) {
       LoggerService.instance.d(
         '工具引导错误: chapter_not_found position=$position',
@@ -307,7 +314,14 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
     final newContent = ContentSanitizer.sanitize(rewriteResult.content!);
 
     // 保存到数据库
-    final affected = await chapterRepo.updateChapterContent(chapterUrl, newContent, source: 'ai_rewrite');
+    final affected = await ref
+        .read(chapterMutationProvider.notifier)
+        .updateChapterContent(
+          chapterUrl,
+          newContent,
+          source: 'ai_rewrite',
+          novelUrl: novelUrl,
+        );
     if (affected == 0) {
       LoggerService.instance.d(
         '工具引导错误: chapter_not_found position=$position',
@@ -370,15 +384,14 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
     final deletedTitle = deletedChapter.title;
     final deletedIndex = deletedChapter.chapterIndex;
 
-    // 1) 同时清两张表
-    await chapterRepo.deleteCustomChapter(chapterUrl);
+    // 单事务：delete 两表 + 剩余章节 chapterIndex 连续化，走 ChapterMutationNotifier
+    // 收口（bump signal 触发章节列表软刷新）。替代原 delete+重读+cacheNovelChapters 三步。
+    await ref.read(chapterMutationProvider.notifier).deleteChapter(
+          novelUrl,
+          chapterUrl,
+        );
 
-    // 2) 触发索引重排：把剩余章节重新 cacheNovelChapters，内部会把 chapterIndex
-    //    连续化为 0,1,2...。注意：仅传剩余章节，避免对已删除行做无用 upsert。
     final remaining = await chapterRepo.getCachedNovelChapters(novelUrl);
-    if (remaining.isNotEmpty) {
-      await chapterRepo.cacheNovelChapters(novelUrl, remaining);
-    }
 
     LoggerService.instance.i(
         '删除章节: novelUrl=$novelUrl position=$position title="$deletedTitle" index=$deletedIndex',

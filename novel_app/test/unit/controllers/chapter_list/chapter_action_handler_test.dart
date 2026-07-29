@@ -1,7 +1,9 @@
 /// ChapterActionHandler 章节操作处理器单元测试
 ///
-/// 使用 mockito Mock IChapterRepository，
-/// 验证章节操作的业务逻辑（插入/删除/缓存检查）。
+/// Controller 重构（2026-07-29 章节写入收口）后，仅保留 [isChapterCached]
+/// 只读委托。原 insertChapter / deleteChapter 写方法已迁出至
+/// `ChapterMutationNotifier`（createChapter / deleteChapter），其收口 + bump
+/// signal 语义由 `chapter_mutation_provider_test.dart` 覆盖。
 ///
 /// 运行:
 ///   cd novel_app
@@ -14,7 +16,7 @@ import 'package:mockito/mockito.dart';
 import 'package:novel_app/controllers/chapter_list/chapter_action_handler.dart';
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart';
 
-// 生成 MockIChapterRepository
+// 生成 MockIChapterRepository（接口脱钩后写方法已移除，mock 仅需 mock isChapterCached）
 @GenerateMocks([IChapterRepository])
 import 'chapter_action_handler_test.mocks.dart';
 
@@ -27,131 +29,33 @@ void main() {
     handler = ChapterActionHandler(chapterRepository: mockRepo);
   });
 
-  group('ChapterActionHandler', () {
-    group('insertChapter', () {
-      test('应先调用 shiftChapterIndicesFrom 再调用 createCustomChapter', () async {
-        when(mockRepo.shiftChapterIndicesFrom(any, any))
-            .thenAnswer((_) async {});
-        when(mockRepo.createCustomChapter(any, any, any, any))
-            .thenAnswer((_) async => 1);
+  group('ChapterActionHandler - isChapterCached', () {
+    test('应委托给 repository.isChapterCached', () async {
+      when(mockRepo.isChapterCached('chapter_url'))
+          .thenAnswer((_) async => true);
 
-        await handler.insertChapter(
-          novelUrl: 'novel_url',
-          title: '新章节',
-          content: '章节内容',
-          insertIndex: 5,
-        );
+      final result = await handler.isChapterCached('chapter_url');
 
-        // 验证调用顺序：先 shift 再 create
-        verifyInOrder([
-          mockRepo.shiftChapterIndicesFrom('novel_url', 5),
-          mockRepo.createCustomChapter('novel_url', '新章节', '章节内容', 5),
-        ]);
-      });
-
-      test('中间位置插入时应先 shift 再 create', () async {
-        when(mockRepo.shiftChapterIndicesFrom(any, any))
-            .thenAnswer((_) async {});
-        when(mockRepo.createCustomChapter(any, any, any, any))
-            .thenAnswer((_) async => 1);
-
-        await handler.insertChapter(
-          novelUrl: 'novel_url',
-          title: '中间插入',
-          content: '内容',
-          insertIndex: 3,
-        );
-
-        verify(mockRepo.shiftChapterIndicesFrom('novel_url', 3)).called(1);
-        verify(mockRepo.createCustomChapter('novel_url', '中间插入', '内容', 3))
-            .called(1);
-      });
-
-      test('insertIndex 为 0 时也应先 shift', () async {
-        when(mockRepo.shiftChapterIndicesFrom(any, any))
-            .thenAnswer((_) async {});
-        when(mockRepo.createCustomChapter(any, any, any, any))
-            .thenAnswer((_) async => 1);
-
-        await handler.insertChapter(
-          novelUrl: 'novel_url',
-          title: '首位置插入',
-          content: '内容',
-          insertIndex: 0,
-        );
-
-        verify(mockRepo.shiftChapterIndicesFrom('novel_url', 0)).called(1);
-        verify(mockRepo.createCustomChapter('novel_url', '首位置插入', '内容', 0))
-            .called(1);
-      });
-
-      test('repository 抛出异常时应 rethrow', () async {
-        when(mockRepo.shiftChapterIndicesFrom(any, any))
-            .thenAnswer((_) async {});
-        when(mockRepo.createCustomChapter(any, any, any, any))
-            .thenThrow(Exception('数据库错误'));
-
-        expect(
-          () => handler.insertChapter(
-            novelUrl: 'novel_url',
-            title: '新章节',
-            content: '内容',
-            insertIndex: 0,
-          ),
-          throwsException,
-        );
-      });
+      expect(result, isTrue);
+      verify(mockRepo.isChapterCached('chapter_url')).called(1);
     });
 
-    group('deleteChapter', () {
-      test('应调用 repository.deleteCustomChapter', () async {
-        when(mockRepo.deleteCustomChapter('custom://chapter_1'))
-            .thenAnswer((_) async {});
+    test('应正确返回 false（未缓存）', () async {
+      when(mockRepo.isChapterCached('chapter_url'))
+          .thenAnswer((_) async => false);
 
-        await handler.deleteChapter('custom://chapter_1');
+      final result = await handler.isChapterCached('chapter_url');
 
-        verify(mockRepo.deleteCustomChapter('custom://chapter_1')).called(1);
-      });
-
-      test('repository 抛出异常时应 rethrow', () async {
-        when(mockRepo.deleteCustomChapter(any))
-            .thenThrow(Exception('删除失败'));
-
-        expect(
-          () => handler.deleteChapter('custom://chapter_1'),
-          throwsException,
-        );
-      });
+      expect(result, isFalse);
     });
 
-    group('isChapterCached', () {
-      test('应委托给 repository.isChapterCached', () async {
-        when(mockRepo.isChapterCached('chapter_url'))
-            .thenAnswer((_) async => true);
+    test('repository 异常时应 rethrow', () async {
+      when(mockRepo.isChapterCached(any)).thenThrow(Exception('查询失败'));
 
-        final result = await handler.isChapterCached('chapter_url');
-
-        expect(result, isTrue);
-        verify(mockRepo.isChapterCached('chapter_url')).called(1);
-      });
-
-      test('应正确返回 false（未缓存）', () async {
-        when(mockRepo.isChapterCached('chapter_url'))
-            .thenAnswer((_) async => false);
-
-        final result = await handler.isChapterCached('chapter_url');
-
-        expect(result, isFalse);
-      });
-
-      test('repository 异常时应 rethrow', () async {
-        when(mockRepo.isChapterCached(any)).thenThrow(Exception('查询失败'));
-
-        expect(
-          () => handler.isChapterCached('chapter_url'),
-          throwsException,
-        );
-      });
+      expect(
+        () => handler.isChapterCached('chapter_url'),
+        throwsException,
+      );
     });
   });
 }

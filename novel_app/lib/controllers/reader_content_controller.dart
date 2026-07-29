@@ -6,6 +6,7 @@ import '../services/headless_webview_content_service.dart';
 import '../services/headless_webview_errors.dart';
 import '../core/interfaces/repositories/i_chapter_repository.dart';
 import '../core/providers/bookshelf_mutation_provider.dart';
+import '../core/providers/chapter_mutation_provider.dart';
 import '../core/providers/reader_state_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -162,11 +163,13 @@ class ReaderContentController {
       }
 
       // 验证通过，缓存章节（forceRefresh时覆盖旧缓存）
-      await _chapterRepository.cacheChapter(
-        novel.url,
-        chapter,
-        content,
-      );
+      // 走 ChapterMutationNotifier 收口：写库 + bump signal 触发章节列表软刷新
+      // （isCached 标记实时变 true）
+      await _ref.read(chapterMutationProvider.notifier).cacheChapter(
+            novel.url,
+            chapter,
+            content,
+          );
       LoggerService.instance.i(
         'ReaderContentController: 已缓存章节 - ${content.length}字符',
         category: LogCategory.ui,

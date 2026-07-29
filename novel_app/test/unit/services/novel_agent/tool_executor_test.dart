@@ -19,6 +19,7 @@ import 'package:sqflite_common/sqflite.dart';
 
 import 'package:novel_app/core/database/database_connection.dart';
 import 'package:novel_app/core/interfaces/repositories/i_chapter_repository.dart';
+import 'package:novel_app/repositories/chapter_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_character_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_novel_repository.dart';
 import 'package:novel_app/core/interfaces/repositories/i_outline_repository.dart';
@@ -54,6 +55,11 @@ void main() {
   late Database db;
   late INovelRepository novelRepo;
   late IChapterRepository chapterRepo;
+  // fixture 准备需要直接调写方法（cacheChapter/cacheNovelChapters 等），
+  // 这些方法在 2026-07-29 接口脱钩后已从 IChapterRepository 移除，
+  // 仅 ChapterRepository 实现类保留。Fixture 是测试基础设施，绕过 Notifier 收口
+  // 直接写库可接受（不需要触发章节列表刷新语义）。
+  late ChapterRepository chapterRepoImpl;
   late ICharacterRepository characterRepo;
   late IOutlineRepository outlineRepo;
 
@@ -67,6 +73,7 @@ void main() {
     );
     novelRepo = container.read(novelRepositoryProvider);
     chapterRepo = container.read(chapterRepositoryProvider);
+    chapterRepoImpl = chapterRepo as ChapterRepository;
     characterRepo = container.read(characterRepositoryProvider);
     outlineRepo = container.read(outlineRepositoryProvider);
     executor = container.read(_toolExecutorProvider);
@@ -112,7 +119,7 @@ void main() {
     String content = '段落0\n\n段落1\n\n段落2',
     int chapterIndex = 0,
   }) async {
-    await chapterRepo.cacheChapter(
+    await chapterRepoImpl.cacheChapter(
       novelUrl,
       Chapter(
         title: title,
@@ -122,7 +129,7 @@ void main() {
       ),
       content,
     );
-    await chapterRepo.cacheNovelChapters(novelUrl, [
+    await chapterRepoImpl.cacheNovelChapters(novelUrl, [
       Chapter(
         title: title,
         url: chapterUrl,
@@ -796,7 +803,7 @@ void main() {
     test('章节未缓存 → not_cached', () async {
       final novelId = await insertNovel();
       // 插入章节列表元数据但不缓存正文内容
-      await chapterRepo.cacheNovelChapters(defaultNovelUrl, [
+      await chapterRepoImpl.cacheNovelChapters(defaultNovelUrl, [
         Chapter(title: '空章', url: 'https://example.com/empty', chapterIndex: 0),
       ]);
       final ctx = _ctx(novelId);
@@ -1586,8 +1593,8 @@ void main() {
         chapterIndex: 0,
         isCached: true,
       );
-      await chapterRepo.cacheChapter(novelUrl, chapter, '首章内容');
-      await chapterRepo.cacheNovelChapters(novelUrl, [chapter]);
+      await chapterRepoImpl.cacheChapter(novelUrl, chapter, '首章内容');
+      await chapterRepoImpl.cacheNovelChapters(novelUrl, [chapter]);
 
       final ctx = _writingContext(novelId, '链路测试');
 
