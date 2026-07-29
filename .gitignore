@@ -305,3 +305,7 @@ fanqie-now.png
 # OCR 准确率测试临时资产（番茄截图，PoC 用，别提交）
 novel_app/tool/ocr_test_assets/
 novel_app/lib/main_ocr_test.dart
+
+# 个人草稿/推广素材（本地保留，不进仓库）
+promo_covers/
+zhihu_article.md
