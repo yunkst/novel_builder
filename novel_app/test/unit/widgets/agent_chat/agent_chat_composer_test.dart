@@ -24,8 +24,9 @@ void main() {
   testWidgets('无文本时发送按钮禁用（onPressed null）', (tester) async {
     await tester.pumpWidget(_wrap(const AgentChatComposer()));
     await tester.pumpAndSettle();
-    // find.byTooltip 返回的 Tooltip widget；校验渲染存在即可
-    final sendBtn = tester.widget<Tooltip>(find.byTooltip('发送'));
-    expect(sendBtn, isNotNull);
+    // find.byTooltip 校验发送按钮渲染存在即可
+    // （不取 widget 强转 Tooltip：Flutter 升级后 byTooltip 命中的是 RawTooltip 子类，
+    //   不再是 Tooltip，as Tooltip 会抛 _TypeError）
+    expect(find.byTooltip('发送'), findsOneWidget);
   });
 }
