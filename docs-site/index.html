@@ -169,54 +169,6 @@
   .feat h3 { font-family: var(--serif); color: var(--ink); font-size: 20px; margin-bottom: 8px; }
   .feat p { font-size: 14.5px; color: var(--ink-soft); }
 
-  /* ============ 预览画廊（占位图） ============ */
-  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
-  .shot { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--paper); }
-  .shot .placeholder {
-    aspect-ratio: 16 / 10; display: grid; place-items: center; text-align: center; padding: 24px;
-    background:
-      repeating-linear-gradient(45deg, rgba(160,82,45,.04) 0 12px, transparent 12px 24px),
-      var(--bg-alt);
-    border-bottom: 1px dashed var(--accent-soft);
-  }
-  .shot .placeholder .pico { font-size: 30px; margin-bottom: 10px; opacity: .55; }
-  .shot .placeholder .pttl { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 16px; }
-  .shot .placeholder .pdesc { font-size: 13px; color: var(--ink-faint); margin-top: 6px; max-width: 320px; }
-  .shot .cap { padding: 16px 20px; }
-  .shot .cap .t { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 15px; }
-  .shot .cap .d { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
-
-  /* ============ 媒体卡片（录屏/截图/占位 三态） ============ */
-  .shot .media {
-    position: relative; aspect-ratio: 16 / 10; overflow: hidden;
-    background: var(--bg-alt);
-    border-bottom: 1px dashed var(--accent-soft);
-  }
-  /* 视频：自动循环静音播放（移动端兼容） */
-  .shot .media video,
-  .shot .media img.live {
-    width: 100%; height: 100%; object-fit: cover; display: block;
-  }
-  .shot .media video { background: var(--ink); }
-  /* 占位态（无视频无图片时显示） */
-  .shot .placeholder {
-    position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
-    background:
-      repeating-linear-gradient(45deg, rgba(160,82,45,.04) 0 12px, transparent 12px 24px),
-      var(--bg-alt);
-  }
-  .shot .placeholder .pico { font-size: 30px; margin-bottom: 10px; opacity: .55; }
-  .shot .placeholder .pttl { font-family: var(--serif); color: var(--ink); font-weight: 700; font-size: 16px; }
-  .shot .placeholder .pdesc { font-size: 13px; color: var(--ink-faint); margin-top: 6px; max-width: 320px; }
-  /* 播放角标（有视频时） */
-  .shot .badge-live {
-    position: absolute; top: 12px; left: 12px; z-index: 2;
-    font-size: 11.5px; color: #fff; background: rgba(43,38,32,.72);
-    padding: 4px 9px; border-radius: 5px; backdrop-filter: blur(4px);
-    display: none; align-items: center; gap: 6px;
-  }
-  .shot .badge-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #ff5f57; }
-
   /* ============ 技术栈 ============ */
   .stack-wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
   .stack-col { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); }
@@ -286,7 +238,6 @@
     .mockup { max-width: 520px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; }
     .feat-grid, .stack-wrap { grid-template-columns: 1fr; }
-    .gallery { grid-template-columns: 1fr; }
     .quick-dual { grid-template-columns: 1fr; gap: 22px; }
     .foot-grid { grid-template-columns: 1fr 1fr; }
   }
@@ -296,6 +247,21 @@
     .menu-toggle { display: block; }
     section.block { padding: 64px 0; }
     .foot-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ 竖屏视频（9:16 B 站 iframe）============ */
+  .video-portrait-wrap {
+    max-width: 380px; margin: 0 auto; position: relative;
+    aspect-ratio: 9 / 16; background: var(--ink);
+    border-radius: var(--radius); overflow: hidden;
+    box-shadow: var(--shadow-lg); border: 1px solid var(--line);
+  }
+  .video-portrait-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .video-portrait-tip { text-align: center; color: var(--ink-soft); font-size: 14px; margin-top: 18px; }
+  .video-portrait-tip a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .video-portrait-tip a:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    .video-portrait-wrap { max-width: 78%; }
   }
 </style>
 </head>
@@ -310,7 +276,6 @@
     </a>
     <nav class="nav-links" id="navLinks">
       <a href="#features">功能特性</a>
-      <a href="#preview">界面预览</a>
       <a href="#stack">技术栈</a>
       <a href="#quick">快速开始</a>
       <a class="btn btn-gh" href="https://github.com/yunkst/novel_builder" target="_blank" rel="noopener">★ GitHub</a>
@@ -387,6 +352,29 @@
     </div>
   </section>
 
+  <!-- ===================== 介绍视频（竖屏）===================== -->
+  <section class="block" id="intro-video" style="background: var(--bg-alt); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">DEMO VIDEO</div>
+        <h2 class="sec-title">一分钟看完这个 APP</h2>
+        <p class="sec-sub">视频比文字更直观 —— 看看书架、阅读、AI 改写与创作是怎么跑起来的。</p>
+      </div>
+      <div class="reveal" style="max-width: 380px; margin: 0 auto;">
+        <div class="video-portrait-wrap">
+          <iframe
+            src="//player.bilibili.com/player.html?isOutside=true&aid=117002224277450&bvid=BV1Vj3C6zEAa&cid=40403796793&p=1&autoplay=0&high_quality=1&danmaku=0"
+            scrolling="no" border="0" frameborder="no" framespacing="0"
+            allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+            referrerpolicy="no-referrer-when-downgrade"
+            loading="lazy">
+          </iframe>
+        </div>
+        <p class="video-portrait-tip">加载不出来？<a href="https://www.bilibili.com/video/BV1Vj3C6zEAa" target="_blank" rel="noopener">在 B 站打开 ›</a></p>
+      </div>
+    </div>
+  </section>
+
   <!-- ===================== 功能特性 ===================== -->
   <section class="block" id="features">
     <div class="wrap">
@@ -425,80 +413,6 @@
           <div class="ico">🕸️</div>
           <h3>角色关系图</h3>
           <p>智能提取章节角色信息，可视化人物关系网络，理清长篇人物脉络。</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== 界面预览（占位图） ===================== -->
-  <section class="block" id="preview" style="background: var(--bg-alt); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <div class="sec-kicker">PREVIEW</div>
-        <h2 class="sec-title">看看它长什么样</h2>
-        <p class="sec-sub">下方为占位示意 —— 发布前请替换为真实截图。</p>
-      </div>
-      <div class="gallery">
-        <!--
-          ====== 媒体素材清单（放到 docs-site/assets/ 下，文件名对应 data-video / data-img）======
-          每张卡片：有「录屏 .mp4」就自动循环静音播放；否则显示「截图 .png」；都没有则显示占位。
-          1) 书架主页    demo-bookshelf.mp4 / .png   录屏建议 5-10s，展示滑动、点进书目
-          2) 阅读界面    demo-reader.mp4 / .png       录屏建议 5-10s，展示翻页与排版
-          3) AI 对话     demo-agent.mp4 / .png        录屏建议 5-10s，展示流式输出
-          4) 角色关系图  demo-relation.mp4 / .png     录屏建议 5-10s，展示关系网络展开
-          录屏要求：H.264 编码、无声轨（页面会静音循环播放）；横屏 16:10 最佳。
-        -->
-        <div class="shot reveal" data-video="assets/demo-bookshelf.mp4" data-img="assets/demo-bookshelf.png">
-          <div class="media">
-            <span class="badge-live">录屏</span>
-            <div class="placeholder">
-              <div>
-                <div class="pico">📚</div>
-                <div class="pttl">书架主页</div>
-                <div class="pdesc">待填：demo-bookshelf.mp4<br />或 .png · 16:10</div>
-              </div>
-            </div>
-          </div>
-          <div class="cap"><div class="t">书架管理</div><div class="d">收藏、进度、分组一目了然</div></div>
-        </div>
-        <div class="shot reveal" data-video="assets/demo-reader.mp4" data-img="assets/demo-reader.png">
-          <div class="media">
-            <span class="badge-live">录屏</span>
-            <div class="placeholder">
-              <div>
-                <div class="pico">📖</div>
-                <div class="pttl">阅读界面</div>
-                <div class="pdesc">待填：demo-reader.mp4<br />或 .png · 16:10</div>
-              </div>
-            </div>
-          </div>
-          <div class="cap"><div class="t">沉浸阅读</div><div class="d">书卷质感排版，离线可读</div></div>
-        </div>
-        <div class="shot reveal" data-video="assets/demo-agent.mp4" data-img="assets/demo-agent.png">
-          <div class="media">
-            <span class="badge-live">录屏</span>
-            <div class="placeholder">
-              <div>
-                <div class="pico">🤖</div>
-                <div class="pttl">AI 智能对话</div>
-                <div class="pdesc">待填：demo-agent.mp4<br />或 .png · 16:10</div>
-              </div>
-            </div>
-          </div>
-          <div class="cap"><div class="t">Agent Chat</div><div class="d">DSL Engine + 智能对话</div></div>
-        </div>
-        <div class="shot reveal" data-video="assets/demo-relation.mp4" data-img="assets/demo-relation.png">
-          <div class="media">
-            <span class="badge-live">录屏</span>
-            <div class="placeholder">
-              <div>
-                <div class="pico">🕸️</div>
-                <div class="pttl">角色关系图</div>
-                <div class="pdesc">待填：demo-relation.mp4<br />或 .png · 16:10</div>
-              </div>
-            </div>
-          </div>
-          <div class="cap"><div class="t">人物关系</div><div class="d">可视化角色关系网络</div></div>
         </div>
       </div>
     </div>
@@ -668,41 +582,6 @@
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
   }, { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-
-  // ====== 媒体卡片：录屏优先 → 截图兜底 → 占位（自动降级） ======
-  document.querySelectorAll('.shot').forEach(shot => {
-    const media  = shot.querySelector('.media');
-    const ph     = shot.querySelector('.placeholder');
-    const badge  = shot.querySelector('.badge-live');
-    const vSrc   = shot.dataset.video;
-    const iSrc   = shot.dataset.img;
-
-    function showImg(src) {
-      const img = document.createElement('img');
-      img.src = src; img.alt = ''; img.className = 'live';
-      img.onerror = () => img.remove(); // 加载失败则保留占位
-      media.insertBefore(img, ph);
-    }
-    function showVideo(src) {
-      const v = document.createElement('video');
-      v.src = src; v.muted = true; v.loop = true; v.playsInline = true;
-      v.preload = 'auto'; v.autoplay = true;
-      v.onerror = () => {
-        v.remove();
-        if (badge) badge.style.display = 'none';
-        if (iSrc) showImg(iSrc);        // 视频失败 → 退回截图
-      };
-      v.addEventListener('canplay', () => {
-        if (ph) ph.style.display = 'none';
-        if (badge) badge.style.display = 'inline-flex';
-        v.play().catch(() => {});
-      }, { once: true });
-      media.insertBefore(v, ph);
-    }
-
-    if (vSrc) showVideo(vSrc);
-    else if (iSrc) showImg(iSrc);
-  });
 </script>
 </body>
 </html>
