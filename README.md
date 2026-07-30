@@ -73,9 +73,18 @@
 
 - 🎭 **人设不漂**：每个角色的外貌、性格、背景独立建档，写章节时按角色注入上下文，前后一致
 - 🎨 **风格随你定**：`赛博朋克` `暗黑` `轻松日常` 这些标签自由组合，每章套用；还能自定义「AI 作家设定」（比如"参考烽火戏诸侯的文风"）
-- 🧠 **越用越懂你**：你改过的地方、强调过的偏好，AI 会沉淀下来（可随时改、可清空），换次会话也不用重新交代——它记得你
 - 🖼️ **顺手配图**：按场景描述生成封面或插图，文字+画面一起出（需后端 ComfyUI）
 - 📚 **全部本地、永远属于你**：你的书、章节、角色都存在本地，导出备份随你带走
+
+### 🧠 越用越懂你：你攒的素材越多，AI 写得越稳
+
+不是玄学推荐算法。AI 看到的上下文会随你的使用**真实增长**——下面三件事你做得越多，每次写章节 AI 能调用的素材就越丰富：
+
+- 🏷️ **写作标签库**：你在「设置 → 提示词标签管理」里建的标签（赛博朋克、暗黑、轻松日常……），每个标签就是一段 prompt 文本。同一名字还能存多条变体——AI 写章节时会**随机抽一条**拼到 LLM 输入里。**标签全局共享、不绑书**：你在 A 书建的"悬疑感开场"标签，B 书直接复用
+- 🧠 **经验记忆**：你在 Agent Chat 里交代的偏好（"别写错别字""每章结尾留个钩子""反派要立体别扁平"），AI 会**主动**用 `patch_memory` 工具记下来，**跨会话跨书**生效，换次开聊不用重新交代。**你想收拾随时收拾**——「设置 → Agent 记忆管理」可逐条查看、新增、修改、删除
+- ✍️ **AI 作家设定**：在「设置 → AI 配置」里给 AI 定个调（"参考烽火戏诸侯的文风""冷峻克制不滥用形容词"），AI 把这段话作为 system prompt 头部**每次写章节都套用**。配合标签组合，每章都能套不同风格
+
+> 一句话：**你把角色卡、大纲、标签、风格、记忆这些素材整理得越扎实，AI 每次写章节能调用的"弹药库"就越满**——输出自然更稳、更连贯、更对你胃口。
 
 > 不知道第一句怎么起？直接问 AI："我想写一本 XX 题材的小说，但不知道从哪开始"——它会帮你出点子、定大纲、起人名。
 
@@ -88,7 +97,10 @@
 - `write_outline` / `update_outline` / `get_outline`：大纲 CRUD（`agent_tools.dart:625+`）
 - 人物卡：`characters` 表（v35 `first_appearance_chapter` / v34 `avatar_media_id`），写章节按 `characterNames` 注入
 - 风格：`prompt_tags` / `prompt_tag_categories` 表 + 用户自定义 `ai_writer_prompt`（SharedPreferences `ai_writer_prompt`，`chapter_write_executor.dart:400`）
-- `agent_memory` 表（v27）：跨会话持久化写作偏好，`WritingScenario.getMemories()` 回灌；`patch_memory` 可增改——**可手改的经验笔记**，非自动学习你行为的推荐算法
+- **写作标签全局共享**：`prompt_tags` / `prompt_tag_categories` 表（v23/24/28）不绑 novelUrl；写章节时 `chapter_write_executor.dart:441-454` 取全部标签按 name 匹配 → 同名多条变体 `shuffle()` 随机抽一条 `promptText` 拼进 user prompt
+- **经验记忆手动 + AI 主动**：写入唯一入口是 LLM 调 `patch_memory` 工具（`agent_scenario.dart:284-`），**非自动埋点推荐**；`agent_memory` 表（v27）按 `scenario_id` 分桶（写作 / 网页提取），跨书跨会话持久化；回灌位置 `agent_system_prompt.dart:52-60`「## 经验记忆」段编号 [N] 列出
+- **AI 作家设定生效路径**：SharedPreferences `ai_writer_prompt` key（`ai_settings_screen.dart:55-56`）→ `_loadWriterPrompt()`（`chapter_write_executor.dart:411-415`）每章写前同步读取 → 拼到 system prompt 头部（line 561 / 621）→ LLM 始终按这个调子写
+- **上下文六件套 = AI 弹药库**：写章节时 AI 看到的素材 = 角色卡 + 大纲（LLM 主动 `get_outline`）+ 标签（随机抽）+ 作家设定 + 经验记忆 + 前一章正文（衔接上下文）。**没有跨书章节正文自动学习机制**——所有 Repository 调用都按 `novelUrl` 严格过滤；"借鉴其他小说技巧"的诚实边界 = 你主动把这些素材整理好（建角色、定大纲、囤标签、设风格、积累记忆），AI 每次写都能用上
 - 生图：`create_images` / `create_image_to_video` → 后端 ComfyUI（`agent_tools.dart:838+`）
 - 本地存储：`bookshelf` / `novel_chapters` / `chapter_cache` 表，`backup_service.dart` 可导出
 

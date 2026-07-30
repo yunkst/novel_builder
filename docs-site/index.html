@@ -169,6 +169,50 @@
   .feat h3 { font-family: var(--serif); color: var(--ink); font-size: 20px; margin-bottom: 8px; }
   .feat p { font-size: 14.5px; color: var(--ink-soft); }
 
+  /* ============ 越用越懂你（强调区）============ */
+  .smart {
+    background:
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
+    border-top: 1px solid var(--line);
+    position: relative; overflow: hidden;
+  }
+  .smart::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(540px 340px at 8% 0%, rgba(184,134,11,.10), transparent 60%),
+      radial-gradient(520px 320px at 96% 100%, rgba(160,82,45,.08), transparent 62%);
+  }
+  .smart .wrap { position: relative; }
+  .smart-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .smart-card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 32px 28px; box-shadow: var(--shadow); transition: transform .25s, box-shadow .25s, border-color .25s;
+    position: relative;
+  }
+  .smart-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--accent); }
+  .smart-card .ico {
+    width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+    font-size: 24px; margin-bottom: 20px;
+    background: linear-gradient(135deg, var(--accent), var(--gold)); color: #fff;
+    box-shadow: 0 6px 16px rgba(160,82,45,.28);
+  }
+  .smart-card h3 { font-family: var(--serif); color: var(--ink); font-size: 21px; margin-bottom: 6px; }
+  .smart-card .sub { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 14px; letter-spacing: .3px; }
+  .smart-card p { font-size: 14.5px; color: var(--ink-soft); }
+  .smart-card p b { color: var(--ink); font-weight: 600; }
+  .smart-quote {
+    margin-top: 40px; text-align: center; max-width: 720px;
+    margin-left: auto; margin-right: auto;
+    font-family: var(--serif); font-size: 17px; color: var(--ink); line-height: 1.7;
+    padding: 24px 28px; background: var(--paper); border: 1px solid var(--accent-soft);
+    border-left: 4px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--shadow);
+  }
+  .smart-quote .em { color: var(--accent-deep); font-weight: 700; }
+  @media (max-width: 920px) {
+    .smart-grid { grid-template-columns: 1fr; }
+  }
+
   /* ============ 技术栈 ============ */
   .stack-wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
   .stack-col { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); }
@@ -275,6 +319,7 @@
       Novel Builder
     </a>
     <nav class="nav-links" id="navLinks">
+      <a href="#smart">越用越懂你</a>
       <a href="#features">功能特性</a>
       <a href="#stack">技术栈</a>
       <a href="#quick">快速开始</a>
@@ -371,6 +416,40 @@
           </iframe>
         </div>
         <p class="video-portrait-tip">加载不出来？<a href="https://www.bilibili.com/video/BV1Vj3C6zEAa" target="_blank" rel="noopener">在 B 站打开 ›</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 越用越懂你（强调区）===================== -->
+  <section class="block smart" id="smart">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="sec-kicker">YOUR AI TOOLKIT</div>
+        <h2 class="sec-title">越用越懂你 · AI 的弹药库随你越攒越满</h2>
+        <p class="sec-sub">不是玄学推荐算法。AI 看到的上下文会随你的使用真实增长——下面三件事你做得越多，每次写章节 AI 能调用的素材就越丰富。</p>
+      </div>
+      <div class="smart-grid">
+        <div class="smart-card reveal">
+          <div class="ico">🏷️</div>
+          <h3>写作标签库</h3>
+          <div class="sub">全局共享 · 不绑书</div>
+          <p>在「设置 → 提示词标签管理」里建标签——每个标签就是一段 prompt 文本（赛博朋克、暗黑、轻松日常……）。同一名字还能存多条变体，<b>AI 写章节时随机抽一条</b>拼到输入里。<b>你在 A 书建的标签，B 书直接复用。</b></p>
+        </div>
+        <div class="smart-card reveal">
+          <div class="ico">🧠</div>
+          <h3>经验记忆</h3>
+          <div class="sub">跨会话跨书 · 可手改</div>
+          <p>在 Agent Chat 里交代的偏好（"别写错别字""每章结尾留个钩子""反派要立体别扁平"），AI 会<b>主动用 patch_memory 工具记下来</b>，换次开聊不用重新交代。<b>「设置 → Agent 记忆管理」可逐条查看、改写、删除</b>——你想收拾随时收拾。</p>
+        </div>
+        <div class="smart-card reveal">
+          <div class="ico">✍️</div>
+          <h3>AI 作家设定</h3>
+          <div class="sub">每章都套用 · 风格可控</div>
+          <p>在「设置 → AI 配置」里给 AI 定个调（"参考烽火戏诸侯的文风""冷峻克制不滥用形容词"），AI 把这段话作为 system prompt 头部<b>每次写章节都套用</b>。配合标签组合，每章都能套不同风格。</p>
+        </div>
+      </div>
+      <div class="smart-quote reveal">
+        一句话：<span class="em">你把角色卡、大纲、标签、风格、记忆这些素材整理得越扎实，AI 每次写章节能调用的"弹药库"就越满</span>——输出自然更稳、更连贯、更对你胃口。
       </div>
     </div>
   </section>
@@ -476,19 +555,19 @@
             <span class="track-ico">📱</span>
             <div>
               <h3>下载体验</h3>
-              <p class="track-sub">正式版 v2.0.1 · 2026-07-19 · Android</p>
+              <p class="track-sub">正式版 v2.0.2 · 2026-07-29 · Android</p>
             </div>
           </div>
-          <a class="btn-apk" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-arm64-v8a-release.apk" target="_blank" rel="noopener">
+          <a class="btn-apk" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.2/app-arm64-v8a-release.apk" target="_blank" rel="noopener">
             <span class="apk-main">⬇ 下载 APK（arm64-v8a）</span>
             <span class="apk-meta">98 MB · 主流手机推荐</span>
           </a>
           <div class="apk-alts">
             <span>其他架构：</span>
-            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-armeabi-v7a-release.apk" target="_blank" rel="noopener">armv7a（老设备）</a>
-            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/app-x86_64-release.apk" target="_blank" rel="noopener">x86_64（模拟器）</a>
+            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.2/app-armeabi-v7a-release.apk" target="_blank" rel="noopener">armv7a（老设备）</a>
+            <a href="https://github.com/yunkst/novel_builder/releases/download/v2.0.2/app-x86_64-release.apk" target="_blank" rel="noopener">x86_64（模拟器）</a>
           </div>
-          <a class="apk-sha" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.1/SHA256SUMS.txt" target="_blank" rel="noopener">🔏 SHA256SUMS 校验</a>
+          <a class="apk-sha" href="https://github.com/yunkst/novel_builder/releases/download/v2.0.2/SHA256SUMS.txt" target="_blank" rel="noopener">🔏 SHA256SUMS 校验</a>
           <p class="track-note">首次安装请允许「未知来源」。iOS 暂需自行编译。</p>
         </div>
 
