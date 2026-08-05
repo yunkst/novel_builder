@@ -228,9 +228,9 @@ class ImageToVideoService:
                 path_parts = video_filename.split("/")
                 filename = path_parts[-1]
                 subfolder = "/".join(path_parts[:-1])
-                url = f"{comfyui_url}/api/view?filename={filename}&type=output&subfolder={subfolder}"
+                url = f"{comfyui_url}/view?filename={filename}&type=output&subfolder={subfolder}"
             else:
-                url = f"{comfyui_url}/api/view?filename={video_filename}&type=output"
+                url = f"{comfyui_url}/view?filename={video_filename}&type=output"
 
             async with httpx.AsyncClient(timeout=TIMEOUT_GET_MEDIA) as client:
                 response = await client.get(url)
