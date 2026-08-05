@@ -20,7 +20,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 质量门禁：先跑 analyze + test，通过后才允许 build APK。
+  # 历史上 release 直接 build，任何 analyze/test 报错都会被掩盖到二进制里，
+  # 现在让 quality 必过才能 build。
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: novel_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.18.0
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        # 范围与 flutter-ci.yml 保持一致；subagent_detail_screen_test.dart 已知
+        # 破坏（引用已删 API），grep 跳过。详见 flutter-ci.yml 注释。
+        run: |
+          rm -rf .dart_tool/sqflite_common_ffi 2>/dev/null || true
+          SKIP_LIST="test/screens/subagent_detail_screen_test.dart"
+          FILES=""
+          for d in test/unit/ test/bug/ test/verification/ \
+                   test/widgets/ test/widget/ test/screens/; do
+            for f in $(find "$d" -name '*.dart' 2>/dev/null); do
+              skip=0
+              for s in $SKIP_LIST; do
+                [ "$f" = "$s" ] && skip=1 && break
+              done
+              [ $skip -eq 0 ] && FILES="$FILES $f"
+            done
+          done
+          flutter test --no-pub -j 1 $FILES
+
   build-and-release:
+    needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:

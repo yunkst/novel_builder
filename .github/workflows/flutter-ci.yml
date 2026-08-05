@@ -5,14 +5,19 @@ on:
     branches: [main, master]
     paths:
       - 'novel_app/**'
+      - '.github/workflows/flutter-ci.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'novel_app/**'
+      - '.github/workflows/flutter-ci.yml'
 
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    # 冷启动本地预估 9-12 分钟（无 cache 的 build_runner + 184 个测试文件单 worker）；
+    # CI 有 cache 后实测更短。30 分钟留 buffer。
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: novel_app
@@ -36,7 +41,74 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Run unit tests
+      # 测试范围说明：
+      #   历史上 CI 只跑 test/unit/ test/bug/ test/verification/，显式排除了
+      #   test/widgets/ test/screens/ test/integration/，导致 widget/screen 层
+      #   的测试永远不跑，回归无门禁。
+      #   现把 test/widgets/ test/widget/ test/screens/ 一并纳入。
+      #   test/screens/subagent_detail_screen_test.dart 已知破坏（引用已删的
+      #   SubagentRun.tokenSource / CancellationTokenSource），用 --exclude-tags
+      #   无法过滤（文件级编译失败）；先用文件名 grep 跳过，待 owner 修复后移除
+      #   跳过。test/integration/ 依赖真实 headless WebView / 网络，跑在 CI 会
+      #   flaky，暂不纳入（后续可拆 separate job + continue-on-error）。
+      - name: Run unit tests with coverage
         run: |
           rm -rf .dart_tool/sqflite_common_ffi 2>/dev/null || true
-          flutter test --no-pub -j 1 test/unit/ test/bug/ test/verification/
+          SKIP_LIST="test/screens/subagent_detail_screen_test.dart"
+          FILES=""
+          for d in test/unit/ test/bug/ test/verification/ \
+                   test/widgets/ test/widget/ test/screens/; do
+            for f in $(find "$d" -name '*.dart' 2>/dev/null); do
+              skip=0
+              for s in $SKIP_LIST; do
+                [ "$f" = "$s" ] && skip=1 && break
+              done
+              [ $skip -eq 0 ] && FILES="$FILES $f"
+            done
+          done
+          flutter test --no-pub --coverage -j 1 $FILES
+
+      - name: Check line coverage threshold
+        # coverage_config.yaml 写的是 70% 阈值，但当前测试集远未覆盖到该水位，
+        # 立即套 70% 会让 CI 全红。先以 50% 作为基线门禁，逐步收紧到 70%。
+        # 阈值收紧计划见 PR 描述。
+        run: |
+          set -e
+          if [ ! -f coverage/lcov.info ]; then
+            echo "❌ coverage/lcov.info 未生成，coverage 检查失败"
+            exit 1
+          fi
+          # 纯 shell 解析 lcov.info：累计所有文件的 hit/total 行数。
+          # lcov 记录格式：DA:<line>,<count>  (count>0 视为命中)
+          awk '
+            /^DA:/ {
+              split($0, a, ":"); split(a[2], b, ",");
+              total++; if (b[2]+0 > 0) hit++;
+            }
+            END {
+              if (total == 0) { printf "0\n0\n"; exit }
+              printf "%d\n%d\n", hit, total;
+            }
+          ' coverage/lcov.info > /tmp/cov_stats.txt
+          HIT=$(sed -n 1p /tmp/cov_stats.txt)
+          TOTAL=$(sed -n 2p /tmp/cov_stats.txt)
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "⚠️ lcov.info 中无 DA 记录，跳过阈值判定"
+            exit 0
+          fi
+          PCT=$((HIT * 100 / TOTAL))
+          THRESHOLD=50
+          echo "行覆盖率: ${HIT}/${TOTAL} = ${PCT}% (阈值 ${THRESHOLD}%)"
+          if [ "$PCT" -lt "$THRESHOLD" ]; then
+            echo "❌ 覆盖率 ${PCT}% 低于阈值 ${THRESHOLD}%"
+            exit 1
+          fi
+          echo "✅ 覆盖率达标"
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: novel_app/coverage/
+          retention-days: 14
