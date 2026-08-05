@@ -12,6 +12,6 @@ from .models.text2img import ImageToVideoTask, Text2ImgTask
 # 导出所有模型，方便其他模块导入
 __all__ = [
     "ClientLog",
-    "Text2ImgTask",
     "ImageToVideoTask",
+    "Text2ImgTask",
 ]

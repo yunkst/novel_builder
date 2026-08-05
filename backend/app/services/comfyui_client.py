@@ -5,46 +5,28 @@ ComfyUI API客户端服务.
 支持基于YAML配置的多工作流动态选择。
 """
 
-import asyncio
-import base64
 import json
 import logging
 import random
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
-import requests
-from requests.exceptions import RequestException
+import httpx
 
 from ..workflow_config.workflow_config import workflow_config_manager
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowType(str, Enum):
-    """工作流类型枚举"""
-
-    TEXT_TO_IMAGE = "t2i"
-    IMAGE_TO_VIDEO = "i2v"
-
-
-class MediaFileType(str, Enum):
-    """媒体文件类型枚举"""
-
-    IMAGE = "image"
-    VIDEO = "video"
-
-
-class MediaFileResult:
-    """媒体文件结果"""
-
-    def __init__(self, filename: str, file_type: MediaFileType):
-        self.filename = filename
-        self.file_type = file_type
-
-    def __repr__(self):
-        return f"MediaFileResult(filename='{self.filename}', type='{self.file_type}')"
+# 各类 ComfyUI 调用的超时配置（秒）。
+# ComfyUI 提交 prompt 是异步落队,通常很快返回,但偶尔会卡顿,留 30s 余量。
+TIMEOUT_SUBMIT_PROMPT = 30.0
+# history 查询应当很快。
+TIMEOUT_CHECK_STATUS = 10.0
+# 拉取生成的图片/视频二进制:大视频可能很慢,留 120s。
+TIMEOUT_GET_MEDIA = 120.0
+# 健康检查。
+TIMEOUT_HEALTH_CHECK = 5.0
 
 
 class ComfyUIClient:
@@ -59,7 +41,7 @@ class ComfyUIClient:
         """
         self.base_url = base_url.rstrip("/")
         self.workflow_path = workflow_path
-        self.workflow_json = None
+        self.workflow_json: dict | None = None
         self._load_workflow()
         logger.info("ComfyUI客户端初始化完成")
 
@@ -75,12 +57,12 @@ class ComfyUIClient:
             if not workflow_file.exists():
                 raise FileNotFoundError(f"工作流文件不存在: {full_path}")
 
-            with open(workflow_file, encoding="utf-8") as f:
+            with workflow_file.open(encoding="utf-8") as f:
                 self.workflow_json = json.load(f)
 
             logger.info(f"成功加载ComfyUI工作流: {full_path}")
 
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
+        except (OSError, ValueError, json.JSONDecodeError) as e:
             logger.error(f"加载ComfyUI工作流失败: {e}")
             raise
 
@@ -105,12 +87,12 @@ class ComfyUIClient:
             # 准备工作流数据（返回JSON字符串）
             workflow_json_str = self._prepare_workflow(prompt, negative_prompt)
 
-            # 调用ComfyUI API
-            response = requests.post(
-                f"{self.base_url}/prompt",
-                json={"prompt": json.loads(workflow_json_str)},
-                timeout=None,  # 移除超时限制
-            )
+            # 调用ComfyUI API（httpx 异步,带超时,不阻塞事件循环）
+            async with httpx.AsyncClient(timeout=TIMEOUT_SUBMIT_PROMPT) as client:
+                response = await client.post(
+                    f"{self.base_url}/prompt",
+                    json={"prompt": json.loads(workflow_json_str)},
+                )
 
             if response.status_code == 200:
                 result = response.json()
@@ -118,64 +100,17 @@ class ComfyUIClient:
                 if task_id:
                     logger.info(f"ComfyUI图片生成任务已提交: {task_id}")
                     return task_id
-                else:
-                    logger.error("ComfyUI响应中未找到task_id")
-                    return None
-            else:
-                logger.error(
-                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
-                )
+                logger.error("ComfyUI响应中未找到task_id")
                 return None
 
-        except RequestException as e:
+            logger.error(
+                f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+            )
+            return None
+
+        except (OSError, ValueError, json.JSONDecodeError, httpx.HTTPError) as e:
             logger.error(f"ComfyUI API请求异常: {e}")
             return None
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
-            logger.error(f"ComfyUI图片生成失败: {e}")
-            return None
-
-    async def generate_images_batch(self, prompts: list[str]) -> list[str] | None:
-        """批量生成图片.
-
-        Args:
-            prompts: 图片生成提示词列表
-
-        Returns:
-            生成的图片文件名列表，如果生成失败则返回None
-        """
-        if not prompts:
-            logger.error("提示词列表为空")
-            return None
-
-        image_filenames = []
-        for i, prompt in enumerate(prompts):
-            logger.info(f"生成第 {i + 1}/{len(prompts)} 张图片")
-            try:
-                # 提交生成任务，获取ComfyUI任务ID
-                task_id = await self.generate_image(prompt)
-                if task_id:
-                    logger.info(f"ComfyUI任务ID: {task_id}")
-                    # 等待任务完成并获取实际图片文件名
-                    completed_files = await self.wait_for_completion(task_id)
-                    if completed_files and len(completed_files) > 0:
-                        media_file = completed_files[0]  # 使用第一个生成的媒体文件
-                        filename = media_file.filename  # 获取文件名
-                        image_filenames.append(filename)
-                        logger.info(f"第 {i + 1} 张图片生成成功，文件名: {filename}")
-                    else:
-                        logger.warning(f"第 {i + 1} 张图片生成失败（未获取到文件名）")
-                else:
-                    logger.warning(f"第 {i + 1} 张图片生成失败（提交任务失败）")
-            except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
-                logger.error(f"生成第 {i + 1} 张图片时发生异常: {e}")
-                continue
-
-        if not image_filenames:
-            logger.error("所有图片生成都失败了")
-            return None
-
-        logger.info(f"批量图片生成完成，共生成 {len(image_filenames)} 张图片")
-        return image_filenames
 
     async def check_task_status(self, task_id: str) -> dict[str, Any]:
         """检查任务状态.
@@ -187,108 +122,18 @@ class ComfyUIClient:
             任务状态信息
         """
         try:
-            response = requests.get(f"{self.base_url}/history/{task_id}", timeout=10)
+            async with httpx.AsyncClient(timeout=TIMEOUT_CHECK_STATUS) as client:
+                response = await client.get(f"{self.base_url}/history/{task_id}")
 
             if response.status_code == 200:
                 history = response.json()
                 return history.get(task_id, {})
-            else:
-                logger.error(f"查询任务状态失败: {response.status_code}")
-                return {}
-
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
-            logger.error(f"查询任务状态异常: {e}")
+            logger.error(f"查询任务状态失败: {response.status_code}")
             return {}
 
-    async def wait_for_completion(self, task_id: str) -> list[MediaFileResult] | None:
-        """等待任务完成并获取生成的媒体文件名（支持图片和视频）.
-
-        Args:
-            task_id: 任务ID
-
-        Returns:
-            生成的媒体文件信息列表，失败则返回None
-        """
-        while True:
-            # 查询任务状态
-            task_info = await self.check_task_status(task_id)
-
-            if not task_info:
-                await asyncio.sleep(2)
-                continue
-
-            # 检查任务状态
-            status = task_info.get("status", {})
-
-            if status.get("status_str") in ["completed", "success"]:
-                # 任务完成，获取媒体文件
-                outputs = task_info.get("outputs", {})
-                media_files = []
-
-                # 遍历输出节点查找图片和视频
-                for node_output in outputs.values():
-                    # 处理图片文件
-                    if "images" in node_output:
-                        for image in node_output["images"]:
-                            filename = image.get("filename")
-                            if filename:
-                                file_type_enum = (
-                                    MediaFileType.VIDEO
-                                    if filename.lower().endswith(".mp4")
-                                    else MediaFileType.IMAGE
-                                )
-                                media_files.append(
-                                    MediaFileResult(filename, file_type_enum)
-                                )
-                                logger.info(
-                                    f"找到生成的{file_type_enum.value}: {filename}"
-                                )
-
-                    # 处理视频文件（可能在不同的输出字段）
-                    if "videos" in node_output:
-                        for video in node_output["videos"]:
-                            filename = video.get("filename")
-                            if filename:
-                                media_files.append(
-                                    MediaFileResult(filename, MediaFileType.VIDEO)
-                                )
-                                logger.info(f"找到生成的视频: {filename}")
-
-                if media_files:
-                    return media_files
-                else:
-                    logger.error("任务完成但未找到生成的媒体文件")
-                    return None
-
-            elif status.get("status_str") in ["error", "failed"]:
-                error_msg = status.get("messages", [])
-                logger.error(f"任务失败: {error_msg}")
-                return None
-
-            # 继续等待
-            await asyncio.sleep(3)
-
-    def get_media_url(self, filename: str) -> str:
-        """获取媒体文件访问URL（支持图片和视频）.
-
-        Args:
-            filename: 媒体文件名
-
-        Returns:
-            媒体文件访问URL
-        """
-        return f"{self.base_url}/view?filename={filename}"
-
-    def get_image_url(self, filename: str) -> str:
-        """获取图片访问URL（保持向后兼容）.
-
-        Args:
-            filename: 图片文件名
-
-        Returns:
-            图片访问URL
-        """
-        return self.get_media_url(filename)
+        except (OSError, ValueError, json.JSONDecodeError, httpx.HTTPError) as e:
+            logger.error(f"查询任务状态异常: {e}")
+            return {}
 
     async def get_media_data(self, filename: str) -> bytes | None:
         """获取媒体文件二进制数据（支持图片和视频）.
@@ -300,18 +145,16 @@ class ComfyUIClient:
             媒体文件二进制数据，失败则返回None
         """
         try:
-            response = requests.get(
-                self.get_media_url(filename),
-                timeout=None,  # 移除超时限制
-            )
+            url = f"{self.base_url}/view?filename={filename}"
+            async with httpx.AsyncClient(timeout=TIMEOUT_GET_MEDIA) as client:
+                response = await client.get(url)
 
             if response.status_code == 200:
                 return response.content
-            else:
-                logger.error(f"获取媒体文件失败: {response.status_code}")
-                return None
+            logger.error(f"获取媒体文件失败: {response.status_code}")
+            return None
 
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
+        except (OSError, ValueError, httpx.HTTPError) as e:
             logger.error(f"获取媒体文件异常: {e}")
             return None
 
@@ -346,9 +189,10 @@ class ComfyUIClient:
         try:
             # 第一步：上传图片到ComfyUI
             files = {"image": (image_filename, image_data, "image/png")}
-            upload_response = requests.post(
-                f"{self.base_url}/upload/image", files=files, timeout=None
-            )
+            async with httpx.AsyncClient(timeout=TIMEOUT_SUBMIT_PROMPT) as client:
+                upload_response = await client.post(
+                    f"{self.base_url}/upload/image", files=files
+                )
 
             if upload_response.status_code != 200:
                 logger.error(
@@ -371,11 +215,11 @@ class ComfyUIClient:
             )
 
             # 调用ComfyUI API
-            response = requests.post(
-                f"{self.base_url}/prompt",
-                json={"prompt": json.loads(workflow_json_str)},
-                timeout=None,  # 移除超时限制
-            )
+            async with httpx.AsyncClient(timeout=TIMEOUT_SUBMIT_PROMPT) as client:
+                response = await client.post(
+                    f"{self.base_url}/prompt",
+                    json={"prompt": json.loads(workflow_json_str)},
+                )
 
             if response.status_code == 200:
                 result = response.json()
@@ -383,16 +227,15 @@ class ComfyUIClient:
                 if task_id:
                     logger.info(f"ComfyUI视频生成任务已提交: {task_id}")
                     return task_id
-                else:
-                    logger.error("ComfyUI响应中未找到task_id")
-                    return None
-            else:
-                logger.error(
-                    f"ComfyUI API请求失败: {response.status_code} - {response.text}"
-                )
+                logger.error("ComfyUI响应中未找到task_id")
                 return None
 
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
+            logger.error(
+                f"ComfyUI API请求失败: {response.status_code} - {response.text}"
+            )
+            return None
+
+        except (OSError, ValueError, json.JSONDecodeError, httpx.HTTPError) as e:
             logger.error(f"ComfyUI视频生成失败: {e}")
             return None
 
@@ -400,7 +243,6 @@ class ComfyUIClient:
         self,
         prompt: str,
         negative_prompt: str | None = None,
-        image_base64: str | None = None,
     ) -> str:
         """准备ComfyUI工作流数据 - 使用固定字符串替换模式.
 
@@ -409,7 +251,6 @@ class ComfyUIClient:
         - "负向提示词在这里替换"    → 负向提示词 negative_prompt
           (negative_prompt 为空时,占位符原样保留,工作流可保留其默认值)
         - "在这替换随机数"          → 1~999999 随机 seed
-        - "图片base64在这里替换"    → image_base64 (仅图生视频)
 
         找不到对应占位符的工作流不会受影响(如某些工作流用
         ConditioningZeroOut 模拟负向,不含该字面量)。
@@ -417,7 +258,6 @@ class ComfyUIClient:
         Args:
             prompt: 图片生成提示词
             negative_prompt: 负向提示词（可选）
-            image_base64: 图片的base64编码（仅图生视频使用）
 
         Returns:
             准备好的工作流JSON字符串
@@ -429,13 +269,8 @@ class ComfyUIClient:
         if not prompt or not prompt.strip():
             raise ValueError("提示词不能为空")
 
-        if image_base64 and not image_base64.strip():
-            raise ValueError("图片base64数据不能为空字符串")
-
         # 负向提示词白名单 trim(空串视为不提供,保留工作流占位符/默认值)
-        negative_prompt_trimmed = (
-            negative_prompt.strip() if negative_prompt else None
-        )
+        negative_prompt_trimmed = negative_prompt.strip() if negative_prompt else None
 
         # 创建工作流副本并修改（避免修改原始workflow_json）
         workflow_json_copy = json.loads(json.dumps(self.workflow_json))
@@ -455,12 +290,6 @@ class ComfyUIClient:
                         workflow_dict[key] = negative_prompt_trimmed
                     elif isinstance(value, str) and value == "在这替换随机数":
                         workflow_dict[key] = random.randint(1, 999999)
-                    elif (
-                        isinstance(value, str)
-                        and value == "图片base64在这里替换"
-                        and image_base64
-                    ):
-                        workflow_dict[key] = image_base64
                     elif isinstance(value, (dict, list)):
                         replace_prompt_in_workflow(value)
             elif isinstance(workflow_dict, list):
@@ -472,26 +301,11 @@ class ComfyUIClient:
         # 序列化为JSON字符串
         workflow_content = json.dumps(workflow_json_copy, ensure_ascii=False)
 
-        if image_base64:
-            logger.info("已注入图片base64数据到工作流")
         if negative_prompt_trimmed:
-            logger.info(
-                f"已注入负向提示词(长度: {len(negative_prompt_trimmed)})"
-            )
+            logger.info(f"已注入负向提示词(长度: {len(negative_prompt_trimmed)})")
 
         logger.info(f"工作流准备完成，提示词长度: {len(prompt)}")
         return workflow_content
-
-    def _encode_image_to_base64(self, image_data: bytes) -> str:
-        """将图片数据编码为base64字符串.
-
-        Args:
-            image_data: 图片二进制数据
-
-        Returns:
-            base64编码的字符串
-        """
-        return base64.b64encode(image_data).decode("utf-8")
 
     def _prepare_workflow_with_filename(self, prompt: str, image_filename: str) -> str:
         """准备ComfyUI工作流数据 - 使用图片文件名替换模式（用于图生视频）.
@@ -550,19 +364,38 @@ class ComfyUIClient:
             服务是否可用
         """
         try:
-            response = requests.get(f"{self.base_url}/system_stats", timeout=5)
+            async with httpx.AsyncClient(timeout=TIMEOUT_HEALTH_CHECK) as client:
+                response = await client.get(f"{self.base_url}/system_stats")
             return response.status_code == 200
-        except (OSError, requests.RequestException, ValueError, json.JSONDecodeError) as e:
+        except (OSError, ValueError, httpx.HTTPError) as e:
             logger.error(f"ComfyUI健康检查失败: {e}")
             return False
 
 
-def create_comfyui_client(
+# === 客户端缓存 ===
+# ComfyUIClient 构造时会读 YAML + 工作流 JSON 文件,频繁创建有磁盘开销。
+# 这里按 (workflow_type, model_title) 缓存客户端实例,假设运行时工作流文件不变。
+# 如需热加载工作流,需手动清空此缓存或重启进程。
+_client_cache: dict[tuple[str, str | None], ComfyUIClient] = {}
+
+
+def _get_or_create_client(workflow_type: str, model_title: str | None) -> ComfyUIClient:
+    """从缓存取或新建 ComfyUIClient."""
+    cache_key = (workflow_type, model_title)
+    cached = _client_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    client = _build_client(model_title=model_title, workflow_type=workflow_type)
+    _client_cache[cache_key] = client
+    return client
+
+
+def _build_client(
     workflow_path: str | None = None,
     model_title: str | None = None,
     workflow_type: str = "t2i",
 ) -> ComfyUIClient:
-    """创建ComfyUI客户端实例.
+    """实际构造 ComfyUIClient 实例（无缓存）.
 
     Args:
         workflow_path: 指定的工作流路径（可选）
@@ -570,7 +403,7 @@ def create_comfyui_client(
         workflow_type: 工作流类型，"t2i"（文生图）或 "i2v"（图生视频）
 
     Returns:
-        ComfyUI客户端实例
+        ComfyUIClient客户端实例
     """
     from ..config import settings
 
@@ -614,6 +447,31 @@ def create_comfyui_client(
     return ComfyUIClient(base_url, workflow_path)
 
 
+def create_comfyui_client(
+    workflow_path: str | None = None,
+    model_title: str | None = None,
+    workflow_type: str = "t2i",
+) -> ComfyUIClient:
+    """创建ComfyUI客户端实例（带缓存）.
+
+    Args:
+        workflow_path: 指定的工作流路径（可选,传入则不走缓存）
+        model_title: 模型标题，用于从配置中查找工作流（可选）
+        workflow_type: 工作流类型，"t2i"（文生图）或 "i2v"（图生视频）
+
+    Returns:
+        ComfyUIClient客户端实例
+    """
+    # 显式指定 workflow_path 时无法稳定缓存(参数组合不唯一),直接构造。
+    if workflow_path is not None:
+        return _build_client(
+            workflow_path=workflow_path,
+            model_title=model_title,
+            workflow_type=workflow_type,
+        )
+    return _get_or_create_client(workflow_type, model_title)
+
+
 def create_comfyui_client_for_model(
     model_title: str, workflow_type: str = "t2i"
 ) -> ComfyUIClient:
@@ -624,7 +482,7 @@ def create_comfyui_client_for_model(
         workflow_type: 工作流类型，"t2i"（文生图）或 "i2v"（图生视频）
 
     Returns:
-        ComfyUI客户端实例
+        ComfyUIClient客户端实例
 
     Raises:
         ValueError: 当模型不存在时
@@ -639,7 +497,7 @@ def create_t2i_client(model_title: str | None = None) -> ComfyUIClient:
         model_title: 模型标题（可选，使用默认模型）
 
     Returns:
-        ComfyUI客户端实例
+        ComfyUIClient客户端实例
     """
     return create_comfyui_client(model_title=model_title, workflow_type="t2i")
 
@@ -651,6 +509,6 @@ def create_i2v_client(model_title: str | None = None) -> ComfyUIClient:
         model_title: 模型标题（可选，使用默认模型）
 
     Returns:
-        ComfyUI客户端实例
+        ComfyUIClient客户端实例
     """
     return create_comfyui_client(model_title=model_title, workflow_type="i2v")

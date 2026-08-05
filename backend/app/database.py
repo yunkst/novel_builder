@@ -6,11 +6,15 @@ This module provides database connectivity, session management,
 and initialization utilities for the application.
 """
 
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 # 创建数据库引擎
 engine = create_engine(
@@ -59,14 +63,22 @@ class DatabaseSession:
 
 
 def init_db():
-    """初始化数据库（创建所有表）"""
+    """初始化数据库（创建所有表）
+
+    使用 Base.metadata.create_all 创建表,适用于本地开发快速启动。
+    生产环境应使用 ``alembic upgrade head`` 进行迁移,以保留 schema 演进历史。
+    """
     try:
         # 导入所有模型以确保它们被注册
-        from .models.client_log import ClientLog
+        from .models.client_log import ClientLog  # noqa: F401
 
+        logger.warning(
+            "init_db 使用 Base.metadata.create_all 创建表;生产环境应使用 "
+            "'alembic upgrade head' 进行迁移,以保留 schema 演进历史。"
+        )
         # 创建所有表
         Base.metadata.create_all(bind=engine)
-        print("✓ 数据库表创建成功")
+        logger.info("数据库表创建成功")
     except Exception as e:
-        print(f"⚠️ 数据库初始化失败: {e}")
+        logger.exception(f"数据库初始化失败: {e}")
         raise

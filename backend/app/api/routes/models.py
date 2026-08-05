@@ -12,6 +12,7 @@ ComfyUI 模型文件分块上传 API endpoints.
 - 防路径穿越：target_subdir 必须是 /app/models 的一级子目录
 """
 
+import contextlib
 import shutil
 import uuid
 from datetime import datetime
@@ -24,8 +25,8 @@ from ...config import settings
 from ...deps.auth import verify_token
 from ...schemas import (
     ModelChunkUploadResponse,
-    ModelDirsResponse,
     ModelDirInfo,
+    ModelDirsResponse,
     ModelUploadCompleteResponse,
     ModelUploadInitRequest,
     ModelUploadInitResponse,
@@ -134,9 +135,7 @@ async def list_model_dirs(
             # 跳过分块上传临时目录
             if entry.name == ".tmp":
                 continue
-            dirs.append(
-                ModelDirInfo(name=entry.name, size_bytes=_dir_size(entry))
-            )
+            dirs.append(ModelDirInfo(name=entry.name, size_bytes=_dir_size(entry)))
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"读取目录失败: {e}")
 
@@ -233,17 +232,45 @@ async def upload_model_chunk(
 
     chunk_path = upload_dir / f"{index}.part"
     received = 0
+    exceeded = False
+    max_total_bytes = int(meta["total_size"])
     try:
-        # 流式写入，避免占用内存
+        # 流式写入,避免占用内存;累计字节数超过 init 声明的 total_size 即停止写入,
+        # 防止恶意客户端上传超出声明尺寸的分块。
         with chunk_path.open("wb") as buffer:
             async for chunk in request.stream():
-                if chunk:
-                    buffer.write(chunk)
-                    received += len(chunk)
-        # 校验实际写入大小（最后一块允许小于 chunk_size）
-        received = chunk_path.stat().st_size
+                if not chunk:
+                    continue
+                received += len(chunk)
+                if received > max_total_bytes:
+                    # 超过声明的总大小:停止接收,稍后清理文件并返回 413。
+                    exceeded = True
+                    break
+                buffer.write(chunk)
     except OSError as e:
+        # 写入失败:清理半截文件,返回 500
+        try:
+            if chunk_path.exists():
+                chunk_path.unlink()
+        except OSError:
+            pass
         raise HTTPException(status_code=500, detail=f"分块写入失败: {e}")
+
+    if exceeded:
+        # 上下文已退出 (buffer 已关闭),可以安全 unlink
+        try:
+            if chunk_path.exists():
+                chunk_path.unlink()
+        except OSError:
+            pass
+        raise HTTPException(
+            status_code=413,
+            detail=(f"累计分块超过 init 声明的 total_size ({max_total_bytes} bytes)"),
+        )
+
+    # 校验实际写入大小（最后一块允许小于 chunk_size）
+    with contextlib.suppress(OSError):
+        received = chunk_path.stat().st_size
 
     return ModelChunkUploadResponse(index=index, received_bytes=received)
 
@@ -345,10 +372,8 @@ async def complete_model_upload(
         size = 0
 
     # 删除临时目录
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree(upload_dir, ignore_errors=True)
-    except OSError:
-        pass
 
     return ModelUploadCompleteResponse(
         stored_path=str(final_path),

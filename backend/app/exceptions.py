@@ -3,6 +3,7 @@
 自定义异常类模块
 
 定义应用程序中使用的各种自定义异常，提供更好的错误分类和处理。
+每个异常类携带 status_code 属性,供全局异常处理器映射到正确的 HTTP 状态码。
 """
 
 from typing import Any
@@ -10,6 +11,9 @@ from typing import Any
 
 class NovelBuilderException(Exception):
     """基础异常类，所有自定义异常的基类"""
+
+    # 默认状态码,子类按语义覆盖
+    status_code: int = 500
 
     def __init__(
         self,
@@ -34,6 +38,8 @@ class NovelBuilderException(Exception):
 class AuthenticationError(NovelBuilderException):
     """认证相关错误"""
 
+    status_code = 401
+
     def __init__(self, message: str = "认证失败", **kwargs):
         super().__init__(message, "AUTH_ERROR", **kwargs)
 
@@ -41,72 +47,16 @@ class AuthenticationError(NovelBuilderException):
 class ConfigurationError(NovelBuilderException):
     """配置相关错误"""
 
+    status_code = 500
+
     def __init__(self, message: str = "配置错误", **kwargs):
         super().__init__(message, "CONFIG_ERROR", **kwargs)
 
 
-class CrawlerError(NovelBuilderException):
-    """爬虫相关错误"""
-
-    def __init__(
-        self,
-        message: str = "爬虫操作失败",
-        site_name: str | None = None,
-        url: str | None = None,
-        **kwargs,
-    ):
-        details = kwargs.get("details", {})
-        if site_name:
-            details["site_name"] = site_name
-        if url:
-            details["url"] = url
-        kwargs["details"] = details
-
-        super().__init__(message, "CRAWLER_ERROR", **kwargs)
-
-
-class NetworkError(CrawlerError):
-    """网络相关错误"""
-
-    def __init__(
-        self,
-        message: str = "网络连接失败",
-        timeout: float | None = None,
-        status_code: int | None = None,
-        **kwargs,
-    ):
-        details = kwargs.get("details", {})
-        if timeout:
-            details["timeout"] = timeout
-        if status_code:
-            details["status_code"] = status_code
-        kwargs["details"] = details
-
-        super().__init__(message, **kwargs)
-
-
-class ParseError(CrawlerError):
-    """内容解析错误"""
-
-    def __init__(
-        self,
-        message: str = "内容解析失败",
-        selector: str | None = None,
-        html_length: int | None = None,
-        **kwargs,
-    ):
-        details = kwargs.get("details", {})
-        if selector:
-            details["selector"] = selector
-        if html_length:
-            details["html_length"] = html_length
-        kwargs["details"] = details
-
-        super().__init__(message, **kwargs)
-
-
 class DatabaseError(NovelBuilderException):
     """数据库相关错误"""
+
+    status_code = 500
 
     def __init__(
         self,
@@ -125,28 +75,10 @@ class DatabaseError(NovelBuilderException):
         super().__init__(message, "DATABASE_ERROR", **kwargs)
 
 
-class CacheError(NovelBuilderException):
-    """缓存相关错误"""
-
-    def __init__(
-        self,
-        message: str = "缓存操作失败",
-        task_id: str | None = None,
-        cache_key: str | None = None,
-        **kwargs,
-    ):
-        details = kwargs.get("details", {})
-        if task_id:
-            details["task_id"] = task_id
-        if cache_key:
-            details["cache_key"] = cache_key
-        kwargs["details"] = details
-
-        super().__init__(message, "CACHE_ERROR", **kwargs)
-
-
 class ValidationError(NovelBuilderException):
     """数据验证错误"""
+
+    status_code = 400
 
     def __init__(
         self,
@@ -168,6 +100,8 @@ class ValidationError(NovelBuilderException):
 class ContentNotFoundError(NovelBuilderException):
     """内容未找到错误"""
 
+    status_code = 404
+
     def __init__(
         self,
         message: str = "请求的内容不存在",
@@ -188,6 +122,8 @@ class ContentNotFoundError(NovelBuilderException):
 class RateLimitError(NovelBuilderException):
     """频率限制错误"""
 
+    status_code = 429
+
     def __init__(
         self,
         message: str = "请求频率过高",
@@ -206,7 +142,10 @@ class RateLimitError(NovelBuilderException):
 
 
 class ExternalServiceError(NovelBuilderException):
-    """外部服务错误"""
+    """外部服务错误(如 ComfyUI 调用失败)"""
+
+    # 默认 502(Bad Gateway);特定场景(如服务不可用)可由调用方覆盖实例的 status_code
+    status_code = 502
 
     def __init__(
         self,
@@ -239,20 +178,22 @@ def handle_exception(exc: Exception, logger=None) -> NovelBuilderException:
     if logger:
         logger.exception(f"处理异常: {exc}")
 
-    # 已经是自定义异常，直接返回
+    # 已经是自定义异常，直接返回(保留其 status_code)
     if isinstance(exc, NovelBuilderException):
         return exc
 
     # 根据异常类型进行转换
     if isinstance(exc, ConnectionError):
-        return NetworkError(f"网络连接错误: {exc}")
+        return ExternalServiceError(f"网络连接错误: {exc}")
     elif isinstance(exc, TimeoutError):
-        return NetworkError(f"请求超时: {exc}", timeout=None)
+        return ExternalServiceError(f"请求超时: {exc}")
     elif isinstance(exc, ValueError):
         return ValidationError(f"数据验证错误: {exc}")
     elif isinstance(exc, KeyError):
         return ValidationError(f"缺少必需字段: {exc}")
     elif isinstance(exc, AttributeError):
-        return ParseError(f"属性访问错误: {exc}")
+        # 不再伪装为 ParseError(已删);AttributeError 通常是真实 bug,
+        # 用通用 NovelBuilderException 抛出,保留原始类型信息便于排查。
+        return NovelBuilderException(f"属性访问错误: {exc}", "ATTRIBUTE_ERROR")
     else:
         return NovelBuilderException(f"未知错误: {exc}", "UNKNOWN_ERROR")

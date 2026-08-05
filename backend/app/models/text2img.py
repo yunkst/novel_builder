@@ -18,15 +18,24 @@ class Text2ImgTask(Base):
 
     id = Column(Integer, primary_key=True, comment="主键ID")
     prompt_id = Column(
-        String(255), unique=True, nullable=False, index=True, comment="ComfyUI prompt_id, 对外即 task_id"
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="ComfyUI prompt_id, 对外即 task_id",
     )
     prompt = Column(Text, nullable=False, comment="用户提供的提示词")
     negative_prompt = Column(
-        Text, nullable=True, comment="用户提供的负向提示词（可选；工作流不支持时静默忽略）"
+        Text,
+        nullable=True,
+        comment="用户提供的负向提示词（可选；工作流不支持时静默忽略）",
     )
     model_name = Column(String(100), nullable=False, comment="使用的模型名称")
     status = Column(
-        String(20), nullable=False, default="pending", comment="任务状态: pending/completed/failed"
+        String(20),
+        nullable=False,
+        default="pending",
+        comment="任务状态: pending/completed/failed",
     )
     filename = Column(String(500), nullable=True, comment="生成成功后的图片文件名")
     error_message = Column(Text, nullable=True, comment="错误信息")
@@ -46,15 +55,28 @@ class ImageToVideoTask(Base):
 
     id = Column(Integer, primary_key=True, comment="主键ID")
     prompt_id = Column(
-        String(255), unique=True, nullable=False, index=True, comment="ComfyUI prompt_id, 对外即 task_id"
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="ComfyUI prompt_id, 对外即 task_id",
     )
     prompt = Column(Text, nullable=False, comment="用户提供的视频提示词")
     model_name = Column(String(100), nullable=False, comment="使用的图生视频模型名称")
-    image_filename = Column(String(255), nullable=True, comment="上传到 ComfyUI 的图片文件名")
-    status = Column(
-        String(20), nullable=False, default="pending", comment="任务状态: pending/completed/failed"
+    image_filename = Column(
+        String(255), nullable=True, comment="上传到 ComfyUI 的图片文件名"
     )
-    video_filename = Column(String(500), nullable=True, comment="生成成功后的视频文件名(可含 subfolder/filename)")
+    status = Column(
+        String(20),
+        nullable=False,
+        default="pending",
+        comment="任务状态: pending/completed/failed",
+    )
+    video_filename = Column(
+        String(500),
+        nullable=True,
+        comment="生成成功后的视频文件名(可含 subfolder/filename)",
+    )
     error_message = Column(Text, nullable=True, comment="错误信息")
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), comment="创建时间"
@@ -62,4 +84,6 @@ class ImageToVideoTask(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True, comment="完成时间")
 
     def __repr__(self) -> str:
-        return f"<ImageToVideoTask(prompt_id='{self.prompt_id}', status='{self.status}')>"
+        return (
+            f"<ImageToVideoTask(prompt_id='{self.prompt_id}', status='{self.status}')>"
+        )

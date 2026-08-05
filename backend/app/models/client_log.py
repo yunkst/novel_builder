@@ -5,7 +5,7 @@ Client log model for remote log reporting.
 Stores logs uploaded from the Flutter mobile application.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Index, Integer, String, Text
 
@@ -29,7 +29,7 @@ class ClientLog(Base):
         DateTime, nullable=False, index=True
     )  # client-side timestamp (UTC)
     received_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )  # server-side timestamp
 
     __table_args__ = (
@@ -39,4 +39,6 @@ class ClientLog(Base):
     )
 
     def __repr__(self):
-        return f"<ClientLog(id={self.id}, level={self.level}, timestamp={self.timestamp})>"
+        return (
+            f"<ClientLog(id={self.id}, level={self.level}, timestamp={self.timestamp})>"
+        )

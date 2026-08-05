@@ -8,13 +8,17 @@
 import logging
 from datetime import datetime
 
-import requests
+import httpx
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models.text2img import ImageToVideoTask
 from ..utils.model_validation import validate_and_get_model
-from .comfyui_client import create_comfyui_client
+from .comfyui_client import (
+    TIMEOUT_GET_MEDIA,
+    TIMEOUT_HEALTH_CHECK,
+    create_comfyui_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,16 +95,14 @@ class ImageToVideoService:
             return None, 404
 
         if task.status == "completed" and task.video_filename:
-            data = self._fetch_video(task.video_filename)
+            data = await self._fetch_video(task.video_filename)
             if data:
                 return data, 200
             logger.warning(f"视频文件在 ComfyUI 上不存在: {task.video_filename}")
             return None, 404
 
         # pending: 查询 ComfyUI history
-        client = create_comfyui_client(
-            model_title=task.model_name, workflow_type="i2v"
-        )
+        client = create_comfyui_client(model_title=task.model_name, workflow_type="i2v")
         info = await client.check_task_status(task_id)
 
         if not info:
@@ -121,7 +123,7 @@ class ImageToVideoService:
             task.completed_at = datetime.now()
             db.commit()
 
-            data = self._fetch_video(video_filename)
+            data = await self._fetch_video(video_filename)
             if data:
                 return data, 200
             return None, 404
@@ -152,11 +154,18 @@ class ImageToVideoService:
             视频文件路径,未找到返回 None
         """
         video_extensions = {
-            ".gif", ".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".wmv"
+            ".gif",
+            ".mp4",
+            ".webm",
+            ".mkv",
+            ".avi",
+            ".mov",
+            ".flv",
+            ".wmv",
         }
 
         # 第一优先级: 查找视频合成节点
-        for node_id, node_output in outputs.items():
+        for node_output in outputs.values():
             if "_meta" in node_output:
                 class_type = node_output.get("_meta", {}).get("class_type", "")
                 if "VideoCombine" in class_type or "Video" in class_type:
@@ -168,7 +177,11 @@ class ImageToVideoService:
                                 filename = file_info.get("filename")
                                 subfolder = file_info.get("subfolder", "")
                                 if filename and file_info.get("type") != "temp":
-                                    subfolder = subfolder.replace("\\", "/") if subfolder else ""
+                                    subfolder = (
+                                        subfolder.replace("\\", "/")
+                                        if subfolder
+                                        else ""
+                                    )
                                     return (
                                         f"{subfolder}/{filename}"
                                         if subfolder
@@ -188,7 +201,9 @@ class ImageToVideoService:
                     if not filename or file_info.get("type") == "temp":
                         continue
                     file_ext = (
-                        f".{filename.rsplit('.', 1)[-1].lower()}" if "." in filename else ""
+                        f".{filename.rsplit('.', 1)[-1].lower()}"
+                        if "." in filename
+                        else ""
                     )
                     if file_ext in video_extensions:
                         subfolder = file_info.get("subfolder", "")
@@ -197,7 +212,7 @@ class ImageToVideoService:
 
         return None
 
-    def _fetch_video(self, video_filename: str) -> bytes | None:
+    async def _fetch_video(self, video_filename: str) -> bytes | None:
         """从 ComfyUI 获取视频二进制数据.
 
         Args:
@@ -217,7 +232,8 @@ class ImageToVideoService:
             else:
                 url = f"{comfyui_url}/api/view?filename={video_filename}&type=output"
 
-            response = requests.get(url, timeout=120)
+            async with httpx.AsyncClient(timeout=TIMEOUT_GET_MEDIA) as client:
+                response = await client.get(url)
             if response.status_code == 200:
                 logger.info(
                     f"成功获取视频: {video_filename}, 大小: {len(response.content)} bytes"
@@ -225,7 +241,7 @@ class ImageToVideoService:
                 return response.content
             logger.error(f"从 ComfyUI 获取视频失败: {response.status_code}")
             return None
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"从 ComfyUI 获取视频异常: {e}")
             return None
 
@@ -233,9 +249,10 @@ class ImageToVideoService:
         """健康检查."""
         try:
             comfyui_url = settings.comfyui_api_url
-            response = requests.get(f"{comfyui_url}/system_stats", timeout=5)
+            async with httpx.AsyncClient(timeout=TIMEOUT_HEALTH_CHECK) as client:
+                response = await client.get(f"{comfyui_url}/system_stats")
             return {"comfyui": response.status_code == 200}
-        except requests.RequestException:
+        except httpx.HTTPError:
             return {"comfyui": False}
 
 

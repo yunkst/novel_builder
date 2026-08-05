@@ -6,7 +6,8 @@ This module provides upload, list, download, and delete functionality
 for user database backups.
 """
 
-import shutil
+import contextlib
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -18,8 +19,12 @@ from ...schemas import BackupInfo, BackupListResponse, BackupUploadResponse
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
+logger = logging.getLogger(__name__)
+
 # 备份存储目录
 BACKUP_DIR = Path("backups")
+# 备份文件大小上限(默认 1GB)。客户端 SQLite 备份远小于此,超过即视为异常。
+MAX_BACKUP_BYTES = 1024 * 1024 * 1024
 
 
 def _safe_backup_path(backup_id: str) -> Path:
@@ -90,9 +95,7 @@ async def upload_backup(
         raise HTTPException(status_code=400, detail="文件名不能为空")
 
     if not file.filename.lower().endswith((".db", ".zip")):
-        raise HTTPException(
-            status_code=400, detail="仅支持.db或.zip格式的备份文件"
-        )
+        raise HTTPException(status_code=400, detail="仅支持.db或.zip格式的备份文件")
 
     # 2. 生成存储路径（按日期分目录）
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -102,9 +105,7 @@ async def upload_backup(
     try:
         date_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        raise HTTPException(
-            status_code=500, detail=f"无法创建备份目录: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"无法创建备份目录: {e!s}")
 
     # 3. 确定存储文件名（避免冲突）
     original_filename = file.filename
@@ -124,12 +125,34 @@ async def upload_backup(
         stored_filename = f"{name_without_ext}_{timestamp}{new_ext}"
         file_path = date_dir / stored_filename
 
-    # 4. 流式写入文件（避免大文件占用过多内存）
+    # 4. 流式写入文件（避免大文件占用过多内存;累计字节数限制）
+    bytes_written = 0
     try:
         with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while True:
+                chunk = file.file.read(1024 * 1024)  # 1MB 块
+                if not chunk:
+                    break
+                bytes_written += len(chunk)
+                if bytes_written > MAX_BACKUP_BYTES:
+                    # 超过上限:关闭文件、删除已写入数据,返回 413
+                    with contextlib.suppress(OSError):
+                        file_path.unlink()
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(f"备份文件超过大小上限 ({MAX_BACKUP_BYTES} bytes)"),
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        raise
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"文件写入失败: {str(e)}")
+        # 失败时清理已写入的半截文件
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except OSError:
+            pass
+        raise HTTPException(status_code=500, detail=f"文件写入失败: {e!s}")
     finally:
         # 确保文件对象被关闭
         file.file.close()
@@ -137,8 +160,8 @@ async def upload_backup(
     # 5. 获取文件大小
     try:
         file_size = file_path.stat().st_size
-    except OSError as e:
-        file_size = 0
+    except OSError:
+        file_size = bytes_written
 
     # 6. 生成响应（返回相对路径，方便跨平台）
     stored_path = str(file_path)
@@ -250,7 +273,7 @@ async def delete_backup(
     try:
         file_path.unlink()
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除失败: {e!s}")
 
     # 清理空的日期目录
     parent_dir = file_path.parent

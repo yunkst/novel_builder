@@ -4,7 +4,6 @@ ComfyUI工作流配置管理器
 """
 
 import logging
-import os
 from pathlib import Path
 
 import yaml
@@ -224,7 +223,7 @@ class WorkflowConfigManager:
             文件是否存在
         """
         # 如果是相对路径，需要根据环境确定基础路径
-        if not os.path.isabs(workflow_path):
+        if not Path(workflow_path).is_absolute():
             # 检查是否在Docker容器中运行
             if Path("/app").exists() and Path("/app/app").exists():
                 # 在Docker容器中，直接使用/app作为基础路径
@@ -248,7 +247,7 @@ class WorkflowConfigManager:
         Returns:
             完整路径
         """
-        if os.path.isabs(workflow_path):
+        if Path(workflow_path).is_absolute():
             return workflow_path
 
         # 检查是否在Docker容器中运行

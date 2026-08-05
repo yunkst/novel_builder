@@ -6,8 +6,9 @@ This module contains data models used throughout the application
 for request validation and response serialization.
 """
 
-from pydantic import BaseModel, Field
+from datetime import datetime
 
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # 文生图功能相关API模式
@@ -17,7 +18,9 @@ from pydantic import BaseModel, Field
 class Text2ImgGenerateRequest(BaseModel):
     """文生图生成请求模式."""
 
-    prompt: str = Field(..., min_length=1, max_length=5000, description="图片生成提示词")
+    prompt: str = Field(
+        ..., min_length=1, max_length=5000, description="图片生成提示词"
+    )
     model_name: str | None = Field(
         None, max_length=100, description="模型名称(可选，默认使用默认模型)"
     )
@@ -93,17 +96,13 @@ class BackupListResponse(BaseModel):
 # ================= 客户端日志上报 =================
 
 
-from datetime import datetime as _dt
-from typing import Optional as _Optional
-
-
 class LogEntrySchema(BaseModel):
     """单条客户端日志条目"""
 
-    timestamp: _dt = Field(..., description="客户端时间戳 (UTC ISO 8601)")
+    timestamp: datetime = Field(..., description="客户端时间戳 (UTC ISO 8601)")
     level: str = Field(..., description="日志级别: debug/info/warning/error")
     message: str = Field(..., description="日志消息内容")
-    stack_trace: _Optional[str] = Field(None, description="堆栈信息")
+    stack_trace: str | None = Field(None, description="堆栈信息")
     category: str = Field("general", description="日志分类")
     tags: list[str] = Field(default_factory=list, description="日志标签列表")
 
@@ -186,4 +185,3 @@ class ModelUploadCompleteResponse(BaseModel):
     stored_path: str = Field(..., description="最终存储路径(绝对路径)")
     filename: str = Field(..., description="最终文件名")
     size: int = Field(..., description="文件大小(字节)")
-

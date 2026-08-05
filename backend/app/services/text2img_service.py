@@ -8,14 +8,13 @@
 import logging
 from datetime import datetime
 
-import requests
+import httpx
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..constants import CACHE_ONE_DAY
 from ..models.text2img import Text2ImgTask
 from ..utils.model_validation import validate_and_get_model
-from .comfyui_client import create_comfyui_client
+from .comfyui_client import TIMEOUT_GET_MEDIA, create_comfyui_client
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,7 @@ class Text2ImgService:
             return None, 404
 
         if task.status == "completed" and task.filename:
-            data = self._fetch_media(task.filename)
+            data = await self._fetch_media(task.filename)
             if data:
                 return data, 200
             # ComfyUI 上的文件可能已被清理
@@ -95,9 +94,7 @@ class Text2ImgService:
             return None, 404
 
         # pending: 查询 ComfyUI history
-        client = create_comfyui_client(
-            model_title=task.model_name, workflow_type="t2i"
-        )
+        client = create_comfyui_client(model_title=task.model_name, workflow_type="t2i")
         info = await client.check_task_status(task_id)
 
         if not info:
@@ -119,7 +116,7 @@ class Text2ImgService:
             task.completed_at = datetime.now()
             db.commit()
 
-            data = self._fetch_media(filename)
+            data = await self._fetch_media(filename)
             if data:
                 return data, 200
             return None, 404
@@ -156,7 +153,7 @@ class Text2ImgService:
                         return filename
         return None
 
-    def _fetch_media(self, filename: str) -> bytes | None:
+    async def _fetch_media(self, filename: str) -> bytes | None:
         """从 ComfyUI 获取媒体文件二进制数据.
 
         Args:
@@ -168,12 +165,13 @@ class Text2ImgService:
         try:
             comfyui_url = settings.comfyui_api_url
             url = f"{comfyui_url}/view?filename={filename}"
-            response = requests.get(url, timeout=60)
+            async with httpx.AsyncClient(timeout=TIMEOUT_GET_MEDIA) as client:
+                response = await client.get(url)
             if response.status_code == 200:
                 return response.content
             logger.error(f"从 ComfyUI 获取文件失败: {response.status_code}")
             return None
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"从 ComfyUI 获取文件异常: {e}")
             return None
 

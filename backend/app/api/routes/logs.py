@@ -8,7 +8,7 @@ POST /api/logs/upload - Upload batch of client logs
 import json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ...database import get_db
@@ -35,6 +35,9 @@ async def upload_logs(
 
     接收客户端批量上报的日志并存入数据库。
     单次最多接收 50 条日志。
+
+    成功返回 200 + LogUploadResponse;
+    处理失败抛 500 HTTPException(不回显异常细节,仅记录服务端日志)。
     """
     count = 0
     try:
@@ -53,13 +56,11 @@ async def upload_logs(
 
         db.commit()
         logger.info(f"成功接收 {count} 条客户端日志")
-        return LogUploadResponse(
-            received=count, message=f"成功接收 {count} 条日志"
-        )
+        return LogUploadResponse(received=count, message=f"成功接收 {count} 条日志")
 
-    except Exception as e:
+    except Exception:
+        # 内部异常:回滚 + 记录 traceback(含堆栈) + 不向客户端回显异常细节,
+        # 仅返回统一失败消息与 500 状态码。
         db.rollback()
-        logger.error(f"日志上报处理失败: {e}")
-        return LogUploadResponse(
-            received=0, message=f"处理失败: {e!s}"
-        )
+        logger.exception("日志上报处理失败")
+        raise HTTPException(status_code=500, detail="日志上报处理失败")

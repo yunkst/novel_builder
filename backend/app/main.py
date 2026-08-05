@@ -7,7 +7,6 @@ for novel searching, chapter management, and caching functionality.
 """
 
 import logging
-import secrets
 from typing import Any
 
 from fastapi import (
@@ -24,8 +23,12 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from . import __version__
+from .api.routes.backup import router as backup_router
+from .api.routes.logs import router as logs_router
+from .api.routes.models import router as models_router
 from .config import settings
-from .constants import CACHE_ONE_DAY, CACHE_ONE_HOUR, TIMEOUT_FAST
+from .constants import CACHE_ONE_DAY, CACHE_ONE_HOUR
 from .database import get_db, init_db
 from .deps.auth import verify_token
 from .exceptions import (
@@ -38,11 +41,9 @@ from .schemas import (
     Text2ImgGenerateRequest,
     WorkflowInfo,
 )
+from .services.comfyui_client import create_comfyui_client
 from .services.image_to_video_service import create_image_to_video_service
 from .services.text2img_service import create_text2img_service
-from .api.routes.backup import router as backup_router
-from .api.routes.logs import router as logs_router
-from .api.routes.models import router as models_router
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +53,8 @@ image_to_video_service = create_image_to_video_service()
 
 app = FastAPI(
     title="Novel Builder Backend",
-    version="0.2.0",
-    description="FastAPI backend for novel crawling and management",
+    version=__version__,
+    description="FastAPI backend for novel AI image/video generation, backup, and model management",
 )
 
 # CORS配置 - 使用环境变量控制允许的源
@@ -96,20 +97,23 @@ async def startup_event() -> None:
 
 # 全局异常处理器
 @app.exception_handler(NovelBuilderException)
-async def novel_builder_exception_handler(request: Request, exc: NovelBuilderException):
+async def novel_builder_exception_handler(request: Request, exc: NovelBuilderException):  # noqa: ARG001
     """处理自定义应用异常"""
-    logger.error(f"应用异常: {exc.error_code} - {exc.message}")
-    return JSONResponse(status_code=500, content=exc.to_dict())
+    status_code = getattr(exc, "status_code", 500)
+    logger.exception(f"应用异常: {exc.error_code} - {exc.message} (HTTP {status_code})")
+    return JSONResponse(status_code=status_code, content=exc.to_dict())
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(
-    request: Request, exc: Exception
+    request: Request,  # noqa: ARG001
+    exc: Exception,
 ) -> JSONResponse:
     """处理未预期的异常"""
     novel_exc = handle_exception(exc, logger)
-    logger.error(f"未处理异常: {novel_exc.message}")
-    return JSONResponse(status_code=500, content=novel_exc.to_dict())
+    status_code = getattr(novel_exc, "status_code", 500)
+    logger.exception(f"未处理异常: {novel_exc.message} (HTTP {status_code})")
+    return JSONResponse(status_code=status_code, content=novel_exc.to_dict())
 
 
 def handle_service_exception(
@@ -149,7 +153,7 @@ def security_check() -> dict[str, Any]:
     return {
         "is_secure": settings.is_secure(),
         "has_api_token": bool(settings.api_token),
-        "has_custom_secret_key": settings.secret_key != secrets.token_urlsafe(32),
+        "has_custom_secret_key": settings.has_custom_secret_key,
         "is_debug_mode": settings.debug,
         "cors_origins": settings.cors_origins.split(",")
         if settings.cors_origins
@@ -157,9 +161,7 @@ def security_check() -> dict[str, Any]:
         "warnings": [
             "DEBUG模式已启用" if settings.debug else None,
             "未设置API_TOKEN" if not settings.api_token else None,
-            "使用默认SECRET_KEY"
-            if settings.secret_key == "your-secret-key-here"
-            else None,
+            "使用默认SECRET_KEY" if not settings.has_custom_secret_key else None,
             "CORS设置为允许所有源" if "*" in (settings.cors_origins or "") else None,
         ],
     }
@@ -240,25 +242,24 @@ async def text2img_get_image(task_id: str, db: Session = Depends(get_db)):
 @app.get("/text2img/health", dependencies=[Depends(verify_token)])
 async def text2img_health_check():
     """检查ComfyUI服务健康状态"""
-    import requests
-
     try:
-        comfyui_url = settings.comfyui_api_url
-        response = requests.get(f"{comfyui_url}/system_stats", timeout=TIMEOUT_FAST)
+        # 复用 ComfyUIClient.health_check (httpx 异步 + 超时)
+        client = create_comfyui_client()
+        healthy = await client.health_check()
 
-        if response.status_code == 200:
+        if healthy:
             return {
                 "status": "healthy",
                 "message": "ComfyUI服务正常",
                 "services": {"comfyui": True, "api_accessible": True},
             }
-        else:
-            return {
-                "status": "unhealthy",
-                "message": f"ComfyUI服务响应异常: {response.status_code}",
-                "services": {"comfyui": False, "api_accessible": False},
-            }
-    except requests.RequestException as e:
+        return {
+            "status": "unhealthy",
+            "message": "ComfyUI服务响应异常",
+            "services": {"comfyui": False, "api_accessible": False},
+        }
+    except Exception as e:
+        logger.warning(f"ComfyUI 健康检查异常: {e}")
         return {
             "status": "unhealthy",
             "message": f"无法连接ComfyUI服务: {e!s}",
@@ -267,6 +268,12 @@ async def text2img_health_check():
 
 
 # ================= 图生视频 API =================
+
+
+# 图生视频输入图片大小上限(50MB)。ComfyUI 通常足够,过大的图影响 I2V 性能。
+MAX_I2V_IMAGE_BYTES = 50 * 1024 * 1024
+# 允许的图生视频输入图片 MIME 类型(ComfyUI upload/image 端点要求 image/png,但放宽校验)
+ALLOWED_I2V_IMAGE_MIME = {"image/png", "image/jpeg", "image/webp"}
 
 
 @app.post("/api/image-to-video/generate", dependencies=[Depends(verify_token)])
@@ -281,16 +288,39 @@ async def image_to_video_generate(
 
     - **prompt**: 视频生成提示词
     - **model_name**: 模型名称（可选，不填则使用默认模型）
-    - **image**: 输入图片文件
+    - **image**: 输入图片文件(<=50MB,支持 png/jpeg/webp)
 
     返回 task_id，可通过 GET /api/image-to-video/video/{task_id} 获取视频
     """
     try:
+        # MIME 校验(优先用客户端声明,缺失时按扩展名兜底)
+        mime = (image.content_type or "").lower()
+        if mime and mime not in ALLOWED_I2V_IMAGE_MIME:
+            raise HTTPException(
+                status_code=400,
+                detail=f"不支持的图片类型: {mime},仅支持 {sorted(ALLOWED_I2V_IMAGE_MIME)}",
+            )
+
         image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="图片文件为空")
+
+        # 大小校验
+        if len(image_bytes) > MAX_I2V_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"图片过大({len(image_bytes)} bytes),"
+                    f"上限 {MAX_I2V_IMAGE_BYTES} bytes"
+                ),
+            )
+
         task_id = await image_to_video_service.generate(
             prompt, model_name, image_bytes, image.filename or "input_image.png", db
         )
         return {"task_id": task_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise handle_service_exception(e, logger, "提交图生视频任务")
 
@@ -387,7 +417,7 @@ async def get_models() -> ModelsResponse:
 def index():
     return {
         "message": "Novel Builder Backend",
-        "version": "0.2.0",
+        "version": __version__,
         "docs": "/docs",
         "token_required": True,
         "token_header": settings.token_header,
