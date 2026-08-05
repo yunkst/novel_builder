@@ -9,12 +9,12 @@
     workflows = response.workflows
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class WorkflowType(str, Enum):
+class WorkflowType(StrEnum):
     """工作流类型枚举"""
 
     T2I = "t2i"  # 文生图
