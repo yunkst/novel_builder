@@ -242,8 +242,8 @@ TEST_*.md
 baseline_analysis.txt
 test_failures_detailed.log
 
-# 临时测试脚本
-test_*.py
+# 临时测试脚本(仅仓库根目录,避免误伤 backend/tests/test_*.py)
+/test_*.py
 replace_*.py
 upload_apk_now.py
 
