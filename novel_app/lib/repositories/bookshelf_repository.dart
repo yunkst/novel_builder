@@ -353,8 +353,10 @@ class BookshelfRepository extends BaseRepository
   /// [toBookshelfId] 目标书架ID
   ///
   /// 限制：
-  /// - 不能从/到"全部小说"书架（ID=1）移动
+  /// - 不能移动到"全部小说"书架（ID=1，虚拟书架无关联可加）
   /// - 源书架和目标书架相同时无操作
+  /// - from=1（全部小说）降级为 add-only：只调 addNovelToBookshelf(to)，
+  ///   跳过 removeNovelFromBookshelf(_, 1)（该调用本就是 no-op，跳过以避免无意义 warning）
   ///
   /// Web平台抛出UnsupportedError异常
   @override
@@ -367,8 +369,10 @@ class BookshelfRepository extends BaseRepository
       throw UnsupportedError('Web平台不支持书架操作');
     }
 
-    if (fromBookshelfId == 1 || toBookshelfId == 1) {
-      throw ArgumentError('不能从/到"全部小说"书架移动小说');
+    // to=1 是虚拟书架"全部小说"，无关联可加；UI 选择对话框已过滤 id=1，
+    // 保留此断言作为防御性兜底，防止未来其他调用方误用。
+    if (toBookshelfId == 1) {
+      throw ArgumentError('不能移动到"全部小说"虚拟书架');
     }
 
     if (fromBookshelfId == toBookshelfId) {
@@ -383,12 +387,27 @@ class BookshelfRepository extends BaseRepository
     // 先添加到目标书架
     await addNovelToBookshelf(novelUrl, toBookshelfId);
 
-    // 再从原书架移除
-    final removed = await removeNovelFromBookshelf(novelUrl, fromBookshelfId);
+    // from=1 是虚拟书架"全部小说"，无关联可删（removeNovelFromBookshelf(_, 1) 本就 no-op），
+    // 跳过以避免无意义的 warning 日志。等价于"加入目标书架，书仍留在全部小说"。
+    if (fromBookshelfId != 1) {
+      final removed = await removeNovelFromBookshelf(novelUrl, fromBookshelfId);
 
-    if (removed) {
+      if (removed) {
+        LoggerService.instance.i(
+          '移动小说: $novelUrl 从书架 $fromBookshelfId 到书架 $toBookshelfId',
+          category: LogCategory.database,
+          tags: ['bookshelf', 'move_novel'],
+        );
+      } else {
+        LoggerService.instance.i(
+          '加入小说: $novelUrl 到书架 $toBookshelfId (来源:书架 $fromBookshelfId 无关联可删)',
+          category: LogCategory.database,
+          tags: ['bookshelf', 'move_novel'],
+        );
+      }
+    } else {
       LoggerService.instance.i(
-        '移动小说: $novelUrl 从书架 $fromBookshelfId 到书架 $toBookshelfId',
+        '加入小说: $novelUrl 到书架 $toBookshelfId (来源:虚拟书架 全部小说)',
         category: LogCategory.database,
         tags: ['bookshelf', 'move_novel'],
       );
