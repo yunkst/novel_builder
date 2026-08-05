@@ -309,3 +309,12 @@ novel_app/lib/main_ocr_test.dart
 # 个人草稿/推广素材（本地保留，不进仓库）
 promo_covers/
 zhihu_article.md
+
+# 滚动日志（如 backend/novel_builder.log.1 这类带数字后缀的轮转日志）
+*.log.*
+
+# Flutter 应用图标生成产物（flutter_launcher_icons / 手工导出）
+app_icons/
+
+# 仓库根悬挂的临时测试文件（已被上方 *.txt 通配覆盖，此处显式标注意图）
+_preflight_test.txt

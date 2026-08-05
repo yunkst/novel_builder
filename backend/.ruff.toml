@@ -63,16 +63,16 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 per-file-ignores."__init__.py" = ["F401"]
 per-file-ignores."test_*.py" = ["ARG001", "ARG002"]
 per-file-ignores."conftest.py" = ["F401", "ARG001"]
-
-# Ignore broad exception handling in crawlers (intentional error handling)
-per-file-ignores."*_crawler*.py" = ["BLE001"]
+# FastAPI 路由:`authenticated: bool = Depends(verify_token)` 是依赖注入触发器,
+# 函数体故意不读(authenticated 存在即代表"已鉴权"声明)。ARG001 是框架惯例,
+# 全局压制避免每行加 noqa。
+per-file-ignores."app/api/routes/*.py" = ["ARG001"]
 
 # Ignore specific rules in specific services (intentional broad exception handling)
-per-file-ignores."scene_illustration_service.py" = ["BLE001"]
-per-file-ignores."role_card_service.py" = ["BLE001"]
-per-file-ignores."search_service.py" = ["BLE001"]
-per-file-ignores."model_validation.py" = ["BLE001"]
-per-file-ignores."auth.py" = ["BLE001"]
+# 注：*_crawler*.py / scene_illustration_service.py / role_card_service.py / search_service.py
+# 已随 2026-07-08 后端爬虫移除全部删除，per-file-ignores 段同步清理。
+per-file-ignores."app/utils/model_validation.py" = ["BLE001"]
+per-file-ignores."app/deps/auth.py" = ["BLE001"]
 
 # Fix settings
 fixable = ["ALL"]
