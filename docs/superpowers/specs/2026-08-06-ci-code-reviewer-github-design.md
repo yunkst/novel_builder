@@ -628,7 +628,7 @@ def handler(args: dict, ctx: dict) -> str:
 
 ---
 
-## 8. Archive 处理
+## 9. Archive 处理
 
 ### 8.1 GitHub 平台
 
@@ -645,7 +645,7 @@ if cfg["platform"] == "github":
 
 ---
 
-## 9. CI 构建链迁移
+## 10. CI 构建链迁移
 
 ### 9.1 `.github/workflows/build.yml`
 
@@ -779,7 +779,7 @@ jobs:
 
 ---
 
-## 10. templates/code-review.yml 重写
+## 11. templates/code-review.yml 重写
 
 ```yaml
 spec:
@@ -830,7 +830,7 @@ spec:
 
 ---
 
-## 11. novel_builder 接入
+## 12. novel_builder 接入
 
 ### 11.1 `.github/workflows/code-review.yml`
 
@@ -924,7 +924,7 @@ jobs:
 
 ---
 
-## 12. 去硬编码清单
+## 13. 去硬编码清单
 
 | 文件 | 旧值 | 新值 |
 |------|------|------|
@@ -937,7 +937,7 @@ jobs:
 | `ci/bump_tag.sh` | 自动 bump | 删除 |
 | `tests/test_archive.py` | 默认 178 假设 | 改默认 0 假设 |
 
-### 12.1 README 关键词完整清单（重写时 grep 核对）
+### 13.1 README 关键词完整清单（重写时 grep 核对）
 
 重写 README 前需在现 README 全文 grep 以下关键词，确保无遗漏（不限于第一处）：
 
@@ -954,7 +954,7 @@ jobs:
 
 ---
 
-## 13. 测试策略
+## 14. 测试策略
 
 ### 13.1 新增测试
 
@@ -993,7 +993,7 @@ jobs:
 
 ---
 
-## 14. 实施顺序
+## 15. 实施顺序
 
 ```
 1. 本地改造 D:\work\ci-code-reviewer（不开 PR 不推，先本地跑测试）
@@ -1025,7 +1025,7 @@ jobs:
 
 ---
 
-## 15. CHANGELOG 摘要
+## 16. CHANGELOG 摘要
 
 ```markdown
 ## v2.0.0 (2026-08-06) — BREAKING
