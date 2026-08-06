@@ -277,6 +277,11 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     Novel novel,
     String mode,
   ) async {
+    // "加入书架"(全部小说书架下的合并入口)与"复制到书架"语义等价,
+    // 仅标题文案不同。
+    final isJoin = mode == 'join';
+    final isMove = mode == 'move';
+
     // 使用Repository获取书架列表
     final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
     final bookshelves = await bookshelfRepository.getBookshelves();
@@ -304,11 +309,17 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
         title: Row(
           children: [
             Icon(
-              mode == 'move' ? Icons.drive_file_move_outline : Icons.copy,
+              isMove
+                  ? Icons.drive_file_move_outline
+                  : Icons.bookmark_add_outlined,
               color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 8),
-            Text(mode == 'move' ? '移动到书架' : '复制到书架'),
+            Text(
+              isMove
+                  ? '移动到书架'
+                  : (isJoin ? '加入书架' : '复制到书架'),
+            ),
           ],
         ),
         content: SizedBox(
@@ -340,9 +351,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
     );
 
     if (selectedBookshelf != null && mounted) {
-      if (mode == 'move') {
+      if (isMove) {
         await _moveNovelToBookshelf(novel, selectedBookshelf.id);
       } else {
+        // 'join' 和 'copy' 都走 copyToBookshelf:add-only,不影响原书架归属
         await _copyNovelToBookshelf(novel, selectedBookshelf.id);
       }
     }
@@ -401,6 +413,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
 
   /// 显示小说操作菜单（编辑/移动/复制/移除）
   void _showNovelMenu(Novel novel) {
+    final currentBookshelfId = ref.read(currentBookshelfIdProvider);
+    final isAllNovelsBookshelf = currentBookshelfId == 1;
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -433,23 +447,36 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
                   _editNovelTitle(novel);
                 },
               ),
-              ListTile(
-                leading:
-                    Icon(Icons.drive_file_move_outline, color: colors.warning),
-                title: const Text('移动到书架'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _showBookshelfSelectionDialog(novel, 'move');
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.copy_all_outlined, color: colors.success),
-                title: const Text('复制到书架'),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _showBookshelfSelectionDialog(novel, 'copy');
-                },
-              ),
+              if (isAllNovelsBookshelf)
+                ListTile(
+                  leading: Icon(Icons.bookmark_add_outlined,
+                      color: colors.warning),
+                  title: const Text('加入书架'),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _showBookshelfSelectionDialog(novel, 'join');
+                  },
+                )
+              else ...[
+                ListTile(
+                  leading: Icon(Icons.drive_file_move_outline,
+                      color: colors.warning),
+                  title: const Text('移动到书架'),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _showBookshelfSelectionDialog(novel, 'move');
+                  },
+                ),
+                ListTile(
+                  leading:
+                      Icon(Icons.copy_all_outlined, color: colors.success),
+                  title: const Text('复制到书架'),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _showBookshelfSelectionDialog(novel, 'copy');
+                  },
+                ),
+              ],
               ListTile(
                 leading: Icon(Icons.image_outlined, color: colors.info),
                 title: const Text('设置封面'),
