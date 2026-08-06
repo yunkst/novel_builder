@@ -272,7 +272,11 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> {
   /// 显示书架选择对话框
   ///
   /// [novel] 要操作的小说
-  /// [mode] 操作模式：'move' 或 'copy'
+  /// [mode] 操作模式：'move' / 'copy' / 'join'
+  ///   - 'move': 从当前书架移动到目标书架(仅非全部小说书架下入口)
+  ///   - 'copy': 复制到目标书架(保留原书架归属)
+  ///   - 'join': 全部小说书架下的合并入口,等价 'copy'(add-only,
+  ///     书仍留在全部小说——虚拟书架无关联可删)
   Future<void> _showBookshelfSelectionDialog(
     Novel novel,
     String mode,
