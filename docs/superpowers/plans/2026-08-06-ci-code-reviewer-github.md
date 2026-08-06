@@ -15,7 +15,7 @@
 ### 代码仓库状态
 
 - **`D:\work\ci-code-reviewer`** — 待改造的本地仓库（GitLab 内网，不发 PR 上游），改造后整体推新仓 `github.com/yedazhi/code-reviewer`
-- **`D:\my_space\novel_builder`** — 消费方，本计划任务 16-19 在此仓库加 workflow
+- **`D:\my_space\novel_builder`** — 消费方，本计划任务 17 在此仓库加 workflow
 
 ### 计划来源
 
@@ -124,12 +124,12 @@ ci/bump_tag.sh                         # 自动 bump 机制（v1.x → v2.0 移�
 
 ## 任务拆分
 
-任务分 4 个 Phase，共 19 个任务：
+任务分 4 个 Phase，共 17 个任务：
 
-- **Phase 1（任务 1-5）**：平台抽象骨架 — IssueClient + Notifier 拆目录、工厂、GitLab 迁移
-- **Phase 2（任务 6-10）**：GitHub 实现 — GithubIssueClient + GithubPrCommentNotifier + status check
-- **Phase 3（任务 11-15）**：主流程接入 — __main__ / agent / orchestrator / config / tools 改造
-- **Phase 4（任务 16-19）**：迁移与消费方 — CI 迁 GitHub / 开源卫生 / novel_builder 接入
+- **Phase 1（任务 1-5）**：平台抽象骨架 — IssueClient + Notifier 拆目录、工厂、GitLab 迁移（在 `D:\work\ci-code-reviewer`）
+- **Phase 2（任务 6-10）**：GitHub 实现 — GithubIssueClient + GithubPrCommentNotifier + status check（在 `D:\work\ci-code-reviewer`）
+- **Phase 3（任务 11-13）**：主流程接入（任务 11 是原子任务，三处一起改）+ 清理兼容层 + 4 场景验证（在 `D:\work\ci-code-reviewer`）
+- **Phase 4（任务 14-17）**：迁移与消费方 — CI 迁 GitHub Actions + 开源 + templates 重写（任务 14-16 在 `D:\work\ci-code-reviewer`），novel_builder 接入（任务 17 在 `D:\my_space\novel_builder`）
 
 ---
 
@@ -789,7 +789,7 @@ notifier/__init__.py: 末尾追加 send_report/send_error/send_skip 模块级 wr
 
 注意：不能创建 src/code_review/notifier.py（与 notifier/ 包同名冲突，Python 会忽略）。
 
-过渡 commit，让未迁移的调用点仍能 import 老路径。任务 14 完成主流程迁移后，
+过渡 commit，让未迁移的调用点仍能 import 老路径。任务 12 完成主流程迁移后，
 本兼容层连同这些未迁移点一并清理。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
@@ -1668,11 +1668,11 @@ def test_build_agent_b_prompt_github_uses_github_terms(tmp_path, monkeypatch):
 PLATFORM_TERMS = {
     "gitlab": {
         "issue_system": "GitLab issue",
-        "label_intro": "会自动打上 reviewer-generated 和 severity 标签。",
+        "issue_label_intro": "会自动打上 reviewer-generated 和 severity 标签。",
     },
     "github": {
         "issue_system": "GitHub issue",
-        "label_intro": "会自动打上 reviewer-generated 和 severity 标签（GitHub 需要仓库预创建这些 label）。",
+        "issue_label_intro": "会自动打上 reviewer-generated 和 severity 标签（GitHub 需要仓库预创建这些 label）。",
     },
 }
 
@@ -1685,7 +1685,7 @@ def _substitute_platform_terms(text: str, platform: str) -> str:
             .replace("关闭一个已确认被本次提交修复的 GitLab issue",
                      f"关闭一个已确认被本次提交修复的 {terms['issue_system']}")
             .replace("GitLab issue（带 severity）", f"{terms['issue_system']}（带 severity）")
-            .replace("会自动打上 reviewer-generated 和 severity 标签。", terms["label_intro"])
+            .replace("会自动打上 reviewer-generated 和 severity 标签。", terms["issue_label_intro"])
             .replace("GitLab issue", terms["issue_system"]))
 ```
 
@@ -2254,7 +2254,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 > **本 Phase 是一个原子任务**（任务 11-13 合并为任务 11"主流程改造"）：
 > `resolve_assignee_id` 改签名 + `main()` 接入 IssueClient + `orchestrator` 接入 Notifier 三处强耦合，
 > 单独 commit 任一处都会让 pytest 中间态失败。必须**一次 commit 三处改造 + 全部测试通过**。
-> 任务 14"删兼容层"单独成任务，在任务 11 commit 通过后进行。
+> 任务 12"删兼容层"单独成任务，在任务 11 commit 通过后进行。
 
 ### 任务 11：主流程改造（resolve_assignee_id + main + orchestrator 三处一起改）
 
