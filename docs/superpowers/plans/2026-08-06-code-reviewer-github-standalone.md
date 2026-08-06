@@ -56,9 +56,15 @@
 
 ---
 
-### 任务 1：建仓 + 复制核心 + 删 GitLab 文件
+### 任务 1：建仓 + 复制核心 + 删 GitLab 文件 + Dockerfile/pyproject 新写
 
-**目标**：在 `D:\my_space\code-reviewer` 建立新 git 仓库，从 `D:\work\ci-code-reviewer` 复制核心代码（不依赖 GitLab/issue/notifier/config/main 的部分），跑能跑的测试确认绿。
+**目标**：在 `D:\my_space\code-reviewer` 建立新 git 仓库，从 `D:\work\ci-code-reviewer` 复制核心代码，改 Dockerfile（去内网镜像）、新写 pyproject.toml（老仓没有），跑能跑的测试确认绿。
+
+**关键事实**（源仓库实际状态，已核实）：
+- 源仓**无 `pyproject.toml`**（只有 `requirements.txt`，内容 `openai>=1.0`）
+- 源仓 `Dockerfile` 用 `ccr.ccs.tencentyun.com/comms/python:3.11-slim` 内网镜像 + aliyun 换源 + `COPY entrypoint_weekly.sh`（新仓不复制 weekly，必须删这行）
+- 源仓 prompts 在**根目录** `prompts/`（不是 `src/code_review/prompts/`），`agents.py._PROMPTS_DIR` 和 `test_prompt.py._PROMPT_DIR` 都按根 `prompts/` 计算
+- 源仓 `prompt.py` 用 `{{XXX}}` 双大括号占位符 + `extra` 参数（**不是** `.format()`）
 
 **文件：**
 - 新建目录：`D:\my_space\code-reviewer`
@@ -67,100 +73,157 @@
   - `src/code_review/agent.py`（任务 5 改 dispatch_ctx）
   - `src/code_review/agents.py`（任务 5 加术语替换）
   - `src/code_review/orchestrator.py`（任务 5 改）
-  - `src/code_review/prompt.py`（任务 5 加术语替换）
+  - `src/code_review/prompt.py`（**保留老仓实现**，任务 5 仅末尾追加术语替换）
   - `src/code_review/cr_ignore.py`
   - `src/code_review/log.py`
   - `src/code_review/tools/__init__.py`
-  - `src/code_review/tools/{git_diff,git_log,git_show,grep,list_directory,list_files,notes_store,read_file,read_notes,take_note}.py`（10 个）
-  - `src/code_review/tools/create_issue.py`（任务 5 改）
-  - `src/code_review/tools/close_issue.py`（任务 5 改）
-  - `src/code_review/prompts/agent_a_feature.md`
-  - `src/code_review/prompts/agent_b_quality.md`（任务 5 术语）
-  - `src/code_review/prompts/agent_c_repair.md`（任务 5 术语）
-  - `Dockerfile` / `entrypoint.sh` / `pyproject.toml` / `requirements.txt`
-  - `tests/test_cr_ignore.py` / `test_log.py` / `test_prompt.py`
-  - `tests/test_tool_{git_diff,git_log,git_show,grep,list_directory,list_files,notes,read_file}.py`（8 个只读工具测试）
+  - `src/code_review/tools/{git_diff,git_log,git_show,grep,list_directory,list_files,notes_store,read_file,read_notes,take_note}.py`（10 个不改）
+  - `src/code_review/tools/create_issue.py`（任务 5 重写 handler）
+  - `src/code_review/tools/close_issue.py`（任务 5 重写 handler）
+  - `prompts/agent_a_feature.md` / `agent_b_quality.md` / `agent_c_repair.md`（**复制到根 `prompts/`**，不是 src 下）
+  - `entrypoint.sh` / `requirements.txt`
+  - `Dockerfile`（**复制后改造**，见步骤 4）
+  - `tests/__init__.py`
+  - `tests/test_cr_ignore.py` / `test_log.py` / `test_prompt.py`（不改）
+  - `tests/test_tool_{git_diff,git_log,git_show,grep,list_directory,list_files,notes,read_file,registry}.py`（9 个，含 registry，不改）
   - `tests/test_agent.py` / `test_orchestrate.py` / `test_agents.py` / `test_tool_create_issue.py` / `test_tool_close_issue.py`（任务 5 改 fixture 后才能跑，先复制）
-- **不复制**（GitLab/公司专用）：`gitlab_client.py` / `notifier.py`（企微）/ `archive.py` / `config.py` / `__main__.py` / `weekly/` / `entrypoint_weekly.sh` / `prompts/weekly_member.md` / `.gitlab-ci.yml` / `ci/` / `templates/` / `bump_test/` / 对应测试
+- **新写**（老仓没有）：`pyproject.toml`
+- **不复制**（GitLab/公司专用）：`gitlab_client.py` / `notifier.py`（企微）/ `archive.py` / `config.py` / `__main__.py` / `weekly/` / `entrypoint_weekly.sh` / `prompts/weekly_member.md` / `.gitlab-ci.yml` / `ci/` / `templates/` / `bump_test/` / `test_gitlab_client*.py` / `test_archive.py` / `test_weekly_*.py` / `test_review_cache.py`
 
 - [ ] **步骤 1：建仓 + 目录结构**
 
 ```bash
-mkdir -p D:/my_space/code-reviewer
+mkdir -p D:/my_space/code-reviewer/src/code_review/tools D:/my_space/code-reviewer/prompts D:/my_space/code-reviewer/tests
 cd D:/my_space/code-reviewer
 git init
-mkdir -p src/code_review/tools src/code_review/prompts tests
 ```
+
+注意：prompts 在**根目录**（与老仓一致，`agents.py._PROMPTS_DIR` 往上三层到根再进 `prompts/`）。
 
 - [ ] **步骤 2：复制核心代码**
 
-从 `D:/work/ci-code-reviewer` 复制（按上方清单）。PowerShell 示例：
+PowerShell 示例：
 ```powershell
 $src = "D:\work\ci-code-reviewer"
 $dst = "D:\my_space\code-reviewer"
 # src 核心
-Copy-Item "$src\src\code_review\__init__.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\agent.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\agents.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\orchestrator.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\prompt.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\cr_ignore.py" "$dst\src\code_review\"
-Copy-Item "$src\src\code_review\log.py" "$dst\src\code_review\"
+foreach ($f in @("__init__","agent","agents","orchestrator","prompt","cr_ignore","log")) {
+    Copy-Item "$src\src\code_review\$f.py" "$dst\src\code_review\"
+}
 # tools（10 个不改 + 2 个待改）
 Copy-Item "$src\src\code_review\tools\__init__.py" "$dst\src\code_review\tools\"
 foreach ($t in @("git_diff","git_log","git_show","grep","list_directory","list_files","notes_store","read_file","read_notes","take_note","create_issue","close_issue")) {
     Copy-Item "$src\src\code_review\tools\$t.py" "$dst\src\code_review\tools\"
 }
-# prompts
-Copy-Item "$src\src\code_review\prompts\agent_a_feature.md" "$dst\src\code_review\prompts\"
-Copy-Item "$src\src\code_review\prompts\agent_b_quality.md" "$dst\src\code_review\prompts\"
-Copy-Item "$src\src\code_review\prompts\agent_c_repair.md" "$dst\src\code_review\prompts\"
+# prompts（到根 prompts/，不是 src 下）
+foreach ($p in @("agent_a_feature","agent_b_quality","agent_c_repair")) {
+    Copy-Item "$src\prompts\$p.md" "$dst\prompts\"
+}
 # 根文件
-Copy-Item "$src\Dockerfile" "$dst\"
 Copy-Item "$src\entrypoint.sh" "$dst\"
-Copy-Item "$src\pyproject.toml" "$dst\"
 Copy-Item "$src\requirements.txt" "$dst\"
-# 测试（不改的）
-foreach ($t in @("test_cr_ignore","test_log","test_prompt","test_tool_git_diff","test_tool_git_log","test_tool_git_show","test_tool_grep","test_tool_list_directory","test_tool_list_files","test_tool_notes","test_tool_read_file","test_agent","test_orchestrate","test_agents","test_tool_create_issue","test_tool_close_issue")) {
+Copy-Item "$src\Dockerfile" "$dst\"  # 步骤 4 改造
+# 测试
+Copy-Item "$src\tests\__init__.py" "$dst\tests\"
+foreach ($t in @("test_cr_ignore","test_log","test_prompt","test_tool_git_diff","test_tool_git_log","test_tool_git_show","test_tool_grep","test_tool_list_directory","test_tool_list_files","test_tool_notes","test_tool_read_file","test_tool_registry","test_agent","test_orchestrate","test_agents","test_tool_create_issue","test_tool_close_issue")) {
     Copy-Item "$src\tests\$t.py" "$dst\tests\"
 }
-Copy-Item "$src\tests\__init__.py" "$dst\tests\"
 ```
 
-- [ ] **步骤 3：临时 stub 让 import 不破**
+- [ ] **步骤 3：临时 stub 让 import 不破 + 临时禁用 create_issue/close_issue 注册**
 
-因为 `config.py` / `github_client.py` / `notifier.py` / `__main__.py` 还没写，复制过来的 `agent.py` / `orchestrator.py` / `tools/create_issue.py` 会 import 失败。先建最小 stub：
+复制过来的代码 import 链：`agent.py`/`orchestrator.py` import config/notifier；`tools/create_issue.py`/`close_issue.py` import `gitlab_client`（未复制）。策略：**最小 stub + 临时禁用两个 issue 工具注册**。
 
-`src/code_review/config.py`（stub）：
+stub 文件（任务 2-4 填充真实实现）：
+
+`src/code_review/config.py`：
 ```python
-def load_config(): 
-    raise NotImplementedError("任务 2 实现")
+class ConfigError(Exception): ...
+def load_config(): raise NotImplementedError("任务 2 实现")
 ```
 
-`src/code_review/notifier.py`（stub，给 orchestrator.py 临时 import 用）：
+`src/code_review/github_client.py`：
 ```python
-def build_multi_section_report(*a, **kw): raise NotImplementedError
-def send_report(*a, **kw): raise NotImplementedError
-def send_error(*a, **kw): raise NotImplementedError
+class GithubClient:
+    def __init__(self, token, repo): ...
 ```
 
-`src/code_review/github_client.py`（stub）：
+`src/code_review/notifier.py`（orchestrator.py 复制后会 import，需提供符号）：
 ```python
-class GithubClient: ...
+class GithubPrNotifier: ...
+class ReportContext: ...
+def build_multi_section_report(*a, **kw): raise NotImplementedError("任务 4 实现")
 ```
 
-`src/code_review/__main__.py`（stub）：
+`src/code_review/__main__.py`：
 ```python
-def main(): raise NotImplementedError
+def main(): raise NotImplementedError("任务 5 实现")
 ```
 
-注意：`agent.py` 复制后仍 import `from . import log` 和 `from .tools import ...`，这些都在。但 `agent.py` 的 `dispatch_ctx` 仍含 `gitlab_token` 等 key（从老仓原样复制）——任务 5 才改。任务 1 阶段 `agent.py` 能 import 但跑起来会因缺 config/issue_client 失败，所以 `test_agent.py` 暂时跑不通（预期），任务 5 后才通。
+**临时禁用 create_issue/close_issue**（因为它们 `from .. import gitlab_client` 会失败）：
 
-`tools/create_issue.py` / `close_issue.py` 复制后含 `from .. import gitlab_client`——**这个 import 会失败**（gitlab_client 没复制）。任务 1 阶段先注释掉这两个工具的 handler 体或临时改 import，让 `tools/__init__.py` 能加载。最简做法：临时把这两个文件的 `from .. import gitlab_client` 改成 `from .github_client import GithubClient as _Stub`（stub），handler 体保持原样（任务 5 重写）。或者更简单：在 `tools/__init__.py` 的 dispatch 注册里临时跳过这两个（任务 5 恢复）。
+打开 `src/code_review/tools/__init__.py`，找到 TOOL_REGISTRY（或工具注册字典）里 `create_issue` / `close_issue` 两行，**临时注释掉**（加 `# 任务 5 恢复` 注释）。这样 `tools/__init__.py` 能加载，`test_tool_registry.py` 会因少 2 个工具失败——**暂时跳过它**（任务 5 恢复注册后才跑）。步骤 5 的测试命令不含 test_tool_registry。
 
-**推荐**：临时给 `github_client.py` stub 加上 `list_issues` / `create_issue` 等方法名（raise NotImplementedError），让 `create_issue.py` 的 `from .. import gitlab_client` 改成 `from ..github_client import GithubClient as gitlab_client` 临时通过 import。任务 5 时彻底重写为 `ctx["issue_client"]`。
+- [ ] **步骤 4：新写 pyproject.toml + 改造 Dockerfile**
 
-- [ ] **步骤 4：跑能跑的测试确认绿**
+`pyproject.toml`（新写，老仓无）：
+```toml
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-reviewer"
+version = "1.0.0"
+description = "AI code reviewer for GitHub (PR comments + issue tracking)"
+requires-python = ">=3.11"
+dependencies = ["openai>=1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+code-reviewer = "code_review.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+```
+
+`Dockerfile` 改造（复制后改 3 处）：
+- 第 2 行：`FROM ccr.ccs.tencentyun.com/comms/python:3.11-slim` → `FROM python:3.11-slim`
+- 第 13-27 行（aliyun apt + pip 换源段）：**删除**（开源镜像走默认源）
+- 第 38 行：`COPY entrypoint_weekly.sh ./` → **删除**（新仓无此文件）
+- 第 39 行 `chmod +x entrypoint.sh entrypoint_weekly.sh` → `chmod +x entrypoint.sh`
+
+改造后 Dockerfile 关键段：
+```dockerfile
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY prompts/ ./prompts/
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+
+ENV PYTHONPATH=/app/src
+WORKDIR /repo
+ENTRYPOINT ["/app/entrypoint.sh"]
+```
+
+- [ ] **步骤 5：安装 + 跑能跑的测试确认绿**
 
 ```bash
 cd D:/my_space/code-reviewer
@@ -168,11 +231,11 @@ pip install -e ".[dev]"
 pytest tests/test_cr_ignore.py tests/test_log.py tests/test_prompt.py tests/test_tool_git_diff.py tests/test_tool_git_log.py tests/test_tool_git_show.py tests/test_tool_grep.py tests/test_tool_list_directory.py tests/test_tool_list_files.py tests/test_tool_notes.py tests/test_tool_read_file.py -v
 ```
 
-预期：全绿（这些测试不依赖 config/github_client/notifier/main）
+预期：全绿（这些测试不依赖 config/github_client/notifier/main，且 test_prompt 验证 `{{XXX}}` 占位符 + extra 契约能过，因为 prompt.py 原样复制）
 
-`test_agent.py` / `test_orchestrate.py` / `test_agents.py` / `test_tool_create_issue.py` / `test_tool_close_issue.py` 此时**预期失败**（依赖未写代码），任务 5 完成后才绿。
+**预期失败（任务 5 后才绿）**：`test_agent.py` / `test_orchestrate.py` / `test_agents.py` / `test_tool_create_issue.py` / `test_tool_close_issue.py` / `test_tool_registry.py`（registry 因临时禁用 2 工具而失败，任务 5 恢复）。
 
-- [ ] **步骤 5：写 .gitignore + Commit**
+- [ ] **步骤 6：写 .gitignore + Commit**
 
 `.gitignore`：
 ```
@@ -186,12 +249,15 @@ __pycache__/
 ```bash
 cd D:/my_space/code-reviewer
 git add -A
-git commit -m "init: 从 ci-code-reviewer 复制核心代码建仓
+git commit -m "init: 从 ci-code-reviewer 复制核心 + Dockerfile/pyproject 改造
 
 从 D:\work\ci-code-reviewer 复制三 agent 编排 + prompt + 只读工具集 +
-.cr-ignore + LLM 重试 + Dockerfile + 测试。
+.cr-ignore + LLM 重试 + 测试。prompts 放根目录（与老仓 _PROMPTS_DIR 一致）。
 不复制 GitLab 专用代码（gitlab_client/notifier/archive/weekly/GitLab CI）。
 config/github_client/notifier/__main__ 临时 stub，任务 2-5 填充。
+tools/__init__ 临时禁用 create_issue/close_issue 注册（任务 5 恢复）。
+Dockerfile 改：基础镜像 python:3.11-slim、删 aliyun 换源、删 weekly 入口。
+pyproject.toml 新写（老仓无）。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -616,6 +682,18 @@ def test_add_comment_posts(mock_urlopen):
     req = mock_urlopen.call_args.args[0]
     assert req.method == "POST"
     assert "repos/owner/repo/issues/8/comments" in req.full_url
+
+
+@patch("urllib.request.urlopen")
+def test_update_description_patches_body(mock_urlopen):
+    mock_urlopen.return_value = _mock_response({"number": 8, "html_url": "https://gh/x/8"})
+    client = GithubClient(token="ghp_x", repo="owner/repo")
+    client.update_description(8, "new body")
+    req = mock_urlopen.call_args.args[0]
+    assert req.method == "PATCH"
+    assert "repos/owner/repo/issues/8" in req.full_url
+    body = json.loads(req.data)
+    assert body == {"body": "new body"}
 ```
 
 - [ ] **步骤 2：跑测试确认失败**
@@ -854,6 +932,38 @@ def test_send_skip_push_no_status(mock_urlopen):
     n = GithubPrNotifier(token="ghp_x", repo="owner/repo")
     n.send_skip("跳过", "无 diff", context=_ctx(pr_number=None))
     assert mock_urlopen.call_count == 0
+
+
+@patch("urllib.request.urlopen")
+def test_send_skip_pr_posts_comment(mock_urlopen):
+    """PR + skip 发评论（与 push 不发对照）。"""
+    mock_urlopen.return_value = MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None)
+    n = GithubPrNotifier(token="ghp_x", repo="owner/repo")
+    n.send_skip("跳过", "无 diff", context=_ctx(pr_number=42))
+    assert mock_urlopen.call_count == 1
+    assert "repos/owner/repo/issues/42/comments" in mock_urlopen.call_args.args[0].full_url
+
+
+@patch("urllib.request.urlopen")
+def test_send_error_pr_posts_comment(mock_urlopen):
+    """PR + error 发评论（与 push status failure 对照）。"""
+    mock_urlopen.return_value = MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None)
+    n = GithubPrNotifier(token="ghp_x", repo="owner/repo")
+    n.send_error("title", "body", context=_ctx(pr_number=42))
+    assert mock_urlopen.call_count == 1
+    assert "repos/owner/repo/issues/42/comments" in mock_urlopen.call_args.args[0].full_url
+    # 不发 status check（PR 场景避免双重通知）
+    assert "/statuses/" not in mock_urlopen.call_args.args[0].full_url
+
+
+@patch("urllib.request.urlopen")
+def test_send_report_pr_no_status_check(mock_urlopen):
+    """PR + report 发评论，不发 status check（避免双重通知）。"""
+    mock_urlopen.return_value = MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None)
+    n = GithubPrNotifier(token="ghp_x", repo="owner/repo")
+    n.send_report("# report", context=_ctx(pr_number=42))
+    assert mock_urlopen.call_count == 1
+    assert "/statuses/" not in mock_urlopen.call_args.args[0].full_url
 
 
 def test_build_multi_section_report_renders_header():
@@ -1120,11 +1230,73 @@ def test_build_context_returns_reportcontext_with_pr_number():
     assert ctx.trigger_user == "alice"
 ```
 
-`tests/test_orchestrate.py`（改 fixture，send_report 走 notifier 实例）：参照老仓 test_orchestrate.py，把 `send_report`/`send_error` 的断言改成验证 `FakeNotifier.send_report_called`。
+`tests/test_orchestrate.py`（改 fixture）：从老仓复制后，**3 处改造**——cfg 字段、notifier patch 路径、send_report/send_error 断言。
 
-`tests/test_agent.py`（改 fixture）：dispatch_ctx 含 `issue_client`（FakeGithubClient），不含 gitlab_*。
+老仓 `_CFG` 含 `wecom_webhook_url`/`gitlab_token`/`gitlab_api_url`/`gitlab_project_id`；新仓改：
+```python
+_CFG = {
+    "platform": "github",
+    "gh_token": "ghp_x", "github_repository": "owner/repo",
+    "llm_base_url": "x", "llm_api_key": "k", "llm_model": "m",
+    "max_turns": 1, "max_diff_bytes": 50000, "report_lang": "zh",
+    "ci_pipeline_url": "",
+}
+```
+老仓 `patch("code_review.orchestrator.send_report")` / `send_error`（模块级函数）→ 新仓改 patch notifier 类：
+```python
+from tests.test_helpers import FakeNotifier
 
-`tests/test_tool_create_issue.py` / `test_tool_close_issue.py`（改 fixture）：用 FakeGithubClient，验证调 `ctx["issue_client"].create_issue` / `close_issue`。
+def test_orchestrate_calls_notifier_send_report():
+    fake_n = FakeNotifier()
+    ctx = {"repo_path": "/repo", "base_sha": "a", "head_sha": "b",
+           "issue_client": None, "assignee_id": None}
+    with patch("code_review.orchestrator.GithubPrNotifier", return_value=fake_n), \
+         patch("code_review.orchestrator.run_agent") as mock_run:
+        mock_run.return_value = AgentResult(notes=[], created_issues=[],
+                                            closed_issues=[], failed=False)
+        orchestrate(_CFG, ctx, {"authors": "x", "stat": "0", "author_list": "",
+                                "files_changed": "0", "commit_summary": "（无）"},
+                    [], context=None)
+    assert fake_n.send_report_called
+```
+所有 `send_report`/`send_error` 模块级 patch 改 `GithubPrNotifier` 类 patch + FakeNotifier 断言。
+
+`tests/test_agent.py`（改 fixture）：**2 处改造**——cfg 字段（同上去 gitlab/wecom 加 gh_token/github_repository）+ patch 路径。
+
+老仓 `test_run_agent_propagates_assignee_id_to_create_issue` 用 `patch("code_review.tools.create_issue.gitlab_client.create_issue")`；新仓 create_issue.py 改调 `ctx["issue_client"]`，patch 路径失效，改为构造 FakeGithubClient 注入 dispatch_ctx：
+```python
+from tests.test_helpers import FakeGithubClient
+
+def test_run_agent_propagates_assignee_to_create_issue():
+    fake_client = FakeGithubClient()
+    fake_client.create_issue_result = {"iid": 42, "web_url": "https://gh/x/42"}
+    ctx = {
+        "repo_path": "/repo", "base_sha": "a", "head_sha": "b",
+        "issue_client": fake_client, "assignee_id": "alice",  # username 非 id list
+    }
+    # ... 跑 run_agent，触发 create_issue tool_call ...
+    assert fake_client.create_issue_called_with[1] == ...  # assignee="alice" 单值
+```
+老仓断言 `kwargs["assignee_ids"] == [42]`（list）→ 新仓 `assignee == "alice"`（单值字符串）。所有 `gitlab_client.xxx` patch 改 FakeGithubClient 注入。
+
+`tests/test_tool_create_issue.py`（改 fixture）：**3 处改造**——patch 路径、方法名、assignee 形态。
+
+老仓 9 个测试全 `patch("code_review.tools.create_issue.gitlab_client.create_issue" / .update_issue_description)`；新仓改：
+```python
+from tests.test_helpers import FakeGithubClient
+
+def test_create_issue_calls_client_and_records_ops():
+    fake = FakeGithubClient()
+    fake.create_issue_result = {"iid": 7, "web_url": "https://gh/x/7"}
+    ctx = {"issue_client": fake, "issue_ops": [], "assignee_id": None}
+    obs = handler({"title": "t", "description": "d", "severity": "critical"}, ctx)
+    assert "已创建 issue #7" in obs
+    assert fake.create_issue_called_with == ("t", "d",
+        ["reviewer-generated", "severity::critical"], None)  # assignee 单值 None
+```
+方法名映射：`update_issue_description` → `update_description`，`add_issue_comment` → `add_comment`。assignee：老 `assignee_ids=[42]` → 新 `assignee="alice"`（单值）。
+
+`tests/test_tool_close_issue.py`（改 fixture）：同上模式，`gitlab_client.add_issue_comment`/`close_issue` patch → FakeGithubClient 注入，方法名 `add_issue_comment` → `add_comment`。
 
 `tests/test_agents.py`（加术语 case）：
 ```python
@@ -1332,9 +1504,9 @@ dispatch_ctx = {
 
 - [ ] **步骤 6：改 tools/create_issue.py + close_issue.py**
 
-把 `from .. import gitlab_client` + `gitlab_client.xxx(ctx, ...)` 全改为 `ctx["issue_client"].xxx(...)`。占位符 `<CR_IGNORE_IID_HASH>` / `<CR_IGNORE_IID_NUM>` 机制保留（iid = GitHub number）。
+删除 `from .. import gitlab_client`，handler 体改为调 `ctx["issue_client"]`。**完整改造代码见规格 §8**（含方法名映射 `update_issue_description`→`update_description`、`add_issue_comment`→`add_comment`、assignee 单值非 list、占位符机制保留）。
 
-具体代码见规格 §8。
+同时**恢复任务 1 步骤 3 临时注释的 `tools/__init__.py` 里 create_issue/close_issue 注册**（去掉 `# 任务 5 恢复` 注释），让 `test_tool_registry.py` 重新通过（验证 11 工具注册）。
 
 - [ ] **步骤 7：改 agents.py + prompt.py（术语替换）**
 
@@ -1356,14 +1528,29 @@ def _substitute_platform_terms(text: str) -> str:
             .replace("GitLab issue", PLATFORM_TERMS["issue_system"]))
 ```
 
-`src/code_review/prompt.py` `build_prompt` 末尾：
+`src/code_review/prompt.py`：**保留老仓 `build_prompt(ctx, template_path, extra)` 实现不动**（`{{XXX}}` 占位符 + extra 字典注入，`test_prompt.py` 依赖此契约），仅在函数**末尾返回前**追加术语替换：
+
 ```python
-def build_prompt(context, template_path):
-    text = _read_template(template_path)
-    rendered = text.format(**context)
+def build_prompt(ctx: dict, template_path: str, extra: dict = None) -> str:
+    """读取指定模板并替换占位符。extra 的 kv 合并到 mapping。"""
+    with open(template_path, "r", encoding="utf-8") as f:
+        tmpl = f.read()
+    mapping = {
+        "{{REPO_PATH}}": ctx.get("repo_path", ""),
+        # ... 老仓原 11 个占位符映射保持不变 ...
+    }
+    if extra:
+        for k, v in extra.items():
+            mapping[f"{{{{{k}}}}}"] = str(v)
+    out = tmpl
+    for k, v in mapping.items():
+        out = out.replace(k, str(v))
+    # === 新增：平台术语替换（仅末尾这两行）===
     from .agents import _substitute_platform_terms
-    return _substitute_platform_terms(rendered)
+    return _substitute_platform_terms(out)
 ```
+
+**关键**：不用 `.format(**context)`（会破坏 `{{XXX}}` 占位符 + extra 契约，导致 `test_prompt.py` 全红）。老仓的 `str.replace` 循环原样保留，只在 return 前套一层术语替换。
 
 - [ ] **步骤 8：跑全测试确认通过**
 

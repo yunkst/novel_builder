@@ -77,24 +77,26 @@ code-reviewer/
 │   │   ├── notes_store.py           # 复制（不改）
 │   │   ├── read_file.py             # 复制（不改）
 │   │   └── read_notes.py            # 复制（不改）
-│   └── prompts/
-│       ├── agent_a_feature.md       # 复制（不改）
-│       ├── agent_b_quality.md       # 复制 + 术语替换
-│       └── agent_c_repair.md        # 复制 + 术语替换
+├── prompts/                         # 根目录（与老仓一致，agents.py._PROMPTS_DIR 按此计算）
+│   ├── agent_a_feature.md           # 复制（不改）
+│   ├── agent_b_quality.md           # 复制 + 术语替换（任务 5 在 build_prompt 末尾做，不改 .md）
+│   └── agent_c_repair.md            # 复制 + 术语替换（同上）
 ├── tests/
+│   ├── __init__.py                  # 复制（不改）
 │   ├── test_github_client.py        # 新写
 │   ├── test_notifier.py             # 新写
 │   ├── test_config.py               # 新写
-│   ├── test_main.py                 # 新写
-│   ├── test_agent.py                # 复制 + 改 fixture
-│   ├── test_orchestrate.py          # 复制 + 改 fixture
+│   ├── test_main.py                 # 新写（老仓 test_main 测的 compute_review_range/_build_report_header/resolve_assignee_id 全删，不复用）
+│   ├── test_agent.py                # 复制 + 改 fixture（去 gitlab_*/wecom，加 issue_client）
+│   ├── test_orchestrate.py          # 复制 + 改 fixture（send_report 走 FakeNotifier）
 │   ├── test_agents.py               # 复制 + 加平台术语 case
-│   ├── test_tool_create_issue.py    # 复制 + 改 fixture
+│   ├── test_tool_create_issue.py    # 复制 + 改 fixture（FakeGithubClient，assignee 单值）
 │   ├── test_tool_close_issue.py     # 复制 + 改 fixture
-│   ├── test_tool_*.py               # 复制其他工具测试（不改）
+│   ├── test_tool_registry.py        # 复制（不改，验证 11 工具注册 + dispatch）
+│   ├── test_tool_*.py               # 复制其他只读工具测试（不改）
 │   ├── test_cr_ignore.py            # 复制（不改）
 │   ├── test_log.py                  # 复制（不改）
-│   ├── test_prompt.py               # 复制（不改）
+│   ├── test_prompt.py               # 复制（不改，验证 {{XXX}} 占位符 + extra 契约）
 │   └── test_helpers.py              # 新写：FakeGithubClient + FakeNotifier
 ├── .github/
 │   ├── workflows/
@@ -109,10 +111,10 @@ code-reviewer/
 ├── docs/
 ├── scripts/
 │   └── verify_notifier.py           # 手动验证 notifier 出口
-├── Dockerfile                       # 复制（不改）
-├── entrypoint.sh                    # 复制（不改）
-├── pyproject.toml                   # 复制（不改）
-├── requirements.txt                 # 复制（不改）
+├── Dockerfile                       # 复制 + 改：基础镜像换 python:3.11-slim、删 aliyun 换源、删 COPY entrypoint_weekly.sh
+├── entrypoint.sh                    # 复制（不改，调 python -m code_review）
+├── pyproject.toml                   # 新写（老仓无此文件，需新建以支持 pip install -e ".[dev]"）
+├── requirements.txt                 # 复制（不改，openai>=1.0）
 ├── README.md                        # 新写
 ├── CHANGELOG.md                     # 新写（v1.0.0，无 BREAKING）
 ├── CONTRIBUTING.md                  # 新写
@@ -129,18 +131,18 @@ code-reviewer/
 
 | 文件 | 改动 |
 |------|------|
-| `agent.py` | 改 `dispatch_ctx`：删 `gitlab_token/gitlab_api_url/gitlab_project_id` 三 key，加 `issue_client` |
-| `agents.py` | 加 `_substitute_platform_terms`（GitLab issue → GitHub issue） |
-| `orchestrator.py` | `send_report`/`send_error` 改调 `notifier` 实例（不再模块级函数） |
-| `prompt.py` | `build_prompt` 末尾调术语替换 |
+| `agent.py` | 改 `dispatch_ctx`：删 `gitlab_token/gitlab_api_url/gitlab_project_id` 三 key，加 `issue_client`；`assignee_id` 字段语义改为 username（GitHub）|
+| `agents.py` | 加 `_substitute_platform_terms`（GitLab issue → GitHub issue + label 预创建提示） |
+| `orchestrator.py` | `send_report`/`send_error` 改调 `GithubPrNotifier` 实例（不再模块级函数）；cfg 用 `gh_token`/`github_repository` |
+| `prompt.py` | **保留老仓 `build_prompt(ctx, template_path, extra)` 实现（`{{XXX}}` 占位符 + extra）**，仅末尾追加术语替换。不用 `.format()` |
 | `cr_ignore.py` | 不改 |
 | `log.py` | 不改 |
-| `tools/__init__.py` | 不改 |
+| `tools/__init__.py` | 不改（11 工具注册） |
 | `tools/{git_diff,git_log,git_show,grep,list_directory,list_files,notes_store,read_file,read_notes,take_note}.py` | 不改（10 个只读/笔记工具） |
-| `prompts/agent_a_feature.md` | 不改 |
-| `Dockerfile` | 不改 |
-| `entrypoint.sh` | 不改 |
-| `pyproject.toml` / `requirements.txt` | 不改 |
+| `prompts/agent_a_feature.md` / `agent_b_quality.md` / `agent_c_repair.md` | **放根 `prompts/`**（与老仓一致，`agents.py._PROMPTS_DIR` 按此计算）；.md 文件本身不改，术语替换在 build_prompt 运行时做 |
+| `Dockerfile` | **改**：基础镜像 `ccr.ccs.tencentyun.com/comms/python:3.11-slim` → `python:3.11-slim`；删 aliyun apt/pip 换源段；删 `COPY entrypoint_weekly.sh` |
+| `entrypoint.sh` | 不改（`python -m code_review`） |
+| `requirements.txt` | 不改（`openai>=1.0`） |
 
 ### 删除（不复制，GitLab/公司专用）
 
@@ -150,7 +152,7 @@ code-reviewer/
 | `notifier.py`（企微） | 换成新 `notifier.py`（PR 评论 + status check） |
 | `archive.py` | 不归档 |
 | `weekly/` 整个目录 | 周报功能，公司内部 |
-| `entrypoint_weekly.sh` | 周报入口 |
+| `entrypoint_weekly.sh` | 周报入口（Dockerfile 的 COPY 也要删） |
 | `prompts/weekly_member.md` | 周报专用 |
 | `.gitlab-ci.yml` | 换 GitHub Actions |
 | `ci/` 整个目录（build.yml / include.yml / bump_tag.sh） | GitLab CI 专用 |
@@ -161,15 +163,16 @@ code-reviewer/
 
 | 文件 | 职责 |
 |------|------|
-| `github_client.py` | GitHub REST API v3：list/create/close/comment/update_description/lookup_assignee |
-| `notifier.py` | GithubPrNotifier：PR 评论 + commit status check |
+| `pyproject.toml` | **老仓无此文件，需新建**：`[project] name="code-reviewer"` + `[project.scripts] code-reviewer="code_review.__main__:main"` + `[project.optional-dependencies] dev=["pytest"]` + `[build-system]` + `[tool.setuptools.packages.find] where=["src"]`，支持 `pip install -e ".[dev]"` |
+| `github_client.py` | GitHub REST API v3：`GithubClient` 类，list/create/close/comment/update_description/lookup_assignee |
+| `notifier.py` | GithubPrNotifier：PR 评论 + commit status check + build_multi_section_report + ReportContext |
 | `config.py` | GitHub 必填项（GH_TOKEN / GITHUB_REPOSITORY / LLM_* / REVIEW_*） |
-| `__main__.py` | 主流程（github_client + notifier，无 GitLab 分支） |
-| `tools/create_issue.py` | 改调 `github_client`（直接，无抽象层） |
+| `__main__.py` | 主流程（github_client + notifier，无 GitLab 分支，无 compute_review_range） |
+| `tools/create_issue.py` | 改调 `ctx["issue_client"]`（见 §8 完整代码） |
 | `tools/close_issue.py` | 同上 |
 | `.github/workflows/{build,test,release}.yml` | CI |
 | 开源基础设施 7 个文件 | LICENSE / README / CONTRIBUTING / SECURITY / CODE_OF_CONDUCT / 4 个模板 |
-| `tests/test_github_client.py` / `test_notifier.py` / `test_config.py` / `test_main.py` / `test_helpers.py` | 新测试 |
+| `tests/test_github_client.py` / `test_notifier.py` / `test_config.py` / `test_main.py` / `test_helpers.py` | 新测试（老仓 test_main 不复用，测的函数全删） |
 
 ---
 
@@ -299,32 +302,133 @@ REQUIRED = [
 
 ```
 load_config()
-  → github_client = GithubIssueClient(GH_TOKEN, GITHUB_REPOSITORY)
+  → client = GithubClient(GH_TOKEN, GITHUB_REPOSITORY)
   → notifier = GithubPrNotifier(GH_TOKEN, GITHUB_REPOSITORY)
   → 空 range 检查（base==head）→ notifier.send_skip
   → gather_commit_metadata（git log/diff 元信息）
-  → open_issues = github_client.list_open_issues(["reviewer-generated"])
-  → assignee = github_client.lookup_assignee(trigger_user)  # None 则不指派
-  → ctx = {repo_path, base_sha, head_sha, issue_client: github_client, assignee_id: assignee}
+  → open_issues = client.list_open_issues(["reviewer-generated"])
+  → assignee = client.lookup_assignee(trigger_user)  # 返回 username 字符串或 None
+  → ctx = {repo_path, base_sha, head_sha, issue_client: client, assignee_id: assignee}
   → report_context = ReportContext(...)
   → result = orchestrate(cfg, ctx, meta, open_issues, context=report_context)
   → return result.exit_code
 ```
+
+> **类名统一为 `GithubClient`**（不是 `GithubIssueClient`）。`assignee_id` 字段名沿用老仓（`dispatch_ctx["assignee_id"]`），但在新仓语义是 **GitHub username 字符串**（`lookup_assignee` 返回值），不是数字 id。`create_issue` 工具透传给 `GithubClient.create_issue(assignee=...)`。
 
 **失败路径**：
 - `gather_commit_metadata` 失败 → `notifier.send_error("审查未完成", ...)` + return 1
 - `list_open_issues` 失败 → `notifier.send_error` + return 1（拉不到 issue 列表 = 闭环不可用，硬退）
 - agent 失败 → orchestrator 内部 `notifier.send_error` + exit 2
 
-**删除的函数**：`compute_review_range`（容器内不算 range）、`resolve_assignee_id`（直接调 `github_client.lookup_assignee`，一行）、`_try_archive_review`（不归档）、GitLab ctx 构造。
+**删除的函数**：`compute_review_range`（容器内不算 range，GitHub Actions 端算好传入）、`resolve_assignee_id`（直接调 `client.lookup_assignee`，一行）、`_try_archive_review`（不归档）、GitLab ctx 构造、`_build_report_header`（由 `build_context` 返回 `ReportContext` 替代）。
 
 ---
 
-## 8. tools/create_issue.py + close_issue.py
+## 8. tools/create_issue.py + close_issue.py 完整改造代码
 
-直接调 `ctx["issue_client"]`（`GithubIssueClient` 实例）。从原 ci-code-reviewer 复制后，把 `from .. import gitlab_client` + `gitlab_client.xxx(ctx, ...)` 改成 `ctx["issue_client"].xxx(...)`。
+从原 ci-code-reviewer 复制后，删除 `from .. import gitlab_client`，handler 体改为调 `ctx["issue_client"]`（`GithubClient` 实例）。**方法名映射**：老仓 `gitlab_client.create_issue(ctx, ...)` / `update_issue_description` / `add_issue_comment` / `close_issue` → 新 `ctx["issue_client"].create_issue(...)` / `update_description` / `add_comment` / `close_issue`（无 ctx 第一参，assignee 单值非 list）。**assignee**：老仓传 `assignee_ids=[id]`（list），新仓传 `assignee=username`（单值字符串）。
 
-`<CR_IGNORE_IID_HASH>` / `<CR_IGNORE_IID_NUM>` 占位符机制保留（`iid` = GitHub number）。
+### `tools/create_issue.py`
+
+```python
+"""create_issue 工具：通过 ctx["issue_client"] 创建 issue。"""
+
+_IID_PLACEHOLDER_HASH = "<CR_IGNORE_IID_HASH>"  # → #<iid>，源码行内注释
+_IID_PLACEHOLDER_NUM = "<CR_IGNORE_IID_NUM>"    # → <iid>，.cr-ignore.md 条目（纯数字）
+
+
+definition = {
+    "type": "function",
+    "function": {
+        "name": "create_issue",
+        "description": "在项目创建一个 GitHub issue 记录审查发现的质量问题。会自动打上 reviewer-generated 和 severity 标签（GitHub 需要仓库预创建这些 label）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "issue 标题"},
+                "description": {"type": "string",
+                                "description": "详细描述 + 末尾忽略指南段（含 <CR_IGNORE_IID_HASH> 或 <CR_IGNORE_IID_NUM> 占位符）"},
+                "severity": {"type": "string",
+                             "enum": ["critical", "warning", "suggestion"],
+                             "description": "严重程度"},
+            },
+            "required": ["title", "description", "severity"],
+        },
+    },
+}
+
+
+def handler(args: dict, ctx: dict) -> str:
+    title = args["title"]
+    severity = args["severity"]
+    base_desc = args["description"] or ""
+    assignee = ctx.get("assignee_id")  # 新仓语义：username 字符串或 None
+    client = ctx["issue_client"]
+    result = client.create_issue(
+        title=title,
+        description=base_desc,
+        labels=["reviewer-generated", f"severity::{severity}"],
+        assignee=assignee,  # 单值，非 list
+    )
+    iid = result["iid"]
+    final_desc = (base_desc
+                  .replace(_IID_PLACEHOLDER_HASH, f"#{iid}")
+                  .replace(_IID_PLACEHOLDER_NUM, f"{iid}"))
+    if final_desc != base_desc:
+        try:
+            client.update_description(iid, final_desc)
+        except Exception:
+            pass
+    ctx.setdefault("issue_ops", []).append({
+        "op": "created", "iid": iid, "web_url": result["web_url"],
+        "severity": severity, "title": title,
+    })
+    return f"已创建 issue #{iid}: {result['web_url']}"
+```
+
+### `tools/close_issue.py`
+
+```python
+"""close_issue 工具：通过 ctx["issue_client"] 关闭 issue。"""
+
+
+definition = {
+    "type": "function",
+    "function": {
+        "name": "close_issue",
+        "description": "关闭一个已确认被本次提交修复的 GitHub issue，并附关闭理由评论。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "issue_iid": {"type": "integer", "description": "要关闭的 issue number"},
+                "reason": {"type": "string", "description": "关闭理由"},
+            },
+            "required": ["issue_iid", "reason"],
+        },
+    },
+}
+
+
+def handler(args: dict, ctx: dict) -> str:
+    iid = args["issue_iid"]
+    reason = args["reason"]
+    client = ctx["issue_client"]
+    try:
+        client.add_comment(iid, f"🤖 code-reviewer 关闭理由：{reason}")
+    except Exception:
+        pass
+    client.close_issue(iid)
+    info = next((i for i in ctx.get("open_issues", []) if i.get("iid") == iid), {})
+    ctx.setdefault("issue_ops", []).append({
+        "op": "closed", "iid": iid,
+        "web_url": info.get("web_url", ""), "title": info.get("title", ""),
+        "reason": reason,
+    })
+    return f"已关闭 issue #{iid}"
+```
+
+`<CR_IGNORE_IID_HASH>` / `<CR_IGNORE_IID_NUM>` 占位符机制保留（`iid` = GitHub number，`.cr-ignore` 解析零改动）。
 
 ---
 
@@ -463,27 +567,28 @@ jobs:
 
 | 测试文件 | 覆盖 |
 |----------|------|
-| `test_github_client.py` | mock `urlopen`：6 端点构造、labels 预过滤（含 GET /labels 失败兜底）、422 三分支（assignee/labels/其他）、labels 空集→422 联动降级、rate limit、lookup_assignee（collaborator/非 collaborator） |
-| `test_notifier.py` | PR 评论端点 + 65000 截断、push 场景 status check（success/failure/skip 不发）、description 140 截断、status check 失败吞异常 |
+| `test_github_client.py` | mock `urlopen`：6 端点构造（list_open_issues/create_issue/close_issue/add_comment/**update_description**/lookup_assignee）、labels 预过滤（含 GET /labels 失败兜底）、422 三分支（assignee/labels/其他）、labels 空集→422 联动降级、rate limit、lookup_assignee（collaborator/非 collaborator） |
+| `test_notifier.py` | PR 评论端点 + 65000 截断、push 场景 status check（success/failure/skip 不发）、**PR 场景 send_skip 发评论**、**PR 场景 send_error 发评论**、**PR 场景 send_report 不发 status check（避免双重通知）**、description 140 截断、status check 失败吞异常 |
 | `test_config.py` | GitHub 必填项校验、可选 env 默认值、PR_NUMBER 解析（None） |
-| `test_main.py` | main() 启动组装 github_client + notifier + ctx 含 issue_client、空 range send_skip、list_open_issues 失败 send_error |
+| `test_main.py` | **新写（不复用老仓 test_main）**——老仓 test_main 测的 `compute_review_range`/`_build_report_header`/`resolve_assignee_id`/GitLab env 全删。新 test_main 覆盖：main() 启动组装 GithubClient + GithubPrNotifier + ctx 含 issue_client、空 range send_skip、list_open_issues 失败 send_error、build_context 返回 ReportContext |
 | `test_helpers.py` | FakeGithubClient + FakeNotifier 桩 |
 
 ### 复制 + 改 fixture 的测试
 
 | 测试文件 | 改动 |
 |----------|------|
-| `test_agent.py` | dispatch_ctx 含 `issue_client`，不含 gitlab_* |
-| `test_orchestrate.py` | send_report 走 notifier 实例（FakeNotifier） |
-| `test_agents.py` | 加 `_substitute_platform_terms` case（GitHub issue） |
-| `test_tool_create_issue.py` | fixture 用 FakeGithubClient |
-| `test_tool_close_issue.py` | 同上 |
-| `test_tool_*.py`（其他 9 个工具） | 不改 |
-| `test_cr_ignore.py` / `test_log.py` / `test_prompt.py` | 不改 |
+| `test_agent.py` | dispatch_ctx 含 `issue_client`（FakeGithubClient），不含 gitlab_*；`assignee_id` 断言改单值 username（非 list）；`patch("code_review.tools.create_issue.gitlab_client.create_issue")` 改为构造 FakeGithubClient 注入 dispatch_ctx |
+| `test_orchestrate.py` | cfg 字段去 `wecom_webhook_url`/`gitlab_*`，加 `gh_token`/`github_repository`；`patch("code_review.orchestrator.send_report")` 改 `patch("code_review.orchestrator.GithubPrNotifier")` 返回 FakeNotifier，断言 `FakeNotifier.send_report_called` |
+| `test_agents.py` | 加 `_substitute_platform_terms` case（GitHub issue + label 预创建提示） |
+| `test_tool_create_issue.py` | `patch("code_review.tools.create_issue.gitlab_client.create_issue")` 改 FakeGithubClient 注入 ctx；`assignee_ids==[42]` 断言改 `assignee=="alice"` 单值；`update_issue_description` 改 `update_description`；`add_issue_comment` 改 `add_comment` |
+| `test_tool_close_issue.py` | 同上方法名映射 + FakeGithubClient |
+| `test_tool_registry.py` | **复制不改**——验证 11 工具注册 + dispatch 路径 |
+| `test_tool_*.py`（其他 8 个只读工具） | 不改 |
+| `test_cr_ignore.py` / `test_log.py` / `test_prompt.py` | 不改（test_prompt 验证 `{{XXX}}` 占位符 + extra 契约） |
 
 ### 不复制的测试（对应删除的代码）
 
-`test_gitlab_client*.py` / `test_notifier.py`（企微）/ `test_archive.py` / `test_weekly_*.py`。
+`test_gitlab_client*.py` / `test_notifier.py`（企微，新仓 test_notifier 同名但内容全新写）/ `test_archive.py` / `test_weekly_*.py` / `test_review_cache.py`。
 
 ---
 
