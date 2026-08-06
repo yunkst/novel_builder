@@ -679,22 +679,21 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ### 任务 3：兼容旧 import（过渡 commit）
 
 **文件：**
-- 创建：`src/code_review/gitlab_client.py`（重新创建为兼容层）
-- 创建：`src/code_review/notifier.py`（重新创建为兼容层）
+- 修改：`src/code_review/notifier/__init__.py`（追加模块级 wrapper 函数）
+- 创建：`src/code_review/gitlab_client.py`（向后兼容模块）
 
 - [ ] **步骤 1：写兼容层**
 
-`src/code_review/gitlab_client.py`：
+`src/code_review/gitlab_client.py`（向后兼容模块，仅保留原 `_request` + `list_issues` 等模块级函数，**不再写 GitlabIssueClient**）：
+
 ```python
 """向后兼容：原 gitlab_client.py 的 GitLab 函数仍然可 import。
 新代码请改用 code_review.platform.gitlab.GitlabIssueClient。
 """
+import json
+import urllib.request
+
 from .platform.gitlab import GitlabIssueClient
-# 原模块级函数迁移路径（用 cfg dict 调用方式）：
-# 现 gitlab_client.py:46-132 的 _request / list_issues / create_issue /
-# close_issue / add_issue_comment / update_issue_description / lookup_user_id
-# 改为 GitlabIssueClient 实例方法。
-# 这里提供旧调用方式的模块级 wrapper：
 
 
 def _make_client(ctx):
@@ -703,6 +702,19 @@ def _make_client(ctx):
         token=ctx["gitlab_token"],
         project_id=ctx["gitlab_project_id"],
     )
+
+
+def _request(method, ctx, path, data=None):
+    """原 _request 模块级函数，向后兼容。"""
+    url = f"{ctx['gitlab_api_url']}/projects/{ctx['gitlab_project_id']}{path}"
+    body = json.dumps(data).encode("utf-8") if data is not None else None
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"PRIVATE-TOKEN": ctx["gitlab_token"], "Content-Type": "application/json"},
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def list_issues(ctx, labels="reviewer-generated", state="opened", per_page=100):
@@ -730,42 +742,36 @@ def update_issue_description(ctx, iid, description):
     return _make_client(ctx).update_description(iid, description)
 ```
 
-`src/code_review/notifier.py`：
+`src/code_review/notifier/__init__.py` 末尾追加模块级 wrapper（**避免创建 `notifier.py` 同名冲突**）：
+
 ```python
-"""向后兼容：原 notifier.py 的模块级函数仍可 import。"""
-from .notifier import (
-    build_multi_section_report,
-    ReportContext,
-    get_notifier,
-    Notifier,
-)
-from .notifier.wecom import WecomNotifier
-from .notifier.base import NullNotifier
-from .notifier.github_pr import GithubPrCommentNotifier
+# === 向后兼容：原 notifier.py 模块级函数 ===
 
-# 旧模块级函数（ctx dict 形态）：
-
-
-def send_report(webhook_url, report):
+def send_report(webhook_url: str, report: str) -> bool:
+    """原 send_report(webhook_url, report) 签名，向后兼容。"""
     notifier = WecomNotifier(webhook_url=webhook_url)
     ctx = ReportContext(project="", project_url="", authors="", trigger_user="",
-                       branch_line="", commit_sha="", stat="", pr_number=None)
+                        branch_line="", commit_sha="", stat="", pr_number=None)
     return notifier.send_report(report, context=ctx)
 
 
-def send_error(webhook_url, title, body):
+def send_error(webhook_url: str, title: str, body: str) -> None:
+    """原 send_error(webhook_url, title, body) 签名，向后兼容。"""
     notifier = WecomNotifier(webhook_url=webhook_url)
     ctx = ReportContext(project="", project_url="", authors="", trigger_user="",
-                       branch_line="", commit_sha="", stat="", pr_number=None)
+                        branch_line="", commit_sha="", stat="", pr_number=None)
     notifier.send_error(title, body, context=ctx)
 
 
-def send_skip(webhook_url, title, body):
+def send_skip(webhook_url: str, title: str, body: str) -> None:
+    """原 send_skip(webhook_url, title, body) 签名，向后兼容。"""
     notifier = WecomNotifier(webhook_url=webhook_url)
     ctx = ReportContext(project="", project_url="", authors="", trigger_user="",
-                       branch_line="", commit_sha="", stat="", pr_number=None)
+                        branch_line="", commit_sha="", stat="", pr_number=None)
     notifier.send_skip(title, body, context=ctx)
 ```
+
+并在文件顶部 `__all__` 列表追加 `"send_report", "send_error", "send_skip"`。
 
 - [ ] **步骤 2：跑现有全测试确认兼容层不破坏**
 
@@ -775,11 +781,16 @@ def send_skip(webhook_url, title, body):
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add src/code_review/gitlab_client.py src/code_review/notifier.py
+git add src/code_review/gitlab_client.py src/code_review/notifier/__init__.py
 git commit -m "feat(compat): 保留旧 import 路径兼容层
 
-过渡 commit，让未迁移的调用点仍能 import 老路径。任务 11-15 完成
-主流程迁移后，本兼容层连同这些未迁移点一并清理。
+gitlab_client.py: 重新导出 GitlabIssueClient 的模块级 wrapper
+notifier/__init__.py: 末尾追加 send_report/send_error/send_skip 模块级 wrapper
+
+注意：不能创建 src/code_review/notifier.py（与 notifier/ 包同名冲突，Python 会忽略）。
+
+过渡 commit，让未迁移的调用点仍能 import 老路径。任务 14 完成主流程迁移后，
+本兼容层连同这些未迁移点一并清理。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -1175,6 +1186,32 @@ def test_labels_cache_failure_falls_through(mock_urlopen):
 
 
 @patch("urllib.request.urlopen")
+def test_empty_labels_cache_does_not_filter_lets_422_trigger_fallback(mock_urlopen):
+    """labels 缓存空集时 create_issue 不过滤 → 原样传 labels → 422 → 触发 labels 降级。
+    验证两个机制联动，避免 'GET /labels 失败 + 422 标签缺失' 死循环。
+    """
+    err_response = MagicMock()
+    err_response.read.return_value = json.dumps({
+        "errors": [{"resource": "Issue", "field": "labels", "code": "invalid"}]
+    }).encode("utf-8")
+    err_response.__enter__ = lambda s: s
+    err_response.__exit__ = lambda s, *a: None
+
+    # 构造 client 时 GET /labels 抛 403（_available_labels=空集）
+    mock_urlopen.side_effect = [
+        urllib.error.HTTPError("url", 403, "Forbidden", {}, err_response),  # 构造期 GET /labels
+        urllib.error.HTTPError("url", 422, "Unprocessable", {}, err_response),  # create_issue 第一次
+        _mock_response({"number": 7, "html_url": "https://gh/x/7"}),  # create_issue labels 降级重试
+    ]
+    client = GithubIssueClient(token="ghp_x", repo="owner/repo")
+    # 缓存为空集
+    assert client._available_labels == set()
+    # create_issue 仍走 labels 降级路径
+    result = client.create_issue("t", "d", ["severity::critical"])
+    assert result["iid"] == 7
+
+
+@patch("urllib.request.urlopen")
 def test_lookup_assignee_returns_username_for_collaborator(mock_urlopen):
     mock_urlopen.return_value = _mock_response({"permission": "write"})
     client = GithubIssueClient(token="ghp_x", repo="owner/repo")
@@ -1556,68 +1593,139 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 `tests/test_agents.py` 加 case：
 ```python
-def test_substitute_platform_terms_gitlab():
+def test_substitute_platform_terms_gitlab_keeps_gitlab_phrase():
     from code_review.agents import _substitute_platform_terms
     text = "在 GitLab 项目创建一个 issue"
     out = _substitute_platform_terms(text, "gitlab")
     assert "GitLab issue" in out
+    assert "GitHub" not in out
 
 
-def test_substitute_platform_terms_github():
+def test_substitute_platform_terms_github_replaces_to_github():
     from code_review.agents import _substitute_platform_terms
     text = "在 GitLab 项目创建一个 issue"
     out = _substitute_platform_terms(text, "github")
     assert "GitHub issue" in out
+    # 旧短语不残留
+    assert "GitLab issue" not in out
 
 
-def test_build_agent_b_prompt_includes_platform_specific_terms(tmp_path, monkeypatch):
-    monkeypatch.setenv("REPO_PATH", str(tmp_path))
+def test_substitute_platform_terms_github_adds_label_intro():
+    """GitHub 平台 prompt 含 label 预创建提醒。"""
+    from code_review.agents import _substitute_platform_terms
+    text = "会自动打上 reviewer-generated 和 severity 标签。"
+    out = _substitute_platform_terms(text, "github")
+    assert "GitHub 需要仓库预创建这些 label" in out
+
+
+def test_substitute_platform_terms_gitlab_keeps_label_intro():
+    """GitLab 平台 label 自动创建，无需预创建提示。"""
+    from code_review.agents import _substitute_platform_terms
+    text = "会自动打上 reviewer-generated 和 severity 标签。"
+    out = _substitute_platform_terms(text, "gitlab")
+    # GitLab 不需要 pre-create 提示
+    assert "预创建" not in out
+
+
+def test_build_agent_b_prompt_default_is_gitlab():
+    """默认 platform=gitlab，prompt 含 GitLab issue。"""
     from code_review.agents import build_agent_b_prompt
-    ctx = {"repo_path": str(tmp_path), "base_sha": "abc", "head_sha": "def"}
+    ctx = {"repo_path": "/repo", "base_sha": "abc", "head_sha": "def"}
     meta = {"author_list": "", "files_changed": "0", "commit_summary": "（无）"}
     prompt_gitlab = build_agent_b_prompt(ctx, meta, "", "zh", prior_notes=[], open_issues=[])
-    assert "GitLab issue" in prompt_gitlab or "issue" in prompt_gitlab  # 默认 gitlab
+    assert "GitLab issue" in prompt_gitlab
+
+
+def test_build_agent_b_prompt_github_uses_github_terms(tmp_path, monkeypatch):
+    monkeypatch.setenv("PLATFORM", "github")
+    monkeypatch.setenv("GH_TOKEN", "ghp_x")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "o/r")
+    monkeypatch.setenv("LLM_BASE_URL", "x")
+    monkeypatch.setenv("LLM_API_KEY", "k")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("REVIEW_BASE_SHA", "a")
+    monkeypatch.setenv("REVIEW_HEAD_SHA", "b")
+    from code_review.agents import build_agent_b_prompt
+    ctx = {"repo_path": "/repo", "base_sha": "abc", "head_sha": "def"}
+    meta = {"author_list": "", "files_changed": "0", "commit_summary": "（无）"}
+    # build_agent_b_prompt 不直接读 cfg，需要从 ctx["platform"] 取
+    ctx_with_platform = {**ctx, "platform": "github"}
+    prompt_github = build_agent_b_prompt(ctx_with_platform, meta, "", "zh",
+                                         prior_notes=[], open_issues=[])
+    assert "GitHub issue" in prompt_github
+    assert "GitLab issue" not in prompt_github
 ```
 
 - [ ] **步骤 2：跑测试确认失败**
 
-运行：`pytest tests/test_agents.py::test_substitute_platform_terms_github -v`
-预期：FAIL `ImportError`
+运行：`pytest tests/test_agents.py -v`
+预期：FAIL `ImportError: cannot import name '_substitute_platform_terms'`
 
-- [ ] **步骤 3：实现 _substitute_platform_terms**
+- [ ] **步骤 3：实现 _substitute_platform_terms + build_prompt 改签名**
 
 `src/code_review/agents.py` 顶部加：
 ```python
 PLATFORM_TERMS = {
     "gitlab": {
         "issue_system": "GitLab issue",
+        "label_intro": "会自动打上 reviewer-generated 和 severity 标签。",
     },
     "github": {
         "issue_system": "GitHub issue",
+        "label_intro": "会自动打上 reviewer-generated 和 severity 标签（GitHub 需要仓库预创建这些 label）。",
     },
 }
 
 
 def _substitute_platform_terms(text: str, platform: str) -> str:
-    """替换 prompt 文本里的平台术语。"""
+    """替换 prompt 文本里的平台术语 + label 创建说明。"""
     terms = PLATFORM_TERMS.get(platform, PLATFORM_TERMS["gitlab"])
     return (text
             .replace("在 GitLab 项目创建一个 issue", f"在 {terms['issue_system']} 创建一个 issue")
             .replace("关闭一个已确认被本次提交修复的 GitLab issue",
                      f"关闭一个已确认被本次提交修复的 {terms['issue_system']}")
             .replace("GitLab issue（带 severity）", f"{terms['issue_system']}（带 severity）")
+            .replace("会自动打上 reviewer-generated 和 severity 标签。", terms["label_intro"])
             .replace("GitLab issue", terms["issue_system"]))
 ```
 
-`build_prompt` 末尾调用一次：
+`build_prompt` 改签名 + 末尾调用：
 ```python
-# build_prompt 函数末尾：
-text = _read_template(template_path)
-rendered = text.format(**context)
-return _substitute_platform_terms(rendered, cfg.get("platform", "gitlab"))
+def build_prompt(context: dict, template_path: str, platform: str = "gitlab") -> str:
+    """读取模板、填充变量、应用平台术语替换。"""
+    text = _read_template(template_path)
+    rendered = text.format(**context)
+    return _substitute_platform_terms(rendered, platform)
 ```
 
-实际需要从 `cfg` 拿到 platform，但 `build_prompt` 当前签名无 cfg。**改签名**：把 `build_prompt(context, template_path, platform="gitlab")`，所有 `build_agent_*_prompt` 调用处传 platform 参数（从 ctx["platform"] 读，或硬编码读环境变量）。
+`build_agent_a_prompt` / `build_agent_b_prompt` / `build_agent_c_prompt` 改签名增加 `platform: str = "gitlab"` 参数：
+```python
+def build_agent_a_prompt(ctx: dict, meta: dict, pipeline_url: str,
+                         report_lang: str, platform: str = "gitlab") -> str:
+    return build_prompt(_base_ctx(ctx, meta, pipeline_url, report_lang),
+                        os.path.join(_PROMPTS_DIR, "agent_a_feature.md"),
+                        platform=platform)
+
+
+def build_agent_b_prompt(ctx: dict, meta: dict, pipeline_url: str, report_lang: str,
+                         prior_notes: list, open_issues: list,
+                         platform: str = "gitlab") -> str:
+    c = _base_ctx(ctx, meta, pipeline_url, report_lang)
+    c["prior_notes"] = "\n".join(prior_notes) if prior_notes else "（无）"
+    c["open_issues"] = _format_issues(open_issues)
+    return build_prompt(c, os.path.join(_PROMPTS_DIR, "agent_b_quality.md"),
+                        platform=platform)
+
+
+def build_agent_c_prompt(ctx: dict, meta: dict, pipeline_url: str, report_lang: str,
+                         open_issues: list, platform: str = "gitlab") -> str:
+    c = _base_ctx(ctx, meta, pipeline_url, report_lang)
+    c["open_issues"] = _format_issues(open_issues)
+    return build_prompt(c, os.path.join(_PROMPTS_DIR, "agent_c_repair.md"),
+                        platform=platform)
+```
+
+调用方传 platform：`orchestrator.py` 改 `build_agent_*_prompt(ctx, ..., platform=cfg.get("platform", "gitlab"))`。
 
 - [ ] **步骤 4：跑测试确认通过**
 
@@ -1627,11 +1735,13 @@ return _substitute_platform_terms(rendered, cfg.get("platform", "gitlab"))
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add src/code_review/agents.py tests/test_agents.py
-git commit -m "feat(agents): prompt 平台术语替换
+git add src/code_review/agents.py tests/test_agents.py src/code_review/orchestrator.py
+git commit -m "feat(agents): prompt 平台术语 + label 预创建提示
 
-_substitute_platform_terms 把 GitLab issue → GitHub issue（GitHub 平台）。
-build_prompt 末尾调用一次，三个 agent prompt 同步生效。
+_substitute_platform_terms 把 GitLab issue → GitHub issue
+GitHub 平台额外添加 '需要仓库预创建 label' 提示
+build_prompt / build_agent_*_prompt 加 platform 参数（默认 gitlab）
+orchestrator.py 调用处传 cfg['platform']
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -1664,9 +1774,62 @@ def test_create_issue_uses_ctx_issue_client(monkeypatch):
     )
     assert "已创建 issue #42" in observation
     assert fake.create_issue_called_with == ("bug", "desc", ["reviewer-generated", "severity::critical"], None)
+
+
+def test_create_issue_replaces_iid_placeholders(monkeypatch):
+    """description 含占位符时回写更新 issue。"""
+    from code_review.tools.create_issue import handler
+    from tests.test_helpers import FakeIssueClient
+
+    fake = FakeIssueClient()
+    fake.create_issue_result = {"iid": 7, "web_url": "https://gh/x/7"}
+    ctx = {"issue_client": fake, "issue_ops": [], "assignee_id": None}
+    handler(
+        {"title": "t", "description": "前文 <CR_IGNORE_IID_HASH> 后文 <CR_IGNORE_IID_NUM>", "severity": "warning"},
+        ctx,
+    )
+    # update_description 被调用，body 含替换后的 iid
+    assert fake.update_description_called_with == [(7, "前文 #7 后文 7")]
 ```
 
-需要新建 `tests/test_helpers.py` 提供 FakeIssueClient（任务 9 期间一并新建）。
+`tests/test_tool_close_issue.py`：
+```python
+def test_close_issue_uses_ctx_issue_client():
+    """close_issue 工具从 ctx["issue_client"] 拿 IssueClient 实例。"""
+    from code_review.tools.close_issue import handler
+    from tests.test_helpers import FakeIssueClient
+
+    fake = FakeIssueClient()
+    ctx = {"issue_client": fake, "issue_ops": [], "open_issues": [
+        {"iid": 5, "title": "old bug", "web_url": "https://gh/x/5"}
+    ]}
+    observation = handler({"issue_iid": 5, "reason": "已修复"}, ctx)
+    assert observation == "已关闭 issue #5"
+    # add_comment + close_issue 都被调
+    assert fake.add_comment_called_with == [(5, "🤖 code-reviewer 关闭理由：已修复")]
+    assert fake.close_issue_called_with == [5]
+    # issue_ops 记录含 web_url/title 来自 open_issues
+    assert ctx["issue_ops"][-1]["op"] == "closed"
+    assert ctx["issue_ops"][-1]["web_url"] == "https://gh/x/5"
+
+
+def test_close_issue_add_comment_failure_swallowed():
+    """add_comment 抛异常不影响 close_issue 继续。"""
+    from code_review.tools.close_issue import handler
+    from tests.test_helpers import FakeIssueClient
+
+    fake = FakeIssueClient()
+
+    def raise_exc(*a, **kw):
+        raise Exception("comment failed")
+    fake.add_comment = raise_exc
+    ctx = {"issue_client": fake, "issue_ops": [], "open_issues": []}
+    # 不抛异常即通过
+    handler({"issue_iid": 1, "reason": "x"}, ctx)
+    assert fake.close_issue_called_with == [1]
+```
+
+需要新建 `tests/test_helpers.py` 提供 FakeIssueClient + FakeNotifier（任务 10 步骤 1 一并新建）。
 
 - [ ] **步骤 2：跑测试确认失败**
 
@@ -1855,26 +2018,170 @@ class FakeIssueClient:
     def lookup_assignee(self, username):
         self.lookup_assignee_called_with.append(username)
         return self.lookup_assignee_result
+
+
+@dataclass
+class FakeNotifier:
+    """测试用 Notifier 桩，记录所有调用 + 返回预设值。"""
+    send_report_return: bool = True
+
+    # 记录
+    send_report_called: bool = False
+    send_report_called_with: list = field(default_factory=list)
+    send_error_called_with: list = field(default_factory=list)
+    send_skip_called_with: list = field(default_factory=list)
+
+    def send_report(self, report: str, *, context=None) -> bool:
+        self.send_report_called = True
+        self.send_report_called_with.append((report, context))
+        return self.send_report_return
+
+    def send_error(self, title: str, body: str, *, context=None) -> None:
+        self.send_error_called_with.append((title, body, context))
+
+    def send_skip(self, title: str, body: str, *, context=None) -> None:
+        self.send_skip_called_with.append((title, body, context))
 ```
 
-`tests/test_agent.py` 加 case：
+`tests/test_agent.py` 加 case（直接验证 dispatch_ctx 构造，不依赖完整 agent 循环）：
+
 ```python
-def test_dispatch_ctx_contains_issue_client():
-    """dispatch_ctx 必须含 issue_client key，三个 gitlab_* key 必须删除。"""
+def test_dispatch_ctx_contains_issue_client_not_gitlab_keys():
+    """验证 agent.run_agent 构造的 dispatch_ctx 含 issue_client，不含 gitlab_* 三 key。"""
+    from unittest.mock import patch, MagicMock
     from code_review.agent import run_agent
+    from code_review.tools import get_tool_definitions
     from tests.test_helpers import FakeIssueClient
 
     fake = FakeIssueClient()
-    ctx = {
-        "repo_path": "/repo", "base_sha": "abc", "head_sha": "def",
-        "issue_client": fake, "notes_store": None, "issue_ops": [],
-        "open_issues": [],
+    cfg = {
+        "llm_base_url": "https://llm/x",
+        "llm_api_key": "sk",
+        "llm_model": "m",
+        "max_turns": 1,
+        "gitlab_token": "should-not-appear",
+        "gitlab_api_url": "should-not-appear",
+        "gitlab_project_id": 999,
     }
-    # 通过 patch 跑 agent 循环，验证 dispatch_ctx 构造
-    # ...（细节根据 run_agent 实际接口调整）
+    ctx = {
+        "repo_path": "/repo",
+        "base_sha": "abc",
+        "head_sha": "def",
+        "issue_client": fake,
+        "assignee_id": None,
+    }
+
+    # patch OpenAI client + run_agent 内调用的 LLM，返回无 tool_calls 让循环立即退出
+    with patch("code_review.agent.OpenAI") as mock_openai_cls:
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="ok", tool_calls=None,
+                                                              model_dump=lambda **kw: {"role": "assistant", "content": "ok"}))]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai_cls.return_value = mock_client
+
+        run_agent(cfg, "A", "system prompt", ["take_note"], ctx)
+
+    # 验证 dispatch_ctx 构造时传给 LLM 工具的 ctx 含 issue_client，不含 gitlab_*
+    # 实际：take_note 工具不需要这些 key，但 notes_store / issue_client / repo_path 等会被传到 dispatch_ctx
+    # 间接验证：检查 mock_client.chat.completions.create 的 messages/tools 调用
+    create_call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    # 工具定义不含 gitlab 字段
+    tool_names = [t["function"]["name"] for t in create_call_kwargs["tools"]]
+    assert "create_issue" in tool_names  # 工具集本身不变
+    # system prompt 注入
+    assert "system prompt" in create_call_kwargs["messages"][0]["content"]
+
+
+def test_create_issue_handler_dispatch_ctx_uses_issue_client():
+    """create_issue 工具 handler 收到的 ctx 含 issue_client（dispatch_ctx 注入验证）。"""
+    # 走 dispatch 路径，验证 dispatch_ctx 构造完整
+    from code_review.tools import dispatch
+    from tests.test_helpers import FakeIssueClient
+
+    fake = FakeIssueClient()
+    fake.create_issue_result = {"iid": 99, "web_url": "https://gh/x/99"}
+    dispatch_ctx = {
+        "repo_path": "/repo",
+        "base_sha": "abc",
+        "head_sha": "def",
+        "issue_client": fake,
+        "notes_store": None,
+        "issue_ops": [],
+        "open_issues": [],
+        "assignee_id": None,
+    }
+    observation = dispatch("create_issue",
+                           {"title": "t", "description": "d", "severity": "critical"},
+                           dispatch_ctx)
+    assert "已创建 issue #99" in observation
+    assert fake.create_issue_called_with == ("t", "d",
+                                              ["reviewer-generated", "severity::critical"],
+                                              None)
+
+
+def test_run_agent_does_not_pass_gitlab_keys_to_dispatch():
+    """run_agent 不会向 dispatch_ctx 注入 gitlab_token/gitlab_api_url/gitlab_project_id。"""
+    from unittest.mock import patch, MagicMock
+    from code_review.agent import run_agent
+    from tests.test_helpers import FakeIssueClient
+
+    captured_ctx = {}
+
+    # patch dispatch 模块，记录传给 handler 的 ctx
+    def fake_dispatch(tool_name, args, ctx):
+        captured_ctx.update(ctx)
+        return "ok"
+
+    fake = FakeIssueClient()
+    cfg = {
+        "llm_base_url": "https://llm/x",
+        "llm_api_key": "sk",
+        "llm_model": "m",
+        "max_turns": 1,
+        "gitlab_token": "should-not-leak",
+        "gitlab_api_url": "should-not-leak",
+        "gitlab_project_id": 999,
+    }
+    ctx = {
+        "repo_path": "/repo",
+        "base_sha": "abc",
+        "head_sha": "def",
+        "issue_client": fake,
+        "assignee_id": None,
+    }
+
+    with patch("code_review.agent.OpenAI") as mock_openai_cls, \
+         patch("code_review.tools.dispatch", side_effect=fake_dispatch):
+        # 让 LLM 返回一个 take_note tool_call 触发 dispatch
+        mock_tc = MagicMock()
+        mock_tc.id = "call_1"
+        mock_tc.function.name = "take_note"
+        mock_tc.function.arguments = '{"note": "test"}'
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(
+            content="", tool_calls=[mock_tc],
+            model_dump=lambda **kw: {"role": "assistant", "content": "",
+                                     "tool_calls": [{"id": "call_1",
+                                                     "type": "function",
+                                                     "function": {"name": "take_note",
+                                                                  "arguments": "{}"}}]},
+        ))]
+        mock_response.choices[0].message.tool_calls = [mock_tc]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai_cls.return_value = mock_client
+
+        run_agent(cfg, "A", "system", ["take_note"], ctx)
+
+    # 验证 dispatch_ctx 不含 gitlab_* 三 key
+    assert "gitlab_token" not in captured_ctx
+    assert "gitlab_api_url" not in captured_ctx
+    assert "gitlab_project_id" not in captured_ctx
+    assert captured_ctx["issue_client"] is fake
 ```
 
-实际验证方式：在 `agent.py` 改完后写测试验证 `dispatch_ctx` 构造时 `issue_client in ctx` 且 `gitlab_token not in ctx`。
+实际验证方式：直接构造 dispatch_ctx 走 `code_review.tools.dispatch` 验证注入逻辑，不再依赖完整 agent 循环。
 
 - [ ] **步骤 2：跑测试确认失败**
 
@@ -1944,13 +2251,21 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## Phase 3：主流程接入
 
-### 任务 11：resolve_assignee_id 改造
+> **本 Phase 是一个原子任务**（任务 11-13 合并为任务 11"主流程改造"）：
+> `resolve_assignee_id` 改签名 + `main()` 接入 IssueClient + `orchestrator` 接入 Notifier 三处强耦合，
+> 单独 commit 任一处都会让 pytest 中间态失败。必须**一次 commit 三处改造 + 全部测试通过**。
+> 任务 14"删兼容层"单独成任务，在任务 11 commit 通过后进行。
+
+### 任务 11：主流程改造（resolve_assignee_id + main + orchestrator 三处一起改）
 
 **文件：**
 - 修改：`src/code_review/__main__.py`
+- 修改：`src/code_review/orchestrator.py`
 - 修改：`tests/test_main.py`
+- 修改：`tests/test_orchestrate.py`
+- 修改：`tests/test_helpers.py`（追加 `FakeNotifier`，任务 10 已建 `FakeIssueClient`）
 
-- [ ] **步骤 1：写测试**
+- [ ] **步骤 1：写测试覆盖三处改造**
 
 `tests/test_main.py` 加 case：
 ```python
@@ -1989,26 +2304,110 @@ def test_resolve_assignee_id_lookup_fails_returns_none():
     fake.lookup_assignee_result = None
     result = resolve_assignee_id({}, fake, "ghost")
     assert result is None
+
+
+def test_main_starts_issue_client_and_fetches_open_issues():
+    """main() 启动时构造 IssueClient 并调 list_open_issues。"""
+    from code_review.__main__ import main
+    from tests.test_helpers import FakeIssueClient
+
+    fake = FakeIssueClient()
+    fake.list_open_issues_result = []
+    with patch("code_review.__main__.get_issue_client", return_value=fake), \
+         patch("code_review.__main__.load_config", return_value={
+             "platform": "gitlab", "wecom_webhook_url": "",
+             "llm_base_url": "x", "llm_api_key": "k", "llm_model": "m",
+             "review_base_sha": "a", "review_head_sha": "b",
+             "repo_path": "/repo", "max_turns": 1, "max_diff_bytes": 50000,
+             "report_lang": "zh", "gitlab_token": "x",
+             "gitlab_api_url": "x", "gitlab_project_id": 1,
+             "weekly_report_project_id": 0,
+             "pr_number": None,
+             "ci_project_path": "p", "ci_project_url": "",
+             "trigger_user": "alice", "commit_short_sha": "abc1234",
+             "commit_branch": "main", "pipeline_source": "push",
+             "mr_iid": "", "mr_source_branch": "", "mr_target_branch": "",
+         }), \
+         patch("code_review.__main__.compute_review_range", return_value=("a", "b")), \
+         patch("code_review.__main__.gather_commit_metadata", return_value={
+             "authors": "", "stat": "0", "author_list": "",
+             "files_changed": "0", "commit_summary": "（无）",
+         }), \
+         patch("code_review.__main__.orchestrate") as mock_orchestrate:
+        result = main()
+    assert fake.list_open_issues_called_with == [["reviewer-generated"]]
+    mock_orchestrate.assert_called_once()
+    # 验证 ctx 含 issue_client
+    call_args = mock_orchestrate.call_args
+    assert call_args.args[1]["issue_client"] is fake
+
+
+def test_main_github_force_weekly_zero():
+    """GitHub 平台强制 weekly_report_project_id=0。"""
+    from code_review.__main__ import main
+
+    fake = FakeIssueClient()
+    with patch("code_review.__main__.get_issue_client", return_value=fake), \
+         patch("code_review.__main__.load_config", return_value={
+             "platform": "github", "wecom_webhook_url": "",
+             "llm_base_url": "x", "llm_api_key": "k", "llm_model": "m",
+             "review_base_sha": "a", "review_head_sha": "b",
+             "repo_path": "/repo", "max_turns": 1, "max_diff_bytes": 50000,
+             "report_lang": "zh", "gh_token": "x", "github_repository": "o/r",
+             "weekly_report_project_id": 178,  # GitLab 默认被覆盖
+             "pr_number": 42, "gitlab_token": "", "gitlab_api_url": "",
+             "gitlab_project_id": 0, "ci_project_path": "p",
+             "ci_project_url": "", "trigger_user": "alice",
+             "commit_short_sha": "abc1234", "commit_branch": "main",
+             "pipeline_source": "push", "mr_iid": "",
+             "mr_source_branch": "", "mr_target_branch": "",
+         }), \
+         patch("code_review.__main__.compute_review_range", return_value=("a", "b")), \
+         patch("code_review.__main__.gather_commit_metadata", return_value={
+             "authors": "", "stat": "0", "author_list": "",
+             "files_changed": "0", "commit_summary": "（无）",
+         }), \
+         patch("code_review.__main__.orchestrate"), \
+         patch("code_review.archive.archive_review_to_weekly_reports") as mock_archive:
+        main()
+    # GitHub 平台 weekly=0，archive 不被调
+    mock_archive.assert_not_called()
 ```
+
+`tests/test_orchestrate.py` 加 case：
+```python
+def test_orchestrate_calls_notifier_send_report():
+    from code_review.orchestrator import orchestrate
+    from code_review.agent import AgentResult
+    from tests.test_helpers import FakeNotifier
+
+    fake_notifier = FakeNotifier()
+    cfg = {"platform": "gitlab", "wecom_webhook_url": "x",
+           "max_diff_bytes": 50000}
+    ctx = {"repo_path": "/repo", "base_sha": "a", "head_sha": "b",
+           "issue_client": None, "assignee_id": None}
+    with patch("code_review.orchestrator.get_notifier", return_value=fake_notifier), \
+         patch("code_review.orchestrator.run_agent") as mock_run:
+        mock_run.return_value = AgentResult(notes=[], created_issues=[],
+                                            closed_issues=[], failed=False)
+        result = orchestrate(cfg, ctx, {"authors": "x", "stat": "0",
+                                        "author_list": "", "files_changed": "0",
+                                        "commit_summary": "（无）"},
+                             [], context=None)
+    assert fake_notifier.send_report_called
+```
+
+FakeNotifier 已在任务 10 的 test_helpers.py 一并定义（含 `send_report_called` / `send_report_return` / `send_error_called_with` / `send_skip_called_with` 字段）。
 
 - [ ] **步骤 2：跑测试确认失败**
 
-运行：`pytest tests/test_main.py::test_resolve_assignee_id_gitlab_returns_int -v`
-预期：FAIL 旧签名 `resolve_assignee_id(gitlab_ctx, trigger_user)` 参数不匹配
+运行：`pytest tests/test_main.py tests/test_orchestrate.py -v`
+预期：FAIL（resolve_assignee_id 旧签名 / main 未调 issue_client / orchestrate 仍走模块级 send_report）
 
-- [ ] **步骤 3：改造 __main__.py:121-141**
+- [ ] **步骤 3：改造 resolve_assignee_id**
 
-`src/code_review/__main__.py` 第 121-141 行：
+`src/code_review/__main__.py:121-141`：
 ```python
-# 原
-def resolve_assignee_id(gitlab_ctx: dict, trigger_user: str) -> int | None:
-    if not trigger_user:
-        log.log_event("assignee_skip", "reason=empty_trigger_user")
-        return None
-    uid = gitlab_client.lookup_user_id(gitlab_ctx, trigger_user)
-    ...
-
-# 新
 def resolve_assignee_id(cfg: dict, issue_client: IssueClient,
                         trigger_user: str) -> str | int | None:
     """把 trigger_user 解析为 assignee 标识。
@@ -2026,103 +2425,24 @@ def resolve_assignee_id(cfg: dict, issue_client: IssueClient,
     return assignee
 ```
 
-新增 import：`from .platform import get_issue_client, IssueClient`，删除 `from . import gitlab_client`。
+顶部新增 `from .platform import get_issue_client, IssueClient`，**删除 `from . import gitlab_client`**（避免 GitHub 平台误 import）。
 
-- [ ] **步骤 4：跑测试确认通过**
+- [ ] **步骤 4：改造 main() 接入 IssueClient + ReportContext**
 
-运行：`pytest tests/test_main.py -v`
-预期：全绿
+`src/code_review/__main__.py:227-307 main()` 整体重写：
 
-- [ ] **步骤 5：Commit**
-
-```bash
-git add src/code_review/__main__.py tests/test_main.py
-git commit -m "refactor(main): resolve_assignee_id 走 IssueClient
-
-签名改为 resolve_assignee_id(cfg, issue_client, trigger_user)
-返回值类型放宽到 str | int | None（GitLab int / GitHub str）
-删除 import gitlab_client（GitHub 平台不需要）
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-```
-
----
-
-### 任务 12：__main__.py 主流程接入 IssueClient
-
-**文件：**
-- 修改：`src/code_review/__main__.py`
-- 修改：`tests/test_main.py`
-
-- [ ] **步骤 1：写测试覆盖组装路径**
-
-`tests/test_main.py` 加 case：
-```python
-def test_main_starts_issue_client_and_fetches_open_issues():
-    """main() 启动时构造 IssueClient 并调 list_open_issues。"""
-    from code_review.__main__ import main
-    from tests.test_helpers import FakeIssueClient
-
-    fake = FakeIssueClient()
-    fake.list_open_issues_result = []
-    # patch get_issue_client + LLM
-    with patch("code_review.__main__.get_issue_client", return_value=fake), \
-         patch("code_review.__main__.load_config", return_value={
-             "platform": "gitlab", "wecom_webhook_url": "",
-             "llm_base_url": "x", "llm_api_key": "k", "llm_model": "m",
-             "review_base_sha": "a", "review_head_sha": "b",
-             "repo_path": "/repo", "max_turns": 1, "max_diff_bytes": 50000,
-             "report_lang": "zh", "gitlab_token": "x",
-             "gitlab_api_url": "x", "gitlab_project_id": 1,
-             "weekly_report_project_id": 0,
-             "pr_number": None,
-         }), \
-         patch("code_review.__main__.orchestrate") as mock_orchestrate:
-        result = main()
-    assert fake.list_open_issues_called_with == [["reviewer-generated"]]
-    mock_orchestrate.assert_called_once()
-
-
-def test_main_github_force_weekly_zero():
-    """GitHub 平台强制 weekly_report_project_id=0，跳过归档。"""
-    from code_review.__main__ import main
-
-    fake = FakeIssueClient()
-    with patch("code_review.__main__.get_issue_client", return_value=fake), \
-         patch("code_review.__main__.load_config", return_value={
-             "platform": "github", "wecom_webhook_url": "",
-             "llm_base_url": "x", "llm_api_key": "k", "llm_model": "m",
-             "review_base_sha": "a", "review_head_sha": "b",
-             "repo_path": "/repo", "max_turns": 1, "max_diff_bytes": 50000,
-             "report_lang": "zh", "gh_token": "x", "github_repository": "o/r",
-             "weekly_report_project_id": 178,  # GitLab 默认被覆盖
-             "pr_number": 42,
-         }), \
-         patch("code_review.__main__.orchestrate"):
-        main()
-    # 验证 _try_archive_review 不会调 archive 模块（weekly 强制 0）
-    # 通过 patch archive.archive_review_to_weekly_reports 验证未被调用
-```
-
-- [ ] **步骤 2：跑测试确认失败**
-
-运行：`pytest tests/test_main.py::test_main_starts_issue_client -v`
-预期：FAIL main() 仍走 gitlab_ctx 路径
-
-- [ ] **步骤 3：改造 main() 启动路径**
-
-`src/code_review/__main__.py:227-307 main()`：
 ```python
 def main() -> int:
     repo_path = os.environ.get("REPO_PATH", "/repo")
+
+    # REVIEW_BASE_SHA / REVIEW_HEAD_SHA 由外部注入（GitLab CI 预定义变量 / GitHub Actions 注入）
+    # 缺失时容器内回退计算（GitLab 场景）
     if not os.environ.get("REVIEW_BASE_SHA") or not os.environ.get("REVIEW_HEAD_SHA"):
         try:
             base, head = compute_review_range(repo_path)
         except Exception as exc:
-            wecom = os.environ.get("WECOM_WEBHOOK_URL", "")
             print(f"[fatal] 计算 review range 失败: {exc}", file=sys.stderr, flush=True)
-            if wecom:
-                notifier.send_error(wecom, "审查未完成", f"计算 review range 失败：{exc}")
+            # 此处 cfg 尚未加载，notifier 无法构造；只 stderr 兜底
             return 1
         os.environ["REVIEW_BASE_SHA"] = base
         os.environ["REVIEW_HEAD_SHA"] = head
@@ -2133,27 +2453,36 @@ def main() -> int:
         print(f"[fatal] {exc}", file=sys.stderr)
         return 1
 
-    # GitHub 平台强制 weekly_report_project_id=0，跳过归档
+    # GitHub 平台强制跳过归档（archive.py 走不到）
     if cfg["platform"] == "github":
         cfg["weekly_report_project_id"] = 0
 
-    # 构造 IssueClient（贯穿整个流程）
     issue_client = get_issue_client(cfg)
 
-    # 空范围处理
+    # 空范围（base==head）
     if cfg["review_base_sha"] == cfg["review_head_sha"]:
-        log.log_event("review_range_empty", ...)
+        log.log_event(
+            "review_range_empty",
+            f"base==head={cfg['review_base_sha'][:8]}, 无 diff 可审查",
+        )
         n = get_notifier(cfg)
         ctx_skip = _build_context(cfg, {})
-        n.send_skip("本次无变更，跳过代码审查",
-                    f"base == head ({cfg['review_base_sha'][:8]})，无可审查 diff。"
-                    "可能是首次提交或 MR 源分支无新 commit。",
-                    context=ctx_skip)
+        n.send_skip(
+            "本次无变更，跳过代码审查",
+            f"base == head ({cfg['review_base_sha'][:8]})，无可审查 diff。"
+            "可能是首次提交或 MR 源分支无新 commit。",
+            context=ctx_skip,
+        )
         return 0
 
-    log.log_init(...)
+    log.log_init(
+        f"repo={cfg['repo_path']}, range={cfg['review_base_sha'][:8]}.."
+        f"{cfg['review_head_sha'][:8]}, lang={cfg['report_lang']}"
+    )
     try:
-        meta = gather_commit_metadata(cfg["repo_path"], cfg["review_base_sha"], cfg["review_head_sha"])
+        meta = gather_commit_metadata(
+            cfg["repo_path"], cfg["review_base_sha"], cfg["review_head_sha"]
+        )
     except RuntimeError as exc:
         print(f"[fatal] {exc}", file=sys.stderr)
         n = get_notifier(cfg)
@@ -2186,7 +2515,7 @@ def main() -> int:
     return result.exit_code
 ```
 
-新增私有 helper：
+新增私有 helper（替换原 `_build_report_header`）：
 ```python
 def _build_context(cfg: dict, meta: dict) -> ReportContext:
     """组装 ReportContext 给 Notifier。"""
@@ -2211,71 +2540,14 @@ def _build_context(cfg: dict, meta: dict) -> ReportContext:
     )
 ```
 
-`_build_report_header` 函数**删除**（被 `_build_context` 替代）。
+删除 `_build_report_header` 函数（原 `__main__.py:144-169`），其返回的 dict 已全部由 ReportContext 字段承接。
 
-- [ ] **步骤 4：跑测试确认通过**
+**早期失败路径说明**：compute_review_range 失败时 cfg 尚未加载，无法构造 notifier，仅 stderr 兜底 + return 1。CI job 红/绿足够通知。其他失败路径（gather_commit_metadata / list_open_issues / agent 失败）都在 cfg 加载之后，可走 notifier。
 
-运行：`pytest tests/test_main.py -v`
-预期：全绿，包括原 `test_main.py` 所有用例（用 FakeIssueClient 改造 fixture）
+- [ ] **步骤 5：改造 orchestrator.py 接入 Notifier**
 
-- [ ] **步骤 5：Commit**
+`src/code_review/orchestrator.py` 整体重写：
 
-```bash
-git add src/code_review/__main__.py tests/test_main.py
-git commit -m "refactor(main): 主流程接入 IssueClient + ReportContext
-
-main() 启动时构造 IssueClient（贯穿 ctx）
-open_issues 改 issue_client.list_open_issues（替换 gitlab_client.list_issues）
-resolve_assignee_id 走 IssueClient（任务 11）
-_build_context 替代 _build_report_header，返回 ReportContext
-GitHub 平台强制 weekly_report_project_id=0
-删除 import gitlab_client
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-```
-
----
-
-### 任务 13：orchestrator.py 接入 Notifier
-
-**文件：**
-- 修改：`src/code_review/orchestrator.py`
-- 修改：`tests/test_orchestrate.py`
-
-- [ ] **步骤 1：写测试**
-
-`tests/test_orchestrate.py` 加 case：
-```python
-def test_orchestrate_calls_notifier_send_report():
-    from code_review.orchestrator import orchestrate
-    from tests.test_helpers import FakeNotifier
-
-    fake_notifier = FakeNotifier()
-    cfg = {"platform": "gitlab", "wecom_webhook_url": "x",
-           "max_diff_bytes": 50000}
-    ctx = {"repo_path": "/repo", "base_sha": "a", "head_sha": "b",
-           "issue_client": None, "assignee_id": None}
-    with patch("code_review.orchestrator.get_notifier", return_value=fake_notifier), \
-         patch("code_review.orchestrator.run_agent") as mock_run:
-        mock_run.return_value = AgentResult(notes=[], created_issues=[],
-                                            closed_issues=[], failed=False)
-        result = orchestrate(cfg, ctx, {"authors": "x", "stat": "0",
-                                        "author_list": "", "files_changed": "0",
-                                        "commit_summary": "（无）"},
-                             [], header=None)
-    assert fake_notifier.send_report_called
-```
-
-需要在 `tests/test_helpers.py` 加 `FakeNotifier`。
-
-- [ ] **步骤 2：跑测试确认失败**
-
-运行：`pytest tests/test_orchestrate.py::test_orchestrate_calls_notifier_send_report -v`
-预期：FAIL `send_report` 仍走模块级函数
-
-- [ ] **步骤 3：改造 orchestrator.py**
-
-`src/code_review/orchestrator.py`：
 ```python
 """多 agent 编排：A->B 串行 + C 并行，汇总报告。"""
 from concurrent.futures import ThreadPoolExecutor
@@ -2309,10 +2581,11 @@ def orchestrate(cfg: dict, ctx: dict, commit_meta: dict, open_issues: list,
     pipeline_url = cfg.get("ci_pipeline_url", "")
     report_lang = cfg.get("report_lang", "zh")
     results = {"a": None, "b": None, "c": None}
-    context = context or ReportContext(
-        project="", project_url="", authors="", trigger_user="",
-        branch_line="", commit_sha="", stat="", pr_number=None,
-    )
+    if context is None:
+        context = ReportContext(
+            project="", project_url="", authors="", trigger_user="",
+            branch_line="", commit_sha="", stat="", pr_number=None,
+        )
 
     notifier = get_notifier(cfg)
 
@@ -2362,140 +2635,220 @@ def orchestrate(cfg: dict, ctx: dict, commit_meta: dict, open_issues: list,
     )
 ```
 
-- [ ] **步骤 4：跑测试确认通过**
+注意 `orchestrate` 参数顺序：`(cfg, ctx, commit_meta, open_issues, context=...)` —— `context` 是第 5 个参数（**不是第 4 个**，open_issues 是第 4 个）。
 
-运行：`pytest tests/test_orchestrate.py -v`
-预期：全绿
+- [ ] **步骤 6：跑全测试确认通过**
 
-- [ ] **步骤 5：Commit**
+运行：`pytest tests/ -v`
+预期：全绿，0 失败
+
+- [ ] **步骤 7：Commit**
 
 ```bash
-git add src/code_review/orchestrator.py tests/test_orchestrate.py tests/test_helpers.py
-git commit -m "refactor(orchestrator): 接入 Notifier 实例
+git add src/code_review/__main__.py src/code_review/orchestrator.py \
+        tests/test_main.py tests/test_orchestrate.py
+git commit -m "refactor(main+orchestrator): 三处主流程接入 IssueClient + Notifier
 
-send_report/send_error 改 notifier.send_*(..., context=context)
-header dict 参数改 ReportContext
-import 调整：删模块级 send_report/send_error，加 get_notifier
+resolve_assignee_id 签名改 (cfg, issue_client, trigger_user) → 返回值类型放宽
+main() 启动时构造 IssueClient，贯穿 ctx；compute_review_range 失败仅 stderr
+兜底（cfg 未加载），其他失败路径走 notifier.send_error
+orchestrate() 改 notifier.send_*(..., context=...)；参数顺序
+(cfg, ctx, commit_meta, open_issues, context=...) 第 5 个是 context
+_build_context 替代 _build_report_header，返回 ReportContext
+GitHub 平台强制 weekly_report_project_id=0
+删除 import gitlab_client（任务 2 兼容层仍在，老 gitlab_client.py 仍可用）
+
+本任务原子 commit，单独提交任一处都会让 pytest 中间态失败。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### 任务 14：删除兼容层 + 全测试回归
+### 任务 12：删除兼容层 + 全测试回归
 
 **文件：**
-- 删除：`src/code_review/gitlab_client.py`
-- 删除：`src/code_review/notifier.py`
+- 删除：`src/code_review/gitlab_client.py`（兼容层模块）
+- 修改：`src/code_review/notifier/__init__.py`（删除末尾的 `send_report` / `send_error` / `send_skip` 模块级 wrapper）
 
 - [ ] **步骤 1：验证所有调用方已迁移**
 
-运行：`grep -r "from code_review.gitlab_client" src/ tests/` 与 `grep -r "from code_review import gitlab_client" src/ tests/`
-预期：无任何结果（除本文件本身外）
+```bash
+# 1. import 路径：应无 import 旧 gitlab_client
+grep -rn "from code_review.gitlab_client\|from code_review import gitlab_client" src/ tests/
+# 2. 旧 wrapper 函数名调用：应无 send_report(wecom, ...) / send_error(wecom, ...) / send_skip(wecom, ...) 模块级调用
+grep -rn "send_report(\|send_error(\|send_skip(" src/ tests/ | grep -v "notifier\.send\|\.send_report\|\.send_error\|\.send_skip\|def send_"
+# 3. gitlab_client 模块级函数：应无 list_issues(ctx, ...) / create_issue(ctx, ...) 等旧 ctx dict 调用
+grep -rn "gitlab_client\.\(list_issues\|create_issue\|close_issue\|add_issue_comment\|update_issue_description\|lookup_user_id\)" src/ tests/
+```
 
-运行：`grep -r "from code_review.notifier import" src/ tests/`
-预期：无任何旧 `send_report / send_error / send_skip` import
+预期：3 个 grep 全部无任何匹配（如有，迁移对应调用方后再删兼容层）
 
-- [ ] **步骤 2：删除兼容层文件**
+- [ ] **步骤 2：删除 gitlab_client.py**
 
 ```bash
 git rm src/code_review/gitlab_client.py
-git rm src/code_review/notifier.py
 ```
 
-- [ ] **步骤 3：跑全测试确认通过**
+- [ ] **步骤 3：删除 notifier/__init__.py 末尾的 wrapper**
+
+打开 `src/code_review/notifier/__init__.py`，删除步骤 3（任务 3）追加的 `send_report` / `send_error` / `send_skip` 三个模块级 wrapper 函数（约 20 行），同步从顶部 `__all__` 列表移除 `"send_report", "send_error", "send_skip"`。
+
+- [ ] **步骤 4：跑全测试确认通过**
 
 运行：`pytest tests/ -v`
-预期：全绿，0 失败
+预期：全绿，0 失败。如果有测试 import 旧 wrapper（应已在任务 11 主流程迁移时改完），会 ImportError 暴露，按错误逐个修复
 
-- [ ] **步骤 4：Commit**
+- [ ] **步骤 5：Commit**
 
 ```bash
 git add -A
 git commit -m "refactor: 删除兼容层，主流程迁移完成
 
+gitlab_client.py 兼容层删除（迁移到 platform/gitlab.py）
+notifier/__init__.py 末尾 send_report/send_error/send_skip 模块级 wrapper 删除
 所有调用方已迁移到 platform/IssueClient + notifier/Notifier 抽象。
-兼容层不再需要，整体删除。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### 任务 15：本地验证 4 场景矩阵
+### 任务 13：本地验证 4 场景矩阵
 
-**手动验证**（不写自动化测试，但需要执行并记录）：
+**手动验证**（不写自动化测试，但需要执行并记录）。
+
+**统一执行方式**：不依赖 `--test-notify` flag（不强制实现）。改用 Python 脚本 `scripts/verify_notifier.py`，直接 import `get_notifier` + `build_multi_section_report` + `ReportContext`，绕开 agent 循环，只验证 notifier 出口行为。先创建该脚本，再按 4 场景设置环境变量跑。
+
+- [ ] **步骤 0：创建验证脚本 `scripts/verify_notifier.py`**
+
+```python
+"""验证脚本：组装假报告 + 按 PLATFORM/WECOM/PR_NUMBER 组合发 notifier。
+不跑 agent 循环，仅验证出口行为（PR 评论 / 企微 / status check / Null）。
+用法：设置环境变量后 python scripts/verify_notifier.py
+"""
+import os
+from code_review.config import load_config
+from code_review.notifier import (
+    build_multi_section_report, get_notifier, ReportContext,
+)
+
+cfg = load_config()
+n = get_notifier(cfg)
+ctx = ReportContext(
+    project=cfg.get("ci_project_path") or "verify-project",
+    project_url="",
+    authors="verify-author",
+    trigger_user=cfg.get("trigger_user", ""),
+    branch_line=f"verify branch (platform={cfg['platform']})",
+    commit_sha=cfg.get("commit_short_sha", "abc1234")[:8],
+    stat="1 文件 +1 -1",
+    pr_number=cfg.get("pr_number"),
+)
+# 构造假报告：1 条 feature note + 1 个 created issue + 1 个 closed issue
+report = build_multi_section_report(
+    a_notes=["✅ 验证报告"],
+    b_notes=[],
+    created=[{"title": "verify created issue", "web_url": "https://example.com/1",
+              "severity": "warning"}],
+    closed=[],
+    open_count=0,
+    context=ctx,
+)
+print(f"[verify] platform={cfg['platform']} pr_number={cfg.get('pr_number')} "
+      f"notifier={type(n).__name__}")
+ok = n.send_report(report, context=ctx)
+print(f"[verify] send_report returned ok={ok}")
+print("[verify] 发送错误路径测试...")
+n.send_error("verify error title", "verify error body", context=ctx)
+print("[verify] done")
+```
 
 - [ ] **步骤 1：GitLab + 企微场景（字节级兼容回归）**
 
 ```bash
+# 设环境变量（PowerShell 用 $env:，bash 用 export）
 PLATFORM=gitlab \
-  WECOM_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test \
+  WECOM_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_TEST_KEY \
   CODE_REVIEWER_TOKEN=glpat-x \
   CI_API_V4_URL=https://gl.example.com/api/v4 \
   CI_PROJECT_ID=1 \
   LLM_BASE_URL=https://llm/x LLM_API_KEY=sk LLM_MODEL=m \
   REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
   WEEKLY_REPORT_PROJECT_ID=178 \
-  python -m code_review --test-notify
+  CI_COMMIT_SHORT_SHA=abc1234 \
+  python scripts/verify_notifier.py
 ```
 
-预期：notifier 走 WecomNotifier，企业微信 webhook 收到分片 Markdown 报告。
+预期输出：
+- `[verify] ... notifier=WecomNotifier`
+- `[verify] send_report returned ok=True`（webhook 真实可达时；可达性失败 ok=False 但不抛异常）
+- 企业微信测试群收到分片 Markdown 报告（需真实 webhook key 才能验证送达）
 
 - [ ] **步骤 2：GitLab + 无企微场景**
 
 ```bash
-# 删 WECOM_WEBHOOK_URL
 PLATFORM=gitlab \
-  CODE_REVIEWER_TOKEN=glpat-x CI_API_V4_URL=... CI_PROJECT_ID=1 \
-  LLM_... REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
-  python -m code_review --test-notify
+  CODE_REVIEWER_TOKEN=glpat-x CI_API_V4_URL=https://gl/x CI_PROJECT_ID=1 \
+  LLM_BASE_URL=x LLM_API_KEY=k LLM_MODEL=m \
+  REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
+  CI_COMMIT_SHORT_SHA=abc1234 \
+  python scripts/verify_notifier.py
+# 注意：不设 WECOM_WEBHOOK_URL
 ```
 
-预期：notifier 走 NullNotifier，控制台 log "notify_null"，无 HTTP 请求。
+预期输出：
+- `[verify] ... notifier=NullNotifier`
+- `[verify] send_report returned ok=True`
+- 控制台 log "notify_null"，**无任何 HTTP 请求**（可用 `mitmproxy` 或抓包确认）
 
 - [ ] **步骤 3：GitHub + PR 场景**
 
 ```bash
 PLATFORM=github \
-  GH_TOKEN=ghp_x GITHUB_REPOSITORY=owner/repo \
+  GH_TOKEN=ghp_YOUR_TOKEN GITHUB_REPOSITORY=owner/repo \
   PR_NUMBER=42 \
-  LLM_... REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
-  python -m code_review --test-notify
+  LLM_BASE_URL=x LLM_API_KEY=k LLM_MODEL=m \
+  REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
+  CI_COMMIT_SHORT_SHA=abc1234 \
+  python scripts/verify_notifier.py
 ```
 
-预期：notifier 走 GithubPrCommentNotifier，POST 到 `https://api.github.com/repos/owner/repo/issues/42/comments`。
+预期输出：
+- `[verify] ... notifier=GithubPrCommentNotifier`
+- `[verify] send_report returned ok=True`
+- PR #42 收到评论（需真实 GH_TOKEN + 真实仓库 PR 才能验证；可用 test 仓库 + 测试 PR）
+- 用 `mitmproxy` / Wireshark 抓包验证请求 URL 是 `https://api.github.com/repos/owner/repo/issues/42/comments`
 
 - [ ] **步骤 4：GitHub + push 场景**
 
 ```bash
 PLATFORM=github \
-  GH_TOKEN=ghp_x GITHUB_REPOSITORY=owner/repo \
-  # 不设 PR_NUMBER
-  COMMIT_SHORT_SHA=deadbeef \
-  LLM_... REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
-  python -m code_review --test-notify
+  GH_TOKEN=ghp_YOUR_TOKEN GITHUB_REPOSITORY=owner/repo \
+  CI_COMMIT_SHORT_SHA=deadbeef \
+  LLM_BASE_URL=x LLM_API_KEY=k LLM_MODEL=m \
+  REVIEW_BASE_SHA=abc REVIEW_HEAD_SHA=def \
+  python scripts/verify_notifier.py
+# 注意：不设 PR_NUMBER（push 场景）
 ```
 
-预期：notifier 走 GithubPrCommentNotifier，POST 到 `https://api.github.com/repos/owner/repo/statuses/deadbeef`，payload `{"state": "success", "context": "ci-code-reviewer/ai"}`。
+预期输出：
+- `[verify] ... notifier=GithubPrCommentNotifier`（同一实现，靠 pr_number=None 分流）
+- `[verify] send_report returned ok=True`
+- `send_error` 路径发 commit status check `state=failure`
+- 抓包验证请求 URL 是 `https://api.github.com/repos/owner/repo/statuses/deadbeef`，payload 含 `"state": "success"`（send_report）和 `"state": "failure"`（send_error）
 
-> 注：`--test-notify` 假设实现一个调试模式，只组装报告+发 notifier 不跑 agent 循环。本任务**不强制实现该 flag**，可改用直接 import 测：
-> ```python
-> from code_review.notifier import build_multi_section_report, get_notifier, ReportContext
-> from code_review.config import load_config
-> cfg = load_config()
-> n = get_notifier(cfg)
-> ctx = ReportContext(...)
-> n.send_report(build_multi_section_report([], [], [], [], 0, ctx), context=ctx)
-> ```
+> **验证手段说明**：4 场景都需要真实凭证才能端到端验证送达。如无凭证，至少用 `mitmproxy` 抓包验证请求 URL + payload 结构（确认 notifier 选型正确、端点正确、payload 字段正确），这比单纯看 `ok=True/False` 更可靠。
 
-- [ ] **步骤 5：手动验证通过后 Commit 验证脚本**
+- [ ] **步骤 5：手动验证通过后 Commit**
 
 ```bash
-git commit --allow-empty -m "verify: 4 场景矩阵手动验证通过
+git add scripts/verify_notifier.py
+git commit -m "verify: 4 场景矩阵手动验证通过
 
+新增 scripts/verify_notifier.py 验证脚本（绕开 agent 循环，直接测 notifier 出口）
 GitLab+wecom / GitLab+无wecom / GitHub+PR / GitHub+push 四场景
-全部按规格预期行为执行。详见任务 15 步骤 1-4 输出。
+全部按规格预期行为执行（notifier 选型 + 端点 + payload 字段正确）。
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -2504,7 +2857,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## Phase 4：迁移与消费方
 
-### 任务 16：CI 构建链迁移 GitHub Actions + 去 .gitlab-ci.yml
+### 任务 14：CI 构建链迁移 GitHub Actions + 去 .gitlab-ci.yml
 
 **文件：**
 - 创建：`.github/workflows/build.yml`
@@ -2634,7 +2987,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### 任务 17：开源基础设施 + README 重写
+### 任务 15：开源基础设施 + README 重写
 
 **文件：**
 - 创建：`LICENSE`
@@ -2675,15 +3028,160 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-- [ ] **步骤 2：创建 CONTRIBUTING.md / SECURITY.md / CODE_OF_CONDUCT.md**
+- [ ] **步骤 2：创建 CONTRIBUTING.md**
 
-三文件标准内容，参考 Contributor Covenant 2.1 中文版（CODE_OF_CONDUCT）+ GitHub 官方 SECURITY.md 模板 + 标准 CONTRIBUTING.md 模板。
+`CONTRIBUTING.md`：
+```markdown
+# 贡献指南
 
-- [ ] **步骤 3：创建 ISSUE_TEMPLATE 与 PULL_REQUEST_TEMPLATE**
+欢迎贡献！本项目采用 Apache 友好协议，欢迎通过 Issue / PR 参与改进。
 
-四个文件参考 GitHub 官方 `.github/ISSUE_TEMPLATE/` 推荐模板。
+## 开发环境
 
-- [ ] **步骤 4：重写 README.md**
+- Python 3.11+
+- pip install -e ".[dev]"
+
+## 运行测试
+
+```bash
+pytest -q
+```
+
+测试用 mock 隔离所有外部 HTTP 调用，不需要真实 LLM/GitHub/GitLab 凭证。
+
+## 提交流程
+
+1. Fork 仓库
+2. 创建特性分支（`git checkout -b feat/my-change`）
+3. 编写代码 + 测试（TDD 优先）
+4. 跑测试确认通过（`pytest -q`）
+5. 提交（commit message 建议用中文，参考 `feat:` / `fix:` / `docs:` / `test:` 前缀）
+6. 推分支 + 开 PR
+
+## 代码风格
+
+- ruff check app（Python）
+- 类型注解保持简洁，新代码鼓励加类型
+
+## 添加新平台支持
+
+如果要加新平台（如 BitBucket / Gitea）：
+
+1. 在 `src/code_review/platform/` 新建 `<platform>.py`，实现 `IssueClient` Protocol
+2. 在 `src/code_review/notifier/` 新建对应 Notifier（如 `bitbucket_pr.py`）
+3. 在 `src/code_review/__main__.py:cfg["platform"]` 加新分支
+4. 在 `config.py:GITHUB_PLATFORM_REQUIRED` 模式加新平台必填项
+5. 写测试 + 文档
+```
+
+- [ ] **步骤 3：创建 SECURITY.md**
+
+`SECURITY.md`：
+```markdown
+# 安全策略
+
+## 支持版本
+
+| 版本 | 支持状态 |
+|------|----------|
+| v2.x | ✅ 支持 |
+| v1.x | ❌ 不再维护 |
+
+## 报告漏洞
+
+请通过 GitHub Security Advisories 私下报告：
+https://github.com/yedazhi/code-reviewer/security/advisories/new
+
+**请勿**通过公开 Issue 报告安全问题。
+
+## 响应时间
+
+- 收到报告后 7 天内确认
+- 严重漏洞 30 天内修复并发布 patch 版本
+- 一般漏洞按版本计划随下一版本发布
+```
+
+- [ ] **步骤 4：创建 CODE_OF_CONDUCT.md**
+
+`CODE_OF_CONDUCT.md` 采用 Contributor Covenant 2.1 中文版（开源标准，CC BY-SA 4.0 许可，可直接抄录 https://www.contributor-covenant.org/zh-cn/version/2/1/code_of_conduct/ 全文，约 130 行）。
+
+- [ ] **步骤 5：创建 ISSUE_TEMPLATE 与 PULL_REQUEST_TEMPLATE**
+
+`.github/ISSUE_TEMPLATE/bug_report.md`：
+```markdown
+---
+name: Bug Report
+about: 报告 code-reviewer 自身 bug（非审查结果问题）
+title: "[bug] "
+labels: bug
+---
+
+## 现象
+
+## 复现步骤
+
+1. ...
+2. ...
+
+## 预期行为
+
+## 实际行为
+
+## 环境
+
+- code-reviewer 版本：
+- 平台（GitLab / GitHub / 其他）：
+- LLM：
+- 镜像 tag（`docker pull ghcr.io/yedazhi/code-reviewer:xxx`）：
+```
+
+`.github/ISSUE_TEMPLATE/feature_request.md`：
+```markdown
+---
+name: Feature Request
+about: 提出新功能建议
+title: "[feat] "
+labels: enhancement
+---
+
+## 需求场景
+
+## 建议方案
+
+## 替代方案
+```
+
+`.github/ISSUE_TEMPLATE/config.yml`：
+```yaml
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/yedazhi/code-reviewer/discussions
+    about: 一般问题 / 想法 / 展示
+```
+
+`.github/PULL_REQUEST_TEMPLATE.md`：
+```markdown
+## 改动
+
+<!-- 简述本次 PR 改动 -->
+
+## 关联 Issue
+
+<!-- Closes #xxx -->
+
+## 测试
+
+<!-- 列出新增/修改的测试用例 -->
+
+## Checklist
+
+- [ ] pytest -q 全绿
+- [ ] 新增代码有测试覆盖
+- [ ] 文档同步更新（如有 API 变化）
+```
+
+- [ ] **步骤 6：重写 README.md**
 
 新 README 结构：
 1. 标题 + 徽章（build status / release / docker image size / License）
@@ -2698,21 +3196,30 @@ SOFTWARE.
 10. Contributing 入口
 11. License
 
-去硬编码（README 关键词完整清单）：
+去硬编码关键词（grep 校验范围）：
 - `ccr.ccs.tencentyun.com` → `ghcr.io/yedazhi/code-reviewer`
 - `c2h4` → 删除
 - `git.c2h4.cn` → `github.com/yedazhi/code-reviewer`
+- `devtools/code_review` → `yedazhi/code-reviewer`
+- `devtools/weekly_reports` → 删除（归档默认 0）
+- `kaniko` → 删除（迁 GitHub Actions 用 docker/build-push-action）
+- `glab` → 删除
+- `release:` → 删除
 
-- [ ] **步骤 5：写 CHANGELOG.md v2.0.0 BREAKING**
+- [ ] **步骤 7：写 CHANGELOG.md v2.0.0 BREAKING**
 
 按规格 §16 内容写。
 
-- [ ] **步骤 6：grep 校验 README 无内网痕迹**
+- [ ] **步骤 8：grep 校验全仓库无内网痕迹**
 
-运行：`grep -E "ccr\.ccs\.tencentyun\.com|c2h4|git\.c2h4\.cn" README.md`
-预期：无任何匹配
+运行：
+```bash
+grep -rE "ccr\.ccs\.tencentyun\.com|c2h4|git\.c2h4\.cn|devtools/(code_review|weekly_reports)|kaniko|glab" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.py" .
+```
 
-- [ ] **步骤 7：Commit**
+预期：无任何匹配（如有匹配，按规格 §13.1 关键词完整清单逐个处理）
+
+- [ ] **步骤 9：Commit**
 
 ```bash
 git add LICENSE CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
@@ -2730,7 +3237,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### 任务 18：templates/code-review.yml + ci/include.yml 重写
+### 任务 16：templates/code-review.yml + ci/include.yml 重写
 
 **文件：**
 - 修改：`templates/code-review.yml`
@@ -2831,7 +3338,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### 任务 19：novel_builder 接入 GitHub Actions
+### 任务 17：novel_builder 接入 GitHub Actions
 
 **文件（`D:\my_space\novel_builder`）：**
 - 创建：`.github/workflows/code-review.yml`
@@ -2943,30 +3450,31 @@ Task 6 (GithubIssueClient) ─── Task 7 (GithubPrCommentNotifier)
   ↓                            ↓
 Task 8 (prompt) ─── Task 9 (tools) ─── Task 10 (agent.py dispatch_ctx)
                                             ↓
-Task 11 (resolve_assignee_id) ─── Task 12 (__main__.py 主流程)
+Task 11 (主流程改造：resolve_assignee_id + main + orchestrator 三处原子 commit)
                                             ↓
-Task 13 (orchestrator.py) ─── Task 14 (删兼容层) ─── Task 15 (4 场景验证)
+Task 12 (删兼容层) ─── Task 13 (4 场景验证)
                                             ↓
-Task 16 (CI 迁移) ─── Task 17 (开源) ─── Task 18 (templates 重写)
+Task 14 (CI 迁移) ─── Task 15 (开源) ─── Task 16 (templates 重写)
                                             ↓
-                                          Task 19 (novel_builder 接入)
+                                          Task 17 (novel_builder 接入)
 ```
 
 依赖关系总结：
-- 任务 1-5：基础抽象（可独立 commit）
+- 任务 1-5：基础抽象（可独立 commit，每步测试全绿）
 - 任务 6-7：GitHub 实现（依赖任务 1-2 的工厂）
-- 任务 8-10：工具层 + 主流程改造（依赖任务 1-2 + 6-7）
-- 任务 11-13：主流程接入（依赖任务 8-10）
-- 任务 14-15：清理 + 验证（依赖任务 11-13）
-- 任务 16-18：迁移 + 开源（依赖任务 14-15，可与 19 并行）
-- 任务 19：消费方接入（依赖任务 17 的镜像发布）
+- 任务 8-10：工具层 + dispatch_ctx 改造（依赖任务 1-2 + 6-7）
+- **任务 11：主流程改造（原子任务）** — resolve_assignee_id 签名 + main() + orchestrator() 三处强耦合，单独 commit 任一处会让 pytest 中间态失败，必须**一个 commit 三处全改 + 全绿**
+- 任务 12-13：清理兼容层 + 4 场景验证（依赖任务 11）
+- 任务 14-16：迁移 + 开源 + templates 重写（依赖任务 13，可与 17 并行）
+- 任务 17：消费方接入（依赖任务 15 的 GHCR 镜像发布）
 
 ## 执行检查点
 
 - **Checkpoint A（任务 5 完成）**：基础抽象就绪，GitLab 字节级兼容已验证。可以 review 一遍。
-- **Checkpoint B（任务 10 完成）**：所有平台实现 + 工具层 + dispatch_ctx 改造完成，issue 闭环已切平台。可以 review 一遍。
-- **Checkpoint C（任务 15 完成）**：主流程跑通，4 场景验证通过。可以 review 一遍。
-- **Checkpoint D（任务 19 完成）**：消费方接入，整体可对外发布。
+- **Checkpoint AB（任务 7 完成）**：⚠️ 关键节点 — GitHub 平台首次能跑端到端测试（GithubIssueClient + GithubPrCommentNotifier 就绪，可单测验证 6 端点 + PR 评论 + status check）。可以 review 一遍。
+- **Checkpoint B（任务 10 完成）**：所有平台实现 + 工具层 + dispatch_ctx 改造完成。**注意：此时 main() 仍走老路径（`gitlab_client.list_issues(gitlab_ctx)`），issue 闭环尚未切平台，要等任务 11 主流程改造完成后才切**。可以 review 一遍。
+- **Checkpoint C（任务 13 完成）**：主流程跑通，4 场景验证通过。可以 review 一遍。
+- **Checkpoint D（任务 17 完成）**：消费方接入，整体可对外发布。
 
 ## 风险与缓解
 
