@@ -21,8 +21,7 @@
 | `assignee_id` 解析走 GitLab `users?username=` | `__main__.py:298` | GitLab 特有 |
 | 审查结果归档到 GitLab `devtools/weekly_reports` (id=178) | `archive.py:46-51` + `config.py:74` | 公司内部项目 |
 | 通知出口**只有**企业微信 | `notifier.py` 整体 | 无平台分支 |
-| 镜像仓库 `ccr.ccs.tencentyun.com/c2h4/code_review` | README, templates, .gitlab-ci.yml | 公司内部 CCR |
-| 构建/发布走 GitLab CI + `release:` 关键字 + glab | `.gitlab-ci.yml` | 公司内部 CI |
+| 镜像仓库 `ccr.ccs.tencentyun.com/c2h4/code_review` + 构建/发布走 GitLab CI + `release:` 关键字 + glab | README, templates, `.gitlab-ci.yml` | 公司内部 CCR + CI 一体 |
 
 ### 目标
 
@@ -118,18 +117,28 @@ code-reviewer/
 │   ├── test_tool_create_issue.py    # 改 fixture，加 issue_client key
 │   ├── test_tool_close_issue.py     # 同上
 │   └── ...                          # 其他测试不动
-├── .github/workflows/
-│   ├── build.yml                    # 镜像构建 + 推 GHCR
-│   ├── test.yml                     # pytest
-│   ├── release.yml                  # 发 GitHub Release
-│   └── lint.yml                     # 可选，验证 templates 完整性
 ├── templates/
 │   └── code-review.yml              # 默认 image_tag="latest" + platform input
 ├── ci/
 │   └── include.yml                  # include:remote 兼容模板（GitHub raw URL）
 ├── docs/
-├── README.md                        # 重写，去内网痕迹
+├── README.md                        # 重写，去内网痕迹，加开源标配（徽章 / License / Contribution 入口）
 ├── CHANGELOG.md                     # 标注 v2.0.0 BREAKING
+├── CONTRIBUTING.md                  # 新增，贡献指南（开发环境 / 测试运行 / PR 流程）
+├── SECURITY.md                      # 新增，漏洞上报流程（私聊优先于公开 issue）
+├── CODE_OF_CONDUCT.md               # 新增，社区行为准则（Contributor Covenant 2.1 中文版）
+├── LICENSE                          # 新增，MIT（与 novel_builder 一致）
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md            # 新增
+│   │   ├── feature_request.md       # 新增
+│   │   └── config.yml               # 新增（issue 选用引导）
+│   ├── PULL_REQUEST_TEMPLATE.md     # 新增
+│   └── workflows/
+│       ├── build.yml                # 镜像构建 + 推 GHCR
+│       ├── test.yml                 # pytest
+│       ├── release.yml              # 发 GitHub Release
+│       └── lint.yml                 # 可选，验证 templates 完整性
 ├── Dockerfile                       # 不变
 ├── pyproject.toml                   # 不变
 └── requirements.txt
@@ -212,9 +221,16 @@ def get_issue_client(cfg: dict) -> IssueClient:
 
 1. **`iid` ↔ `number` 映射**：所有 GitHub 响应里的 `number` 在内部立刻改 key 为 `iid`，工具层/`.cr-ignore.md` 解析层零改动
 2. **labels 预过滤**：构造函数调用一次 `GET /labels` 缓存现有 label 集合；`create_issue` 过滤掉不存在的（GitHub 422 报错，GitLab 自动建）
+   - **缓存失败兜底**：`GET /labels` 抛异常（403 / 网络错）→ `_available_labels` 落空集；`create_issue` 在空集时**不过滤**直接传原 labels，让 422 自然触发降级路径（见下方 422 分流）。不阻断审查启动
 3. **assignee 静默降级**：`create_issue` 时若 422 含 "assignee" → 自动去掉 `assignees` 字段重试一次，记 warning 日志
 4. **rate limit 防御**：解析 `X-RateLimit-Remaining` / `X-RateLimit-Reset`，< 50 时 sleep 到 reset（≤ 5 分钟）；429/502/503 指数退避重试 3 次
 5. **README 前置要求**：GitHub 接入前需手动创建 4 个 label（`reviewer-generated` / `severity::critical` / `severity::warning` / `severity::suggestion`），双保险机制
+6. **422 错误分流**（防止 LLM 死循环）：
+   - 422 + 响应体含 `"assignees"` 或 `"assignee"` → 去掉 `assignees` 重试一次（assignee 静默降级）
+   - 422 + 响应体含 `"labels"` → 去掉 `labels` 重试一次（labels 预创建遗漏兜底），记 warning 提醒开发者补建 label
+   - 422 + 其他字段（title/body 等）→ **不重试**，原异常抛回 LLM，让 LLM 收到 `ERROR: GitHub 拒绝创建: <detail>` 决定是否 take_note 兜底
+   - 重试仍 422 → 抛回 LLM
+7. **GitLab 实现不复用此降级路径**：`GitlabIssueClient.create_issue` 直接调 GitLab API（GitLab 自动建 label + assignee_ids 失败天然抛异常），不实现 422 分流逻辑。GitHub 422 分流是 `GithubIssueClient` 独有
 
 ### 3.4 GitLab 实现迁移
 
@@ -233,15 +249,20 @@ from dataclasses import dataclass
 
 @dataclass
 class ReportContext:
-    """本次审查的元信息，供 Notifier 实现拼头部/链接用。"""
+    """本次审查的元信息，供 Notifier 实现拼头部/链接用。
+
+    字段名与原 _build_report_header 返回的 header dict key 一一对应，
+    保证 build_multi_section_report 输出字节级一致。pr_number 是唯一新增字段，
+    WecomNotifier 不消费它（GitLab 场景恒为 None）。
+    """
     project: str
     project_url: str
-    pr_number: int | None        # None 表示 push 场景
-    head_sha: str
-    branch_line: str
     authors: str
-    stat: str
     trigger_user: str
+    branch_line: str
+    commit_sha: str       # 保留原 key 名（short sha），与 build_multi_section_report 第 102 行读取一致；非 GitHub 全 SHA
+    stat: str
+    pr_number: int | None # 新增字段，仅 GithubPrCommentNotifier 用；GitLab 场景恒 None
 
 @runtime_checkable
 class Notifier(Protocol):
@@ -254,7 +275,9 @@ def get_notifier(cfg: dict) -> Notifier: ...
 
 ### 4.2 `build_multi_section_report` 字段替换
 
-原 `build_multi_section_report(..., header: dict)` 改成接收 `context: ReportContext`。`ReportContext` 字段跟原 `header` dict key 一一对应，**输出 Markdown 字节级一致**。
+原 `build_multi_section_report(..., header: dict)` 改成接收 `context: ReportContext`。`ReportContext` 字段名跟原 `header` dict key 一一对应（`project` / `project_url` / `authors` / `trigger_user` / `branch_line` / `commit_sha` / `stat`），**输出 Markdown 字节级一致**。`pr_number` 是新增字段，`build_multi_section_report` 不读取（仅 Notifier 用）。
+
+`__main__.py:_build_report_header` 改造：原返回 dict 改为返回 `ReportContext`，末尾追加 `pr_number=cfg.get("pr_number")`（GitLab 场景为 None）。
 
 ### 4.3 三种实现
 
@@ -275,30 +298,57 @@ class GithubPrCommentNotifier:
 
     def send_report(self, report, *, context):
         if context.pr_number is None:
-            log.log_event("notify_skip", "reason=no_pr_push_scenario")
-            return True
+            # push 场景：发 commit status check 兜底（见下方"push 场景错误反馈"）
+            return self._send_status_check(
+                context.head_sha, "success", "AI 审查完成，详见控制台日志"
+            )
         body = self._truncate(report, 65000)
         self._post_comment(context.pr_number, body)
         return True
 
     def send_error(self, title, body, *, context):
-        if context.pr_number is None:
-            return  # push 场景静默
         msg = f"## ⚠️ {title}\n\n{body}"
-        self._post_comment(context.pr_number, self._truncate(msg, 65000))
+        if context.pr_number is not None:
+            self._post_comment(context.pr_number, self._truncate(msg, 65000))
+        else:
+            # push 场景：发 commit status check 标 failure，让 GitHub UI 立刻可见
+            self._send_status_check(context.head_sha, "failure",
+                                    f"{title}: {body[:200]}")
 
     def send_skip(self, title, body, *, context):
-        if context.pr_number is None:
-            return
-        msg = f"## ℹ️ {title}\n\n{body}"
-        self._post_comment(context.pr_number, self._truncate(msg, 65000))
+        # skip 不发 status check（不是失败，只是本次无 diff）
+        if context.pr_number is not None:
+            self._post_comment(context.pr_number,
+                               self._truncate(f"## ℹ️ {title}\n\n{body}", 65000))
 
     def _post_comment(self, issue_number: int, body: str):
         url = f"{self._api}/repos/{self._repo}/issues/{issue_number}/comments"
         req = urllib.request.Request(url, data=json.dumps({"body": body}).encode(),
-                                     headers={**self._headers()}, method="POST")
+                                     headers=self._headers(), method="POST")
         with urllib.request.urlopen(req, timeout=15) as resp:
             resp.read()
+
+    def _send_status_check(self, sha: str, state: str, description: str):
+        """GitHub push 场景的兜底通知路径。
+        用 POST /repos/{o}/{r}/statuses/{sha} 提交 commit status，
+        让开发者从 GitHub UI / git push 输出看到审查是否成功。
+        """
+        url = f"{self._api}/repos/{self._repo}/statuses/{sha}"
+        payload = {
+            "state": state,                        # success / failure / pending
+            "description": description[:140],       # GitHub 限制 140 字符
+            "context": "ci-code-reviewer/ai",      # 唯一标识，避免与 GitHub Actions 的同名 context 撞车
+        }
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode(),
+            headers=self._headers(), method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                resp.read()
+        except Exception as exc:
+            log.log_event("status_check_fail",
+                          f"sha={sha[:8]} state={state} exc={type(exc).__name__}: {exc}")
 
     def _truncate(self, text, limit):
         return text if len(text) <= limit else text[:limit] + "\n\n…（报告超长已截断）"
@@ -307,8 +357,14 @@ class GithubPrCommentNotifier:
 **关键设计点**：
 
 1. **PR 场景**：直接发评论，不分片（GitHub 评论上限 65536 字符远超企微 4000）
-2. **push 场景**：`pr_number is None` → 静默（GitHub Actions job 红/绿足够）
-3. **复用**：直接调 `_post_comment` 不复用 `GithubIssueClient._request`（避免 PR 评论请求共享 issue 客户端的 rate limit 计数）
+2. **push 场景兜底**：不发 PR 评论（无 PR），改发 **commit status check** 让 GitHub UI `git push` 输出立刻可见
+   - `send_report` 成功 → `state=success`
+   - `send_error` → `state=failure`
+   - `send_skip` → 不发 status（不是失败）
+3. **description 截断 140 字符**：GitHub API 硬限制
+4. **status check context 名 `ci-code-reviewer/ai`**：唯一标识避免与 GitHub Actions 的同名 context 撞车
+5. **status check 失败吞异常**：不能因为兜底通知失败把主流程崩了
+6. **不复用 IssueClient**：自己持 `_token` / `_repo`，避免与 issue 操作的 rate limit 计数混在一起
 
 #### `NullNotifier`（新增）
 
@@ -433,9 +489,102 @@ def _substitute_platform_terms(text: str, platform: str) -> str:
 
 ---
 
-## 7. 工具层改造
+## 7. 主流程改造（__main__ / agent / resolve_assignee）
 
-### 7.1 `tools/create_issue.py`
+本节明确启动路径里三处 GitLab 硬耦合的改造方式，覆盖审查指出的"组装时机 + 注入路径 + 字段类型"问题。
+
+### 7.1 启动时组装 IssueClient 并贯穿调用链
+
+`__main__.py:main()` 在 `load_config()` 后立即构造 client：
+
+```python
+cfg = load_config()                       # 已含 platform 字段
+issue_client = get_issue_client(cfg)      # 平台分支返回 GitlabIssueClient / GithubIssueClient
+```
+
+`issue_client` 贯穿三个下游：
+1. `__main__.py` 启动时 `open_issues = issue_client.list_open_issues(labels=["reviewer-generated"])`（替代现 `gitlab_client.list_issues(gitlab_ctx)`）。**失败仍 exit 1**，两平台行为一致——拉不到 issue 列表等于审查闭环不可用，硬退比静默继续安全。
+2. 传给 `resolve_assignee_id(cfg, issue_client, trigger_user)`（见 7.3）
+3. 存入 `ctx["issue_client"]`，传给 `orchestrate(cfg, ctx, ...)` → `run_agent(...)` → `dispatch_ctx`
+
+### 7.2 `agent.py:96-98` dispatch_ctx 改造
+
+```python
+# 原（删除）
+"gitlab_token": cfg["gitlab_token"],
+"gitlab_api_url": cfg["gitlab_api_url"],
+"gitlab_project_id": cfg["gitlab_project_id"],
+
+# 新（替换）
+"issue_client": ctx["issue_client"],   # IssueClient 实例，工具层统一调它
+```
+
+三个 `gitlab_*` key **彻底删除**。`tools/create_issue.py` / `tools/close_issue.py` 改读 `ctx["issue_client"]`（见第 8 节）。其他 9 个工具的 `dispatch_ctx` 读取不受影响。
+
+`agent.py:77` 注释 `cfg: 配置（含 llm 凭证/max_turns/gitlab_*）` 同步改为 `cfg: 配置（含 llm 凭证/max_turns/platform）`。
+
+### 7.3 `resolve_assignee_id` 改造
+
+现签名 `resolve_assignee_id(gitlab_ctx: dict, trigger_user: str) -> int | None` 改为：
+
+```python
+def resolve_assignee_id(cfg: dict, issue_client: IssueClient,
+                        trigger_user: str) -> str | int | None:
+    """把 trigger_user 解析为 assignee 标识。
+    GitLab 侧返回 user id（int），GitHub 侧返回 username（str）。
+    失败（trigger_user 空 / lookup 异常 / 非 collaborator）记 warning 返回 None，
+    不阻塞 issue 创建（保持 unassigned）。
+    """
+    if not trigger_user:
+        log.log_event("assignee_skip", "reason=empty_trigger_user")
+        return None
+    assignee = issue_client.lookup_assignee(trigger_user)
+    if assignee is None:
+        log.log_event("assignee_skip", f"reason=lookup_failed user={trigger_user}")
+    else:
+        log.log_event("assignee_resolved", f"user={trigger_user} assignee={assignee}")
+    return assignee
+```
+
+返回值类型从 `int | None` 放宽到 `str | int | None`。`ctx["assignee_id"]` 存这个值，`create_issue` 工具透传给 `issue_client.create_issue(assignee_id=...)`，各平台实现各自消化（GitLab 用 `assignee_ids=[int]`，GitHub 用 `assignees=[str]`）。
+
+### 7.4 `__main__.py:280-298` gitlab_ctx 删除
+
+```python
+# 原（删除整个 gitlab_ctx dict 构造）
+gitlab_ctx = {
+    "gitlab_token": cfg["gitlab_token"],
+    "gitlab_api_url": cfg["gitlab_api_url"],
+    "gitlab_project_id": cfg["gitlab_project_id"],
+}
+open_issues = gitlab_client.list_issues(gitlab_ctx)
+...
+"assignee_id": resolve_assignee_id(gitlab_ctx, cfg["trigger_user"]),
+
+# 新
+open_issues = issue_client.list_open_issues(labels=["reviewer-generated"])
+...
+"assignee_id": resolve_assignee_id(cfg, issue_client, cfg["trigger_user"]),
+```
+
+`from . import gitlab_client` import 行删除（GitHub 平台根本不 import gitlab 模块）。
+
+### 7.5 `orchestrator.py:12` import 调整
+
+```python
+# 原
+from .notifier import build_multi_section_report, send_report, send_error
+# 新（send_report/send_error 不再是模块级函数，改走 Notifier 实例）
+from .notifier import build_multi_section_report, get_notifier
+```
+
+`orchestrate()` 内首行 `notifier = get_notifier(cfg)`，第 78 行 `send_report(cfg["wecom_webhook_url"], report)` 改 `notifier.send_report(report, context=ctx)`，第 86 行 `send_error(...)` 同理。
+
+---
+
+## 8. 工具层改造
+
+### 8.1 `tools/create_issue.py`
 
 ```python
 from .. import platform
@@ -469,11 +618,11 @@ def handler(args: dict, ctx: dict) -> str:
     return f"已创建 issue #{iid}: {result['web_url']}"
 ```
 
-### 7.2 `tools/close_issue.py`
+### 8.2 `tools/close_issue.py`
 
 同 7.1 模式：`ctx["issue_client"]` 取代直接 import `gitlab_client`。
 
-### 7.3 其他 9 个工具
+### 8.3 其他 9 个工具
 
 不动（`list_files` / `read_file` / `list_directory` / `git_diff` / `git_log` / `git_show` / `grep` / `take_note` / `read_notes`）。
 
@@ -700,6 +849,13 @@ on:
 
 permissions:
   contents: read
+  # 注：code-reviewer 在容器内用 GH_TOKEN（fine-grained PAT, scope=repo）操作 issue / PR 评论
+  # / commit status，跟 workflow 自身的 GITHUB_TOKEN 是两套凭证。下方 permissions 仅在
+  # 用户改用 GITHUB_TOKEN 注入容器时需要；用 PAT 时这些权限不影响容器内调用。
+  # 保险起见仍列出，避免用户切换凭证时遇到 403。
+  issues: write            # 创建/关闭 issue（GH_TOKEN 路径自动具备，GITHUB_TOKEN 路径需要）
+  pull-requests: write     # 发 PR 评论 + commit status check
+  statuses: write          # push 场景 commit status check
 
 jobs:
   code-review:
@@ -781,6 +937,21 @@ jobs:
 | `ci/bump_tag.sh` | 自动 bump | 删除 |
 | `tests/test_archive.py` | 默认 178 假设 | 改默认 0 假设 |
 
+### 12.1 README 关键词完整清单（重写时 grep 核对）
+
+重写 README 前需在现 README 全文 grep 以下关键词，确保无遗漏（不限于第一处）：
+
+- `ccr.ccs.tencentyun.com`（镜像仓库域名）
+- `c2h4`（公司命名空间，镜像路径 / GitLab group）
+- `git.c2h4.cn`（内网 GitLab 域名）
+- `devtools/code_review`（GitLab 项目路径）
+- `devtools/weekly_reports`（归档项目路径）
+- `WECOM_WEBHOOK_URL`（保留但标注"GitLab 平台可选"）
+- `CODE_REVIEWER_TOKEN`（保留，GitLab 平台必填）
+- `kaniko` / `glab` / `release:` 关键字（GitLab CI 专有）
+
+全部替换为 `ghcr.io/yedazhi/code-reviewer` / `github.com/yedazhi/code-reviewer` / GitHub Actions 工作流描述。
+
 ---
 
 ## 13. 测试策略
@@ -790,12 +961,12 @@ jobs:
 | 测试文件 | 覆盖 |
 |----------|------|
 | `tests/platform/test_factory.py` | `get_issue_client` 按 PLATFORM 返回正确实现 |
-| `tests/platform/test_github_client.py` | mock `urlopen`，验证 6 个端点构造、labels 预过滤、422 降级、rate limit |
+| `tests/platform/test_github_client.py` | mock `urlopen`，验证 6 个端点构造、labels 预过滤（含 `GET /labels` 失败兜底）、422 assignee 降级、422 其他字段错误抛回、rate limit 防御 |
 | `tests/platform/test_gitlab_client.py` | 现 `tests/test_gitlab_client.py` + `test_gitlab_client_api.py` 迁入 |
-| `tests/notifier/test_factory.py` | `get_notifier` 决策树 4 分支 |
+| `tests/notifier/test_factory.py` | `get_notifier` 决策树 4 分支（gitlab+wecom / gitlab+无wecom / github+pr / github+push） |
 | `tests/notifier/test_wecom.py` | 现 `tests/test_notifier.py` 拆出来，断言字节级兼容 |
-| `tests/notifier/test_github_pr.py` | PR 评论端点构造、截断、push 场景静默 |
-| `tests/notifier/test_report.py` | `build_multi_section_report` 接收 `ReportContext` 后输出字符级等于原 `header` dict |
+| `tests/notifier/test_github_pr.py` | PR 评论端点构造、65000 字符截断、push 场景 commit status check（success/failure）、status check 失败吞异常、status check description 140 字符截断 |
+| `tests/notifier/test_report.py` | `build_multi_section_report` 接收 `ReportContext` 后输出字符级等于原 `header` dict（含 commit_sha 字段名一致断言） |
 
 ### 13.2 修改的现有测试
 
@@ -810,9 +981,15 @@ jobs:
 | 场景 | 老行为 | 新行为 |
 |------|--------|--------|
 | `PLATFORM=gitlab` + `WECOM_WEBHOOK_URL=xxx` + 全部 GitLab env | 发企微 + GitLab issue | `WecomNotifier` + `GitlabIssueClient`，字节级一致 ✅ |
-| `PLATFORM=gitlab` + 不配 `WECOM_WEBHOOK_URL` | send_report 崩 NPE | `NullNotifier`，静默 ✅ |
+| `PLATFORM=gitlab` + 不配 `WECOM_WEBHOOK_URL` + 不配 `WEEKLY_REPORT_PROJECT_ID` | send_report 崩 NPE | `NullNotifier`，静默 ✅ |
+| `PLATFORM=gitlab` + 不配 `WECOM_WEBHOOK_URL` + 配 `WEEKLY_REPORT_PROJECT_ID=178`（老配置） | 静默 + 自动归档 | 静默 + 归档 ✅（WECOM 变可选但不破坏归档行为） |
+| `PLATFORM=gitlab` + `WECOM_WEBHOOK_URL=xxx` + 不显式配 `WEEKLY_REPORT_PROJECT_ID` | 自动归档 | 发企微 + **不归档**（默认 0）⚠️ **隐式行为变化**：CHANGELOG + Migration Guide 第 3 条已说明 |
 | `PLATFORM=github` + PR 场景 | (原本不支持) | 发 PR 评论 + GitHub issue ✅ |
-| `PLATFORM=github` + push 场景 | (原本不支持) | 静默（job 红/绿） ✅ |
+| `PLATFORM=github` + push 场景 + 审查成功 | (原本不支持) | 发 commit status check `state=success` ✅ |
+| `PLATFORM=github` + push 场景 + 审查失败 | (原本不支持) | 发 commit status check `state=failure` ✅（不再静默漏掉） |
+| `PLATFORM=github` + 4 label 缺失 → create_issue 422 → LLM 重试 → 又 422 | (原本不支持) | `GithubIssueClient.create_issue` 第一次抛 422 时**labels 缺失**特殊路径：去掉 `labels` 字段重试一次，记 warning；返回无 labels 的 issue 供 LLM 继续。这避免死循环 ✅ |
+| `PLATFORM=github` + PR 评论发送失败（rate limit / token 失效） | (原本不支持) | `GithubPrCommentNotifier._post_comment` 抛异常向上冒泡，`orchestrate` 失败路径发 commit status check `state=failure` ✅ |
+| `PLATFORM=github` + push 场景 + `send_error`（启动失败） | (原本不支持) | 发 commit status check `state=failure` ✅ |
 
 ---
 
@@ -874,4 +1051,8 @@ jobs:
 2. 若仍需归档到 `devtools/weekly_reports`，env 加 `WEEKLY_REPORT_PROJECT_ID=178`
 3. 若仅需审查+企微通知（不归档），删 `WEEKLY_REPORT_PROJECT_ID` 即可
 4. CI 变量名不变，行为不变
+
+> **组合行为变化提醒**：v1.x 老的 GitLab 消费方若同时满足"配了 WECOM_WEBHOOK_URL + 没显式配 WEEKLY_REPORT_PROJECT_ID"，
+> 升级到 v2.0 后会**静默失去归档能力**（默认 178 → 0）。审查报告照常发企微，但不再归档到 weekly_reports。
+> 如果依赖周报消费 review cache，升级时务必显式加 `WEEKLY_REPORT_PROJECT_ID=178`。
 ```
