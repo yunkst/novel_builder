@@ -55,14 +55,19 @@ class StreamingResult {
 
       final func = delta['function'] as Map<String, dynamic>?;
       if (func != null) {
+        // 空串视为缺失：OpenAI 规范在后续 delta 帧省略 name 字段，
+        // 但 DeepSeek-V4-Pro 通过 new-api 网关时会把 name 发成 ""（实测见
+        // tmp/sse_capture_<ts>.txt frame #56）。一旦 if(name != null)
+        // 放过，会覆盖首帧已聚合的真名（如"list_prompt_tags"），下游将
+        // 用空函数名调用未知工具。空串不写入即可兼容两种格式。
         final name = func['name'] as String?;
-        if (name != null) entry.name = name;
+        if (name != null && name.isNotEmpty) entry.name = name;
         final args = func['arguments'] as String?;
         if (args != null) entry.argumentsBuffer.write(args);
       }
     }
 
-    return aggregated.values.where((d) => d.name != null).map((d) {
+    return aggregated.values.where((d) => d.name != null && d.name!.isNotEmpty).map((d) {
       var args = <String, dynamic>{};
       final argsStr = d.argumentsBuffer.toString();
       if (argsStr.isNotEmpty) {

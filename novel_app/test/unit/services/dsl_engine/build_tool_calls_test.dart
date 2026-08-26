@@ -194,5 +194,62 @@ void main() {
       final sr = StreamingResult(toolCallDeltas: const []);
       expect(sr.buildToolCalls(), isEmpty);
     });
+
+    // 回归：DeepSeek-V4-Pro 流式后续帧 function.name 为空串 ""，覆盖首帧真名
+    // （实捕 llm_1787760494454_3332 同型流：首帧 name="list_prompt_tags" 完整、
+    // 次帧 name="" 且 id=null，OpenAI/glm-4.7 规范行为是省略字段而非空串）。
+    // 空串不是合法工具名，不得覆盖已聚合的 name。
+    test('DeepSeek 后续帧 name 为空串 → 不覆盖首帧真名（回归 llm_1787760494454_3332）', () {
+      final sr = StreamingResult(toolCallDeltas: [
+        {
+          'index': 0,
+          'id': '01a03eedc2b388ed35523f51cdc15fa6',
+          'type': 'function',
+          'function': {'name': 'list_prompt_tags', 'arguments': ''},
+        },
+        {
+          'index': 0,
+          'id': null,
+          'type': null,
+          'function': {'name': '', 'arguments': '{}'},
+        },
+      ]);
+      final tcs = sr.buildToolCalls();
+      expect(tcs, hasLength(1));
+      expect(tcs.first.name, 'list_prompt_tags');
+      expect(tcs.first.arguments, isEmpty); // "{}" 解析为空 Map
+    });
+
+    test('name 先空串后有值 → 空串不写入，最终取非空 name', () {
+      final sr = StreamingResult(toolCallDeltas: [
+        {
+          'index': 0,
+          'id': 'c1',
+          'function': {'name': ''}  // 首帧空串（部分网关首帧只带 id）
+        },
+        {
+          'index': 0,
+          'function': {'name': 'list_prompt_tags'}  // 后续帧补上真名
+        },
+        {
+          'index': 0,
+          'function': {'arguments': '{}'}
+        },
+      ]);
+      final tcs = sr.buildToolCalls();
+      expect(tcs, hasLength(1));
+      expect(tcs.first.name, 'list_prompt_tags');
+    });
+
+    test('name 帧全为空串 → 整条不可执行，返回空列表', () {
+      final sr = StreamingResult(toolCallDeltas: [
+        {
+          'index': 0,
+          'id': 'c1',
+          'function': {'name': '', 'arguments': '{}'}
+        },
+      ]);
+      expect(sr.buildToolCalls(), isEmpty);
+    });
   });
 }

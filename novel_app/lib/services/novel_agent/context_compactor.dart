@@ -50,6 +50,16 @@ class CompactorConfig {
   /// 默认 500000 字符 ≈ 125K tokens（适配 GPT-4o/DeepSeek/Qwen 128K 上下文窗口）
   final int maxContextChars;
 
+  /// 上下文 token 数阈值（[needsCompaction] 双轨判定的次级阈值）
+  ///
+  /// 优先级高于字符阈值：
+  /// 1. [ContextCompactor.needsCompaction] 传入 `realPromptTokens`（上一轮 LLM 用
+  ///    usage 回报）→ 直接对照本阈值，绕过字符启发式，最准。
+  /// 2. 字符阈值 + 启发式 token 估算（CJK×2 / 其他×0.25）→ 取任一超限即触发。
+  ///
+  /// 默认 100000 tokens：适配 128K 上下文窗口留 28K 余量给输出+新消息。
+  final int maxContextTokens;
+
   /// 保留尾部字符数（最近的消息）
   ///
   /// 默认 100000 字符 ≈ 25K tokens（占总阈值的 20%，保证近期对话 + 工具结果不被丢）
@@ -82,6 +92,7 @@ class CompactorConfig {
   const CompactorConfig({
     this.enabled = true,
     this.maxContextChars = 500000,
+    this.maxContextTokens = 100000,
     this.preserveTailChars = 100000,
     this.prePruneEnabled = true,
     this.dedupThresholdChars = 200,
@@ -95,6 +106,7 @@ class CompactorConfig {
   CompactorConfig copyWith({
     bool? enabled,
     int? maxContextChars,
+    int? maxContextTokens,
     int? preserveTailChars,
     bool? prePruneEnabled,
     int? dedupThresholdChars,
@@ -104,6 +116,7 @@ class CompactorConfig {
     return CompactorConfig(
       enabled: enabled ?? this.enabled,
       maxContextChars: maxContextChars ?? this.maxContextChars,
+      maxContextTokens: maxContextTokens ?? this.maxContextTokens,
       preserveTailChars: preserveTailChars ?? this.preserveTailChars,
       prePruneEnabled: prePruneEnabled ?? this.prePruneEnabled,
       dedupThresholdChars: dedupThresholdChars ?? this.dedupThresholdChars,
@@ -174,11 +187,20 @@ class ContextCompactor {
 
   /// 检查是否需要压缩
   ///
-  /// 返回 true 表示消息总字符数超过阈值，需要压缩
-  bool needsCompaction(List<ChatMessage> messages) {
+  /// 返回 true 表示消息总规模超过阈值，需要压缩。
+  /// 触发判定按优先级：
+  /// 1. [realPromptTokens] 非空（上一轮 LLM usage 回报）→ 直接对照
+  ///    [CompactorConfig.maxContextTokens]，最准。
+  /// 2. 否则字符阈值 + 启发式 token 估算→ 任一超限即触发。
+  bool needsCompaction(List<ChatMessage> messages, {int? realPromptTokens}) {
     if (!_config.enabled) return false;
+    if (realPromptTokens != null) {
+      return realPromptTokens >= _config.maxContextTokens;
+    }
     final totalChars = _estimateTotalChars(messages);
-    return totalChars >= _config.maxContextChars;
+    if (totalChars >= _config.maxContextChars) return true;
+    final estimatedTokens = _estimateTotalTokens(messages);
+    return estimatedTokens >= _config.maxContextTokens;
   }
 
   /// 执行压缩
@@ -347,22 +369,57 @@ class ContextCompactor {
 
   /// 估算单条消息的字符数
   int _estimateMessageChars(ChatMessage m) {
-    var len = (m.content?.length ?? 0);
+    return _messagePayload(m).length;
+  }
 
-    // tool_calls 参数也计入
+  /// 估算消息列表总 token 数（启发式 CJK×2 / 其他×0.25）
+  ///
+  /// 仅在无真实 usage 时作为压缩判定的 fallback。准确度约 80%，
+  /// 比字符阈值准（CJK 字符字均 token 数远高于 ASCII）。
+  double _estimateTotalTokens(List<ChatMessage> messages) {
+    double sum = 0;
+    for (final m in messages) {
+      sum += _estimateTokens(_messagePayload(m));
+    }
+    return sum;
+  }
+
+  /// 拼接单条消息的全部"对 LLM 有意义"内容（content + toolCalls + toolCallId）
+  ///
+  /// 同时被字符估算与 token 估算复用（拼接后 length 等价于原 chars 求和）。
+  String _messagePayload(ChatMessage m) {
+    final buf = StringBuffer(m.content ?? '');
     if (m.toolCalls != null) {
       for (final tc in m.toolCalls!) {
-        len += tc.name.length;
-        len += _safeJsonEncode(tc.arguments).length;
+        buf.write(tc.name);
+        buf.write(_safeJsonEncode(tc.arguments));
       }
     }
+    if (m.toolCallId != null) buf.write(m.toolCallId!);
+    return buf.toString();
+  }
 
-    // tool 角色消息的 toolCallId 也计入
-    if (m.toolCallId != null) {
-      len += m.toolCallId!.length;
+  /// 估算字符串的 token 数（启发式）
+  ///
+  /// CJK 类字符（中文/日文/汉字偏旁/CJK 标点/全角）按 2 token/字符；
+  /// 其他字符按 0.25 token/字符（≈ 4 字符 1 token）。
+  /// 返回浮点最终 round 到 int。零依赖、不引入分词库，符合 P1 启发式定位。
+  int _estimateTokens(String s) {
+    if (s.isEmpty) return 0;
+    double tokens = 0;
+    for (final r in s.runes) {
+      tokens += _isCjk(r) ? 2 : 0.25;
     }
+    return tokens.round();
+  }
 
-    return len;
+  /// 是否 CJK 类字符（含中文/日文/汉字偏旁/兼容区/CJK 标点/全角）
+  bool _isCjk(int r) {
+    if (r >= 0x2E80 && r <= 0x9FFF) return true; // 偏旁部首 + 基本汉字
+    if (r >= 0xF900 && r <= 0xFAFF) return true; // CJK 兼容汉字
+    if (r >= 0xFF00 && r <= 0xFFEF) return true; // 全角/半角
+    if (r >= 0x20000 && r <= 0x2FA1F) return true; // 扩展 B-F
+    return false;
   }
 
   /// 安全的 JSON 编码（失败时返回空字符串）

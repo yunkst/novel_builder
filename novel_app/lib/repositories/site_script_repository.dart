@@ -11,6 +11,19 @@ import 'base_repository.dart';
 class SiteScriptRepository extends BaseRepository {
   SiteScriptRepository({required super.dbConnection});
 
+  /// 进程内 ID 单调计数器：与微秒时间戳拼接保证任意两次 INSERT 的 id 必不同
+  ///
+  /// 原实现 `${ms}_${microseconds % 100000}` 在同毫秒内两次 INSERT 会撞
+  /// UNIQUE(site_scripts.id)（CI 高并发测试稳定复现）；追加进程内自增
+  /// 序列后即使时钟静止也唯一。历史 id 格式为字符串，无格式约束。
+  static int _idSeq = 0;
+
+  /// 生成新的 site_scripts 主键
+  static String _newScriptId() {
+    final us = DateTime.now().microsecondsSinceEpoch;
+    return '${us}_${_idSeq++}';
+  }
+
   /// 查询所有脚本（按最后使用时间倒序）
   Future<List<SiteScript>> getAll({int limit = 50}) async {
     try {
@@ -244,7 +257,7 @@ class SiteScriptRepository extends BaseRepository {
       }
 
       // INSERT：首次保存
-      final id = '${now}_${DateTime.now().microsecondsSinceEpoch % 100000}';
+      final id = _newScriptId();
       await db.insert('site_scripts', {
         'id': id,
         'domain': domain,
@@ -309,7 +322,7 @@ class SiteScriptRepository extends BaseRepository {
       if (existing.isEmpty) {
         // 首次保存：INSERT 一条新记录，本次列写脚本 + ocr，另一列填空串占位。
         // 另一半由后续 save_script 调同样的方法补齐，无需前置工具。
-        final insertId = now.toString();
+        final insertId = _newScriptId();
         await db.insert('site_scripts', {
           'id': insertId,
           'domain': domain,

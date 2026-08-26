@@ -25,6 +25,7 @@ import 'package:novel_app/services/dsl_engine/retry_signals.dart';
 import 'package:novel_app/services/novel_agent/agent_event.dart';
 import 'package:novel_app/services/novel_agent/agent_loop.dart';
 import 'package:novel_app/services/novel_agent/agent_scenario.dart';
+import 'package:novel_app/services/novel_agent/context_compactor.dart';
 import 'package:novel_app/utils/cancellation_token.dart';
 import 'package:novel_app/utils/retry_helper.dart';
 import '../../../helpers/fake_agent_scenario.dart';
@@ -49,11 +50,24 @@ class _ScriptedErrorLlm extends LlmProvider {
   final List<_ScriptedItem> _script = [];
   int callCount = 0;
 
-  /// 入队一条脚本：throwMode 非 null 表示该轮直接抛错；否则按 response yield
-  void enqueue({Object? throwMode, _ScriptedResponse? response}) {
+  /// 每次调用的 messages 快照（供断言 LLM 上下文内容）
+  final List<List<ChatMessage>> calls = [];
+
+  /// 入队一条脚本：throwMode 非 null 表示该轮直接抛错；否则按 response yield。
+  /// [partialChunks] 配合 throwMode：抛错前先 yield 这些 partial 文本，
+  /// 模拟"流式中途断开"（LLM 已输出部分内容后连接失败）。
+  void enqueue({
+    Object? throwMode,
+    _ScriptedResponse? response,
+    List<String> partialChunks = const [],
+  }) {
     assert(
         throwMode != null || response != null, 'throwMode 与 response 至少一个非空');
-    _script.add(_ScriptedItem(throwMode: throwMode, response: response));
+    _script.add(_ScriptedItem(
+      throwMode: throwMode,
+      response: response,
+      partialChunks: partialChunks,
+    ));
   }
 
   @override
@@ -66,13 +80,17 @@ class _ScriptedErrorLlm extends LlmProvider {
     String? toolChoice,
   }) async* {
     callCount++;
+    calls.add(List.of(messages));
     if (_script.isEmpty) {
       throw StateError('_ScriptedErrorLlm 脚本已耗尽');
     }
     final item = _script.removeAt(0);
     if (item.throwMode != null) {
-      // 短暂延迟模拟网络抖动后抛错
+      // 短暂延迟模拟网络抖动后抛错（此前先流出 partial chunks）
       await Future<void>.delayed(const Duration(milliseconds: 1));
+      for (final chunk in item.partialChunks) {
+        yield LlmStreamChunk(contentChunk: chunk);
+      }
       await Future<void>.error(item.throwMode!);
       return;
     }
@@ -83,10 +101,10 @@ class _ScriptedErrorLlm extends LlmProvider {
     if (resp.toolCallDeltas != null) {
       yield LlmStreamChunk(
         toolCallDeltas: resp.toolCallDeltas!,
-        finishReason: 'tool_calls',
+        finishReason: resp.finishReason ?? 'tool_calls',
       );
     } else {
-      yield const LlmStreamChunk(finishReason: 'stop');
+      yield LlmStreamChunk(finishReason: resp.finishReason ?? 'stop');
     }
   }
 }
@@ -94,15 +112,26 @@ class _ScriptedErrorLlm extends LlmProvider {
 class _ScriptedItem {
   final Object? throwMode;
   final _ScriptedResponse? response;
-  const _ScriptedItem({this.throwMode, this.response});
+
+  /// throwMode 非 null 时，抛错前先 yield 的 partial 文本
+  final List<String> partialChunks;
+  const _ScriptedItem({
+    this.throwMode,
+    this.response,
+    this.partialChunks = const [],
+  });
 }
 
 class _ScriptedResponse {
   final List<String> contentChunks;
   final List<Map<String, dynamic>>? toolCallDeltas;
+
+  /// finish_reason 覆盖（默认 stop）。'length' 用于触发强制压缩路径。
+  final String? finishReason;
   const _ScriptedResponse({
     this.contentChunks = const [],
     this.toolCallDeltas,
+    this.finishReason,
   });
 }
 
@@ -521,6 +550,142 @@ void main() {
       );
       // 验证重试成功（notifier 已被 AgentDoneEvent clear）
       expect(RetrySignals.instance.notifier.value, isNull);
+    });
+  });
+
+  group('修复回归（contentChunks 累积 / RetryEvent / nudge / length 压缩）', () {
+    test('流式中途断开 → RetryEvent.emittedChars = 本轮已流出字符数', () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(
+          throwMode: const SocketException('中途断开'),
+          partialChunks: const ['你好', '世界'],
+        )
+        ..enqueue(response: const _ScriptedResponse(contentChunks: ['完整输出']));
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      final events = await runLoop(loop);
+
+      final retry = events.whereType<RetryEvent>().single;
+      expect(retry.emittedChars, '你好世界'.length,
+          reason: 'partial 已流出 4 字符，session 据此截断 streamingSegments');
+      expect(retry.attempt, 1);
+      expect(retry.maxAttempts, 2);
+      expect(retry.delayMs, greaterThan(0));
+      expect(retry.errorText, contains('中途断开'));
+      expect(events.last, isA<AgentDoneEvent>());
+      expect(llm.callCount, 2);
+    });
+
+    test('assistant 文本随消息入栈（回归 v1.7.3 contentChunks 未累积 bug）', () async {
+      // 修复前 listener 不累积 contentChunks → fullContent 恒空 →
+      // assistant.content 恒 null → 多轮 ReAct 中 LLM 看不到自己说过的话
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(
+          response: const _ScriptedResponse(
+            contentChunks: ['我来', '查一下'],
+            toolCallDeltas: [
+              {
+                'index': 0,
+                'id': 'c1',
+                'function': {'name': 'foo', 'arguments': '{}'},
+              },
+            ],
+          ),
+        )
+        ..enqueue(response: const _ScriptedResponse(contentChunks: ['完成']));
+      final loop = AgentLoop(llm: llm, scenario: _FakeScenario());
+      await runLoop(loop);
+
+      expect(llm.callCount, 2);
+      // 第 2 次调用的上下文应含第 1 轮 assistant 完整文本
+      final assistantMsgs = llm.calls[1]
+          .where((m) =>
+              m.role == 'assistant' && (m.toolCalls?.isNotEmpty ?? false))
+          .toList();
+      expect(assistantMsgs, hasLength(1));
+      expect(assistantMsgs.single.content, '我来查一下');
+    });
+
+    test('异常空响应 → 注入一次 nudge；持续空响应不再注入 → Done', () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(response: const _ScriptedResponse()) // 空响应 1 → nudge
+        ..enqueue(response: const _ScriptedResponse()); // 空响应 2 → 不再 nudge
+      final loop = AgentLoop(llm: llm, scenario: _FakeScenario());
+      final events = await runLoop(loop);
+
+      expect(llm.callCount, 2, reason: '第 1 次空 → nudge 续跑；第 2 次空 → Done');
+      expect(events.last, isA<AgentDoneEvent>());
+      // nudge user 消息恰好 1 条
+      final nudges = llm.calls[1]
+          .where((m) => m.role == 'user' && (m.content ?? '').contains('空内容'))
+          .toList();
+      expect(nudges, hasLength(1));
+    });
+
+    test('finish_reason=length + tool_calls → 下一轮强制压缩检查；'
+        '无可丢内容时跳过（不 emit CompactionEvent，messages 原样）', () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(
+          response: const _ScriptedResponse(
+            contentChunks: ['截断文本'],
+            finishReason: 'length',
+            toolCallDeltas: [
+              {
+                'index': 0,
+                'id': 'c1',
+                'function': {'name': 'foo', 'arguments': '{}'},
+              },
+            ],
+          ),
+        )
+        ..enqueue(response: const _ScriptedResponse(contentChunks: ['完成']));
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(networkRetryPerRound: 2),
+      );
+      final events = await runLoop(loop);
+
+      expect(llm.callCount, 2);
+      expect(events.last, isA<AgentDoneEvent>());
+      // 消息太少 → compact 无可丢（dropped=0 且无改写）→ 跳过：不 emit 空压缩提示
+      expect(events.whereType<CompactionEvent>(), isEmpty);
+      // 未压缩 → 第 2 次调用的 messages 仍含原始 user 'hi'
+      expect(llm.calls[1].any((m) => m.role == 'user' && m.content == 'hi'),
+          isTrue);
+    });
+
+    test('字符阈值触发压缩 → emit CompactionEvent，messages 被重组', () async {
+      final llm = _ScriptedErrorLlm()
+        ..enqueue(
+          response: const _ScriptedResponse(
+            toolCallDeltas: [
+              {
+                'index': 0,
+                'id': 'c1',
+                'function': {'name': 'foo', 'arguments': '{}'},
+              },
+            ],
+          ),
+        )
+        ..enqueue(response: const _ScriptedResponse(contentChunks: ['完成']));
+      final loop = AgentLoop(
+        llm: llm,
+        scenario: _FakeScenario(),
+        config: const AgentLoopConfig(
+          // 极小字符阈值：第 2 轮 0b 必触发压缩
+          compaction: CompactorConfig(maxContextChars: 1, preserveTailChars: 1),
+        ),
+      );
+      final events = await runLoop(loop);
+
+      expect(llm.callCount, 2);
+      expect(events.whereType<CompactionEvent>(), isNotEmpty,
+          reason: '超过 maxContextChars=1 应触发压缩');
+      expect(events.last, isA<AgentDoneEvent>());
     });
   });
 }
