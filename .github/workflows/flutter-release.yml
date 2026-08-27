@@ -36,7 +36,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2.18.0
         with:
-          flutter-version: '3.x'
+          # 锁定与本地预检一致的版本。不能用 '3.x'：会跟随最新 stable
+          # （曾漂移到 3.47.1/Dart 3.13），其自带的 analyzer 3.9 无法解析
+          # Dart 3.10+ DotShorthandPropertyAccess AST，riverpod_generator
+          # 在 CI 上直接崩溃（Missing implementation of visitDotShorthand...），
+          # 表现为 Generate code 步骤静默挂死至 job 超时。
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
 
@@ -189,7 +194,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2.18.0
         with:
-          flutter-version: '3.x'
+          # 锁定与本地预检一致的版本。不能用 '3.x'：会跟随最新 stable
+          # （曾漂移到 3.47.1/Dart 3.13），其自带的 analyzer 3.9 无法解析
+          # Dart 3.10+ DotShorthandPropertyAccess AST，riverpod_generator
+          # 在 CI 上直接崩溃（Missing implementation of visitDotShorthand...），
+          # 表现为 Generate code 步骤静默挂死至 job 超时。
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
 
