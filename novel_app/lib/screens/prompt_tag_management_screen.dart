@@ -276,6 +276,12 @@ class PromptTagManagementScreen extends ConsumerWidget {
         categoryId: tag.categoryId,
         categoryName: category.name,
         categories: state.categories,
+        onDeleteRequested: () {
+          // 编辑对话框点「删除」→ 直接 pop 出去，外层再走标准删除流程
+          // （二次确认 + notifier.deleteTag + Toast）以保证 UX 一致。
+          Navigator.of(context).pop();
+          _deleteTag(context, notifier, tag);
+        },
       ),
     );
     if (result == null) return;

@@ -18,6 +18,10 @@ class TagEditDialog extends StatefulWidget {
   final List<PromptTagCategory> categories;
   final String? presetName;
 
+  /// 仅编辑模式（[tag] != null）下生效：点击 actions 区「删除」按钮时回调。
+  /// 由外层 Screen 负责二次确认 + 实际删除。
+  final VoidCallback? onDeleteRequested;
+
   const TagEditDialog({
     super.key,
     this.tag,
@@ -25,6 +29,7 @@ class TagEditDialog extends StatefulWidget {
     required this.categoryName,
     required this.categories,
     this.presetName,
+    this.onDeleteRequested,
   });
 
   @override
@@ -132,6 +137,15 @@ class _TagEditDialogState extends State<TagEditDialog> {
         ),
       ),
       actions: [
+        // 编辑模式下显示「删除」按钮（左侧，红色）→ 触发外层回调
+        if (isEditing && widget.onDeleteRequested != null)
+          TextButton(
+            onPressed: widget.onDeleteRequested,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('删除'),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
