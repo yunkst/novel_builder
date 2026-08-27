@@ -47,8 +47,9 @@ description: Use this skill when building and releasing the Novel Flutter app. T
 
 **预览版版本号推导**(默认路径):
 - 查看上一个 tag(`git describe --tags --abbrev=0`)
-- 若上个是稳定版 `vX.Y.Z` → 本次预览版 `vX.Y.Z-preview.1`
-- 若上个是预览版 `vX.Y.Z-preview.N` → 本次 `vX.Y.Z-preview.{N+1}`(同版本继续迭代)
+- 若上个是稳定版 `vX.Y.Z` → 本次预览版基线递增小版本号 `vX.{Y+1}.0-preview.1`（如 `v2.0.1` → `v2.0.2-preview.1`）
+- 若上个是预览版 `vX.Y.Z-preview.N` → 本次 `vX.Y.Z-preview.{N+1}`（同基线继续迭代）
+- 若上个 tag 是 `vX.Y.0-preview.N`（首个小版本为 0 的预览版）→ 继续该基线迭代，不递增
 - version_code 始终递增
 
 **稳定版版本号推导**(仅用户明确要求):
@@ -252,8 +253,8 @@ fi
 - 上个预览版 `vX.Y.Z-preview.N` → 本次 `vX.Y.Z-preview.{N+1}`
 
 ```yaml
-# pubspec.yaml 示例(从 2.0.0+107 发首个预览版)
-version: 2.0.0-preview.1+108
+# pubspec.yaml 示例(从 2.0.1 稳定版发首个预览版 → 基线递增为 2.0.2)
+version: 2.0.2-preview.1+110
 ```
 
 ```bash
@@ -270,7 +271,7 @@ CHANGELOG="..." python .claude/skills/novel-app-release/scripts/build_and_upload
 
 ```yaml
 # pubspec.yaml
-version: 2.0.0-preview.1+108  →  version: 2.0.0+109  # version_code 递增
+version: 2.0.2-preview.1+110  →  version: 2.0.2+111  # version_code 递增，去掉 -preview.N
 ```
 
 ```bash
@@ -345,6 +346,7 @@ git reset --soft HEAD~1              # 回退 commit
 
 ## 变更记录
 
+- **2026-07-19**: 修正预览版基线推导规则：从稳定版发预览版时基线递增小版本号（`v2.0.1` → `v2.0.2-preview.1`），而非沿用稳定版小版本号。稳定版发完后再迭代新功能应走更高的 minor 版本。
 - **2026-06-22**: changelog 生成改为 **AI 驱动**:SKILL.md 新增「第二步:生成更新日志」专章,指导 Claude 分析 git diff/log 撰写语义化 changelog 并通过 `CHANGELOG` 环境变量注入脚本;脚本规则生成降级为兜底机制(CI / 纯手动运行时);明确职责分工
 - **2026-06-22**: changelog 数据源扩展为双源(commit history + 工作区 diff);工作区 diff 按 novel_app/lib 子目录归类成模块摘要,无需预先 commit 也能产出 changelog
 - **2026-06-22**: 重写 changelog 自动生成:从 git diff 文件路径分析改为 Conventional Commits 分类,输出 Markdown 分组格式,自动跳过 chore/release/style/build commit;commit message 不再附加 changelog(仅 tag message 保留)

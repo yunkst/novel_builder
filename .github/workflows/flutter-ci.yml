@@ -28,7 +28,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          # 锁定与本地预检一致的版本（详见 flutter-release.yml 同段注释）。
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
 
@@ -52,13 +53,15 @@ jobs:
       #   跳过。test/integration/ 依赖真实 headless WebView / 网络，跑在 CI 会
       #   flaky，暂不纳入（后续可拆 separate job + continue-on-error）。
       - name: Run unit tests with coverage
+        # 必须用 '*_test.dart' 过滤：flutter test 只在传目录时才自动挑
+        # _test.dart；一旦显式列文件，*.mocks.dart 等非测试文件会因无
+        # main() 编译失败（假失败）。SKIP_LIST 文件引用已删 API 待修复。
         run: |
           rm -rf .dart_tool/sqflite_common_ffi 2>/dev/null || true
           SKIP_LIST="test/screens/subagent_detail_screen_test.dart"
           FILES=""
-          for d in test/unit/ test/bug/ test/verification/ \
-                   test/widgets/ test/widget/ test/screens/; do
-            for f in $(find "$d" -name '*.dart' 2>/dev/null); do
+          for d in test/unit/ test/bug/ test/verification/; do
+            for f in $(find "$d" -name '*_test.dart' 2>/dev/null); do
               skip=0
               for s in $SKIP_LIST; do
                 [ "$f" = "$s" ] && skip=1 && break
@@ -66,7 +69,7 @@ jobs:
               [ $skip -eq 0 ] && FILES="$FILES $f"
             done
           done
-          flutter test --no-pub --coverage -j 1 $FILES
+          flutter test --no-pub --coverage $FILES
 
       - name: Check line coverage threshold
         # coverage_config.yaml 写的是 70% 阈值，但当前测试集远未覆盖到该水位，

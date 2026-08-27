@@ -1058,6 +1058,16 @@ class ScenarioSession {
         _state = _state.copyWith(
           supplementaryCount: _state.supplementaryCount + 1,
         );
+
+      case RetryEvent e:
+        // 回合级网络重试：本轮流式已 emit 的 partial 文本作废（重试后 LLM
+        // 会重新输出完整版）。从 _pendingSegments 末尾 TextSegment 砍掉
+        // e.emittedChars 个字符，避免两段文本拼接进同一 assistant 消息。
+        _truncatePendingText(e.emittedChars);
+        _state = _state.copyWith(
+          streamingSegments:
+              List<AgentChatSegment>.unmodifiable(_pendingSegments),
+        );
     }
     _notifyStateChanged();
   }
@@ -1144,6 +1154,25 @@ class ScenarioSession {
 
     if (newMessages.isNotEmpty) {
       unawaited(_persistAgentMessages(newMessages, partial: partial));
+    }
+  }
+
+  /// 从 _pendingSegments 末尾 TextSegment 砍掉 [chars] 个字符。
+  ///
+  /// RetryEvent 消费用：回合重试时丢弃本轮已作废的 partial 流式文本。
+  /// 与 TextDeltaEvent 的追加规则对称——本轮 partial 一定累积在末尾
+  /// TextSegment（可能与之前轮次的完整文本同段，如场景注入钩子后的下一轮
+  /// 失败），故按字符数精确截断而非整段删除。剩余为空则移除该段。
+  void _truncatePendingText(int chars) {
+    if (chars <= 0 || _pendingSegments.isEmpty) return;
+    final last = _pendingSegments.last;
+    if (last is! TextSegment) return; // 本轮无 TextDelta（chars 应为 0），防御
+    final remaining = last.content.length - chars;
+    if (remaining > 0) {
+      _pendingSegments[_pendingSegments.length - 1] =
+          TextSegment(last.content.substring(0, remaining));
+    } else {
+      _pendingSegments.removeLast();
     }
   }
 

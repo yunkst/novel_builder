@@ -287,6 +287,80 @@ void main() {
           'https://api.deepseek.com/v1/chat/completions');
     });
   });
+
+  group('chatStreamWithTools usage 帧', () {
+    test('SSE 末帧 choices=[] + usage → yield hasUsage=true 且无 content', () async {
+      // DeepSeek 等网关在末帧附带 usage（choices 常为空），下游 AgentLoop 据此
+      // 被动消费 _lastPromptTokens 做压缩判定。
+      const sse = 'data: {"choices":[],"usage":{"prompt_tokens":42,'
+          '"completion_tokens":10}}\n'
+          'data: [DONE]\n';
+
+      final provider = LlmProvider(
+        LlmConfig(
+          baseUrl: 'https://api.deepseek.com/v1',
+          apiKey: 'sk-test',
+          defaultModel: 'deepseek-chat',
+        ),
+        httpClient: _SseHttpClient(sse),
+      );
+
+      final chunks = await provider
+          .chatStreamWithTools(messages: const [
+            ChatMessage(role: 'user', content: 'hi'),
+          ])
+          .toList();
+
+      expect(chunks, hasLength(1));
+      expect(chunks.single.hasUsage, isTrue);
+      expect(chunks.single.usage!.promptTokens, 42);
+      expect(chunks.single.usage!.completionTokens, 10);
+      expect(chunks.single.isContent, isFalse);
+      expect(chunks.single.isFinished, isFalse);
+    });
+
+    test('SSE 末帧 choices=[finish_reason=stop] + usage → 同时附带', () async {
+      // OpenAI 兼容末帧：delta=null（不再更新内容）+ finishReason + usage
+      const sse = 'data: {"choices":[{"delta":null,"finish_reason":"stop"}],'
+          '"usage":{"prompt_tokens":7}}\n'
+          'data: [DONE]\n';
+
+      final provider = LlmProvider(
+        LlmConfig(
+          baseUrl: 'https://api.deepseek.com/v1',
+          apiKey: 'sk-test',
+          defaultModel: 'deepseek-chat',
+        ),
+        httpClient: _SseHttpClient(sse),
+      );
+
+      final chunks = await provider
+          .chatStreamWithTools(messages: const [
+            ChatMessage(role: 'user', content: 'hi'),
+          ])
+          .toList();
+
+      expect(chunks.single.isFinished, isTrue);
+      expect(chunks.single.finishReason, 'stop');
+      expect(chunks.single.hasUsage, isTrue);
+      expect(chunks.single.usage!.promptTokens, 7);
+    });
+  });
+}
+
+/// 按 SSE 行内容响应的最小 HTTP 客户端（供 usage 测试用）
+class _SseHttpClient implements LlmHttpClient {
+  final String body;
+  _SseHttpClient(this.body);
+  @override
+  Future<String> postJson(
+          String url, Map<String, String> headers, String reqBody) =>
+      throw UnimplementedError();
+  @override
+  Stream<String> postJsonStream(
+          String url, Map<String, String> headers, String reqBody) async* {
+    yield body;
+  }
 }
 
 /// 占位 HTTP 客户端：本测试只覆盖请求体构建/URL 拼接，不发真实请求

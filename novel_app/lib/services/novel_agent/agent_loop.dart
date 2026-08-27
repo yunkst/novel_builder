@@ -90,6 +90,23 @@ class AgentLoop {
   final ContextCompactor _compactor;
   late final ToolResultFormatter _toolResultFormatter;
 
+  /// 最近一次 LLM 响应携带的 usage.prompt_tokens（网关支持时才有值）。
+  ///
+  /// 作为下一轮压缩判定的真实 token 依据（被动消费：不主动发
+  /// `stream_options`，兼容不支持的网关；DeepSeek 等默认在末帧带 usage）。
+  int? _lastPromptTokens;
+
+  /// finish_reason=length 后置位：下一轮 LLM 调用前强制压缩（绕过阈值）。
+  ///
+  /// length 说明输出被截断，上下文压力是常见诱因之一；主动压缩一轮缓解。
+  /// 压缩后（或确认无可压缩内容）清位，避免每轮重复强制压缩。
+  bool _forceCompaction = false;
+
+  /// 本次 run 内是否已对"异常空响应"注入过 nudge。
+  ///
+  /// 整个 run 只 nudge 一次，防止 LLM 持续返回空内容导致死循环。
+  bool _emptyResponseNudged = false;
+
   AgentLoop({
     required LlmProvider llm,
     required AgentScenario scenario,
@@ -146,6 +163,13 @@ class AgentLoop {
         return;
       }
 
+      // 本轮流式累积结果：提升到 try 外声明，catch 块需要读取
+      // fullContent.length（本轮已 emit 的 partial 字符数）以构造
+      // RetryEvent.emittedChars，供 session/projector 精确截断。
+      final streamingResult = StreamingResult();
+      String? streamFinishReason;
+      int contentChunkCount = 0;
+
       try {
         LoggerService.instance.d('Agent 循环第 $round 轮 (${_scenario.id})',
             category: LogCategory.ai, tags: ['agent', 'loop', _scenario.id]);
@@ -167,11 +191,20 @@ class AgentLoop {
         }
 
         // 0b. 上下文压缩检查（每轮 LLM 调用前）
-        //     防止 messages 无限增长导致超出 LLM 上下文窗口
-        if (_compactor.needsCompaction(messages)) {
+        //     防止 messages 无限增长导致超出 LLM 上下文窗口。
+        //     三种触发：字符阈值 / 启发式 token 阈值（无 usage 时的 fallback）/
+        //     真实 promptTokens 超限（上一轮 LLM usage，最准）/ length 强制。
+        final forced = _forceCompaction;
+        if (forced || _compactor.needsCompaction(messages,
+            realPromptTokens: _lastPromptTokens)) {
+          final triggerDesc = forced
+              ? 'finish_reason=length 强制'
+              : (_lastPromptTokens != null
+                  ? '真实 promptTokens=$_lastPromptTokens'
+                  : '超过阈值 (${_config.compaction.maxContextChars} 字符 / '
+                      '${_config.compaction.maxContextTokens} tokens)');
           LoggerService.instance.w(
-            '触发上下文压缩: 消息总量 ${messages.length} '
-            '条，超过阈值 (${_config.compaction.maxContextChars} 字符)',
+            '触发上下文压缩: 消息总量 ${messages.length} 条，$triggerDesc',
             category: LogCategory.ai,
             tags: ['agent', 'compaction', 'triggered', _scenario.id],
           );
@@ -179,19 +212,32 @@ class AgentLoop {
             messages: messages,
             systemPrompt: systemPrompt,
           );
-          messages
-            ..clear()
-            ..addAll(result.messages);
-          emit(CompactionEvent(
-            removedChars: result.removedChars,
-            originalChars: result.originalChars,
-            compactedChars: result.compactedChars,
-            keptMessageCount: result.keptMessageCount,
-            droppedMessageCount: result.droppedMessageCount,
-            droppedAgentFromIndex: result.droppedAgentFromIndex,
-            compactionNote: result.messages[1].content ?? '',
-            rewrittenContent: result.rewrittenContent,
-          ));
+          // 无可压缩内容（如首轮即 length：无老消息可丢）→ 不 apply 不 emit，
+          // 避免插入"丢弃 0 条"的空压缩提示污染上下文与 DB marker。
+          if (result.droppedMessageCount == 0 &&
+              result.rewrittenContent.isEmpty) {
+            LoggerService.instance.w(
+              '压缩无内容可丢弃，跳过 (messages=${messages.length}, '
+              'chars=${result.originalChars}, scenario=${_scenario.id})',
+              category: LogCategory.ai,
+              tags: ['agent', 'compaction', 'skipped', _scenario.id],
+            );
+          } else {
+            messages
+              ..clear()
+              ..addAll(result.messages);
+            emit(CompactionEvent(
+              removedChars: result.removedChars,
+              originalChars: result.originalChars,
+              compactedChars: result.compactedChars,
+              keptMessageCount: result.keptMessageCount,
+              droppedMessageCount: result.droppedMessageCount,
+              droppedAgentFromIndex: result.droppedAgentFromIndex,
+              compactionNote: result.messages[1].content ?? '',
+              rewrittenContent: result.rewrittenContent,
+            ));
+          }
+          _forceCompaction = false;
         }
 
         // 1. 调用 LLM（流式 + 工具定义），逐 chunk 实时 emit
@@ -200,10 +246,6 @@ class AgentLoop {
             '调用 LLM (round $round, $toolsCount 个工具, 流式, scenario=${_scenario.id})',
             category: LogCategory.ai,
             tags: ['agent', 'llm', 'request']);
-
-        final streamingResult = StreamingResult();
-        String? streamFinishReason;
-        int contentChunkCount = 0;
 
         // ★ 流式超时：超过 [llmStreamTimeout] 无事件到达 → TimeoutException
         // → 由 catch 块判定为瞬态网络错误，触发 round 重试
@@ -247,6 +289,10 @@ class AgentLoop {
             // 实时 emit 文本增量 → UI 流式展示
             if (chunk.isContent) {
               contentChunkCount++;
+              // 累积 content chunk：fullContent 供 assistant 消息入栈与
+              // RetryEvent.emittedChars 使用。缺失会导致 LLM 上下文丢失
+              // 本轮文本（v1.7.3 起遗留 bug，连带 isAbnormalEmpty 误判）。
+              streamingResult.contentChunks.add(chunk.contentChunk!);
               emit(TextDeltaEvent(chunk.contentChunk!));
             }
             // 累积 tool_calls delta
@@ -256,6 +302,12 @@ class AgentLoop {
             // 记录 finish_reason
             if (chunk.isFinished) {
               streamFinishReason = chunk.finishReason;
+            }
+            // 被动消费 usage：网关在末帧附带 prompt/completion tokens，
+            // 用于下一轮压缩判定的真实 token 依据。无值时静默忽略。
+            final usage = chunk.usage;
+            if (usage != null && usage.promptTokens != null) {
+              _lastPromptTokens = usage.promptTokens;
             }
           },
           onError: (e, s) {
@@ -314,6 +366,11 @@ class AgentLoop {
               _scenario.id,
             ],
           );
+          // length 强制下一轮压缩：上限触发说明上下文压力是常见诱因之一，
+          // 主动压缩一轮缓解（无论是否达阈值）。content_filter 不触发（与上下文无关）。
+          if (streamFinishReason == 'length') {
+            _forceCompaction = true;
+          }
         }
 
         // contentLength=0 但 finishReason 不是 tool_calls 时，说明 LLM 异常返回空内容，需要告警
@@ -349,6 +406,27 @@ class AgentLoop {
               role: 'assistant',
               content: fullContent,
             ));
+          }
+
+          // 异常空响应（无内容 + 无工具 + finishReason 非 tool_calls）：
+          // 注入一次 nudge 让 LLM 重试本轮，而非静默结束让用户困惑。
+          // 整个 run 只 nudge 一次（防 LLM 持续返回空内容的死循环）；
+          // 置于场景钩子之前——空响应时钩子的"漏步骤"提示文不对题。
+          if (isAbnormalEmpty && !_emptyResponseNudged) {
+            _emptyResponseNudged = true;
+            messages.add(ChatMessage(
+              role: 'user',
+              content: '你上一轮返回了空内容。请继续完成当前任务，'
+                  '直接输出内容或调用工具。',
+            ));
+            LoggerService.instance.w(
+              'LLM 空响应，注入 nudge 重试 (round $round, scenario=${_scenario.id})',
+              category: LogCategory.ai,
+              tags: ['agent', 'loop', 'empty_response_nudge', _scenario.id],
+            );
+            roundRetryCount = 0;
+            round++;
+            continue;
           }
 
           // 场景注入钩子：允许场景在"即将结束"时追加一条 user 提示
@@ -454,6 +532,16 @@ class AgentLoop {
             stackTrace: stack.toString(),
             tags: ['agent', 'loop', 'round_retry', _scenario.id],
           );
+          // 走事件流 emit RetryEvent：session/projector 据 emittedChars 丢弃
+          // 本轮已流出的 partial 文本（不丢的话，重试后的完整输出会与残缺
+          // 前缀拼接进 streamingSegments 并落库）。
+          emit(RetryEvent(
+            attempt: roundRetryCount,
+            maxAttempts: _config.networkRetryPerRound,
+            delayMs: delayMs,
+            errorText: e.toString(),
+            emittedChars: streamingResult.fullContent.length,
+          ));
           // 直接调 RetrySignals 走 UI 横幅(绕开 shouldMainSessionHandleEvent
           // 过滤,子 Agent 重试也能显示 — spec §3.1.1 方案 B)。
           try {

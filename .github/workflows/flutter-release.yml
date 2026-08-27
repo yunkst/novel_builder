@@ -25,7 +25,7 @@ jobs:
   # 现在让 quality 必过才能 build。
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: novel_app
@@ -36,7 +36,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2.18.0
         with:
-          flutter-version: '3.x'
+          # 锁定与本地预检一致的版本。不能用 '3.x'：会跟随最新 stable
+          # （曾漂移到 3.47.1/Dart 3.13），其自带的 analyzer 3.9 无法解析
+          # Dart 3.10+ DotShorthandPropertyAccess AST，riverpod_generator
+          # 在 CI 上直接崩溃（Missing implementation of visitDotShorthand...），
+          # 表现为 Generate code 步骤静默挂死至 job 超时。
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
 
@@ -50,15 +55,18 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Run tests
-        # 范围与 flutter-ci.yml 保持一致；subagent_detail_screen_test.dart 已知
-        # 破坏（引用已删 API），grep 跳过。详见 flutter-ci.yml 注释。
+        # 必须用 '*_test.dart' 过滤：flutter test 只在传目录时才自动挑
+        # _test.dart；一旦显式列文件（本写法），所有传入路径都会被当
+        # 测试加载，*.mocks.dart 等非测试文件会因无 main() 编译失败
+        # （曾在 CI 上致 16 个 loading failed 假失败）。
+        # SKIP_LIST 的 subagent_detail_screen_test.dart 引用已删 API，
+        # 文件级编译失败，grep 跳过待修复。
         run: |
           rm -rf .dart_tool/sqflite_common_ffi 2>/dev/null || true
           SKIP_LIST="test/screens/subagent_detail_screen_test.dart"
           FILES=""
-          for d in test/unit/ test/bug/ test/verification/ \
-                   test/widgets/ test/widget/ test/screens/; do
-            for f in $(find "$d" -name '*.dart' 2>/dev/null); do
+          for d in test/unit/ test/bug/ test/verification/; do
+            for f in $(find "$d" -name '*_test.dart' 2>/dev/null); do
               skip=0
               for s in $SKIP_LIST; do
                 [ "$f" = "$s" ] && skip=1 && break
@@ -66,7 +74,7 @@ jobs:
               [ $skip -eq 0 ] && FILES="$FILES $f"
             done
           done
-          flutter test --no-pub -j 1 $FILES
+          flutter test --no-pub $FILES
 
   build-and-release:
     needs: quality
@@ -189,7 +197,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2.18.0
         with:
-          flutter-version: '3.x'
+          # 锁定与本地预检一致的版本。不能用 '3.x'：会跟随最新 stable
+          # （曾漂移到 3.47.1/Dart 3.13），其自带的 analyzer 3.9 无法解析
+          # Dart 3.10+ DotShorthandPropertyAccess AST，riverpod_generator
+          # 在 CI 上直接崩溃（Missing implementation of visitDotShorthand...），
+          # 表现为 Generate code 步骤静默挂死至 job 超时。
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
 

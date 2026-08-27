@@ -22,6 +22,22 @@ abstract class LlmHttpClient {
       String url, Map<String, String> headers, String body);
 }
 
+/// LLM 响应 usage 统计（OpenAI 兼容 `usage` 字段的被动解析结果）
+///
+/// 部分 OpenAI 兼容网关（DeepSeek 等）在流式末帧默认附带 usage；
+/// OpenAI 官方需 `stream_options.include_usage`（本项目不主动发送，
+/// 避免个别兼容网关 400）。字段缺失时为 null，消费方走启发式 fallback。
+class LlmUsage {
+  final int? promptTokens;
+  final int? completionTokens;
+
+  const LlmUsage({this.promptTokens, this.completionTokens});
+
+  @override
+  String toString() =>
+      'LlmUsage(prompt=$promptTokens, completion=$completionTokens)';
+}
+
 /// 流式 chat completion 的单帧事件
 ///
 /// - [contentChunk] 文本增量（可能为空，例如当帧只更新 tool_calls）
@@ -32,24 +48,30 @@ abstract class LlmHttpClient {
 ///   - 'tool_calls' 表示 LLM 决定调用工具
 ///   - 'length' 表示达到 max_tokens 上限
 ///   - 'content_filter' / 其他
+/// - [usage] 部分网关在末帧附带（choices 常为空数组）；供 AgentLoop 做
+///   真实 token 压缩判定，不参与常规 chunk 过滤。
 class LlmStreamChunk {
   final String? contentChunk;
   final List<Map<String, dynamic>> toolCallDeltas;
   final String? finishReason;
+  final LlmUsage? usage;
 
   const LlmStreamChunk({
     this.contentChunk,
     this.toolCallDeltas = const [],
     this.finishReason,
+    this.usage,
   });
 
   bool get isContent => contentChunk != null && contentChunk!.isNotEmpty;
   bool get isToolCallDelta => toolCallDeltas.isNotEmpty;
   bool get isFinished => finishReason != null;
+  bool get hasUsage => usage != null;
 
   @override
   String toString() =>
-      'LlmStreamChunk(content=$contentChunk, deltas=${toolCallDeltas.length}, finish=$finishReason)';
+      'LlmStreamChunk(content=$contentChunk, deltas=${toolCallDeltas.length}, '
+      'finish=$finishReason, usage=$usage)';
 }
 
 class LlmProvider {
@@ -338,8 +360,12 @@ class LlmProvider {
         .map((payload) {
       try {
         final json = jsonDecode(payload) as Map<String, dynamic>;
+        // 被动解析 usage：部分网关在末帧附带（OpenAI 兼容）。
+        // choices 经常是空数组（usage-only 帧），不能直接 skip。
+        final usage = _parseUsage(json['usage']);
         final choices = json['choices'] as List?;
         if (choices == null || choices.isEmpty) {
+          if (usage != null) return LlmStreamChunk(usage: usage);
           return const LlmStreamChunk();
         }
         final first = choices.first as Map<String, dynamic>;
@@ -347,8 +373,9 @@ class LlmProvider {
         if (delta == null) {
           final finishReason = first['finish_reason'] as String?;
           if (finishReason != null) {
-            return LlmStreamChunk(finishReason: finishReason);
+            return LlmStreamChunk(finishReason: finishReason, usage: usage);
           }
+          if (usage != null) return LlmStreamChunk(usage: usage);
           return const LlmStreamChunk();
         }
         final content = (delta['content'] as String?) ?? '';
@@ -366,6 +393,7 @@ class LlmProvider {
           contentChunk: content.isNotEmpty ? content : null,
           toolCallDeltas: tcDeltas,
           finishReason: finishReason,
+          usage: usage,
         );
       } catch (e) {
         LoggerService.instance.w(
@@ -376,7 +404,18 @@ class LlmProvider {
         return const LlmStreamChunk();
       }
     }).where((chunk) =>
-            chunk.isContent || chunk.isToolCallDelta || chunk.isFinished);
+            chunk.isContent || chunk.isToolCallDelta || chunk.isFinished || chunk.hasUsage);
+  }
+
+  /// 解析 OpenAI 兼容 SSE 帧的 usage 字段。字段缺失或类型不匹配返回 null。
+  static LlmUsage? _parseUsage(dynamic raw) {
+    if (raw is! Map) return null;
+    final pt = raw['prompt_tokens'];
+    final ct = raw['completion_tokens'];
+    final prompt = pt is int ? pt : null;
+    final completion = ct is int ? ct : null;
+    if (prompt == null && completion == null) return null;
+    return LlmUsage(promptTokens: prompt, completionTokens: completion);
   }
 }
 

@@ -143,6 +143,47 @@ class InjectedUserInputEvent extends AgentEvent {
   });
 }
 
+/// 回合级网络重试事件
+///
+/// 由 [AgentLoop] round-level catch 在重试退避前 emit（瞬态网络错误场景）。
+/// UI 横幅展示走 [RetrySignals]（模块级单例）；本事件走事件流，可按
+/// [runId] 区分主/子 Agent，并携带精确的 partial 处理信息。
+///
+/// 消费者职责：
+/// - ScenarioSession / SubagentStateProjector：按 [emittedChars] 从
+///   streamingSegments 末尾 TextSegment 砍掉本轮已流式输出的 partial 文本。
+///   不丢弃的话，重试后 LLM 重新输出的完整文本会与残缺前缀拼接落库。
+class RetryEvent extends AgentEvent {
+  /// 当前重试序号（1-based，即将执行第几次重试）
+  final int attempt;
+
+  /// 本轮最大重试次数（AgentLoopConfig.networkRetryPerRound）
+  final int maxAttempts;
+
+  /// 退避等待毫秒数
+  final int delayMs;
+
+  /// 错误摘要（e.toString()）
+  final String errorText;
+
+  /// 本轮流式已 emit 且即将作废的字符数
+  ///
+  /// = 本轮 StreamingResult.fullContent.length（错误发生前已到达的 content
+  /// chunk 总字符）。0 表示本轮尚无任何文本输出（如连接即失败）。
+  /// 消费者用它做"尾部截断"而非"整段删除"：末尾 TextSegment 可能还包含
+  /// 之前轮次的完整文本（场景注入钩子后的下一轮失败场景），只能砍本轮部分。
+  final int emittedChars;
+
+  const RetryEvent({
+    required this.attempt,
+    required this.maxAttempts,
+    required this.delayMs,
+    required this.errorText,
+    required this.emittedChars,
+    super.runId,
+  });
+}
+
 /// 上下文压缩事件
 ///
 /// 在 Agent 循环自动压缩消息列表时触发。ScenarioSession 据此同步裁剪内存 + 删 DB。

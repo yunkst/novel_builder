@@ -55,6 +55,33 @@ void main() {
       final messages = _buildLargeMessages(1500);
       expect(compactor.needsCompaction(messages), isTrue);
     });
+
+    test('双轨：realPromptTokens 超限 → true（即使字符数很小）', () {
+      final compactor = ContextCompactor(
+        config: const CompactorConfig(maxContextTokens: 1000),
+      );
+      const messages = [ChatMessage(role: 'user', content: 'hi')];
+      // 真实 usage 优先，直接对照 token 阈值，绕过字符启发式
+      expect(
+          compactor.needsCompaction(messages, realPromptTokens: 1000), isTrue);
+      expect(
+          compactor.needsCompaction(messages, realPromptTokens: 999), isFalse);
+    });
+
+    test('双轨：无 usage 时走 CJK×2 启发式 token 估算', () {
+      final compactor = ContextCompactor(
+        config: const CompactorConfig(
+          maxContextChars: 100000, // 字符阈值不触发
+          maxContextTokens: 10,
+        ),
+      );
+      // 5 个 CJK 字符 × 2 = 10 tokens ≥ 10 → 触发
+      const messages = [ChatMessage(role: 'user', content: '你好世界呀')];
+      expect(compactor.needsCompaction(messages), isTrue);
+      // 4 个 CJK 字符 × 2 = 8 tokens < 10 → 不触发
+      const small = [ChatMessage(role: 'user', content: '你好世界')];
+      expect(compactor.needsCompaction(small), isFalse);
+    });
   });
 
   group('ContextCompactor.compact', () {

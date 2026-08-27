@@ -72,6 +72,21 @@ class EventTagger {
           compactionNote: compactionNote,
           runId: runId,
         ),
+      RetryEvent(
+        attempt: final attempt,
+        maxAttempts: final maxAttempts,
+        delayMs: final delayMs,
+        errorText: final errorText,
+        emittedChars: final emittedChars,
+      ) =>
+        RetryEvent(
+          attempt: attempt,
+          maxAttempts: maxAttempts,
+          delayMs: delayMs,
+          errorText: errorText,
+          emittedChars: emittedChars,
+          runId: runId,
+        ),
     };
   }
 }
@@ -171,10 +186,40 @@ class SubagentStateProjector {
         // No-op: spec §8.2 由 ScenarioSession 处理 CompactionEvent
         return;
 
+      case RetryEvent(:final emittedChars):
+        // 回合重试：砍掉末尾 TextSegment 中本轮已作废的 partial 字符，
+        // 防止重试后的完整输出与残缺前缀拼接（与 ScenarioSession 对称）。
+        final segments =
+            _truncateTrailingText(state.streamingSegments, emittedChars);
+        run.chatState = state.copyWith(streamingSegments: segments);
+        run.lastThought = _currentStreamingText(segments);
+        return;
+
       case InjectedUserInputEvent():
         // No-op: 主 session 行为（运行中补充消息），子 Agent 不处理
         return;
     }
+  }
+
+  /// 从 streamingSegments 末尾 TextSegment 砍掉 [chars] 个字符。
+  ///
+  /// 与 [_appendText] 的追加规则对称：本轮 partial 一定累积在末尾
+  /// TextSegment（可能与之前轮次的完整文本同段）。截断后剩余为空则移除该段；
+  /// chars<=0 或末尾非 TextSegment 时原样返回（防御，正常不会发生）。
+  static List<AgentChatSegment> _truncateTrailingText(
+      List<AgentChatSegment> segs, int chars) {
+    if (chars <= 0 || segs.isEmpty || segs.last is! TextSegment) {
+      return segs;
+    }
+    final last = segs.last as TextSegment;
+    final remaining = last.content.length - chars;
+    if (remaining > 0) {
+      return [
+        ...segs.sublist(0, segs.length - 1),
+        TextSegment(last.content.substring(0, remaining))
+      ];
+    }
+    return segs.sublist(0, segs.length - 1);
   }
 
   /// 把 text 追加到 streamingSegments 末尾 TextSegment；末尾不是 TextSegment 则新建。
