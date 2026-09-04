@@ -74,6 +74,14 @@ class OcrPredictor {
     //   运行时探针：前者确认本机有哪些 EP，后者让包自报输入签名（与 Python
     //   onnx 包读到的 [DynamicDimension.0, 3, 48, DynamicDimension.1] 对比，
     //   验证 w=64 是否真是包支持的宽度）。
+    // 重复调用 load()（热重载）前先关闭旧 session：closeSession 是 native
+    // sessions 注册表的唯一清理入口，不关则旧 OrtSession + 模型 buffer 永久驻留。
+    final previousSession = _session;
+    _session = null;
+    if (previousSession != null) {
+      await previousSession.close();
+    }
+
     final ort = OnnxRuntime();
 
     // 诊断 1：本机可用 EP 清单
@@ -222,41 +230,51 @@ class OcrPredictor {
       final image = frame.image;
       try {
         final (tensor, w) = await _preprocess(image);
-      try {
-        LoggerService.instance.i(
-          'OCR ONNX 推理开始 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
-          category: LogCategory.ai,
-          tags: ['ocr', 'onnx', 'session-run-begin'],
-        );
-        final outputs = await _session!.run({
-          'x': await OrtValue.fromList(tensor, [1, 3, 48, w]),
-        });
-        LoggerService.instance.i(
-          'OCR ONNX 推理完成 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
-          category: LogCategory.ai,
-          tags: ['ocr', 'onnx', 'session-run-ok'],
-        );
-        final value = outputs.values.first;
-        final nested = await value.asList();
-        final logits = (nested[0] as List)
-            .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
-            .toList();
-        final (text, _) = _ctcDecode(logits);
-        LoggerService.instance.i(
-          'OCR CTC 解码完成 result="$text" 总耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
-          category: LogCategory.ai,
-          tags: ['ocr', 'onnx', 'recognize-done'],
-        );
-        return text;
-      } catch (e, st) {
-        LoggerService.instance.e(
-          'OCR ONNX 推理崩溃: $e',
-          stackTrace: st.toString(),
-          category: LogCategory.ai,
-          tags: ['ocr', 'onnx', 'session-run-crash'],
-        );
-        rethrow;
-      }
+        final inputValue = await OrtValue.fromList(tensor, [1, 3, 48, w]);
+        // 兜底初始化为空：run() 抛异常时 finally 只需释放 input。
+        Map<String, OrtValue> outputs = const {};
+        try {
+          LoggerService.instance.i(
+            'OCR ONNX 推理开始 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+            category: LogCategory.ai,
+            tags: ['ocr', 'onnx', 'session-run-begin'],
+          );
+          outputs = await _session!.run({'x': inputValue});
+          LoggerService.instance.i(
+            'OCR ONNX 推理完成 耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+            category: LogCategory.ai,
+            tags: ['ocr', 'onnx', 'session-run-ok'],
+          );
+          final value = outputs.values.first;
+          final nested = await value.asList();
+          final logits = (nested[0] as List)
+              .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
+              .toList();
+          final (text, _) = _ctcDecode(logits);
+          LoggerService.instance.i(
+            'OCR CTC 解码完成 result="$text" 总耗时=${DateTime.now().difference(t0).inMilliseconds}ms',
+            category: LogCategory.ai,
+            tags: ['ocr', 'onnx', 'recognize-done'],
+          );
+          return text;
+        } catch (e, st) {
+          LoggerService.instance.e(
+            'OCR ONNX 推理崩溃: $e',
+            stackTrace: st.toString(),
+            category: LogCategory.ai,
+            tags: ['ocr', 'onnx', 'session-run-crash'],
+          );
+          rethrow;
+        } finally {
+          // OrtValue 是 native tensor 的句柄（Dart 侧仅持 id 字符串），必须
+          // 显式 dispose：Android 插件维护 ortValues 注册表，只有
+          // releaseOrtValue 会移除条目，closeSession 也不清空。不释放则每次
+          // 推理驻留 ~634KB native 内存（output [1,T,18710] float32 占大头）。
+          await inputValue.dispose();
+          for (final v in outputs.values) {
+            await v.dispose();
+          }
+        }
       } finally {
         image.dispose();
       }
