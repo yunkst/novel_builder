@@ -11,6 +11,7 @@ import '../core/providers/database_providers.dart';
 import '../models/llm_config.dart' as app;
 import '../services/dsl_engine/llm_provider.dart' as llm;
 import '../services/logger_service.dart';
+import 'ai/ai_service_factory.dart';
 
 class LlmConfigService {
   final Ref _ref;
@@ -96,12 +97,30 @@ class LlmConfigService {
   // ── 构建 LlmProvider 配置 ──
 
   /// 将 LlmConfig 转换为 LlmProvider 的 LlmConfig
+  ///
+  /// 注意：这是 app 层 → DSL 层的字段映射，两边的字段清单必须人工同步；
+  /// app 层新增字段（如未来加 temperature）后要在这里显式转发，否则会被静默丢弃。
   llm.LlmConfig buildLlmProviderConfig(app.LlmConfig config) {
     return llm.LlmConfig(
       baseUrl: config.apiUrl,
       apiKey: config.apiKey,
       defaultModel: config.model,
     );
+  }
+
+  /// 解析场景激活配置并构建 [llm.LlmProvider]（内部先确保旧配置迁移）。
+  ///
+  /// 收口此前散落在 novel_agent_service / subagent_runner /
+  /// chapter_write_executor 三处的同构「迁移 → getActiveConfig →
+  /// buildLlmProviderConfig → AiServiceFactory」链（原 chapter_write_executor
+  /// 一支漏了迁移钩子）。返回 null 表示该场景没有激活配置，调用方各自决定报错形态。
+  Future<llm.LlmProvider?> buildActiveProvider(String scenarioId) async {
+    await ensureMigratedFromLegacy();
+    await ensureGlobalActiveMigrated();
+    final activeConfig = await getActiveConfig(scenarioId: scenarioId);
+    if (activeConfig == null) return null;
+    return AiServiceFactory.buildLlmProvider(
+        buildLlmProviderConfig(activeConfig));
   }
 
   // ── CRUD 委托 ──

@@ -15,7 +15,6 @@ import 'package:novel_app/services/logger_service.dart';
 import 'package:novel_app/core/providers/services/ai_service_providers.dart';
 import 'package:novel_app/services/llm_config_service.dart';
 
-import '../ai/ai_service_factory.dart';
 import '../../utils/cancellation_token.dart';
 import '../dsl_engine/llm_provider.dart' show LlmProvider;
 import 'agent_event.dart';
@@ -296,17 +295,12 @@ class NovelAgentService {
     AgentScenarioContext scenarioContext,
   ) async {
     final configService = ref.read(llmConfigServiceProvider);
-    await configService.ensureMigratedFromLegacy();
-    await configService.ensureGlobalActiveMigrated();
-    final activeConfig =
-        await configService.getActiveConfig(scenarioId: scenarioId);
-    if (activeConfig == null) {
+    final llm = await configService.buildActiveProvider(scenarioId);
+    if (llm == null) {
       _controller.add(const AgentErrorEvent(
           LlmConfigService.notConfiguredMessage));
       return null;
     }
-    final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
-    final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
     final scenario =
         await AgentScenarioFactory(ref).build(scenarioId, scenarioContext);
     return (llm: llm, scenario: scenario);

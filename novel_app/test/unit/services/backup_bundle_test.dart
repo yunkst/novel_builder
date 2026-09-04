@@ -153,7 +153,7 @@ void main() {
         'reader_font_size': 18.0,
         'theme_mode': 'ThemeMode.dark',
         'onboarding_completed': true,
-        'max_history_length': 3000,
+        'test_int_key': 3000,
         'bookmark_novel_x': ['ch1', 'ch2'],
         'last_backup_time': 123456789, // 应被排除
         'webview_ua': 'Mozilla', // 应被排除（前缀）
@@ -173,7 +173,7 @@ void main() {
         'reader_font_size',
         'theme_mode',
         'onboarding_completed',
-        'max_history_length',
+        'test_int_key',
         'bookmark_novel_x',
       ]));
       expect(keys, isNot(contains('last_backup_time')));
@@ -197,7 +197,7 @@ void main() {
       final byKey = {for (final e in list) e['k'] as String: e};
 
       expect(byKey['reader_font_size']?['t'], 'd');
-      expect(byKey['max_history_length']?['t'], 'i');
+      expect(byKey['test_int_key']?['t'], 'i');
       expect(byKey['onboarding_completed']?['t'], 'b');
       expect(byKey['theme_mode']?['t'], 's');
       expect(byKey['bookmark_novel_x']?['t'], 'sl');
@@ -212,7 +212,7 @@ void main() {
         'reader_font_size': 18.0,
         'theme_mode': 'ThemeMode.dark',
         'onboarding_completed': true,
-        'max_history_length': 3000,
+        'test_int_key': 3000,
         'bookmark_novel_x': ['ch1', 'ch2'],
       });
       await SharedPreferences.getInstance();
@@ -231,7 +231,7 @@ void main() {
       final prefs2 = await SharedPreferences.getInstance();
       // double 仍是 double
       expect(prefs2.getDouble('reader_font_size'), 18.0);
-      expect(prefs2.getInt('max_history_length'), 3000);
+      expect(prefs2.getInt('test_int_key'), 3000);
       expect(prefs2.getBool('onboarding_completed'), true);
       expect(prefs2.getString('theme_mode'), 'ThemeMode.dark');
       expect(prefs2.getStringList('bookmark_novel_x'), ['ch1', 'ch2']);
@@ -239,7 +239,7 @@ void main() {
 
     test('JSON 序列化往返后类型不丢（int 不会被解析为 double）', () async {
       SharedPreferences.setMockInitialValues({
-        'max_history_length': 3000,
+        'test_int_key': 3000,
         'reader_font_size': 18.0,
       });
       await SharedPreferences.getInstance();
@@ -259,7 +259,7 @@ void main() {
 
       final prefs2 = await SharedPreferences.getInstance();
       // 关键：int 字段读出来仍是 int，不会被 JSON 拆成 double
-      expect(prefs2.getInt('max_history_length'), 3000);
+      expect(prefs2.getInt('test_int_key'), 3000);
       // double 字段仍是 double
       expect(prefs2.getDouble('reader_font_size'), 18.0);
     });
@@ -328,7 +328,7 @@ void main() {
       final prefsList = [
         {'k': 'api_host', 't': 's', 'v': 'http://x:3800'},
         {'k': 'reader_font_size', 't': 'd', 'v': 18.0},
-        {'k': 'max_history_length', 't': 'i', 'v': 3000},
+        {'k': 'test_int_key', 't': 'i', 'v': 3000},
         {'k': 'onboarding_completed', 't': 'b', 'v': true},
         {'k': 'bookmark_x', 't': 'sl', 'v': ['a', 'b']},
       ];

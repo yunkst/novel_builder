@@ -19,7 +19,6 @@ import '../logger_service.dart';
 import '../dsl_engine/llm_provider.dart';
 import '../../utils/cancellation_token.dart';
 import '../../core/providers/services/ai_service_providers.dart';
-import '../ai/ai_service_factory.dart';
 import '../../core/providers/agent_chat_state.dart';
 import '../../models/agent_chat_message.dart';
 import 'agent_event.dart';
@@ -324,15 +323,11 @@ class SubagentRunner {
       return factoryOverride(scenarioId);
     }
     final configService = ref.read(llmConfigServiceProvider);
-    await configService.ensureMigratedFromLegacy();
-    await configService.ensureGlobalActiveMigrated();
-    final activeConfig =
-        await configService.getActiveConfig(scenarioId: scenarioId);
-    if (activeConfig == null) {
+    final llm = await configService.buildActiveProvider(scenarioId);
+    if (llm == null) {
       throw StateError('LLM 未配置（scenarioId=$scenarioId），子 Agent 无法启动');
     }
-    final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
-    return AiServiceFactory.buildLlmProvider(llmProviderConfig);
+    return llm;
   }
 
   Future<String> _executeToolForSubagent(

@@ -357,10 +357,12 @@ class ChapterRepository extends BaseRepository
       String novelUrl, List<Chapter> chapters) async {
     final db = await database;
 
+    // 批量 upsert：单 batch 一次 commit，避免逐章串行落盘
+    final batch = db.batch();
     for (var i = 0; i < chapters.length; i++) {
       // 优先使用章节自身的 chapterIndex，否则使用列表顺序
       final chapterIndex = chapters[i].chapterIndex ?? i;
-      await db.rawInsert('''
+      batch.rawInsert('''
         INSERT INTO novel_chapters (novelUrl, chapterUrl, title, chapterIndex, isUserInserted)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(novelUrl, chapterUrl) DO UPDATE SET
@@ -368,6 +370,7 @@ class ChapterRepository extends BaseRepository
           chapterIndex = excluded.chapterIndex
       ''', [novelUrl, chapters[i].url, chapters[i].title, chapterIndex, chapters[i].isUserInserted ? 1 : 0]);
     }
+    await batch.commit(noResult: true);
 
     await _reorderChapters(novelUrl);
     LoggerService.instance.i(

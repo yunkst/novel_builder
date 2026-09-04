@@ -63,9 +63,21 @@ class _ChapterListScreenRiverpodState
 
   @override
   void deactivate() {
-    // 离开页面时清除阅读上下文
-    // 使用 Future.microtask 延迟执行，避免在 widget 树构建期间修改 provider
+    // 离开页面时清除 Agent 阅读上下文。
+    //
+    // 两难:
+    // - 同步修改会触发 Riverpod "Tried to modify a provider while the
+    //   widget tree was building"(deactivate 在 _InactiveElements 重建链
+    //   中触发,属于 build 阶段);
+    // - 直接 Future.microtask 又可能跨过 dispose,触发 Riverpod
+    //   "_assertNotDisposed" 崩溃(Bad state: Cannot use "ref" after the
+    //   widget was disposed)。
+    //
+    // 解法:Future.microtask 把修改推到 build 阶段之后 + mounted 兜底,
+    // widget 已 dispose 时跳过(ref 已失效)。读取 mounted 不经过 ref,
+    // 不会触发 _assertNotDisposed。
     Future.microtask(() {
+      if (!mounted) return;
       ref.read(readingContextProvider.notifier).state = const ReadingContext();
     });
     super.deactivate();

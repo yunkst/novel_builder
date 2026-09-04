@@ -93,11 +93,12 @@ class LlmProvider {
   }
 
   /// 构建请求体（Phase 1: 增加 tools / toolChoice 参数）
+  ///
+  /// 不发送 max_tokens：输出长度交给模型 / provider 原生上限。
   Map<String, dynamic> buildRequestBody({
     required List<ChatMessage> messages,
     bool stream = false,
     String? model,
-    int? maxTokens,
     double? temperature,
     Map<String, dynamic>? responseFormat,
     List<Map<String, dynamic>>? tools,
@@ -108,7 +109,6 @@ class LlmProvider {
       'model': model ?? config.defaultModel,
       'stream': stream,
       'temperature': temperature ?? config.temperature,
-      'max_tokens': maxTokens ?? config.maxTokens,
       'messages': messages.map((m) => m.toJson()).toList(),
     };
     if (responseFormat != null) {
@@ -182,7 +182,6 @@ class LlmProvider {
   Future<LlmResponse> chat({
     required List<ChatMessage> messages,
     String? model,
-    int? maxTokens,
     double? temperature,
     Map<String, dynamic>? responseFormat,
     List<Map<String, dynamic>>? tools,
@@ -191,7 +190,6 @@ class LlmProvider {
     LoggerService.instance.d(
       'LLM chat 阻塞调用入口: model=${model ?? config.defaultModel}, '
       'messages=${messages.length}, baseUrl=${config.baseUrl}, '
-      'maxTokens=${maxTokens ?? config.maxTokens}, '
       'temperature=${temperature ?? config.temperature}',
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
@@ -200,7 +198,6 @@ class LlmProvider {
     final body = buildRequestBody(
       messages: messages,
       model: model,
-      maxTokens: maxTokens,
       temperature: temperature,
       responseFormat: responseFormat,
       tools: tools,
@@ -241,7 +238,6 @@ class LlmProvider {
     String schemaDescription = '',
     @Deprecated('应用层重试已委托传输层') int retryOnParseError = 0,
     String? model,
-    int? maxTokens,
     double? temperature,
   }) async {
     final systemIdx = messages.indexWhere((m) => m.role == 'system');
@@ -265,7 +261,6 @@ class LlmProvider {
     final response = await chat(
       messages: enrichedMessages,
       model: model,
-      maxTokens: maxTokens,
       temperature: temperature ?? 0.3,
       responseFormat: const {'type': 'json_object'},
     );
@@ -282,14 +277,12 @@ class LlmProvider {
   Stream<String> chatStream({
     required List<ChatMessage> messages,
     String? model,
-    int? maxTokens,
     double? temperature,
     Map<String, dynamic>? responseFormat,
   }) {
     LoggerService.instance.d(
       'LLM chatStream 流式调用入口: model=${model ?? config.defaultModel}, '
       'messages=${messages.length}, baseUrl=${config.baseUrl}, '
-      'maxTokens=${maxTokens ?? config.maxTokens}, '
       'temperature=${temperature ?? config.temperature}',
       category: LogCategory.ai,
       tags: ['dsl', 'llm'],
@@ -298,7 +291,6 @@ class LlmProvider {
     final body = buildRequestBody(
       messages: messages,
       model: model,
-      maxTokens: maxTokens,
       temperature: temperature,
       responseFormat: responseFormat,
       tools: null,
@@ -328,7 +320,6 @@ class LlmProvider {
   Stream<LlmStreamChunk> chatStreamWithTools({
     required List<ChatMessage> messages,
     String? model,
-    int? maxTokens,
     double? temperature,
     List<Map<String, dynamic>>? tools,
     String? toolChoice,
@@ -345,7 +336,6 @@ class LlmProvider {
     final body = buildRequestBody(
       messages: messages,
       model: model,
-      maxTokens: maxTokens,
       temperature: temperature,
       tools: tools,
       toolChoice: toolChoice,

@@ -12,10 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/chapter_mutation_provider.dart';
 import '../../../core/providers/database_providers.dart';
-import '../../../core/providers/services/ai_service_providers.dart';
 import '../../../models/character.dart';
+import '../../../models/prompt_tag.dart';
+import '../../../core/providers/services/ai_service_providers.dart';
 import '../../../utils/content_sanitizer.dart';
-import '../../ai/ai_service_factory.dart';
 import '../../dsl_engine/llm_provider.dart';
 import '../../logger_service.dart';
 import '../../llm_config_service.dart';
@@ -425,10 +425,17 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
   ) async {
     final parts = <String>[];
 
-    // 人物卡
+    // 人物卡与写作标签两路查询互不依赖：先并发启动，再各自 await 收集
+    final charactersFuture = characterNames.isEmpty
+        ? Future<List<Character>>.value(const [])
+        : ref.read(characterRepositoryProvider).getCharacters(novelUrl);
+    final tagsFuture = tagNames.isEmpty
+        ? Future<List<PromptTag>>.value(const [])
+        : ref.read(promptTagRepositoryProvider).getAll();
+
+    // 人物卡：按名字在当前小说里查找（避免暴露/误传真实 ID）
+    final allCharacters = await charactersFuture;
     if (characterNames.isNotEmpty) {
-      final charRepo = ref.read(characterRepositoryProvider);
-      final allCharacters = await charRepo.getCharacters(novelUrl);
       final wanted = allCharacters
           .where((c) => characterNames.contains(c.name))
           .toList();
@@ -438,9 +445,8 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
     }
 
     // 写作标签（每个标签随机抽一条 prompt）
+    final allTags = await tagsFuture;
     if (tagNames.isNotEmpty) {
-      final tagRepo = ref.read(promptTagRepositoryProvider);
-      final allTags = await tagRepo.getAll();
       final buffer = StringBuffer('【写作标签参考】\n');
       for (final name in tagNames) {
         final matched = allTags.where((t) => t.name == name).toList();
@@ -469,17 +475,14 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
     String scenarioId = ScenarioIds.writing,
     void Function(int generatedChars)? onProgress,
   }) async {
-    final configService = ref.read(llmConfigServiceProvider);
-    final activeConfig =
-        await configService.getActiveConfig(scenarioId: scenarioId);
-    if (activeConfig == null) {
+    final llm =
+        await ref.read(llmConfigServiceProvider).buildActiveProvider(scenarioId);
+    if (llm == null) {
       return _RewriteResult.failure({
         'error': 'llm_not_configured',
         'message': LlmConfigService.notConfiguredMessage,
       });
     }
-    final llmProviderConfig = configService.buildLlmProviderConfig(activeConfig);
-    final llm = AiServiceFactory.buildLlmProvider(llmProviderConfig);
 
     try {
       final buffer = StringBuffer();
@@ -488,7 +491,6 @@ class ChapterWriteExecutor with ToolExecutorHelpers {
           ChatMessage(role: 'system', content: systemPrompt),
           ChatMessage(role: 'user', content: userPrompt),
         ],
-        maxTokens: 8192,
         temperature: 0.8,
       )) {
         if (chunk.isNotEmpty) {

@@ -15,14 +15,15 @@ class LlmConfig {
   final String baseUrl; // 如 https://api.deepseek.com/v1
   final String apiKey;
   final String defaultModel;
-  final int maxTokens;
   final double temperature;
+
+  // max_tokens 已移除：输出长度交给模型/provider 原生上限
+  // （原默认 4096 会截断长章节生成，且无任何用户配置入口，2026-09-04）。
 
   const LlmConfig({
     this.baseUrl = '',
     this.apiKey = '',
     this.defaultModel = '',
-    this.maxTokens = 4096,
     this.temperature = 0.7,
   });
 
@@ -30,14 +31,12 @@ class LlmConfig {
     String? baseUrl,
     String? apiKey,
     String? defaultModel,
-    int? maxTokens,
     double? temperature,
   }) {
     return LlmConfig(
       baseUrl: baseUrl ?? this.baseUrl,
       apiKey: apiKey ?? this.apiKey,
       defaultModel: defaultModel ?? this.defaultModel,
-      maxTokens: maxTokens ?? this.maxTokens,
       temperature: temperature ?? this.temperature,
     );
   }

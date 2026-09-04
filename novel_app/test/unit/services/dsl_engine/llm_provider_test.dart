@@ -17,7 +17,6 @@ void main() {
       expect(config.baseUrl, '');
       expect(config.apiKey, '');
       expect(config.defaultModel, '');
-      expect(config.maxTokens, 4096);
       expect(config.temperature, 0.7);
     });
 
@@ -26,13 +25,11 @@ void main() {
         baseUrl: 'https://api.deepseek.com/v1',
         apiKey: 'sk-test',
         defaultModel: 'deepseek-chat',
-        maxTokens: 8192,
         temperature: 0.5,
       );
       expect(config.baseUrl, 'https://api.deepseek.com/v1');
       expect(config.apiKey, 'sk-test');
       expect(config.defaultModel, 'deepseek-chat');
-      expect(config.maxTokens, 8192);
       expect(config.temperature, 0.5);
     });
   });
@@ -136,7 +133,8 @@ void main() {
       expect(body['model'], 'deepseek-chat');
       expect(body['stream'], false);
       expect(body['temperature'], 0.7);
-      expect(body['max_tokens'], 4096);
+      // max_tokens 已移除：请求体不再携带输出长度约束
+      expect(body.containsKey('max_tokens'), isFalse);
       expect(body['messages'].length, 2);
     });
 
@@ -169,13 +167,11 @@ void main() {
       final body = provider.buildRequestBody(
         messages: [ChatMessage(role: 'user', content: 'Hello')],
         model: 'deepseek-reasoner',
-        maxTokens: 16384,
         temperature: 0.3,
         stream: false,
       );
 
       expect(body['model'], 'deepseek-reasoner');
-      expect(body['max_tokens'], 16384);
       expect(body['temperature'], 0.3);
     });
 

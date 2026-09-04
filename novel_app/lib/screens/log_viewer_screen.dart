@@ -10,6 +10,19 @@ import '../utils/toast_utils.dart';
 import '../widgets/common/common_widgets.dart';
 import '../widgets/common/library_app_bar.dart';
 
+/// "全部级别" / "全部分类" 菜单项的 sentinel。
+///
+/// 之所以需要它：Flutter 的 PopupMenuItem 对 value:null 故意跳过点击
+/// （"If itemBuilder returns an item with a null value, the item will not be
+/// selectable."），点 null 不会触发 onSelected。我们用 const Object() 作为
+/// 不可点击之外的另一个稳定值，绕过这条限制，onSelected 里再用 identical
+/// 判别还原成"不过滤"。
+const Object _kNoFilterSentinel = Object();
+
+/// 把菜单回调里的 sentinel 解码回 nullable 过滤值（sentinel → null）。
+T? _decodeNoFilter<T>(Object? value) =>
+    identical(value, _kNoFilterSentinel) ? null : value as T?;
+
 /// 日志查看页面
 ///
 /// 提供应用日志的查看、过滤、搜索、导出和清空功能。
@@ -204,23 +217,23 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
             tooltip: '搜索日志',
           ),
           // 分类过滤按钮
-          PopupMenuButton<LogCategory?>(
+          PopupMenuButton<Object?>(
             icon: const Icon(Icons.category_outlined),
             tooltip: '按分类过滤',
-            onSelected: (category) {
+            onSelected: (value) {
               setState(() {
-                _selectedCategory = category;
+                _selectedCategory = _decodeNoFilter<LogCategory>(value);
                 _loadLogs();
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: null,
+              const PopupMenuItem<Object?>(
+                value: _kNoFilterSentinel,
                 child: Text('全部分类'),
               ),
               const PopupMenuDivider(),
               ...LogCategory.values.map(
-                (category) => PopupMenuItem(
+                (category) => PopupMenuItem<Object?>(
                   value: category,
                   child: Row(
                     children: [
@@ -241,23 +254,23 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
             ],
           ),
           // 级别过滤按钮
-          PopupMenuButton<LogLevel?>(
+          PopupMenuButton<Object?>(
             icon: const Icon(Icons.filter_list),
             tooltip: '按级别过滤',
-            onSelected: (level) {
+            onSelected: (value) {
               setState(() {
-                _selectedLevel = level;
+                _selectedLevel = _decodeNoFilter<LogLevel>(value);
                 _loadLogs();
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: null,
+              const PopupMenuItem<Object?>(
+                value: _kNoFilterSentinel,
                 child: Text('全部级别'),
               ),
               const PopupMenuDivider(),
               ...LogLevel.values.map(
-                (level) => PopupMenuItem(
+                (level) => PopupMenuItem<Object?>(
                   value: level,
                   child: Row(
                     children: [

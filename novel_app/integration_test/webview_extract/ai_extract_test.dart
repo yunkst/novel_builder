@@ -264,7 +264,6 @@ LlmProvider _createLlmProvider() {
     baseUrl: _apiBaseUrl,
     apiKey: _apiKey,
     defaultModel: _defaultModel,
-    maxTokens: 4096,
     temperature: 0.7,
   );
   return LlmProvider(config, httpClient: _RealHttpClient());
