@@ -31,6 +31,45 @@ bool isCjk(String ch) {
   return cp >= 0x4E00 && cp <= 0x9FFF; // 基本 CJK 区（与 Python "一" <= ch <= "鿿" 等价）
 }
 
+/// 本地 TextPainter 渲染 PUA 码点 → base64 PNG（白底黑字，居中）。
+/// 与产品路径的区别仅在于渲染位置：产品走 WebView canvas，demo 走 TextPainter。
+Future<String> renderPuaToBase64Png(
+  int codepoint, {
+  required String family,
+  required double fontSize,
+  required double canvasSize,
+}) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawColor(Colors.white, BlendMode.src);
+
+  final tp = TextPainter(
+    text: TextSpan(
+      text: String.fromCharCode(codepoint),
+      style: TextStyle(
+        fontFamily: family,
+        fontSize: fontSize,
+        color: Colors.black,
+        decoration: TextDecoration.none,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  );
+  tp.layout();
+  tp.paint(
+    canvas,
+    Offset((canvasSize - tp.width) / 2, (canvasSize - tp.height) / 2),
+  );
+
+  final picture = recorder.endRecording();
+  final rendered =
+      await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+  final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
+  rendered.dispose();
+  picture.dispose();
+  return base64Encode(byteData!.buffer.asUint8List());
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print('[PPOCR] start');
@@ -54,8 +93,8 @@ Future<void> main() async {
       await rootBundle.loadString('tool/ocr_test_assets/chapter_raw_text.txt');
   print('[PPOCR] raw text length: ${rawText.length}');
 
-  // 4. 实例化 + 加载 OcrPredictor（显式传参，与 Python 一致）
-  final ocr = OcrPredictor(family: family, fontSize: 80, canvasSize: 120);
+  // 4. 实例化 + 加载 OcrPredictor
+  final ocr = OcrPredictor();
   await ocr.load();
   print('[PPOCR] ocr loaded: isLoaded=${ocr.isLoaded}');
 
@@ -68,7 +107,15 @@ Future<void> main() async {
 
   for (var i = 0; i < puaList.length; i++) {
     final cp = puaList[i];
-    final (text, _) = await ocr.recognizeGlyph(cp);
+    // demo 本地渲染（canvasSize=120 / fontSize=80，与 Python 一致）后走产品
+    // 推理入口 recognizeImage；OcrPredictor 自身不再承担渲染职责。
+    final png = await renderPuaToBase64Png(
+      cp,
+      family: family,
+      fontSize: 80,
+      canvasSize: 120,
+    );
+    final text = await ocr.recognizeImage(png);
 
     if (text.isEmpty) {
       emptyCount++;

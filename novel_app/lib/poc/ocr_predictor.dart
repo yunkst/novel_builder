@@ -3,41 +3,27 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:image/image.dart' as img;
 
 import '../services/logger_service.dart';
 
-/// PP-OCRv6 rec 离线识别器（仅用于番茄字体反爬 PoC）。
+/// PP-OCRv6 rec 离线识别器。
 ///
 /// 模型：assets/models/inference.onnx — 番茄字体反爬 PUA 单字识别
 /// 字典：assets/models/ppocrv6_dict.txt — 18708 行 CTC 字符表
 ///
-/// 用法：
-///   final ocr = OcrPredictor(family: 'FanqieAntiCrawl');
-///   await ocr.load();
-///   final decoded = await ocr.recognizeGlyph(0xE3E8);
-///
-/// 流水线（与 fanqie-evidence/ppocr_full_decode.py 1:1）：
-///   1. TextPainter 渲染 PUA 到 ui.Image（白底黑字 + 大字号）
-///   2. ui.Image → rawRgba bytes → image.Image → copyResize 到 (W, 48)
+/// 产品用法（编排见 OcrRestoreService）：
+///   1. WebView canvas 用反爬字体把单个 PUA 渲染为 base64 PNG
+///   2. recognizeImage(base64Png) → base64 → ui.Image
 ///   3. NCHW float32 tensor，2x-1 归一化（PP-OCR 标准 mean=0.5/std=0.5）
 ///   4. onnxruntime 推理 → [1, T, 18710] logits
 ///   5. CTC greedy decode，blank=index 0，dict idx = ctc_idx - 1
+///
+/// 模型不渲染字体；WebView 渲染是为了保留 @font-face 上下文。
 class OcrPredictor {
-  OcrPredictor({this.family = '', this.fontSize = 80, this.canvasSize = 120});
-
-  /// 番茄反爬字体 family（已通过 ui.loadFontFromList 注册）。
-  final String family;
-
-  /// TextPainter 渲染时的字号。与 fanqie-evidence/ppocr_full_decode.py
-  /// 的 `ImageFont.truetype(font, 80)` 1:1 对齐，保证 PoC 能复现 PC 82.9%。
-  final double fontSize;
-
-  /// TextPainter 渲染时的画布尺寸。与 Python 脚本的 `canvas=120` 1:1 对齐。
-  final double canvasSize;
+  OcrPredictor();
 
   OrtSession? _session;
   List<String> _vocab = const [];
@@ -145,33 +131,10 @@ class OcrPredictor {
     }
   }
 
-  /// 识别单个字符（PUA 码点或真字都可用）。
-  /// 返回 (decodedText, rawIndexSequence)。
-  @Deprecated('PoC 用，产品路径用 recognizeImage(base64Png)。Task 15 清理时移除。')
-  Future<(String, List<int>)> recognizeGlyph(int codepoint) async {
-    _ensureLoaded();
-    final img = await _render(codepoint);
-    if (img == null) return ('', <int>[]);
-
-    final (tensor, w) = await _preprocess(img);
-    final outputs = await _session!.run({
-      'x': await OrtValue.fromList(tensor, [1, 3, 48, w]),
-    });
-    final value = outputs.values.first;
-    final nested = await value.asList();
-    // nested 形状：[1, T, C]；逐层 cast 成 List<List<double>>
-    final logits = (nested[0] as List)
-        .map((e) => (e as List).map((x) => (x as num).toDouble()).toList())
-        .toList();
-    final (text, raw) = _ctcDecode(logits);
-    return (text, raw);
-  }
-
   /// 识别 WebView canvas 渲染好的单字图（base64 PNG，不带 data:image/png;base64, 前缀）。
   ///
-  /// 与 recognizeGlyph 的区别：本方法不自己渲染（渲染在 WebView canvas），
-  /// 只做 base64 → ui.Image → 预处理 → onnx 推理 → CTC 解码。
-  /// 预处理 / CTC 解码完全复用 PoC 已验证的 [_preprocess] / [_ctcDecode]。
+  /// 渲染由调用方在 WebView canvas 完成（保留 @font-face 上下文），本方法只做
+  /// base64 → ui.Image → 预处理 → onnx 推理 → CTC 解码。
   ///
   /// 抛出 [StateError] 如果模型尚未加载（防御 _session 空指针崩溃）。
   Future<String> recognizeImage(String base64Png) async {
@@ -292,55 +255,10 @@ class OcrPredictor {
     }
   }
 
-  // --- 渲染 ---
-
-  Future<ui.Image?> _render(int codepoint) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final fillColor = Colors.black;
-    canvas.drawColor(Colors.white, BlendMode.src);
-
-    final char = String.fromCharCode(codepoint);
-    final tp = TextPainter(
-      text: TextSpan(
-        text: char,
-        style: TextStyle(
-          fontFamily: family,
-          fontSize: fontSize,
-          color: fillColor,
-          decoration: TextDecoration.none,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout();
-    if (tp.width == 0 || tp.height == 0) return null;
-
-    // 将字形画到画布中心
-    final dx = (canvasSize - tp.width) / 2;
-    final dy = (canvasSize - tp.height) / 2;
-    tp.paint(canvas, Offset(dx, dy));
-
-    final picture = recorder.endRecording();
-    final rendered = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
-
-    // 检查是否真的渲染出字形（非白像素比例太低视为空白）
-    final rgba = await rendered.toByteData(format: ui.ImageByteFormat.rawRgba);
-    final bytes = rgba!.buffer.asUint8List();
-    int dark = 0;
-    for (int i = 0; i < bytes.length; i += 4) {
-      final r = bytes[i], g = bytes[i + 1], b = bytes[i + 2];
-      if ((r + g + b) / 3 < 128) dark++;
-    }
-    final total = rendered.width * rendered.height;
-    if (dark / total < 0.005) return null;
-    return rendered;
-  }
-
   // --- 预处理：rawRgba → Float32List NCHW，2x-1 归一化 ---
 
   Future<(Float32List, int)> _preprocess(ui.Image rendered) async {
-    // ui.Image (canvasSize x canvasSize, RGBA) → image.Image
+    // ui.Image (rendered.width x rendered.height, RGBA) → image.Image
     final rgba = await rendered.toByteData(format: ui.ImageByteFormat.rawRgba);
     final src = rgba!.buffer.asUint8List();
     final srcImg = img.Image.fromBytes(
@@ -351,7 +269,7 @@ class OcrPredictor {
       order: img.ChannelOrder.rgba,
     );
 
-    // resize 到 (W, 48)，W = ceil(canvasSize * 48 / canvasSize / 32) * 32
+    // resize 到 (W, 48)，W = ceil(rendered.width * 48 / rendered.height / 32) * 32
     final scale = 48.0 / rendered.height;
     final w = (max(1, rendered.width * scale) / 32).ceil() * 32;
     final resized = img.copyResize(

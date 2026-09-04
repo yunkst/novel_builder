@@ -2,8 +2,8 @@
 //
 // 测试分两组：
 //   1. 结构测试（不依赖 onnxruntime 原生库，必过）：验证无参构造、
-//      recognizeImage 方法存在、recognizeGlyph 标 @Deprecated、
-//      源文件 import 了 dart:convert。
+//      recognizeImage 方法存在、deprecated PoC 路径（recognizeGlyph）
+//      已从源文件移除、源文件 import 了 dart:convert。
 //   2. 真实推理测试（需 onnxruntime 原生库）：桌面 flutter test 大概率
 //      无 onnxruntime-android 原生库，load() 抛异常时整组不 FAIL
 //      （body 内 if-return + print skip 原因）。
@@ -20,10 +20,9 @@ void main() {
 
   // ── 结构测试（不依赖 onnx，必过）──
   group('OcrPredictor 结构', () {
-    test('无参构造存在，family 默认空', () {
+    test('无参构造存在', () {
       final ocr = OcrPredictor();
       expect(ocr, isA<OcrPredictor>());
-      expect(ocr.family, isEmpty);
     });
 
     test('recognizeImage 方法存在', () {
@@ -31,11 +30,10 @@ void main() {
       expect(ocr.recognizeImage, isA<Function>());
     });
 
-    test('recognizeGlyph 仍保留（标 @Deprecated）', () {
-      // ignore: deprecated_member_use_from_same_package
-      final ocr = OcrPredictor();
-      // ignore: deprecated_member_use_from_same_package
-      expect(ocr.recognizeGlyph, isA<Function>());
+    test('recognizeGlyph 已从源文件移除（P2 清理生效）', () async {
+      final src = await File('lib/poc/ocr_predictor.dart').readAsString();
+      expect(src, isNot(contains('recognizeGlyph')),
+          reason: 'PoC 入口已被产品 recognizeImage 取代，应已删除');
     });
 
     test('源文件 import 了 dart:convert', () async {
@@ -43,9 +41,10 @@ void main() {
       expect(src, contains("import 'dart:convert'"));
     });
 
-    test('源文件 recognizeGlyph 上方有 @Deprecated 注解', () async {
+    test('源文件已无 @Deprecated 注解（P2 清理生效）', () async {
       final src = await File('lib/poc/ocr_predictor.dart').readAsString();
-      expect(src, contains('@Deprecated'));
+      expect(src, isNot(contains('@Deprecated')),
+          reason: 'deprecated PoC 路径已删除，源文件不应再含 @Deprecated');
     });
 
     test('recognizeImage _session=null 时抛 StateError 而非 NPE', () async {
@@ -117,8 +116,7 @@ Future<String> _encodeBlankPng() async {
   return base64.encode(bd!.buffer.asUint8List());
 }
 
-/// 用系统字体渲染单个汉字到 120x120 PNG -> base64。
-/// 复用 PoC _render 的 PictureRecorder + TextPainter 思路（仅测试用，
+/// 用系统字体渲染单个汉字到 120x120 PNG -> base64（仅测试用，
 /// 产品路径在 WebView canvas 渲染）。
 Future<String> _renderCharToBase64(String ch) async {
   final recorder = ui.PictureRecorder();
